@@ -34,7 +34,51 @@ components: transforms: pipelines: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.pipelines.configuration
+	configuration: {
+		_pipeline_group: {
+			description: "A list of pipeline's configurations."
+			required:    true
+			warnings: []
+			type: array: items: type: object: options: {
+				name: {
+					description: "Name of the pipeline"
+					required:    false
+					common:      true
+					type: string: default: null
+				}
+
+				filter: {
+					description: """
+						A condition to filter the events that will be processed by the pipeline. If the condition is not satisfied,
+						the event will be forwarded to the next pipeline.
+
+						The filter uses the same format that conditions use for [unit testing](\(urls.vector_unit_tests)).
+						"""
+					required:    false
+					common:      true
+					type: string: {
+						default: "vrl"
+
+						enum: {
+							vrl: "[Vector Remap Language](\(urls.vrl_reference))."
+						}
+					}
+				}
+
+				transforms: {
+					description: """
+						Any list of valid transform configurations. See [transforms documentation](\(urls.vector_transforms))
+						for the list of available transforms and their configuration.
+						"""
+					required:    true
+					type: array: items: type: object: options: {}
+				}
+			}
+		}
+
+		logs:    _pipeline_group
+		metrics: _pipeline_group
+	}
 
 	input: {
 		logs: true

@@ -93,7 +93,17 @@ base: components: sources: prometheus_scrape: configuration: {
 			 scraping the `/federate` endpoint.
 			"""
 		required: false
-		type: object: options: "*": type: array: items: type: string: syntax: "literal"
+		type: object: options: "*": {
+			description: """
+				Custom parameters for the scrape request query string.
+
+				One or more values for the same parameter key can be provided. The parameters provided in this option are
+				 appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
+				 scraping the `/federate` endpoint.
+				"""
+			required: true
+			type: array: items: type: string: syntax: "literal"
+		}
 	}
 	scrape_interval_secs: {
 		description: "The interval between scrapes, in seconds."

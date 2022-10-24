@@ -116,7 +116,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
+					required: false
 					type: string: {
 						const:   "zlib"
 						default: "none"
@@ -299,7 +299,17 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			[custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
 			"""
 		required: false
-		type: object: options: "*": type: string: syntax: "literal"
+		type: object: options: "*": {
+			description: """
+				The set of metadata `key:value` pairs for the created objects.
+
+				For more information, see [Custom metadata][custom_metadata].
+
+				[custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
+				"""
+			required: true
+			type: string: syntax: "literal"
+		}
 	}
 	request: {
 		description: """

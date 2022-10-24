@@ -237,7 +237,11 @@ base: components: sinks: influxdb_metrics: configuration: {
 	tags: {
 		description: "A map of additional tags, in the form of key/value pairs, to add to each measurement."
 		required:    false
-		type: object: options: "*": type: string: syntax: "literal"
+		type: object: options: "*": {
+			description: "A map of additional tags, in the form of key/value pairs, to add to each measurement."
+			required:    true
+			type: string: syntax: "literal"
+		}
 	}
 	tls: {
 		description: "Standard TLS options."

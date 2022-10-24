@@ -90,7 +90,7 @@ base: components: sinks: azure_blob: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
+					required: false
 					type: string: {
 						const:   "zlib"
 						default: "gzip"

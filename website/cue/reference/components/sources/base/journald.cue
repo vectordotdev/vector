@@ -41,7 +41,15 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: object: {
 			default: {}
-			options: "*": type: array: items: type: string: syntax: "literal"
+			options: "*": {
+				description: """
+					A list of sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source.
+
+					If `exclude_units` is specified, it will be merged into this list.
+					"""
+				required: true
+				type: array: items: type: string: syntax: "literal"
+			}
 		}
 	}
 	exclude_units: {
@@ -65,7 +73,15 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: object: {
 			default: {}
-			options: "*": type: array: items: type: string: syntax: "literal"
+			options: "*": {
+				description: """
+					A list of sets of field/value pairs to monitor.
+
+					If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
+					"""
+				required: true
+				type: array: items: type: string: syntax: "literal"
+			}
 		}
 	}
 	include_units: {

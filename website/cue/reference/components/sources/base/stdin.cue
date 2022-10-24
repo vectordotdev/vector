@@ -7,7 +7,7 @@ base: components: sources: stdin: configuration: {
 		type: object: {
 			default: codec: "bytes"
 			options: codec: {
-				required: true
+				required: false
 				type: string: {
 					default: "bytes"
 					enum: {

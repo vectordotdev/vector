@@ -146,7 +146,7 @@ base: components: sinks: elasticsearch: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
+					required: false
 					type: string: {
 						const:   "zlib"
 						default: "none"
@@ -360,7 +360,11 @@ base: components: sinks: elasticsearch: configuration: {
 	query: {
 		description: "Custom parameters to add to the query string of each request sent to Elasticsearch."
 		required:    false
-		type: object: options: "*": type: string: syntax: "literal"
+		type: object: options: "*": {
+			description: "Custom parameters to add to the query string of each request sent to Elasticsearch."
+			required:    true
+			type: string: syntax: "literal"
+		}
 	}
 	request: {
 		description: "Outbound HTTP request settings."
@@ -439,7 +443,11 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: object: {
 					default: {}
-					options: "*": type: string: syntax: "literal"
+					options: "*": {
+						description: "Additional HTTP headers to add to every HTTP request."
+						required:    true
+						type: string: syntax: "literal"
+					}
 				}
 			}
 			rate_limit_duration_secs: {

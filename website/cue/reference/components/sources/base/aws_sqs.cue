@@ -74,7 +74,7 @@ base: components: sources: aws_sqs: configuration: {
 		description: "Configuration for building a `Deserializer`."
 		required:    false
 		type: object: options: codec: {
-			required: true
+			required: false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -128,7 +128,7 @@ base: components: sources: aws_sqs: configuration: {
 				}
 			}
 			method: {
-				required: true
+				required: false
 				type: string: {
 					default: "bytes"
 					enum: {

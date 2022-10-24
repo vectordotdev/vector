@@ -213,7 +213,11 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 		description: "The monitored resource to associate the metrics with."
 		required:    true
 		type: object: options: {
-			"*": type: string: syntax: "literal"
+			"*": {
+				description: "Type-specific labels."
+				required:    true
+				type: string: syntax: "literal"
+			}
 			type: {
 				description: """
 					The monitored resource type.

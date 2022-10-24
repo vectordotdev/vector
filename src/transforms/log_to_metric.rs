@@ -139,11 +139,6 @@ pub struct SummaryConfig {
 // or more of the subschemas) takes the details of the last subschema to be iterated over that
 // contains that field, such that, for example, the `Summary` variant below is overriding the
 // description for almost all of the fields because they're shared across all of the variants.
-//
-// This should look better with upcoming changes (#), I think, but we may need to rethink the output
-// we generate for overlapping schemas, or at least include more datapoints in our logic that
-// detects if identically-named fields in adjacent subschemas safely overlap/represent the same
-// thing.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]

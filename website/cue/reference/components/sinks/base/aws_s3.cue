@@ -168,7 +168,7 @@ base: components: sinks: aws_s3: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
+					required: false
 					type: string: {
 						const:   "zlib"
 						default: "gzip"
@@ -582,7 +582,11 @@ base: components: sinks: aws_s3: configuration: {
 	tags: {
 		description: "The tag-set for the object."
 		required:    false
-		type: object: options: "*": type: string: syntax: "literal"
+		type: object: options: "*": {
+			description: "Tags for a metric series."
+			required:    true
+			type: string: syntax: "literal"
+		}
 	}
 	tls: {
 		description: "Standard TLS options."

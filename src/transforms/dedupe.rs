@@ -33,18 +33,25 @@ use crate::{
 pub enum FieldMatchConfig {
     /// Matches events using only the specified fields.
     #[serde(rename = "match")]
-    #[configurable(metadata(docs::examples = "field1", docs::examples = "parent.child_field"))]
-    MatchFields(#[configurable(transparent)] Vec<String>),
+    
+    MatchFields(
+        #[configurable(metadata(docs::examples = "field1", docs::examples = "parent.child_field"))]
+        #[configurable(transparent)]
+        Vec<String>
+    ),
 
     /// Matches events using all fields except for the ignored ones.
     #[serde(rename = "ignore")]
-    #[configurable(metadata(
-        docs::examples = "field1",
-        docs::examples = "parent.child_field",
-        docs::examples = "host",
-        docs::examples = "hostname"
-    ))]
-    IgnoreFields(#[configurable(transparent)] Vec<String>),
+    IgnoreFields(
+        #[configurable(metadata(
+            docs::examples = "field1",
+            docs::examples = "parent.child_field",
+            docs::examples = "host",
+            docs::examples = "hostname"
+        ))]
+        #[configurable(transparent)]
+        Vec<String>
+    ),
 }
 
 /// Caching configuration for deduplication.

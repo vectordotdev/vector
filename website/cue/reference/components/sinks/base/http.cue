@@ -86,7 +86,7 @@ base: components: sinks: http: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
+					required: false
 					type: string: {
 						const:   "zlib"
 						default: "none"
@@ -197,7 +197,11 @@ base: components: sinks: http: configuration: {
 	headers: {
 		description: "A list of custom headers to add to each request."
 		required:    false
-		type: object: options: "*": type: string: syntax: "literal"
+		type: object: options: "*": {
+			description: "A list of custom headers to add to each request."
+			required:    true
+			type: string: syntax: "literal"
+		}
 	}
 	method: {
 		description: "The HTTP method to use when making the request."
@@ -294,7 +298,11 @@ base: components: sinks: http: configuration: {
 				required:    false
 				type: object: {
 					default: {}
-					options: "*": type: string: syntax: "literal"
+					options: "*": {
+						description: "Additional HTTP headers to add to every HTTP request."
+						required:    true
+						type: string: syntax: "literal"
+					}
 				}
 			}
 			rate_limit_duration_secs: {

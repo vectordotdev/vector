@@ -72,7 +72,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
+					required: false
 					type: string: {
 						const:   "zlib"
 						default: "none"

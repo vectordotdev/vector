@@ -44,7 +44,7 @@ base: components: sources: http_client: configuration: {
 		description: "Decoder to use on the HTTP responses."
 		required:    false
 		type: object: options: codec: {
-			required: true
+			required: false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -92,7 +92,7 @@ base: components: sources: http_client: configuration: {
 				}
 			}
 			method: {
-				required: true
+				required: false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -136,7 +136,14 @@ base: components: sources: http_client: configuration: {
 			 One or more values for the same header can be provided.
 			"""
 		required: false
-		type: object: options: "*": type: array: items: type: string: syntax: "literal"
+		type: object: options: "*": {
+			description: """
+				Headers to apply to the HTTP requests.
+				 One or more values for the same header can be provided.
+				"""
+			required: true
+			type: array: items: type: string: syntax: "literal"
+		}
 	}
 	log_namespace: {
 		description: "The namespace to use for logs. This overrides the global setting"
@@ -166,7 +173,16 @@ base: components: sources: http_client: configuration: {
 			 appended to any parameters manually provided in the `endpoint` option.
 			"""
 		required: false
-		type: object: options: "*": type: array: items: type: string: syntax: "literal"
+		type: object: options: "*": {
+			description: """
+				Custom parameters for the HTTP request query string.
+
+				One or more values for the same parameter key can be provided. The parameters provided in this option are
+				 appended to any parameters manually provided in the `endpoint` option.
+				"""
+			required: true
+			type: array: items: type: string: syntax: "literal"
+		}
 	}
 	scrape_interval_secs: {
 		description: "The interval between calls, in seconds."

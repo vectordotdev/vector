@@ -35,7 +35,7 @@ base: components: sources: heroku_logs: configuration: {
 		description: "Configuration for building a `Deserializer`."
 		required:    false
 		type: object: options: codec: {
-			required: true
+			required: false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -75,7 +75,7 @@ base: components: sources: heroku_logs: configuration: {
 				}
 			}
 			method: {
-				required: true
+				required: false
 				type: string: {
 					default: "bytes"
 					enum: {

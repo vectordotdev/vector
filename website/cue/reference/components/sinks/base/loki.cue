@@ -194,18 +194,18 @@ base: components: sinks: loki: configuration: {
 		required: false
 		type: object: options: "*": {
 			description: """
-				A templated field.
+				A set of labels that are attached to each batch of events.
 
-				In many cases, components can be configured in such a way where some portion of the component's functionality can be
-				 customized on a per-event basis. An example of this might be a sink that writes events to a file, where we want to
-				 provide the flexibility to specify which file an event should go to by using an event field itself as part of the
-				 input to the filename we use.
+				Both keys and values are templateable, which enables you to attach dynamic labels to events.
 
-				By using `Template`, users can specify either fixed strings or "templated" strings, which use a common syntax to
-				 refer to fields in an event that will serve as the input data when rendering the template.  While a fixed string may
-				 look something like `my-file.log`, a template string could look something like `my-file-{{key}}.log`, and the `key`
-				 field of the event being processed would serve as the value when rendering the template into a string.
+				Labels can be suffixed with a “*” to allow the expansion of objects into multiple labels,
+				 see “How it works” for more information.
+
+				Note: If the set of labels has high cardinality, this can cause drastic performance issues
+				 with Loki. To prevent this from happening, reduce the number of unique label keys and
+				 values.
 				"""
+			required: true
 			type: string: syntax: "template"
 		}
 	}

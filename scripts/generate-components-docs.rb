@@ -234,36 +234,25 @@ def apply_object_property_fields!(parent_schema, property_schema, property_name,
   @logger.debug "Applying object property fields for '#{property_name}'..."
 
   required_properties = parent_schema['required'] || []
-  has_default_value = !property_schema['default'].nil? || !parent_schema.dig('default', property_name).nil?
+  has_self_default_value = !property_schema['default'].nil?
+  has_parent_default_value = !parent_schema.dig('default', property_name).nil?
+  has_default_value = has_self_default_value || has_parent_default_value 
   is_required = required_properties.include?(property_name)
+
+  if has_self_default_value
+    @logger.debug "Property has self-defined default value: #{property_schema['default']}"
+  end
+
+  if has_parent_default_value
+    @logger.debug "Property has parent-defined default value: #{parent_schema.dig('default', property_name)}"
+  end
+
+  if is_required
+    @logger.debug "Property is marked as required."
+  end
 
   # Set whether or not this property is required.
   property['required'] = required_properties.include?(property_name) && !has_default_value
-
-  # Provide a type-specific default value if this property is not required and it has no default
-  # value of its own.
-  #
-  # We handle this here, instead of in `apply_schema_default_value!`, because we need access to
-  # the object schema that owns the property to know if it's required or not.
-  #
-  # TODO: Maybe we can actually ditch this just from tweaking the Cue stuff to use a default value
-  # for the various scalar types when the field isn't present.
-  if !has_default_value && !is_required && false
-    schema_type = resolved_schema_type?(property)
-    if !schema_type.nil?
-      case schema_type
-      when "object"
-        # Object properties have no requirement for a `default` field to be present if they're not required.
-      else
-        # For everything besides objects, we provide a type-relevant default value.
-        #
-        # Only arrays, strings, unsigned intergers, floating-point numbers, and booleans have a
-        # type-specific default value defined currently.
-        default_value = @default_schema_type_values[schema_type]
-        property['type'][schema_type]['default'] = default_value if !default_value.nil?
-      end
-    end
-  end
 end
 
 # Resolves a schema reference, if present.
@@ -433,6 +422,7 @@ def resolve_schema(root_schema, schema)
   # Otherwise, we simply resolve the schema as it exists.
   referenced_schema_name = get_schema_ref(schema)
   resolved = if !referenced_schema_name.nil?
+    @logger.debug "Resolving referenced schema '#{referenced_schema_name}..."
     resolve_schema_by_name(root_schema, referenced_schema_name)
   else
     resolve_bare_schema(root_schema, schema)
@@ -518,7 +508,15 @@ def resolve_bare_schema(root_schema, schema)
       # (`*`) which uses the specified schema for that field.
       additional_properties = schema['additionalProperties']
       if !additional_properties.nil?
+        # If the schema has no other properties -- i.e. it's always just a free-form "whatever
+        # properties you want" objectg schema -- then copy the title/description of the schema to
+        # this free-form schema we're generating. Since it's still a property on an object schema at
+        # the end of the day, we need follow the rules of providing a description, and so on.
+        additional_properties['title'] = schema['title'] unless schema['title'].nil?
+        additional_properties['description'] = schema['description'] unless schema['description'].nil?
+
         resolved_additional_properties = resolve_schema(root_schema, additional_properties)
+        resolved_additional_properties['required'] = true
         options.push(['*', resolved_additional_properties])
       end
 
@@ -581,7 +579,7 @@ def resolve_enum_schema(root_schema, schema)
   enum_tagging = get_schema_metadata(schema, 'docs::enum_tagging')
   if enum_tagging.nil?
     @logger.error 'Enum schemas should never be missing the metadata for the enum tagging mode.'
-    @logger.error "Schema: #{JSON.pretty_generate(schema)}"
+    @logger.error "Schema: #{schema}"
     exit
   end
 
@@ -692,7 +690,7 @@ def resolve_enum_schema(root_schema, schema)
 
         if tag_value.nil?
           @logger.error 'All enum subschemas representing an internally-tagged enum must have the tag field use a const value.'
-          @logger.error "Tag subschema: #{JSON.pretty_generate(tag_subschema)}"
+          @logger.error "Tag subschema: #{tag_subschema}"
           exit
         end
 
@@ -715,8 +713,8 @@ def resolve_enum_schema(root_schema, schema)
 
             if reduced_existing_property != reduced_new_property
               @logger.error "Had overlapping property '#{property_name}' from resolved enum subschema, but schemas differed:"
-              @logger.error "Existing property schema (reduced): #{JSON.pretty_generate(reduced_existing_property)}"
-              @logger.error "New property schema (reduced): #{JSON.pretty_generate(reduced_new_property)}"
+              @logger.error "Existing property schema (reduced): #{reduced_existing_property}"
+              @logger.error "New property schema (reduced): #{reduced_new_property}"
               exit
             end
 
@@ -798,7 +796,7 @@ def resolve_enum_schema(root_schema, schema)
     end
 
     if tag_values.keys.all? { |tag| !tag.nil? && tag.is_a?(String) }
-      @logger.debug "Resolved as 'externally-tagged with only unit varaints' enum schema."
+      @logger.debug "Resolved as 'externally-tagged with only unit variants' enum schema."
 
       return { '_resolved' => { 'type' => { 'string' => {
         'enum' => tag_values.transform_values { |tag_schema| get_rendered_description_from_schema(tag_schema) }
@@ -856,6 +854,59 @@ def resolve_enum_schema(root_schema, schema)
     end
   end
 
+  # Schema pattern: simple externally tagged enum with only non-unit variants.
+  #
+  # This pattern represents an enum where the default external tagging mode is used, which leads to
+  # a schema for each variant that looks like it's an object with a single property -- the name of
+  # which is the name of the variant itself -- and the schema of that property representing whatever
+  # the fields are for the variant.
+  #
+  # Contrasted with an externally tagged enum with only unit variants, this type of enum is treated
+  # like an object itself, where each possible variant is its own property, with whatever the
+  # resulting subschema for that variant may be.
+  if enum_tagging == 'external'
+    # With external tagging, and non-unit variants, each variant must be represented as an object schema.
+    if subschemas.all? { |subschema| get_schema_type(subschema) == "object" }
+      # Generate our overall object schema, where each variant is a property on this schema. The
+      # schema of that property should be the schema for the variant's tagging field. For example,
+      # a variant called `Foo` will have an object schema with a single, required field `foo`. We
+      # take the schema of that property `foo`, and set it as the schema for property `foo` on our
+      # new aggregated object schema.
+      #
+      # Additionally, since this is a "one of" schema, we can't make any of the properties on the
+      # aggregated object schema be required, since the whole point is that they're deserialized
+      # opportunistically.
+      aggregated_properties = {}
+
+      subschemas.each { |subschema|
+        resolved_subschema = resolve_schema(root_schema, subschema)
+
+        @logger.debug "ETNUV original subschema: #{subschema}"
+        @logger.debug "ETNUV resolved subschema: #{resolved_subschema}"
+
+        resolved_properties = resolved_subschema.dig('type', 'object', 'options')
+        if resolved_properties.nil? || resolved_properties.keys.length != 1
+          @logger.error "Encountered externally tagged enum schema with non-unit variants where the resulting \
+          resolved schema for a given variant had more than one property!"
+          @logger.error "Original variant subschema: #{subschema}"
+          @logger.error "Resolved variant subschema: #{resolved_subschema}"
+        end
+
+        # Generate a description from the overall subschema and apply it to the properly itself. We
+        # do this since it would be lost otherwise.
+        description = get_rendered_description_from_schema(subschema)
+        resolved_properties.each { |property_name, property_schema|
+          property_schema['description'] = description unless description.empty?
+          aggregated_properties[property_name] = property_schema
+        }
+      }
+
+      @logger.debug "Resolved as 'externally-tagged with only non-unit variants' enum schema."
+
+      return { '_resolved' => { 'type' => { 'object' => { 'options' => aggregated_properties } } } }
+    end
+  end
+
   # Fallback schema pattern: mixed-mode enums.
   #
   # These are enums that can basically be some combination of possible values: `Concurrency` is the
@@ -870,6 +921,8 @@ def resolve_enum_schema(root_schema, schema)
     .reduce { |acc, item| nested_merge(acc, item) }
 
   @logger.debug "Resolved as 'fallback mixed-mode' enum schema."
+
+  @logger.debug "Tagging mode: #{enum_tagging}"
 
   { '_resolved' => { 'type' => type_defs['type'] }, 'annotations' => 'mixed_mode' }
 end
@@ -930,6 +983,7 @@ def apply_schema_default_value!(source_schema, resolved_schema)
         property_default_value = default_value[property_name]
         property_type_field = get_schema_type_field_for_value(resolved_property, property_default_value)
         property_type_field['default'] = property_default_value unless property_type_field.nil?
+        resolved_property['required'] = false unless property_type_field.nil?
       end
     else
       # We're dealing with a normal scalar or whatever, so just apply the default directly.

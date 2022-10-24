@@ -29,7 +29,7 @@ base: components: sources: demo_logs: configuration: {
 		}
 	}
 	format: {
-		required: true
+		required: false
 		type: string: {
 			default: "json"
 			enum: {

@@ -43,7 +43,7 @@ base: components: sources: kafka: configuration: {
 		description: "Configuration for building a `Deserializer`."
 		required:    false
 		type: object: options: codec: {
-			required: true
+			required: false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -88,7 +88,7 @@ base: components: sources: kafka: configuration: {
 				}
 			}
 			method: {
-				required: true
+				required: false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -166,7 +166,15 @@ base: components: sources: kafka: configuration: {
 			See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
 			"""
 		required: false
-		type: object: options: "*": type: string: syntax: "literal"
+		type: object: options: "*": {
+			description: """
+				Advanced options set directly on the underlying `librdkafka` client.
+
+				See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
+				"""
+			required: true
+			type: string: syntax: "literal"
+		}
 	}
 	offset_key: {
 		description: """

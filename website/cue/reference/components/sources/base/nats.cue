@@ -99,7 +99,7 @@ base: components: sources: nats: configuration: {
 		description: "Configuration for building a `Deserializer`."
 		required:    false
 		type: object: options: codec: {
-			required: true
+			required: false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -139,7 +139,7 @@ base: components: sources: nats: configuration: {
 				}
 			}
 			method: {
-				required: true
+				required: false
 				type: string: {
 					default: "bytes"
 					enum: {

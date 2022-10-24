@@ -6,7 +6,7 @@ base: components: transforms: dedupe: configuration: {
 		required:    false
 		type: object: options: num_events: {
 			description: "Number of events to cache and use for comparing incoming events to previously seen events."
-			required:    true
+			required:    false
 			type: uint: default: 5000
 		}
 	}
@@ -20,17 +20,22 @@ base: components: transforms: dedupe: configuration: {
 
 			[global_log_schema]: https://vector.dev/docs/reference/configuration/global-options/#log_schema
 			"""
-		required: true
-		type: object: {
-			examples: ["field1", "parent.child_field", "host", "hostname"]
-			options: {
-				ignore: {
-					required: true
-					type: array: items: type: string: syntax: "literal"
+		required: false
+		type: object: options: {
+			ignore: {
+				description: "Matches events using all fields except for the ignored ones."
+				required:    true
+				type: array: items: type: string: {
+					examples: ["field1", "parent.child_field", "host", "hostname"]
+					syntax: "literal"
 				}
-				match: {
-					required: true
-					type: array: items: type: string: syntax: "literal"
+			}
+			match: {
+				description: "Matches events using only the specified fields."
+				required:    true
+				type: array: items: type: string: {
+					examples: ["field1", "parent.child_field"]
+					syntax: "literal"
 				}
 			}
 		}

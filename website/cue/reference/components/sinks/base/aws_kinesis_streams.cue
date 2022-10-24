@@ -88,7 +88,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
+					required: false
 					type: string: {
 						const:   "zlib"
 						default: "none"

@@ -51,7 +51,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		}
 	}
 	billing_account_id: {
-		required: true
+		description: "The billing account ID to which to publish logs."
+		required:    true
 		type: string: syntax: "literal"
 	}
 	credentials_path: {
@@ -93,6 +94,13 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		}
 	}
 	folder_id: {
+		description: """
+			The folder ID to which to publish logs.
+
+			See the [Google Cloud Platform folder documentation][folder_docs] for more details.
+
+			[folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
+			"""
 		required: true
 		type: string: syntax: "literal"
 	}
@@ -106,10 +114,22 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		type: string: syntax: "template"
 	}
 	organization_id: {
+		description: """
+			The organization ID to which to publish logs.
+
+			This would be the identifier assigned to your organization on Google Cloud Platform.
+			"""
 		required: true
 		type: string: syntax: "literal"
 	}
 	project_id: {
+		description: """
+			The project ID to which to publish logs.
+
+			See the [Google Cloud Platform project management documentation][project_docs] for more details.
+
+			[project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
+			"""
 		required: true
 		type: string: syntax: "literal"
 	}
@@ -239,19 +259,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		required:    true
 		type: object: options: {
 			"*": {
-				description: """
-					A templated field.
-
-					In many cases, components can be configured in such a way where some portion of the component's functionality can be
-					 customized on a per-event basis. An example of this might be a sink that writes events to a file, where we want to
-					 provide the flexibility to specify which file an event should go to by using an event field itself as part of the
-					 input to the filename we use.
-
-					By using `Template`, users can specify either fixed strings or "templated" strings, which use a common syntax to
-					 refer to fields in an event that will serve as the input data when rendering the template.  While a fixed string may
-					 look something like `my-file.log`, a template string could look something like `my-file-{{key}}.log`, and the `key`
-					 field of the event being processed would serve as the value when rendering the template into a string.
-					"""
+				description: "Type-specific labels."
+				required:    true
 				type: string: syntax: "template"
 			}
 			type: {

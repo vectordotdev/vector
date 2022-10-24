@@ -86,7 +86,7 @@ base: components: sinks: clickhouse: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
+					required: false
 					type: string: {
 						const:   "zlib"
 						default: "gzip"

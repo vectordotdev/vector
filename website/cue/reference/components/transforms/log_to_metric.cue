@@ -24,7 +24,11 @@ components: transforms: log_to_metric: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.log_to_metric.configuration
+    // TODO: It'd be nice to have a way to define the description of the enum tag field on the Rust
+    // side and propagate it forward, since this is a common pattern that gets used.
+	configuration: base.components.transforms.log_to_metric.configuration & {
+		metrics: type: array: items: type: object: options: type: description: "The metric type."
+	}
 
 	input: {
 		logs:    true

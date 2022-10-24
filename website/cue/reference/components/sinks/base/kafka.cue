@@ -149,7 +149,17 @@ base: components: sinks: kafka: configuration: {
 			[config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
 			"""
 		required: false
-		type: object: options: "*": type: string: syntax: "literal"
+		type: object: options: "*": {
+			description: """
+				A map of advanced options to pass directly to the underlying `librdkafka` client.
+
+				For more information on configuration options, see [Configuration properties][config_props_docs].
+
+				[config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+				"""
+			required: true
+			type: string: syntax: "literal"
+		}
 	}
 	message_timeout_ms: {
 		description: "Local message timeout, in milliseconds."

@@ -36,7 +36,7 @@ base: components: sinks: configuration: {
 				type: uint: {}
 			}
 			type: {
-				required: true
+				required: false
 				type: string: {
 					default: "memory"
 					enum: {

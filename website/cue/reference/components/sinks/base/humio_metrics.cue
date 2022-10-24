@@ -42,7 +42,7 @@ base: components: sinks: humio_metrics: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
+					required: false
 					type: string: {
 						const:   "zlib"
 						default: "none"

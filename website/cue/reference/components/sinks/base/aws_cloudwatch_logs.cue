@@ -97,7 +97,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
+					required: false
 					type: string: {
 						const:   "zlib"
 						default: "none"
@@ -293,7 +293,11 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 				required:    false
 				type: object: {
 					default: {}
-					options: "*": type: string: syntax: "literal"
+					options: "*": {
+						description: "Additional HTTP headers to add to every HTTP request."
+						required:    true
+						type: string: syntax: "literal"
+					}
 				}
 			}
 			rate_limit_duration_secs: {

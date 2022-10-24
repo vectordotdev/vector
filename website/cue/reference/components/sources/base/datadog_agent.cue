@@ -23,7 +23,7 @@ base: components: sources: datadog_agent: configuration: {
 		description: "Configuration for building a `Deserializer`."
 		required:    false
 		type: object: options: codec: {
-			required: true
+			required: false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -78,7 +78,7 @@ base: components: sources: datadog_agent: configuration: {
 				}
 			}
 			method: {
-				required: true
+				required: false
 				type: string: {
 					default: "bytes"
 					enum: {

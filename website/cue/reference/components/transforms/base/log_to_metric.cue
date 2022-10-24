@@ -54,7 +54,11 @@ base: components: transforms: log_to_metric: configuration: metrics: {
 		tags: {
 			description: "Tags to apply to the counter."
 			required:    false
-			type: object: options: "*": type: string: syntax: "literal"
+			type: object: options: "*": {
+				description: "Tags to apply to the counter."
+				required:    true
+				type: string: syntax: "literal"
+			}
 		}
 		type: {
 			required: true
