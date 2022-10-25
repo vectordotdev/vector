@@ -8885,6 +8885,7 @@ dependencies = [
  "crossbeam-utils",
  "derivative",
  "futures 0.3.25",
+ "indexmap",
  "metrics",
  "nom",
  "ordered-float 3.3.0",
