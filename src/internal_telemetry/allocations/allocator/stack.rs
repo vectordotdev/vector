@@ -8,17 +8,17 @@ use super::token::AllocationGroupId;
 ///
 /// This implementation is uses an array to represent the stack to avoid thread local destructor registration issues.
 #[derive(Copy, Clone)]
-pub(crate) struct GroupStack {
-    slots: [AllocationGroupId; 256],
+pub(crate) struct GroupStack<const N: usize> {
+    slots: [AllocationGroupId; N],
     current_top: usize,
 }
 
-impl GroupStack {
+impl<const N: usize> GroupStack<N> {
     /// Creates an empty [`GroupStack`].
     pub const fn new() -> Self {
         Self {
             current_top: 0,
-            slots: [AllocationGroupId::ROOT; 256],
+            slots: [AllocationGroupId::ROOT; N],
         }
     }
 
@@ -36,16 +36,16 @@ impl GroupStack {
     /// Pushes an allocation group on to the stack, marking it as the active allocation group.
     pub fn push(&mut self, group: AllocationGroupId) {
         if self.current_top >= self.slots.len() {
-            panic!("stack overflow");
+            panic!("tried to push new allocation group to the current stack, but hit the limit of {} entries", N);
         }
         self.slots[self.current_top] = group;
         self.current_top += 1;
     }
 
-    /// Pops the currently active allocation group off the stack.
+    /// Pops and returns the pervious allocation group that was on the stack.
     pub fn pop(&mut self) -> AllocationGroupId {
         if self.current_top == 0 {
-            panic!("stack underflow!");
+            panic!("tried to pop current allocation group from the stack but the stack is empty");
         }
         self.current_top -= 1;
         self.slots[self.current_top]

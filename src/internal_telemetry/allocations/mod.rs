@@ -1,20 +1,9 @@
 //! Allocation tracking exposed via internal telemetry.
 
 mod allocator;
-use std::{
-    ops::Index,
-    sync::atomic::{AtomicU64, Ordering},
-    thread,
-    time::Duration,
-};
 
-use arr_macro::arr;
-
-use self::allocator::{without_allocation_tracing, Tracer};
-
+use self::allocator::Tracer;
 pub(crate) use self::allocator::{AllocationGroupId, AllocationLayer, GroupedTraceableAllocator};
-
-static GROUP_MEM_METRICS: [AtomicU64; 256] = arr![AtomicU64::new(0); 256];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -33,29 +22,7 @@ impl Tracer for MainTracer {
 }
 
 /// Initializes allocation tracing.
-pub fn init_allocation_tracing() {
-    let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
-    alloc_processor
-        .spawn(move || {
-            without_allocation_tracing(move || loop {
-                for idx in 0..GROUP_MEM_METRICS.len() {
-                    let atomic_ref = GROUP_MEM_METRICS.index(idx);
-                    let mem_used = atomic_ref.load(Ordering::Relaxed);
-                    if mem_used == 0 {
-                        continue;
-                    }
-
-                    info!(
-                        message = "Allocation group memory usage.",
-                        group_id = idx,
-                        current_memory_allocated_in_bytes = mem_used
-                    );
-                }
-                thread::sleep(Duration::from_millis(10000));
-            })
-        })
-        .unwrap();
-}
+pub const fn init_allocation_tracing() {}
 
 /// Acquires an allocation group ID.
 ///
@@ -65,12 +32,5 @@ pub fn init_allocation_tracing() {
 /// entering, exiting, and how spans exist as a stack -- in order to handle keeping the "current
 /// allocation group" accurate across all threads.
 pub fn acquire_allocation_group_id() -> AllocationGroupId {
-    let group_id =
-        AllocationGroupId::register().expect("failed to register allocation group token");
-    // We default to the root group in case of overflow
-    if group_id.as_raw() >= GROUP_MEM_METRICS.len() {
-        AllocationGroupId::ROOT
-    } else {
-        group_id
-    }
+    AllocationGroupId::register().expect("failed to register allocation group token")
 }
