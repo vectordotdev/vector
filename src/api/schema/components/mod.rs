@@ -348,7 +348,7 @@ mod tests {
     use super::*;
     use crate::{
         api::schema::sort,
-        config::{ComponentKey, DataType, OutputId},
+        config::{ComponentKey, DataType, Inputs, OutputId},
     };
 
     /// Generate component fixes for use with tests
@@ -375,13 +375,16 @@ mod tests {
             Component::Transform(transform::Transform(transform::Data {
                 component_key: ComponentKey::from("parse_json"),
                 component_type: "json".to_string(),
-                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
+                inputs: Inputs::from_iter(vec![OutputId::from("gen1"), OutputId::from("gen2")]),
                 outputs: vec![],
             })),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("devnull"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
+                inputs: Inputs::from_iter(vec![
+                    OutputId::from("gen3"),
+                    OutputId::from("parse_json"),
+                ]),
             })),
         ]
     }
@@ -505,17 +508,23 @@ mod tests {
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("a"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
+                inputs: Inputs::from_iter(vec![
+                    OutputId::from("gen3"),
+                    OutputId::from("parse_json"),
+                ]),
             })),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("b"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
+                inputs: Inputs::from_iter(vec![
+                    OutputId::from("gen3"),
+                    OutputId::from("parse_json"),
+                ]),
             })),
             Component::Transform(transform::Transform(transform::Data {
                 component_key: ComponentKey::from("c"),
                 component_type: "json".to_string(),
-                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
+                inputs: Inputs::from_iter(vec![OutputId::from("gen1"), OutputId::from("gen2")]),
                 outputs: vec![],
             })),
             Component::Source(source::Source(source::Data {

@@ -18,7 +18,8 @@ use vector_common::trigger::DisabledTrigger;
 use super::{TapOutput, TapResource};
 use crate::{
     config::{
-        ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource, SourceConfig,
+        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource,
+        SourceConfig,
     },
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
@@ -856,7 +857,7 @@ impl RunningTopology {
     }
 }
 
-fn get_changed_outputs(diff: &ConfigDiff, output_ids: Vec<OutputId>) -> Vec<OutputId> {
+fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<OutputId> {
     let mut changed_outputs = Vec::new();
 
     for source_key in &diff.sources.to_change {

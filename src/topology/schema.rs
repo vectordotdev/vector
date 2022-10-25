@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 use value::Kind;
 
 pub(super) use crate::schema::Definition;
@@ -318,7 +318,7 @@ impl ComponentContainer for Config {
 
     fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]> {
         self.transform(key)
-            .map(|transform| transform.inputs.as_slice())
+            .map(|transform| transform.inputs.deref())
     }
 
     fn transform_outputs(

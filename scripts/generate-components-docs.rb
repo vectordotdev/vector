@@ -1060,14 +1060,6 @@ def apply_schema_metadata!(source_schema, resolved_schema)
 end
 
 def get_rendered_description_from_schema(schema)
-  # If the schema is marked as `no_description`, we're being told -- for whatever reason -- that the
-  # existing title/description should not be rendered in the output. This is primarily to avoid
-  # spitting out developer-oriented documentation into the user-facing documentation, when we're
-  # providing the necessary description in another way.
-  #if !get_schema_metadata(schema, 'docs::no_description').nil?
-  #  return ''
-  #end
-
   # Grab both the raw description and raw title, and if the title is empty, just use the
   # description, otherwise concatenate the title and description with newlines so that there's a
   # whitespace break between the title and description.

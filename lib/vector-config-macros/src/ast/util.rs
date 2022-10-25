@@ -110,7 +110,7 @@ fn group_doc_lines(ungrouped: &[String]) -> Vec<String> {
             // The line actually has some content, so just append it to our string buffer after
             // dropping the leading space, if one exists.
             s => {
-                buffer.push_str(s.strip_prefix(' ').unwrap_or_else(|| s));
+                buffer.push_str(s.strip_prefix(' ').unwrap_or(s));
                 buffer.push('\n');
             }
         };
