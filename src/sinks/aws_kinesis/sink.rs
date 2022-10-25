@@ -78,11 +78,8 @@ where
                 self.batch_settings,
             )
             .map(|(key, events)| {
-                let mut metadata_vec = vec![];
-                for req in &events {
-                    metadata_vec.push(*req.get_metadata());
-                }
-                let metadata = RequestMetadata::from_batch(&metadata_vec);
+                let metadata =
+                    RequestMetadata::from_batch(events.iter().map(|req| req.get_metadata()));
                 BatchKinesisRequest {
                     key,
                     events,
@@ -109,7 +106,13 @@ where
     }
 }
 
-pub fn process_log(
+/// Returns a `KinesisProcessedEvent` containing the unmodified log event + metadata consisting of
+/// the partition key. The partition key is either generated from the provided partition_key_field
+/// or is generated randomly.
+///
+/// If the provided partition_key_field was not found in the log, `Error` `EventsDropped` internal
+/// events are emitted and None is returned.
+pub(crate) fn process_log(
     log: LogEvent,
     partition_key_field: &Option<String>,
 ) -> Option<KinesisProcessedEvent> {

@@ -1,10 +1,9 @@
 /// Used in both `aws_kinesis_streams` and `aws_kinesis_firehose` sinks
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]

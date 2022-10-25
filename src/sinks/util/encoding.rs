@@ -86,7 +86,7 @@ pub(crate) fn write_all(
     writer.write_all(buf).map_err(|error| {
         emit!(EncoderWriteError {
             error: &error,
-            count: n_events_pending as u64,
+            count: n_events_pending,
         });
         error
     })

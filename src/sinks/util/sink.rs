@@ -461,7 +461,7 @@ where
                     emit!(CallError {
                         error,
                         request_id,
-                        count: count as u64,
+                        count,
                     });
                 }
 

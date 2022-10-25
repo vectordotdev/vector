@@ -32,7 +32,7 @@ impl<E: std::fmt::Debug> InternalEvent for PollReadyError<E> {
 pub struct CallError<E> {
     pub error: E,
     pub request_id: usize,
-    pub count: u64,
+    pub count: usize,
 }
 
 impl<E: std::fmt::Debug> InternalEvent for CallError<E> {

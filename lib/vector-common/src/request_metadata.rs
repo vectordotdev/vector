@@ -60,7 +60,7 @@ impl RequestMetadata {
     }
 
     #[must_use]
-    pub fn from_batch(metadata_vec: &Vec<RequestMetadata>) -> Self {
+    pub fn from_batch<'a, T: Iterator<Item = &'a RequestMetadata>>(metadata_vec: T) -> Self {
         let mut event_count = 0;
         let mut events_byte_size = 0;
         let mut request_encoded_size = 0;
