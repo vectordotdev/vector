@@ -5,8 +5,9 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::{parse_value_path, OwnedValuePath};
-use lookup::PathPrefix;
+use lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
+use lookup::owned_value_path;
+use lookup::OwnedTargetPath;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use snafu::ResultExt as _;
@@ -81,7 +82,7 @@ pub struct Ec2Metadata {
     endpoint: Option<String>,
 
     /// Sets a prefix for all event fields added by the transform.
-    namespace: Option<String>,
+    namespace: Option<OptionalTargetPath>,
 
     /// The interval between querying for updated metadata, in seconds.
     refresh_interval_secs: Option<u64>,
@@ -110,7 +111,7 @@ pub struct Ec2MetadataTransform {
 
 #[derive(Debug, Clone)]
 struct MetadataKey {
-    log_path: OwnedValuePath,
+    log_path: OwnedTargetPath,
     metric_tag: String,
 }
 
@@ -140,13 +141,7 @@ impl TransformConfig for Ec2Metadata {
 
         // Check if the namespace is set to `""` which should mean that we do
         // not want a prefixed namespace.
-        let namespace = self.namespace.clone().and_then(|namespace| {
-            if namespace.is_empty() {
-                None
-            } else {
-                Some(namespace)
-            }
-        });
+        let namespace = self.namespace.clone().and_then(|namespace| namespace.path);
 
         let keys = Keys::new(&namespace);
 
@@ -231,7 +226,7 @@ impl Ec2MetadataTransform {
         match event {
             Event::Log(ref mut log) => {
                 state.iter().for_each(|(k, v)| {
-                    log.insert((PathPrefix::Event, &k.log_path), v.clone());
+                    log.insert(&k.log_path, v.clone());
                 });
             }
             Event::Metric(ref mut metric) => {
@@ -517,22 +512,49 @@ impl MetadataClient {
     }
 }
 
-fn create_key(namespace: &Option<String>, key: &str) -> MetadataKey {
+// This creates a simplified string from the namespace. Since the namespace is technically
+// a target path, it can contain syntax that is undesirable for a metric tag (such as prefix, quotes, etc)
+// This is mainly used for backwards compatibility.
+// see: https://github.com/vectordotdev/vector/issues/14931
+fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
+    let mut output = String::new();
+    for segment in &namespace.path.segments {
+        if !output.is_empty() {
+            output += ".";
+        }
+        match segment {
+            OwnedSegment::Field(field) => {
+                output += field;
+            }
+            OwnedSegment::Index(i) => {
+                output += &i.to_string();
+            }
+            OwnedSegment::Coalesce(fields) => {
+                if let Some(first) = fields.first() {
+                    output += first;
+                }
+            }
+        }
+    }
+    output
+}
+
+fn create_key(namespace: &Option<OwnedTargetPath>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
-            log_path: parse_value_path(namespace).with_field_appended(key),
-            metric_tag: format!("{}.{}", namespace, key),
+            log_path: namespace.with_field_appended(key),
+            metric_tag: format!("{}.{}", create_metric_namespace(namespace), key),
         }
     } else {
         MetadataKey {
-            log_path: OwnedValuePath::single_field(key),
+            log_path: OwnedTargetPath::event(owned_value_path!(key)),
             metric_tag: key.to_owned(),
         }
     }
 }
 
 impl Keys {
-    pub fn new(namespace: &Option<String>) -> Self {
+    pub fn new(namespace: &Option<OwnedTargetPath>) -> Self {
         Keys {
             account_id_key: create_key(namespace, ACCOUNT_ID_KEY),
             ami_id_key: create_key(namespace, AMI_ID_KEY),
@@ -580,8 +602,8 @@ enum Ec2MetadataError {
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use lookup::event_path;
-    use lookup::lookup_v2::{parse_value_path, OwnedSegment, OwnedValuePath};
+    use lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
+    use lookup::{event_path, PathPrefix};
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
 
@@ -641,7 +663,7 @@ mod integration_tests {
                 vec![OwnedSegment::field(SUBNET_ID_KEY)].into(),
                 "mock-subnet-id",
             ),
-            (parse_value_path("\"role-name\"[0]"), "mock-user"),
+            (owned_value_path!("role-name", 0), "mock-user"),
         ]
     }
 
@@ -879,7 +901,9 @@ mod integration_tests {
             assert_transform_compliance(async {
                 let transform_config = Ec2Metadata {
                     endpoint: Some(ec2_metadata_address()),
-                    namespace: Some("ec2.metadata".into()),
+                    namespace: Some(
+                        OwnedTargetPath::event(owned_value_path!("ec2", "metadata")).into(),
+                    ),
                     ..Default::default()
                 };
 
@@ -913,7 +937,7 @@ mod integration_tests {
                 // Set an empty namespace to ensure we don't prepend one.
                 let transform_config = Ec2Metadata {
                     endpoint: Some(ec2_metadata_address()),
-                    namespace: Some("".into()),
+                    namespace: Some(OptionalTargetPath::none()),
                     ..Default::default()
                 };
 
@@ -948,7 +972,9 @@ mod integration_tests {
             assert_transform_compliance(async {
                 let transform_config = Ec2Metadata {
                     endpoint: Some(ec2_metadata_address()),
-                    namespace: Some("ec2.metadata".into()),
+                    namespace: Some(
+                        OwnedTargetPath::event(owned_value_path!("ec2", "metadata")).into(),
+                    ),
                     ..Default::default()
                 };
 
@@ -983,7 +1009,7 @@ mod integration_tests {
                 // Set an empty namespace to ensure we don't prepend one.
                 let transform_config = Ec2Metadata {
                     endpoint: Some(ec2_metadata_address()),
-                    namespace: Some("".into()),
+                    namespace: Some(OptionalTargetPath::none()),
                     ..Default::default()
                 };
 

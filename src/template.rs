@@ -5,6 +5,7 @@ use chrono::{
     format::{strftime::StrftimeItems, Item},
     Utc,
 };
+use lookup::lookup_v2::parse_target_path;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
@@ -17,10 +18,12 @@ use crate::{
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateParseError {
     #[snafu(display("Invalid strftime item"))]
     StrftimeError,
+    #[snafu(display("Invalid field path in template {:?} (see https://vector.dev/docs/reference/configuration/template-syntax/)", path))]
+    InvalidPathSyntax { path: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
@@ -297,7 +300,16 @@ fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
         if all.start() > last_end {
             parts.push(parse_literal(&src[last_end..all.start()])?);
         }
-        parts.push(Part::Reference(cap[1].trim().to_owned()));
+
+        let path = cap[1].trim().to_owned();
+
+        // This checks the syntax, but doesn't yet store it for use later
+        // see: https://github.com/vectordotdev/vector/issues/14864
+        if parse_target_path(&path).is_err() {
+            return Err(TemplateParseError::InvalidPathSyntax { path });
+        }
+
+        parts.push(Part::Reference(path));
         last_end = all.end();
     }
     if src.len() > last_end {
