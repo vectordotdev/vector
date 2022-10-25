@@ -115,18 +115,22 @@ impl From<AllocationGroupId> for AllocationGroupToken {
 /// If the active allocation group is not currently suspended, then `f` is called, after suspending it, with a reference
 /// to the suspended allocation group. If any other call to `try_with_suspended_allocation_group` happens while this
 /// method call is on the stack, `f` in those calls with itself not be called.
+#[inline(always)]
 pub(super) fn try_with_suspended_allocation_group<F>(f: F)
 where
     F: FnOnce(AllocationGroupId),
 {
-    let _result = LOCAL_ALLOCATION_GROUP_STACK.try_with(|current_group_id| {
-        // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, which allows callers to skip trying to run
-        // `f` if they cannot mutably borrow the current allocation group. As `try_borrow_mut` will only let one
-        // mutable borrow happen at a time, the tracker logic is never reentrant.
-        if let Ok(stack) = current_group_id.try_borrow_mut() {
-            f(stack.current());
-        }
-    });
+    let _result = LOCAL_ALLOCATION_GROUP_STACK.try_with(
+        #[inline(always)]
+        |current_group_id| {
+            // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, which allows callers to skip trying to run
+            // `f` if they cannot mutably borrow the current allocation group. As `try_borrow_mut` will only let one
+            // mutable borrow happen at a time, the tracker logic is never reentrant.
+            if let Ok(stack) = current_group_id.try_borrow_mut() {
+                f(stack.current());
+            }
+        },
+    );
 }
 
 /// Calls `f` after suspending the active allocation group.
@@ -137,17 +141,21 @@ where
 /// In practice, this method is primarily useful for "run this function and don't trace any (de)allocations at all" while
 /// `try_with_suspended_allocation_group` is primarily useful for "run this function if nobody else is tracing
 /// an (de)allocation right now".
+#[inline(always)]
 pub(super) fn with_suspended_allocation_group<F>(f: F)
 where
     F: FnOnce(),
 {
-    let _result = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| {
-        // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, as `try_borrow_mut` will only let one
-        // mutable borrow happen at a time. As we simply want to ensure that the allocation group is suspended, we
-        // don't care what the return value is: calling `try_borrow_mut` and holding on to the result until the end
-        // of the scope is sufficient to either suspend the allocation group or know that it's already suspended and
-        // will stay that way until we're done in this method.
-        let _result = stack.try_borrow_mut();
-        f();
-    });
+    let _result = LOCAL_ALLOCATION_GROUP_STACK.try_with(
+        #[inline(always)]
+        |stack| {
+            // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, as `try_borrow_mut` will only let one
+            // mutable borrow happen at a time. As we simply want to ensure that the allocation group is suspended, we
+            // don't care what the return value is: calling `try_borrow_mut` and holding on to the result until the end
+            // of the scope is sufficient to either suspend the allocation group or know that it's already suspended and
+            // will stay that way until we're done in this method.
+            let _result = stack.try_borrow_mut();
+            f();
+        },
+    );
 }
