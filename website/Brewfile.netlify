@@ -1,4 +1,4 @@
 tap "cue-lang/tap"
 
-brew "cue-lang/tap/cue"
+brew "cue-lang/tap/cue@0.4.3"
 brew "htmltest"
