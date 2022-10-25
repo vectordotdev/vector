@@ -509,7 +509,7 @@ def resolve_bare_schema(root_schema, schema)
       additional_properties = schema['additionalProperties']
       if !additional_properties.nil?
         # If the schema has no other properties -- i.e. it's always just a free-form "whatever
-        # properties you want" objectg schema -- then copy the title/description of the schema to
+        # properties you want" object schema -- then copy the title/description of the schema to
         # this free-form schema we're generating. Since it's still a property on an object schema at
         # the end of the day, we need follow the rules of providing a description, and so on.
         additional_properties['title'] = schema['title'] unless schema['title'].nil?
