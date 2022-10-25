@@ -168,7 +168,7 @@ jobs:
           context: baseline-vector/
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          file: experiments/Dockerfile
+          file: regression/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }}
@@ -216,7 +216,7 @@ jobs:
           context: comparison-vector/
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          file: experiments/Dockerfile
+          file: regression/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }}
