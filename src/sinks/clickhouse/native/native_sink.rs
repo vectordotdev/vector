@@ -30,19 +30,14 @@ pub async fn build_native_sink(
 }
 
 fn gen_table_schema(table: &BTreeMap<String, String>) -> crate::Result<Vec<(String, SqlType)>> {
-    let mut table_schema = Vec::with_capacity(table.len());
-    for (k, v) in table {
-        match parse_field_type(v.as_str()) {
-            Ok((_, t)) => {
-                table_schema.push((k.to_owned(), t));
-            }
-            Err(e) => {
-                let ne: crate::Error = std::convert::From::from(e.to_string());
-                Err(ne)?;
-            }
-        }
-    }
-    Ok(table_schema)
+    table
+        .into_iter()
+        .map(|(k, v)| {
+            parse_field_type(v.as_str())
+                .map(|(_, t)| (k.to_owned(), t))
+                .map_err(|e| e.to_string().into())
+        })
+        .collect()
 }
 
 async fn healthcheck(pool: Pool, opts: SinkHealthcheckOptions) -> crate::Result<()> {
