@@ -1,20 +1,12 @@
-use std::{cmp::Ordering, collections::BTreeMap};
+use std::cmp::Ordering;
 
 use chrono::{DateTime, TimeZone, Utc};
 use prometheus_parser::{proto, GroupKind, MetricGroup, ParserError};
 
 use crate::event::{
-    metric::{Bucket, Metric, MetricKind, MetricValue, Quantile},
+    metric::{Bucket, Metric, MetricKind, MetricTags, MetricValue, Quantile},
     Event,
 };
-
-fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String, String>> {
-    if tags.is_empty() {
-        None
-    } else {
-        Some(tags)
-    }
-}
 
 fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc> {
     timestamp
@@ -49,7 +41,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                         },
                     )
                     .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                    .with_tags(has_values_or_none(key.labels));
+                    .with_tags(MetricTags::from(key.labels).as_option());
 
                     result.push(counter.into());
                 }
@@ -64,7 +56,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                         },
                     )
                     .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                    .with_tags(has_values_or_none(key.labels));
+                    .with_tags(MetricTags::from(key.labels).as_option());
 
                     result.push(gauge.into());
                 }
@@ -100,7 +92,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                             },
                         )
                         .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                        .with_tags(has_values_or_none(key.labels))
+                        .with_tags(MetricTags::from(key.labels).as_option())
                         .into(),
                     );
                 }
@@ -125,7 +117,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                             },
                         )
                         .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                        .with_tags(has_values_or_none(key.labels))
+                        .with_tags(MetricTags::from(key.labels).as_option())
                         .into(),
                     );
                 }
@@ -141,7 +133,8 @@ mod test {
     use chrono::{TimeZone, Utc};
     use once_cell::sync::Lazy;
     use pretty_assertions::assert_eq;
-    use vector_common::{assert_event_data_eq, btreemap};
+    use vector_common::assert_event_data_eq;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
@@ -412,7 +405,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(btreemap! { "tag" => "}" }))
+            .with_tags(Some(metric_tags! { "tag" => "}" }))
             .with_timestamp(Some(*TIMESTAMP))]),
         );
     }
@@ -431,7 +424,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(btreemap! { "tag" => "a,b" }))
+            .with_tags(Some(metric_tags! { "tag" => "a,b" }))
             .with_timestamp(Some(*TIMESTAMP))]),
         );
     }
@@ -450,7 +443,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(btreemap! { "tag" => "\\n" }))
+            .with_tags(Some(metric_tags! { "tag" => "\\n" }))
             .with_timestamp(Some(*TIMESTAMP))]),
         );
     }
@@ -469,7 +462,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(btreemap! { "tag" => " * " }))
+            .with_tags(Some(metric_tags! { "tag" => " * " }))
             .with_timestamp(Some(*TIMESTAMP))]),
         );
     }
@@ -970,14 +963,14 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 263719.0 },
                 )
-                .with_tags(Some(btreemap! { "direction" => "in", "host" => "*" }))
+                .with_tags(Some(metric_tags! { "direction" => "in", "host" => "*" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 255061.0 },
                 )
-                .with_tags(Some(btreemap! { "direction" => "in", "host" => "_" }))
+                .with_tags(Some(metric_tags! { "direction" => "in", "host" => "_" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_bytes",
@@ -985,7 +978,7 @@ mod test {
                     MetricValue::Counter { value: 8658.0 },
                 )
                 .with_tags(Some(
-                    btreemap! { "direction" => "in", "host" => "nginx-vts-status" }
+                    metric_tags! { "direction" => "in", "host" => "nginx-vts-status" }
                 ))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
@@ -993,14 +986,14 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 944199.0 },
                 )
-                .with_tags(Some(btreemap! { "direction" => "out", "host" => "*" }))
+                .with_tags(Some(metric_tags! { "direction" => "out", "host" => "*" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 360775.0 },
                 )
-                .with_tags(Some(btreemap! { "direction" => "out", "host" => "_" }))
+                .with_tags(Some(metric_tags! { "direction" => "out", "host" => "_" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_bytes",
@@ -1008,7 +1001,7 @@ mod test {
                     MetricValue::Counter { value: 583424.0 },
                 )
                 .with_tags(Some(
-                    btreemap! { "direction" => "out", "host" => "nginx-vts-status" }
+                    metric_tags! { "direction" => "out", "host" => "nginx-vts-status" }
                 ))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
@@ -1016,42 +1009,44 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(btreemap! { "host" => "*", "status" => "bypass" }))
+                .with_tags(Some(metric_tags! { "host" => "*", "status" => "bypass" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(btreemap! { "host" => "*", "status" => "expired" }))
+                .with_tags(Some(metric_tags! { "host" => "*", "status" => "expired" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(btreemap! { "host" => "*", "status" => "hit" }))
+                .with_tags(Some(metric_tags! { "host" => "*", "status" => "hit" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(btreemap! { "host" => "*", "status" => "miss" }))
+                .with_tags(Some(metric_tags! { "host" => "*", "status" => "miss" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(btreemap! { "host" => "*", "status" => "revalidated" }))
+                .with_tags(Some(
+                    metric_tags! { "host" => "*", "status" => "revalidated" }
+                ))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(btreemap! { "host" => "*", "status" => "scarce" }))
+                .with_tags(Some(metric_tags! { "host" => "*", "status" => "scarce" }))
                 .with_timestamp(Some(*TIMESTAMP))
             ]
         );

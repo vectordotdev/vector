@@ -8,7 +8,6 @@ use serde_bytes;
 use super::{ddsketch_full, sink::PartitionKey};
 use crate::{
     event::{TraceEvent, Value},
-    internal_events::DatadogTracesStatsError,
     metrics::AgentDDSketch,
 };
 
@@ -42,19 +41,19 @@ impl AggregationKey {
             bucket_key: BucketAggregationKey {
                 service: span
                     .get("service")
-                    .map(|v| v.to_string_lossy())
+                    .map(|v| v.to_string_lossy().into_owned())
                     .unwrap_or_default(),
                 name: span
                     .get("name")
-                    .map(|v| v.to_string_lossy())
+                    .map(|v| v.to_string_lossy().into_owned())
                     .unwrap_or_default(),
                 resource: span
                     .get("resource")
-                    .map(|v| v.to_string_lossy())
+                    .map(|v| v.to_string_lossy().into_owned())
                     .unwrap_or_default(),
                 ty: span
                     .get("type")
-                    .map(|v| v.to_string_lossy())
+                    .map(|v| v.to_string_lossy().into_owned())
                     .unwrap_or_default(),
                 status_code: span
                     .get("meta")
@@ -84,7 +83,7 @@ impl PayloadAggregationKey {
                 .get("meta")
                 .and_then(|m| m.as_object())
                 .and_then(|m| m.get("env"))
-                .map(|s| s.to_string_lossy())
+                .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or(self.env),
             hostname: self.hostname,
             version: self.version,
@@ -312,11 +311,11 @@ impl Aggregator {
             hostname: partition_key.hostname.clone().unwrap_or_default(),
             version: trace
                 .get("app_version")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             container_id: trace
                 .get("container_id")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
         };
         let synthetics = trace
@@ -435,6 +434,14 @@ impl Aggregator {
         // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L38-L41
         // , and https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L195-L207
 
+        // NOTE: The Agent flushes on a specific time interval. We are currently flushing per batch
+        // input to the sink.
+        // If this becomes problematic for users, we will have to spin up a separate thread that
+        // flushes on a specific time interval.
+        // In theory the existing approach should work, and would just manifest as overall more stats payloads
+        // being output by Vector, but the payloads themselves should be correct.
+        // https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L83-L108
+
         let now = Utc::now().timestamp_nanos() as u64;
         let flush_cutoff_time = now - (BUCKET_DURATION_NANOSECONDS * BUCKET_WINDOW_LEN);
 
@@ -450,7 +457,13 @@ impl Aggregator {
 
         // update the oldest_timestamp allowed, to prevent having stats for an already flushed
         // bucket
-        self.oldest_timestamp = align_timestamp(now);
+        let new_oldest_ts =
+            align_timestamp(now) - ((BUCKET_WINDOW_LEN - 1) * BUCKET_DURATION_NANOSECONDS);
+
+        if new_oldest_ts > self.oldest_timestamp {
+            debug!("Updated oldest_timestamp to {}.", new_oldest_ts);
+            self.oldest_timestamp = new_oldest_ts;
+        }
     }
 }
 
@@ -509,10 +522,13 @@ fn is_partial_snapshot(span: &BTreeMap<String, Value>) -> bool {
     }
 }
 
-/// This extracts the relative weights from the top level span (i.e. the span that does not have
-/// a parent). The weight calculation is borrowed from
+/// This extracts the relative weights from the top level span (i.e. the span that does not have a parent).
 fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
     // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/weight.go#L17-L26.
+
+    // TODO this logic likely has a bug(s) that need to be root caused. The root span is not reliably found and defaults to "1.0"
+    // regularly for users even when sampling is disabled in the Agent.
+    // GH issue to track that: https://github.com/vectordotdev/vector/issues/14859
 
     if spans.is_empty() {
         return 1.0;
@@ -574,20 +590,24 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
 
     // There should be only one value remaining, the weight from the root span
     if parent_id_to_child_weight.len() != 1 {
-        emit!(DatadogTracesStatsError {
-            error_message: "Didn't reliably find the root span for weight calculation.",
-            trace_id,
-        });
+        // TODO remove the debug print and emit the Error event as outlined in
+        // https://github.com/vectordotdev/vector/issues/14859
+        debug!(
+            "Didn't reliably find the root span for weight calculation of trace_id {:?}.",
+            trace_id
+        );
     }
 
     *parent_id_to_child_weight
         .values()
         .next()
         .unwrap_or_else(|| {
-            emit!(DatadogTracesStatsError {
-                error_message: "Root span was not found. Defaulting to weight of 1.0.",
-                trace_id,
-            });
+            // TODO remove the debug print and emit the Error event as outlined in
+            // https://github.com/vectordotdev/vector/issues/14859
+            debug!(
+                "Root span was not found. Defaulting to weight of 1.0 for trace_id {:?}.",
+                trace_id
+            );
             &1.0
         })
 }

@@ -2,8 +2,8 @@ use futures::StreamExt;
 use heim::units::information::byte;
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
-use vector_common::btreemap;
 use vector_config::configurable_component;
+use vector_core::metric_tags;
 
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
 
@@ -84,7 +84,7 @@ impl HostMetrics {
                     .await
                 {
                     let fs = partition.file_system();
-                    let mut tags = btreemap! {
+                    let mut tags = metric_tags! {
                         "filesystem" => fs.as_str(),
                         "mountpoint" => partition.mount_point().to_string_lossy()
                     };

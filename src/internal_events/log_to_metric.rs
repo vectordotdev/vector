@@ -5,7 +5,6 @@ use vector_core::internal_event::InternalEvent;
 
 use crate::emit;
 use crate::internal_events::{ComponentEventsDropped, UNINTENTIONAL};
-use crate::template::TemplateParseError;
 use vector_common::internal_event::{error_stage, error_type};
 
 pub struct LogToMetricFieldNullError<'a> {
@@ -68,37 +67,6 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
         counter!(
             "processing_errors_total", 1,
             "error_type" => "parse_error",
-        );
-
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
-    }
-}
-
-pub struct LogToMetricTemplateParseError {
-    pub error: TemplateParseError,
-}
-
-impl InternalEvent for LogToMetricTemplateParseError {
-    fn emit(self) {
-        let reason = "Failed to parse template.";
-        error!(
-            message = reason,
-            error = ?self.error,
-            error_code = "failed_parsing_template",
-            error_type = error_type::TEMPLATE_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "failed_parsing_template",
-            "error_type" => error_type::TEMPLATE_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!(
-            "processing_errors_total", 1,
-            "error_type" => "template_error",
         );
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })

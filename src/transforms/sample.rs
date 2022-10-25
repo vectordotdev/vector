@@ -140,9 +140,11 @@ mod tests {
         conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
         event::{Event, LogEvent, TraceEvent},
-        test_util::random_lines,
-        transforms::test::transform_one,
+        test_util::{components::assert_transform_compliance, random_lines},
+        transforms::test::{create_topology, transform_one},
     };
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     fn condition_contains(key: &str, needle: &str) -> Condition {
         let vrl_config = VrlConfig {
@@ -332,6 +334,29 @@ mod tests {
             .filter_map(|_| transform_one(&mut sampler, trace.clone()))
             .count();
         assert_eq!(total_passed, 1);
+    }
+
+    #[tokio::test]
+    async fn emits_internal_events() {
+        assert_transform_compliance(async move {
+            let config = SampleConfig {
+                rate: 1,
+                key_field: None,
+                exclude: None,
+            };
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let log = LogEvent::from("hello world");
+            tx.send(log.into()).await.unwrap();
+
+            _ = out.recv().await;
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 
     fn random_events(n: usize) -> Vec<Event> {

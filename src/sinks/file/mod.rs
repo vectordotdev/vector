@@ -40,7 +40,6 @@ use bytes_path::BytesPath;
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
     /// File name to write events to.
-    #[configurable(metadata(templateable))]
     pub path: Template,
 
     /// The amount of time, in seconds, that a file can be idle and stay open.

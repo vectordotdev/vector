@@ -17,6 +17,7 @@ use vector_core::{
 };
 
 use super::config::S3Options;
+use super::partitioner::S3PartitionKey;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -35,7 +36,8 @@ impl Finalizable for S3Request {
 
 #[derive(Clone, Debug)]
 pub struct S3Metadata {
-    pub partition_key: String,
+    pub partition_key: S3PartitionKey,
+    pub s3_key: String,
     pub count: usize,
     pub byte_size: usize,
     pub finalizers: EventFinalizers,
@@ -119,7 +121,7 @@ impl Service<S3Request> for S3Service {
                 .put_object()
                 .body(bytes_to_bytestream(request.body))
                 .bucket(request.bucket)
-                .key(request.metadata.partition_key)
+                .key(request.metadata.s3_key)
                 .set_content_encoding(content_encoding)
                 .set_content_type(content_type)
                 .set_acl(options.acl.map(Into::into))

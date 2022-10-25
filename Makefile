@@ -336,7 +336,7 @@ test-enterprise: ## Runs enterprise related behavioral tests
 test-integration: ## Runs all integration tests
 test-integration: test-integration-amqp test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
 test-integration: test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-scrape test-integration-influxdb
+test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
@@ -645,6 +645,12 @@ fmt: ## Format code
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
 	scripts/generate-manifests.sh
+
+.PHONY: generate-component-docs
+generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
+	${MAYBE_ENVIRONMENT_EXEC} cargo build
+	target/debug/vector generate-schema > /tmp/vector-config-schema.json
+	scripts/generate-components-docs.rb /tmp/vector-config-schema.json
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

@@ -21,11 +21,9 @@ use super::sink::AmqpSink;
 #[derive(Clone, Debug)]
 pub struct AmqpSinkConfig {
     /// The exchange to publish messages to.
-    #[configurable(metadata(templateable))]
     pub(crate) exchange: Template,
 
     /// Template used to generate a routing key which corresponds to a queue binding.
-    #[configurable(metadata(templateable))]
     pub(crate) routing_key: Option<Template>,
 
     /// Connection options for the `amqp` sink.

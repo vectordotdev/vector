@@ -71,11 +71,6 @@ where
         H::referenceable_name()
     }
 
-    fn description() -> Option<&'static str> {
-        // Forward to the underlying `H`.
-        H::description()
-    }
-
     fn is_optional() -> bool {
         // Forward to the underlying `H`.
         H::is_optional()

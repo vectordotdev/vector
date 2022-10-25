@@ -13,7 +13,7 @@ pub struct MetricSeries {
     #[serde(flatten)]
     pub name: MetricName,
 
-    /// Tags for this metric series.
+    #[configurable(derived)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<MetricTags>,
 }
