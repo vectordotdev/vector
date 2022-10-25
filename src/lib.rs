@@ -29,8 +29,11 @@ extern crate derivative;
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[cfg(all(feature = "tikv-jemallocator", feature = "allocation-tracing"))]
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(
+    feature = "tikv-jemallocator",
+    feature = "allocation-tracing",
+    not(target_os = "macos")
+))]
 #[global_allocator]
 static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
     self::internal_telemetry::allocations::get_grouped_tracing_allocator(
