@@ -75,7 +75,7 @@ impl AllocationGroupId {
         tracing::dispatcher::get_default(move |dispatch| {
             if let Some(id) = span.id() {
                 if let Some(ctx) = dispatch.downcast_ref::<WithAllocationGroup>() {
-                    ctx.with_allocation_group(dispatch, &id, AllocationGroupToken::from(self));
+                    (ctx.with_allocation_group)(dispatch, &id, AllocationGroupToken::from(self));
                 }
             }
         });
