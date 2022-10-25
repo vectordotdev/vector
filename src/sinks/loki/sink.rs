@@ -442,15 +442,11 @@ impl LokiSink {
                         })
                         .collect::<Vec<_>>();
                     if count > 0 {
-                        emit!(LokiOutOfOrderEventRewritten {
-                            count: count as u64
-                        });
+                        emit!(LokiOutOfOrderEventRewritten { count });
                     }
                     Some((partition, result))
                 } else {
-                    emit!(LokiOutOfOrderEventDropped {
-                        count: batch.len() as u64
-                    });
+                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
                     None
                 }
             })
