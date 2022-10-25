@@ -42,6 +42,7 @@ jobs:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY }}
           aws-region: us-west-2
+
       - name: Download SMP binary
         run: |
           aws s3 cp s3://smp-cli-releases/v0.3.0/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
@@ -125,6 +126,10 @@ jobs:
 
           echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
           echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
+
+  ##
+  ## BUILD
+  ##
 
   build-baseline:
     name: Build baseline Vector container
@@ -221,3 +226,78 @@ jobs:
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }}
           push: true
+
+  ##
+  ## SUBMIT
+  ##
+
+  submit_vector_job:
+    name: Submit vector regression job
+    runs-on: ubuntu-22.04
+    needs:
+      - compute-metadata
+      - build-baseline
+      - build-comparison
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Download SMP binary
+        run: |
+          aws s3 cp s3://smp-cli-releases/v0.3.0/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+
+      - name: Submit job
+        env:
+          RUST_LOG: debug
+        run: |
+          chmod +x ${{ runner.temp }}/bin/smp
+
+          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job submit \
+            --total-samples ${{ needs.compute-metadata.outputs.total-samples }} \
+            --warmup-seconds ${{ needs.compute-metadata.outputs.warmup-seconds }} \
+            --replicas ${{ needs.compute-metadata.outputs.replicas }} \
+            --baseline-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }} \
+            --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }} \
+            --target-config-dir ${{ github.workspace }}/regression/cases \
+            --target-name vector \
+            --submission-metadata ${{ runner.temp }}/submission-metadata
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: vector-submission-metadata
+          path: ${{ runner.temp }}/submission-metadata
+
+      - name: Display submission-metadata
+        run: |
+          cat ${{ runner.temp }}/submission-metadata
+
+      - name: Await job
+        timeout-minutes: 60
+        env:
+          RUST_LOG: info
+        run: |
+          chmod +x ${{ runner.temp }}/bin/smp
+
+          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
+            --wait \
+            --wait-delay-seconds 60 \
+            --submission-metadata ${{ runner.temp }}/submission-metadata
+
+      - name: Handle cancellation if necessary
+        if: ${{ cancelled() }}
+        timeout-minutes: 60
+        env:
+          RUST_LOG: info
+        run: |
+          chmod +x ${{ runner.temp }}/bin/smp
+          ${{ runner.temp }}/bin/smp job cancel --submission-metadata ${{ runner.temp }}/submission-metadata
