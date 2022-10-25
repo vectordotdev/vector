@@ -30,6 +30,8 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
+#[allow(unreachable_pub)]
+pub mod components;
 pub mod conditions;
 pub mod dns;
 #[cfg(feature = "docker")]
