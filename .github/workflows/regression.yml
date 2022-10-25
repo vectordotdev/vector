@@ -52,10 +52,10 @@ jobs:
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
 
-      comparison: ${{ steps.vector.outputs.COMPARISON }}
-      comparison-tag: ${{ steps.vector.outputs.COMPARISON_TAG }}
-      baseline: ${{ steps.vector.outputs.BASELINE }}
-      baseline-tag: ${{ steps.vector.outputs.BASELINE_TAG }}
+      comparison: ${{ steps.comparison.outputs.COMPARISON }}
+      comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
+      baseline: ${{ steps.baseline.outputs.BASELINE }}
+      baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
 
       cpus: ${{ steps.system.outputs.CPUS }}
       memory: ${{ steps.system.outputs.MEMORY }}
