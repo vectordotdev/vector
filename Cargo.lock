@@ -9190,6 +9190,7 @@ dependencies = [
  "prost-types 0.11.1",
  "quanta",
  "quickcheck",
+ "quickcheck_macros",
  "rand 0.8.5",
  "rand_distr",
  "regex",

@@ -156,7 +156,7 @@ macro_rules! series {
 				namespace: None,
 			},
 			tags: Some(vector_core::event::MetricTags::from_iter(
-				vec![$(($tk.into(), $tv.into())),*]
+				[$(($tk.to_string(), $tv.to_string())),*]
 			)),
 		}
 	};
