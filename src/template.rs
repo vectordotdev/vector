@@ -56,40 +56,6 @@ pub struct Template {
     #[serde(skip)]
     is_static: bool,
 
-    // <<<<<<< HEAD
-    // impl Template {
-    //     /// Returns `true` if this template string has a length of zero, and `false` otherwise.
-    //     pub fn is_empty(&self) -> bool {
-    //         self.src.is_empty()
-    //     }
-    //
-    //     pub fn new(src: &str) -> Result<Self, TemplateParseError> {
-    //         let (has_error, is_dynamic) = StrftimeItems::new(src)
-    //             .fold((false, false), |(error, dynamic), item| {
-    //                 (error || is_error(&item), dynamic || is_dynamic(&item))
-    //             });
-    //
-    //         let fields = get_fields(src);
-    //
-    //         for field in &fields {
-    //             if parse_target_path(field).is_err() {
-    //                 return Err(TemplateParseError::InvalidPathSyntax {
-    //                     path: field.to_owned(),
-    //                 });
-    //             }
-    //         }
-    //
-    //         if has_error {
-    //             Err(TemplateParseError::StrftimeError)
-    //         } else {
-    //             Ok(Template {
-    //                 has_fields: !fields.is_empty(),
-    //                 src: src.to_owned(),
-    //                 has_ts: is_dynamic,
-    //             })
-    //         }
-    //     }
-    // =======
     #[serde(skip)]
     reserve_size: usize,
 }
@@ -234,41 +200,6 @@ impl Template {
         &self.src
     }
 
-    // <<<<<<< HEAD
-    // fn get_fields(src: &str) -> Vec<String> {
-    //     RE.captures_iter(src)
-    //         .map(|c| {
-    //             c.get(1)
-    //                 .map(|s| s.as_str().trim().to_string())
-    //                 .expect("src should match regex")
-    //         })
-    //         .collect::<Vec<_>>()
-    // }
-    //
-    // fn render_fields(src: &str, event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
-    //     let mut missing_keys = Vec::new();
-    //     let out = RE
-    //         .replace_all(src, |caps: &Captures<'_>| {
-    //             let key = caps
-    //                 .get(1)
-    //                 .map(|s| s.as_str().trim())
-    //                 .expect("src should match regex");
-    //             match event {
-    //                 EventRef::Log(log) => log.get(key).map(|val| val.to_string_lossy()),
-    //                 EventRef::Metric(metric) => render_metric_field(key, metric).map(Into::into),
-    //                 EventRef::Trace(trace) => trace.get(&key).map(|val| val.to_string_lossy()),
-    //             }
-    //             .unwrap_or_else(|| {
-    //                 missing_keys.push(key.to_owned());
-    //                 "".into()
-    //             })
-    //         })
-    //         .into_owned();
-    //     if missing_keys.is_empty() {
-    //         Ok(out)
-    //     } else {
-    //         Err(TemplateRenderingError::MissingKeys { missing_keys })
-    // =======
     /// Returns `true` if this template string has a length of zero, and `false` otherwise.
     pub fn is_empty(&self) -> bool {
         self.src.is_empty()
@@ -370,17 +301,15 @@ fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
             parts.push(parse_literal(&src[last_end..all.start()])?);
         }
 
-        let path_str = cap[1].trim().to_owned();
+        let path = cap[1].trim().to_owned();
 
         // This checks the syntax, but doesn't yet store it for use later
         // see: https://github.com/vectordotdev/vector/issues/14864
-        if parse_target_path(&path_str).is_err() {
-            return Err(TemplateParseError::InvalidPathSyntax {
-                path: path_str.to_owned(),
-            });
+        if parse_target_path(&path).is_err() {
+            return Err(TemplateParseError::InvalidPathSyntax { path });
         }
 
-        parts.push(Part::Reference(path_str));
+        parts.push(Part::Reference(path));
         last_end = all.end();
     }
     if src.len() > last_end {
