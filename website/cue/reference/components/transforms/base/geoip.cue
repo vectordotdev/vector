@@ -53,7 +53,7 @@ base: components: transforms: geoip: configuration: {
 		description: """
 			The field to insert the resulting GeoIP data into.
 
-			See [output](#output) for more info.
+			See [output](#output-data) for more info.
 			"""
 		required: false
 		type: string: {

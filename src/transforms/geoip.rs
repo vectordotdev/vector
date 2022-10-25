@@ -43,7 +43,7 @@ pub struct GeoipConfig {
 
     /// The field to insert the resulting GeoIP data into.
     ///
-    /// See [output](#output) for more info.
+    /// See [output](#output-data) for more info.
     #[serde(default = "default_geoip_target_field")]
     #[configurable(metadata(docs::examples = "geoip", docs::examples = "parent.child",))]
     pub target: String,
