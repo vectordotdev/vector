@@ -97,7 +97,7 @@ where
     }
 }
 
-pub fn process_log(
+pub(crate) fn process_log(
     log: LogEvent,
     partition_key_field: &Option<String>,
 ) -> Option<KinesisProcessedEvent> {

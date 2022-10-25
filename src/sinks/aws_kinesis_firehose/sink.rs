@@ -94,7 +94,7 @@ where
     }
 }
 
-pub fn process_log(log: LogEvent) -> Option<KinesisProcessedEvent> {
+pub(crate) fn process_log(log: LogEvent) -> Option<KinesisProcessedEvent> {
     let partition_key = gen_partition_key();
 
     let partition_key = if partition_key.len() >= 256 {
