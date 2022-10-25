@@ -1,18 +1,10 @@
-use std::task::{Context, Poll};
-use vector_core::{
-    ByteSizeOf,
-    stream::{DriverResponse}
-};
-use futures::{future::BoxFuture};
-use vector_common::{
-    internal_event::CountByteSize,
-    Error,
-};
-use clickhouse_rs::{Pool, types::SqlType};
-use crate::{
-    event::{EventStatus, LogEvent},
-};
 use super::convert::build_block;
+use crate::event::{EventStatus, LogEvent};
+use clickhouse_rs::{types::SqlType, Pool};
+use futures::future::BoxFuture;
+use std::task::{Context, Poll};
+use vector_common::{internal_event::CountByteSize, Error};
+use vector_core::{stream::DriverResponse, ByteSizeOf};
 
 pub(super) struct ClickhouseResponse {
     pub(super) event_count: usize,
@@ -59,7 +51,7 @@ impl tower::Service<Vec<LogEvent>> for ClickhouseService {
             let block = build_block(schema, events)?;
             let mut handle = pool.get_handle().await?;
             handle.insert(table, block).await?;
-            Ok(ClickhouseResponse{
+            Ok(ClickhouseResponse {
                 event_count,
                 event_byte_size,
             })
@@ -69,6 +61,10 @@ impl tower::Service<Vec<LogEvent>> for ClickhouseService {
 
 impl ClickhouseService {
     pub(super) fn new(pool: Pool, schema: Vec<(String, SqlType)>, table: String) -> Self {
-        Self { pool, schema, table }
+        Self {
+            pool,
+            schema,
+            table,
+        }
     }
 }
