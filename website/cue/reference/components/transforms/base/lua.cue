@@ -16,7 +16,7 @@ base: components: transforms: lua: configuration: {
 					It can produce new events using the `emit` function.
 
 					This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
-					 cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
+					cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
 					"""
 				required: false
 				type: string: {
@@ -35,8 +35,8 @@ base: components: transforms: lua: configuration: {
 					It can produce new events using the `emit` function.
 
 					This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
-					 cases, the closure/function takes two parameters. The first parameter, `event`, is the event being processed,
-					 while the second parameter, `emit`, is a reference to a function for emitting events.
+					cases, the closure/function takes two parameters. The first parameter, `event`, is the event being processed,
+					while the second parameter, `emit`, is a reference to a function for emitting events.
 					"""
 				required: true
 				type: string: {
@@ -59,7 +59,7 @@ base: components: transforms: lua: configuration: {
 					It can produce new events using the `emit` function.
 
 					This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
-					 cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
+					cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
 					"""
 				required: false
 				type: string: {
@@ -93,8 +93,8 @@ base: components: transforms: lua: configuration: {
 			The Lua program to initialize the transform with.
 
 			The program can be used to to import external dependencies, as well as define the functions
-			 used for the various lifecycle hooks. However, it's not strictly required, as the lifecycle
-			 hooks can be configured directly with inline Lua source for each respective hook.
+			used for the various lifecycle hooks. However, it's not strictly required, as the lifecycle
+			hooks can be configured directly with inline Lua source for each respective hook.
 			"""
 		required: false
 		type: string: {
@@ -146,8 +146,8 @@ base: components: transforms: lua: configuration: {
 						It can produce new events using the `emit` function.
 
 						This can either be inline Lua that defines a closure to use, or the name of the Lua function
-						 to call. In both cases, the closure/function takes a single parameter, `emit`, which is a
-						 reference to a function for emitting events.
+						to call. In both cases, the closure/function takes a single parameter, `emit`, which is a
+						reference to a function for emitting events.
 						"""
 					required: true
 					type: string: {

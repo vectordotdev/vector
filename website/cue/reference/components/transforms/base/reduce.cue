@@ -6,7 +6,7 @@ base: components: transforms: reduce: configuration: {
 			A condition used to distinguish the final event of a transaction.
 
 			If this condition resolves to `true` for an event, the current transaction is immediately
-			 flushed with this event.
+			flushed with this event.
 			"""
 		required: false
 		type: condition: {}
@@ -14,7 +14,7 @@ base: components: transforms: reduce: configuration: {
 	expire_after_ms: {
 		description: """
 			The maximum period of time to wait after the last event is received, in milliseconds, before
-			 a combined event should be considered complete.
+			a combined event should be considered complete.
 			"""
 		required: false
 		type: uint: {
@@ -35,11 +35,11 @@ base: components: transforms: reduce: configuration: {
 			An ordered list of fields by which to group events.
 
 			Each group with matching values for the specified keys is reduced independently, allowing
-			 you to keep independent event streams separate. When no fields are specified, all events
-			 will be combined in a single group.
+			you to keep independent event streams separate. When no fields are specified, all events
+			will be combined in a single group.
 
 			For example, if `group_by = ["host", "region"]`, then all incoming events that have the same
-			 host and region will be grouped together before being reduced.
+			host and region will be grouped together before being reduced.
 			"""
 		required: false
 		type: array: {
@@ -55,14 +55,14 @@ base: components: transforms: reduce: configuration: {
 			A map of field names to custom merge strategies.
 
 			For each field specified, the given strategy will be used for combining events rather than
-			 the default behavior.
+			the default behavior.
 
 			The default behavior is as follows:
 
 			- The first value of a string field is kept, subsequent values are discarded.
-			 - For timestamp fields the first is kept and a new field `[field-name]_end` is added with
-			   the last received timestamp value.
-			 - Numeric values are summed.
+			- For timestamp fields the first is kept and a new field `[field-name]_end` is added with
+			  the last received timestamp value.
+			- Numeric values are summed.
 			"""
 		required: false
 		type: object: options: "*": {
@@ -70,14 +70,14 @@ base: components: transforms: reduce: configuration: {
 				A map of field names to custom merge strategies.
 
 				For each field specified, the given strategy will be used for combining events rather than
-				 the default behavior.
+				the default behavior.
 
 				The default behavior is as follows:
 
 				- The first value of a string field is kept, subsequent values are discarded.
-				 - For timestamp fields the first is kept and a new field `[field-name]_end` is added with
-				   the last received timestamp value.
-				 - Numeric values are summed.
+				- For timestamp fields the first is kept and a new field `[field-name]_end` is added with
+				  the last received timestamp value.
+				- Numeric values are summed.
 				"""
 			required: true
 			type: string: enum: {
@@ -105,7 +105,7 @@ base: components: transforms: reduce: configuration: {
 			A condition used to distinguish the first event of a transaction.
 
 			If this condition resolves to `true` for an event, the previous transaction is flushed
-			 (without this event) and a new transaction is started.
+			(without this event) and a new transaction is started.
 			"""
 		required: false
 		type: condition: {}

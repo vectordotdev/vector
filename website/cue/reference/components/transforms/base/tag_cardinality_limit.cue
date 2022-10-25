@@ -6,7 +6,7 @@ base: components: transforms: tag_cardinality_limit: configuration: {
 			The size of the cache for detecting duplicate tags, in bytes.
 
 			The larger the cache size, the less likely it is to have a false positive, or a case where
-			 we allow a new value for tag even after we have reached the configured limits.
+			we allow a new value for tag even after we have reached the configured limits.
 			"""
 		relevant_when: "mode = \"probabilistic\""
 		required:      false
@@ -15,7 +15,7 @@ base: components: transforms: tag_cardinality_limit: configuration: {
 	limit_exceeded_action: {
 		description: """
 			Possible actions to take when an event arrives that would exceed the cardinality limit for one
-			 or more of its tags.
+			or more of its tags.
 			"""
 		required: false
 		type: string: {
@@ -33,15 +33,15 @@ base: components: transforms: tag_cardinality_limit: configuration: {
 				Tracks cardinality exactly.
 
 				This mode has higher memory requirements than `probabilistic`, but never falsely outputs
-				 metrics with new tags after the limit has been hit.
+				metrics with new tags after the limit has been hit.
 				"""
 			probabilistic: """
 				Tracks cardinality probabilistically.
 
 				This mode has lower memory requirements than `exact`, but may occasionally allow metric
-				 events to pass through the transform even when they contain new tags that exceed the
-				 configured limit. The rate at which this happens can be controlled by changing the value of
-				 `cache_size_per_tag`.
+				events to pass through the transform even when they contain new tags that exceed the
+				configured limit. The rate at which this happens can be controlled by changing the value of
+				`cache_size_per_tag`.
 				"""
 		}
 	}

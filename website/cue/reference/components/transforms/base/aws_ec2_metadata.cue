@@ -33,8 +33,8 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 			Proxy configuration.
 
 			Vector can be configured to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
-			 proxy configuration convention, users can set different proxies to use based on the type of traffic being proxied,
-			 as well as set specific hosts that should not be proxied.
+			proxy configuration convention, users can set different proxies to use based on the type of traffic being proxied,
+			as well as set specific hosts that should not be proxied.
 			"""
 		required: false
 		type: object: options: {
@@ -74,12 +74,12 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 					Multiple patterns are allowed:
 
 					| Pattern             | Example match                                                               |
-					 | ------------------- | --------------------------------------------------------------------------- |
-					 | Domain names        | `**example.com**` matches requests to `**example.com**`                     |
-					 | Wildcard domains    | `**.example.com**` matches requests to `**example.com**` and its subdomains |
-					 | IP addresses        | `**127.0.0.1**` matches requests to `**127.0.0.1**`                         |
-					 | [CIDR][cidr] blocks | `**192.168.0.0/16**` matches requests to any IP addresses in this range     |
-					 | Splat               | `__*__` matches all hosts                                                   |
+					| ------------------- | --------------------------------------------------------------------------- |
+					| Domain names        | `**example.com**` matches requests to `**example.com**`                     |
+					| Wildcard domains    | `**.example.com**` matches requests to `**example.com**` and its subdomains |
+					| IP addresses        | `**127.0.0.1**` matches requests to `**127.0.0.1**`                         |
+					| [CIDR][cidr] blocks | `**192.168.0.0/16**` matches requests to any IP addresses in this range     |
+					| Splat               | `__*__` matches all hosts                                                   |
 
 					[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 					"""

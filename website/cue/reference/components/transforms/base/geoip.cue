@@ -4,12 +4,12 @@ base: components: transforms: geoip: configuration: {
 	database: {
 		description: """
 			Path to the [MaxMind GeoIP2][geoip2] or [GeoLite2 binary city database file][geolite2]
-			 (**GeoLite2-City.mmdb**).
+			(**GeoLite2-City.mmdb**).
 
 			Other databases, such as the country database, are not supported.
 
 			[geoip2]: https://dev.maxmind.com/geoip/geoip2/downloadable
-			 [geolite2]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
+			[geolite2]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
 			"""
 		required: true
 		type: string: {
@@ -22,11 +22,11 @@ base: components: transforms: geoip: configuration: {
 			The locale to use when querying the database.
 
 			MaxMind includes localized versions of some of the fields within their database, such as
-			 country name. This setting can control which of those localized versions are returned by the
-			 transform.
+			country name. This setting can control which of those localized versions are returned by the
+			transform.
 
 			More information on which portions of the geolocation data are localized, and what languages
-			 are available, can be found [here][locale_docs].
+			are available, can be found [here][locale_docs].
 
 			[locale_docs]: https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q
 			"""

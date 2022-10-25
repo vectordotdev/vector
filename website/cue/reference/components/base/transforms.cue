@@ -9,8 +9,8 @@ base: components: transforms: configuration: inputs: {
 		See [configuration][configuration] for more info.
 
 		[sources]: https://vector.dev/docs/reference/configuration/sources/
-		 [transforms]: https://vector.dev/docs/reference/configuration/transforms/
-		 [configuration]: https://vector.dev/docs/reference/configuration/
+		[transforms]: https://vector.dev/docs/reference/configuration/transforms/
+		[configuration]: https://vector.dev/docs/reference/configuration/
 		"""
 	required: true
 	type: array: items: type: string: {
