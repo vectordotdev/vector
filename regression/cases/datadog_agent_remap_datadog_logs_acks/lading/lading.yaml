@@ -12,5 +12,5 @@ generator:
           maximum_prebuild_cache_size_bytes: "256 Mb"
 
 blackhole:
-  http:
-    binding_addr: "0.0.0.0:8080"
+  - http:
+      binding_addr: "0.0.0.0:8080"
