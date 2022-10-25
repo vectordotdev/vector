@@ -51,11 +51,8 @@ where
             })
             .batched_partitioned(CloudwatchParititoner, batcher_settings)
             .map(|(key, events)| {
-                let mut metadata_vec = vec![];
-                for req in &events {
-                    metadata_vec.push(req.get_metadata().clone());
-                }
-                let metadata = RequestMetadata::from_batch(&metadata_vec);
+                let metadata =
+                    RequestMetadata::from_batch(events.iter().map(|req| req.get_metadata()));
                 BatchCloudwatchRequest {
                     key,
                     events,
