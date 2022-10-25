@@ -9,7 +9,7 @@ use tracing::Span;
 use super::tracing::WithAllocationGroup;
 
 thread_local! {
-    /// The currently executing allocation grop.
+    /// The currently executing allocation group.
     ///
     /// Any allocations which occur on this thread will be associated with whichever token is
     /// present at the time of the allocation.

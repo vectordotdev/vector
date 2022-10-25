@@ -1,4 +1,4 @@
-use std::{any::TypeId, marker::PhantomData, ptr::addr_of};
+use std::marker::PhantomData;
 
 use tracing::{Dispatch, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
@@ -27,7 +27,7 @@ impl WithAllocationGroup {
 /// `tracing_subscriber` docs, found [here][tracing_subscriber::layer].
 #[cfg_attr(docsrs, doc(cfg(feature = "tracing-compat")))]
 pub struct AllocationLayer<S> {
-    ctx: WithAllocationGroup,
+    _ctx: WithAllocationGroup,
     _subscriber: PhantomData<fn(S)>,
 }
 
@@ -43,7 +43,7 @@ where
         };
 
         Self {
-            ctx,
+            _ctx: ctx,
             _subscriber: PhantomData,
         }
     }
@@ -77,16 +77,6 @@ where
             if let Some(token) = span_ref.extensions_mut().get_mut::<AllocationGroupToken>() {
                 token.exit();
             }
-        }
-    }
-
-    unsafe fn downcast_raw(&self, id: TypeId) -> Option<*const ()> {
-        match id {
-            id if id == TypeId::of::<Self>() => Some(addr_of!(self).cast::<()>()),
-            id if id == TypeId::of::<WithAllocationGroup>() => {
-                Some(addr_of!(self.ctx).cast::<()>())
-            }
-            _ => None,
         }
     }
 }
