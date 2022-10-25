@@ -1,4 +1,5 @@
 use self::token::with_suspended_allocation_group;
+mod stack;
 mod token;
 mod tracer;
 mod tracing;

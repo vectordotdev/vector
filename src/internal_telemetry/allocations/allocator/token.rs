@@ -8,12 +8,23 @@ use tracing::Span;
 
 use super::tracing::WithAllocationGroup;
 
+use crate::internal_telemetry::allocations::allocator::stack::GroupStack;
+
 thread_local! {
-    /// The currently executing allocation group.
+    /// The currently executing allocation token.
     ///
     /// Any allocations which occur on this thread will be associated with whichever token is
     /// present at the time of the allocation.
-    pub static CURRENT_ALLOCATION_GROUP: RefCell<AllocationGroupId> = RefCell::new(AllocationGroupId::ROOT);
+    pub(crate) static LOCAL_ALLOCATION_GROUP_STACK: RefCell<GroupStack> =
+        RefCell::new(GroupStack::new());
+}
+
+fn push_group_to_stack(group: AllocationGroupId) {
+    LOCAL_ALLOCATION_GROUP_STACK.with(|stack| stack.borrow_mut().push(group));
+}
+
+fn pop_group_from_stack() -> AllocationGroupId {
+    LOCAL_ALLOCATION_GROUP_STACK.with(|stack| stack.borrow_mut().pop())
 }
 
 /// The identifier that uniquely identifiers an allocation group.
@@ -23,14 +34,6 @@ pub struct AllocationGroupId(NonZeroUsize);
 impl AllocationGroupId {
     /// The group ID used for allocations which are not made within a registered allocation group.
     pub const ROOT: Self = Self(unsafe { NonZeroUsize::new_unchecked(1) });
-
-    #[allow(dead_code)]
-    pub(super) const fn from_raw(raw_group_id: usize) -> Option<Self> {
-        match NonZeroUsize::new(raw_group_id) {
-            Some(id) => Some(Self(id)),
-            None => None,
-        }
-    }
 
     pub(super) const fn from_raw_unchecked(raw_group_id: usize) -> Self {
         unsafe { Self(NonZeroUsize::new_unchecked(raw_group_id)) }
@@ -84,59 +87,27 @@ impl AllocationGroupId {
 
 /// A token that allows controlling when an allocation group is active or inactive.
 pub struct AllocationGroupToken {
-    previous: Option<AllocationGroupId>,
     id: AllocationGroupId,
 }
 
 impl AllocationGroupToken {
     pub fn enter(&mut self) {
-        if self.previous.is_some() {
-            panic!(
-                "Should not be entering a token which has already been entered: previous={}, id={}",
-                self.previous.unwrap().as_raw(),
-                self.id.as_raw()
-            );
-        }
-
-        let previous = set_current_allocation_group(self.id);
-        self.previous = Some(previous);
+        push_group_to_stack(self.id);
     }
 
     pub fn exit(&mut self) {
-        match self.previous.take() {
-            None => panic!(
-                "Should not be exiting a token which has not yet been entered: id={}",
-                self.id.as_raw()
-            ),
-            Some(previous) => {
-                let current = set_current_allocation_group(previous);
-                if self.id != current {
-                    panic!(
-                        "Expected current allocation group for thread to be {}, but got {}.",
-                        self.id.as_raw(),
-                        current.as_raw()
-                    );
-                }
-            }
-        }
+        let current = pop_group_from_stack();
+        debug_assert_eq!(
+            current, self.id,
+            "popped group from stack but got unexpected group"
+        );
     }
 }
 
 impl From<AllocationGroupId> for AllocationGroupToken {
     fn from(group_id: AllocationGroupId) -> Self {
-        Self {
-            previous: None,
-            id: group_id,
-        }
+        Self { id: group_id }
     }
-}
-
-fn set_current_allocation_group(group_id: AllocationGroupId) -> AllocationGroupId {
-    // If the current thread is being deinitialized, we can't actually access the value, so we just
-    // return a default of `AllocationGroupId::ROOT`.
-    CURRENT_ALLOCATION_GROUP
-        .try_with(|current_group_id| current_group_id.replace(group_id))
-        .unwrap_or(AllocationGroupId::ROOT)
 }
 
 /// Calls `f` after suspending the active allocation group, if it was not already suspended.
@@ -148,12 +119,12 @@ pub(super) fn try_with_suspended_allocation_group<F>(f: F)
 where
     F: FnOnce(AllocationGroupId),
 {
-    let _result = CURRENT_ALLOCATION_GROUP.try_with(|current_group_id| {
+    let _result = LOCAL_ALLOCATION_GROUP_STACK.try_with(|current_group_id| {
         // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, which allows callers to skip trying to run
         // `f` if they cannot mutably borrow the current allocation group. As `try_borrow_mut` will only let one
         // mutable borrow happen at a time, the tracker logic is never reentrant.
-        if let Ok(group_id) = current_group_id.try_borrow_mut() {
-            f(*group_id);
+        if let Ok(stack) = current_group_id.try_borrow_mut() {
+            f(stack.current());
         }
     });
 }
@@ -170,13 +141,13 @@ pub(super) fn with_suspended_allocation_group<F>(f: F)
 where
     F: FnOnce(),
 {
-    let _result = CURRENT_ALLOCATION_GROUP.try_with(|current_group_id| {
+    let _result = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| {
         // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, as `try_borrow_mut` will only let one
         // mutable borrow happen at a time. As we simply want to ensure that the allocation group is suspended, we
         // don't care what the return value is: calling `try_borrow_mut` and holding on to the result until the end
         // of the scope is sufficient to either suspend the allocation group or know that it's already suspended and
         // will stay that way until we're done in this method.
-        let _result = current_group_id.try_borrow_mut();
+        let _result = stack.try_borrow_mut();
         f();
     });
 }

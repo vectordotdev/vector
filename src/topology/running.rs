@@ -885,7 +885,7 @@ impl RunningTopology {
         }
 
         let task_name = format!("{} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span.clone());
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -896,7 +896,7 @@ impl RunningTopology {
 
         // Now spawn the actual source task.
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone());
+        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(task_span);
         self.source_tasks
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }
