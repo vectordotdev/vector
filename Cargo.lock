@@ -1647,7 +1647,7 @@ dependencies = [
  "once_cell",
  "strsim 0.10.0",
  "termcolor",
- "terminal_size",
+ "terminal_size 0.2.1",
 ]
 
 [[package]]
@@ -1716,11 +1716,11 @@ dependencies = [
  "memchr",
  "once_cell",
  "ordered-float 3.3.0",
- "pretty_assertions",
  "prost 0.11.0",
  "regex",
  "serde",
  "serde_json",
+ "similar-asserts",
  "smallvec",
  "snafu",
  "syslog_loose",
@@ -1790,6 +1790,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30ed07550be01594c6026cff2a1d7fe9c8f683caa798e12b68694ac9e88286a3"
 dependencies = [
  "cache-padded",
+]
+
+[[package]]
+name = "console"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c050367d967ced717c04b65d8c619d863ef9292ce0c5760028655a2fb298718c"
+dependencies = [
+ "encode_unicode 0.3.6",
+ "lazy_static",
+ "libc",
+ "terminal_size 0.1.17",
+ "winapi",
 ]
 
 [[package]]
@@ -2762,11 +2775,11 @@ dependencies = [
  "glob",
  "indexmap",
  "libc",
- "pretty_assertions",
  "quickcheck",
  "scan_fmt",
  "serde",
  "serde_json",
+ "similar-asserts",
  "tempfile",
  "tokio",
  "tracing 0.1.37",
@@ -5375,15 +5388,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e22443d1643a904602595ba1cd8f7d896afe56d26712531c5ff73a15b2fbf64"
 
 [[package]]
-name = "output_vt100"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "628223faebab4e3e40667ee0b2336d34a5b960ff60ea743ddfdbcf7770bcfb66"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5781,18 +5785,6 @@ checksum = "4d86de6de25020a36c6d3643a86d9a6a9f552107c0559c60ea03551b5e16c032"
 dependencies = [
  "predicates-core",
  "termtree",
-]
-
-[[package]]
-name = "pretty_assertions"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a25e9bcb20aa780fd0bb16b72403a9064d6b3f22f026946029acb941a50af755"
-dependencies = [
- "ctor",
- "diff",
- "output_vt100",
- "yansi",
 ]
 
 [[package]]
@@ -7331,6 +7323,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f054c6c1a6e95179d6f23ed974060dcefb2d9388bb7256900badad682c499de4"
 
 [[package]]
+name = "similar"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62ac7f900db32bf3fd12e0117dd3dc4da74bc52ebaac97f39668446d89694803"
+dependencies = [
+ "bstr 0.2.17",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "similar-asserts"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbf644ad016b75129f01a34a355dcb8d66a5bc803e417c7a77cc5d5ee9fa0f18"
+dependencies = [
+ "console",
+ "similar",
+]
+
+[[package]]
 name = "simpl"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7689,6 +7701,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "terminal_size"
+version = "0.1.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "633c1a546cee861a1a6d0dc69ebeca693bf4296661ba7852b9d21d159e0506df"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]
@@ -8853,7 +8875,6 @@ dependencies = [
  "pin-project",
  "portpicker",
  "postgres-openssl",
- "pretty_assertions",
  "prometheus-parser",
  "proptest",
  "prost 0.11.0",
@@ -8879,6 +8900,7 @@ dependencies = [
  "serde_with 2.0.1",
  "serde_yaml 0.9.14",
  "sha2 0.10.6",
+ "similar-asserts",
  "smallvec",
  "smpl_jwt",
  "snafu",
@@ -9114,7 +9136,6 @@ dependencies = [
  "ordered-float 3.3.0",
  "parking_lot",
  "pin-project",
- "pretty_assertions",
  "proptest",
  "prost 0.11.0",
  "prost-build 0.11.1",
@@ -9129,6 +9150,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with 2.0.1",
+ "similar-asserts",
  "snafu",
  "socket2",
  "tokio",
@@ -9875,12 +9897,6 @@ checksum = "56c1936c4cc7a1c9ab21a1ebb602eb942ba868cbd44a99cb7cdc5892335e1c85"
 dependencies = [
  "linked-hash-map",
 ]
-
-[[package]]
-name = "yansi"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
 
 [[package]]
 name = "zerocopy"

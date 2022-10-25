@@ -16,7 +16,7 @@ use http::HeaderMap;
 use indoc::indoc;
 use lookup::LookupBuf;
 use ordered_float::NotNan;
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use value::Kind;

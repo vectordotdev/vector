@@ -1089,7 +1089,7 @@ mod tests {
         );
 
         let output = transform_one_fallible(&mut tform, happy_metric).unwrap();
-        pretty_assertions::assert_eq!(
+        similar_asserts::assert_eq!(
             output,
             Event::Metric(
                 Metric::new_with_metadata(
@@ -1107,7 +1107,7 @@ mod tests {
         );
 
         let output = transform_one_fallible(&mut tform, abort_metric).unwrap_err();
-        pretty_assertions::assert_eq!(
+        similar_asserts::assert_eq!(
             output,
             Event::Metric(
                 Metric::new_with_metadata(
@@ -1128,7 +1128,7 @@ mod tests {
         );
 
         let output = transform_one_fallible(&mut tform, error_metric).unwrap_err();
-        pretty_assertions::assert_eq!(
+        similar_asserts::assert_eq!(
             output,
             Event::Metric(
                 Metric::new_with_metadata(

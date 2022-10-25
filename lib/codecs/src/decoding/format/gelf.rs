@@ -210,7 +210,7 @@ mod tests {
     use bytes::Bytes;
     use chrono::{DateTime, NaiveDateTime, Utc};
     use lookup::event_path;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use serde_json::json;
     use smallvec::SmallVec;
     use value::Value;

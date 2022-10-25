@@ -15,7 +15,7 @@ use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
 };
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 use serde_json::{json, Value};
 use vector::test_util::{next_addr, temp_file};
 
