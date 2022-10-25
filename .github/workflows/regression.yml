@@ -277,10 +277,6 @@ jobs:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/submission-metadata
 
-      - name: Display submission-metadata
-        run: |
-          cat ${{ runner.temp }}/submission-metadata
-
       - name: Await job
         timeout-minutes: 60
         env:
@@ -301,3 +297,48 @@ jobs:
         run: |
           chmod +x ${{ runner.temp }}/bin/smp
           ${{ runner.temp }}/bin/smp job cancel --submission-metadata ${{ runner.temp }}/submission-metadata
+
+  ##
+  ## ANALYZE
+  ##
+
+  download-artifacts:
+    name: Download job artifacts
+    runs-on: ubuntu-22.04
+    needs:
+      - submit-job
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Download SMP binary
+        run: |
+          aws s3 cp s3://smp-cli-releases/v0.3.0/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+
+      - name: Download submission metadata
+        uses: actions/download-artifact@v3
+        with:
+          name: vector-submission-metadata
+          path: ${{ runner.temp }}/
+
+      - name: Sync output to local system
+        env:
+          RUST_LOG: info
+        run: |
+          chmod +x ${{ runner.temp }}/bin/smp
+
+          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
+            --submission-metadata ${{ runner.temp }}/submission-metadata \
+            --output-path "${{ runner.temp }}/outputs"
+
+      - name: Upload captures
+        uses: actions/upload-artifact@v3
+        with:
+          name: capture-artifacts
+          path: ${{ runner.temp }}/outputs/*
