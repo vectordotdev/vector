@@ -9359,6 +9359,7 @@ dependencies = [
 name = "vrl-web-playground"
 version = "0.1.0"
 dependencies = [
+ "getrandom 0.2.6",
  "gloo-utils",
  "serde",
  "serde-wasm-bindgen",
