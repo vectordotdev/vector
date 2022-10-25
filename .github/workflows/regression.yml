@@ -231,8 +231,8 @@ jobs:
   ## SUBMIT
   ##
 
-  submit_vector_job:
-    name: Submit vector regression job
+  submit-job:
+    name: Submit regression job
     runs-on: ubuntu-22.04
     needs:
       - compute-metadata
@@ -268,7 +268,7 @@ jobs:
             --replicas ${{ needs.compute-metadata.outputs.replicas }} \
             --baseline-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }} \
             --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }} \
-            --target-config-dir ${{ github.workspace }}/regression/cases \
+            --target-config-dir ${{ github.workspace }}/regression/ \
             --target-name vector \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
