@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, ops::Deref};
 
 use vector_config::configurable_component;
 pub use vector_core::config::ComponentKey;
@@ -20,25 +20,24 @@ pub use vector_core::config::ComponentKey;
 #[derive(Clone, Debug)]
 pub struct Inputs<T>(#[configurable(transparent)] Vec<T>);
 
+impl<T> Inputs<T> {
+    /// Returns `true` if no inputs are present.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl<T> Deref for Inputs<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl<T> Default for Inputs<T> {
     fn default() -> Self {
         Self(Vec::new())
-    }
-}
-
-impl<T> std::ops::Deref for Inputs<T> {
-    type Target = [T];
-
-    #[inline]
-    fn deref(&self) -> &[T] {
-        self.0.as_slice()
-    }
-}
-
-impl<T> std::ops::DerefMut for Inputs<T> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut [T] {
-        self.0.as_mut_slice()
     }
 }
 
@@ -68,7 +67,7 @@ impl<T> Extend<T> for Inputs<T> {
 
 impl<T> IntoIterator for Inputs<T> {
     type Item = T;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type IntoIter = std::vec::IntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -86,7 +85,13 @@ impl<'a, T> IntoIterator for &'a Inputs<T> {
 
 impl<T> FromIterator<T> for Inputs<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self(Vec::from_iter(iter.into_iter()))
+        Self(Vec::from_iter(iter))
+    }
+}
+
+impl<T> From<Vec<T>> for Inputs<T> {
+    fn from(inputs: Vec<T>) -> Self {
+        Self(inputs)
     }
 }
 

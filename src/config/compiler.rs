@@ -237,7 +237,7 @@ fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexS
         for input in candidates {
             if matcher.matches(input) && input != id {
                 matched = true;
-                inputs.extend(Some(input.clone()))
+                inputs.extend(Some(input.to_string()))
             }
         }
         // If it didn't work as a glob pattern, leave it in the inputs as-is. This lets us give

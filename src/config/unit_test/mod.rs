@@ -297,7 +297,10 @@ impl UnitTestBuildMetadata {
         let sinks = template_sinks
             .into_iter()
             .map(|(transform_ids, sink_config)| {
-                let transform_ids_str = transform_ids.iter().map(|s| s.to_string());
+                let transform_ids_str = transform_ids
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>();
                 let sink_ids = transform_ids
                     .iter()
                     .map(|transform_id| {

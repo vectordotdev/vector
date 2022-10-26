@@ -3,7 +3,6 @@ use std::{
     fmt::{self, Display, Formatter},
     hash::Hash,
     net::SocketAddr,
-    ops::Deref,
     path::PathBuf,
 };
 
@@ -148,8 +147,8 @@ impl Config {
     pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
         self.transforms
             .get(id)
-            .map(|t| t.inputs.deref())
-            .or_else(|| self.sinks.get(id).map(|s| s.inputs.deref()))
+            .map(|t| &t.inputs[..])
+            .or_else(|| self.sinks.get(id).map(|s| &s.inputs[..]))
     }
 
     /// Expand a logical component id (i.e. from the config file) into the ids of the

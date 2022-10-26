@@ -97,7 +97,7 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         }
 
         let mut frequencies = HashMap::new();
-        for input in inputs {
+        for input in inputs.into_iter() {
             let entry = frequencies.entry(input.clone()).or_insert(0usize);
             *entry += 1;
         }
