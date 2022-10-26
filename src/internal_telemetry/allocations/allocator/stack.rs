@@ -42,7 +42,7 @@ impl<const N: usize> GroupStack<N> {
         self.current_top += 1;
     }
 
-    /// Pops and returns the pervious allocation group that was on the stack.
+    /// Pops and returns the previous allocation group that was on the stack.
     pub fn pop(&mut self) -> AllocationGroupId {
         if self.current_top == 0 {
             panic!("tried to pop current allocation group from the stack but the stack is empty");
