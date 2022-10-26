@@ -1,11 +1,14 @@
-use crate::lookup_v2::{parse_value_path, BorrowedSegment, ValuePath};
-use std::fmt::{Display, Formatter};
+use crate::lookup_v2::{
+    parse_target_path, parse_value_path, BorrowedSegment, PathParseError, ValuePath,
+};
+use crate::PathPrefix;
+use std::fmt::{Debug, Display, Formatter};
 use vector_config::configurable_component;
 
 /// A lookup path.
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
-#[serde(from = "String", into = "String")]
+#[serde(try_from = "String", into = "String")]
 pub struct OwnedValuePath {
     pub segments: Vec<OwnedSegment>,
 }
@@ -58,7 +61,6 @@ impl OwnedValuePath {
         let mut components = vec![vec![]];
         for segment in self.segments.iter().take(limit) {
             match segment {
-                OwnedSegment::Invalid => return vec![],
                 OwnedSegment::Field(field) => {
                     for component in &mut components {
                         component.push(field.as_str());
@@ -90,10 +92,89 @@ impl OwnedValuePath {
     pub fn push(&mut self, segment: OwnedSegment) {
         self.segments.push(segment);
     }
+}
 
-    pub fn invalid() -> Self {
+/// An owned path that contains a target (pointing to either an Event or Metadata)
+#[configurable_component]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[serde(try_from = "String", into = "String")]
+pub struct OwnedTargetPath {
+    pub prefix: PathPrefix,
+    pub path: OwnedValuePath,
+}
+
+impl OwnedTargetPath {
+    pub fn event_root() -> Self {
+        Self::root(PathPrefix::Event)
+    }
+    pub fn metadata_root() -> Self {
+        Self::root(PathPrefix::Metadata)
+    }
+
+    pub fn root(prefix: PathPrefix) -> Self {
         Self {
-            segments: vec![OwnedSegment::Invalid],
+            prefix,
+            path: OwnedValuePath::root(),
+        }
+    }
+
+    pub fn event(path: OwnedValuePath) -> Self {
+        Self {
+            prefix: PathPrefix::Event,
+            path,
+        }
+    }
+
+    pub fn metadata(path: OwnedValuePath) -> Self {
+        Self {
+            prefix: PathPrefix::Metadata,
+            path,
+        }
+    }
+
+    pub fn can_start_with(&self, prefix: &Self) -> bool {
+        if self.prefix != prefix.prefix {
+            return false;
+        }
+        (&self.path).can_start_with(&prefix.path)
+    }
+
+    pub fn with_field_appended(&self, field: &str) -> Self {
+        let mut new_path = self.path.clone();
+        new_path.push_field(field);
+        Self {
+            prefix: self.prefix,
+            path: new_path,
+        }
+    }
+
+    pub fn with_index_appended(&self, index: isize) -> Self {
+        let mut new_path = self.path.clone();
+        new_path.push_index(index);
+        Self {
+            prefix: self.prefix,
+            path: new_path,
+        }
+    }
+}
+
+impl Display for OwnedTargetPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", String::from(self.to_owned()))
+    }
+}
+
+impl Debug for OwnedTargetPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+impl From<OwnedTargetPath> for String {
+    fn from(target_path: OwnedTargetPath) -> Self {
+        match target_path.prefix {
+            PathPrefix::Event => format!(".{}", target_path.path),
+            PathPrefix::Metadata => format!("%{}", target_path.path),
         }
     }
 }
@@ -104,9 +185,23 @@ impl Display for OwnedValuePath {
     }
 }
 
-impl From<String> for OwnedValuePath {
-    fn from(raw_path: String) -> Self {
-        parse_value_path(raw_path.as_str())
+impl TryFrom<String> for OwnedValuePath {
+    type Error = PathParseError;
+
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        parse_value_path(&src).map_err(|_| PathParseError::InvalidPathSyntax {
+            path: src.to_owned(),
+        })
+    }
+}
+
+impl TryFrom<String> for OwnedTargetPath {
+    type Error = PathParseError;
+
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        parse_target_path(&src).map_err(|_| PathParseError::InvalidPathSyntax {
+            path: src.to_owned(),
+        })
     }
 }
 
@@ -122,9 +217,6 @@ impl From<OwnedValuePath> for String {
                     serialize_field(field.as_ref(), (i != 0).then_some("."))
                 }
                 OwnedSegment::Index(index) => format!("[{}]", index),
-                OwnedSegment::Invalid => {
-                    (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
-                }
                 OwnedSegment::Coalesce(fields) => {
                     let mut output = String::new();
                     let (last, fields) = fields.split_last().expect("coalesce must not be empty");
@@ -194,7 +286,6 @@ pub enum OwnedSegment {
     Field(String),
     Index(isize),
     Coalesce(Vec<String>),
-    Invalid,
 }
 
 impl OwnedSegment {
@@ -215,13 +306,9 @@ impl OwnedSegment {
     pub fn is_index(&self) -> bool {
         matches!(self, OwnedSegment::Index(_))
     }
-    pub fn is_invalid(&self) -> bool {
-        matches!(self, OwnedSegment::Invalid)
-    }
 
     pub fn can_start_with(&self, prefix: &OwnedSegment) -> bool {
         match (self, prefix) {
-            (OwnedSegment::Invalid, _) | (_, OwnedSegment::Invalid) => false,
             (OwnedSegment::Index(a), OwnedSegment::Index(b)) => a == b,
             (OwnedSegment::Index(_), _) | (_, OwnedSegment::Index(_)) => false,
             (OwnedSegment::Field(a), OwnedSegment::Field(b)) => a == b,
@@ -315,7 +402,6 @@ impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let output = self.segments.get(self.index).map(|segment| match segment {
             OwnedSegment::Field(field) => BorrowedSegment::Field(field.as_str().into()),
-            OwnedSegment::Invalid => BorrowedSegment::Invalid,
             OwnedSegment::Index(i) => BorrowedSegment::Index(*i),
             OwnedSegment::Coalesce(fields) => {
                 let coalesce_segment;
@@ -345,50 +431,49 @@ mod test {
     #[test]
     fn owned_path_serialize() {
         let test_cases = [
-            (".", ""),
-            ("", "<invalid>"),
-            ("]", "<invalid>"),
-            ("]foo", "<invalid>"),
-            ("..", "<invalid>"),
-            ("...", "<invalid>"),
-            ("f", "f"),
-            ("foo", "foo"),
+            (".", Some("")),
+            ("", None),
+            ("]", None),
+            ("]foo", None),
+            ("..", None),
+            ("...", None),
+            ("f", Some("f")),
+            ("foo", Some("foo")),
             (
                 r#"ec2.metadata."availability-zone""#,
-                r#"ec2.metadata."availability-zone""#,
+                Some(r#"ec2.metadata."availability-zone""#),
             ),
-            ("@timestamp", "@timestamp"),
-            ("foo[", "<invalid>"),
-            ("foo$", "<invalid>"),
-            (r#""$peci@l chars""#, r#""$peci@l chars""#),
-            ("foo.foo bar", "<invalid>"),
-            (r#"foo."foo bar".bar"#, r#"foo."foo bar".bar"#),
-            ("[1]", "[1]"),
-            ("[42]", "[42]"),
-            ("foo.[42]", "<invalid>"),
-            ("[42].foo", "[42].foo"),
-            ("[-1]", "[-1]"),
-            ("[-42]", "[-42]"),
-            ("[-42].foo", "[-42].foo"),
-            ("[-42]foo", "[-42].foo"),
-            (r#""[42]. {}-_""#, r#""[42]. {}-_""#),
-            (r#""a\"a""#, r#""a\"a""#),
-            (r#"foo."a\"a"."b\\b".bar"#, r#"foo."a\"a"."b\\b".bar"#),
-            ("<invalid>", "<invalid>"),
-            (r#""🤖""#, r#""🤖""#),
-            (".(a|b)", "(a|b)"),
-            (".(a|b|c)", "(a|b|c)"),
-            ("foo.(a|b|c)", "foo.(a|b|c)"),
-            ("[0].(a|b|c)", "[0].(a|b|c)"),
-            (".(a|b|c).foo", "(a|b|c).foo"),
-            (".( a | b | c ).foo", "(a|b|c).foo"),
+            ("@timestamp", Some("@timestamp")),
+            ("foo[", None),
+            ("foo$", None),
+            (r#""$peci@l chars""#, Some(r#""$peci@l chars""#)),
+            ("foo.foo bar", None),
+            (r#"foo."foo bar".bar"#, Some(r#"foo."foo bar".bar"#)),
+            ("[1]", Some("[1]")),
+            ("[42]", Some("[42]")),
+            ("foo.[42]", None),
+            ("[42].foo", Some("[42].foo")),
+            ("[-1]", Some("[-1]")),
+            ("[-42]", Some("[-42]")),
+            ("[-42].foo", Some("[-42].foo")),
+            ("[-42]foo", Some("[-42].foo")),
+            (r#""[42]. {}-_""#, Some(r#""[42]. {}-_""#)),
+            (r#""a\"a""#, Some(r#""a\"a""#)),
+            (r#"foo."a\"a"."b\\b".bar"#, Some(r#"foo."a\"a"."b\\b".bar"#)),
+            ("<invalid>", None),
+            (r#""🤖""#, Some(r#""🤖""#)),
+            (".(a|b)", Some("(a|b)")),
+            (".(a|b|c)", Some("(a|b|c)")),
+            ("foo.(a|b|c)", Some("foo.(a|b|c)")),
+            ("[0].(a|b|c)", Some("[0].(a|b|c)")),
+            (".(a|b|c).foo", Some("(a|b|c).foo")),
+            (".( a | b | c ).foo", Some("(a|b|c).foo")),
         ];
 
         for (path, expected) in test_cases {
-            let path = parse_value_path(path);
-            let path = serde_json::to_string(&path).unwrap();
-            let path = serde_json::from_str::<serde_json::Value>(&path).unwrap();
-            assert_eq!(path, expected);
+            let path = parse_value_path(path).map(String::from).ok();
+
+            assert_eq!(path, expected.map(|x| x.to_owned()));
         }
     }
 }
