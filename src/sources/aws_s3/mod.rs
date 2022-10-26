@@ -1,26 +1,23 @@
-use std::convert::TryInto;
-use std::io::ErrorKind;
+use std::{convert::TryInto, io::ErrorKind};
 
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
-use futures::stream;
-use futures::{stream::StreamExt, TryStreamExt};
+use codecs::BytesDeserializerConfig;
+use futures::{stream, stream::StreamExt, TryStreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use value::Kind;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{DataType, LogNamespace};
 
 use super::util::MultilineConfig;
-use crate::aws::create_client;
-use crate::aws::RegionOrEndpoint;
-use crate::common::s3::S3ClientBuilder;
-use crate::common::sqs::SqsClientBuilder;
-use crate::tls::TlsConfig;
 use crate::{
-    aws::auth::AwsAuthentication,
-    config::{AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext},
+    aws::{auth::AwsAuthentication, create_client, RegionOrEndpoint},
+    common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
+    config::{AcknowledgementsConfig, Output, ProxyConfig, SourceConfig, SourceContext},
     line_agg,
     serde::bool_or_struct,
+    tls::TlsConfig,
 };
 
 pub mod sqs;
@@ -105,6 +102,10 @@ pub struct AwsS3Config {
 
     #[configurable(derived)]
     tls_options: Option<TlsConfig>,
+
+    /// The namespace to use for logs. This overrides the global setting
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl_generate_config_from_default!(AwsS3Config);
@@ -112,6 +113,8 @@ impl_generate_config_from_default!(AwsS3Config);
 #[async_trait::async_trait]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let multiline_config: Option<line_agg::Config> = self
             .multiline
             .as_ref()
@@ -122,13 +125,39 @@ impl SourceConfig for AwsS3Config {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
-                    .run(cx, self.acknowledgements),
+                    .run(cx, self.acknowledgements, log_namespace),
             )),
         }
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let schema_definition = BytesDeserializerConfig
+            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .with_source_metadata(
+                self.get_component_name(),
+                Some("bucket"),
+                "bucket",
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                self.get_component_name(),
+                Some("object"),
+                "object",
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                self.get_component_name(),
+                Some("region"),
+                "region",
+                Kind::bytes(),
+                None,
+            )
+            .unknown_fields(Kind::bytes())
+            .with_standard_vector_source_metadata();
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
