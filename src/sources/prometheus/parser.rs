@@ -132,7 +132,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
 mod test {
     use chrono::{TimeZone, Utc};
     use once_cell::sync::Lazy;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_common::assert_event_data_eq;
     use vector_core::metric_tags;
 

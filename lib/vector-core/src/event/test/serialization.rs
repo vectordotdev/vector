@@ -1,8 +1,8 @@
 use bytes::{Buf, BufMut, BytesMut};
-use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
+use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
 use vector_common::btreemap;
 

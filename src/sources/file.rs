@@ -648,7 +648,7 @@ mod tests {
     };
 
     use encoding_rs::UTF_16LE;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
 

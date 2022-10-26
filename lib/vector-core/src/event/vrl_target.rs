@@ -551,7 +551,7 @@ enum MetricPathError<'a> {
 mod test {
     use chrono::{offset::TimeZone, Utc};
     use lookup::owned_value_path;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_common::btreemap;
     use vrl_lib::Target;
 

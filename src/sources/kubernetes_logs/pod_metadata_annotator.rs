@@ -7,8 +7,8 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::lookup_v2::{parse_value_path, OwnedSegment};
-use lookup::PathPrefix;
+use lookup::lookup_v2::{OptionalTargetPath, ValuePath};
+use lookup::{owned_value_path, path, OwnedTargetPath, PathPrefix};
 use vector_config::configurable_component;
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
@@ -20,57 +20,73 @@ use crate::event::{Event, LogEvent};
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
     /// Event field for Pod name.
-    pub pod_name: String,
+    pub pod_name: OptionalTargetPath,
 
     /// Event field for Pod namespace.
-    pub pod_namespace: String,
+    pub pod_namespace: OptionalTargetPath,
 
     /// Event field for Pod uid.
-    pub pod_uid: String,
+    pub pod_uid: OptionalTargetPath,
 
     /// Event field for Pod IPv4 address.
-    pub pod_ip: String,
+    pub pod_ip: OptionalTargetPath,
 
     /// Event field for Pod IPv4 and IPv6 addresses.
-    pub pod_ips: String,
+    pub pod_ips: OptionalTargetPath,
 
     /// Event field for Pod labels.
-    pub pod_labels: String,
+    pub pod_labels: OptionalTargetPath,
 
     /// Event field for Pod annotations.
-    pub pod_annotations: String,
+    pub pod_annotations: OptionalTargetPath,
 
     /// Event field for Pod node_name.
-    pub pod_node_name: String,
+    pub pod_node_name: OptionalTargetPath,
 
     /// Event field for Pod owner reference.
-    pub pod_owner: String,
+    pub pod_owner: OptionalTargetPath,
 
     /// Event field for container name.
-    pub container_name: String,
+    pub container_name: OptionalTargetPath,
 
     /// Event field for container ID.
-    pub container_id: String,
+    pub container_id: OptionalTargetPath,
 
     /// Event field for container image.
-    pub container_image: String,
+    pub container_image: OptionalTargetPath,
 }
 
 impl Default for FieldsSpec {
     fn default() -> Self {
         Self {
-            pod_name: "kubernetes.pod_name".to_owned(),
-            pod_namespace: "kubernetes.pod_namespace".to_owned(),
-            pod_uid: "kubernetes.pod_uid".to_owned(),
-            pod_ip: "kubernetes.pod_ip".to_owned(),
-            pod_ips: "kubernetes.pod_ips".to_owned(),
-            pod_labels: "kubernetes.pod_labels".to_owned(),
-            pod_annotations: "kubernetes.pod_annotations".to_owned(),
-            pod_node_name: "kubernetes.pod_node_name".to_owned(),
-            pod_owner: "kubernetes.pod_owner".to_owned(),
-            container_name: "kubernetes.container_name".to_owned(),
-            container_id: "kubernetes.container_id".to_owned(),
-            container_image: "kubernetes.container_image".to_owned(),
+            pod_name: OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_name")).into(),
+            pod_namespace: OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_namespace"))
+                .into(),
+            pod_uid: OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_uid")).into(),
+            pod_ip: OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_ip")).into(),
+            pod_ips: OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_ips")).into(),
+            pod_labels: OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_labels"))
+                .into(),
+            pod_annotations: OwnedTargetPath::event(owned_value_path!(
+                "kubernetes",
+                "pod_annotations"
+            ))
+            .into(),
+            pod_node_name: OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_node_name"))
+                .into(),
+            pod_owner: OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_owner")).into(),
+            container_name: OwnedTargetPath::event(owned_value_path!(
+                "kubernetes",
+                "container_name"
+            ))
+            .into(),
+            container_id: OwnedTargetPath::event(owned_value_path!("kubernetes", "container_id"))
+                .into(),
+            container_image: OwnedTargetPath::event(owned_value_path!(
+                "kubernetes",
+                "container_image"
+            ))
+            .into(),
         }
     }
 }
@@ -138,10 +154,9 @@ fn annotate_from_file_info(
     fields_spec: &FieldsSpec,
     file_info: &LogFileInfo<'_>,
 ) {
-    log.insert(
-        fields_spec.container_name.as_str(),
-        file_info.container_name.to_owned(),
-    );
+    if let Some(path) = &fields_spec.container_name.path {
+        log.insert(path, file_info.container_name.to_owned());
+    }
 }
 
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
@@ -152,60 +167,70 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
     ]
     .iter()
     {
-        if let Some(val) = val {
-            log.insert(key.as_str(), val.to_owned());
+        if let (Some(key), Some(val)) = (&key.path, val) {
+            log.insert(key, val.to_owned());
         }
     }
 
-    if let Some(owner_references) = &metadata.owner_references {
+    if let (Some(key), Some(owner_references)) =
+        (&fields_spec.pod_owner.path, &metadata.owner_references)
+    {
         log.insert(
-            fields_spec.pod_owner.as_str(),
+            key,
             format!("{}/{}", owner_references[0].kind, owner_references[0].name),
         );
     }
 
     if let Some(labels) = &metadata.labels {
-        // Calculate and cache the prefix path.
-        let prefix_path = parse_value_path(&fields_spec.pod_labels);
-        for (key, val) in labels.iter() {
-            let mut path = prefix_path.clone().segments;
-            path.push(OwnedSegment::Field(key.clone()));
-            log.insert((PathPrefix::Event, &path), val.to_owned());
+        if let Some(pod_label_prefix) = &fields_spec.pod_labels.path {
+            for (key, val) in labels.iter() {
+                let key_path = path!(key);
+                log.insert(
+                    (PathPrefix::Event, (&pod_label_prefix.path).concat(key_path)),
+                    val.to_owned(),
+                );
+            }
         }
     }
 
     if let Some(annotations) = &metadata.annotations {
-        let prefix_path = parse_value_path(&fields_spec.pod_annotations);
-        for (key, val) in annotations.iter() {
-            let mut path = prefix_path.clone().segments;
-            path.push(OwnedSegment::Field(key.clone()));
-            log.insert((PathPrefix::Event, &path), val.to_owned());
+        if let Some(pod_annotations_prefix) = &fields_spec.pod_annotations.path {
+            for (key, val) in annotations.iter() {
+                let key_path = path!(key);
+                log.insert(
+                    (
+                        PathPrefix::Event,
+                        (&pod_annotations_prefix.path).concat(key_path),
+                    ),
+                    val.to_owned(),
+                );
+            }
         }
     }
 }
 
 fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec: &PodSpec) {
     for (key, val) in [(&fields_spec.pod_node_name, &pod_spec.node_name)].iter() {
-        if let Some(val) = val {
-            log.insert(key.as_str(), val.to_owned());
+        if let (Some(key), Some(val)) = (&key.path, val) {
+            log.insert(key, val.to_owned());
         }
     }
 }
 
 fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_status: &PodStatus) {
     for (key, val) in [(&fields_spec.pod_ip, &pod_status.pod_ip)].iter() {
-        if let Some(val) = val {
-            log.insert(key.as_str(), val.to_owned());
+        if let (Some(key), Some(val)) = (&key.path, val) {
+            log.insert(key, val.to_owned());
         }
     }
 
     for (key, val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
-        if let Some(val) = val {
+        if let (Some(key), Some(val)) = (&key.path, val) {
             let inner: Vec<String> = val
                 .iter()
                 .filter_map(|v| v.ip.clone())
                 .collect::<Vec<String>>();
-            log.insert(key.as_str(), inner);
+            log.insert(key, inner);
         }
     }
 }
@@ -216,16 +241,16 @@ fn annotate_from_container_status(
     container_status: &ContainerStatus,
 ) {
     for (key, val) in [(&fields_spec.container_id, &container_status.container_id)].iter() {
-        if let Some(val) = val {
-            log.insert(key.as_str(), val.to_owned());
+        if let (Some(key), Some(val)) = (&key.path, val) {
+            log.insert(key, val.to_owned());
         }
     }
 }
 
 fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, container: &Container) {
     for (key, val) in [(&fields_spec.container_image, &container.image)].iter() {
-        if let Some(val) = val {
-            log.insert(key.as_str(), val.to_owned());
+        if let (Some(key), Some(val)) = (&key.path, val) {
+            log.insert(key, val.to_owned());
         }
     }
 }
@@ -289,12 +314,12 @@ mod tests {
             ),
             (
                 FieldsSpec {
-                    pod_name: "name".to_owned(),
-                    pod_namespace: "ns".to_owned(),
-                    pod_uid: "uid".to_owned(),
-                    pod_labels: "labels".to_owned(),
+                    pod_name: OwnedTargetPath::event(owned_value_path!("name")).into(),
+                    pod_namespace: OwnedTargetPath::event(owned_value_path!("ns")).into(),
+                    pod_uid: OwnedTargetPath::event(owned_value_path!("uid")).into(),
+                    pod_labels: OwnedTargetPath::event(owned_value_path!("labels")).into(),
                     // ensure we can disable fields
-                    pod_annotations: "".to_owned(),
+                    pod_annotations: OptionalTargetPath::none(),
                     ..Default::default()
                 },
                 ObjectMeta {
@@ -381,7 +406,7 @@ mod tests {
             },
         ),(
             FieldsSpec{
-                container_name: "container_name".to_owned(),
+                container_name: OwnedTargetPath::event(owned_value_path!("container_name")).into(),
                 ..Default::default()
             },
             "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
@@ -422,7 +447,7 @@ mod tests {
             ),
             (
                 FieldsSpec {
-                    pod_node_name: "node_name".to_owned(),
+                    pod_node_name: OwnedTargetPath::event(owned_value_path!("node_name")).into(),
                     ..Default::default()
                 },
                 PodSpec {
@@ -481,8 +506,16 @@ mod tests {
             ),
             (
                 FieldsSpec {
-                    pod_ip: "kubernetes.custom_pod_ip".to_owned(),
-                    pod_ips: "kubernetes.custom_pod_ips".to_owned(),
+                    pod_ip: OwnedTargetPath::event(owned_value_path!(
+                        "kubernetes",
+                        "custom_pod_ip"
+                    ))
+                    .into(),
+                    pod_ips: OwnedTargetPath::event(owned_value_path!(
+                        "kubernetes",
+                        "custom_pod_ips"
+                    ))
+                    .into(),
                     ..FieldsSpec::default()
                 },
                 PodStatus {
@@ -507,7 +540,7 @@ mod tests {
             ),
             (
                 FieldsSpec {
-                    pod_node_name: "node_name".to_owned(),
+                    pod_node_name: OwnedTargetPath::event(owned_value_path!("node_name")).into(),
                     ..FieldsSpec::default()
                 },
                 PodStatus {
@@ -591,7 +624,8 @@ mod tests {
             ),
             (
                 FieldsSpec {
-                    container_image: "container_image".to_owned(),
+                    container_image: OwnedTargetPath::event(owned_value_path!("container_image"))
+                        .into(),
                     ..Default::default()
                 },
                 Container {
