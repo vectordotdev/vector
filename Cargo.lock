@@ -581,7 +581,7 @@ dependencies = [
  "aws-http",
  "aws-sdk-sso",
  "aws-sdk-sts",
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.49.0",
@@ -641,7 +641,7 @@ dependencies = [
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.49.0",
@@ -664,7 +664,7 @@ dependencies = [
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.49.0",
@@ -686,7 +686,7 @@ dependencies = [
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.49.0",
@@ -708,7 +708,7 @@ dependencies = [
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.49.0",
@@ -729,7 +729,7 @@ dependencies = [
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.49.0",
@@ -752,7 +752,7 @@ dependencies = [
  "aws-http",
  "aws-sig-auth",
  "aws-sigv4",
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-checksums",
  "aws-smithy-client",
  "aws-smithy-eventstream",
@@ -779,7 +779,7 @@ dependencies = [
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.49.0",
@@ -802,7 +802,7 @@ dependencies = [
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.49.0",
@@ -824,7 +824,7 @@ dependencies = [
  "aws-endpoint",
  "aws-http",
  "aws-sig-auth",
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.49.0",
@@ -884,6 +884,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-smithy-async"
+version = "0.51.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b3442b4c5d3fc39891a2e5e625735fba6b24694887d49c6518460fde98247a9"
+dependencies = [
+ "futures-util",
+ "pin-project-lite",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "aws-smithy-checksums"
 version = "0.49.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -910,7 +922,7 @@ version = "0.49.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec39585f8274fa543ad5c63cc09cbd435666be16b2cf99e4e07be5cf798bc050"
 dependencies = [
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.49.0",
  "aws-smithy-types 0.49.0",
@@ -1066,7 +1078,7 @@ version = "0.49.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93f3f349b39781849261db1c727369923bb97007cf7bd0deb3a6e9e461c8d38f"
 dependencies = [
- "aws-smithy-async",
+ "aws-smithy-async 0.49.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-types 0.49.0",
@@ -8828,7 +8840,7 @@ dependencies = [
  "aws-sdk-s3",
  "aws-sdk-sqs",
  "aws-sigv4",
- "aws-smithy-async",
+ "aws-smithy-async 0.51.0",
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.51.0",
