@@ -611,13 +611,19 @@ impl ByteSizeOf for Sample {
 /// Histogram buckets represent the `count` of observations where the value of the observations does
 /// not exceed the specified `upper_limit`.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub struct Bucket {
     /// The upper limit of values in the bucket.
     pub upper_limit: f64,
 
     /// The number of values tracked in this bucket.
     pub count: u64,
+}
+
+impl PartialEq for Bucket {
+    fn eq(&self, other: &Self) -> bool {
+        self.count == other.count && float_eq(self.upper_limit, other.upper_limit)
+    }
 }
 
 impl ByteSizeOf for Bucket {
