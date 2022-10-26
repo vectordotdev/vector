@@ -91,16 +91,12 @@ pub struct AllocationGroupToken {
 }
 
 impl AllocationGroupToken {
-    pub fn enter(&mut self) {
+    pub fn enter(&self) {
         push_group_to_stack(self.id);
     }
 
-    pub fn exit(&mut self) {
-        let current = pop_group_from_stack();
-        debug_assert_eq!(
-            current, self.id,
-            "popped group from stack but got unexpected group"
-        );
+    pub fn exit(&self) {
+        pop_group_from_stack();
     }
 }
 
@@ -122,11 +118,11 @@ where
 {
     let _result = LOCAL_ALLOCATION_GROUP_STACK.try_with(
         #[inline(always)]
-        |current_group_id| {
+        |group_stack| {
             // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, which allows callers to skip trying to run
             // `f` if they cannot mutably borrow the current allocation group. As `try_borrow_mut` will only let one
             // mutable borrow happen at a time, the tracker logic is never reentrant.
-            if let Ok(stack) = current_group_id.try_borrow_mut() {
+            if let Ok(stack) = group_stack.try_borrow_mut() {
                 f(stack.current());
             }
         },
@@ -148,13 +144,13 @@ where
 {
     let _result = LOCAL_ALLOCATION_GROUP_STACK.try_with(
         #[inline(always)]
-        |stack| {
+        |group_stack| {
             // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, as `try_borrow_mut` will only let one
             // mutable borrow happen at a time. As we simply want to ensure that the allocation group is suspended, we
             // don't care what the return value is: calling `try_borrow_mut` and holding on to the result until the end
             // of the scope is sufficient to either suspend the allocation group or know that it's already suspended and
             // will stay that way until we're done in this method.
-            let _result = stack.try_borrow_mut();
+            let _result = group_stack.try_borrow_mut();
             f();
         },
     );
