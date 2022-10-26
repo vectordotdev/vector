@@ -47,7 +47,7 @@ version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
  "once_cell",
  "version_check",
 ]
@@ -59,7 +59,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57e6e951cfbb2db8de1828d49073a113a29fd7117b1596caa781a258c7e38d72"
 dependencies = [
  "cfg-if",
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
  "once_cell",
  "serde",
  "version_check",
@@ -1084,7 +1084,7 @@ dependencies = [
  "bytes 1.2.1",
  "dyn-clone",
  "futures 0.3.25",
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
  "http-types",
  "log",
  "paste",
@@ -1172,7 +1172,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b62ddb9cb1ec0a098ad4bbf9344d0713fa193ae1a80af55febcff2627b6a00c1"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
  "instant",
  "rand 0.8.5",
 ]
@@ -3045,14 +3045,14 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.6"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9be70c98951c83b8d2f8f60d7065fa6d5146873094452a1008da8c2f1e4205ad"
+checksum = "c05aeb6a22b8f62540c194aac980f2115af067bfe15a0734d7277a768d396b31"
 dependencies = [
  "cfg-if",
  "js-sys",
  "libc",
- "wasi 0.10.2+wasi-snapshot-preview1",
+ "wasi 0.11.0+wasi-snapshot-preview1",
  "wasm-bindgen",
 ]
 
@@ -4887,7 +4887,7 @@ dependencies = [
  "byteorder",
  "data-encoding",
  "ed25519-dalek",
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
  "log",
  "rand 0.8.5",
  "signatory",
@@ -5156,7 +5156,7 @@ checksum = "80e47cfc4c0a1a519d9a025ebfbac3a2439d1b5cdf397d72dcb79b11d9920dab"
 dependencies = [
  "base64",
  "chrono",
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
  "http",
  "rand 0.8.5",
  "reqwest",
@@ -6224,7 +6224,7 @@ version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
 ]
 
 [[package]]
@@ -6401,7 +6401,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b033d837a7cf162d7993aded9304e30a83213c648b6e389db233191f891e5c2b"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
  "redox_syscall 0.2.13",
  "thiserror",
 ]
@@ -8683,7 +8683,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
  "serde",
 ]
 
@@ -8693,7 +8693,7 @@ version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "feb41e78f93363bb2df8b0e86a2ca30eed7806ea16ea0c790d757cf93f79be83"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
  "rand 0.8.5",
  "serde",
 ]
@@ -9359,7 +9359,7 @@ dependencies = [
 name = "vrl-web-playground"
 version = "0.1.0"
 dependencies = [
- "getrandom 0.2.6",
+ "getrandom 0.2.8",
  "gloo-utils",
  "serde",
  "serde-wasm-bindgen",
