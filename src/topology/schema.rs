@@ -335,7 +335,7 @@ mod tests {
     use std::collections::HashMap;
 
     use indexmap::IndexMap;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use value::Kind;
     use vector_core::config::{DataType, Output};
 

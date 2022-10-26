@@ -293,7 +293,7 @@ mod test {
         service::{make_service_fn, service_fn},
         Body, Client, Response, Server,
     };
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
     use warp::Filter;
 

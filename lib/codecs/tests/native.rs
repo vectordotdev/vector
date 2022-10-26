@@ -8,7 +8,7 @@ use codecs::{
     decoding::format::Deserializer, NativeDeserializerConfig, NativeJsonDeserializerConfig,
     NativeJsonSerializerConfig, NativeSerializerConfig,
 };
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 use tokio_util::codec::Encoder;
 use vector_core::config::LogNamespace;
 
