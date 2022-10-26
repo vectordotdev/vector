@@ -40,7 +40,7 @@ const DROPPED: &str = "dropped";
 /// Configuration for the `remap` transform.
 #[configurable_component(transform("remap"))]
 #[derive(Clone, Debug, Derivative)]
-#[serde(deny_unknown_fields, default)]
+#[serde(deny_unknown_fields)]
 #[derivative(Default)]
 pub struct RemapConfig {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
@@ -48,6 +48,10 @@ pub struct RemapConfig {
     /// Required if `file` is missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
+    #[configurable(metadata(
+        docs::examples = ". = parse_json!(.message)\n.new_field = \"new value\"\n.status = to_int!(.status)\n.duration = parse_duration!(.duration, \"s\")\n.new_name = del(.old_name)",
+        docs::syntax_override = "remap_program"
+    ))]
     pub source: Option<String>,
 
     /// File path to the [Vector Remap Language][vrl] (VRL) program to execute for each event.
@@ -57,6 +61,7 @@ pub struct RemapConfig {
     /// Required if `source` is missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
+    #[configurable(metadata(docs::examples = "./my/program.vrl",))]
     pub file: Option<PathBuf>,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
@@ -80,6 +85,7 @@ pub struct RemapConfig {
     ///
     /// Additionally, dropped events can potentially be diverted to a specially named output for
     /// further logging and analysis by setting `reroute_dropped`.
+    #[serde(default = "crate::serde::default_false")]
     pub drop_on_error: bool,
 
     /// Drops any event that is manually aborted during processing.
@@ -106,6 +112,7 @@ pub struct RemapConfig {
     /// In these cases, `reroute_dropped` can be set to `true` which will forward the original event
     /// to a specially-named output, `dropped`. The original event will be annotated with additional
     /// fields describing why the event was dropped.
+    #[serde(default = "crate::serde::default_false")]
     pub reroute_dropped: bool,
 
     #[configurable(derived)]
