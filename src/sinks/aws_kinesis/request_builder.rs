@@ -93,12 +93,15 @@ where
         &self.encoder
     }
 
-    fn split_input(&self, mut event: KinesisProcessedEvent) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        mut processed_event: KinesisProcessedEvent,
+    ) -> (Self::Metadata, Self::Events) {
         let metadata = KinesisMetadata {
-            finalizers: event.event.take_finalizers(),
-            partition_key: event.metadata.partition_key,
+            finalizers: processed_event.event.take_finalizers(),
+            partition_key: processed_event.metadata.partition_key,
         };
-        let event = Event::from(event.event);
+        let event = Event::from(processed_event.event);
         let builder = RequestMetadataBuilder::from_events(&event);
 
         ((metadata, builder), event)
