@@ -8832,7 +8832,7 @@ dependencies = [
  "aws-smithy-client",
  "aws-smithy-http 0.49.0",
  "aws-smithy-http-tower 0.51.0",
- "aws-smithy-types 0.49.0",
+ "aws-smithy-types 0.51.0",
  "aws-types",
  "axum",
  "azure_core",
