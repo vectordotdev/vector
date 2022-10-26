@@ -48,6 +48,8 @@ mod vrl;
 
 use std::path::PathBuf;
 
+use float_eq::FloatEq;
+
 #[cfg(feature = "vrl")]
 pub use vrl::compile_vrl;
 
@@ -67,3 +69,11 @@ pub fn default_data_dir() -> Option<PathBuf> {
 }
 
 pub(crate) use vector_common::{Error, Result};
+
+pub(crate) fn float_eq(l_value: f64, r_value: f64) -> bool {
+    if l_value.is_nan() && r_value.is_nan() {
+        true
+    } else {
+        l_value.eq_ulps(&r_value, &1)
+    }
+}

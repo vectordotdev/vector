@@ -1,12 +1,11 @@
 use core::fmt;
 use std::collections::BTreeSet;
 
-use float_eq::FloatEq;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
 use super::{samples_to_buckets, write_list, write_word};
-use crate::metrics::AgentDDSketch;
+use crate::{float_eq, metrics::AgentDDSketch};
 
 /// Metric value.
 #[configurable_component]
@@ -417,14 +416,6 @@ impl PartialEq for MetricValue {
             }
             _ => false,
         }
-    }
-}
-
-fn float_eq(l_value: f64, r_value: f64) -> bool {
-    if l_value.is_nan() && r_value.is_nan() {
-        true
-    } else {
-        l_value.eq_ulps(&r_value, &1)
     }
 }
 
