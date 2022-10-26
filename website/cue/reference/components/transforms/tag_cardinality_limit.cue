@@ -9,7 +9,7 @@ components: transforms: tag_cardinality_limit: {
 		of metrics storages.
 
 		The default behavior is to drop the tag from incoming metrics when the configured
-		limit would be exceeded. Note that this usually only useful when applied to
+		limit would be exceeded. Note that this is usually only useful when applied to
 		incremental counter metrics and can have unindended effects when applied to other
 		metric types. The default action to take can be modified with the
 		`limit_exceeded_action` option.
