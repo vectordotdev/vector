@@ -43,6 +43,11 @@ pub struct CounterConfig {
 }
 
 /// Specification of a metric derived from a log event.
+// TODO: While we're resolving the schema for this enum somewhat reasonably (in
+// `generate-components-docs.rb`), we have a problem where an overlapping field (overlap between two
+// or more of the subschemas) takes the details of the last subschema to be iterated over that
+// contains that field, such that, for example, the `Summary` variant below is overriding the
+// description for almost all of the fields because they're shared across all of the variants.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct MetricConfig {
