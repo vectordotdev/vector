@@ -60,7 +60,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
-        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(acknowledgements);
         Ok(Box::pin(async move {
             let span = Span::current();
             let mut filter: BoxedFilter<()> = match method {

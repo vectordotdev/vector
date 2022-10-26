@@ -114,7 +114,7 @@ where
         acknowledgements: AcknowledgementsConfig,
         max_connections: Option<u32>,
     ) -> crate::Result<crate::sources::Source> {
-        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(acknowledgements);
 
         Ok(Box::pin(async move {
             let listenfd = ListenFd::from_env();

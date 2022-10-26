@@ -140,7 +140,8 @@ impl SourceContext {
         }
     }
 
-    pub fn do_acknowledgements(&self, config: &AcknowledgementsConfig) -> bool {
+    pub fn do_acknowledgements<C: Into<AcknowledgementsConfig>>(&self, config: C) -> bool {
+        let config = config.into();
         if config.enabled() {
             warn!(
                 message = "Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.",

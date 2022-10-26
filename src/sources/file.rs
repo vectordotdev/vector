@@ -17,7 +17,9 @@ use vector_core::config::LogNamespace;
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
-    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
+    config::{
+        log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+    },
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
@@ -194,7 +196,7 @@ pub struct FileConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 /// Configuration for how files should be identified.
@@ -360,7 +362,7 @@ impl SourceConfig for FileConfig {
             }
         }
 
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(file_source(
             self,

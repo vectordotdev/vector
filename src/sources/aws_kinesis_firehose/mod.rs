@@ -11,7 +11,7 @@ use warp::Filter;
 use crate::{
     codecs::DecodingConfig,
     config::{
-        AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
+        GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -58,7 +58,7 @@ pub struct AwsKinesisFirehoseConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 /// Compression scheme for records in a Firehose message.
@@ -103,7 +103,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             LogNamespace::Legacy,
         )
         .build();
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         let svc = filters::firehose(
             self.access_key.as_ref().map(|k| k.inner().to_owned()),
