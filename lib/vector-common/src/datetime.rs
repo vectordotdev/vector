@@ -105,6 +105,9 @@ impl Configurable for TimeZone {
 
 [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"#);
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "untagged"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "local"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "America/New_York"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "EST5EDT"));
         metadata
     }
 

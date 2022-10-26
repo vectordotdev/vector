@@ -57,6 +57,7 @@ pub struct ProxyConfig {
     ///
     /// Must be a valid URI string.
     #[configurable(validation(format = "uri"))]
+    #[configurable(metadata(docs::examples = "http://foo.bar:3128"))]
     #[serde(default)]
     pub http: Option<String>,
 
@@ -65,6 +66,7 @@ pub struct ProxyConfig {
     /// Must be a valid URI string.
     #[configurable(validation(format = "uri"))]
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "http://foo.bar:3128"))]
     pub https: Option<String>,
 
     /// A list of hosts to avoid proxying.
