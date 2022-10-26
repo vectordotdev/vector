@@ -44,7 +44,7 @@ pub enum TemplateRenderingError {
 /// look something like `my-file.log`, a template string could look something like `my-file-{{key}}.log`, and the `key`
 /// field of the event being processed would serve as the value when rendering the template into a string.
 #[configurable_component]
-#[configurable(metadata(docs::templateable, docs::no_description))]
+#[configurable(metadata(docs::templateable))]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {

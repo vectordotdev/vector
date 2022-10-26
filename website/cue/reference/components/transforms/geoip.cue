@@ -35,44 +35,7 @@ components: transforms: geoip: {
 		notices: []
 	}
 
-	configuration: {
-		database: {
-			description: """
-				Path to the [MaxMind GeoIP2](\(urls.maxmind_geoip2)) or [GeoLite2 binary city
-				database](\(urls.maxmind_geolite2_city)) file (`GeoLite2-City.mmdb`). Other
-				databases, such as the country database, are not supported.
-				"""
-			required:    true
-			type: string: {
-				examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
-			}
-		}
-		source: {
-			description: "The field name that contains the IP address. This field should contain a valid IPv4 or IPv6 address."
-			required:    true
-			type: string: {
-				examples: ["ip_address", "x-forwarded-for", "parent.child", "array[0]"]
-			}
-		}
-		target: {
-			common:      true
-			description: "The default field to insert the resulting GeoIP data into. See [output](#output-data) for more info."
-			required:    false
-			type: string: {
-				default: "geoip"
-				examples: ["geoip", "parent.child"]
-			}
-		}
-		locale: {
-			description: "The locale to use to lookup the country name and region name for the city database. See [Locations Files](https://dev.maxmind.com/geoip/docs/databases/city-and-country?lang=en)"
-			required:    false
-			common:      false
-			type: string: {
-				default: "en"
-				examples: ["de", "en", "es", "fr", "ja", "pt-BR", "ru", "zh-CN"]
-			}
-		}
-	}
+	configuration: base.components.transforms.geoip.configuration
 
 	input: {
 		logs:    true

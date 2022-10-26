@@ -20,6 +20,16 @@ end
 ))
 @logger.level = ENV['LOG_LEVEL'] || 'info'
 
+@default_schema_type_values = {
+  "array" => [],
+  "uint" => 0,
+  "float" => 0,
+  "string" => "",
+  "boolean" => false,
+}
+
+@numeric_schema_types = %w[uint int float]
+
 # Cross-platform friendly method of finding if command exists on the current path.
 #
 # If the command is found, the full path to it is returned. Otherwise, `nil` is returned.
@@ -133,6 +143,25 @@ def docs_type_str(value)
   type_str
 end
 
+# Gets the type of the resolved schema.
+#
+# If the resolved schema has more than one type defined, `nil` is returned.
+def resolved_schema_type?(resolved_schema)
+  if resolved_schema['type'].length == 1
+    resolved_schema['type'].keys.first
+  else
+  end
+end
+
+# Gets the numeric type of the resolved schema.
+#
+# If the resolved schema has more than one type defined, or the type is not a numeric type, `nil` is
+# returned.
+def numeric_schema_type(resolved_schema)
+  schema_type = resolved_schema_type?(resolved_schema)
+  schema_type if @numeric_schema_types.include?(schema_type)
+end
+
 # Gets the schema type field for the given value's type.
 #
 # Essentially, as we resolve a schema we end up with a hash that looks like this:
@@ -153,7 +182,7 @@ def get_schema_type_field_for_value(schema, value)
   value_type = docs_type_str(value)
   case value_type
   when 'number'
-    %w[uint int float].each do |numeric_type|
+    @numeric_schema_types.each do |numeric_type|
       type_field = schema.dig('type', numeric_type)
       return type_field unless type_field.nil?
     end
@@ -204,9 +233,25 @@ end
 def apply_object_property_fields!(parent_schema, property_schema, property_name, property)
   @logger.debug "Applying object property fields for '#{property_name}'..."
 
-  # Set whether or not this property is required.
   required_properties = parent_schema['required'] || []
-  has_default_value = !property_schema['default'].nil? || !parent_schema.dig('default', property_name).nil?
+  has_self_default_value = !property_schema['default'].nil?
+  has_parent_default_value = !parent_schema.dig('default', property_name).nil?
+  has_default_value = has_self_default_value || has_parent_default_value
+  is_required = required_properties.include?(property_name)
+
+  if has_self_default_value
+    @logger.debug "Property has self-defined default value: #{property_schema['default']}"
+  end
+
+  if has_parent_default_value
+    @logger.debug "Property has parent-defined default value: #{parent_schema.dig('default', property_name)}"
+  end
+
+  if is_required
+    @logger.debug "Property is marked as required."
+  end
+
+  # Set whether or not this property is required.
   property['required'] = required_properties.include?(property_name) && !has_default_value
 end
 
@@ -239,15 +284,46 @@ end
 def get_reduced_schema(schema)
   schema = deep_copy(schema)
 
-  # TODO: We may or may not have to also do reduction at further levels i.e. clean up `properties`
-  # when the schema has the object type, etc.
-
   allowed_properties = ['type', 'const', 'enum', 'allOf', 'oneOf', '$ref', 'items']
   schema.delete_if { |key, _value| !allowed_properties.include?(key) }
 
   schema['allOf'].map!(get_reduced_schema) if schema.key?('allOf')
-
   schema['oneOf'].map!(get_reduced_schema) if schema.key?('oneOf')
+
+  schema
+end
+
+
+# Gets a reduced version of a resolved schema.
+#
+# This is similar in purpose to `get_reduced_schema` but only cares about fields relevant to a
+# resolved schema.
+def get_reduced_resolved_schema(schema)
+  schema = deep_copy(schema)
+
+  allowed_types = ['condition', 'object', 'array', 'enum', 'const', 'string', 'bool', 'float', 'int', 'uint']
+  allowed_fields = []
+
+  # Clear out anything not related to the type definitions first.
+  schema.delete_if { |key, _value| key != 'type' }
+  type_defs = schema['type']
+  if !type_defs.nil?
+    type_defs.delete_if { |key, _value| !allowed_types.include?(key) }
+    schema['type'].each { |type_name, type_def|
+      case type_name
+      when "object"
+        type_def.delete_if { |key, _value| key != 'options' }
+        type_def['options'].transform_values! { |property|
+          get_reduced_resolved_schema(property)
+        }
+      when "array"
+        type_def.delete_if { |key, _value| key != 'items' }
+        type_def['items'] = get_reduced_resolved_schema(type_def['items'])
+      else
+        type_def.delete_if { |key, _value| !allowed_types.include?(key) }
+      end
+    }
+  end
 
   schema
 end
@@ -290,7 +366,7 @@ end
 # transforming certain usages -- composite/enum (`allOf`, `oneOf`), etc -- into more human-readable
 # forms.
 def resolve_schema(root_schema, schema)
-  # First, skip any schema that is marked as hidden.
+  # Skip any schema that is marked as hidden.
   #
   # While this is already sort of obvious, one non-obvious usage is for certain types that we
   # manually merge after this script runs, such as the high-level "outer" (`SinkOuter`, etc) types.
@@ -305,15 +381,33 @@ def resolve_schema(root_schema, schema)
     return
   end
 
-  # Next, return a bare-minimum resolved schema for any schema marked as a cycle entrypoint.
+  # Avoid schemas that represent a resolution cycle.
   #
-  # This means the schema is self-referential (i.e. the `pipelines` transform, which is part of
-  # `Transforms`, having a field that references `Transforms`) and we have to break the cycle.
+  # When a schema is marked as a "cycle entrypoint", this means the schema is self-referential (i.e.
+  # the `pipelines` transform, which is part of `Transforms`, having a field that references
+  # `Transforms`) and we have to break the cycle.
   #
   # We have to return _something_, as it's a real part of the schema, so we just return a basic
   # schema with no type information but with any description that is specified, etc.
   if get_schema_metadata(schema, 'docs::cycle_entrypoint')
     resolved = { 'type' => 'blank' }
+    description = get_rendered_description_from_schema(schema)
+    resolved['description'] = description unless description.empty?
+    return resolved
+  end
+
+  # Handle schemas that have type overrides.
+  #
+  # In order to better represent specific field types in the documentation, we may opt to use a
+  # special type definition name, separate from the classic types like "bool" or "string" or
+  # "object", and so on, in order to let the documentation generation process inject more
+  # full-fledged output than we can curry from the Rust side, across the configuration schema.
+  #
+  # We intentially set no actual definition for these types, relying on the documentation generation
+  # process to provide the actual details. We only need to specify the custom type name.
+  type_override = get_schema_metadata(schema, 'docs::type_override')
+  if !type_override.nil?
+    resolved = { 'type' => { type_override.to_s => {} } }
     description = get_rendered_description_from_schema(schema)
     resolved['description'] = description unless description.empty?
     return resolved
@@ -328,9 +422,17 @@ def resolve_schema(root_schema, schema)
   # Otherwise, we simply resolve the schema as it exists.
   referenced_schema_name = get_schema_ref(schema)
   resolved = if !referenced_schema_name.nil?
+    @logger.debug "Resolving referenced schema '#{referenced_schema_name}..."
     resolve_schema_by_name(root_schema, referenced_schema_name)
   else
     resolve_bare_schema(root_schema, schema)
+  end
+
+  # If this is an array schema, remove the description from the schema used for the items, as we
+  # want the description for the overall property, using this array schema, to describe everything.
+  items_schema = resolved.dig('type', 'array', 'items')
+  if !items_schema.nil?
+    items_schema.delete('description')
   end
 
   # Apply any necessary defaults, descriptions, etc, to the resolved schema. This must happen here
@@ -338,8 +440,6 @@ def resolve_schema(root_schema, schema)
   # schema definition that have to be layered.
   apply_schema_default_value!(schema, resolved)
   apply_schema_metadata!(schema, resolved)
-
-  @logger.debug "About to resolve original schema: #{schema}"
 
   description = get_rendered_description_from_schema(schema)
   resolved['description'] = description unless description.empty?
@@ -408,7 +508,15 @@ def resolve_bare_schema(root_schema, schema)
       # (`*`) which uses the specified schema for that field.
       additional_properties = schema['additionalProperties']
       if !additional_properties.nil?
+        # If the schema has no other properties -- i.e. it's always just a free-form "whatever
+        # properties you want" object schema -- then copy the title/description of the schema to
+        # this free-form schema we're generating. Since it's still a property on an object schema at
+        # the end of the day, we need follow the rules of providing a description, and so on.
+        additional_properties['title'] = schema['title'] unless schema['title'].nil?
+        additional_properties['description'] = schema['description'] unless schema['description'].nil?
+
         resolved_additional_properties = resolve_schema(root_schema, additional_properties)
+        resolved_additional_properties['required'] = true
         options.push(['*', resolved_additional_properties])
       end
 
@@ -426,6 +534,8 @@ def resolve_bare_schema(root_schema, schema)
       numeric_type = get_schema_metadata(schema, 'docs::numeric_type') || 'number'
       number_def = {}
       number_def['default'] = schema['default'] unless schema['default'].nil?
+
+      @logger.debug 'Resolved number schema.'
 
       { numeric_type => number_def }
     when 'boolean'
@@ -469,7 +579,7 @@ def resolve_enum_schema(root_schema, schema)
   enum_tagging = get_schema_metadata(schema, 'docs::enum_tagging')
   if enum_tagging.nil?
     @logger.error 'Enum schemas should never be missing the metadata for the enum tagging mode.'
-    @logger.error "Schema: #{JSON.pretty_generate(schema)}"
+    @logger.error "Schema: #{schema}"
     exit
   end
 
@@ -539,7 +649,9 @@ def resolve_enum_schema(root_schema, schema)
     # This transformation only makes sense when all subschemas are objects, so only resolve the ones
     # that are objects, and only proceed if all of them were resolved.
     resolved_subschemas = subschemas.filter_map do |subschema|
-      resolve_schema(root_schema, subschema) if get_schema_type(subschema) == 'object'
+      # the exact enum variant probably isn't an object? but probabilistic is... gotta handle that
+      resolved = resolve_schema(root_schema, subschema)
+      resolved if resolved_schema_type?(resolved) == 'object'
     end
 
     if resolved_subschemas.count == subschemas.count
@@ -578,7 +690,7 @@ def resolve_enum_schema(root_schema, schema)
 
         if tag_value.nil?
           @logger.error 'All enum subschemas representing an internally-tagged enum must have the tag field use a const value.'
-          @logger.error "Tag subschema: #{JSON.pretty_generate(tag_subschema)}"
+          @logger.error "Tag subschema: #{tag_subschema}"
           exit
         end
 
@@ -596,13 +708,13 @@ def resolve_enum_schema(root_schema, schema)
           resolved_property = if !existing_property.nil?
             # The property is already being tracked, so just do a check to make sure the property from our
             # current subschema matches the existing property, schema-wise, before we update it.
-            reduced_existing_property = get_reduced_schema(existing_property)
-            reduced_new_property = get_reduced_schema(property_schema)
+            reduced_existing_property = get_reduced_resolved_schema(existing_property)
+            reduced_new_property = get_reduced_resolved_schema(property_schema)
 
             if reduced_existing_property != reduced_new_property
-              @logger.error "Had overlapping property '#{property_name}' from resolved enum subschema, but schemas differed: \
-              Existing property schema (reduced): #{reduced_existing_property} \
-              New property schema (reduced): #{reduced_new_property}"
+              @logger.error "Had overlapping property '#{property_name}' from resolved enum subschema, but schemas differed:"
+              @logger.error "Existing property schema (reduced): #{reduced_existing_property}"
+              @logger.error "New property schema (reduced): #{reduced_new_property}"
               exit
             end
 
@@ -684,11 +796,114 @@ def resolve_enum_schema(root_schema, schema)
     end
 
     if tag_values.keys.all? { |tag| !tag.nil? && tag.is_a?(String) }
-      @logger.debug "Resolved as 'externally-tagged with only unit varaints' enum schema."
+      @logger.debug "Resolved as 'externally-tagged with only unit variants' enum schema."
 
       return { '_resolved' => { 'type' => { 'string' => {
         'enum' => tag_values.transform_values { |tag_schema| get_rendered_description_from_schema(tag_schema) }
       } } } }
+    end
+  end
+
+  # Schema pattern: untagged enum with narrowing constant variants and catch-all free-form variant.
+  #
+  # This a common pattern where an enum might represent a particular single value type, say a
+  # string, and it contains multiple variants where one is a "dynamic" variant and the others are
+  # "fixed", such that the dynamic variant can represent all possible string values _except_ for the
+  # string values defined by each fixed variant.
+  #
+  # An example of this is the `TimeZone` enum, where there is one variant `Local`, represented by
+  # `"local"`, and the other variant `Named` can represent any other possible timezone.
+  if enum_tagging == 'untagged'
+    type_def_kinds = []
+    fixed_subschemas = 0
+    freeform_subschemas = 0
+
+    subschemas.each do |subschema|
+      @logger.debug "Untagged subschema: #{subschema}"
+      schema_type = get_schema_type(subschema)
+      case schema_type
+      when nil, "all-of", "one-of"
+        # We don't handle these cases.
+      when "const"
+        # Track the type definition kind associated with the constant value.
+        type_def_kinds << docs_type_str(subschema['const'])
+        fixed_subschemas = fixed_subschemas + 1
+      when "enum"
+        # Figure out the type definition kind for each enum value and track it.
+        type_def_kinds << subschema['enum'].map { |value| docs_type_str(value) }
+        fixed_subschemas = fixed_subschemas + 1
+      else
+        # Just a regular schema type, so track it.
+        type_def_kinds << schema_type
+        freeform_subschemas = freeform_subschemas + 1
+      end
+    end
+
+    # If there's more than a single type definition in play, then it doesn't qualify.
+    unique_type_def_kinds = type_def_kinds.flatten.uniq
+    if unique_type_def_kinds.length == 1 && fixed_subschemas >= 1 && freeform_subschemas == 1
+      @logger.debug "Resolved as 'untagged with narrowed free-form' enum schema."
+
+      type_def_kind = unique_type_def_kinds[0]
+
+      # TODO: It would be nice to forward along the fixed values so they could be enumerated in the
+      # documentation, and we could have a boilerplate blurb about "these values are fixed/reserved,
+      # but any other value than these can be passed", etc.
+
+      return { '_resolved' => { 'type' => { type_def_kind => {} } }, 'annotations' => 'narrowed_free_form' }
+    end
+  end
+
+  # Schema pattern: simple externally tagged enum with only non-unit variants.
+  #
+  # This pattern represents an enum where the default external tagging mode is used, which leads to
+  # a schema for each variant that looks like it's an object with a single property -- the name of
+  # which is the name of the variant itself -- and the schema of that property representing whatever
+  # the fields are for the variant.
+  #
+  # Contrasted with an externally tagged enum with only unit variants, this type of enum is treated
+  # like an object itself, where each possible variant is its own property, with whatever the
+  # resulting subschema for that variant may be.
+  if enum_tagging == 'external'
+    # With external tagging, and non-unit variants, each variant must be represented as an object schema.
+    if subschemas.all? { |subschema| get_schema_type(subschema) == "object" }
+      # Generate our overall object schema, where each variant is a property on this schema. The
+      # schema of that property should be the schema for the variant's tagging field. For example,
+      # a variant called `Foo` will have an object schema with a single, required field `foo`. We
+      # take the schema of that property `foo`, and set it as the schema for property `foo` on our
+      # new aggregated object schema.
+      #
+      # Additionally, since this is a "one of" schema, we can't make any of the properties on the
+      # aggregated object schema be required, since the whole point is that they're deserialized
+      # opportunistically.
+      aggregated_properties = {}
+
+      subschemas.each { |subschema|
+        resolved_subschema = resolve_schema(root_schema, subschema)
+
+        @logger.debug "ETNUV original subschema: #{subschema}"
+        @logger.debug "ETNUV resolved subschema: #{resolved_subschema}"
+
+        resolved_properties = resolved_subschema.dig('type', 'object', 'options')
+        if resolved_properties.nil? || resolved_properties.keys.length != 1
+          @logger.error "Encountered externally tagged enum schema with non-unit variants where the resulting \
+          resolved schema for a given variant had more than one property!"
+          @logger.error "Original variant subschema: #{subschema}"
+          @logger.error "Resolved variant subschema: #{resolved_subschema}"
+        end
+
+        # Generate a description from the overall subschema and apply it to the properly itself. We
+        # do this since it would be lost otherwise.
+        description = get_rendered_description_from_schema(subschema)
+        resolved_properties.each { |property_name, property_schema|
+          property_schema['description'] = description unless description.empty?
+          aggregated_properties[property_name] = property_schema
+        }
+      }
+
+      @logger.debug "Resolved as 'externally-tagged with only non-unit variants' enum schema."
+
+      return { '_resolved' => { 'type' => { 'object' => { 'options' => aggregated_properties } } } }
     end
   end
 
@@ -703,18 +918,16 @@ def resolve_enum_schema(root_schema, schema)
   # integer side. This code mostly assumes the upstream schema is itself correct, in terms of not
   # providing a schema that is too ambiguous to properly validate against an input document.
   type_defs = subschemas.filter_map { |subschema| resolve_schema(root_schema, subschema) }
-                        .reduce { |acc, item| nested_merge(acc, item) }
+    .reduce { |acc, item| nested_merge(acc, item) }
 
   @logger.debug "Resolved as 'fallback mixed-mode' enum schema."
+
+  @logger.debug "Tagging mode: #{enum_tagging}"
 
   { '_resolved' => { 'type' => type_defs['type'] }, 'annotations' => 'mixed_mode' }
 end
 
 def apply_schema_default_value!(source_schema, resolved_schema)
-  @logger.debug "Apply defaults to schema."
-  @logger.debug "Source schema: #{source_schema}"
-  @logger.debug "Resolved schema: #{resolved_schema}"
-
   default_value = source_schema['default']
   unless default_value.nil?
     # Make sure that the resolved schema actually has a type definition that matches the type of the
@@ -770,13 +983,14 @@ def apply_schema_default_value!(source_schema, resolved_schema)
         property_default_value = default_value[property_name]
         property_type_field = get_schema_type_field_for_value(resolved_property, property_default_value)
         property_type_field['default'] = property_default_value unless property_type_field.nil?
+        resolved_property['required'] = false unless property_type_field.nil?
       end
     else
       # We're dealing with a normal scalar or whatever, so just apply the default directly.
-      @logger.debug "Resolved schema type field: #{resolved_schema_type_field}"
-      @logger.debug "Default value on fallback path: #{default_value}"
       resolved_schema_type_field['default'] = default_value
     end
+
+    @logger.debug "Applied default value(s) to schema."
   end
 end
 
@@ -786,22 +1000,66 @@ def apply_schema_metadata!(source_schema, resolved_schema)
   is_templateable = get_schema_metadata(source_schema, 'docs::templateable') == true
   string_type_def = resolved_schema.dig('type', 'string')
   if !string_type_def.nil? && is_templateable
+    @logger.debug "Schema is templateable."
     string_type_def['syntax'] = 'template'
   end
 
-  # Handle the niche case where we have an object schema without any of its own fields -- aka a map
+  # TODO: Handle the niche case where we have an object schema without any of its own fields -- aka a map
   # of optional key/value pairs i.e. tags -- and it allows templateable values.
+
+  # Handle adding any defined examples to the type definition.
+  #
+  # TODO: Since a resolved schema could be represented by _multiple_ input types, and we only take
+  # examples in the form of strings, we don't have a great way to discern which type definition
+  # should get the examples applied to it (i.e. for a number-or-enum-of-strings schema, do we
+  # apply the examples to the number type def or the enum type def?) so we simply... apply them to
+  # any type definition present in the resolved schema.
+  #
+  # We might be able to improve this in the future with a simply better heuristic, dunno. This might
+  # also work totally fine as-is!
+  examples = get_schema_metadata(source_schema, 'docs::examples')
+  if !examples.nil?
+    count = [examples].flatten.length
+    @logger.debug "Schema has #{count} example(s)."
+    resolved_schema['type'].each { |type_name, type_def|
+      # We need to recurse one more level if we're dealing with an array type definition, as we need
+      # to stick the examples on the type definition for the array's `items`. There might also be
+      # multiple type definitions under `items`, but we'll cross that bridge if/when we get to it.
+      case type_name
+      when 'array'
+        type_def['items']['type'].each { |subtype_name, subtype_def|
+          if subtype_name != 'array'
+            subtype_def['examples'] = [examples].flatten
+          end
+        }
+      else
+        type_def['examples'] = [examples].flatten
+      end
+    }
+  end
+
+  # Apply any units that have been specified.
+  type_unit = get_schema_metadata(source_schema, 'docs::type_unit')
+  if !type_unit.nil?
+    schema_type = numeric_schema_type(resolved_schema)
+    if !schema_type.nil?
+      resolved_schema['type'][schema_type]['unit'] = type_unit.to_s
+    end
+  end
+
+  # Modify the `syntax` of a string type definition if overridden via metadata.
+  syntax_override = get_schema_metadata(source_schema, 'docs::syntax_override')
+  if !syntax_override.nil?
+    if resolved_schema_type?(resolved_schema) != "string"
+      @logger.error "Non-string schemas should not use the `syntax_override` metadata attribute."
+      exit
+    end
+
+    resolved_schema['type']['string']['syntax'] = syntax_override.to_s
+  end
 end
 
 def get_rendered_description_from_schema(schema)
-  # If the schema is marked as `no_description`, we're being told -- for whatever reason -- that the
-  # existing title/description should not be rendered in the output. This is primarily to avoid
-  # spitting out developer-oriented documentation into the user-facing documentation, when we're
-  # providing the necessary description in another way.
-  if !get_schema_metadata(schema, 'docs::no_description').nil?
-    return ''
-  end
-
   # Grab both the raw description and raw title, and if the title is empty, just use the
   # description, otherwise concatenate the title and description with newlines so that there's a
   # whitespace break between the title and description.
@@ -866,8 +1124,8 @@ def render_and_import_base_component_schema(root_schema, schema_name, component_
     root_schema,
     schema_name,
     "base #{component_type} configuration",
-    [component_type],
-    "base/#{component_type}.cue"
+    ["#{component_type}s"],
+    "base/#{component_type}s.cue"
   )
 end
 
@@ -876,7 +1134,7 @@ def render_and_import_component_schema(root_schema, schema_name, component_type,
     root_schema,
     schema_name,
     "'#{component_name}' #{component_type} configuration",
-    [component_type, component_name],
+    ["#{component_type}s", component_name],
     "#{component_type}s/base/#{component_name}.cue"
   )
 end

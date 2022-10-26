@@ -937,7 +937,7 @@ components: {
 				}
 			}
 
-			if Kind != "source" {
+			if Kind != "source" && Kind != "transform" {
 				inputs: {
 					description: """
 						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))

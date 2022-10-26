@@ -38,9 +38,9 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, EnrichmentTableConfig, Input, Output, OutputId, ProxyConfig,
-        SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig, TransformContext,
-        TransformOuter,
+        ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, Output, OutputId,
+        ProxyConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
+        TransformContext, TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -126,7 +126,7 @@ pub(self) async fn load_enrichment_tables<'a>(
 }
 
 pub struct Pieces {
-    pub(super) inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Vec<OutputId>)>,
+    pub(super) inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
     pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub(super) tasks: HashMap<ComponentKey, Task>,
     pub(crate) source_tasks: HashMap<ComponentKey, Task>,
@@ -582,7 +582,7 @@ const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
 struct TransformNode {
     key: ComponentKey,
     typetag: &'static str,
-    inputs: Vec<OutputId>,
+    inputs: Inputs<OutputId>,
     input_details: Input,
     outputs: Vec<Output>,
     enable_concurrency: bool,

@@ -42,7 +42,7 @@ pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, OutputId};
+pub use id::{ComponentKey, Inputs, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
     load_from_str, load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
@@ -147,8 +147,8 @@ impl Config {
     pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
         self.transforms
             .get(id)
-            .map(|t| t.inputs.as_slice())
-            .or_else(|| self.sinks.get(id).map(|s| s.inputs.as_slice()))
+            .map(|t| &t.inputs[..])
+            .or_else(|| self.sinks.get(id).map(|s| &s.inputs[..]))
     }
 
     /// Expand a logical component id (i.e. from the config file) into the ids of the
