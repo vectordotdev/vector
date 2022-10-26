@@ -302,43 +302,48 @@ jobs:
   ## ANALYZE
   ##
 
-  download-artifacts:
-    name: Download job artifacts
-    runs-on: ubuntu-22.04
-    needs:
-      - submit-job
-    steps:
-      - uses: actions/checkout@v3
+  ## NOTE intentionally left as an example. The SMP capture files are quite
+  ## large, 1.5Gb. In the future we won't sync capture files at all, doing
+  ## analysis in the background and shipping the analysis. That said, at this
+  ## stage, it's still useful to know that you can sync if you want.
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY }}
-          aws-region: us-west-2
+  # download-artifacts:
+  #   name: Download job artifacts
+  #   runs-on: ubuntu-22.04
+  #   needs:
+  #     - submit-job
+  #   steps:
+  #     - uses: actions/checkout@v3
 
-      - name: Download SMP binary
-        run: |
-          aws s3 cp s3://smp-cli-releases/v0.3.0/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY }}
+  #         aws-region: us-west-2
 
-      - name: Download submission metadata
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-submission-metadata
-          path: ${{ runner.temp }}/
+  #     - name: Download SMP binary
+  #       run: |
+  #         aws s3 cp s3://smp-cli-releases/v0.3.0/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
-      - name: Sync output to local system
-        env:
-          RUST_LOG: info
-        run: |
-          chmod +x ${{ runner.temp }}/bin/smp
+  #     - name: Download submission metadata
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-submission-metadata
+  #         path: ${{ runner.temp }}/
 
-          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
-            --submission-metadata ${{ runner.temp }}/submission-metadata \
-            --output-path "${{ runner.temp }}/outputs"
+  #     - name: Sync output to local system
+  #       env:
+  #         RUST_LOG: info
+  #       run: |
+  #         chmod +x ${{ runner.temp }}/bin/smp
 
-      - name: Upload captures
-        uses: actions/upload-artifact@v3
-        with:
-          name: capture-artifacts
-          path: ${{ runner.temp }}/outputs/*
+  #         ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
+  #           --submission-metadata ${{ runner.temp }}/submission-metadata \
+  #           --output-path "${{ runner.temp }}/outputs"
+
+  #     - name: Upload captures
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: capture-artifacts
+  #         path: ${{ runner.temp }}/outputs/*
