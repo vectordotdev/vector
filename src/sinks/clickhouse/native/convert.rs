@@ -61,46 +61,28 @@ enum ConvertError {
 
 type CResult = std::result::Result<CHValue, ConvertError>;
 
-macro_rules! gen_into_numeric {
-    ($method:ident, $ty:ty, $vtype:ident, $chtype:ident) => {
-        fn $method(v: Option<&Value>) -> CResult {
-            if v.is_none() {
-                return Err(ConvertError::NoValue);
-            }
-            let inner = v.unwrap();
-            match inner {
-                Value::$vtype(val) => Ok(CHValue::$chtype(*val as $ty)),
-                _ => Err(ConvertError::TypeMisMatch {
-                    from: inner.clone(),
-                    to: stringify!($ty).to_string(),
-                }),
-            }
-        }
-    };
+fn into_integer(v: Option<&Value>, conv: impl Fn(i64) -> CHValue) -> CResult {
+    match v {
+        Some(Value::Integer(i)) => Ok(conv(*i)),
+        Some(Value::Float(f)) => Ok(conv(f.into_inner() as i64)),
+        Some(inner) => Err(ConvertError::TypeMisMatch {
+            from: inner.clone(),
+            to: stringify!($ty).to_string(),
+        }),
+        None => Err(ConvertError::NoValue),
+    }
 }
 
-gen_into_numeric!(into_u8, u8, Integer, UInt8);
-gen_into_numeric!(into_u16, u16, Integer, UInt16);
-gen_into_numeric!(into_u32, u32, Integer, UInt32);
-gen_into_numeric!(into_u64, u64, Integer, UInt64);
-gen_into_numeric!(into_i8, i8, Integer, Int8);
-gen_into_numeric!(into_i16, i16, Integer, Int16);
-gen_into_numeric!(into_i32, i32, Integer, Int32);
-gen_into_numeric!(into_i64, i64, Integer, Int64);
-
 fn into_float(v: Option<&Value>, to_f32: bool) -> CResult {
-    if v.is_none() {
-        return Err(ConvertError::NoValue);
-    }
-    let inner = v.unwrap();
-    match inner {
-        Value::Float(v) => {
+    match v {
+        None => Err(ConvertError::NoValue),
+        Some(Value::Float(v)) => {
             if to_f32 {
                 return Ok(CHValue::Float32(v.as_f32().into()));
             }
             Ok(CHValue::Float64(v.into_inner()))
         }
-        _ => {
+        Some(inner) => {
             let target_type = if to_f32 { "f32" } else { "f64" };
             Err(ConvertError::TypeMisMatch {
                 from: inner.clone(),
@@ -110,44 +92,31 @@ fn into_float(v: Option<&Value>, to_f32: bool) -> CResult {
     }
 }
 
-macro_rules! gen_into_ip {
-    ($method:ident, $ty:ty, $chtype:ident) => {
-        fn $method(v: Option<&Value>) -> CResult {
-            if v.is_none() {
-                return Err(ConvertError::NoValue);
-            }
-            let inner = v.unwrap();
-            match inner {
-                Value::Bytes(bs) => {
-                    let w = &bs.to_vec()[..];
-                    let s = std::str::from_utf8(w)?;
-                    let addr: $ty = s
-                        .parse()
-                        .context(InvalidIPAddrSnafu { val: s.to_string() })?;
-                    Ok(CHValue::$chtype(addr.octets()))
-                }
-                _ => Err(ConvertError::TypeMisMatch {
-                    from: inner.clone(),
-                    to: stringify!($chtype).to_string(),
-                }),
-            }
+fn into_ip(v: Option<&Value>, conv: impl Fn(&str) -> CResult) -> CResult {
+    match v {
+        None => Err(ConvertError::NoValue),
+        Some(Value::Bytes(bs)) => {
+            let w = &bs.to_vec()[..];
+            let s = std::str::from_utf8(w)?;
+            conv(s)
         }
-    };
+        Some(inner) => Err(ConvertError::TypeMisMatch {
+            from: inner.clone(),
+            to: stringify!($chtype).to_string(),
+        }),
+    }
 }
-
-gen_into_ip!(into_ipv4, Ipv4Addr, Ipv4);
-gen_into_ip!(into_ipv6, Ipv6Addr, Ipv6);
 
 fn into_clickhouse_value(v: Option<&Value>, target_type: &SqlType) -> CResult {
     match target_type {
-        SqlType::UInt8 => into_u8(v),
-        SqlType::UInt16 => into_u16(v),
-        SqlType::UInt32 => into_u32(v),
-        SqlType::UInt64 => into_u64(v),
-        SqlType::Int8 => into_i8(v),
-        SqlType::Int16 => into_i16(v),
-        SqlType::Int32 => into_i32(v),
-        SqlType::Int64 => into_i64(v),
+        SqlType::UInt8 => into_integer(v, |t| CHValue::UInt8(t as u8)),
+        SqlType::UInt16 => into_integer(v, |t| CHValue::UInt16(t as u16)),
+        SqlType::UInt32 => into_integer(v, |t| CHValue::UInt32(t as u32)),
+        SqlType::UInt64 => into_integer(v, |t| CHValue::UInt64(t as u64)),
+        SqlType::Int8 => into_integer(v, |t| CHValue::Int8(t as i8)),
+        SqlType::Int16 => into_integer(v, |t| CHValue::Int16(t as i16)),
+        SqlType::Int32 => into_integer(v, |t| CHValue::Int32(t as i32)),
+        SqlType::Int64 => into_integer(v, |t| CHValue::Int64(t as i64)),
         SqlType::String => into_string(v),
         SqlType::FixedString(len) => into_fixed_string(v, *len),
         SqlType::Float32 => into_float(v, true),
@@ -157,8 +126,18 @@ fn into_clickhouse_value(v: Option<&Value>, target_type: &SqlType) -> CResult {
             DateTimeType::DateTime32 => into_datetime(v),
             _ => unimplemented!(),
         },
-        SqlType::Ipv4 => into_ipv4(v),
-        SqlType::Ipv6 => into_ipv6(v),
+        SqlType::Ipv4 => into_ip(v, |s| {
+            let w: Ipv4Addr = s
+                .parse()
+                .context(InvalidIPAddrSnafu { val: s.to_string() })?;
+            Ok(CHValue::Ipv4(w.octets()))
+        }),
+        SqlType::Ipv6 => into_ip(v, |s| {
+            let w: Ipv6Addr = s
+                .parse()
+                .context(InvalidIPAddrSnafu { val: s.to_string() })?;
+            Ok(CHValue::Ipv6(w.octets()))
+        }),
         SqlType::Nullable(ty) => into_nullable(v, *ty),
         SqlType::Array(ty) => into_array(v, ty),
         SqlType::Map(_, ty) => into_map(v, ty),
@@ -178,19 +157,16 @@ fn into_nullable(v: Option<&Value>, target_type: &SqlType) -> CResult {
 }
 
 fn into_array(v: Option<&Value>, target_type: &SqlType) -> CResult {
-    if v.is_none() {
-        return Err(ConvertError::NoValue);
-    }
-    let inner = v.unwrap();
-    match inner {
-        Value::Array(arr) => {
+    match v {
+        None => Err(ConvertError::NoValue),
+        Some(Value::Array(arr)) => {
             let mut w = Vec::with_capacity(arr.len());
             for ev in arr {
                 w.push(into_clickhouse_value(Some(ev), target_type)?);
             }
             Ok(CHValue::Array((*target_type).clone().into(), Arc::new(w)))
         }
-        _ => Err(ConvertError::TypeMisMatch {
+        Some(inner) => Err(ConvertError::TypeMisMatch {
             from: inner.clone(),
             to: target_type.to_string().into_owned(),
         }),
@@ -199,12 +175,9 @@ fn into_array(v: Option<&Value>, target_type: &SqlType) -> CResult {
 
 // only support Map(String, xxx)
 fn into_map(v: Option<&Value>, target_type: &SqlType) -> CResult {
-    if v.is_none() {
-        return Err(ConvertError::NoValue);
-    }
-    let inner = v.unwrap();
-    match inner {
-        Value::Object(bt) => {
+    match v {
+        None => Err(ConvertError::NoValue),
+        Some(Value::Object(bt)) => {
             let mut hm = HashMap::with_capacity(bt.len());
             for (k, v) in bt {
                 hm.insert(
@@ -218,7 +191,7 @@ fn into_map(v: Option<&Value>, target_type: &SqlType) -> CResult {
                 Arc::new(hm),
             ))
         }
-        _ => Err(ConvertError::TypeMisMatch {
+        Some(inner) => Err(ConvertError::TypeMisMatch {
             from: inner.clone(),
             to: target_type.to_string().into_owned(),
         }),
@@ -226,13 +199,10 @@ fn into_map(v: Option<&Value>, target_type: &SqlType) -> CResult {
 }
 
 fn into_string(v: Option<&Value>) -> CResult {
-    if v.is_none() {
-        return Err(ConvertError::NoValue);
-    }
-    let inner = v.unwrap();
-    match inner {
-        Value::Bytes(bs) => Ok(CHValue::String(Arc::new(bs.to_vec()))),
-        _ => Err(ConvertError::TypeMisMatch {
+    match v {
+        None => Err(ConvertError::NoValue),
+        Some(Value::Bytes(bs)) => Ok(CHValue::String(Arc::new(bs.to_vec()))),
+        Some(inner) => Err(ConvertError::TypeMisMatch {
             from: inner.clone(),
             to: "string".to_string(),
         }),
@@ -240,17 +210,14 @@ fn into_string(v: Option<&Value>) -> CResult {
 }
 
 fn into_fixed_string(v: Option<&Value>, len: usize) -> CResult {
-    if v.is_none() {
-        return Err(ConvertError::NoValue);
-    }
-    let inner = v.unwrap();
-    match inner {
-        Value::Bytes(bs) => {
+    match v {
+        None => Err(ConvertError::NoValue),
+        Some(Value::Bytes(bs)) => {
             let mut w = bs.to_vec();
             w.truncate(len);
             Ok(CHValue::String(Arc::new(w)))
         }
-        _ => Err(ConvertError::TypeMisMatch {
+        Some(inner) => Err(ConvertError::TypeMisMatch {
             from: inner.clone(),
             to: format!("fixedstring{}", len),
         }),
@@ -260,12 +227,9 @@ fn into_fixed_string(v: Option<&Value>, len: usize) -> CResult {
 const TIME_FORMAT: &str = "%d/%m/%Y %H:%M:%S%.9f%z";
 
 fn into_date(v: Option<&Value>) -> CResult {
-    if v.is_none() {
-        return Err(ConvertError::NoValue);
-    }
-    let inner = v.unwrap();
-    match inner {
-        Value::Timestamp(ts) => {
+    match v {
+        None => Err(ConvertError::NoValue),
+        Some(Value::Timestamp(ts)) => {
             let s = ts.format(TIME_FORMAT).to_string();
             let t = Tz::UTC
                 .datetime_from_str(s.as_str(), TIME_FORMAT)
@@ -276,8 +240,8 @@ fn into_date(v: Option<&Value>) -> CResult {
                 .date();
             Ok(t.into())
         }
-        Value::Integer(ts_nano) => Ok(Tz::UTC.timestamp_nanos(*ts_nano).date().into()),
-        _ => Err(ConvertError::TypeMisMatch {
+        Some(Value::Integer(ts_nano)) => Ok(Tz::UTC.timestamp_nanos(*ts_nano).date().into()),
+        Some(inner) => Err(ConvertError::TypeMisMatch {
             from: inner.clone(),
             to: "date".to_string(),
         }),
@@ -285,14 +249,11 @@ fn into_date(v: Option<&Value>) -> CResult {
 }
 
 fn into_datetime(v: Option<&Value>) -> CResult {
-    if v.is_none() {
-        return Err(ConvertError::NoValue);
-    }
-    let inner = v.unwrap();
-    match inner {
-        Value::Timestamp(ts) => Ok((*ts).into()),
-        Value::Integer(ts_nano) => Ok(Tz::UTC.timestamp_nanos(*ts_nano).into()),
-        _ => Err(ConvertError::TypeMisMatch {
+    match v {
+        None => Err(ConvertError::NoValue),
+        Some(Value::Timestamp(ts)) => Ok((*ts).into()),
+        Some(Value::Integer(ts_nano)) => Ok(Tz::UTC.timestamp_nanos(*ts_nano).into()),
+        Some(inner) => Err(ConvertError::TypeMisMatch {
             from: inner.clone(),
             to: "datetime".to_string(),
         }),
