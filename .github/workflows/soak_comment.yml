@@ -35,7 +35,7 @@ jobs:
           script: |
             console.log("Fetching artifacts for run %s of %s/%s", "${{github.event.workflow_run.id }}", context.repo.owner, context.repo.repo);
 
-            var artifacts = await github.paginate(github.actions.listWorkflowRunArtifacts, {
+            var artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
@@ -51,7 +51,7 @@ jobs:
 
             console.log("Downloading artifact %s", matchArtifact.id);
 
-            var download = await github.actions.downloadArtifact({
+            var download = await github.rest.actions.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
                artifact_id: matchArtifact.id,
@@ -73,7 +73,7 @@ jobs:
           script: |
             console.log("Fetching artifacts for run %s of %s/%s", "${{github.event.workflow_run.id }}", context.repo.owner, context.repo.repo);
 
-            var artifacts = await github.paginate(github.actions.listWorkflowRunArtifacts, {
+            var artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
@@ -89,7 +89,7 @@ jobs:
 
             console.log("Downloading artifact %s", matchArtifact.id);
 
-            var download = await github.actions.downloadArtifact({
+            var download = await github.rest.actions.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
                artifact_id: matchArtifact.id,

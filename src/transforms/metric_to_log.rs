@@ -18,7 +18,7 @@ use crate::{
 /// Configuration for the `metric_to_log` transform.
 #[configurable_component(transform("metric_to_log"))]
 #[derive(Clone, Debug, Default)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct MetricToLogConfig {
     /// Name of the tag in the metric to use for the source host.
     ///
@@ -26,6 +26,7 @@ pub struct MetricToLogConfig {
     /// where the field key will use the [global `host_key` option][global_log_schema_host_key].
     ///
     /// [global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
+    #[configurable(metadata(docs::examples = "host", docs::examples = "hostname"))]
     pub host_tag: Option<String>,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit

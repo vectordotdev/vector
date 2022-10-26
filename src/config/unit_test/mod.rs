@@ -165,7 +165,7 @@ impl UnitTestBuildMetadata {
                 .get(key)
                 .expect("Missing test source for a transform")
                 .clone();
-            transform.inputs.push(test_source_id);
+            transform.inputs.extend(Some(test_source_id));
 
             template_sources.insert(key.clone(), UnitTestSourceConfig::default());
         }
@@ -297,7 +297,10 @@ impl UnitTestBuildMetadata {
         let sinks = template_sinks
             .into_iter()
             .map(|(transform_ids, sink_config)| {
-                let transform_ids_str = transform_ids.iter().map(ToString::to_string).collect();
+                let transform_ids_str = transform_ids
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>();
                 let sink_ids = transform_ids
                     .iter()
                     .map(|transform_id| {
@@ -428,7 +431,7 @@ async fn build_unit_test(
         transform.inputs = inputs
             .into_iter()
             .filter(|input| valid_inputs.contains_key(input))
-            .collect::<Vec<_>>();
+            .collect();
     }
 
     if let Some(sink) = get_loose_end_outputs_sink(&config_builder) {

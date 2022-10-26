@@ -317,8 +317,7 @@ impl ComponentContainer for Config {
     }
 
     fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]> {
-        self.transform(key)
-            .map(|transform| transform.inputs.as_slice())
+        self.transform(key).map(|transform| &transform.inputs[..])
     }
 
     fn transform_outputs(
