@@ -332,7 +332,7 @@ Incremental steps to execute this change. These will be converted to issues afte
 - [ ] Add multi-valued tag support to the `log_to_metric` transform
 - [ ] Update the `tag_cardinality_limit` transform for multi-valued tags
 - [ ] Add deprecation warnings for single-valued tags behavior (Lua and VRL)
-- [ ] Change optional behavior to multi-valued tags (Lua and VRL)
+- [ ] Change default behavior to multi-valued tags (Lua and VRL)
 - [ ] Drop single-valued tags support (Lua and VRL)
 
 ## Future Improvements
@@ -340,6 +340,11 @@ Incremental steps to execute this change. These will be converted to issues afte
 Most often, tags will only have a single value instead of an array. This suggests that an
 implementation that stores tag values as an enum switching between a simple `TagValue` and the above
 `IndexMap` would be more efficient for memory consumption and likely be more efficient for CPU time.
+
+Since tags will most often only have a single value, we may not want to change the default behavior
+of Lua and VRL to use multi-valued tags, as it represents a regression in user experience, and so
+also not remove the single value support. This will be determined after we start the deprecation
+process.
 
 We could also investigate reworking the storage based on `BTreeMap<String>`. This would allow us to
 avoid splitting tag strings in two pieces, reducing allocations and overhead, at the cost of
