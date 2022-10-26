@@ -30,7 +30,7 @@ pub struct ClickhouseConfig {
 
     /// The database that contains the table that data will be inserted into.
     pub database: Option<String>,
-    /// Enable using clickhouse native protocol rather than the default jsoneachrow over http.
+    /// If true`, ClickHouse Native Protocol is used. Defaults to `false`, using `JSONEachRow` over HTTP.
     #[serde(default)]
     pub use_native_proto: bool,
 
