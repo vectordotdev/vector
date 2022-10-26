@@ -206,7 +206,7 @@ lapin = { version = "2.1.1", default-features = false, optional = true }
 
 # API
 async-graphql = { version = "4.0.16", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "4.0.15", default-features = false, optional = true }
+async-graphql-warp = { version = "4.0.16", default-features = false, optional = true }
 itertools = { version = "0.10.5", default-features = false, optional = true }
 
 # API client
