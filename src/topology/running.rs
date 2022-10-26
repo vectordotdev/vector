@@ -879,7 +879,7 @@ impl RunningTopology {
                 component_type = task.typetag(),
                 component_id = task.id(),
                 group_id = group_id.as_raw().to_string(),
-                message = "New allocation group."
+                "Registered new allocation group."
             );
             group_id.attach_to_span(&task_span);
         }
