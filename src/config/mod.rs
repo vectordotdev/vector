@@ -1233,10 +1233,13 @@ mod acknowledgements_tests {
                 data_dir = "/tmp"
                 [sources.in1]
                     type = "file"
+                    include = ["/var/log/**/*.log"]
                 [sources.in2]
                     type = "file"
+                    include = ["/var/log/**/*.log"]
                 [sources.in3]
                     type = "file"
+                    include = ["/var/log/**/*.log"]
                 [transforms.parse3]
                     type = "test_basic"
                     inputs = ["in3"]
