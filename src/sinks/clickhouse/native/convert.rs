@@ -18,7 +18,7 @@ pub(super) fn build_block(
     let mut b = Block::new();
     for ev in &events {
         b.push(get_row_from_events(&schema, ev)?)
-            .map_err(|e| Box::new(e))?;
+            .map_err(Box::new)?;
     }
     Ok(b)
 }
@@ -30,7 +30,7 @@ fn get_row_from_events(
     let mut row = vec![];
     for (col_name, ty) in schema {
         let event_field = event.get(col_name.as_str());
-        let column = into_clickhouse_value(event_field, ty).map_err(|e| Box::new(e))?;
+        let column = into_clickhouse_value(event_field, ty).map_err(Box::new)?;
         row.push((col_name.clone(), column))
     }
     Ok(row)
@@ -98,14 +98,14 @@ fn into_float(v: Option<&Value>, to_f32: bool) -> CResult {
             if to_f32 {
                 return Ok(CHValue::Float32(v.as_f32().into()));
             }
-            return Ok(CHValue::Float64(v.into_inner()));
+            Ok(CHValue::Float64(v.into_inner()))
         }
         _ => {
             let target_type = if to_f32 { "f32" } else { "f64" };
-            return Err(ConvertError::TypeMisMatch {
+            Err(ConvertError::TypeMisMatch {
                 from: inner.clone(),
                 to: target_type.to_string(),
-            });
+            })
         }
     }
 }
@@ -252,7 +252,7 @@ fn into_fixed_string(v: Option<&Value>, len: usize) -> CResult {
         }
         _ => Err(ConvertError::TypeMisMatch {
             from: inner.clone(),
-            to: format!("fixedstring{}", len).to_string(),
+            to: format!("fixedstring{}", len),
         }),
     }
 }

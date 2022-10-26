@@ -22,7 +22,7 @@ pub async fn build_native_sink(
     let batch = cfg.batch.into_batcher_settings()?;
     let pool = Pool::new(cfg.endpoint.to_string());
     let sink = NativeClickhouseSink::new(pool.clone(), batch, cfg.table.clone(), table_schema);
-    let health_check = healthcheck(pool, cx.healthcheck.clone());
+    let health_check = healthcheck(pool, cx.healthcheck);
     Ok((
         VectorSink::from_event_streamsink(sink),
         Box::pin(health_check),
@@ -31,7 +31,7 @@ pub async fn build_native_sink(
 
 fn gen_table_schema(table: &BTreeMap<String, String>) -> crate::Result<Vec<(String, SqlType)>> {
     table
-        .into_iter()
+        .iter()
         .map(|(k, v)| {
             parse_field_type(v.as_str())
                 .map(|(_, t)| (k.to_owned(), t))
