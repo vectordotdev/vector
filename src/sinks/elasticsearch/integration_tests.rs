@@ -206,7 +206,7 @@ async fn structures_events_correctly() {
 }
 
 #[tokio::test]
-async fn auto_version() {
+async fn auto_version_http() {
     trace_init();
 
     let config = ElasticsearchConfig {
@@ -216,6 +216,49 @@ async fn auto_version() {
         api_version: ElasticsearchApiVersion::Auto,
         ..config()
     };
+    let _ = ElasticsearchCommon::parse_single(&config)
+        .await
+        .expect("Config error");
+}
+
+#[tokio::test]
+async fn auto_version_https() {
+    trace_init();
+
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuth::Basic {
+            user: "elastic".to_string(),
+            password: "vector".to_string().into(),
+        }),
+        endpoints: vec![https_server()],
+        doc_type: Some("log_lines".into()),
+        compression: Compression::None,
+        tls: Some(TlsConfig {
+            ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+            ..Default::default()
+        }),
+        api_version: ElasticsearchApiVersion::Auto,
+        ..config()
+    };
+    let _ = ElasticsearchCommon::parse_single(&config)
+        .await
+        .expect("Config error");
+}
+
+#[tokio::test]
+async fn auto_version_aws() {
+    trace_init();
+
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+            load_timeout_secs: Some(5),
+        })),
+        endpoints: vec![aws_server()],
+        aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
+        api_version: ElasticsearchApiVersion::Auto,
+        ..config()
+    };
+
     let _ = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
