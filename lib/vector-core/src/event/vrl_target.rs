@@ -1037,7 +1037,7 @@ mod test {
         match target {
             VrlTarget::Metric { metric, value: _ } => {
                 assert!(metric.tags().is_some());
-                assert_eq!(metric.tags().unwrap(), &metric_tags!("a" => "b"));
+                assert_eq!(metric.tags().unwrap(), &crate::metric_tags!("a" => "b"));
             }
             _ => panic!("must be a metric"),
         }

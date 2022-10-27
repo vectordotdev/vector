@@ -1,3 +1,5 @@
+#[cfg(test)]
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::{btree_map, hash_map::DefaultHasher, BTreeMap};
 use std::hash::{Hash, Hasher};
@@ -7,7 +9,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::{configurable_component, Configurable};
 
-type TagValue = String;
+type TagValue = Option<String>;
 
 /// Tag values for a metric series.  This may be empty, a single value, or a set of values. This is
 /// used to provide the storage for `TagValueSet`.
@@ -36,8 +38,17 @@ impl TagValueSet {
     /// single string while still storing all of the values.
     pub(crate) fn into_single(self) -> Option<String> {
         match self {
-            Self::Single(tag) => tag,
-            Self::Set(set) => set.into_iter().last(),
+            Self::Single(tag) => tag.and_then(|tag| tag),
+            Self::Set(set) => {
+                let mut iter = set.into_iter();
+                loop {
+                    match iter.next_back() {
+                        Some(Some(value)) => break Some(value),
+                        Some(None) => continue,
+                        None => break None,
+                    }
+                }
+            }
         }
     }
 
@@ -45,8 +56,17 @@ impl TagValueSet {
     /// single string while still storing all of the values.
     pub(crate) fn as_single(&self) -> Option<&str> {
         match self {
-            Self::Single(tag) => tag.as_ref().map(String::as_str),
-            Self::Set(set) => set.iter().last().map(String::as_ref),
+            Self::Single(tag) => tag.as_ref().and_then(Option::as_deref),
+            Self::Set(set) => {
+                let mut iter = set.iter();
+                loop {
+                    match iter.next_back() {
+                        Some(Some(value)) => break Some(value),
+                        Some(None) => continue,
+                        None => break None,
+                    }
+                }
+            }
         }
     }
 
@@ -71,24 +91,28 @@ impl TagValueSet {
     }
 
     #[cfg(test)]
-    fn contains(&self, value: &str) -> bool {
+    fn contains<T>(&self, value: &T) -> bool
+    where
+        T: Eq + Hash + PartialEq<Option<String>>,
+        TagValue: Borrow<T>,
+    {
         match self {
             Self::Single(None) => false,
-            Self::Single(Some(tag)) => tag == value,
+            Self::Single(Some(tag)) => value == tag,
             Self::Set(set) => set.contains(value),
         }
     }
 
-    fn retain(&mut self, mut f: impl FnMut(&str) -> bool) {
+    fn retain(&mut self, mut f: impl FnMut(Option<&str>) -> bool) {
         match self {
             Self::Single(None) => (),
             Self::Single(Some(tag)) => {
-                if !f(tag) {
+                if !f(tag.as_deref()) {
                     *self = Self::Single(None);
                 }
             }
             Self::Set(set) => {
-                set.retain(|value| f(value.as_str()));
+                set.retain(|value| f(value.as_deref()));
                 match set.len() {
                     0 | 1 => *self = Self::Single(set.pop()),
                     _ => {}
@@ -97,7 +121,8 @@ impl TagValueSet {
         }
     }
 
-    fn insert(&mut self, value: TagValue) -> bool {
+    fn insert(&mut self, value: impl Into<TagValue>) -> bool {
+        let value = value.into();
         match self {
             // Need to take ownership of the single value to optionally move it into a set.
             Self::Single(single) => match single.take() {
@@ -165,9 +190,30 @@ impl PartialOrd for TagValueSet {
     }
 }
 
+impl<const N: usize> From<[String; N]> for TagValueSet {
+    fn from(values: [String; N]) -> Self {
+        // See logic in `TagValueSet::insert` to why we can't just use `Self(values.into())`
+        let mut result = Self::default();
+        for value in values {
+            result.insert(value);
+        }
+        result
+    }
+}
+
 impl<const N: usize> From<[TagValue; N]> for TagValueSet {
     fn from(values: [TagValue; N]) -> Self {
         values.into_iter().collect()
+    }
+}
+
+impl From<Vec<String>> for TagValueSet {
+    fn from(values: Vec<String>) -> Self {
+        let mut result = Self::default();
+        for value in values {
+            result.insert(value);
+        }
+        result
     }
 }
 
@@ -188,9 +234,20 @@ impl FromIterator<TagValue> for TagValueSet {
     }
 }
 
+impl FromIterator<String> for TagValueSet {
+    fn from_iter<T: IntoIterator<Item = String>>(values: T) -> Self {
+        // See logic in `TagValueSet::insert` to why we can't just use `Self(values.into())`
+        let mut result = Self::default();
+        for value in values {
+            result.insert(Some(value));
+        }
+        result
+    }
+}
+
 impl IntoIterator for TagValueSet {
     type IntoIter = TagValueIter;
-    type Item = TagValue;
+    type Item = String;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
@@ -201,17 +258,23 @@ impl IntoIterator for TagValueSet {
 }
 
 pub enum TagValueIter {
-    Single(Option<String>),
+    Single(Option<TagValue>),
     Set(<IndexSet<TagValue> as IntoIterator>::IntoIter),
 }
 
 impl Iterator for TagValueIter {
-    type Item = TagValue;
+    type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Single(single) => single.take(),
-            Self::Set(set) => set.next(),
+            Self::Single(single) => single.take().and_then(|tag| tag),
+            Self::Set(set) => loop {
+                break match set.next() {
+                    Some(None) => continue,
+                    Some(Some(tag)) => Some(tag),
+                    None => None,
+                };
+            },
         }
     }
 }
@@ -229,7 +292,7 @@ impl<'a> IntoIterator for &'a TagValueSet {
 }
 
 pub enum TagValueRefIter<'a> {
-    Single(Option<&'a String>),
+    Single(Option<&'a TagValue>),
     Set(<&'a IndexSet<TagValue> as IntoIterator>::IntoIter),
 }
 
@@ -238,10 +301,15 @@ impl<'a> Iterator for TagValueRefIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Single(single) => single.take(),
-            Self::Set(set) => set.next(),
+            Self::Single(single) => single.take().and_then(Option::as_deref),
+            Self::Set(set) => loop {
+                break match set.next() {
+                    Some(None) => continue,
+                    Some(Some(tag)) => Some(tag.as_str()),
+                    None => None,
+                };
+            },
         }
-        .map(String::as_str)
     }
 }
 
@@ -302,13 +370,13 @@ impl MetricTags {
         self.0.get(name).and_then(TagValueSet::as_single)
     }
 
-    pub fn insert(&mut self, name: String, value: TagValue) -> Option<TagValue> {
+    pub fn insert(&mut self, name: String, value: String) -> Option<String> {
         self.0
             .insert(name, TagValueSet::from([value]))
             .and_then(TagValueSet::into_single)
     }
 
-    pub fn remove(&mut self, name: &str) -> Option<TagValue> {
+    pub fn remove(&mut self, name: &str) -> Option<String> {
         self.0.remove(name).and_then(TagValueSet::into_single)
     }
 
@@ -316,7 +384,7 @@ impl MetricTags {
         self.0.keys().map(String::as_str)
     }
 
-    pub fn extend(&mut self, tags: impl IntoIterator<Item = (String, TagValue)>) {
+    pub fn extend(&mut self, tags: impl IntoIterator<Item = (String, String)>) {
         for (key, value) in tags {
             self.0.entry(key).or_default().insert(value);
         }
@@ -324,14 +392,14 @@ impl MetricTags {
 
     pub fn retain(&mut self, mut f: impl FnMut(&str, &str) -> bool) {
         self.0.retain(|key, tags| {
-            tags.retain(|tag| f(key, tag));
+            tags.retain(|tag| tag.map_or(false, |tag| f(key, tag)));
             !tags.is_empty()
         });
     }
 }
 
 impl IntoIterator for MetricTags {
-    type Item = (String, TagValue);
+    type Item = (String, String);
     type IntoIter = IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -348,7 +416,7 @@ pub struct IntoIter {
 }
 
 impl Iterator for IntoIter {
-    type Item = (String, TagValue);
+    type Item = (String, String);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -416,15 +484,31 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
+impl From<BTreeMap<String, String>> for MetricTags {
+    fn from(tags: BTreeMap<String, String>) -> Self {
+        tags.into_iter().collect()
+    }
+}
+
 impl From<BTreeMap<String, TagValue>> for MetricTags {
     fn from(tags: BTreeMap<String, TagValue>) -> Self {
         tags.into_iter().collect()
     }
 }
 
-impl<const N: usize> From<[(String, TagValue); N]> for MetricTags {
-    fn from(tags: [(String, TagValue); N]) -> Self {
+impl<const N: usize> From<[(String, String); N]> for MetricTags {
+    fn from(tags: [(String, String); N]) -> Self {
         tags.into_iter().collect()
+    }
+}
+
+impl FromIterator<(String, String)> for MetricTags {
+    fn from_iter<T: IntoIterator<Item = (String, String)>>(tags: T) -> Self {
+        let mut result = Self::default();
+        for (key, value) in tags {
+            result.0.entry(key).or_default().insert(value);
+        }
+        result
     }
 }
 
@@ -489,11 +573,11 @@ mod tests {
         }
 
         #[test]
-        fn tag_value_set_checks(values: Vec<TagValue>, addition: TagValue) {
+        fn tag_value_set_checks(values: Vec<String>, addition: String) {
             let mut set = TagValueSet::from(values.clone());
             assert_eq!(set.is_empty(), values.is_empty());
             // All input values are contained in the set.
-            assert!(values.iter().all(|v| set.contains(v.as_str())));
+            assert!(values.iter().all(|v| set.contains(&Some(v.clone()))));
             // All set values were in the input.
             assert!(set.iter().all(|v| values.contains(&v.into())));
             // Critical: the "single value" of the set is the last value added.
@@ -527,9 +611,9 @@ mod tests {
             }
 
             let new_addition = !values.iter().any(|v| v == &addition);
-            assert_eq!(new_addition, !set.contains(&addition));
+            assert_eq!(new_addition, !set.contains(&Some(addition.clone())));
             set.insert(addition.clone());
-            assert!(set.contains(&addition));
+            assert!(set.contains(&Some(addition.clone())));
 
             // If the addition wasn't in the start set, it will increase the length.
             assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
