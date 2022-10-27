@@ -84,7 +84,7 @@ default = [
     "contains",
     "decode_base64",
     "decode_percent",
-    "decode_q",
+    "decode_mime_q",
     "decrypt",
     "del",
     "downcase",
@@ -228,7 +228,7 @@ contains = []
 cryptography = ["dep:aes", "dep:ctr", "dep:cbc", "dep:cfb-mode", "dep:ofb"]
 decode_base64 = ["dep:base64"]
 decode_percent = ["dep:percent-encoding"]
-decode_q = ["dep:data-encoding","dep:charset","dep:quoted_printable"]
+decode_mime_q = ["dep:data-encoding","dep:charset","dep:quoted_printable"]
 decrypt = ["cryptography", "random_bytes", "encrypt"]
 del = []
 downcase = []

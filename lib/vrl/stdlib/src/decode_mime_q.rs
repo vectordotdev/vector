@@ -14,11 +14,11 @@ use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct DecodeQ;
+pub struct DecodeMimeQ;
 
-impl Function for DecodeQ {
+impl Function for DecodeMimeQ {
     fn identifier(&self) -> &'static str {
-        "decode_q"
+        "decode_mime_q"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -37,24 +37,24 @@ impl Function for DecodeQ {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(DecodeQFn { value }.as_expr())
+        Ok(DecodeMimeQFn { value }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
         &[
             Example {
                 title: "Single",
-                source: r#"decode_q!("=?utf-8?b?SGVsbG8sIFdvcmxkIQ==?=")"#,
+                source: r#"decode_mime_q!("=?utf-8?b?SGVsbG8sIFdvcmxkIQ==?=")"#,
                 result: Ok(r#"Hello, World!"#),
             },
             Example {
                 title: "Embedded",
-                source: r#"decode_q!("From: =?utf-8?b?SGVsbG8sIFdvcmxkIQ==?= <=?utf-8?q?hello=5Fworld=40example=2ecom?=>")"#,
+                source: r#"decode_mime_q!("From: =?utf-8?b?SGVsbG8sIFdvcmxkIQ==?= <=?utf-8?q?hello=5Fworld=40example=2ecom?=>")"#,
                 result: Ok(r#"From: Hello, World! <hello_world@example.com>"#),
             },
             Example {
                 title: "Without charset",
-                source: r#"decode_q!("?b?SGVsbG8sIFdvcmxkIQ==")"#,
+                source: r#"decode_mime_q!("?b?SGVsbG8sIFdvcmxkIQ==")"#,
                 result: Ok(r#"Hello, World!"#),
             },
         ]
@@ -62,15 +62,15 @@ impl Function for DecodeQ {
 }
 
 #[derive(Clone, Debug)]
-struct DecodeQFn {
+struct DecodeMimeQFn {
     value: Box<dyn Expression>,
 }
 
-impl FunctionExpression for DecodeQFn {
+impl FunctionExpression for DecodeMimeQFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
-        decode_q(value)
+        decode_mime_q(value)
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
@@ -78,7 +78,7 @@ impl FunctionExpression for DecodeQFn {
     }
 }
 
-fn decode_q(bytes: Value) -> Resolved {
+fn decode_mime_q(bytes: Value) -> Resolved {
     // Parse
     let input = bytes.try_bytes_utf8_lossy()?;
     let input: &str = &input;
@@ -218,7 +218,7 @@ mod test {
     }
 
     test_function![
-        decode_q=> DecodeQ;
+        decode_mime_q=> DecodeMimeQ;
 
         non_utf8_charset {
             args: func_args![value: value!("Subject: =?iso-8859-1?Q?=A1Hola,_se=F1or!?=")],

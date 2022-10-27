@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: decode_q: {
+remap: functions: decode_mime_q: {
 	category:    "Codec"
 	description: """
 		Replaces q-encoded or base64-encoded [encoded-word](\(urls.encoded_word)) substrings in the `value` with their original string.
@@ -23,21 +23,21 @@ remap: functions: decode_q: {
 		{
 			title: "Decode single encoded-word"
 			source: """
-				decode_q!("=?utf-8?b?SGVsbG8sIFdvcmxkIQ==?=")
+				decode_mime_q!("=?utf-8?b?SGVsbG8sIFdvcmxkIQ==?=")
 				"""
 			return: "Hello, World!"
 		},
 		{
 			title: "Embedded"
 			source: """
-				decode_q!("From: =?utf-8?b?SGVsbG8sIFdvcmxkIQ==?= <=?utf-8?q?hello=5Fworld=40example=2ecom?=>")
+				decode_mime_q!("From: =?utf-8?b?SGVsbG8sIFdvcmxkIQ==?= <=?utf-8?q?hello=5Fworld=40example=2ecom?=>")
 				"""
 			return: "From: Hello, World! <hello_world@example.com>"
 		},
 		{
 			title: "Without charset"
 			source: """
-				decode_q!("?b?SGVsbG8sIFdvcmxkIQ==")
+				decode_mime_q!("?b?SGVsbG8sIFdvcmxkIQ==")
 				"""
 			return: "Hello, World!"
 		},
