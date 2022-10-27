@@ -4,7 +4,7 @@ use data_encoding::BASE64_MIME;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_until1},
-    combinator::{map, opt},
+    combinator::{map, map_opt, opt, success},
     error::{ContextError, ParseError},
     multi::fold_many1,
     sequence::{delimited, pair, separated_pair},
@@ -85,19 +85,22 @@ fn decode_q(bytes: Value) -> Resolved {
     let (remaining, decoded) = alt((
         fold_many1(
             parse_delimited_q,
-            || Ok(String::new()),
+            || Result::<String>::Ok(String::new()),
             |result, (head, word)| {
                 let mut result = result?;
 
                 result.push_str(head);
-                if let Some(word) = word {
-                    result.push_str(&word.decode_word()?);
-                }
+                result.push_str(&word.decode_word()?);
 
                 Ok(result)
             },
         ),
-        map(parse_internal_q, |word| word.decode_word()),
+        alt((
+            map_opt(parse_internal_q, |word| {
+                word.decode_word().map(|word| Ok(word)).ok()
+            }),
+            success(Ok(String::new())),
+        )),
     ))(input)
     .map_err(|e| match e {
         nom::Err::Error(e) | nom::Err::Failure(e) => {
@@ -106,6 +109,7 @@ fn decode_q(bytes: Value) -> Resolved {
         }
         nom::Err::Incomplete(_) => e.to_string(),
     })?;
+
     let mut decoded = decoded?;
 
     // Add remaining input to the decoded string.
@@ -117,10 +121,10 @@ fn decode_q(bytes: Value) -> Resolved {
 /// Parses input into (head, (charset, encoding, encoded text))
 fn parse_delimited_q<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     input: &'a str,
-) -> IResult<&'a str, (&'a str, Option<EncodedWord<'a>>), E> {
+) -> IResult<&'a str, (&'a str, EncodedWord<'a>), E> {
     pair(
         take_until("=?"),
-        opt(delimited(tag("=?"), parse_internal_q, tag("?="))),
+        delimited(tag("=?"), parse_internal_q, tag("?=")),
     )(input)
 }
 
@@ -243,6 +247,12 @@ mod test {
         not_encoded{
             args: func_args![value: value!("Is =? equal to ?= or not?")],
             want: Ok(value!("Is =? equal to ?= or not?")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        partial{
+            args: func_args![value: value!("Is =? equal or not?")],
+            want: Ok(value!("Is =? equal or not?")),
             tdef: TypeDef::bytes().fallible(),
         }
 
