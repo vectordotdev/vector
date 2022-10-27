@@ -19,14 +19,6 @@ thread_local! {
         RefCell::new(GroupStack::new());
 }
 
-fn push_group_to_stack(group: AllocationGroupId) {
-    LOCAL_ALLOCATION_GROUP_STACK.with(|stack| stack.borrow_mut().push(group));
-}
-
-fn pop_group_from_stack() -> AllocationGroupId {
-    LOCAL_ALLOCATION_GROUP_STACK.with(|stack| stack.borrow_mut().pop())
-}
-
 /// The identifier that uniquely identifiers an allocation group.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct AllocationGroupId(NonZeroUsize);
@@ -51,17 +43,14 @@ impl AllocationGroupId {
     /// distinguish allocator events between various allocation groups.
     ///
     /// Group IDs must be attached to a [`Span`][tracing::Span] in order to become active,
-    /// assocating allocations and deallocations within an active span as being attached to the
+    /// associating allocations and deallocations within an active span as being attached to the
     /// given allocation group.
     pub fn register() -> Option<AllocationGroupId> {
         static GROUP_ID: AtomicUsize = AtomicUsize::new(AllocationGroupId::ROOT.0.get() + 1);
-        static HIGHEST_GROUP_ID: AtomicUsize =
-            AtomicUsize::new(AllocationGroupId::ROOT.0.get() + 1);
 
         let group_id = GROUP_ID.fetch_add(1, Ordering::Relaxed);
-        let highest_group_id = HIGHEST_GROUP_ID.fetch_max(group_id, Ordering::AcqRel);
 
-        if group_id >= highest_group_id {
+        if group_id != usize::MAX {
             let group_id = NonZeroUsize::new(group_id).expect("bug: GROUP_ID overflowed");
             Some(AllocationGroupId(group_id))
         } else {
@@ -92,11 +81,11 @@ pub struct AllocationGroupToken {
 
 impl AllocationGroupToken {
     pub fn enter(&self) {
-        push_group_to_stack(self.id);
+        LOCAL_ALLOCATION_GROUP_STACK.with(|stack| stack.borrow_mut().push(self.id));
     }
 
     pub fn exit(&self) {
-        pop_group_from_stack();
+        LOCAL_ALLOCATION_GROUP_STACK.with(|stack| stack.borrow_mut().pop());
     }
 }
 
