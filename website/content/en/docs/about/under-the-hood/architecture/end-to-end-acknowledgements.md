@@ -9,7 +9,7 @@ sinks. This is called end-to-end acknowledgement.
 
 ## Design
 
-When a participating [source][sources] receives an event, or batch or events, it can optionally
+When a participating [source][sources] receives an event, or batch of events, it can optionally
 create a **batch notifier** for those events. The batch notifier has two parts: one part stays with
 the source, and the other part is attached to the events. When the events reach their
 [destination sink][sinks] and are processed by the sink, Vector captures the status of the response
@@ -22,7 +22,7 @@ using a [`filter`][filter] transform) or even unintentionally dropped (maybe Vec
 oh!), we still update the batch notifier to indicate the processing status of the event.
 
 Meanwhile, the source will hold on to the other half of the batch notifiers that it has created, and
-is notified when a batch notifier is updated. Once notified, a source will propagate that batch
+is notified when a batch notifier is updated. Once notified, a source will propagate that bath
 notifier status back upstream: maybe this means responding with an appropriate HTTP status code (200
 vs 500, etc) if the events came from an [HTTP request][http_source], or acknowledging the event
 directly, such as when using the [`kafka`][kafka_source] or [`aws_sqs`][aws_sqs_source] sources,
