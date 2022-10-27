@@ -1,6 +1,7 @@
 use redis::{aio::ConnectionManager, AsyncCommands, RedisResult};
 use snafu::{ResultExt, Snafu};
 use vector_common::internal_event::{BytesReceived, Registered};
+use vector_core::config::LogNamespace;
 
 use super::{handle_line, Method};
 use crate::{
@@ -21,6 +22,7 @@ pub async fn watch(
     method: Method,
     decoder: codecs::Decoder,
     cx: SourceContext,
+    log_namespace: LogNamespace,
 ) -> crate::Result<Source> {
     let mut conn = client
         .get_tokio_connection_manager()
@@ -52,6 +54,7 @@ pub async fn watch(
                         decoder.clone(),
                         &bytes_received,
                         &mut tx,
+                        log_namespace,
                     )
                     .await
                     {

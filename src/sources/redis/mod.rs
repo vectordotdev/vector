@@ -7,6 +7,7 @@ use codecs::{
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
@@ -126,6 +127,10 @@ pub struct RedisSourceConfig {
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
+
+    /// The namespace to use for logs. This overrides the global setting
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl GenerateConfig for RedisSourceConfig {
@@ -146,6 +151,8 @@ impl GenerateConfig for RedisSourceConfig {
 #[async_trait::async_trait]
 impl SourceConfig for RedisSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         // A key must be specified to actually query i.e. the list to pop from, or the channel to subscribe to.
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
@@ -153,12 +160,8 @@ impl SourceConfig for RedisSourceConfig {
 
         let client = redis::Client::open(self.url.as_str()).context(ClientSnafu {})?;
         let connection_info = ConnectionInfo::from(client.get_connection_info());
-        let decoder = DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            LogNamespace::Legacy,
-        )
-        .build();
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
         let bytes_received = register!(BytesReceived::from(Protocol::from(
             connection_info.protocol
@@ -175,6 +178,7 @@ impl SourceConfig for RedisSourceConfig {
                     list.method,
                     decoder,
                     cx,
+                    log_namespace,
                 )
                 .await
             }
@@ -187,14 +191,29 @@ impl SourceConfig for RedisSourceConfig {
                     self.redis_key.clone(),
                     decoder,
                     cx,
+                    log_namespace,
                 )
                 .await
             }
         }
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                "redis",
+                self.redis_key.as_ref().map(|x| x.as_str()),
+                "key",
+                Kind::bytes(),
+                None,
+            );
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -209,6 +228,7 @@ async fn handle_line(
     decoder: Decoder,
     bytes_received: &Registered<BytesReceived>,
     out: &mut SourceSender,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let now = Utc::now();
 
@@ -226,10 +246,28 @@ async fn handle_line(
 
                 let events = events.into_iter().map(|mut event| {
                     if let Event::Log(ref mut log) = event {
-                        log.try_insert(log_schema().source_type_key(), Bytes::from("redis"));
-                        log.try_insert(log_schema().timestamp_key(), now);
-                        if let Some(redis_key) = redis_key {
-                            event.as_mut_log().insert(redis_key, key);
+                        log_namespace.insert_vector_metadata(
+                            log,
+                            log_schema().source_type_key(),
+                            "source_type",
+                            Bytes::from("redis"),
+                        );
+                        log_namespace.insert_vector_metadata(
+                            log,
+                            log_schema().timestamp_key(),
+                            "timestamp",
+                            now,
+                        );
+
+                        match log_namespace {
+                            LogNamespace::Vector => log_namespace
+                                .insert_source_metadata("redis", log, "key", "key", key),
+                            LogNamespace::Legacy => {
+                                if let Some(redis_key) = redis_key {
+                                    log_namespace
+                                        .insert_source_metadata("redis", log, redis_key, "key", key)
+                                }
+                            }
                         }
                     }
                     event
@@ -300,6 +338,7 @@ mod integration_test {
             redis_key: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            log_namespace: Some(LogNamespace::Legacy),
         };
 
         let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
