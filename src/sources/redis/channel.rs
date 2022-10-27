@@ -1,6 +1,7 @@
 use futures_util::StreamExt;
 use snafu::{ResultExt, Snafu};
 use vector_common::internal_event::{BytesReceived, Registered};
+use vector_core::config::LogNamespace;
 
 use crate::{
     codecs,
@@ -28,6 +29,7 @@ pub async fn subscribe(
     redis_key: Option<String>,
     decoder: codecs::Decoder,
     cx: SourceContext,
+    log_namespace: LogNamespace,
 ) -> crate::Result<Source> {
     let conn = client
         .get_async_connection()
@@ -57,6 +59,7 @@ pub async fn subscribe(
                         decoder.clone(),
                         &bytes_received,
                         &mut tx,
+                        log_namespace,
                     )
                     .await
                     {
