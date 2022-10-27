@@ -382,14 +382,22 @@ async fn distributed_insert_events_failover() {
     trace_init();
 
     let mut config = ElasticsearchConfig {
-        // A valid endpoint and some random non elasticsearch endpoint
+        auth: Some(ElasticsearchAuth::Basic {
+            user: "elastic".into(),
+            password: "vector".to_string().into(),
+        }),
+        // Valid endpoints and some random non elasticsearch endpoint
         endpoints: vec![
             http_server(),
-            "http://localhost:2347".into(),
             https_server(),
+            "http://localhost:2347".into(),
         ],
         doc_type: Some("log_lines".into()),
         compression: Compression::None,
+        tls: Some(TlsConfig {
+            ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+            ..Default::default()
+        }),
         ..config()
     };
     config.bulk = Some(BulkConfig {
@@ -575,7 +583,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     let client = create_http_client();
     let mut total = 0;
     for base_url in base_urls {
-        let response = client
+        if let Ok(response) = client
             .get(&format!("{}/{}/_search", base_url, index))
             .basic_auth("elastic", Some("vector"))
             .json(&json!({
@@ -583,22 +591,23 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
             }))
             .send()
             .await
-            .unwrap()
-            .json::<Value>()
-            .await
-            .unwrap();
+        {
+            let response = response.json::<Value>().await.unwrap();
 
-        let endpoint_total = response["hits"]["total"]["value"]
-            .as_u64()
-            .or_else(|| response["hits"]["total"].as_u64())
-            .expect("Elasticsearch response does not include hits->total nor hits->total->value");
+            let endpoint_total = response["hits"]["total"]["value"]
+                .as_u64()
+                .or_else(|| response["hits"]["total"].as_u64())
+                .expect(
+                    "Elasticsearch response does not include hits->total nor hits->total->value",
+                );
 
-        assert!(
-            input.len() as u64 > endpoint_total,
-            "One of the endpoints received all of the events."
-        );
+            assert!(
+                input.len() as u64 > endpoint_total,
+                "One of the endpoints received all of the events."
+            );
 
-        total += endpoint_total;
+            total += endpoint_total;
+        }
     }
 
     assert_eq!(input.len() as u64, total);
