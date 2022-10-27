@@ -22,6 +22,14 @@ base: components: transforms: reduce: configuration: {
 			unit:    "milliseconds"
 		}
 	}
+	max_events: {
+		common:      false
+		description: "The maximum number of events to group together."
+		required:    false
+		type: uint: {
+			default: null
+		}
+	}
 	flush_period_ms: {
 		description: "The interval to check for and flush any expired events, in milliseconds."
 		required:    false
