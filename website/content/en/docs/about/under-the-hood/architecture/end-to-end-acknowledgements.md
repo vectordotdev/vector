@@ -22,7 +22,7 @@ using a [`filter`][filter] transform) or even unintentionally dropped (maybe Vec
 oh!), we still update the batch notifier to indicate the processing status of the event.
 
 Meanwhile, the source will hold on to the other half of the batch notifiers that it has created, and
-is notified when a batch notifier is updated. Once notified, a source will propagate that bath
+is notified when a batch notifier is updated. Once notified, a source will propagate that batch
 notifier status back upstream: maybe this means responding with an appropriate HTTP status code (200
 vs 500, etc) if the events came from an [HTTP request][http_source], or acknowledging the event
 directly, such as when using the [`kafka`][kafka_source] or [`aws_sqs`][aws_sqs_source] sources,
