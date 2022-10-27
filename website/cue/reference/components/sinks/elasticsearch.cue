@@ -82,7 +82,6 @@ components: sinks: elasticsearch: {
 				default: "auto"
 				enum: {
 					auto: "Auto-detect the api version. Will fail if endpoint isn't reachable."
-					v6:   "Use the Elasticsearch 6.x API."
 					v7:   "Use the Elasticsearch 7.x API."
 					v8:   "Use the Elasticsearch 8.x API."
 				}
