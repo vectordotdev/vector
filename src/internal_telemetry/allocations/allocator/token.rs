@@ -7,8 +7,7 @@ use std::{
 use tracing::Span;
 
 use super::tracing::WithAllocationGroup;
-
-use crate::internal_telemetry::allocations::allocator::stack::GroupStack;
+use super::super::stack::GroupStack;
 
 thread_local! {
     /// The currently executing allocation token.
