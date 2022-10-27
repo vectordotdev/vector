@@ -222,5 +222,35 @@ mod test {
             tdef: TypeDef::bytes().fallible(),
         }
 
+        missing_encoding{
+            args: func_args![value: value!("Subject: =?iso-8859-1??=A1Hola,_se=F1or!?=")],
+            want: Err("Invalid encoding: \"\""),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        unknown_charset{
+            args: func_args![value: value!("Subject: =?iso-9001?Q?hello=5Fworld=40example=2ecom?=")],
+            want: Err("Unable to decode \"iso-9001\" value"),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        no_start{
+            args: func_args![value: value!("Hello world.")],
+            want: Ok(value!("Hello world.")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        not_encoded{
+            args: func_args![value: value!("Is =? equal to ?= or not?")],
+            want: Ok(value!("Is =? equal to ?= or not?")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        empty{
+            args: func_args![value: value!("")],
+            want: Ok(value!("")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
     ];
 }
