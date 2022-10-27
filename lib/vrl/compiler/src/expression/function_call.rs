@@ -509,7 +509,6 @@ impl<'a> Builder<'a> {
 
             // Check the type definition of the resulting block.This needs to match
             // whatever is configured by the closure input type.
-            let block_type_def = block.type_info(state).result;
             let expected_kind = input.output.into_kind();
             if !expected_kind.is_superset(block_type_def.kind()) {
                 return Err(Error::ReturnTypeMismatch {

@@ -2,7 +2,7 @@ use chrono::TimeZone;
 use ordered_float::NotNan;
 
 use crate::{
-    event::{self, BTreeMap, WithMetadata},
+    event::{self, BTreeMap, MetricTags, WithMetadata},
     metrics::AgentDDSketch,
 };
 
@@ -222,7 +222,7 @@ impl From<Metric> for event::Metric {
 
         Self::new_with_metadata(name, kind, value, metadata)
             .with_namespace(namespace)
-            .with_tags(tags)
+            .with_tags(tags.map(MetricTags))
             .with_timestamp(timestamp)
             .with_interval_ms(std::num::NonZeroU32::new(metric.interval_ms))
     }
@@ -393,7 +393,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
             name,
             namespace,
             timestamp,
-            tags,
+            tags: tags.0,
             kind,
             interval_ms,
             value: Some(metric),

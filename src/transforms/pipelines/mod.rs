@@ -120,7 +120,8 @@ use crate::{
     conditions::AnyCondition,
     conditions::ConditionConfig,
     config::{
-        GenerateConfig, InnerTopology, InnerTopologyTransform, TransformConfig, TransformContext,
+        GenerateConfig, InnerTopology, InnerTopologyTransform, Inputs, TransformConfig,
+        TransformContext,
     },
     schema,
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
@@ -240,7 +241,7 @@ impl TransformConfig for PipelinesConfig {
         result.inner.insert(
             router_name,
             InnerTopologyTransform {
-                inputs: inputs.to_vec(),
+                inputs: Inputs::from_iter(inputs.iter().cloned()),
                 inner: RouteConfig::new(conditions).into(),
             },
         );
@@ -334,7 +335,7 @@ mod tests {
         let routes = transforms
             .iter()
             .map(|(key, transform)| (key.to_string(), transform.inputs.clone()))
-            .collect::<IndexMap<String, Vec<String>>>();
+            .collect::<IndexMap<_, _>>();
         let expansions: IndexMap<String, Vec<String>> = expansions
             .into_iter()
             .map(|(key, others)| {

@@ -34,77 +34,7 @@ components: transforms: "remap": {
 		notices: []
 	}
 
-	configuration: {
-		timezone: configuration._timezone
-		source: {
-			description: """
-				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
-
-				Required if `file` is missing.
-				"""
-			common:      true
-			required:    false
-			type: string: {
-				default: null
-				examples: [
-					"""
-						. = parse_json!(.message)
-						.new_field = "new value"
-						.status = to_int!(.status)
-						.duration = parse_duration!(.duration, "s")
-						.new_name = del(.old_name)
-						""",
-				]
-				syntax: "remap_program"
-			}
-		}
-		file: {
-			description: """
-				File path to the [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
-
-				If a relative path is provided, its root is the current working directory.
-
-				Required if `source` is missing.
-				"""
-			common:      true
-			required:    false
-			type: string: {
-				default: null
-				examples: [
-					"./my/program.vrl",
-				]
-			}
-		}
-		drop_on_error: {
-			common:   false
-			required: false
-			description: """
-				Drop the event from the primary output stream if the VRL program returns
-				an error at runtime. These events will instead be written to the
-				`dropped` output.
-				"""
-			type: bool: default: false
-		}
-		drop_on_abort: {
-			common:   false
-			required: false
-			description: """
-				Drop the event if the VRL program is manually aborted through the
-				`abort` statement. These events will instead be written to the `dropped`
-				output.
-				"""
-			type: bool: default: true
-		}
-		reroute_dropped: {
-			common:   false
-			required: false
-			description: """
-				Send any dropped events (determined according to `drop_on_error` and
-				`drop_on_abort`) to the `dropped` output instead dropping them entirely.
-				"""
-			type: bool: default: false
-		}
-	}
+	configuration: base.components.transforms.remap.configuration
 
 	input: {
 		logs: true

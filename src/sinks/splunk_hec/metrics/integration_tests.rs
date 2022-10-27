@@ -2,8 +2,8 @@ use std::convert::TryFrom;
 
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
-use vector_common::btreemap;
 use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
+use vector_core::metric_tags;
 
 use super::config::HecMetricsSinkConfig;
 use crate::{
@@ -49,7 +49,7 @@ fn get_gauge(batch: BatchNotifier) -> Event {
         MetricValue::Gauge { value: 26.28 },
     )
     .with_tags(Some(
-        btreemap! {"tag_gauge_test".to_string() => "tag_gauge_value".to_string()},
+        metric_tags! {"tag_gauge_test".to_string() => "tag_gauge_value".to_string()},
     ))
     .with_batch_notifier(&batch)
     .into()
@@ -62,7 +62,7 @@ fn get_counter(batch: BatchNotifier) -> Event {
         MetricValue::Counter { value: 26.28 },
     )
     .with_tags(Some(
-        btreemap! {"tag_counter_test".to_string() => "tag_counter_value".to_string()},
+        metric_tags! {"tag_counter_test".to_string() => "tag_counter_value".to_string()},
     ))
     .with_batch_notifier(&batch)
     .into()

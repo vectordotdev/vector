@@ -106,12 +106,6 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/google/rpc/status.proto");
         println!("cargo:rerun-if-changed=proto/vector.proto");
-        println!(
-            "cargo:rerun-if-changed=proto/opentelemetry/proto/collector/logs/v1/logs_service.proto"
-        );
-        println!("cargo:rerun-if-changed=proto/opentelemetry/proto/common/v1/common.proto");
-        println!("cargo:rerun-if-changed=proto/opentelemetry/proto/logs/v1/logs.proto");
-        println!("cargo:rerun-if-changed=proto/opentelemetry/proto/resource/v1/resource.proto");
 
         let mut prost_build = prost_build::Config::new();
         prost_build.btree_map(&["."]);
@@ -128,7 +122,6 @@ fn main() {
                     "proto/google/pubsub/v1/pubsub.proto",
                     "proto/google/rpc/status.proto",
                     "proto/vector.proto",
-                    "proto/opentelemetry/proto/collector/logs/v1/logs_service.proto",
                 ],
                 &["proto/", "lib/vector-core/proto/"],
             )

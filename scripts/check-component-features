@@ -12,7 +12,7 @@ features=$(
     s/ *=.*$//;
 
     # Skip over certain features
-    /-utils-/d;
+    /-utils/d;
     /^default$/d;
     /^all-integration-tests$/d;
   ' < Cargo.toml | sort

@@ -49,11 +49,19 @@ impl Partitioner for EventPartitioner {
             }
             Event::Trace(t) => PartitionKey {
                 api_key: item.metadata().datadog_api_key(),
-                env: t.get("env").map(|s| s.to_string_lossy()),
-                hostname: t.get(log_schema().host_key()).map(|s| s.to_string_lossy()),
-                agent_version: t.get("agent_version").map(|s| s.to_string_lossy()),
-                target_tps: t.get("target_tps").and_then(|tps| tps.as_integer()),
-                error_tps: t.get("error_tps").and_then(|tps| tps.as_integer()),
+                env: t.get("env").map(|s| s.to_string_lossy().into_owned()),
+                hostname: t
+                    .get(log_schema().host_key())
+                    .map(|s| s.to_string_lossy().into_owned()),
+                agent_version: t
+                    .get("agent_version")
+                    .map(|s| s.to_string_lossy().into_owned()),
+                target_tps: t
+                    .get("target_tps")
+                    .and_then(|tps| tps.as_integer().map(Into::into)),
+                error_tps: t
+                    .get("error_tps")
+                    .and_then(|tps| tps.as_integer().map(Into::into)),
             },
         }
     }

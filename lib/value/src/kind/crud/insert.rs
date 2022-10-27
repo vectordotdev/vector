@@ -589,7 +589,7 @@ mod tests {
                 "coalesce empty object",
                 TestCase {
                     this: Kind::object(Collection::empty()),
-                    path: parse_value_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     kind: Kind::bytes(),
                     expected: Kind::object(Collection::from(BTreeMap::from([(
                         "b".into(),
@@ -604,7 +604,7 @@ mod tests {
                         "a".into(),
                         Kind::integer(),
                     )]))),
-                    path: parse_value_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     kind: Kind::bytes(),
                     expected: Kind::object(Collection::from(BTreeMap::from([(
                         "a".into(),
@@ -619,7 +619,7 @@ mod tests {
                         "b".into(),
                         Kind::integer(),
                     )]))),
-                    path: parse_value_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     kind: Kind::bytes(),
                     expected: Kind::object(Collection::from(BTreeMap::from([(
                         "b".into(),
@@ -634,7 +634,7 @@ mod tests {
                         ("a".into(), Kind::integer()),
                         ("b".into(), Kind::integer()),
                     ]))),
-                    path: parse_value_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     kind: Kind::bytes(),
                     expected: Kind::object(Collection::from(BTreeMap::from([
                         ("a".into(), Kind::bytes()),
@@ -646,7 +646,7 @@ mod tests {
                 "coalesce nested",
                 TestCase {
                     this: Kind::object(Collection::from(BTreeMap::from([]))),
-                    path: parse_value_path(".(a|b).x"),
+                    path: parse_value_path(".(a|b).x").unwrap(),
                     kind: Kind::bytes(),
                     expected: Kind::object(Collection::from(BTreeMap::from([(
                         "b".into(),
@@ -658,7 +658,7 @@ mod tests {
                 "insert into never",
                 TestCase {
                     this: Kind::never(),
-                    path: parse_value_path(".x"),
+                    path: parse_value_path(".x").unwrap(),
                     kind: Kind::bytes(),
                     expected: Kind::never(),
                 },
@@ -667,7 +667,7 @@ mod tests {
                 "insert never",
                 TestCase {
                     this: Kind::object(Collection::empty()),
-                    path: parse_value_path(".x"),
+                    path: parse_value_path(".x").unwrap(),
                     kind: Kind::never(),
                     expected: Kind::never(),
                 },
@@ -676,7 +676,7 @@ mod tests {
                 "insert undefined",
                 TestCase {
                     this: Kind::object(Collection::empty()),
-                    path: parse_value_path(".x"),
+                    path: parse_value_path(".x").unwrap(),
                     kind: Kind::undefined(),
                     expected: Kind::object(BTreeMap::from([("x".into(), Kind::null())])),
                 },

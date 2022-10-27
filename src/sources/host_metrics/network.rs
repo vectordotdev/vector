@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use futures::StreamExt;
 #[cfg(target_os = "linux")]
 use heim::net::os::linux::IoCountersExt;
@@ -7,6 +5,7 @@ use heim::net::os::linux::IoCountersExt;
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
 use vector_config::configurable_component;
+use vector_core::event::MetricTags;
 
 use crate::internal_events::HostMetricsScrapeDetailError;
 
@@ -48,39 +47,39 @@ impl HostMetrics {
                     output.counter(
                         "network_receive_bytes_total",
                         counter.bytes_recv().get::<byte>() as f64,
-                        BTreeMap::from([(String::from("device"), interface.to_string())]),
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
                     );
                     output.counter(
                         "network_receive_errs_total",
                         counter.errors_recv() as f64,
-                        BTreeMap::from([(String::from("device"), interface.to_string())]),
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
                     );
                     output.counter(
                         "network_receive_packets_total",
                         counter.packets_recv() as f64,
-                        BTreeMap::from([(String::from("device"), interface.to_string())]),
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
                     );
                     output.counter(
                         "network_transmit_bytes_total",
                         counter.bytes_sent().get::<byte>() as f64,
-                        BTreeMap::from([(String::from("device"), interface.to_string())]),
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
                     );
                     output.counter(
                         "network_transmit_errs_total",
                         counter.errors_sent() as f64,
-                        BTreeMap::from([(String::from("device"), interface.to_string())]),
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
                     );
                     #[cfg(any(target_os = "linux", target_os = "windows"))]
                     output.counter(
                         "network_transmit_packets_drop_total",
                         counter.drop_sent() as f64,
-                        BTreeMap::from([(String::from("device"), interface.to_string())]),
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
                     );
                     #[cfg(any(target_os = "linux", target_os = "windows"))]
                     output.counter(
                         "network_transmit_packets_total",
                         counter.packets_sent() as f64,
-                        BTreeMap::from([(String::from("device"), interface.to_string())]),
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
                     );
                 }
             }

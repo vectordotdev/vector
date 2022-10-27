@@ -94,7 +94,6 @@ pub struct RemoteWriteConfig {
     /// If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the value of this setting.
     ///
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
-    #[configurable(metadata(templateable))]
     #[serde(default)]
     pub tenant_id: Option<Template>,
 
@@ -678,7 +677,7 @@ mod integration_tests {
                     _ => panic!("Unhandled metric value, fix the test"),
                 }
                 for (tag, value) in metric.tags().unwrap() {
-                    assert_eq!(output[&tag[..]], Value::String(value.to_string()));
+                    assert_eq!(output[tag], Value::String(value.to_string()));
                 }
                 let timestamp =
                     format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);
