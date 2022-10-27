@@ -9,8 +9,8 @@ use super::token::AllocationGroupId;
 /// This implementation is uses an array to represent the stack to avoid thread local destructor registration issues.
 #[derive(Copy, Clone)]
 pub(crate) struct GroupStack<const N: usize> {
-    slots: [AllocationGroupId; N],
     current_top: usize,
+    slots: [AllocationGroupId; N],
 }
 
 impl<const N: usize> GroupStack<N> {
