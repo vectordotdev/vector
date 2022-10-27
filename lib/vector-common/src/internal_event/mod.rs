@@ -137,6 +137,10 @@ impl From<&'static str> for Protocol {
 ///         self.handle_field.increment(data.0);
 ///     }
 /// );
+///
+/// let handle = register!(Event { event_field: "message" });
+///
+/// handle.emit(DataType(123));
 /// ```
 ///
 /// In this example, the first set of fields describes the data required to register the event. This
