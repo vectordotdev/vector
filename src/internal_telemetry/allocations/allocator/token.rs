@@ -6,8 +6,8 @@ use std::{
 
 use tracing::Span;
 
+use super::stack::GroupStack;
 use super::tracing::WithAllocationGroup;
-use super::super::stack::GroupStack;
 
 thread_local! {
     /// The currently executing allocation token.

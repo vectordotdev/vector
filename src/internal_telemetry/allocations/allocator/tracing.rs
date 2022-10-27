@@ -17,7 +17,7 @@ pub(crate) struct WithAllocationGroup {
 #[cfg_attr(docsrs, doc(cfg(feature = "tracing-compat")))]
 pub struct AllocationLayer<S> {
     ctx: WithAllocationGroup,
-    _subscriber: PhantomData<fn(S)>,
+    _subscriber: PhantomData<S>,
 }
 
 impl<S> AllocationLayer<S>
