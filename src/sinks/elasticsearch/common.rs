@@ -131,26 +131,16 @@ impl ElasticsearchCommon {
                 ElasticsearchApiVersion::V7 => 7,
                 ElasticsearchApiVersion::V8 => 8,
                 ElasticsearchApiVersion::Auto => {
-                    let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
-                    let response = get(
+                    get_version(
                         &base_url,
                         &http_auth,
                         &aws_auth,
                         &region,
                         &request,
-                        client,
-                        "/_cluster/state/version",
+                        &tls_settings,
+                        proxy_config,
                     )
-                    .await
-                    .map_err(|error| {
-                        format!("Failed to get Elasticsearch API version: {}", error)
-                    })?;
-
-                    let (_, body) = response.into_parts();
-                    let mut body = body::aggregate(body).await?;
-                    let body = body.copy_to_bytes(body.remaining());
-                    let ClusterState { version } = serde_json::from_slice(&body)?;
-                    version
+                    .await?
                 }
             };
             *version = Some(ver);
@@ -251,6 +241,40 @@ pub async fn sign_request(
     crate::aws::sign_request("es", request, credentials_provider, region).await
 }
 
+async fn get_version(
+    base_url: &str,
+    http_auth: &Option<Auth>,
+    aws_auth: &Option<SharedCredentialsProvider>,
+    region: &Option<Region>,
+    request: &RequestConfig,
+    tls_settings: &TlsSettings,
+    proxy_config: &ProxyConfig,
+) -> crate::Result<usize> {
+    #[derive(Deserialize)]
+    struct ClusterState {
+        version: usize,
+    }
+
+    let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
+    let response = get(
+        base_url,
+        http_auth,
+        aws_auth,
+        region,
+        request,
+        client,
+        "/_cluster/state/version",
+    )
+    .await
+    .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;
+
+    let (_, body) = response.into_parts();
+    let mut body = body::aggregate(body).await?;
+    let body = body.copy_to_bytes(body.remaining());
+    let ClusterState { version } = serde_json::from_slice(&body)?;
+    Ok(version)
+}
+
 async fn get(
     base_url: &str,
     http_auth: &Option<Auth>,
@@ -279,9 +303,4 @@ async fn get(
         .send(request.map(hyper::Body::from))
         .await
         .map_err(Into::into)
-}
-
-#[derive(Deserialize)]
-struct ClusterState {
-    version: usize,
 }
