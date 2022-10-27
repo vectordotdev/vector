@@ -72,6 +72,7 @@ pub struct FileConfig {
     /// Takes precedence over the `include` option. Note that the `exclude` patterns are applied _after_ Vector attempts to glob everything
     /// in `include`. That is, Vector will still try to list all of the files matched by `include` and then filter them by the `exclude`
     /// patterns. This can be impactful if `include` contains directories with contents that vector does not have access to.
+    #[serde(default)]
     pub exclude: Vec<PathBuf>,
 
     /// Overrides the name of the log field used to add the file path to each event.
