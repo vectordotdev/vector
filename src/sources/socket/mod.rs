@@ -1,5 +1,5 @@
 pub mod tcp;
-mod udp;
+pub mod udp;
 #[cfg(unix)]
 mod unix;
 
@@ -12,7 +12,7 @@ use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
     config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
-    sources::util::TcpSource,
+    sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
 
@@ -223,8 +223,8 @@ impl SourceConfig for SocketConfig {
 
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
-            Mode::Tcp(tcp) => vec![tcp.address().into()],
-            Mode::Udp(udp) => vec![Resource::udp(udp.address())],
+            Mode::Tcp(tcp) => vec![tcp.address().as_tcp_resource()],
+            Mode::Udp(udp) => vec![udp.address().as_udp_resource()],
             #[cfg(unix)]
             Mode::UnixDatagram(_) => vec![],
             #[cfg(unix)]
@@ -282,6 +282,7 @@ mod test {
         event::{Event, LogEvent},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
+        sources::util::net::SocketListenAddr,
         test_util::{
             collect_n, collect_n_limited,
             components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
@@ -326,25 +327,28 @@ mod test {
 
     #[tokio::test]
     async fn tcp_splits_on_newline() {
-        let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let addr = next_addr();
 
-        let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
+            let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
 
-        wait_for_tcp(addr).await;
-        send_lines(addr, vec!["foo\nbar".to_owned()].into_iter())
-            .await
-            .unwrap();
+            wait_for_tcp(addr).await;
+            send_lines(addr, vec!["foo\nbar".to_owned()].into_iter())
+                .await
+                .unwrap();
 
-        let events = collect_n(rx, 2).await;
+            let events = collect_n(rx, 2).await;
 
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].as_log()[log_schema().message_key()], "foo".into());
-        assert_eq!(events[1].as_log()[log_schema().message_key()], "bar".into());
+            assert_eq!(events.len(), 2);
+            assert_eq!(events[0].as_log()[log_schema().message_key()], "foo".into());
+            assert_eq!(events[1].as_log()[log_schema().message_key()], "bar".into());
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -661,10 +665,13 @@ mod test {
         config: Option<UdpConfig>,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (address, config) = match config {
-            Some(config) => (config.address(), config),
+            Some(config) => match config.address() {
+                SocketListenAddr::SocketAddr(addr) => (addr, config),
+                _ => panic!("listen address should not be systemd FD offset in tests"),
+            },
             None => {
                 let address = next_addr();
-                (address, UdpConfig::from_address(address))
+                (address, UdpConfig::from_address(address.into()))
             }
         };
 
@@ -749,7 +756,7 @@ mod test {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
-            let mut config = UdpConfig::from_address(address);
+            let mut config = UdpConfig::from_address(address.into());
             config.max_length = 11;
             let address = init_udp_with_config(tx, config).await;
 
@@ -785,7 +792,7 @@ mod test {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
-            let mut config = UdpConfig::from_address(address);
+            let mut config = UdpConfig::from_address(address.into());
             config.max_length = 10;
             config.framing = CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
@@ -1026,18 +1033,21 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_message() {
-        let rx = unix_message("test", false).await;
-        let events = collect_n(rx, 1).await;
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let rx = unix_message("test", false).await;
+            let events = collect_n(rx, 1).await;
 
-        assert_eq!(events.len(), 1);
-        assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "test".into()
-        );
-        assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
-            "socket".into()
-        );
+            assert_eq!(events.len(), 1);
+            assert_eq!(
+                events[0].as_log()[log_schema().message_key()],
+                "test".into()
+            );
+            assert_eq!(
+                events[0].as_log()[log_schema().source_type_key()],
+                "socket".into()
+            );
+        })
+        .await;
     }
 
     #[cfg(unix)]

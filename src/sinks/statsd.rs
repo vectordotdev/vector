@@ -284,10 +284,12 @@ impl Service<BytesMut> for StatsdSvc {
     type Error = crate::Error;
     type Future = future::BoxFuture<'static, Result<(), Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, frame: BytesMut) -> Self::Future {
         self.inner.call(frame).err_into().boxed()
     }

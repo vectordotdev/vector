@@ -26,48 +26,10 @@ components: transforms: tag_cardinality_limit: {
 		notices: []
 	}
 
-	configuration: {
-		cache_size_per_tag: {
-			common:        false
-			description:   "The size of the cache in bytes to use to detect duplicate tags. The bigger the cache the less likely it is to have a 'false positive' or a case where we allow a new value for tag even after we have reached the configured limits."
-			relevant_when: "mode = \"probabilistic\""
-			required:      false
-			type: uint: {
-				default: 5120000
-				unit:    "bytes"
-			}
-		}
-		limit_exceeded_action: {
-			common:      true
-			description: "Controls what should happen when a metric comes in with a tag that would exceed the configured limit on cardinality."
-			required:    false
-			type: string: {
-				default: "drop_tag"
-				enum: {
-					drop_tag:   "Remove tags that would exceed the configured limit from the incoming metric"
-					drop_event: "Drop any metric events that contain tags that would exceed the configured limit"
-				}
-			}
-		}
-		mode: {
-			description: "Controls what approach is used internally to keep track of previously seen tags and determine when a tag on an incoming metric exceeds the limit."
-			required:    true
-			type: string: {
-				enum: {
-					exact:         "Has higher memory requirements than `probabilistic`, but never falsely outputs metrics with new tags after the limit has been hit."
-					probabilistic: "Has lower memory requirements than `exact`, but may occasionally allow metric events to pass through the transform even when they contain new tags that exceed the configured limit.  The rate at which this happens can be controlled by changing the value of `cache_size_per_tag`."
-				}
-			}
-		}
-		value_limit: {
-			common:      true
-			description: "How many distinct values to accept for any given key."
-			required:    false
-			type: uint: {
-				default: 500
-				unit:    null
-			}
-		}
+	// TODO: It'd be nice to have a way to define the description of the enum tag field on the Rust
+	// side and propagate it forward, since this is a common pattern that gets used.
+	configuration: base.components.transforms.tag_cardinality_limit.configuration & {
+		mode: description: "Controls the approach taken for tracking tag cardinality."
 	}
 
 	input: {

@@ -27,7 +27,7 @@ use vector_core::{
     },
     internal_event::EventsSent,
     schema::Definition,
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use super::{
@@ -38,9 +38,9 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, EnrichmentTableConfig, Input, Output, OutputId, ProxyConfig,
-        SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig, TransformContext,
-        TransformOuter,
+        ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, Output, OutputId,
+        ProxyConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
+        TransformContext, TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -126,7 +126,7 @@ pub(self) async fn load_enrichment_tables<'a>(
 }
 
 pub struct Pieces {
-    pub(super) inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Vec<OutputId>)>,
+    pub(super) inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
     pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub(super) tasks: HashMap<ComponentKey, Task>,
     pub(crate) source_tasks: HashMap<ComponentKey, Task>,
@@ -474,7 +474,7 @@ pub async fn build_pieces(
                     .inspect(|events| {
                         emit!(EventsReceived {
                             count: events.len(),
-                            byte_size: events.size_of(),
+                            byte_size: events.estimated_json_encoded_size_of(),
                         })
                     })
                     .take_until_if(tripwire),
@@ -582,7 +582,7 @@ const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
 struct TransformNode {
     key: ComponentKey,
     typetag: &'static str,
-    inputs: Vec<OutputId>,
+    inputs: Inputs<OutputId>,
     input_details: Input,
     outputs: Vec<Output>,
     enable_concurrency: bool,
@@ -701,7 +701,7 @@ impl Runner {
 
         emit!(EventsReceived {
             count: events.len(),
-            byte_size: events.size_of(),
+            byte_size: events.estimated_json_encoded_size_of(),
         });
     }
 
@@ -819,7 +819,7 @@ fn build_task_transform(
         .inspect(|events| {
             emit!(EventsReceived {
                 count: events.len(),
-                byte_size: events.size_of(),
+                byte_size: events.estimated_json_encoded_size_of(),
             })
         });
     let stream = t
@@ -827,7 +827,7 @@ fn build_task_transform(
         .inspect(|events: &EventArray| {
             emit!(EventsSent {
                 count: events.len(),
-                byte_size: events.size_of(),
+                byte_size: events.estimated_json_encoded_size_of(),
                 output: None,
             });
         });

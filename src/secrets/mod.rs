@@ -18,7 +18,7 @@ pub enum SecretBackends {
     Exec(#[configurable(derived)] exec::ExecBackend),
 
     /// Test.
-    #[configurable(metadata(hidden))]
+    #[configurable(metadata(docs::hidden))]
     Test(#[configurable(derived)] test::TestBackend),
 }
 

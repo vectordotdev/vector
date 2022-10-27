@@ -168,6 +168,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use metrics::{counter, gauge, histogram};
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -252,8 +253,7 @@ mod tests {
             _ => panic!("wrong type"),
         }
 
-        let mut labels = BTreeMap::new();
-        labels.insert(String::from("host"), String::from("foo"));
+        let labels = metric_tags!("host" => "foo");
         assert_eq!(Some(&labels), output["quux"].tags());
     }
 

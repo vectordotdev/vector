@@ -75,6 +75,29 @@ pub enum Tagging {
     None,
 }
 
+impl Tagging {
+    /// Generates custom attributes that describe the tagging mode.
+    ///
+    /// This is typically added to the metadata for an enum's overall schema to better describe how
+    /// the various subschemas relate to each other and how they're used on the Rust side, for the
+    /// purpose of generating usable documentation from the schema.
+    pub fn as_enum_metadata(&self) -> Vec<CustomAttribute> {
+        match self {
+            Self::External => vec![CustomAttribute::kv("docs::enum_tagging", "external")],
+            Self::Internal { tag } => vec![
+                CustomAttribute::kv("docs::enum_tagging", "internal"),
+                CustomAttribute::kv("docs::enum_tag_field", tag),
+            ],
+            Self::Adjacent { tag, content } => vec![
+                CustomAttribute::kv("docs::enum_tagging", "adjacent"),
+                CustomAttribute::kv("docs::enum_tag_field", tag),
+                CustomAttribute::kv("docs::enum_content_field", content),
+            ],
+            Self::None => vec![CustomAttribute::kv("docs::enum_tagging", "untagged")],
+        }
+    }
+}
+
 impl From<&serde_attr::TagType> for Tagging {
     fn from(tag: &serde_attr::TagType) -> Self {
         match tag {
@@ -125,13 +148,7 @@ impl FromMeta for Metadata {
             .iter()
             .filter_map(|nmeta| match nmeta {
                 NestedMeta::Meta(meta) => match meta {
-                    syn::Meta::Path(path) => match path.get_ident() {
-                        Some(ident) => Some(CustomAttribute::Flag(ident.to_string())),
-                        None => {
-                            errors.push(darling::Error::unknown_value("flag attributes must be simple strings i.e. `flag` or `my_flag`").with_span(nmeta));
-                            None
-                        },
-                    }
+                    syn::Meta::Path(path) => Some(CustomAttribute::Flag(path_to_string(path))),
                     syn::Meta::List(_) => {
                         errors.push(darling::Error::unexpected_type("list").with_span(nmeta));
                         None

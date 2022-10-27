@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
 use vector_buffers::EventCount;
-use vector_core::ByteSizeOf;
+use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::request_builder::EncodeResult;
 
@@ -12,6 +12,8 @@ pub struct RequestMetadata {
     event_count: usize,
     /// Size, in bytes, of the in-memory representation of all events in this batch request.
     events_byte_size: usize,
+    /// Size, in bytes, of the estimated JSON-encoded representation of all events in this batch request.
+    events_estimated_json_encoded_byte_size: usize,
     /// Uncompressed size, in bytes, of the encoded events in this batch request.
     request_encoded_size: usize,
     /// On-the-wire size, in bytes, of the batch request itself after compression, etc.
@@ -24,7 +26,7 @@ pub struct RequestMetadata {
 impl RequestMetadata {
     pub fn builder<E>(events: E) -> RequestMetadataBuilder
     where
-        E: ByteSizeOf + EventCount,
+        E: ByteSizeOf + EventCount + EstimatedJsonEncodedSizeOf,
     {
         RequestMetadataBuilder::from_events(events)
     }
@@ -35,6 +37,10 @@ impl RequestMetadata {
 
     pub const fn events_byte_size(&self) -> usize {
         self.events_byte_size
+    }
+
+    pub const fn events_estimated_json_encoded_byte_size(&self) -> usize {
+        self.events_estimated_json_encoded_byte_size
     }
 
     pub const fn request_encoded_size(&self) -> usize {
@@ -49,16 +55,18 @@ impl RequestMetadata {
 pub struct RequestMetadataBuilder {
     event_count: usize,
     events_byte_size: usize,
+    events_estimated_json_encoded_byte_size: usize,
 }
 
 impl RequestMetadataBuilder {
     pub fn from_events<E>(events: E) -> Self
     where
-        E: ByteSizeOf + EventCount,
+        E: ByteSizeOf + EventCount + EstimatedJsonEncodedSizeOf,
     {
         Self {
             event_count: events.event_count(),
             events_byte_size: events.size_of(),
+            events_estimated_json_encoded_byte_size: events.estimated_json_encoded_size_of(),
         }
     }
 
@@ -66,6 +74,7 @@ impl RequestMetadataBuilder {
         RequestMetadata {
             event_count: self.event_count,
             events_byte_size: self.events_byte_size,
+            events_estimated_json_encoded_byte_size: self.events_estimated_json_encoded_byte_size,
             request_encoded_size: size.get(),
             request_wire_size: size.get(),
         }
@@ -75,6 +84,7 @@ impl RequestMetadataBuilder {
         RequestMetadata {
             event_count: self.event_count,
             events_byte_size: self.events_byte_size,
+            events_estimated_json_encoded_byte_size: self.events_estimated_json_encoded_byte_size,
             request_encoded_size: result.uncompressed_byte_size,
             request_wire_size: result
                 .compressed_byte_size
