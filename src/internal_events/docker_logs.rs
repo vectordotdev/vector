@@ -176,6 +176,7 @@ impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -202,6 +203,7 @@ impl InternalEvent for DockerLogsReceivedOutOfOrderError<'_> {
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
             timestamp = ?self.timestamp_str,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

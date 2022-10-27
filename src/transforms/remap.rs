@@ -40,7 +40,7 @@ const DROPPED: &str = "dropped";
 /// Configuration for the `remap` transform.
 #[configurable_component(transform("remap"))]
 #[derive(Clone, Debug, Derivative)]
-#[serde(deny_unknown_fields, default)]
+#[serde(deny_unknown_fields)]
 #[derivative(Default)]
 pub struct RemapConfig {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
@@ -48,6 +48,10 @@ pub struct RemapConfig {
     /// Required if `file` is missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
+    #[configurable(metadata(
+        docs::examples = ". = parse_json!(.message)\n.new_field = \"new value\"\n.status = to_int!(.status)\n.duration = parse_duration!(.duration, \"s\")\n.new_name = del(.old_name)",
+        docs::syntax_override = "remap_program"
+    ))]
     pub source: Option<String>,
 
     /// File path to the [Vector Remap Language][vrl] (VRL) program to execute for each event.
@@ -57,6 +61,7 @@ pub struct RemapConfig {
     /// Required if `source` is missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
+    #[configurable(metadata(docs::examples = "./my/program.vrl",))]
     pub file: Option<PathBuf>,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
@@ -80,6 +85,7 @@ pub struct RemapConfig {
     ///
     /// Additionally, dropped events can potentially be diverted to a specially named output for
     /// further logging and analysis by setting `reroute_dropped`.
+    #[serde(default = "crate::serde::default_false")]
     pub drop_on_error: bool,
 
     /// Drops any event that is manually aborted during processing.
@@ -106,6 +112,7 @@ pub struct RemapConfig {
     /// In these cases, `reroute_dropped` can be set to `true` which will forward the original event
     /// to a specially-named output, `dropped`. The original event will be annotated with additional
     /// fields describing why the event was dropped.
+    #[serde(default = "crate::serde::default_false")]
     pub reroute_dropped: bool,
 
     #[configurable(derived)]
@@ -577,11 +584,11 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::HashMap;
 
     use indoc::{formatdoc, indoc};
     use vector_common::btreemap;
-    use vector_core::event::EventMetadata;
+    use vector_core::{event::EventMetadata, metric_tags};
 
     use super::*;
     use crate::{
@@ -591,9 +598,14 @@ mod tests {
             LogEvent, Metric, Value,
         },
         schema,
-        test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+        test_util::components::{
+            assert_transform_compliance, init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS,
+        },
+        transforms::test::create_topology,
         transforms::OutputBuffer,
     };
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     fn test_default_schema_definition() -> schema::Definition {
         schema::Definition::empty_legacy_namespace().with_field(
@@ -657,7 +669,12 @@ mod tests {
     }
 
     fn get_field_string(event: &Event, field: &str) -> String {
-        event.as_log().get(field).unwrap().to_string_lossy()
+        event
+            .as_log()
+            .get(field)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned()
     }
 
     #[test]
@@ -954,10 +971,8 @@ mod tests {
                     metadata.with_schema_definition(&Arc::new(test_default_schema_definition())),
                 )
                 .with_namespace(Some("zerk"))
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("host".into(), "zoobub".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "host" => "zoobub",
                 }))
             )
         );
@@ -1081,7 +1096,7 @@ mod tests {
         );
 
         let output = transform_one_fallible(&mut tform, happy_metric).unwrap();
-        pretty_assertions::assert_eq!(
+        similar_asserts::assert_eq!(
             output,
             Event::Metric(
                 Metric::new_with_metadata(
@@ -1091,17 +1106,15 @@ mod tests {
                     EventMetadata::default()
                         .with_schema_definition(&Arc::new(test_default_schema_definition())),
                 )
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("hello".into(), "world".into());
-                    tags.insert("foo".into(), "bar".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "hello" => "world",
+                    "foo" => "bar",
                 }))
             )
         );
 
         let output = transform_one_fallible(&mut tform, abort_metric).unwrap_err();
-        pretty_assertions::assert_eq!(
+        similar_asserts::assert_eq!(
             output,
             Event::Metric(
                 Metric::new_with_metadata(
@@ -1111,20 +1124,18 @@ mod tests {
                     EventMetadata::default()
                         .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
                 )
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("hello".into(), "goodbye".into());
-                    tags.insert("metadata.dropped.reason".into(), "abort".into());
-                    tags.insert("metadata.dropped.component_id".into(), "remapper".into());
-                    tags.insert("metadata.dropped.component_type".into(), "remap".into());
-                    tags.insert("metadata.dropped.component_kind".into(), "transform".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "hello" => "goodbye",
+                    "metadata.dropped.reason" => "abort",
+                    "metadata.dropped.component_id" => "remapper",
+                    "metadata.dropped.component_type" => "remap",
+                    "metadata.dropped.component_kind" => "transform",
                 }))
             )
         );
 
         let output = transform_one_fallible(&mut tform, error_metric).unwrap_err();
-        pretty_assertions::assert_eq!(
+        similar_asserts::assert_eq!(
             output,
             Event::Metric(
                 Metric::new_with_metadata(
@@ -1134,14 +1145,12 @@ mod tests {
                     EventMetadata::default()
                         .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
                 )
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("not_hello".into(), "oops".into());
-                    tags.insert("metadata.dropped.reason".into(), "error".into());
-                    tags.insert("metadata.dropped.component_id".into(), "remapper".into());
-                    tags.insert("metadata.dropped.component_type".into(), "remap".into());
-                    tags.insert("metadata.dropped.component_kind".into(), "transform".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "not_hello" => "oops",
+                    "metadata.dropped.reason" => "error",
+                    "metadata.dropped.component_id" => "remapper",
+                    "metadata.dropped.component_type" => "remap",
+                    "metadata.dropped.component_kind" => "transform",
                 }))
             )
         );
@@ -1398,5 +1407,27 @@ mod tests {
             (None, Some(bad)) => Err(bad),
             (a, b) => panic!("expected output xor error output, got {:?} and {:?}", a, b),
         }
+    }
+
+    #[tokio::test]
+    async fn emits_internal_events() {
+        assert_transform_compliance(async move {
+            let config = RemapConfig {
+                source: Some("abort".to_owned()),
+                drop_on_abort: true,
+                ..Default::default()
+            };
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let log = LogEvent::from("hello world");
+            tx.send(log.into()).await.unwrap();
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 }

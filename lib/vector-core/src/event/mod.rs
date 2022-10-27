@@ -13,7 +13,7 @@ pub use finalization::{
 };
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
-pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
+pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;

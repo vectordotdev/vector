@@ -27,9 +27,9 @@ pub struct CommandIsMaster {
 pub struct CommandBuildInfo {
     pub version: String,
     pub git_version: String,
-    pub bits: i32,
+    pub bits: i64,
     pub debug: bool,
-    pub max_bson_object_size: i32,
+    pub max_bson_object_size: i64,
 }
 
 /// https://docs.mongodb.com/manual/reference/command/serverStatus/
@@ -66,19 +66,19 @@ pub struct CommandServerStatusInstance {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusAsserts {
-    pub regular: i32,
-    pub warning: i32,
-    pub msg: i32,
-    pub user: i32,
-    pub rollovers: i32,
+    pub regular: i64,
+    pub warning: i64,
+    pub msg: i64,
+    pub user: i64,
+    pub rollovers: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusConnections {
-    pub active: i32,
-    pub available: i32,
-    pub current: i32,
+    pub active: i64,
+    pub available: i64,
+    pub current: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -90,10 +90,10 @@ pub struct CommandServerStatusExtraInfo {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusMem {
-    pub resident: i32,
-    pub r#virtual: i32,
-    pub mapped: Option<i32>,
-    pub mapped_with_journal: Option<i32>,
+    pub resident: i64,
+    pub r#virtual: i64,
+    pub mapped: Option<i64>,
+    pub mapped_with_journal: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -106,9 +106,9 @@ pub struct CommandServerStatusGlobalLock {
 
 #[derive(Debug, Deserialize)]
 pub struct CommandServerStatusGlobalLockInner {
-    pub total: i32,
-    pub readers: i32,
-    pub writers: i32,
+    pub total: i64,
+    pub readers: i64,
+    pub writers: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -174,8 +174,8 @@ pub struct CommandServerStatusMetricsGetLastError {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusMetricsGetLastErrorWtime {
-    pub num: i32,
-    pub total_millis: i32,
+    pub num: i64,
+    pub total_millis: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -220,8 +220,8 @@ pub struct CommandServerStatusMetricsReplApply {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusMetricsReplApplyBatches {
-    pub num: i32,
-    pub total_millis: i32,
+    pub num: i64,
+    pub total_millis: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -236,14 +236,14 @@ pub struct CommandServerStatusMetricsReplBuffer {
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusMetricsReplExecutor {
     pub queues: CommandServerStatusMetricsReplExecutorQueues,
-    pub unsignaled_events: i32,
+    pub unsignaled_events: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusMetricsReplExecutorQueues {
-    pub network_in_progress: i32,
-    pub sleepers: i32,
+    pub network_in_progress: i64,
+    pub sleepers: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -258,8 +258,8 @@ pub struct CommandServerStatusMetricsReplNetwork {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusMetricsReplNetworkGetmores {
-    pub num: i32,
-    pub total_millis: i32,
+    pub num: i64,
+    pub total_millis: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -304,51 +304,51 @@ pub struct CommandServerStatusWiredTiger {
 #[derive(Debug, Deserialize)]
 pub struct CommandServerStatusWiredTigerBlockManager {
     #[serde(rename = "blocks pre-loaded")]
-    pub blocks_pre_loaded: i32,
+    pub blocks_pre_loaded: i64,
     #[serde(rename = "blocks read")]
-    pub blocks_read: i32,
+    pub blocks_read: i64,
     #[serde(rename = "blocks written")]
-    pub blocks_written: i32,
+    pub blocks_written: i64,
     #[serde(rename = "bytes read")]
-    pub bytes_read: i32,
+    pub bytes_read: i64,
     #[serde(rename = "bytes written")]
-    pub bytes_written: i32,
+    pub bytes_written: i64,
     #[serde(rename = "mapped blocks read")]
-    pub mapped_blocks_read: i32,
+    pub mapped_blocks_read: i64,
     #[serde(rename = "mapped bytes read")]
-    pub mapped_bytes_read: i32,
+    pub mapped_bytes_read: i64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CommandServerStatusWiredTigerCache {
     #[serde(rename = "bytes currently in the cache")]
-    pub bytes_total: i32,
+    pub bytes_total: i64,
     #[serde(rename = "bytes read into cache")]
-    pub bytes_read_into: i32,
+    pub bytes_read_into: i64,
     #[serde(rename = "bytes written from cache")]
     pub bytes_written_from: i64,
     #[serde(rename = "maximum bytes configured")]
     pub max_bytes: f64,
     #[serde(rename = "modified pages evicted")]
-    pub evicted_modified: i32,
+    pub evicted_modified: i64,
     #[serde(rename = "pages currently held in the cache")]
-    pub pages_total: i32,
+    pub pages_total: i64,
     #[serde(rename = "pages read into cache")]
-    pub pages_read_into: i32,
+    pub pages_read_into: i64,
     #[serde(rename = "pages written from cache")]
-    pub pages_written_from: i32,
+    pub pages_written_from: i64,
     #[serde(rename = "percentage overhead")]
-    pub percent_overhead: i32,
+    pub percent_overhead: i64,
     #[serde(rename = "tracked bytes belonging to internal pages in the cache")]
-    pub bytes_internal_pages: i32,
+    pub bytes_internal_pages: i64,
     #[serde(rename = "tracked bytes belonging to leaf pages in the cache")]
-    pub bytes_leaf_pages: i32,
+    pub bytes_leaf_pages: i64,
     #[serde(rename = "tracked dirty bytes in the cache")]
-    pub bytes_dirty: i32,
+    pub bytes_dirty: i64,
     #[serde(rename = "tracked dirty pages in the cache")]
-    pub pages_dirty: i32,
+    pub pages_dirty: i64,
     #[serde(rename = "unmodified pages evicted")]
-    pub evicted_unmodified: i32,
+    pub evicted_unmodified: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -360,67 +360,67 @@ pub struct CommandServerStatusWiredTigerConcurrentTransactions {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusWiredTigerConcurrentTransactionsStats {
-    pub out: i32,
-    pub available: i32,
-    pub total_tickets: i32,
+    pub out: i64,
+    pub available: i64,
+    pub total_tickets: i64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CommandServerStatusWiredTigerLog {
     #[serde(rename = "log bytes of payload data")]
-    pub bytes_payload_data: i32,
+    pub bytes_payload_data: i64,
     #[serde(rename = "log bytes written")]
-    pub bytes_written: i32,
+    pub bytes_written: i64,
     #[serde(rename = "log flush operations")]
-    pub log_flushes: i32,
+    pub log_flushes: i64,
     #[serde(rename = "log records compressed")]
-    pub records_compressed: i32,
+    pub records_compressed: i64,
     #[serde(rename = "log records not compressed")]
-    pub records_uncompressed: i32,
+    pub records_uncompressed: i64,
     #[serde(rename = "log scan operations")]
-    pub log_scans: i32,
+    pub log_scans: i64,
     #[serde(rename = "log scan records requiring two reads")]
-    pub log_scans_double: i32,
+    pub log_scans_double: i64,
     #[serde(rename = "log sync operations")]
-    pub log_syncs: i32,
+    pub log_syncs: i64,
     #[serde(rename = "log sync_dir operations")]
-    pub log_sync_dirs: i32,
+    pub log_sync_dirs: i64,
     #[serde(rename = "log write operations")]
-    pub log_writes: i32,
+    pub log_writes: i64,
     #[serde(rename = "records processed by log scan")]
-    pub records_processed_log_scan: i32,
+    pub records_processed_log_scan: i64,
     #[serde(rename = "total log buffer size")]
-    pub total_buffer_size: i32,
+    pub total_buffer_size: i64,
     #[serde(rename = "total size of compressed records")]
-    pub total_size_compressed: i32,
+    pub total_size_compressed: i64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CommandServerStatusWiredTigerSession {
     #[serde(rename = "open session count")]
-    pub sessions: i32,
+    pub sessions: i64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CommandServerStatusWiredTigerTransaction {
     #[serde(rename = "transaction begins")]
-    pub begins: i32,
+    pub begins: i64,
     #[serde(rename = "transaction checkpoints")]
-    pub checkpoints: i32,
+    pub checkpoints: i64,
     #[serde(rename = "transaction checkpoint currently running")]
-    pub checkpoints_running: i32,
+    pub checkpoints_running: i64,
     #[serde(rename = "transaction checkpoint max time (msecs)")]
-    pub checkpoint_max_ms: i32,
+    pub checkpoint_max_ms: i64,
     #[serde(rename = "transaction checkpoint min time (msecs)")]
-    pub checkpoint_min_ms: i32,
+    pub checkpoint_min_ms: i64,
     #[serde(rename = "transaction checkpoint most recent time (msecs)")]
-    pub checkpoint_last_ms: i32,
+    pub checkpoint_last_ms: i64,
     #[serde(rename = "transaction checkpoint total time (msecs)")]
-    pub checkpoint_total_ms: i32,
+    pub checkpoint_total_ms: i64,
     #[serde(rename = "transactions committed")]
-    pub committed: i32,
+    pub committed: i64,
     #[serde(rename = "transactions rolled back")]
-    pub rolled_back: i32,
+    pub rolled_back: i64,
 }
 
 #[derive(Debug, Deserialize)]

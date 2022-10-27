@@ -551,12 +551,12 @@ enum MetricPathError<'a> {
 mod test {
     use chrono::{offset::TimeZone, Utc};
     use lookup::owned_value_path;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_common::btreemap;
     use vrl_lib::Target;
 
     use super::{
-        super::{metric::MetricTags, MetricValue},
+        super::{MetricTags, MetricValue},
         *,
     };
 
@@ -901,7 +901,7 @@ mod test {
         )
         .with_namespace(Some("zoob"))
         .with_tags(Some({
-            let mut map = MetricTags::new();
+            let mut map = MetricTags::default();
             map.insert("tig".to_string(), "tog".to_string());
             map
         }))
@@ -948,7 +948,7 @@ mod test {
             MetricValue::Counter { value: 1.23 },
         )
         .with_tags(Some({
-            let mut map = MetricTags::new();
+            let mut map = MetricTags::default();
             map.insert("tig".to_string(), "tog".to_string());
             map
         }));
@@ -1030,7 +1030,7 @@ mod test {
             MetricValue::Counter { value: 1.23 },
         )
         .with_tags(Some({
-            let mut map = MetricTags::new();
+            let mut map = MetricTags::default();
             map.insert("tig".to_string(), "tog".to_string());
             map
         }));
@@ -1052,7 +1052,7 @@ mod test {
                 assert!(metric.tags().is_some());
                 assert_eq!(
                     metric.tags().unwrap(),
-                    &BTreeMap::from([("a".into(), "b".into())])
+                    &MetricTags::from([("a".into(), "b".into())])
                 );
             }
             _ => panic!("must be a metric"),

@@ -9,8 +9,8 @@ use quickcheck::{empty_shrinker, Arbitrary, Gen};
 use crate::{
     event::{
         metric::{
-            Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTime, Quantile,
-            Sample,
+            Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
+            Quantile, Sample,
         },
         Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
         Value,
@@ -474,7 +474,7 @@ impl Arbitrary for StatisticKind {
 impl Arbitrary for MetricSeries {
     fn arbitrary(g: &mut Gen) -> Self {
         let tags = if bool::arbitrary(g) {
-            let mut map: BTreeMap<String, String> = BTreeMap::new();
+            let mut map = MetricTags::default();
             for _ in 0..(usize::arbitrary(g) % MAX_MAP_SIZE) {
                 let key = String::from(Name::arbitrary(g));
                 let value = String::from(Name::arbitrary(g));

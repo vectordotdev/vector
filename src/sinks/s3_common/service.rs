@@ -17,6 +17,7 @@ use vector_core::{
 };
 
 use super::config::S3Options;
+use super::partitioner::S3PartitionKey;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -35,7 +36,8 @@ impl Finalizable for S3Request {
 
 #[derive(Clone, Debug)]
 pub struct S3Metadata {
-    pub partition_key: String,
+    pub partition_key: S3PartitionKey,
+    pub s3_key: String,
     pub count: usize,
     pub byte_size: usize,
     pub finalizers: EventFinalizers,
@@ -83,15 +85,13 @@ impl Service<S3Request> for S3Service {
     type Error = SdkError<PutObjectError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        // Emission of Error internal event is handled upstream by the caller
-
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: S3Request) -> Self::Future {
-        // Emission of Error internal event is handled upstream by the caller
-
         let options = request.options;
 
         let content_encoding = request.content_encoding;
@@ -121,7 +121,7 @@ impl Service<S3Request> for S3Service {
                 .put_object()
                 .body(bytes_to_bytestream(request.body))
                 .bucket(request.bucket)
-                .key(request.metadata.partition_key)
+                .key(request.metadata.s3_key)
                 .set_content_encoding(content_encoding)
                 .set_content_type(content_type)
                 .set_acl(options.acl.map(Into::into))
