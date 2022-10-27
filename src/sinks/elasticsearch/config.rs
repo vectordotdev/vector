@@ -61,7 +61,7 @@ pub struct ElasticsearchConfig {
     /// set this option since Elasticsearch has removed it.
     pub doc_type: Option<String>,
 
-    /// The api version of Elasticsearch.
+    /// The API version of Elasticsearch.
     #[serde(default)]
     pub api_version: ElasticsearchApiVersion,
 
@@ -70,6 +70,8 @@ pub struct ElasticsearchConfig {
     /// `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
     ///
     /// If enabled, the `doc_type` option will be ignored.
+    ///
+    /// This option has been deprecated, the `api_version` option should be used instead.
     #[configurable(deprecated)]
     pub suppress_type_name: Option<bool>,
 
