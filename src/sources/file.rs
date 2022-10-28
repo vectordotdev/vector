@@ -80,7 +80,7 @@ pub struct FileConfig {
     /// The value will be the full path to the file where the event was read message.
     ///
     /// By default, `file` is used.
-    #[serde(default)]
+    #[serde(default = "default_file_key")]
     pub file_key: Option<String>,
 
     /// Whether or not to start reading from the beginning of a new file.
@@ -137,7 +137,10 @@ pub struct FileConfig {
     /// Delay between file discovery calls, in milliseconds.
     ///
     /// This controls the interval at which Vector searches for files. Higher value result in greater chances of some short living files being missed between searches, but lower value increases the performance impact of file discovery.
-    #[serde(alias = "glob_minimum_cooldown", default)]
+    #[serde(
+        alias = "glob_minimum_cooldown",
+        default = "default_glob_minimum_cooldown_ms"
+    )]
     pub glob_minimum_cooldown_ms: u64,
 
     #[configurable(derived)]
@@ -161,7 +164,7 @@ pub struct FileConfig {
     ///
     /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
     #[configurable(deprecated)]
-    #[serde(default)]
+    #[serde(default = "default_multi_line_timeout")]
     pub multi_line_timeout: u64,
 
     /// Multiline aggregation configuration.
@@ -171,7 +174,7 @@ pub struct FileConfig {
     pub multiline: Option<MultilineConfig>,
 
     /// An approximate limit on the amount of data read from a single file at a given time.
-    #[serde(default)]
+    #[serde(default = "default_max_read_bytes")]
     pub max_read_bytes: usize,
 
     /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
@@ -185,7 +188,7 @@ pub struct FileConfig {
     pub remove_after_secs: Option<u64>,
 
     /// String sequence used to separate one file line from another.
-    #[serde(default)]
+    #[serde(default = "default_line_delimiter")]
     pub line_delimiter: String,
 
     #[configurable(derived)]
@@ -195,6 +198,30 @@ pub struct FileConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_max_line_bytes() -> usize {
+    bytesize::kib(100u64) as usize
+}
+
+fn default_file_key() -> Option<String> {
+    Some("file".to_string())
+}
+
+const fn default_glob_minimum_cooldown_ms() -> u64 {
+    1000
+}
+
+const fn default_multi_line_timeout() -> u64 {
+    1000
+}
+
+const fn default_max_read_bytes() -> usize {
+    2048
+}
+
+fn default_line_delimiter() -> String {
+    "\n".to_string()
 }
 
 /// Configuration for how files should be identified.
@@ -237,11 +264,14 @@ impl Default for FingerprintConfig {
         Self::Checksum {
             bytes: None,
             ignored_header_bytes: 0,
-            lines: 1,
+            lines: default_lines(),
         }
     }
 }
 
+const fn default_lines() -> usize {
+    1
+}
 /// File position to use when reading a new file.
 #[configurable_component]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -289,14 +319,6 @@ impl From<FingerprintConfig> for FingerprintStrategy {
     }
 }
 
-fn default_max_line_bytes() -> usize {
-    bytesize::kib(100u64) as usize
-}
-
-const fn default_lines() -> usize {
-    1
-}
-
 #[derive(Debug)]
 pub(crate) struct FinalizerEntry {
     pub(crate) file_id: FileFingerprint,
@@ -308,7 +330,7 @@ impl Default for FileConfig {
         Self {
             include: vec![PathBuf::from("/var/log/**/*.log")],
             exclude: vec![],
-            file_key: Some("file".to_string()),
+            file_key: default_file_key(),
             start_at_beginning: None,
             ignore_checkpoints: None,
             read_from: None,
@@ -319,14 +341,14 @@ impl Default for FileConfig {
             host_key: None,
             offset_key: None,
             data_dir: None,
-            glob_minimum_cooldown_ms: 1000, // millis
+            glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(), // millis
             message_start_indicator: None,
-            multi_line_timeout: 1000, // millis
+            multi_line_timeout: default_multi_line_timeout(), // millis
             multiline: None,
-            max_read_bytes: 2048,
+            max_read_bytes: default_max_read_bytes(),
             oldest_first: false,
             remove_after_secs: None,
-            line_delimiter: "\n".to_string(),
+            line_delimiter: default_line_delimiter(),
             encoding: None,
             acknowledgements: Default::default(),
         }
