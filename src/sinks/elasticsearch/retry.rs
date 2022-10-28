@@ -106,7 +106,7 @@ fn get_error_reason(body: &str) -> String {
 mod tests {
     use bytes::Bytes;
     use http::Response;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::*;
     use crate::event::EventStatus;
