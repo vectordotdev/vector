@@ -478,7 +478,7 @@ impl error::Error for ParseError {
 #[cfg(test)]
 mod test {
     use chrono::{DateTime, Utc};
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_common::assert_event_data_eq;
     use vector_core::metric_tags;
 

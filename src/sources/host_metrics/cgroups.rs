@@ -459,8 +459,8 @@ mod tests {
     use std::io::Write;
     use std::path::{Path, PathBuf};
 
-    use pretty_assertions::{assert_eq, assert_ne};
     use rand::{rngs::ThreadRng, Rng};
+    use similar_asserts::assert_eq;
     use tempfile::TempDir;
     use vector_core::event::Metric;
 

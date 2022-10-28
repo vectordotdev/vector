@@ -433,7 +433,7 @@ fn to_fields(value: f64) -> HashMap<String, Field> {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::*;
     use crate::{
@@ -938,7 +938,7 @@ mod tests {
 mod integration_tests {
     use chrono::{SecondsFormat, Utc};
     use futures::stream;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use crate::{
         config::{SinkConfig, SinkContext},

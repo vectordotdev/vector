@@ -596,7 +596,7 @@ mod tests {
     use chrono::{Duration, Utc};
     use futures::stream;
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::{sync::oneshot::error::TryRecvError, time};
     use vector_common::{
         finalization::{BatchNotifier, BatchStatus},

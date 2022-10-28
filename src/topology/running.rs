@@ -803,8 +803,23 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
+
+        let task_span = span.or_current();
+        #[cfg(feature = "allocation-tracing")]
+        {
+            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id();
+            debug!(
+                component_kind = "sink",
+                component_type = task.typetag(),
+                component_id = task.id(),
+                group_id = group_id.as_raw().to_string(),
+                "Registered new allocation group."
+            );
+            group_id.attach_to_span(&task_span);
+        }
+
         let task_name = format!(">> {} ({})", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.or_current());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -821,8 +836,23 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
+
+        let task_span = span.or_current();
+        #[cfg(feature = "allocation-tracing")]
+        {
+            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id();
+            debug!(
+                component_kind = "transform",
+                component_type = task.typetag(),
+                component_id = task.id(),
+                group_id = group_id.as_raw().to_string(),
+                "Registered new allocation group."
+            );
+            group_id.attach_to_span(&task_span);
+        }
+
         let task_name = format!(">> {} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.or_current());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -839,8 +869,24 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
+
+        let task_span = span.or_current();
+        #[cfg(feature = "allocation-tracing")]
+        {
+            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id();
+
+            debug!(
+                component_kind = "source",
+                component_type = task.typetag(),
+                component_id = task.id(),
+                group_id = group_id.as_raw().to_string(),
+                "Registered new allocation group."
+            );
+            group_id.attach_to_span(&task_span);
+        }
+
         let task_name = format!("{} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone().or_current());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span.clone());
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -849,9 +895,9 @@ impl RunningTopology {
         self.shutdown_coordinator
             .takeover_source(key, &mut new_pieces.shutdown_coordinator);
 
+        // Now spawn the actual source task.
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task =
-            handle_errors(source_task, self.abort_tx.clone()).instrument(span.or_current());
+        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(task_span);
         self.source_tasks
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }
