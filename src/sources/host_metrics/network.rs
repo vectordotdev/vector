@@ -1,7 +1,7 @@
 use futures::StreamExt;
 #[cfg(target_os = "linux")]
 use heim::net::os::linux::IoCountersExt;
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
 use vector_config::configurable_component;
@@ -69,13 +69,13 @@ impl HostMetrics {
                         counter.errors_sent() as f64,
                         MetricTags::from([(String::from("device"), interface.to_string())]),
                     );
-                    #[cfg(any(target_os = "linux", target_os = "windows"))]
+                    #[cfg(any(target_os = "linux", windows))]
                     output.counter(
                         "network_transmit_packets_drop_total",
                         counter.drop_sent() as f64,
                         MetricTags::from([(String::from("device"), interface.to_string())]),
                     );
-                    #[cfg(any(target_os = "linux", target_os = "windows"))]
+                    #[cfg(any(target_os = "linux", windows))]
                     output.counter(
                         "network_transmit_packets_total",
                         counter.packets_sent() as f64,
@@ -95,7 +95,7 @@ impl HostMetrics {
 
 // The Windows CI environment produces zero network metrics, causing
 // these tests to always fail.
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(all(test, not(windows)))]
 mod tests {
     use super::{
         super::{
