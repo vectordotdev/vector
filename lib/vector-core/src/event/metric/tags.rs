@@ -7,17 +7,21 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::{configurable_component, Configurable};
 
-pub type TagValue = String;
+type TagValue = String;
 
 /// Tag values for a metric series.
 #[derive(Clone, Configurable, Debug, Default, Eq, PartialEq)]
 pub struct TagValueSet(#[configurable(transparent)] IndexSet<TagValue>);
 
 impl TagValueSet {
-    pub fn into_single(self) -> Option<TagValue> {
+    /// Convert this set into a single value, mimicking the behavior of this set being just a plain
+    /// single string while still storing all of the values.
+    pub fn into_single(self) -> Option<String> {
         self.0.into_iter().last()
     }
 
+    /// Get the "single" value of this set, mimicking the behavior of this set being just a plain
+    /// single string while still storing all of the values.
     pub fn as_single(&self) -> Option<&str> {
         self.0.iter().last().map(String::as_ref)
     }
