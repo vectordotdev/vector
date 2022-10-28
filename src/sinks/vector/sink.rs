@@ -4,20 +4,15 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use prost::Message;
 use tower::Service;
-use vector_core::{
-    stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
-};
+use vector_core::stream::{BatcherSettings, DriverResponse};
 
 use super::service::VectorRequest;
 use crate::{
     event::{proto::EventWrapper, Event, EventFinalizers, Finalizable},
-    proto::vector as proto_vector,
     sinks::util::{SinkBuilderExt, StreamSink},
 };
 
 struct EventData {
-    byte_size: usize,
     finalizers: EventFinalizers,
     wrapper: EventWrapper,
 }
@@ -37,7 +32,6 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
             .map(|mut event| EventData {
-                byte_size: event.size_of(),
                 finalizers: event.take_finalizers(),
                 wrapper: EventWrapper::from(event),
             })
@@ -46,19 +40,17 @@ where
                 |req: &mut VectorRequest, item: EventData| {
                     req.finalizers.merge(item.finalizers);
                     req.events.push(item.wrapper);
-
-                    req.builder.increment(1, item.byte_size);
-
-                    let events = req.events.clone();
-                    req.request = proto_vector::PushEventsRequest { events };
-
-                    let byte_size = req.request.encoded_len();
-                    let bytes_len =
-                        NonZeroUsize::new(byte_size).expect("payload should never be zero length");
-
-                    req.metadata = req.builder.with_request_size(bytes_len);
                 },
             ))
+            .map(|mut v_request| {
+                let byte_size = v_request.request.encoded_len();
+                let bytes_len =
+                    NonZeroUsize::new(byte_size).expect("payload should never be zero length");
+
+                v_request.metadata = v_request.builder.with_request_size(bytes_len);
+
+                v_request
+            })
             .into_driver(self.service)
             .run()
             .await
