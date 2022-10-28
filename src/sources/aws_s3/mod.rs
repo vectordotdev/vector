@@ -365,7 +365,7 @@ mod integration_tests {
     use aws_sdk_s3::Client as S3Client;
     use aws_sdk_sqs::model::QueueAttributeName;
     use aws_sdk_sqs::Client as SqsClient;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::aws::create_client;

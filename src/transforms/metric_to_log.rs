@@ -137,7 +137,7 @@ impl FunctionTransform for MetricToLog {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_core::metric_tags;

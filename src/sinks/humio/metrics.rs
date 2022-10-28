@@ -195,7 +195,7 @@ mod tests {
     use chrono::{offset::TimeZone, Utc};
     use futures::stream;
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::*;
     use crate::{

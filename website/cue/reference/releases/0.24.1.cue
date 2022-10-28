@@ -10,7 +10,7 @@ releases: "0.24.1": {
 		This patch release contains a few fixes for regressions in 0.24.0.
 
 		**Note:** Please see the release notes for [`v0.24.0`](/releases/0.24.0/) for additional changes if upgrading from
-		`v0.22.X`. In particular, the upgrade guide for breaking changes.
+		`v0.23.X`. In particular, the upgrade guide for breaking changes.
 		"""
 	changelog: [
 		{

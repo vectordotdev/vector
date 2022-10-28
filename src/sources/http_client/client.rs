@@ -209,7 +209,7 @@ impl HttpClientContext {
                         log,
                         log_schema().source_type_key(),
                         "source_type",
-                        HttpClientConfig::NAME,
+                        Bytes::from(HttpClientConfig::NAME),
                     );
                     self.log_namespace.insert_vector_metadata(
                         log,
@@ -246,12 +246,7 @@ impl HttpClientBuilder for HttpClientContext {
 
 impl http_client::HttpClientContext for HttpClientContext {
     /// Decodes the HTTP response body into events per the decoder configured.
-    fn on_response(
-        &mut self,
-        _url: &http::Uri,
-        _header: &Parts,
-        body: &Bytes,
-    ) -> Option<Vec<Event>> {
+    fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         // get the body into a byte array
         let mut buf = BytesMut::new();
         let body = String::from_utf8_lossy(body);
