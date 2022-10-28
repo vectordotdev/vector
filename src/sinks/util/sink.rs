@@ -445,24 +445,27 @@ where
             .map(move |result| {
                 let status = result_status(&result);
                 finalizers.update_status(status);
-                if status == EventStatus::Delivered {
-                    emit!(EventsSent {
-                        count,
-                        byte_size,
-                        output: None
-                    });
-                    // TODO: Emit a BytesSent event here too
-                }
 
-                // Emit the `Error` and `EventsDropped` internal events.
-                // This scenario occurs after retries have been attempted.
-                if status == EventStatus::Rejected {
-                    let error = result.err().unwrap_or_else(|| "Response failed.".into());
-                    emit!(CallError {
-                        error,
-                        request_id,
-                        count,
-                    });
+                match status {
+                    EventStatus::Delivered => {
+                        emit!(EventsSent {
+                            count,
+                            byte_size,
+                            output: None
+                        });
+                        // TODO: Emit a BytesSent event here too
+                    }
+                    EventStatus::Rejected => {
+                        // Emit the `Error` and `EventsDropped` internal events.
+                        // This scenario occurs after retries have been attempted.
+                        let error = result.err().unwrap_or_else(|| "Response failed.".into());
+                        emit!(CallError {
+                            error,
+                            request_id,
+                            count,
+                        });
+                    }
+                    _ => {} // do nothing
                 }
 
                 // If the rx end is dropped we still completed
