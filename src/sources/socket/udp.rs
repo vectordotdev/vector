@@ -9,7 +9,7 @@ use listenfd::ListenFd;
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::Decoder,
@@ -191,7 +191,7 @@ pub(super) fn udp(
                                 let count = events.len();
                                 emit!(SocketEventsReceived {
                                     mode: SocketMode::Udp,
-                                    byte_size: events.size_of(),
+                                    byte_size: events.estimated_json_encoded_size_of(),
                                     count,
                                 });
 

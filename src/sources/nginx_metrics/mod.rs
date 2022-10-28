@@ -9,7 +9,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::{metric_tags, ByteSizeOf};
+use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
@@ -189,7 +189,7 @@ impl NginxMetrics {
             Err(()) => (0.0, vec![]),
         };
 
-        let byte_size = metrics.size_of();
+        let byte_size = metrics.estimated_json_encoded_size_of();
 
         metrics.push(self.create_metric("up", gauge!(up_value)));
 

@@ -27,7 +27,7 @@ use crate::{
     Error, SourceSender,
 };
 use vector_common::shutdown::ShutdownSignal;
-use vector_core::{config::proxy::ProxyConfig, event::Event, ByteSizeOf};
+use vector_core::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
 
 /// Contains the inputs generic to any http client.
 pub(crate) struct GenericHttpClientInputs {
@@ -176,7 +176,7 @@ pub(crate) async fn call<
                         });
                         context.on_response(&url, &header, &body).map(|events| {
                             emit!(HttpClientEventsReceived {
-                                byte_size: events.size_of(),
+                                byte_size: events.estimated_json_encoded_size_of(),
                                 count: events.len(),
                                 url: url.to_string()
                             });

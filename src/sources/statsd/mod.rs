@@ -10,7 +10,7 @@ use listenfd::ListenFd;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::parser::ParseError;
 use super::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource};
@@ -227,7 +227,7 @@ impl decoding::format::Deserializer for StatsdDeserializer {
                 if matches!(self.socket_mode, Some(SocketMode::Udp)) {
                     emit!(EventsReceived {
                         count: 1,
-                        byte_size: event.size_of(),
+                        byte_size: event.estimated_json_encoded_size_of(),
                     });
                 }
                 Ok(smallvec![event])

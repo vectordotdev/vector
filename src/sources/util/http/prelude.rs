@@ -6,7 +6,7 @@ use futures::{FutureExt, TryFutureExt};
 use tracing::Span;
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
     filters::{
@@ -123,7 +123,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .map(|events| {
                                 emit!(HttpEventsReceived {
                                     count: events.len(),
-                                    byte_size: events.size_of(),
+                                    byte_size: events.estimated_json_encoded_size_of(),
                                     http_path,
                                     protocol,
                                 });

@@ -22,7 +22,6 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
 
 use crate::tls::TlsConfig;
 use crate::{
@@ -527,7 +526,7 @@ impl IngestorProcess {
 
             emit!(EventsReceived {
                 count: 1,
-                byte_size: log.size_of()
+                byte_size: log.estimated_json_encoded_size_of()
             });
 
             ready(Some(log))

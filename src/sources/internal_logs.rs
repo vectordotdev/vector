@@ -3,7 +3,6 @@ use chrono::Utc;
 use futures::{stream, StreamExt};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
@@ -89,7 +88,7 @@ async fn run(
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
-        let byte_size = log.size_of();
+        let byte_size = log.estimated_json_encoded_size_of();
         // This event doesn't emit any log
         emit!(InternalLogsBytesReceived { byte_size });
         emit!(InternalLogsEventsReceived {

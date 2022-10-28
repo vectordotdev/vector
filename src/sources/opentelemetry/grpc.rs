@@ -12,7 +12,7 @@ use opentelemetry_proto::proto::collector::logs::v1::{
 };
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 #[derive(Debug, Clone)]
@@ -35,7 +35,7 @@ impl LogsService for Service {
             .collect();
 
         let count = events.len();
-        let byte_size = events.size_of();
+        let byte_size = events.estimated_json_encoded_size_of();
 
         emit!(EventsReceived { count, byte_size });
 

@@ -6,7 +6,7 @@ use vector_config::configurable_component;
 use vector_core::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -51,7 +51,7 @@ impl proto::Service for Service {
             .collect();
 
         let count = events.len();
-        let byte_size = events.size_of();
+        let byte_size = events.estimated_json_encoded_size_of();
 
         emit!(EventsReceived { count, byte_size });
 

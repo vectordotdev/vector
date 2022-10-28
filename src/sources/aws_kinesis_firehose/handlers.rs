@@ -12,7 +12,7 @@ use vector_common::finalization::AddBatchNotifier;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Registered,
 };
-use vector_core::{event::BatchNotifier, ByteSizeOf};
+use vector_core::{event::BatchNotifier, EstimatedJsonEncodedSizeOf};
 use warp::reject;
 
 use super::{
@@ -60,7 +60,7 @@ pub(super) async fn firehose(
                 Some(Ok((mut events, _byte_size))) => {
                     emit!(EventsReceived {
                         count: events.len(),
-                        byte_size: events.size_of(),
+                        byte_size: events.estimated_json_encoded_size_of(),
                     });
 
                     let (batch, receiver) = context

@@ -12,7 +12,7 @@ use vector_common::internal_event::{
 };
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -220,7 +220,7 @@ async fn handle_line(
             Ok((events, _byte_size)) => {
                 let count = events.len();
                 emit!(EventsReceived {
-                    byte_size: events.size_of(),
+                    byte_size: events.estimated_json_encoded_size_of(),
                     count,
                 });
 
