@@ -10,7 +10,10 @@ use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::{decoding::FramingError, CharacterDelimitedDecoder};
+use codecs::{
+    decoding::format::Deserializer as _, decoding::FramingError, BytesDeserializer,
+    CharacterDelimitedDecoder,
+};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -22,11 +25,10 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::ByteSizeOf;
 
 use crate::{
     config::{log_schema, AcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, LogEvent},
+    event::{BatchNotifier, BatchStatus},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
@@ -40,7 +42,7 @@ use crate::{
     SourceSender,
 };
 use lookup::path;
-use vector_core::config::LogNamespace;
+use vector_core::{config::LogNamespace, event::Event::Log, ByteSizeOf};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -520,61 +522,67 @@ impl IngestorProcess {
         let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
 
         let mut stream = lines.filter_map(move |line| {
-            let mut log = LogEvent::from_bytes_legacy(&line).with_batch_notifier_option(&batch);
+            let deserializer = BytesDeserializer::new();
+            match deserializer.parse(line, log_namespace) {
+                Ok(events) => {
+                    let event = events.get(0);
+                    if let Some(Log(ref mut log)) = event {
+                        log_namespace.insert_source_metadata(
+                            AwsS3Config::NAME,
+                            log,
+                            path!("bucket"),
+                            path!("bucket"),
+                            bucket_name.clone(),
+                        );
+                        log_namespace.insert_source_metadata(
+                            AwsS3Config::NAME,
+                            log,
+                            path!("object"),
+                            path!("object"),
+                            object_key.clone(),
+                        );
+                        log_namespace.insert_source_metadata(
+                            AwsS3Config::NAME,
+                            log,
+                            path!("region"),
+                            path!("region"),
+                            aws_region.clone(),
+                        );
 
-            log_namespace.insert_source_metadata(
-                AwsS3Config::NAME,
-                &mut log,
-                path!("bucket"),
-                path!("bucket"),
-                bucket_name.clone(),
-            );
-            log_namespace.insert_source_metadata(
-                AwsS3Config::NAME,
-                &mut log,
-                path!("object"),
-                path!("object"),
-                object_key.clone(),
-            );
-            log_namespace.insert_source_metadata(
-                AwsS3Config::NAME,
-                &mut log,
-                path!("region"),
-                path!("region"),
-                aws_region.clone(),
-            );
+                        if let Some(metadata) = &metadata {
+                            for (key, value) in metadata {
+                                log_namespace.insert_source_metadata(
+                                    AwsS3Config::NAME,
+                                    log,
+                                    key.as_str(),
+                                    key.as_str(),
+                                    value.clone(),
+                                );
+                            }
+                        }
 
-            if let Some(metadata) = &metadata {
-                for (key, value) in metadata {
-                    log_namespace.insert_source_metadata(
-                        AwsS3Config::NAME,
-                        &mut log,
-                        path!(key.as_str()),
-                        path!(key.as_str()),
-                        value.clone(),
-                    );
+                        log_namespace.insert_vector_metadata(
+                            log,
+                            path!(log_schema().source_type_key()),
+                            path!("source_type"),
+                            Bytes::from(AwsS3Config::NAME),
+                        );
+                        log_namespace.insert_vector_metadata(
+                            log,
+                            path!(log_schema().timestamp_key()),
+                            path!("ingest_timestamp"),
+                            timestamp,
+                        );
+                        emit!(EventsReceived {
+                            count: 1,
+                            byte_size: log.size_of()
+                        });
+
+                        ready(Some(log))
+                    }
                 }
+                Err(_) => {}
             }
-
-            log_namespace.insert_vector_metadata(
-                &mut log,
-                log_schema().source_type_key(),
-                "source_type",
-                Bytes::from(AwsS3Config::NAME),
-            );
-            log_namespace.insert_vector_metadata(
-                &mut log,
-                log_schema().timestamp_key(),
-                "ingest_timestamp",
-                timestamp,
-            );
-
-            emit!(EventsReceived {
-                count: 1,
-                byte_size: log.size_of()
-            });
-
-            ready(Some(log))
         });
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
