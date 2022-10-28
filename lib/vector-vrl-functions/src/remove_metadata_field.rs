@@ -1,7 +1,5 @@
 use crate::{get_metadata_key, MetadataKey};
-use ::value::kind::remove;
 use ::value::Value;
-use lookup::LookupBuf;
 use vrl::prelude::state::TypeState;
 use vrl::prelude::*;
 
@@ -77,27 +75,11 @@ impl Expression for RemoveMetadataFieldFn {
     }
 
     fn type_info(&self, state: &TypeState) -> TypeInfo {
-        let mut state = state.clone();
+        let state = state.clone();
 
         if let MetadataKey::Query(query) = &self.key {
             let mut new_kind = state.external.metadata_kind().clone();
-
-            let result = new_kind.remove_at_path(
-                &LookupBuf::from(query.path.clone()).to_lookup(),
-                remove::Strategy {
-                    coalesced_path: remove::CoalescedPath::Reject,
-                },
-            );
-
-            match result {
-                Ok(_) => state.external.update_metadata(new_kind),
-                Err(_) => {
-                    // This isn't ideal, but "remove_at_path" doesn't support
-                    // the path used, so no assumptions can be made about the resulting type
-                    // see: https://github.com/vectordotdev/vector/issues/13460
-                    state.external.update_metadata(Kind::any())
-                }
-            }
+            new_kind.remove(&query.path, false);
         }
 
         TypeInfo::new(state, TypeDef::null())

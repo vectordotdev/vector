@@ -320,7 +320,7 @@ mod tests {
     };
     use futures::Stream;
     use http::{HeaderMap, Method};
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::SimpleHttpConfig;
     use crate::sources::http_server::HttpMethod;

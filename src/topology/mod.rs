@@ -29,7 +29,7 @@ use tokio::sync::{mpsc, watch};
 use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
 use crate::{
-    config::{ComponentKey, Config, ConfigDiff, OutputId},
+    config::{ComponentKey, Config, ConfigDiff, Inputs, OutputId},
     event::EventArray,
     topology::{builder::Pieces, task::Task},
 };
@@ -58,7 +58,7 @@ pub struct TapResource {
     // Outputs and their corresponding Fanout control
     pub outputs: HashMap<TapOutput, fanout::ControlChannel>,
     // Components (transforms, sinks) and their corresponding inputs
-    pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+    pub inputs: HashMap<ComponentKey, Inputs<OutputId>>,
     // Source component keys used to warn against invalid pattern matches
     pub source_keys: Vec<String>,
     // Sink component keys used to warn against invalid pattern amtches

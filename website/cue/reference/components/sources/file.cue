@@ -50,9 +50,14 @@ components: sources: file: {
 	configuration: {
 		acknowledgements: configuration._source_acknowledgements
 		exclude: {
-			common:      false
-			description: "Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*"
-			required:    false
+			common: false
+			description: """
+				Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*
+				Note that the `exclude` patterns are applied _after_ Vector attempts to glob everything in `include`. That is, Vector will still
+				try to list all of the files matched by `include` and then filter them by the `exclude` patterns. This can be impactful if
+				`include` includes directories with contents that vector does not have access to."
+				"""
+			required: false
 			type: array: {
 				default: null
 				items: type: string: {

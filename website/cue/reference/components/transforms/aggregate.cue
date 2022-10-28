@@ -26,20 +26,7 @@ components: transforms: aggregate: {
 		warnings: []
 	}
 
-	configuration: {
-		interval_ms: {
-			common: true
-			description: """
-				The interval over which metrics are aggregated in milliseconds. Over this period metrics with the
-				same series data (name, namespace, tags, ...) will be aggregated.
-				"""
-			required: false
-			type: uint: {
-				default: 10000
-				unit:    "milliseconds"
-			}
-		}
-	}
+	configuration: base.components.transforms.aggregate.configuration
 
 	input: {
 		logs: false

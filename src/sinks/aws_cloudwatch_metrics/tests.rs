@@ -2,7 +2,7 @@
 
 use aws_sdk_cloudwatch::types::DateTime;
 use chrono::{offset::TimeZone, Utc};
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 
 use super::*;
 use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};

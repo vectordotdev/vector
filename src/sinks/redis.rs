@@ -131,7 +131,6 @@ pub struct RedisSinkConfig {
     url: String,
 
     /// The Redis key to publish messages to.
-    #[configurable(metadata(templateable))]
     #[configurable(validation(length(min = 1)))]
     key: Template,
 
