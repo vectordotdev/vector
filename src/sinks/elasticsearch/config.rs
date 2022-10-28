@@ -69,7 +69,7 @@ pub struct ElasticsearchConfig {
     #[serde(default)]
     pub suppress_type_name: bool,
 
-    /// Whether or not to retry successful requests with partial failures.
+    /// Whether or not to retry successful requests containing partial failures.
     ///
     /// To avoid duplicates in Elasticsearch, please use option `id_key`.
     #[serde(default)]
