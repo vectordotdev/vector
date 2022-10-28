@@ -261,7 +261,7 @@ impl SourceConfig for SimpleHttpConfig {
             &self.tls,
             &self.auth,
             cx,
-            self.acknowledgements.into(),
+            self.acknowledgements,
         )
     }
 

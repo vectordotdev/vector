@@ -13,13 +13,10 @@ base: components: sources: file: configuration: {
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: {
-			default: enabled: null
-			options: enabled: {
-				description: "Whether or not end-to-end acknowledgements are enabled for this source."
-				required:    false
-				type: bool: {}
-			}
+		type: object: options: enabled: {
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
+			required:    false
+			type: bool: {}
 		}
 	}
 	data_dir: {
@@ -56,7 +53,9 @@ base: components: sources: file: configuration: {
 		description: """
 			Array of file patterns to exclude. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
 
-			Takes precedence over the `include` option.
+			Takes precedence over the `include` option. Note that the `exclude` patterns are applied _after_ Vector attempts to glob everything
+			in `include`. That is, Vector will still try to list all of the files matched by `include` and then filter them by the `exclude`
+			patterns. This can be impactful if `include` contains directories with contents that vector does not have access to.
 			"""
 		required: false
 		type: array: {
@@ -73,10 +72,7 @@ base: components: sources: file: configuration: {
 			By default, `file` is used.
 			"""
 		required: false
-		type: string: {
-			default: "file"
-			syntax:  "literal"
-		}
+		type: string: syntax: "literal"
 	}
 	fingerprint: {
 		description: """
@@ -85,50 +81,45 @@ base: components: sources: file: configuration: {
 			This is important for `checkpointing` when file rotation is used.
 			"""
 		required: false
-		type: object: {
-			default: {
-				bytes:                null
-				ignored_header_bytes: 0
-				lines:                1
-				strategy:             "checksum"
+		type: object: options: {
+			bytes: {
+				description: """
+					Maximum number of bytes to use, from the lines that are read, for generating the checksum.
+
+					TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
+					bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
+					"""
+				relevant_when: "strategy = \"checksum\""
+				required:      false
+				type: uint: {}
 			}
-			options: {
-				bytes: {
-					description: """
-						Maximum number of bytes to use, from the lines that are read, for generating the checksum.
+			ignored_header_bytes: {
+				description: """
+					The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
 
-						TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
-						bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
-						"""
-					relevant_when: "strategy = \"checksum\""
-					required:      false
-					type: uint: {}
-				}
-				ignored_header_bytes: {
-					description: """
-						The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
+					This can be helpful if all files share a common header that should be skipped.
+					"""
+				relevant_when: "strategy = \"checksum\""
+				required:      false
+				type: uint: default: 0
+			}
+			lines: {
+				description: """
+					The number of lines to read for generating the checksum.
 
-						This can be helpful if all files share a common header that should be skipped.
-						"""
-					relevant_when: "strategy = \"checksum\""
-					required:      true
-					type: uint: {}
-				}
-				lines: {
-					description: """
-						The number of lines to read for generating the checksum.
+					If your files share a common header that is not always a fixed size,
 
-						If your files share a common header that is not always a fixed size,
-
-						If the file has less than this amount of lines, it won’t be read at all.
-						"""
-					relevant_when: "strategy = \"checksum\""
-					required:      false
-					type: uint: default: 1
-				}
-				strategy: {
-					required: true
-					type: string: enum: {
+					If the file has less than this amount of lines, it won’t be read at all.
+					"""
+				relevant_when: "strategy = \"checksum\""
+				required:      false
+				type: uint: default: 1
+			}
+			strategy: {
+				required: false
+				type: string: {
+					default: "checksum"
+					enum: {
 						checksum:         "Read lines from the beginning of the file and compute a checksum over them."
 						device_and_inode: "Use the [device and inode](https://en.wikipedia.org/wiki/Inode) as the identifier."
 					}
@@ -143,7 +134,7 @@ base: components: sources: file: configuration: {
 			This controls the interval at which Vector searches for files. Higher value result in greater chances of some short living files being missed between searches, but lower value increases the performance impact of file discovery.
 			"""
 		required: false
-		type: uint: default: 1000
+		type: uint: default: 0
 	}
 	host_key: {
 		description: """
@@ -183,17 +174,14 @@ base: components: sources: file: configuration: {
 	}
 	include: {
 		description: "Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported."
-		required:    false
-		type: array: {
-			default: []
-			items: type: string: syntax: "literal"
-		}
+		required:    true
+		type: array: items: type: string: syntax: "literal"
 	}
 	line_delimiter: {
 		description: "String sequence used to separate one file line from another."
 		required:    false
 		type: string: {
-			default: "\n"
+			default: ""
 			syntax:  "literal"
 		}
 	}
@@ -209,7 +197,7 @@ base: components: sources: file: configuration: {
 	max_read_bytes: {
 		description: "An approximate limit on the amount of data read from a single file at a given time."
 		required:    false
-		type: uint: default: 2048
+		type: uint: default: 0
 	}
 	message_start_indicator: {
 		description: """
@@ -227,7 +215,7 @@ base: components: sources: file: configuration: {
 			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
 			"""
 		required: false
-		type: uint: default: 1000
+		type: uint: default: 0
 	}
 	multiline: {
 		description: """

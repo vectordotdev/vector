@@ -89,7 +89,7 @@ impl SourceConfig for LogstashConfig {
             tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
-            self.acknowledgements.into(),
+            self.acknowledgements,
             self.connection_limit,
         )
     }

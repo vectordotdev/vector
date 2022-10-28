@@ -5,6 +5,7 @@ use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use tracing::Span;
 use vector_core::{
+    config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
 };
@@ -19,7 +20,7 @@ use warp::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, SourceContext},
+    config::SourceContext,
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
@@ -54,7 +55,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
-        acknowledgements: AcknowledgementsConfig,
+        acknowledgements: SourceAcknowledgementsConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();

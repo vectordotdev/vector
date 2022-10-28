@@ -78,7 +78,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             &self.tls,
             &self.auth,
             cx,
-            self.acknowledgements.into(),
+            self.acknowledgements,
         )
     }
 
