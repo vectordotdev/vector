@@ -24,6 +24,7 @@ impl EsResultResponse {
         })
     }
 
+    /// Returns iterator over status codes for items and optional error details.
     fn iter_status(&self) -> impl Iterator<Item = (StatusCode, Option<&EsErrorDetails>)> {
         self.items.iter().filter_map(|item| {
             item.result()
@@ -116,6 +117,9 @@ impl RetryLogic for ElasticsearchRetryLogic {
                     match EsResultResponse::parse(&body) {
                         Ok(resp) => {
                             if self.retry_partial {
+                                // We will retry if there exists at least one item that
+                                // failed with a retriable error.
+                                // Those are backpressure and server errors.
                                 if let Some((status, error)) =
                                     resp.iter_status().find(|(status, _)| {
                                         *status == StatusCode::TOO_MANY_REQUESTS
