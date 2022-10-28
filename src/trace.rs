@@ -20,6 +20,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
+    filter::LevelFilter,
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
     util::SubscriberInitExt,
@@ -60,8 +61,8 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
         "logging filter targets were not formatted correctly or did not specify a valid level",
     );
 
-    let metrics_layer = metrics_layer_enabled()
-        .then(|| MetricsLayer::new().with_filter(tracing_subscriber::filter::LevelFilter::INFO));
+    let metrics_layer =
+        metrics_layer_enabled().then(|| MetricsLayer::new().with_filter(LevelFilter::INFO));
 
     let broadcast_layer = RateLimitedLayer::new(BroadcastLayer::new())
         .with_default_limit(internal_log_rate_limit)
@@ -78,6 +79,14 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
             .spawn();
 
         subscriber.with(console_layer)
+    };
+
+    #[cfg(feature = "allocation-tracing")]
+    let subscriber = {
+        let allocation_layer = crate::internal_telemetry::allocations::AllocationLayer::new()
+            .with_filter(LevelFilter::ERROR);
+
+        subscriber.with(allocation_layer)
     };
 
     if json {
