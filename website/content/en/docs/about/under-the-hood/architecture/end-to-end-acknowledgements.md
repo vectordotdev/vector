@@ -28,7 +28,7 @@ vs 500, etc) if the events came from an [HTTP request][http_source], or acknowle
 directly, such as when using the [`kafka`][kafka_source] or [`aws_sqs`][aws_sqs_source] sources,
 which have native support for acknowledging messages.
 
-## Ensuring acknowledgement of events even through fanout, batching, aggregation, etc.
+## Ensuring acknowledgement of events even through fanout, batching, aggregation, etc
 
 The high-level description of how end-to-end acknowledgements work leaves out some of the corner
 cases and complications in providing this capability.
