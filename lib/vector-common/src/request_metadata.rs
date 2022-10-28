@@ -73,7 +73,6 @@ impl RequestMetadata {
             events_byte_size += m.events_byte_size();
             request_encoded_size += m.request_encoded_size();
             request_wire_size += m.request_wire_size();
-            request_wire_size += m.request_wire_size();
             events_estimated_json_encoded_byte_size += m.events_estimated_json_encoded_byte_size();
         }
 
