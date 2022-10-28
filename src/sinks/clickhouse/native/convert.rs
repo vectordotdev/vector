@@ -57,6 +57,8 @@ enum ConvertError {
     },
     #[snafu(display("only nullable type can be empty"))]
     NoValue,
+    #[snafu(display("type {to} isn't supported, please file an issue"))]
+    UnsupportedType{to: SqlType}
 }
 
 type CResult = std::result::Result<CHValue, ConvertError>;
@@ -124,7 +126,8 @@ fn into_clickhouse_value(v: Option<&Value>, target_type: &SqlType) -> CResult {
         SqlType::Date => into_date(v),
         SqlType::DateTime(ty) => match ty {
             DateTimeType::DateTime32 => into_datetime(v),
-            _ => unimplemented!(),
+            DateTimeType::Chrono => Err(ConvertError::UnsupportedType { to: SqlType::DateTime(DateTimeType::Chrono)}),
+            DateTimeType::DateTime64(p, t) => Err(ConvertError::UnsupportedType { to: SqlType::DateTime(DateTimeType::DateTime64(*p, *t))}),
         },
         SqlType::Ipv4 => into_ip(v, |s| {
             let w: Ipv4Addr = s
@@ -141,7 +144,7 @@ fn into_clickhouse_value(v: Option<&Value>, target_type: &SqlType) -> CResult {
         SqlType::Nullable(ty) => into_nullable(v, *ty),
         SqlType::Array(ty) => into_array(v, ty),
         SqlType::Map(_, ty) => into_map(v, ty),
-        _ => unimplemented!(),
+        _ => Err(ConvertError::UnsupportedType { to: target_type.clone() })
     }
 }
 
