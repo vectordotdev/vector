@@ -94,7 +94,6 @@ pub struct RemoteWriteConfig {
     /// If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the value of this setting.
     ///
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
-    #[configurable(metadata(templateable))]
     #[serde(default)]
     pub tenant_id: Option<Template>,
 

@@ -370,7 +370,7 @@ impl Sink<Event> for PulsarSink {
 
                     emit!(EventsSent {
                         count: metadata.event_count(),
-                        byte_size: metadata.events_byte_size(),
+                        byte_size: metadata.events_estimated_json_encoded_byte_size(),
                         output: None,
                     });
 

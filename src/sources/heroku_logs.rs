@@ -274,7 +274,7 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use futures::Stream;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_core::event::{Event, EventStatus, Value};
 
     use super::{HttpSourceAuthConfig, LogplexConfig};

@@ -12,6 +12,7 @@ use crate::{
     },
     template::Template,
 };
+use lookup::owned_value_path;
 
 #[tokio::test]
 async fn sets_create_action_when_configured() {
@@ -324,7 +325,7 @@ async fn allows_using_only_fields() {
             action: None,
             index: Some(String::from("{{ idx }}")),
         }),
-        encoding: Transformer::new(Some(vec!["foo".to_string().into()]), None, None).unwrap(),
+        encoding: Transformer::new(Some(vec![owned_value_path!("foo")]), None, None).unwrap(),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()

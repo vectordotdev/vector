@@ -9,7 +9,7 @@ use crate::{
         metrics::{self, outputs_by_component_key, IntoTransformMetrics, Output},
         sort,
     },
-    config::{ComponentKey, OutputId},
+    config::{ComponentKey, Inputs, OutputId},
     filter_check,
 };
 
@@ -17,7 +17,7 @@ use crate::{
 pub struct Data {
     pub component_key: ComponentKey,
     pub component_type: String,
-    pub inputs: Vec<OutputId>,
+    pub inputs: Inputs<OutputId>,
     pub outputs: Vec<String>,
 }
 
@@ -147,19 +147,19 @@ mod tests {
             Transform(Data {
                 component_key: ComponentKey::from("parse_json"),
                 component_type: "json".to_string(),
-                inputs: vec![],
+                inputs: Inputs::default(),
                 outputs: vec![],
             }),
             Transform(Data {
                 component_key: ComponentKey::from("field_adder"),
                 component_type: "add_fields".to_string(),
-                inputs: vec![],
+                inputs: Inputs::default(),
                 outputs: vec![],
             }),
             Transform(Data {
                 component_key: ComponentKey::from("append"),
                 component_type: "concat".to_string(),
-                inputs: vec![],
+                inputs: Inputs::default(),
                 outputs: vec![],
             }),
         ]
