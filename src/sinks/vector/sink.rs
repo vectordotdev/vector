@@ -4,15 +4,20 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use prost::Message;
 use tower::Service;
-use vector_core::stream::{BatcherSettings, DriverResponse};
+use vector_core::{
+    stream::{BatcherSettings, DriverResponse},
+    ByteSizeOf,
+};
 
 use super::service::VectorRequest;
 use crate::{
     event::{proto::EventWrapper, Event, EventFinalizers, Finalizable},
-    sinks::util::{SinkBuilderExt, StreamSink},
+    proto::vector as proto_vector,
+    sinks::util::{metadata::RequestMetadataBuilder, SinkBuilderExt, StreamSink},
 };
 
 struct EventData {
+    byte_size: usize,
     finalizers: EventFinalizers,
     wrapper: EventWrapper,
 }
@@ -32,6 +37,7 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
             .map(|mut event| EventData {
+                byte_size: event.size_of(),
                 finalizers: event.take_finalizers(),
                 wrapper: EventWrapper::from(event),
             })
@@ -40,14 +46,26 @@ where
                 |req: &mut VectorRequest, item: EventData| {
                     req.finalizers.merge(item.finalizers);
                     req.events.push(item.wrapper);
+                    req.events_byte_size += item.byte_size;
                 },
             ))
             .map(|mut v_request| {
-                let byte_size = v_request.request.encoded_len();
+                let builder = RequestMetadataBuilder::new(
+                    v_request.events.len(),
+                    v_request.events_byte_size,
+                    v_request.events_byte_size, // this is fine as it isn't being used
+                );
+
+                let encoded_events = proto_vector::PushEventsRequest {
+                    events: v_request.events.clone(),
+                };
+
+                let byte_size = encoded_events.encoded_len();
                 let bytes_len =
                     NonZeroUsize::new(byte_size).expect("payload should never be zero length");
 
-                v_request.metadata = v_request.builder.with_request_size(bytes_len);
+                v_request.metadata = builder.with_request_size(bytes_len);
+                v_request.request = encoded_events;
 
                 v_request
             })

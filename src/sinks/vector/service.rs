@@ -19,7 +19,7 @@ use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
-    sinks::util::{metadata::RequestMetadataBuilder, uri},
+    sinks::util::uri,
     Error,
 };
 
@@ -49,9 +49,9 @@ impl DriverResponse for VectorResponse {
 pub struct VectorRequest {
     pub events: Vec<EventWrapper>,
     pub finalizers: EventFinalizers,
-    pub request: proto_vector::PushEventsRequest,
     pub metadata: RequestMetadata,
-    pub builder: RequestMetadataBuilder,
+    pub events_byte_size: usize,
+    pub request: proto_vector::PushEventsRequest,
 }
 
 impl Finalizable for VectorRequest {
