@@ -119,7 +119,7 @@ pub struct KafkaPauseResumeError {
 impl InternalEvent for KafkaPauseResumeError {
     fn emit(self) {
         error!(
-            message = "Failed to pause or resume consumer",
+            message = "Failed to pause or resume consumer.",
             error = %self.error,
             error_code = "pause_resume_consumer",
             error_type = error_type::COMMAND_FAILED,

@@ -342,7 +342,7 @@ where
             futures::pin_mut!(sleep);
             match self.handle.block_on(select(shutdown_data, sleep)) {
                 Either::Left((_, _)) => {
-                    debug!("Closing data stream and draining checkpointer");
+                    debug!("Closing data stream and draining checkpointer.");
                     self.handle
                         .block_on(chans.close())
                         .expect("Error closing file_server data channel");

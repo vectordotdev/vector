@@ -261,7 +261,7 @@ async fn kafka_source(
     let mut shutting_down = false;
     loop {
         tokio::select! {
-            _ = &mut shutdown => {
+            _ = &mut shutdown, if !shutting_down => {
                 if let Ok(topics) = consumer.subscription() {
                     if let Err(error) = consumer.pause(&topics) {
                         emit!(KafkaPauseResumeError { error });
@@ -313,7 +313,7 @@ async fn kafka_source(
     match consumer.commit_consumer_state(CommitMode::Sync) {
         Ok(_) => (),
         Err(KafkaError::ConsumerCommit(RDKafkaErrorCode::NoOffset)) => {
-            debug!("No offsets to store");
+            debug!("No offsets to store.");
         }
         Err(error) => {
             emit!(KafkaOffsetUpdateError { error });
@@ -565,9 +565,10 @@ impl ConsumerContext for CustomContext {
         debug!("post_rebalance: {:#?}", rebalance);
         if matches!(rebalance, Rebalance::Revoke(_)) {
             if let Some(tx) = self.callback_channel.get() {
+                debug!("post_rebalance: Sending PartitionRevoked callback.");
                 if let Err(error) = tx.send(KafkaCallback::PartitionRevoked) {
                     // If the receiver has been dropped, we're shutting down already
-                    debug!("callback_channel sender error: {}", error);
+                    debug!("callback_channel sender error: {}.", error);
                 }
             }
         }
