@@ -59,15 +59,16 @@ impl RequestMetadata {
         self.request_wire_size
     }
 
+    /// Constructs a `RequestMetadata` by summation of the "batch" of `RequestMetadata` provided.
     #[must_use]
-    pub fn from_batch<'a, T: Iterator<Item = &'a RequestMetadata>>(metadata_vec: T) -> Self {
+    pub fn from_batch<'a, T: Iterator<Item = &'a RequestMetadata>>(metadata_iter: T) -> Self {
         let mut event_count = 0;
         let mut events_byte_size = 0;
         let mut request_encoded_size = 0;
         let mut request_wire_size = 0;
         let mut events_estimated_json_encoded_byte_size = 0;
 
-        for m in metadata_vec {
+        for m in metadata_iter {
             event_count += m.event_count();
             events_byte_size += m.events_byte_size();
             request_encoded_size += m.request_encoded_size();
