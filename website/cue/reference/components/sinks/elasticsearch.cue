@@ -74,8 +74,8 @@ components: sinks: elasticsearch: {
 	}
 
 	configuration: {
-        api_version:{
-            common:      false
+		api_version: {
+			common:      false
 			description: "The API version of Elasticsearch."
 			required:    false
 			type: string: {
