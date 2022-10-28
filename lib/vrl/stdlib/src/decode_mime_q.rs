@@ -96,9 +96,7 @@ fn decode_mime_q(bytes: Value) -> Resolved {
             },
         ),
         alt((
-            map_opt(parse_internal_q, |word| {
-                word.decode_word().map(|word| Ok(word)).ok()
-            }),
+            map_opt(parse_internal_q, |word| word.decode_word().map(Ok).ok()),
             success(Ok(String::new())),
         )),
     ))(input)
