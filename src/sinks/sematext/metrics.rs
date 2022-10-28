@@ -8,7 +8,7 @@ use indoc::indoc;
 use tower::Service;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use super::Region;
 use crate::{
@@ -183,7 +183,7 @@ impl SematextMetricsService {
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
-                    let byte_size = event.size_of();
+                    let byte_size = event.estimated_json_encoded_size_of();
                     normalizer
                         .normalize(event.into_metric())
                         .map(|item| Ok(EncodedEvent::new(item, byte_size)))
@@ -254,7 +254,7 @@ fn encode_events(
     metrics: Vec<Metric>,
 ) -> EncodedEvent<Bytes> {
     let mut output = BytesMut::new();
-    let byte_size = metrics.size_of();
+    let byte_size = metrics.estimated_json_encoded_size_of();
     for metric in metrics.into_iter() {
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series

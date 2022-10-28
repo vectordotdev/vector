@@ -18,7 +18,7 @@ use tokio::{
 };
 use tokio_util::codec::Encoder as _;
 use vector_config::configurable_component;
-use vector_core::{internal_event::EventsSent, ByteSizeOf};
+use vector_core::{internal_event::EventsSent, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
@@ -333,7 +333,7 @@ impl FileSink {
         };
 
         trace!(message = "Writing an event to file.", path = ?path);
-        let event_size = event.size_of();
+        let event_size = event.estimated_json_encoded_size_of();
         let finalizers = event.take_finalizers();
         match write_event_to_file(file, event, &self.transformer, &mut self.encoder).await {
             Ok(byte_size) => {
