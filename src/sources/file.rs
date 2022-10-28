@@ -208,15 +208,15 @@ fn default_file_key() -> Option<String> {
     Some("file".to_string())
 }
 
-fn default_glob_minimum_cooldown_ms() -> u64 {
+const fn default_glob_minimum_cooldown_ms() -> u64 {
     1000
 }
 
-fn default_multi_line_timeout() -> u64 {
+const fn default_multi_line_timeout() -> u64 {
     1000
 }
 
-fn default_max_read_bytes() -> usize {
+const fn default_max_read_bytes() -> usize {
     2048
 }
 
