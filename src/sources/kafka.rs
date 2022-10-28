@@ -18,8 +18,8 @@ use rdkafka::{
     consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
     error::KafkaError,
     message::{BorrowedMessage, Headers as _, Message},
-    ClientConfig, ClientContext, Statistics,
     types::RDKafkaErrorCode,
+    ClientConfig, ClientContext, Statistics,
 };
 
 use snafu::{ResultExt, Snafu};
