@@ -22,7 +22,7 @@ impl RequestMetadataBuilder {
         Self {
             event_count: events.event_count(),
             events_byte_size: events.size_of(),
-            events_estimated_json_encoded_byte_size: events.estimated_json_encoded_size_of(),
+            events_estimated_json_encoded_byte_size: 0,
         }
     }
 
