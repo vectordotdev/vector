@@ -1,9 +1,20 @@
 //! Allocation tracking exposed via internal telemetry.
 
 mod allocator;
+use std::{
+    ops::Index,
+    sync::atomic::{AtomicU64, Ordering},
+    thread,
+    time::Duration,
+};
 
-use self::allocator::Tracer;
+use arr_macro::arr;
+
+use self::allocator::{without_allocation_tracing, Tracer};
+
 pub(crate) use self::allocator::{AllocationGroupId, AllocationLayer, GroupedTraceableAllocator};
+
+static GROUP_MEM_METRICS: [AtomicU64; 256] = arr![AtomicU64::new(0); 256];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -15,14 +26,41 @@ pub struct MainTracer;
 
 impl Tracer for MainTracer {
     #[inline(always)]
-    fn trace_allocation(&self, _object_size: usize, _group_id: AllocationGroupId) {}
+    fn trace_allocation(&self, wrapped_size: usize, group_id: AllocationGroupId) {
+        GROUP_MEM_METRICS[group_id.as_raw()].fetch_add(wrapped_size as u64, Ordering::Relaxed);
+    }
 
     #[inline(always)]
-    fn trace_deallocation(&self, _object_size: usize, _source_group_id: AllocationGroupId) {}
+    fn trace_deallocation(&self, wrapped_size: usize, source_group_id: AllocationGroupId) {
+        GROUP_MEM_METRICS[source_group_id.as_raw()]
+            .fetch_sub(wrapped_size as u64, Ordering::Relaxed);
+    }
 }
 
 /// Initializes allocation tracing.
-pub const fn init_allocation_tracing() {}
+pub fn init_allocation_tracing() {
+    let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
+    alloc_processor
+        .spawn(move || {
+            without_allocation_tracing(move || loop {
+                for idx in 0..GROUP_MEM_METRICS.len() {
+                    let atomic_ref = GROUP_MEM_METRICS.index(idx);
+                    let mem_used = atomic_ref.load(Ordering::Relaxed);
+                    if mem_used == 0 {
+                        continue;
+                    }
+
+                    info!(
+                        message = "Allocation group memory usage.",
+                        group_id = idx,
+                        current_memory_allocated_in_bytes = mem_used
+                    );
+                }
+                thread::sleep(Duration::from_millis(10000));
+            })
+        })
+        .unwrap();
+}
 
 /// Acquires an allocation group ID.
 ///
