@@ -51,7 +51,7 @@ sudo apt remove vector
 
 ## Management
 
-{{< jump "/docs/administration/management" "apt-dpkg-rpm-yum" >}}
+{{< jump "/docs/administration/management" "apt-dpkg-rpm-yum-pacman" >}}
 
 [apt]: https://en.wikipedia.org/wiki/APT_(software)
 [cloudsmith]: https://cloudsmith.io/~timber/repos/vector/packages

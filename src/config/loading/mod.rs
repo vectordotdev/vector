@@ -1,5 +1,7 @@
 mod config_builder;
 mod loader;
+#[cfg(feature = "enterprise")]
+pub(crate) mod schema;
 mod secret;
 mod source;
 
@@ -18,11 +20,12 @@ use loader::process::Process;
 pub use loader::*;
 pub use secret::*;
 pub use source::*;
+use vector_config::NamedComponent;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
 };
-use crate::signal;
+use crate::{config::ProviderConfig, signal};
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
 
@@ -150,16 +153,24 @@ pub async fn load_from_paths_with_provider_and_secrets(
         load_builder_from_paths(config_paths)?
     };
 
+    // Check secrets in configuration
+    #[cfg(feature = "enterprise")]
+    {
+        crate::config::loading::schema::check_sensitive_fields_from_paths(config_paths, &builder)?;
+    }
+
     validation::check_provider(&builder)?;
     signal_handler.clear();
 
     // If there's a provider, overwrite the existing config builder with the remote variant.
     if let Some(mut provider) = builder.provider {
         builder = provider.build(signal_handler).await?;
-        debug!(message = "Provider configured.", provider = ?provider.provider_type());
+        debug!(message = "Provider configured.", provider = ?provider.get_component_name());
     }
 
     let (new_config, build_warnings) = builder.build_with_warnings()?;
+
+    validation::check_buffer_preconditions(&new_config).await?;
 
     for warning in secrets_warning
         .into_iter()

@@ -3,14 +3,15 @@ use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::{sink::StreamSink, transform::Transform};
 
 use super::{host_key, logs::HumioLogsConfig};
 use crate::{
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-        TransformConfig, TransformContext,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformConfig,
+        TransformContext,
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
@@ -31,7 +32,7 @@ use crate::{
 // `humio_logs` config here.
 //
 // [1]: https://github.com/serde-rs/serde/issues/1504
-#[configurable_component(sink)]
+#[configurable_component(sink("humio_metrics"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HumioMetricsConfig {
@@ -39,7 +40,7 @@ pub struct HumioMetricsConfig {
     transform: MetricToLogConfig,
 
     /// The Humio ingestion token.
-    token: String,
+    token: SensitiveString,
 
     /// The base URL of the Humio instance.
     #[serde(alias = "host")]
@@ -48,13 +49,11 @@ pub struct HumioMetricsConfig {
     /// The source of events sent to this sink.
     ///
     /// Typically the filename the metrics originated from. Maps to `@source` in Humio.
-    #[configurable(metadata(templateable))]
     source: Option<Template>,
 
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
     /// If unset, Humio will default it to none.
-    #[configurable(metadata(templateable))]
     event_type: Option<Template>,
 
     /// Overrides the name of the log field used to grab the hostname to send to Humio.
@@ -84,7 +83,6 @@ pub struct HumioMetricsConfig {
     /// For more information, see [Humio’s Format of Data][humio_data_format].
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
-    #[configurable(metadata(templateable))]
     #[serde(default)]
     index: Option<Template>,
 
@@ -112,10 +110,6 @@ pub struct HumioMetricsConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<HumioMetricsConfig>("humio_metrics")
-}
-
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -127,7 +121,6 @@ impl GenerateConfig for HumioMetricsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transform = self
@@ -167,10 +160,6 @@ impl SinkConfig for HumioMetricsConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "humio_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

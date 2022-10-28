@@ -21,6 +21,7 @@ use vector_config::{
 
 /// A templated string.
 #[configurable_component]
+#[configurable(metadata(docs::templateable))]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
@@ -204,7 +205,7 @@ fn default_simple_source_listen_addr() -> SocketListenAddr {
 
 /// A sink for sending events to the `simple` service.
 #[derive(Clone)]
-#[configurable_component(sink)]
+#[configurable_component(sink("simple"))]
 #[configurable(metadata(status = "beta"))]
 pub struct SimpleSinkConfig {
     /// The endpoint to send events to.
@@ -220,7 +221,6 @@ pub struct SimpleSinkConfig {
     encoding: Encoding,
 
     /// The filepath to write the events to.
-    #[configurable(metadata(templateable))]
     output_path: Template,
 
     /// The tags to apply to each event.
@@ -263,7 +263,7 @@ fn default_simple_sink_endpoint() -> String {
 
 /// A sink for sending events to the `advanced` service.
 #[derive(Clone)]
-#[configurable_component(sink)]
+#[configurable_component(sink("advanced"))]
 #[configurable(metadata(status = "stable"))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdvancedSinkConfig {
@@ -290,7 +290,7 @@ pub struct AdvancedSinkConfig {
     tls: Option<TlsEnablableConfig>,
 
     /// The partition key to use for each event.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::templateable))]
     #[serde(default = "default_partition_key")]
     partition_key: String,
 
@@ -335,36 +335,6 @@ fn default_advanced_sink_endpoint() -> String {
     String::from("https://zalgohtml5.io")
 }
 
-pub mod vector_v1 {
-    use vector_config::configurable_component;
-
-    use crate::SocketListenAddr;
-
-    /// Configuration for version one of the `vector` source.
-    #[configurable_component]
-    #[derive(Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub(crate) struct VectorConfig {
-        /// The address to listen for connections on.
-        ///
-        /// It _must_ include a port.
-        address: SocketListenAddr,
-
-        /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
-        #[serde(default = "default_shutdown_timeout_secs")]
-        shutdown_timeout_secs: u64,
-
-        /// The size, in bytes, of the receive buffer used for each connection.
-        ///
-        /// This should not typically needed to be changed.
-        receive_buffer_bytes: Option<usize>,
-    }
-
-    const fn default_shutdown_timeout_secs() -> u64 {
-        30
-    }
-}
-
 pub mod vector_v2 {
     use std::net::SocketAddr;
 
@@ -400,26 +370,6 @@ pub mod vector_v2 {
     }
 }
 
-/// Marker type for the version one of the configuration for the `vector` source.
-#[configurable_component]
-#[derive(Clone, Debug)]
-enum V1 {
-    /// Marker value for version one.
-    #[serde(rename = "1")]
-    V1,
-}
-
-/// Configuration for version two of the `vector` source.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct VectorConfigV1 {
-    /// Version of the configuration.
-    version: V1,
-
-    #[serde(flatten)]
-    config: self::vector_v1::VectorConfig,
-}
-
 /// Marker type for the version two of the configuration for the `vector` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -445,9 +395,6 @@ pub struct VectorConfigV2 {
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum VectorSourceConfig {
-    /// Configuration for version one.
-    V1(#[configurable(derived)] VectorConfigV1),
-
     /// Configuration for version two.
     V2(#[configurable(derived)] VectorConfigV2),
 }
@@ -514,9 +461,13 @@ pub struct VectorConfig {
 
 #[test]
 fn generate_semi_real_schema() {
-    let root_schema = generate_root_schema::<VectorConfig>();
-    let json = serde_json::to_string_pretty(&root_schema)
-        .expect("rendering root schema to JSON should not fail");
+    match generate_root_schema::<VectorConfig>() {
+        Ok(schema) => {
+            let json = serde_json::to_string_pretty(&schema)
+                .expect("rendering root schema to JSON should not fail");
 
-    println!("{}", json);
+            println!("{}", json);
+        }
+        Err(e) => eprintln!("error while generating schema: {:?}", e),
+    }
 }

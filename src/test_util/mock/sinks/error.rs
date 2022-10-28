@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Configuration for the `test_error` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("test_error"))]
 #[derive(Clone, Debug, Default)]
 pub struct ErrorSinkConfig {
     /// Dummy field used for generating unique configurations to trigger reloads.
@@ -28,7 +28,6 @@ pub struct ErrorSinkConfig {
 impl_generate_config_from_default!(ErrorSinkConfig);
 
 #[async_trait]
-#[typetag::serde(name = "test_error")]
 impl SinkConfig for ErrorSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         Ok((VectorSink::from_event_sink(ErrorSink), ok(()).boxed()))
@@ -36,10 +35,6 @@ impl SinkConfig for ErrorSinkConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "test_error"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

@@ -15,17 +15,17 @@ use crate::{
     sinks::prometheus::exporter::PrometheusExporterConfig,
     sources::{
         internal_metrics::InternalMetricsConfig, prometheus::PrometheusRemoteWriteConfig,
-        splunk_hec::SplunkConfig, Sources,
+        splunk_hec::SplunkConfig,
     },
     test_util::{self, mock::basic_sink, next_addr, start_topology, temp_dir, wait_for_tcp},
 };
 
-fn internal_metrics_source() -> Sources {
-    Sources::InternalMetrics(InternalMetricsConfig::default())
+fn internal_metrics_source() -> InternalMetricsConfig {
+    InternalMetricsConfig::default()
 }
 
-fn prom_remote_write_source(addr: SocketAddr) -> Sources {
-    Sources::PrometheusRemoteWrite(PrometheusRemoteWriteConfig::from_address(addr))
+fn prom_remote_write_source(addr: SocketAddr) -> PrometheusRemoteWriteConfig {
+    PrometheusRemoteWriteConfig::from_address(addr)
 }
 
 fn prom_exporter_sink(addr: SocketAddr, flush_period_secs: u64) -> PrometheusExporterConfig {
@@ -36,10 +36,10 @@ fn prom_exporter_sink(addr: SocketAddr, flush_period_secs: u64) -> PrometheusExp
     }
 }
 
-fn splunk_source_config(addr: SocketAddr) -> Sources {
+fn splunk_source_config(addr: SocketAddr) -> SplunkConfig {
     let mut config = SplunkConfig::default();
     config.address = addr;
-    Sources::SplunkHec(config)
+    config
 }
 
 #[tokio::test]
@@ -178,21 +178,17 @@ async fn topology_disk_buffer_conflict() {
     old_config.add_sink("out", &["in"], prom_exporter_sink(address_0, 1));
 
     let sink_key = ComponentKey::from("out");
-    old_config.sinks[&sink_key].buffer = BufferConfig {
-        stages: vec![BufferType::DiskV1 {
-            max_size: NonZeroU64::new(1024).unwrap(),
-            when_full: WhenFull::Block,
-        }],
-    };
+    old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV1 {
+        max_size: NonZeroU64::new(1024).unwrap(),
+        when_full: WhenFull::Block,
+    });
 
     let mut new_config = old_config.clone();
-    new_config.sinks[&sink_key].inner = Box::new(prom_exporter_sink(address_1, 1));
-    new_config.sinks[&sink_key].buffer = BufferConfig {
-        stages: vec![BufferType::DiskV1 {
-            max_size: NonZeroU64::new(1024).unwrap(),
-            when_full: WhenFull::Block,
-        }],
-    };
+    new_config.sinks[&sink_key].inner = prom_exporter_sink(address_1, 1).into();
+    new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV1 {
+        max_size: NonZeroU64::new(1024).unwrap(),
+        when_full: WhenFull::Block,
+    });
 
     reload_sink_test(
         old_config.build().unwrap(),

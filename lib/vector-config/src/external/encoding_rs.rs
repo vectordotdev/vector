@@ -1,7 +1,7 @@
 use crate::{
-    schema::{finalize_schema, generate_string_schema},
+    schema::generate_string_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
+    Configurable, GenerateError, Metadata,
 };
 
 impl Configurable for &'static encoding_rs::Encoding {
@@ -13,15 +13,15 @@ impl Configurable for &'static encoding_rs::Encoding {
         Some("encoding_rs::Encoding")
     }
 
-    fn description() -> Option<&'static str> {
-        Some(
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description(
             "An encoding as defined in the [Encoding Standard](https://encoding.spec.whatwg.org/).",
-        )
+        );
+        metadata
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
-        let mut schema = generate_string_schema();
-        finalize_schema(gen, &mut schema, overrides);
-        schema
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        Ok(generate_string_schema())
     }
 }

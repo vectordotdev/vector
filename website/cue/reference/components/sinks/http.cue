@@ -70,7 +70,7 @@ components: sinks: http: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
+		notices: ["Input type support can depend on configured `encoding.codec`"]
 	}
 
 	configuration: {
@@ -88,6 +88,18 @@ components: sinks: http: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
 			}
 		}
+		method: {
+			description: "The HTTP method to use."
+			required:    false
+			common:      false
+			type: string: {
+				default: "POST"
+				enum: {
+					PUT:  "PUT"
+					POST: "POST"
+				}
+			}
+		}
 		healthcheck: type: object: options: uri: {
 			common: false
 			description: """
@@ -103,9 +115,16 @@ components: sinks: http: {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			summary:      true
+			set:          true
+		}
+		traces: true
 	}
 
 	telemetry: metrics: {

@@ -1,4 +1,4 @@
-use std::{fmt, num::NonZeroUsize};
+use std::{borrow::Cow, fmt, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
@@ -8,6 +8,7 @@ use vector_core::stream::{BatcherSettings, DriverResponse};
 
 use crate::{
     event::{Event, LogEvent},
+    internal_events::SinkRequestBuildError,
     sinks::{
         aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder},
         util::{processed_event::ProcessedEvent, SinkBuilderExt, StreamSink},
@@ -47,8 +48,8 @@ where
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Kinesis Stream request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -85,17 +86,17 @@ pub fn process_log(
             warn!(
                 message = "Partition key does not exist; dropping event.",
                 %partition_key_field,
-                internal_log_rate_secs = 30,
+                internal_log_rate_limit = true,
             );
             return None;
         }
     } else {
-        gen_partition_key()
+        Cow::Owned(gen_partition_key())
     };
     let partition_key = if partition_key.len() >= 256 {
         partition_key[..256].to_string()
     } else {
-        partition_key
+        partition_key.into_owned()
     };
 
     Some(KinesisProcessedEvent {

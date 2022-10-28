@@ -5,10 +5,10 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
-use futures::{ready, FutureExt};
+use futures::FutureExt;
 use futures_util::{future::BoxFuture, TryFuture};
 use pin_project::pin_project;
 use stream_cancel::{Trigger, Tripwire};

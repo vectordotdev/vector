@@ -28,9 +28,9 @@ impl InternalEvent for AdaptiveConcurrencyLimit {
         // values over each reporting interval, and each of those values
         // is valuable for diagnosis.
         histogram!("adaptive_concurrency_limit", self.concurrency as f64);
-        let reached_limit = self.reached_limit.then(|| 1.0).unwrap_or_default();
+        let reached_limit = self.reached_limit.then_some(1.0).unwrap_or_default();
         histogram!("adaptive_concurrency_reached_limit", reached_limit);
-        let back_pressure = self.had_back_pressure.then(|| 1.0).unwrap_or_default();
+        let back_pressure = self.had_back_pressure.then_some(1.0).unwrap_or_default();
         histogram!("adaptive_concurrency_back_pressure", back_pressure);
         histogram!("adaptive_concurrency_past_rtt_mean", self.past_rtt);
     }

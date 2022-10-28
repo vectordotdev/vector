@@ -9,7 +9,7 @@ use std::{
 };
 
 use futures_util::{future::ready, Stream, StreamExt};
-use lookup::path;
+use lookup::event_path;
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
 use tokio::sync::{
@@ -55,7 +55,7 @@ fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
-pub fn init(color: bool, json: bool, levels: &str) {
+pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64) {
     let fmt_filter = tracing_subscriber::filter::Targets::from_str(levels).expect(
         "logging filter targets were not formatted correctly or did not specify a valid level",
     );
@@ -63,8 +63,9 @@ pub fn init(color: bool, json: bool, levels: &str) {
     let metrics_layer = metrics_layer_enabled()
         .then(|| MetricsLayer::new().with_filter(tracing_subscriber::filter::LevelFilter::INFO));
 
-    let broadcast_layer =
-        RateLimitedLayer::new(BroadcastLayer::new()).with_filter(fmt_filter.clone());
+    let broadcast_layer = RateLimitedLayer::new(BroadcastLayer::new())
+        .with_default_limit(internal_log_rate_limit)
+        .with_filter(fmt_filter.clone());
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)
@@ -85,7 +86,8 @@ pub fn init(color: bool, json: bool, levels: &str) {
         #[cfg(test)]
         let formatter = formatter.with_test_writer();
 
-        let rate_limited = RateLimitedLayer::new(formatter);
+        let rate_limited =
+            RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let _ = subscriber.try_init();
@@ -97,7 +99,8 @@ pub fn init(color: bool, json: bool, levels: &str) {
         #[cfg(test)]
         let formatter = formatter.with_test_writer();
 
-        let rate_limited = RateLimitedLayer::new(formatter);
+        let rate_limited =
+            RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let _ = subscriber.try_init();
@@ -288,7 +291,7 @@ where
                 for span in parent_span.scope().from_root() {
                     if let Some(fields) = span.extensions().get::<SpanFields>() {
                         for (k, v) in &fields.0 {
-                            log.insert(path!("vector", *k), v.clone());
+                            log.insert(event_path!("vector", *k), v.clone());
                         }
                     }
                 }

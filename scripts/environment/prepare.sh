@@ -1,6 +1,8 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
+git config --global --add safe.directory /git/vectordotdev/vector
+
 rustup show # causes installation of version from rust-toolchain.toml
 rustup default "$(rustup show active-toolchain | awk '{print $1;}')"
 if [[ "$(cargo-deb --version)" != "1.29.2" ]] ; then
@@ -11,6 +13,9 @@ if [[ "$(cross --version | grep cross)" != "cross 0.2.4" ]] ; then
 fi
 if [[ "$(cargo-nextest --version)" != "cargo-nextest 0.9.25" ]] ; then
   rustup run stable cargo install cargo-nextest --version 0.9.25 --force --locked
+fi
+if ! cargo deny --version >& /dev/null ; then
+  rustup run stable cargo install cargo-deny --force --locked
 fi
 
 cd scripts

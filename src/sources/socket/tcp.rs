@@ -9,7 +9,7 @@ use crate::{
     config::log_schema,
     event::Event,
     serde::default_decoding,
-    sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
+    sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsSourceConfig,
 };

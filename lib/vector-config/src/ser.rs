@@ -4,7 +4,7 @@ use serde::{Serialize, Serializer};
 
 use crate::{
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
+    Configurable, GenerateError, Metadata,
 };
 
 /// Delegated serialization.
@@ -71,11 +71,6 @@ where
         H::referenceable_name()
     }
 
-    fn description() -> Option<&'static str> {
-        // Forward to the underlying `H`.
-        H::description()
-    }
-
     fn is_optional() -> bool {
         // Forward to the underlying `H`.
         H::is_optional()
@@ -90,12 +85,18 @@ where
         H::metadata().convert::<Self>()
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
         // Forward to the underlying `H`.
         //
         // We have to convert from `Metadata<Self>` to `Metadata<H>` which erases the default value,
-        // notably, but delegated helpers should never actually have default values, so this is
+        // notably, but `serde_with` helpers should never actually have default values, so this is
         // essentially a no-op.
-        H::generate_schema(gen, overrides.convert::<H>())
+        let converted = metadata.convert::<H>();
+        H::validate_metadata(&converted)
+    }
+
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        // Forward to the underlying `H`.
+        H::generate_schema(gen)
     }
 }

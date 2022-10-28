@@ -1,7 +1,7 @@
 FROM ghcr.io/cross-rs/armv7-unknown-linux-musleabihf:0.2.4
 
-COPY bootstrap-ubuntu.sh .
-RUN ./bootstrap-ubuntu.sh
+COPY scripts/cross/bootstrap-ubuntu.sh scripts/environment/install-protoc.sh /
+RUN /bootstrap-ubuntu.sh && bash /install-protoc.sh
 
 # Stick `libstdc++` somewhere it can be found other than it's normal location, otherwise we end up using the wrong version
 # of _other_ libraries, which ultimately just breaks linking. We'll set `/lib/native-libs` as a search path in `.cargo/config.toml`.

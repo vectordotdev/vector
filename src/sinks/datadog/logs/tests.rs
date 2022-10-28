@@ -22,7 +22,13 @@ use crate::{
         util::retries::RetryLogic,
         util::test::{build_test_server_status, load_sink},
     },
-    test_util::{next_addr, random_lines_with_stream},
+    test_util::{
+        components::{
+            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+            SINK_TAGS,
+        },
+        next_addr, random_lines_with_stream,
+    },
     tls::TlsError,
 };
 
@@ -76,9 +82,10 @@ fn event_with_api_key(msg: &str, key: &str) -> Event {
 /// Testers may set `api_status` and `batch_status`. The first controls what
 /// status code faked HTTP responses will have, the second acts as a check on
 /// the `Receiver`'s status before being returned to the caller.
-async fn start_test(
+async fn start_test_detail(
     api_status: ApiStatus,
     batch_status: BatchStatus,
+    is_error: bool,
 ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
     let config = indoc! {r#"
             default_api_key = "atoken"
@@ -100,10 +107,29 @@ async fn start_test(
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
 
-    sink.run(events).await.unwrap();
+    if is_error {
+        run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
+    } else {
+        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    }
+
     assert_eq!(receiver.await, batch_status);
 
     (expected, rx)
+}
+
+async fn start_test_success(
+    api_status: ApiStatus,
+    batch_status: BatchStatus,
+) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+    start_test_detail(api_status, batch_status, false).await
+}
+
+async fn start_test_error(
+    api_status: ApiStatus,
+    batch_status: BatchStatus,
+) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+    start_test_detail(api_status, batch_status, true).await
 }
 
 #[tokio::test]
@@ -113,7 +139,7 @@ async fn start_test(
 /// were delivered and then asserts that every message is able to be
 /// deserialized.
 async fn smoke() {
-    let (expected, rx) = start_test(ApiStatus::OKv1, BatchStatus::Delivered).await;
+    let (expected, rx) = start_test_success(ApiStatus::OKv1, BatchStatus::Delivered).await;
 
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
@@ -157,7 +183,8 @@ async fn smoke() {
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v1() {
-    let (_expected, mut rx) = start_test(ApiStatus::BadRequestv1, BatchStatus::Rejected).await;
+    let (_expected, mut rx) =
+        start_test_error(ApiStatus::BadRequestv1, BatchStatus::Rejected).await;
     let res = rx.try_next();
 
     assert!(matches!(res, Err(TryRecvError { .. })));
@@ -170,7 +197,8 @@ async fn handles_failure_v1() {
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v2() {
-    let (_expected, mut rx) = start_test(ApiStatus::BadRequestv2, BatchStatus::Rejected).await;
+    let (_expected, mut rx) =
+        start_test_error(ApiStatus::BadRequestv2, BatchStatus::Rejected).await;
     let res = rx.try_next();
 
     assert!(matches!(res, Err(TryRecvError { .. })));

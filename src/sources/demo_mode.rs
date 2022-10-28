@@ -7,8 +7,8 @@ use tokio::time;
 
 use super::Sources;
 
-#[derive(Clone)]
-pub(crate) struct DemoMode {
+#[derive(Clone, Debug)]
+pub struct DemoMode {
     inner: Sources,
 }
 
@@ -28,6 +28,15 @@ impl DemoMode {
                 let event = this.inner.generate_demo_data();
                 cx.out.send_event(event).await.unwrap();
             }
+
+            dbg!("out of scope");
         })
+    }
+}
+
+impl Drop for DemoMode {
+    fn drop(&mut self) {
+        dbg!("Dropping!", self);
+        panic!("arg");
     }
 }

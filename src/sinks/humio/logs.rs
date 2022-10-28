@@ -1,13 +1,11 @@
 use codecs::JsonSerializerConfig;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::host_key;
 use crate::{
     codecs::EncodingConfig,
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
             common::{
@@ -26,12 +24,12 @@ use crate::{
 const HOST: &str = "https://cloud.humio.com";
 
 /// Configuration for the `humio_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("humio_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HumioLogsConfig {
     /// The Humio ingestion token.
-    pub(super) token: String,
+    pub(super) token: SensitiveString,
 
     /// The base URL of the Humio instance.
     #[serde(alias = "host")]
@@ -40,7 +38,6 @@ pub struct HumioLogsConfig {
     /// The source of events sent to this sink.
     ///
     /// Typically the filename the logs originated from. Maps to `@source` in Humio.
-    #[configurable(metadata(templateable))]
     pub(super) source: Option<Template>,
 
     #[configurable(derived)]
@@ -49,7 +46,6 @@ pub struct HumioLogsConfig {
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
     /// If unset, Humio will default it to none.
-    #[configurable(metadata(templateable))]
     pub(super) event_type: Option<Template>,
 
     /// Overrides the name of the log field used to grab the hostname to send to Humio.
@@ -79,7 +75,6 @@ pub struct HumioLogsConfig {
     /// For more information, see [Humio’s Format of Data][humio_data_format].
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
-    #[configurable(metadata(templateable))]
     #[serde(default)]
     pub(super) index: Option<Template>,
 
@@ -121,10 +116,6 @@ pub struct HumioLogsConfig {
     pub(super) timestamp_key: String,
 }
 
-inventory::submit! {
-    SinkDescription::new::<HumioLogsConfig>("humio_logs")
-}
-
 pub fn timestamp_nanos_key() -> Option<String> {
     Some("@timestamp.nanos".to_string())
 }
@@ -132,7 +123,7 @@ pub fn timestamp_nanos_key() -> Option<String> {
 impl GenerateConfig for HumioLogsConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            token: "${HUMIO_TOKEN}".to_owned(),
+            token: "${HUMIO_TOKEN}".to_owned().into(),
             endpoint: None,
             source: None,
             encoding: JsonSerializerConfig::new().into(),
@@ -153,7 +144,6 @@ impl GenerateConfig for HumioLogsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         self.build_hec_config().build(cx).await
@@ -161,10 +151,6 @@ impl SinkConfig for HumioLogsConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "humio_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -366,7 +352,7 @@ mod integration_tests {
         batch.max_events = Some(1);
 
         HumioLogsConfig {
-            token: token.to_string(),
+            token: token.to_string().into(),
             endpoint: Some(humio_address()),
             source: None,
             encoding: JsonSerializerConfig::new().into(),

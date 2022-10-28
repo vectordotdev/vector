@@ -20,7 +20,7 @@ use crate::{
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 /// Configuration for the `kafka` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("kafka"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSinkConfig {
@@ -30,7 +30,7 @@ pub struct KafkaSinkConfig {
     pub bootstrap_servers: String,
 
     /// The Kafka topic name to write events to.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::templateable))]
     pub topic: String,
 
     /// The log field name or tags key to use for the topic key.
@@ -216,7 +216,6 @@ impl GenerateConfig for KafkaSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = KafkaSink::new(self.clone())?;
@@ -226,10 +225,6 @@ impl SinkConfig for KafkaSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & (DataType::Log | DataType::Metric))
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "kafka"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

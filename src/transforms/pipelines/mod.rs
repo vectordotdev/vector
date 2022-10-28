@@ -126,8 +126,6 @@ use crate::{
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
 };
 
-use super::Transforms;
-
 /// Configuration for the `pipelines` transform.
 #[configurable_component(transform("pipelines"))]
 #[derive(Clone, Debug, Default)]
@@ -243,7 +241,7 @@ impl TransformConfig for PipelinesConfig {
             router_name,
             InnerTopologyTransform {
                 inputs: inputs.to_vec(),
-                inner: Transforms::Route(RouteConfig::new(conditions)),
+                inner: RouteConfig::new(conditions).into(),
             },
         );
         Ok(Some(result))
@@ -297,12 +295,13 @@ mod tests {
     use std::collections::HashSet;
 
     use indexmap::IndexMap;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     use super::{GenerateConfig, PipelinesConfig};
-    use crate::{
-        config::{ComponentKey, TransformOuter},
-        transforms::Transforms,
-    };
+    use crate::config::{ComponentKey, TransformOuter};
+    use crate::test_util::components::assert_transform_compliance;
+    use crate::transforms::test::create_topology;
 
     #[test]
     fn generate_config() {
@@ -324,10 +323,7 @@ mod tests {
     fn expanding() {
         let config = PipelinesConfig::generate_config();
         let config: PipelinesConfig = config.try_into().unwrap();
-        let outer = TransformOuter {
-            inputs: vec!["source".to_string()],
-            inner: Transforms::Pipelines(config),
-        };
+        let outer = TransformOuter::new(vec!["source".to_string()], config);
         let name = ComponentKey::from("foo");
         let mut transforms = IndexMap::new();
         let mut expansions = IndexMap::new();
@@ -366,5 +362,46 @@ mod tests {
             expansions["foo"],
             vec!["foo.type_router._unmatched", "foo.logs.1"]
         );
+    }
+
+    #[tokio::test]
+    async fn check_compliance() {
+        use crate::event::LogEvent;
+
+        assert_transform_compliance(async move {
+            let config = toml::from_str::<PipelinesConfig>(indoc::indoc! {r#"
+                    [transforms.my_pipelines]
+                    type = "pipelines"
+                    inputs = ["in"]
+
+                    [[transforms.my_pipelines.logs]]
+                    name = "foo pipeline"
+
+                    [[transforms.my_pipelines.logs.transforms]]
+
+                    [[transforms.my_pipelines.logs]]
+                    name = "bar pipeline"
+                    filter.type = "vrl"
+                    filter.source = """true"""
+            "#,
+            })
+            .unwrap();
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let mut e_1 = LogEvent::from("test message 1");
+            e_1.insert("counter", 1);
+            e_1.insert("request_id", "1");
+            tx.send(e_1.into()).await.unwrap();
+
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], "test message 1".into());
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 }

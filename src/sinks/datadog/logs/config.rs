@@ -4,6 +4,7 @@ use futures::FutureExt;
 use indoc::indoc;
 use tower::ServiceBuilder;
 use value::Kind;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
@@ -46,7 +47,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `datadog_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("datadog_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
@@ -71,7 +72,7 @@ pub struct DatadogLogsConfig {
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(alias = "api_key")]
-    pub default_api_key: String,
+    pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
@@ -140,7 +141,7 @@ impl DatadogLogsConfig {
 
 impl DatadogLogsConfig {
     pub fn build_processor(&self, client: HttpClient) -> crate::Result<VectorSink> {
-        let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
+        let default_api_key: Arc<str> = Arc::from(self.default_api_key.inner());
         let request_limits = self.request.unwrap_with(&Default::default());
 
         // We forcefully cap the provided batch configuration to the size/log line limits imposed by
@@ -166,7 +167,12 @@ impl DatadogLogsConfig {
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let validate_endpoint =
             get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
-        Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
+        Ok(healthcheck(
+            client,
+            validate_endpoint,
+            self.default_api_key.inner().to_owned(),
+        )
+        .boxed())
     }
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
@@ -183,7 +189,6 @@ impl DatadogLogsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
@@ -203,10 +208,6 @@ impl SinkConfig for DatadogLogsConfig {
             .optional_meaning("trace_id", Kind::bytes());
 
         Input::log().with_schema_requirement(requirement)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "datadog_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

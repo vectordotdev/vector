@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
-use lookup::path;
+use lookup::event_path;
 use rmp_serde::{decode, Deserializer};
 use serde::Deserialize;
 use smallvec::{smallvec, SmallVec};
@@ -12,7 +12,7 @@ use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
@@ -97,7 +97,7 @@ impl SourceConfig for FluentConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![self.address.into()]
+        vec![self.address.as_tcp_resource()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -457,7 +457,7 @@ impl From<FluentEvent> for LogEvent {
         log.insert(log_schema().timestamp_key(), timestamp);
         log.insert("tag", tag);
         for (key, value) in record.into_iter() {
-            log.insert(path!(&key), value);
+            log.insert(event_path!(&key), value);
         }
         log
     }

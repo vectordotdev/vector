@@ -1,14 +1,13 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
-    collections::{btree_map, BTreeMap},
+    collections::btree_map,
     convert::AsRef,
     fmt::{self, Display, Formatter},
     num::NonZeroU32,
 };
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use vector_common::EventDataEq;
 use vector_config::configurable_component;
 #[cfg(feature = "vrl")]
@@ -28,12 +27,15 @@ pub use self::data::*;
 mod series;
 pub use self::series::*;
 
+mod tags;
+pub use self::tags::*;
+
 mod value;
 pub use self::value::*;
 
-pub type MetricTags = BTreeMap<String, String>;
-
-#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+/// A metric.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Metric {
     #[serde(flatten)]
     pub(super) series: MetricSeries,
@@ -41,7 +43,8 @@ pub struct Metric {
     #[serde(flatten)]
     pub(super) data: MetricData,
 
-    #[serde(skip_serializing, default = "EventMetadata::default")]
+    /// Internal event metadata.
+    #[serde(skip, default = "EventMetadata::default")]
     metadata: EventMetadata,
 }
 
@@ -199,6 +202,12 @@ impl Metric {
         self.series.tags.as_ref()
     }
 
+    /// Gets a mutable reference to the tags of this metric, if they exist.
+    #[inline]
+    pub fn tags_mut(&mut self) -> Option<&mut MetricTags> {
+        self.series.tags.as_mut()
+    }
+
     /// Gets a reference to the timestamp of this metric, if it exists.
     #[inline]
     pub fn timestamp(&self) -> Option<DateTime<Utc>> {
@@ -279,7 +288,6 @@ impl Metric {
     #[allow(clippy::cast_precision_loss)]
     pub(crate) fn from_metric_kv(
         key: &metrics::Key,
-        kind: MetricKind,
         value: MetricValue,
         timestamp: DateTime<Utc>,
     ) -> Self {
@@ -288,15 +296,20 @@ impl Metric {
             .map(|label| (String::from(label.key()), String::from(label.value())))
             .collect::<MetricTags>();
 
-        Self::new(key.name().to_string(), kind, value)
+        Self::new(key.name().to_string(), MetricKind::Absolute, value)
             .with_namespace(Some("vector"))
             .with_timestamp(Some(timestamp))
-            .with_tags((!labels.is_empty()).then(|| labels))
+            .with_tags((!labels.is_empty()).then_some(labels))
     }
 
     /// Removes a tag from this metric, returning the value of the tag if the tag was previously in the metric.
     pub fn remove_tag(&mut self, key: &str) -> Option<String> {
         self.series.remove_tag(key)
+    }
+
+    /// Removes all the tags.
+    pub fn remove_tags(&mut self) {
+        self.series.remove_tags();
     }
 
     /// Returns `true` if `name` tag is present, and matches the provided `value`
@@ -308,7 +321,7 @@ impl Metric {
 
     /// Returns the string value of a tag, if it exists
     pub fn tag_value(&self, name: &str) -> Option<String> {
-        self.tags().and_then(|t| t.get(name).cloned())
+        self.tags().and_then(|t| t.get(name)).map(ToOwned::to_owned)
     }
 
     /// Inserts a tag into this metric.

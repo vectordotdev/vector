@@ -473,16 +473,6 @@ fn timely_shutdown_syslog_unix() {
 }
 
 #[test]
-fn timely_shutdown_vector_v1() {
-    test_timely_shutdown(source_vector(
-        r#"
-    type = "vector"
-    version = "1"
-    address = "${VECTOR_TEST_ADDRESS}""#,
-    ));
-}
-
-#[test]
 fn timely_shutdown_vector_v2() {
     test_timely_shutdown(source_vector(
         r#"

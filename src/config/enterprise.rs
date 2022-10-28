@@ -14,6 +14,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
+use vector_common::sensitive_string::SensitiveString;
 use vector_core::config::proxy::ProxyConfig;
 
 use super::{
@@ -32,9 +33,8 @@ use crate::{
         host_metrics::{Collector, HostMetricsConfig},
         internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
-        Sources,
     },
-    transforms::{filter::FilterConfig, remap::RemapConfig, Transforms},
+    transforms::{filter::FilterConfig, remap::RemapConfig},
 };
 use vector_config::configurable_component;
 
@@ -56,53 +56,73 @@ static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipeline
 pub static DATADOG_API_KEY_ENV_VAR_SHORT: &str = "DD_API_KEY";
 pub static DATADOG_API_KEY_ENV_VAR_FULL: &str = "DATADOG_API_KEY";
 
-#[derive(Debug, PartialEq, Clone)]
+/// Enterprise options for using Datadog's [Observability Pipelines][datadog_op].
+///
+/// [datadog_op]: https://www.datadoghq.com/product/observability-pipelines/
 #[configurable_component]
+#[derive(Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
-/// Observability Pipelines config options.
 pub struct Options {
+    /// Whether or not Observability Pipelines support is enabled.
     #[serde(default = "default_enabled")]
-    /// Enables Observability Pipelines.
     pub enabled: bool,
 
+    /// Whether or not to report internal component logs to Observability Pipelines.
     #[serde(default = "default_enable_logs_reporting")]
-    /// Enables reporting of internal component logs to Datadog.
     pub enable_logs_reporting: bool,
 
+    /// The Datadog [site][dd_site] to send data to.
+    ///
+    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     #[serde(default)]
-    /// Datadog site (e.g. datadoghq.eu).
     site: Option<String>,
-    /// Datadog region, used to derive a default site for a given region.
+
+    /// The Datadog region to send data to.
+    ///
+    /// This option is deprecated, and the `site` field should be used instead.
+    #[configurable(deprecated)]
     region: Option<Region>,
+
+    /// The Datadog endpoint to send data to.
+    ///
+    /// This is an advanced setting that is generally meant only for testing, and overrides both
+    /// `site` and `region`.
+    ///
+    /// You should prefer to set `site`.
     #[configurable(derived)]
-    /// Datadog endpoint, takes precedence over the region and the site. Used mainly for dev environments.
     endpoint: Option<String>,
 
+    /// The Datadog [API key][api_key] to send data with.
+    ///
+    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(default)]
-    /// Datadog API key.
-    pub api_key: Option<String>,
-    #[configurable(deprecated)]
-    /// Datadog application key (deprecated).
-    pub application_key: Option<String>,
-    /// Observability Pipeline's configuration key.
-    pub configuration_key: String,
+    pub api_key: Option<SensitiveString>,
 
+    /// The Datadog application key.
+    ///
+    /// This is deprecated.
+    #[configurable(deprecated)]
+    pub application_key: Option<SensitiveString>,
+
+    /// The configuration key for Observability Pipelines.
+    pub configuration_key: SensitiveString,
+
+    /// The amount of time, in seconds, between reporting host metrics to Observability Pipelines.
     #[serde(default = "default_reporting_interval_secs")]
-    /// A time interval to scrap and report host metrics.
     pub reporting_interval_secs: f64,
 
+    /// The maximum number of retries to report Vector's configuration to Observability Pipelines at startup.
     #[serde(default = "default_max_retries")]
-    /// The maximum number of retries to report a Vector configuration at startup.
     pub max_retries: u32,
 
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    #[configurable(derived)]
     proxy: ProxyConfig,
 
-    /// Additional tags, added to generated Datadog metrics.
+    /// A map of additional tags for metrics sent to Observability Pipelines.
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -116,7 +136,7 @@ impl Default for Options {
             endpoint: None,
             api_key: None,
             application_key: None,
-            configuration_key: "".to_owned(),
+            configuration_key: "".to_owned().into(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
             proxy: ProxyConfig::default(),
@@ -300,7 +320,7 @@ impl TryFrom<&Config> for EnterpriseMetadata {
 
         let api_key = match &opts.api_key {
             // API key provided explicitly.
-            Some(api_key) => api_key.clone(),
+            Some(api_key) => api_key.inner().to_owned(),
             // No API key; attempt to get it from the environment.
             None => match env::var(DATADOG_API_KEY_ENV_VAR_FULL)
                 .or_else(|_| env::var(DATADOG_API_KEY_ENV_VAR_SHORT))
@@ -322,7 +342,7 @@ impl TryFrom<&Config> for EnterpriseMetadata {
         );
 
         // Get the configuration version hash. In DD Pipelines, this is referred to as the 'config hash'.
-        let configuration_version_hash = value.version.clone().expect("Config should be versioned");
+        let configuration_version_hash = value.hash.clone().expect("Config should be versioned");
 
         Ok(Self {
             opts,
@@ -434,9 +454,7 @@ fn setup_logs_reporting(
     let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
     let datadog_logs_id = ComponentKey::from(DATADOG_LOGS_KEY);
 
-    let internal_logs = Sources::InternalLogs(InternalLogsConfig {
-        ..Default::default()
-    });
+    let internal_logs = InternalLogsConfig::default();
 
     let custom_logs_tags_vrl = datadog
         .tags
@@ -445,7 +463,7 @@ fn setup_logs_reporting(
 
     let configuration_key = &datadog.configuration_key;
     let vector_version = crate::vector_version();
-    let tag_logs = Transforms::Remap(RemapConfig {
+    let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
             .ddsource = "vector"
@@ -457,11 +475,11 @@ fn setup_logs_reporting(
             custom_logs_tags_vrl,
         )),
         ..Default::default()
-    });
+    };
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        default_api_key: api_key,
+        default_api_key: api_key.into(),
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
@@ -481,7 +499,7 @@ fn setup_logs_reporting(
 
     config.sinks.insert(
         datadog_logs_id,
-        SinkOuter::new(vec![tag_logs_id], Box::new(datadog_logs)),
+        SinkOuter::new(vec![tag_logs_id], datadog_logs),
     );
 }
 
@@ -505,7 +523,7 @@ fn setup_metrics_reporting(
     // By default, host_metrics generates many metrics and some with high
     // cardinality which can negatively impact customers' costs and downstream
     // systems' performance. To avoid this, we explicitly set `collectors`.
-    let host_metrics = Sources::HostMetrics(HostMetricsConfig {
+    let host_metrics = HostMetricsConfig {
         namespace: Some("vector.host".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         collectors: Some(vec![
@@ -517,16 +535,16 @@ fn setup_metrics_reporting(
             Collector::Network,
         ]),
         ..Default::default()
-    });
+    };
 
-    let internal_metrics = Sources::InternalMetrics(InternalMetricsConfig {
+    let internal_metrics = InternalMetricsConfig {
         // While the default namespace for internal metrics is already "vector",
         // setting the namespace here is meant for clarity and resistance
         // against any future or accidental changes.
         namespace: Some("vector".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         ..Default::default()
-    });
+    };
 
     let custom_metric_tags_vrl = datadog
         .tags
@@ -535,7 +553,7 @@ fn setup_metrics_reporting(
 
     let configuration_key = &datadog.configuration_key;
     let vector_version = crate::vector_version();
-    let tag_metrics = Transforms::Remap(RemapConfig {
+    let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
             .tags.configuration_version_hash = "{configuration_version_hash}"
@@ -546,21 +564,21 @@ fn setup_metrics_reporting(
             custom_metric_tags_vrl
         )),
         ..Default::default()
-    });
+    };
 
     // Preserve the `pipelines` namespace for specific metrics
-    let filter_metrics = Transforms::Filter(FilterConfig::from(AnyCondition::String(
+    let filter_metrics = FilterConfig::from(AnyCondition::String(
         r#".name == "component_received_bytes_total""#.to_string(),
-    )));
+    ));
 
-    let pipelines_namespace_metrics = Transforms::Remap(RemapConfig {
+    let pipelines_namespace_metrics = RemapConfig {
         source: Some(r#".namespace = "pipelines""#.to_string()),
         ..Default::default()
-    });
+    };
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        default_api_key: api_key,
+        default_api_key: api_key.into(),
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
@@ -595,7 +613,7 @@ fn setup_metrics_reporting(
         datadog_metrics_id,
         SinkOuter::new(
             vec![tag_metrics_id, pipelines_namespace_metrics_id],
-            Box::new(datadog_metrics),
+            datadog_metrics,
         ),
     );
 }
@@ -653,7 +671,7 @@ pub(crate) fn report_configuration(
             opts.endpoint.as_ref(),
             opts.site.as_ref(),
             opts.region,
-            &opts.configuration_key,
+            opts.configuration_key.inner(),
         );
         // Datadog uses a JSON:API, so we'll serialize the config to a JSON
         let payload = PipelinesVersionPayload::new(&table, &fields);

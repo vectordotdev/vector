@@ -19,15 +19,15 @@ use chrono::{SecondsFormat, Utc};
 use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
-use lookup::path;
+use lookup::event_path;
 use rand::{thread_rng, Rng};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{log_schema, AcknowledgementsConfig, LogSchema},
-    event::{Event, EventFinalizers, Finalizable},
+    event::{Event, EventFinalizers, Finalizable, MetricTags},
     ByteSizeOf,
 };
 
@@ -56,6 +56,7 @@ use crate::{
             config::{
                 create_service, S3CannedAcl, S3RetryLogic, S3ServerSideEncryption, S3StorageClass,
             },
+            partitioner::{S3KeyPartitioner, S3PartitionKey},
             service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
@@ -87,7 +88,7 @@ impl SinkBatchSettings for DatadogArchivesDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 900.0;
 }
 /// Configuration for the `datadog_archives` sink.
-#[configurable_component(sink)]
+#[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogArchivesSinkConfig {
@@ -216,7 +217,7 @@ pub struct S3Options {
     pub storage_class: Option<S3StorageClass>,
 
     /// The tag-set for the object.
-    pub tags: Option<BTreeMap<String, String>>,
+    pub tags: Option<MetricTags>,
 }
 
 /// ABS-specific configuration options.
@@ -369,7 +370,10 @@ impl DatadogArchivesSinkConfig {
             .into_batcher_settings()
             .expect("invalid batch settings");
 
-        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
+        let partitioner = S3KeyPartitioner::new(
+            Template::try_from(KEY_TEMPLATE).expect("invalid object key format"),
+            None,
+        );
 
         let s3_config = self
             .aws_s3
@@ -549,8 +553,8 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogArchivesEncodi
                     .unwrap_or_else(chrono::Utc::now)
                     .to_rfc3339_opts(SecondsFormat::Millis, true),
             );
-            log_event.rename_key(self.log_schema.message_key(), path!("message"));
-            log_event.rename_key(self.log_schema.host_key(), path!("host"));
+            log_event.rename_key(self.log_schema.message_key(), event_path!("message"));
+            log_event.rename_key(self.log_schema.host_key(), event_path!("host"));
 
             let mut attributes = BTreeMap::new();
 
@@ -598,7 +602,7 @@ impl DatadogS3RequestBuilder {
     }
 }
 
-impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
+impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for DatadogS3RequestBuilder {
     type Metadata = S3Metadata;
     type Events = Vec<Event>;
     type Encoder = DatadogArchivesEncoding;
@@ -614,11 +618,13 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(&self, input: (S3PartitionKey, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
+        let s3_key_prefix = partition_key.key_prefix.clone();
         let metadata = S3Metadata {
             partition_key,
+            s3_key: s3_key_prefix,
             count: events.len(),
             byte_size: events.size_of(),
             finalizers,
@@ -632,9 +638,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         mut metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        metadata.partition_key =
-            generate_object_key(self.key_prefix.clone(), metadata.partition_key);
-
+        metadata.s3_key = generate_object_key(self.key_prefix.clone(), metadata.s3_key);
         let body = payload.into_payload();
         trace!(
             message = "Sending events.",
@@ -819,8 +823,16 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
     }
 }
 
+// This is implemented manually to satisfy `SinkConfig`, because if we derive it automatically via
+// `#[configurable_component(sink("..."))]`, it would register the sink in a way that allowed it to
+// be used in `vector generate`, etc... and we don't want that.
+//
+// TODO: When the sink is fully supported and we expose it for use/within the docs, remove this.
+impl NamedComponent for DatadogArchivesSinkConfig {
+    const NAME: &'static str = "datadog_archives";
+}
+
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_archives")]
 impl SinkConfig for DatadogArchivesSinkConfig {
     async fn build(
         &self,
@@ -832,10 +844,6 @@ impl SinkConfig for DatadogArchivesSinkConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "datadog_archives"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -1041,7 +1049,10 @@ mod tests {
             .expect("invalid test case")
             .with_timezone(&Utc);
         log.as_mut_log().insert("timestamp", timestamp);
-        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
+        let partitioner = S3KeyPartitioner::new(
+            Template::try_from(KEY_TEMPLATE).expect("invalid object key format"),
+            None,
+        );
         let key = partitioner.partition(&log).expect("key wasn't provided");
 
         let request_builder = DatadogS3RequestBuilder::new(
@@ -1056,11 +1067,11 @@ mod tests {
             request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf.clone()));
         let expected_key_prefix = "audit/dt=20210823/hour=16/";
         let expected_key_ext = ".json.gz";
-        println!("{}", req.metadata.partition_key);
-        assert!(req.metadata.partition_key.starts_with(expected_key_prefix));
-        assert!(req.metadata.partition_key.ends_with(expected_key_ext));
-        let uuid1 = &req.metadata.partition_key
-            [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
+        println!("{}", req.metadata.s3_key);
+        assert!(req.metadata.s3_key.starts_with(expected_key_prefix));
+        assert!(req.metadata.s3_key.ends_with(expected_key_ext));
+        let uuid1 = &req.metadata.s3_key
+            [expected_key_prefix.len()..req.metadata.s3_key.len() - expected_key_ext.len()];
         assert_eq!(uuid1.len(), 36);
 
         // check that the second batch has a different UUID
@@ -1069,8 +1080,8 @@ mod tests {
         let key = partitioner.partition(&log2).expect("key wasn't provided");
         let (metadata, _events) = request_builder.split_input((key, vec![log2]));
         let req = request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf));
-        let uuid2 = &req.metadata.partition_key
-            [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
+        let uuid2 = &req.metadata.s3_key
+            [expected_key_prefix.len()..req.metadata.s3_key.len() - expected_key_ext.len()];
 
         assert_ne!(uuid1, uuid2);
     }

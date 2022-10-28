@@ -3,10 +3,9 @@ use std::{collections::BTreeSet, sync::Arc};
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
 use serde_json::{json, Value as JsonValue};
-use vector_common::btreemap;
 use vector_core::{
     event::{Event, Metric, MetricKind, MetricValue},
-    ByteSizeOf,
+    metric_tags, ByteSizeOf,
 };
 
 use super::sink::{process_metric, HecProcessedEvent};
@@ -31,7 +30,7 @@ fn get_counter() -> Metric {
         MetricValue::Counter { value: 26.8 },
     )
     .with_timestamp(Some(timestamp))
-    .with_tags(Some(btreemap! {
+    .with_tags(Some(metric_tags! {
         "template_index".to_string() => "index_value".to_string(),
         "template_source".to_string() => "source_value".to_string(),
         "template_sourcetype".to_string() => "sourcetype_value".to_string(),
@@ -318,7 +317,7 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
 async fn splunk_passthrough_token() {
     let addr = next_addr();
     let config = HecMetricsSinkConfig {
-        default_token: "token".into(),
+        default_token: "token".to_owned().into(),
         endpoint: format!("http://{}", addr),
         host_key: "host".into(),
         index: None,

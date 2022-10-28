@@ -108,7 +108,7 @@ async fn cloudwatch_insert_log_events_sorted() {
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
-    let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
+    let timestamp = chrono::Utc::now() - Duration::days(1);
 
     let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
 
@@ -117,7 +117,7 @@ async fn cloudwatch_insert_log_events_sorted() {
     let mut doit = false;
     let events = events.map(move |mut events| {
         if doit {
-            let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
+            let timestamp = chrono::Utc::now() - Duration::days(1);
 
             events.iter_logs_mut().for_each(|log| {
                 log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
@@ -183,7 +183,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     let mut events = Vec::new();
     let mut lines = Vec::new();
 
-    let mut add_event = |offset: chrono::Duration| {
+    let mut add_event = |offset: Duration| {
         let line = input_lines.next().unwrap();
         let mut event = LogEvent::from(line.clone());
         event.insert(log_schema().timestamp_key(), now + offset);

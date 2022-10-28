@@ -74,7 +74,7 @@ impl Function for EncodeKeyValue {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let fields = arguments.optional("fields_ordering");

@@ -121,6 +121,20 @@ impl<T: Ord + Clone> Collection<T> {
         self.unknown.is_exact()
     }
 
+    /// Returns an enum describing if the collection is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> EmptyState {
+        if self.known.is_empty() {
+            if self.unknown_kind().contains_any_defined() {
+                EmptyState::Maybe
+            } else {
+                EmptyState::Always
+            }
+        } else {
+            EmptyState::Never
+        }
+    }
+
     /// Set all "unknown" collection elements to the given kind.
     pub fn set_unknown(&mut self, unknown: impl Into<Kind>) {
         self.unknown = unknown.into().into();
@@ -229,7 +243,7 @@ impl<T: Ord + Clone> Collection<T> {
                 }
             } else if !overwrite {
                 // other is missing this field, which returns null
-                self_kind.add_null();
+                self_kind.add_undefined();
             }
         }
 
@@ -246,7 +260,7 @@ impl<T: Ord + Clone> Collection<T> {
         } else {
             for (key, other_kind) in other.known {
                 // self is missing this field, which returns null
-                self.known.insert(key, other_kind.or_null());
+                self.known.insert(key, other_kind.or_undefined());
             }
         }
         self.unknown.merge(other.unknown, overwrite);
@@ -264,6 +278,25 @@ impl<T: Ord + Clone> Collection<T> {
             .unwrap_or_else(Kind::never)
             .union(self.unknown_kind().without_undefined())
     }
+}
+
+pub trait CollectionRemove {
+    type Key: Ord;
+
+    fn remove_known(&mut self, key: &Self::Key);
+}
+
+/// Collections have an "unknown" component, so it can't know in all cases if the value this
+/// collection represents is actually empty/not empty, so the state is represented with 3 variants.
+#[derive(Debug)]
+pub enum EmptyState {
+    // The collection is guaranteed to be empty.
+    Always,
+    // The collection may or may not actually be empty. There is not enough type information to
+    // determine. (There are unknown fields/indices that may exist, but there are no known values.)
+    Maybe,
+    // The collection is guaranteed to NOT be empty.
+    Never,
 }
 
 impl<T: Ord> From<BTreeMap<T, Kind>> for Collection<T> {
@@ -530,8 +563,8 @@ mod tests {
                     other: Collection::from(BTreeMap::from([("bar", Kind::bytes())])),
                     overwrite: false,
                     want: Collection::from(BTreeMap::from([
-                        ("foo", Kind::integer().or_null()),
-                        ("bar", Kind::bytes().or_null()),
+                        ("foo", Kind::integer().or_undefined()),
+                        ("bar", Kind::bytes().or_undefined()),
                     ])),
                 },
             ),
@@ -558,7 +591,7 @@ mod tests {
                     overwrite: false,
                     want: Collection::from(BTreeMap::from([
                         ("foo", Kind::integer().or_bytes()),
-                        ("bar", Kind::boolean().or_null()),
+                        ("bar", Kind::boolean().or_undefined()),
                     ])),
                 },
             ),

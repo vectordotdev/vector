@@ -1,5 +1,8 @@
+use enum_dispatch::enum_dispatch;
 use snafu::Snafu;
 
+#[cfg(feature = "sources-amqp")]
+pub mod amqp;
 #[cfg(feature = "sources-apache_metrics")]
 pub mod apache_metrics;
 #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -37,10 +40,10 @@ pub mod gcp_pubsub;
 pub mod heroku_logs;
 #[cfg(feature = "sources-host_metrics")]
 pub mod host_metrics;
-#[cfg(feature = "sources-http")]
-pub mod http;
-#[cfg(feature = "sources-http_scrape")]
-pub mod http_scrape;
+#[cfg(feature = "sources-http_client")]
+pub mod http_client;
+#[cfg(feature = "sources-http_server")]
+pub mod http_server;
 #[cfg(feature = "sources-internal_logs")]
 pub mod internal_logs;
 #[cfg(feature = "sources-internal_metrics")]
@@ -79,13 +82,19 @@ pub mod syslog;
 pub mod vector;
 
 pub(crate) mod demo_mode;
-pub(crate) mod util;
+pub mod util;
 
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{config::{LogNamespace, Output}, event::Event};
 pub use vector_core::source::Source;
+use vector_core::{
+    config::{LogNamespace, Output},
+    event::Event,
+};
 
-use crate::config::{unit_test::UnitTestSourceConfig, Resource, SourceConfig, SourceContext};
+use crate::config::{
+    unit_test::{UnitTestSourceConfig, UnitTestStreamSourceConfig},
+    Resource, SourceConfig, SourceContext,
+};
 
 /// Common build errors
 #[derive(Debug, Snafu)]
@@ -99,7 +108,12 @@ enum BuildError {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[enum_dispatch(SourceConfig)]
 pub enum Sources {
+    /// AMQP.
+    #[cfg(feature = "sources-amqp")]
+    Amqp(#[configurable(derived)] amqp::AmqpSourceConfig),
+
     /// Apache HTTP Server (HTTPD) Metrics.
     #[cfg(feature = "sources-apache_metrics")]
     ApacheMetrics(#[configurable(derived)] apache_metrics::ApacheMetricsConfig),
@@ -171,12 +185,16 @@ pub enum Sources {
     HostMetrics(#[configurable(derived)] host_metrics::HostMetricsConfig),
 
     /// HTTP.
-    #[cfg(feature = "sources-http")]
-    Http(#[configurable(derived)] http::SimpleHttpConfig),
+    #[cfg(feature = "sources-http_server")]
+    Http(#[configurable(derived)] http_server::HttpConfig),
 
-    /// HTTP Scrape.
-    #[cfg(feature = "sources-http_scrape")]
-    HttpScrape(#[configurable(derived)] http_scrape::HttpScrapeConfig),
+    /// HTTP Client.
+    #[cfg(feature = "sources-http_client")]
+    HttpClient(#[configurable(derived)] http_client::HttpClientConfig),
+
+    /// HTTP Server.
+    #[cfg(feature = "sources-http_server")]
+    HttpServer(#[configurable(derived)] http_server::SimpleHttpConfig),
 
     /// Internal Logs.
     #[cfg(feature = "sources-internal_logs")]
@@ -279,489 +297,22 @@ pub enum Sources {
     /// Unit test.
     UnitTest(#[configurable(derived)] UnitTestSourceConfig),
 
+    /// Unit test stream.
+    UnitTestStream(#[configurable(derived)] UnitTestStreamSourceConfig),
+
     /// Vector.
     #[cfg(feature = "sources-vector")]
     Vector(#[configurable(derived)] vector::VectorConfig),
 }
 
-#[async_trait::async_trait]
-impl SourceConfig for Sources {
-    async fn build(&self, cx: SourceContext) -> crate::Result<self::Source> {
-        match self {
-            #[cfg(feature = "sources-apache_metrics")]
-            Self::ApacheMetrics(config) => config.build(cx).await,
-            #[cfg(feature = "sources-aws_ecs_metrics")]
-            Self::AwsEcsMetrics(config) => config.build(cx).await,
-            #[cfg(feature = "sources-aws_kinesis_firehose")]
-            Self::AwsKinesisFirehose(config) => config.build(cx).await,
-            #[cfg(feature = "sources-aws_s3")]
-            Self::AwsS3(config) => config.build(cx).await,
-            #[cfg(feature = "sources-aws_sqs")]
-            Self::AwsSqs(config) => config.build(cx).await,
-            #[cfg(feature = "sources-datadog_agent")]
-            Self::DatadogAgent(config) => config.build(cx).await,
-            #[cfg(feature = "sources-demo_logs")]
-            Self::DemoLogs(config) => config.build(cx).await,
-            #[cfg(all(unix, feature = "sources-dnstap"))]
-            Self::Dnstap(config) => config.build(cx).await,
-            #[cfg(feature = "sources-docker_logs")]
-            Self::DockerLogs(config) => config.build(cx).await,
-            #[cfg(feature = "sources-eventstoredb_metrics")]
-            Self::EventstoredbMetrics(config) => config.build(cx).await,
-            #[cfg(feature = "sources-exec")]
-            Self::Exec(config) => config.build(cx).await,
-            #[cfg(feature = "sources-file")]
-            Self::File(config) => config.build(cx).await,
-            #[cfg(all(unix, feature = "sources-file-descriptor"))]
-            Self::FileDescriptor(config) => config.build(cx).await,
-            #[cfg(feature = "sources-fluent")]
-            Self::Fluent(config) => config.build(cx).await,
-            #[cfg(feature = "sources-gcp_pubsub")]
-            Self::GcpPubsub(config) => config.build(cx).await,
-            #[cfg(feature = "sources-heroku_logs")]
-            Self::HerokuLogs(config) => config.build(cx).await,
-            #[cfg(feature = "sources-host_metrics")]
-            Self::HostMetrics(config) => config.build(cx).await,
-            #[cfg(feature = "sources-http")]
-            Self::Http(config) => config.build(cx).await,
-            #[cfg(feature = "sources-http_scrape")]
-            Self::HttpScrape(config) => config.build(cx).await,
-            #[cfg(feature = "sources-internal_logs")]
-            Self::InternalLogs(config) => config.build(cx).await,
-            #[cfg(feature = "sources-internal_metrics")]
-            Self::InternalMetrics(config) => config.build(cx).await,
-            #[cfg(all(unix, feature = "sources-journald"))]
-            Self::Journald(config) => config.build(cx).await,
-            #[cfg(feature = "sources-kafka")]
-            Self::Kafka(config) => config.build(cx).await,
-            #[cfg(feature = "sources-kubernetes_logs")]
-            Self::KubernetesLogs(config) => config.build(cx).await,
-            #[cfg(all(feature = "sources-logstash"))]
-            Self::Logstash(config) => config.build(cx).await,
-            #[cfg(feature = "sources-mongodb_metrics")]
-            Self::MongodbMetrics(config) => config.build(cx).await,
-            #[cfg(all(feature = "sources-nats"))]
-            Self::Nats(config) => config.build(cx).await,
-            #[cfg(feature = "sources-nginx_metrics")]
-            Self::NginxMetrics(config) => config.build(cx).await,
-            #[cfg(feature = "sources-opentelemetry")]
-            Self::Opentelemetry(config) => config.build(cx).await,
-            #[cfg(feature = "sources-postgresql_metrics")]
-            Self::PostgresqlMetrics(config) => config.build(cx).await,
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusScrape(config) => config.build(cx).await,
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusRemoteWrite(config) => config.build(cx).await,
-            #[cfg(feature = "sources-redis")]
-            Self::Redis(config) => config.build(cx).await,
-            #[cfg(test)]
-            Self::TestBackpressure(config) => config.build(cx).await,
-            #[cfg(test)]
-            Self::TestBasic(config) => config.build(cx).await,
-            #[cfg(test)]
-            Self::TestError(config) => config.build(cx).await,
-            #[cfg(test)]
-            Self::TestPanic(config) => config.build(cx).await,
-            #[cfg(test)]
-            Self::TestTripwire(config) => config.build(cx).await,
-            #[cfg(feature = "sources-socket")]
-            Self::Socket(config) => config.build(cx).await,
-            #[cfg(feature = "sources-splunk_hec")]
-            Self::SplunkHec(config) => config.build(cx).await,
-            #[cfg(feature = "sources-statsd")]
-            Self::Statsd(config) => config.build(cx).await,
-            #[cfg(feature = "sources-stdin")]
-            Self::Stdin(config) => config.build(cx).await,
-            #[cfg(feature = "sources-syslog")]
-            Self::Syslog(config) => config.build(cx).await,
-            Self::UnitTest(config) => config.build(cx).await,
-            #[cfg(feature = "sources-vector")]
-            Self::Vector(config) => config.build(cx).await,
-        }
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        match self {
-            #[cfg(feature = "sources-apache_metrics")]
-            Self::ApacheMetrics(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-aws_ecs_metrics")]
-            Self::AwsEcsMetrics(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-aws_kinesis_firehose")]
-            Self::AwsKinesisFirehose(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-aws_s3")]
-            Self::AwsS3(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-aws_sqs")]
-            Self::AwsSqs(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-datadog_agent")]
-            Self::DatadogAgent(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-demo_logs")]
-            Self::DemoLogs(config) => config.outputs(global_log_namespace),
-            #[cfg(all(unix, feature = "sources-dnstap"))]
-            Self::Dnstap(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-docker_logs")]
-            Self::DockerLogs(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-eventstoredb_metrics")]
-            Self::EventstoredbMetrics(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-exec")]
-            Self::Exec(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-file")]
-            Self::File(config) => config.outputs(global_log_namespace),
-            #[cfg(all(unix, feature = "sources-file-descriptor"))]
-            Self::FileDescriptor(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-fluent")]
-            Self::Fluent(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-gcp_pubsub")]
-            Self::GcpPubsub(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-heroku_logs")]
-            Self::HerokuLogs(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-host_metrics")]
-            Self::HostMetrics(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-http")]
-            Self::Http(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-http_scrape")]
-            Self::HttpScrape(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-internal_logs")]
-            Self::InternalLogs(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-internal_metrics")]
-            Self::InternalMetrics(config) => config.outputs(global_log_namespace),
-            #[cfg(all(unix, feature = "sources-journald"))]
-            Self::Journald(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-kafka")]
-            Self::Kafka(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-kubernetes_logs")]
-            Self::KubernetesLogs(config) => config.outputs(global_log_namespace),
-            #[cfg(all(feature = "sources-logstash"))]
-            Self::Logstash(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-mongodb_metrics")]
-            Self::MongodbMetrics(config) => config.outputs(global_log_namespace),
-            #[cfg(all(feature = "sources-nats"))]
-            Self::Nats(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-nginx_metrics")]
-            Self::NginxMetrics(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-opentelemetry")]
-            Self::Opentelemetry(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-postgresql_metrics")]
-            Self::PostgresqlMetrics(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusScrape(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusRemoteWrite(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-redis")]
-            Self::Redis(config) => config.outputs(global_log_namespace),
-            #[cfg(test)]
-            Self::TestBackpressure(config) => config.outputs(global_log_namespace),
-            #[cfg(test)]
-            Self::TestBasic(config) => config.outputs(global_log_namespace),
-            #[cfg(test)]
-            Self::TestError(config) => config.outputs(global_log_namespace),
-            #[cfg(test)]
-            Self::TestPanic(config) => config.outputs(global_log_namespace),
-            #[cfg(test)]
-            Self::TestTripwire(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-socket")]
-            Self::Socket(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-splunk_hec")]
-            Self::SplunkHec(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-statsd")]
-            Self::Statsd(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-stdin")]
-            Self::Stdin(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-syslog")]
-            Self::Syslog(config) => config.outputs(global_log_namespace),
-            Self::UnitTest(config) => config.outputs(global_log_namespace),
-            #[cfg(feature = "sources-vector")]
-            Self::Vector(config) => config.outputs(global_log_namespace),
-        }
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        match self {
-            #[cfg(feature = "sources-apache_metrics")]
-            Self::ApacheMetrics(config) => config.resources(),
-            #[cfg(feature = "sources-aws_ecs_metrics")]
-            Self::AwsEcsMetrics(config) => config.resources(),
-            #[cfg(feature = "sources-aws_kinesis_firehose")]
-            Self::AwsKinesisFirehose(config) => config.resources(),
-            #[cfg(feature = "sources-aws_s3")]
-            Self::AwsS3(config) => config.resources(),
-            #[cfg(feature = "sources-aws_sqs")]
-            Self::AwsSqs(config) => config.resources(),
-            #[cfg(feature = "sources-datadog_agent")]
-            Self::DatadogAgent(config) => config.resources(),
-            #[cfg(feature = "sources-demo_logs")]
-            Self::DemoLogs(config) => config.resources(),
-            #[cfg(all(unix, feature = "sources-dnstap"))]
-            Self::Dnstap(config) => config.resources(),
-            #[cfg(feature = "sources-docker_logs")]
-            Self::DockerLogs(config) => config.resources(),
-            #[cfg(feature = "sources-eventstoredb_metrics")]
-            Self::EventstoredbMetrics(config) => config.resources(),
-            #[cfg(feature = "sources-exec")]
-            Self::Exec(config) => config.resources(),
-            #[cfg(feature = "sources-file")]
-            Self::File(config) => config.resources(),
-            #[cfg(all(unix, feature = "sources-file-descriptor"))]
-            Self::FileDescriptor(config) => config.resources(),
-            #[cfg(feature = "sources-fluent")]
-            Self::Fluent(config) => config.resources(),
-            #[cfg(feature = "sources-gcp_pubsub")]
-            Self::GcpPubsub(config) => config.resources(),
-            #[cfg(feature = "sources-heroku_logs")]
-            Self::HerokuLogs(config) => config.resources(),
-            #[cfg(feature = "sources-host_metrics")]
-            Self::HostMetrics(config) => config.resources(),
-            #[cfg(feature = "sources-http")]
-            Self::Http(config) => config.resources(),
-            #[cfg(feature = "sources-http_scrape")]
-            Self::HttpScrape(config) => config.resources(),
-            #[cfg(feature = "sources-internal_logs")]
-            Self::InternalLogs(config) => config.resources(),
-            #[cfg(feature = "sources-internal_metrics")]
-            Self::InternalMetrics(config) => config.resources(),
-            #[cfg(all(unix, feature = "sources-journald"))]
-            Self::Journald(config) => config.resources(),
-            #[cfg(feature = "sources-kafka")]
-            Self::Kafka(config) => config.resources(),
-            #[cfg(feature = "sources-kubernetes_logs")]
-            Self::KubernetesLogs(config) => config.resources(),
-            #[cfg(all(feature = "sources-logstash"))]
-            Self::Logstash(config) => config.resources(),
-            #[cfg(feature = "sources-mongodb_metrics")]
-            Self::MongodbMetrics(config) => config.resources(),
-            #[cfg(all(feature = "sources-nats"))]
-            Self::Nats(config) => config.resources(),
-            #[cfg(feature = "sources-nginx_metrics")]
-            Self::NginxMetrics(config) => config.resources(),
-            #[cfg(feature = "sources-opentelemetry")]
-            Self::Opentelemetry(config) => config.resources(),
-            #[cfg(feature = "sources-postgresql_metrics")]
-            Self::PostgresqlMetrics(config) => config.resources(),
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusScrape(config) => config.resources(),
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusRemoteWrite(config) => config.resources(),
-            #[cfg(feature = "sources-redis")]
-            Self::Redis(config) => config.resources(),
-            #[cfg(test)]
-            Self::TestBackpressure(config) => config.resources(),
-            #[cfg(test)]
-            Self::TestBasic(config) => config.resources(),
-            #[cfg(test)]
-            Self::TestError(config) => config.resources(),
-            #[cfg(test)]
-            Self::TestPanic(config) => config.resources(),
-            #[cfg(test)]
-            Self::TestTripwire(config) => config.resources(),
-            #[cfg(feature = "sources-socket")]
-            Self::Socket(config) => config.resources(),
-            #[cfg(feature = "sources-splunk_hec")]
-            Self::SplunkHec(config) => config.resources(),
-            #[cfg(feature = "sources-statsd")]
-            Self::Statsd(config) => config.resources(),
-            #[cfg(feature = "sources-stdin")]
-            Self::Stdin(config) => config.resources(),
-            #[cfg(feature = "sources-syslog")]
-            Self::Syslog(config) => config.resources(),
-            Self::UnitTest(config) => config.resources(),
-            #[cfg(feature = "sources-vector")]
-            Self::Vector(config) => config.resources(),
-        }
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        match self {
-            #[cfg(feature = "sources-apache_metrics")]
-            Self::ApacheMetrics(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-aws_ecs_metrics")]
-            Self::AwsEcsMetrics(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-aws_kinesis_firehose")]
-            Self::AwsKinesisFirehose(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-aws_s3")]
-            Self::AwsS3(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-aws_sqs")]
-            Self::AwsSqs(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-datadog_agent")]
-            Self::DatadogAgent(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-demo_logs")]
-            Self::DemoLogs(config) => config.can_acknowledge(),
-            #[cfg(all(unix, feature = "sources-dnstap"))]
-            Self::Dnstap(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-docker_logs")]
-            Self::DockerLogs(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-eventstoredb_metrics")]
-            Self::EventstoredbMetrics(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-exec")]
-            Self::Exec(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-file")]
-            Self::File(config) => config.can_acknowledge(),
-            #[cfg(all(unix, feature = "sources-file-descriptor"))]
-            Self::FileDescriptor(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-fluent")]
-            Self::Fluent(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-gcp_pubsub")]
-            Self::GcpPubsub(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-heroku_logs")]
-            Self::HerokuLogs(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-host_metrics")]
-            Self::HostMetrics(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-http")]
-            Self::Http(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-http_scrape")]
-            Self::HttpScrape(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-internal_logs")]
-            Self::InternalLogs(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-internal_metrics")]
-            Self::InternalMetrics(config) => config.can_acknowledge(),
-            #[cfg(all(unix, feature = "sources-journald"))]
-            Self::Journald(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-kafka")]
-            Self::Kafka(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-kubernetes_logs")]
-            Self::KubernetesLogs(config) => config.can_acknowledge(),
-            #[cfg(all(feature = "sources-logstash"))]
-            Self::Logstash(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-mongodb_metrics")]
-            Self::MongodbMetrics(config) => config.can_acknowledge(),
-            #[cfg(all(feature = "sources-nats"))]
-            Self::Nats(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-nginx_metrics")]
-            Self::NginxMetrics(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-opentelemetry")]
-            Self::Opentelemetry(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-postgresql_metrics")]
-            Self::PostgresqlMetrics(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusScrape(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusRemoteWrite(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-redis")]
-            Self::Redis(config) => config.can_acknowledge(),
-            #[cfg(test)]
-            Self::TestBackpressure(config) => config.can_acknowledge(),
-            #[cfg(test)]
-            Self::TestBasic(config) => config.can_acknowledge(),
-            #[cfg(test)]
-            Self::TestError(config) => config.can_acknowledge(),
-            #[cfg(test)]
-            Self::TestPanic(config) => config.can_acknowledge(),
-            #[cfg(test)]
-            Self::TestTripwire(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-socket")]
-            Self::Socket(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-splunk_hec")]
-            Self::SplunkHec(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-statsd")]
-            Self::Statsd(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-stdin")]
-            Self::Stdin(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-syslog")]
-            Self::Syslog(config) => config.can_acknowledge(),
-            Self::UnitTest(config) => config.can_acknowledge(),
-            #[cfg(feature = "sources-vector")]
-            Self::Vector(config) => config.can_acknowledge(),
-        }
-    }
-
-    fn generate_demo_data(&self) -> Event {
-        match self {
-            #[cfg(feature = "sources-apache_metrics")]
-            Self::ApacheMetrics(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-aws_ecs_metrics")]
-            Self::AwsEcsMetrics(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-aws_kinesis_firehose")]
-            Self::AwsKinesisFirehose(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-aws_s3")]
-            Self::AwsS3(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-aws_sqs")]
-            Self::AwsSqs(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-datadog_agent")]
-            Self::DatadogAgent(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-demo_logs")]
-            Self::DemoLogs(config) => config.generate_demo_data(),
-            #[cfg(all(unix, feature = "sources-dnstap"))]
-            Self::Dnstap(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-docker_logs")]
-            Self::DockerLogs(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-eventstoredb_metrics")]
-            Self::EventstoredbMetrics(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-exec")]
-            Self::Exec(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-file")]
-            Self::File(config) => config.generate_demo_data(),
-            #[cfg(all(unix, feature = "sources-file-descriptor"))]
-            Self::FileDescriptor(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-fluent")]
-            Self::Fluent(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-gcp_pubsub")]
-            Self::GcpPubsub(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-heroku_logs")]
-            Self::HerokuLogs(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-host_metrics")]
-            Self::HostMetrics(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-http")]
-            Self::Http(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-http_scrape")]
-            Self::HttpScrape(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-internal_logs")]
-            Self::InternalLogs(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-internal_metrics")]
-            Self::InternalMetrics(config) => config.generate_demo_data(),
-            #[cfg(all(unix, feature = "sources-journald"))]
-            Self::Journald(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-kafka")]
-            Self::Kafka(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-kubernetes_logs")]
-            Self::KubernetesLogs(config) => config.generate_demo_data(),
-            #[cfg(all(feature = "sources-logstash"))]
-            Self::Logstash(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-mongodb_metrics")]
-            Self::MongodbMetrics(config) => config.generate_demo_data(),
-            #[cfg(all(feature = "sources-nats"))]
-            Self::Nats(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-nginx_metrics")]
-            Self::NginxMetrics(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-opentelemetry")]
-            Self::Opentelemetry(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-postgresql_metrics")]
-            Self::PostgresqlMetrics(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusScrape(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusRemoteWrite(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-redis")]
-            Self::Redis(config) => config.generate_demo_data(),
-            #[cfg(test)]
-            Self::TestBackpressure(config) => config.generate_demo_data(),
-            #[cfg(test)]
-            Self::TestBasic(config) => config.generate_demo_data(),
-            #[cfg(test)]
-            Self::TestError(config) => config.generate_demo_data(),
-            #[cfg(test)]
-            Self::TestPanic(config) => config.generate_demo_data(),
-            #[cfg(test)]
-            Self::TestTripwire(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-socket")]
-            Self::Socket(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-splunk_hec")]
-            Self::SplunkHec(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-statsd")]
-            Self::Statsd(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-stdin")]
-            Self::Stdin(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-syslog")]
-            Self::Syslog(config) => config.generate_demo_data(),
-            Self::UnitTest(config) => config.generate_demo_data(),
-            #[cfg(feature = "sources-vector")]
-            Self::Vector(config) => config.generate_demo_data(),
-        }
-    }
-}
-
+// We can't use `enum_dispatch` here because it doesn't support associated constants.
 impl NamedComponent for Sources {
     const NAME: &'static str = "_invalid_usage";
 
     fn get_component_name(&self) -> &'static str {
         match self {
+            #[cfg(feature = "sources-amqp")]
+            Self::Amqp(config) => config.get_component_name(),
             #[cfg(feature = "sources-apache_metrics")]
             Self::ApacheMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -796,10 +347,12 @@ impl NamedComponent for Sources {
             Self::HerokuLogs(config) => config.get_component_name(),
             #[cfg(feature = "sources-host_metrics")]
             Self::HostMetrics(config) => config.get_component_name(),
-            #[cfg(feature = "sources-http")]
+            #[cfg(feature = "sources-http_server")]
             Self::Http(config) => config.get_component_name(),
-            #[cfg(feature = "sources-http_scrape")]
-            Self::HttpScrape(config) => config.get_component_name(),
+            #[cfg(feature = "sources-http_client")]
+            Self::HttpClient(config) => config.get_component_name(),
+            #[cfg(feature = "sources-http_server")]
+            Self::HttpServer(config) => config.get_component_name(),
             #[cfg(feature = "sources-internal_logs")]
             Self::InternalLogs(config) => config.get_component_name(),
             #[cfg(feature = "sources-internal_metrics")]
@@ -849,34 +402,9 @@ impl NamedComponent for Sources {
             #[cfg(feature = "sources-syslog")]
             Self::Syslog(config) => config.get_component_name(),
             Self::UnitTest(config) => config.get_component_name(),
+            Self::UnitTestStream(config) => config.get_component_name(),
             #[cfg(feature = "sources-vector")]
             Self::Vector(config) => config.get_component_name(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use vector_config::{configurable_component, schema::generate_root_schema};
-
-    use crate::sources::Sources;
-
-    /// Top-level Vector configuration. (mock)
-    #[configurable_component]
-    #[derive(Clone)]
-    struct MockRootConfig {
-        /// All configured sources.
-        sources: Vec<Sources>,
-    }
-
-    #[test]
-    #[ignore]
-    #[allow(clippy::print_stdout)]
-    fn vector_config() {
-        let root_schema = generate_root_schema::<MockRootConfig>();
-        let json = serde_json::to_string_pretty(&root_schema)
-            .expect("rendering root schema to JSON should not fail");
-
-        println!("{}", json);
     }
 }

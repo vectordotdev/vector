@@ -35,10 +35,12 @@ message Log {
   // Deprecated, use value instead
   map<string, Value> fields = 1;
   Value value = 2;
+  Value metadata = 3;
 }
 
 message Trace {
   map<string, Value> fields = 1;
+  Value metadata = 2;
 }
 
 message ValueMap {
@@ -92,6 +94,7 @@ message Metric {
   }
   string namespace = 11;
   uint32 interval_ms = 18;
+  Value metadata = 19;
 }
 
 message Counter {

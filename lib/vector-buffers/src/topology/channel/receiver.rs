@@ -1,11 +1,11 @@
 use std::{
     mem,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use async_recursion::async_recursion;
-use futures::{ready, Stream};
+use futures::Stream;
 use tokio::select;
 use tokio_util::sync::ReusableBoxFuture;
 use vector_common::internal_event::emit;

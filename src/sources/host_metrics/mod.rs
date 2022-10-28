@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path};
+use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
@@ -244,9 +244,21 @@ impl HostMetrics {
         #[cfg(unix)]
         match heim::cpu::os::unix::loadavg().await {
             Ok(loadavg) => {
-                output.gauge("load1", loadavg.0.get::<ratio>() as f64, BTreeMap::new());
-                output.gauge("load5", loadavg.1.get::<ratio>() as f64, BTreeMap::new());
-                output.gauge("load15", loadavg.2.get::<ratio>() as f64, BTreeMap::new());
+                output.gauge(
+                    "load1",
+                    loadavg.0.get::<ratio>() as f64,
+                    MetricTags::default(),
+                );
+                output.gauge(
+                    "load5",
+                    loadavg.1.get::<ratio>() as f64,
+                    MetricTags::default(),
+                );
+                output.gauge(
+                    "load15",
+                    loadavg.2.get::<ratio>() as f64,
+                    MetricTags::default(),
+                );
             }
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
@@ -260,7 +272,7 @@ impl HostMetrics {
     pub async fn host_metrics(&self, output: &mut MetricsBuffer) {
         output.name = "host";
         match heim::host::uptime().await {
-            Ok(time) => output.gauge("uptime", time.get::<second>() as f64, BTreeMap::default()),
+            Ok(time) => output.gauge("uptime", time.get::<second>() as f64, MetricTags::default()),
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
                     message: "Failed to load host uptime info",
@@ -273,7 +285,7 @@ impl HostMetrics {
             Ok(time) => output.gauge(
                 "boot_time",
                 time.get::<second>() as f64,
-                BTreeMap::default(),
+                MetricTags::default(),
             ),
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
@@ -582,7 +594,7 @@ pub(self) mod tests {
             .expect("Missing tags")
             .get("host")
             .expect("Missing \"host\" tag")
-            != &hostname));
+            != hostname));
     }
 
     #[tokio::test]
@@ -684,7 +696,7 @@ pub(self) mod tests {
     fn collect_tag_values(metrics: &[Metric], tag: &str) -> HashSet<String> {
         metrics
             .iter()
-            .filter_map(|metric| metric.tags().unwrap().get(tag).cloned())
+            .filter_map(|metric| metric.tags().unwrap().get(tag).map(ToOwned::to_owned))
             .collect::<HashSet<_>>()
     }
 

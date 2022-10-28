@@ -25,11 +25,12 @@ use crate::{
     event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::http::HttpMethod,
-    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{
+        add_query_parameters, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    },
     tls::TlsEnableableConfig,
 };
-use lookup::path;
+use lookup::event_path;
 use vector_core::config::LogNamespace;
 
 /// Configuration for `heroku_logs` source.
@@ -230,8 +231,8 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
 
                             log.try_insert(log_schema().host_key(), hostname.to_owned());
 
-                            log.try_insert(path!("app_name"), app_name.to_owned());
-                            log.try_insert(path!("proc_id"), proc_id.to_owned());
+                            log.try_insert(event_path!("app_name"), app_name.to_owned());
+                            log.try_insert(event_path!("proc_id"), proc_id.to_owned());
                         }
 
                         events.push(event);
@@ -249,7 +250,7 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
 
         events.push(LogEvent::from_str_legacy(line).into())
@@ -330,7 +331,7 @@ mod tests {
         let len = body.lines().count();
         let mut req = reqwest::Client::new().post(&format!("http://{}/events?{}", address, query));
         if let Some(auth) = auth {
-            req = req.basic_auth(auth.username, Some(auth.password));
+            req = req.basic_auth(auth.username, Some(auth.password.inner()));
         }
         req.header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
@@ -346,7 +347,7 @@ mod tests {
     fn make_auth() -> HttpSourceAuthConfig {
         HttpSourceAuthConfig {
             username: random_string(16),
-            password: random_string(16),
+            password: random_string(16).into(),
         }
     }
 

@@ -85,7 +85,12 @@ that cannot import Vector's events.
 
 #### Error
 
-An `<Name>Error` event MUST be emitted when an error occurs.
+An `<Name>Error` event MUST be emitted when an error occurs during the running
+of a component.
+
+If an error occurs that prevents the component from starting up an event does
+not need to be emitted as this will prevent Vector from starting and the metric
+is unlikely to be collected. An error should still be logged, however.
 
 - Properties
   - `error_code` - An error code for the failure, if applicable.
@@ -109,15 +114,14 @@ An `<Name>Error` event MUST be emitted when an error occurs.
   - MUST include the defined properties as tags.
   - MUST increment `<namespace>_errors_total` metric.
 - Logs
-  - MUST log a descriptive, user friendly error message that sufficiently
+  - MUST log a descriptive, user-friendly error message that sufficiently
     describes the error.
   - MUST include the defined properties as key-value pairs.
   - MUST log a message at the `error` level.
   - SHOULD be rate limited to 10 seconds.
 - Events
   - MUST emit an [`EventsDropped`] event if the error results in dropping
-    events, or the error event itself MUST meet the `EventsDropped`
-    requirements.
+    events.
 
 #### EventsDropped
 
@@ -134,7 +138,7 @@ example, a failed HTTP request that will be retried does not result in data loss
 succeeds.
 
 Note that this event is independent of any clients of Vector that may retry when end-to-end
-acknowledgements are enabled. From Vector's perspective, it has dropped the events and it cannot
+acknowledgements are enabled. From Vector's perspective, it has dropped the events, and it cannot
 know if the client will retry them.
 
 - Properties
@@ -148,7 +152,8 @@ know if the client will retry them.
 - Metrics
   - MUST increment the `<namespace>_discarded_events_total` counter by the
     number of events discarded.
-  - MUST include the listed properties as tags except the `count` and `reason` properties.
+  - MUST only include the `intentional` property and component properties that
+    are inherited implicitly (e.g. `component_type`).
 - Logs
   - MUST log a `Events dropped` message.
   - MUST include the defined properties as key-value pairs.

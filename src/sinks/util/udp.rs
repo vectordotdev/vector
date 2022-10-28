@@ -1,17 +1,20 @@
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Duration,
 };
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
+use futures::{future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_common::internal_event::BytesSent;
+use tower::Service;
+use vector_common::internal_event::{
+    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
+};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -21,8 +24,8 @@ use crate::{
     dns,
     event::{Event, EventStatus, Finalizable},
     internal_events::{
-        SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionError,
-        UdpSocketConnectionEstablished, UdpSocketError,
+        SocketEventsSent, SocketMode, SocketSendError, UdpSendIncompleteError,
+        UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError,
     },
     sinks::{
         util::{retries::ExponentialBackoff, StreamSink},
@@ -155,7 +158,7 @@ impl UdpConnector {
                     return socket;
                 }
                 Err(error) => {
-                    emit!(UdpSocketConnectionError { error });
+                    emit!(UdpSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -177,22 +180,25 @@ enum UdpServiceState {
 pub struct UdpService {
     connector: UdpConnector,
     state: UdpServiceState,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl UdpService {
-    const fn new(connector: UdpConnector) -> Self {
+    fn new(connector: UdpConnector) -> Self {
         Self {
             connector,
             state: UdpServiceState::Disconnected,
+            bytes_sent: register!(BytesSent::from(Protocol::UDP)),
         }
     }
 }
 
-impl tower::Service<BytesMut> for UdpService {
+impl Service<BytesMut> for UdpService {
     type Response = ();
     type Error = UdpError;
     type Future = BoxFuture<'static, Result<(), Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
             self.state = match &mut self.state {
@@ -219,9 +225,11 @@ impl tower::Service<BytesMut> for UdpService {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, msg: BytesMut) -> Self::Future {
         let (sender, receiver) = oneshot::channel();
         let byte_size = msg.len();
+        let bytes_sent = self.bytes_sent.clone();
 
         let mut socket =
             match std::mem::replace(&mut self.state, UdpServiceState::Sending(receiver)) {
@@ -240,10 +248,7 @@ impl tower::Service<BytesMut> for UdpService {
                 // emitting the `BytesSent` event, and related metrics... and practically, those sinks don't compress
                 // anyways, so the metrics are correct as-is... they just may not be correct in the future if
                 // compression support was added, etc.
-                emit!(BytesSent {
-                    byte_size,
-                    protocol: "udp",
-                });
+                bytes_sent.emit(ByteSize(byte_size));
             }
 
             result
@@ -258,17 +263,19 @@ where
     connector: UdpConnector,
     transformer: Transformer,
     encoder: E,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl<E> UdpSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
-    const fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
+    fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
             transformer,
             encoder,
+            bytes_sent: register!(BytesSent::from(Protocol::UDP)),
         }
     }
 }
@@ -291,6 +298,8 @@ where
 
                 let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
+
+                // Errors are handled by `Encoder`.
                 if encoder.encode(event, &mut bytes).is_err() {
                     continue;
                 }
@@ -303,14 +312,14 @@ where
                             byte_size,
                         });
 
-                        emit!(BytesSent {
-                            byte_size: bytes.len(),
-                            protocol: "udp",
-                        });
+                        self.bytes_sent.emit(ByteSize(bytes.len()));
                         finalizers.update_status(EventStatus::Delivered);
                     }
                     Err(error) => {
-                        emit!(UdpSocketError { error });
+                        emit!(SocketSendError {
+                            mode: SocketMode::Udp,
+                            error
+                        });
                         finalizers.update_status(EventStatus::Errored);
                         break;
                     }

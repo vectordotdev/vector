@@ -1,5 +1,4 @@
 use crate::{get_metadata_key, MetadataKey};
-use ::value::kind::remove;
 use ::value::Value;
 use vrl::prelude::state::TypeState;
 use vrl::prelude::*;
@@ -13,8 +12,8 @@ fn remove_metadata_field(
             ctx.target_mut().remove_secret(key);
             Value::Null
         }
-        MetadataKey::Query(query) => {
-            ctx.target_mut().remove_metadata(query.path())?;
+        MetadataKey::Query(target_path) => {
+            ctx.target_mut().target_remove(target_path, false)?;
             Value::Null
         }
     })
@@ -53,7 +52,7 @@ impl Function for RemoveMetadataField {
         let key = get_metadata_key(&mut arguments)?;
 
         if let MetadataKey::Query(query) = &key {
-            if ctx.is_read_only_metadata_path(query.path()) {
+            if ctx.is_read_only_path(query) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
                     context: format!("{} is read-only, and cannot be removed", query),
                 }
@@ -76,27 +75,11 @@ impl Expression for RemoveMetadataFieldFn {
     }
 
     fn type_info(&self, state: &TypeState) -> TypeInfo {
-        let mut state = state.clone();
+        let state = state.clone();
 
         if let MetadataKey::Query(query) = &self.key {
             let mut new_kind = state.external.metadata_kind().clone();
-
-            let result = new_kind.remove_at_path(
-                &query.path().to_lookup(),
-                remove::Strategy {
-                    coalesced_path: remove::CoalescedPath::Reject,
-                },
-            );
-
-            match result {
-                Ok(_) => state.external.update_metadata(new_kind),
-                Err(_) => {
-                    // This isn't ideal, but "remove_at_path" doesn't support
-                    // the path used, so no assumptions can be made about the resulting type
-                    // see: https://github.com/vectordotdev/vector/issues/13460
-                    state.external.update_metadata(Kind::any())
-                }
-            }
+            new_kind.remove(&query.path, false);
         }
 
         TypeInfo::new(state, TypeDef::null())

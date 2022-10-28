@@ -415,7 +415,6 @@ async fn tap_handler(
     test,
     feature = "sinks-blackhole",
     feature = "sources-demo_logs",
-    feature = "transforms-log_to_metric",
     feature = "transforms-remap",
 ))]
 mod tests {
@@ -423,18 +422,15 @@ mod tests {
     use tokio::sync::watch;
 
     use super::*;
+    use crate::api::schema::events::output::OutputEventsPayload;
+    use crate::api::schema::events::{create_events_stream, log, metric};
     use crate::config::{Config, OutputId};
     use crate::event::{LogEvent, Metric, MetricKind, MetricValue};
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
     use crate::test_util::{start_topology, trace_init};
-    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
+    use crate::transforms::log_to_metric::{LogToMetricConfig, MetricConfig, MetricTypeConfig};
     use crate::transforms::remap::RemapConfig;
-    use crate::{api::schema::events::output::OutputEventsPayload, sources::Sources};
-    use crate::{
-        api::schema::events::{create_events_stream, log, metric},
-        transforms::Transforms,
-    };
 
     #[test]
     /// Patterns should accept globbing.
@@ -523,8 +519,14 @@ mod tests {
             MetricValue::Counter { value: 1.0 },
         );
 
-        fanout.send(vec![metric_event].into()).await;
-        fanout.send(vec![log_event].into()).await;
+        fanout
+            .send(vec![metric_event].into())
+            .await
+            .expect("should not fail");
+        fanout
+            .send(vec![log_event].into())
+            .await
+            .expect("should not fail");
 
         // 3rd payload should be the metric event
         assert!(matches!(
@@ -570,12 +572,12 @@ mod tests {
         let mut config = Config::builder();
         config.add_source(
             "in",
-            Sources::DemoLogs(DemoLogsConfig {
+            DemoLogsConfig {
                 interval: 0.01,
                 count: 200,
                 format: OutputFormat::Json,
                 ..Default::default()
-            }),
+            },
         );
         config.add_sink(
             "out",
@@ -612,7 +614,7 @@ mod tests {
         let mut config = Config::builder();
         config.add_source(
             "in",
-            Sources::DemoLogs(DemoLogsConfig {
+            DemoLogsConfig {
                 interval: 0.01,
                 count: 200,
                 format: OutputFormat::Shuffle {
@@ -620,19 +622,20 @@ mod tests {
                     lines: vec!["1".to_string()],
                 },
                 ..Default::default()
-            }),
+            },
         );
         config.add_transform(
             "to_metric",
             &["in"],
-            Transforms::LogToMetric(LogToMetricConfig {
-                metrics: vec![MetricConfig::Gauge(GaugeConfig {
-                    field: "message".to_string(),
+            LogToMetricConfig {
+                metrics: vec![MetricConfig {
+                    field: "message".try_into().expect("Fixed template string"),
                     name: None,
                     namespace: None,
                     tags: None,
-                })],
-            }),
+                    metric: MetricTypeConfig::Gauge,
+                }],
+            },
         );
         config.add_sink(
             "out",
@@ -669,20 +672,20 @@ mod tests {
         let mut config = Config::builder();
         config.add_source(
             "in",
-            Sources::DemoLogs(DemoLogsConfig {
+            DemoLogsConfig {
                 interval: 0.01,
                 count: 200,
                 format: OutputFormat::Json,
                 ..Default::default()
-            }),
+            },
         );
         config.add_transform(
             "transform",
             &["in"],
-            Transforms::Remap(RemapConfig {
+            RemapConfig {
                 source: Some("".to_string()),
                 ..Default::default()
-            }),
+            },
         );
         config.add_sink(
             "out",
@@ -719,7 +722,7 @@ mod tests {
         let mut config = Config::builder();
         config.add_source(
             "in",
-            Sources::DemoLogs(DemoLogsConfig {
+            DemoLogsConfig {
                 interval: 0.01,
                 count: 200,
                 format: OutputFormat::Shuffle {
@@ -727,15 +730,15 @@ mod tests {
                     lines: vec!["test".to_string()],
                 },
                 ..Default::default()
-            }),
+            },
         );
         config.add_transform(
             "transform",
             &["in"],
-            Transforms::Remap(RemapConfig {
+            RemapConfig {
                 source: Some(".message = \"new message\"".to_string()),
                 ..Default::default()
-            }),
+            },
         );
         config.add_sink(
             "out",
@@ -793,7 +796,7 @@ mod tests {
         let mut config = Config::builder();
         config.add_source(
             "in",
-            Sources::DemoLogs(DemoLogsConfig {
+            DemoLogsConfig {
                 interval: 0.01,
                 count: 200,
                 format: OutputFormat::Shuffle {
@@ -801,15 +804,15 @@ mod tests {
                     lines: vec!["test".to_string()],
                 },
                 ..Default::default()
-            }),
+            },
         );
         config.add_transform(
             "transform",
             &["in"],
-            Transforms::Remap(RemapConfig {
+            RemapConfig {
                 source: Some(".message = \"new message\"".to_string()),
                 ..Default::default()
-            }),
+            },
         );
         config.add_sink(
             "out",
@@ -851,7 +854,7 @@ mod tests {
         let mut config = Config::builder();
         config.add_source(
             "in",
-            Sources::DemoLogs(DemoLogsConfig {
+            DemoLogsConfig {
                 interval: 0.01,
                 count: 200,
                 format: OutputFormat::Shuffle {
@@ -859,17 +862,17 @@ mod tests {
                     lines: vec!["test2".to_string()],
                 },
                 ..Default::default()
-            }),
+            },
         );
         config.add_transform(
             "transform",
             &["in"],
-            Transforms::Remap(RemapConfig {
+            RemapConfig {
                 source: Some("assert_eq!(.message, \"test1\")".to_string()),
                 drop_on_error: true,
                 reroute_dropped: true,
                 ..Default::default()
-            }),
+            },
         );
         config.add_sink(
             "out",
@@ -915,7 +918,7 @@ mod tests {
         let mut config = Config::builder();
         config.add_source(
             "in-test1",
-            Sources::DemoLogs(DemoLogsConfig {
+            DemoLogsConfig {
                 interval: 0.01,
                 count: 1,
                 format: OutputFormat::Shuffle {
@@ -923,11 +926,11 @@ mod tests {
                     lines: vec!["test1".to_string()],
                 },
                 ..Default::default()
-            }),
+            },
         );
         config.add_source(
             "in-test2",
-            Sources::DemoLogs(DemoLogsConfig {
+            DemoLogsConfig {
                 interval: 0.01,
                 count: 1,
                 format: OutputFormat::Shuffle {
@@ -935,17 +938,17 @@ mod tests {
                     lines: vec!["test2".to_string()],
                 },
                 ..Default::default()
-            }),
+            },
         );
         config.add_transform(
             "transform",
             &["in*"],
-            Transforms::Remap(RemapConfig {
+            RemapConfig {
                 source: Some("assert_eq!(.message, \"test1\")".to_string()),
                 drop_on_error: true,
                 reroute_dropped: true,
                 ..Default::default()
-            }),
+            },
         );
         config.add_sink(
             "out",

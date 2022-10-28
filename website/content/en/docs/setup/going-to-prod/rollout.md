@@ -3,6 +3,7 @@ title: Rollout
 description: Strategies for rolling Vector out to production environments.
 weight: 5
 ---
+
 {{< warning >}}
 This document assumes you’ve already decided on an architecture. If you have not, please read the [architecting document](/docs/setup/going-to-prod/architecting/).
 {{< /warning >}}
@@ -75,4 +76,4 @@ Repeat for each network partition.
 
 ## Support
 
-For easy setup and maintenance of this architecture, consider Datadog Observability Pipelines, which comes with support. In addition, we offer Datadog Premier Support Services for expert assistance with your architecture.
+For easy setup and maintenance of this architecture, consider Datadog Observability Pipelines, which comes with support.

@@ -66,6 +66,10 @@ components: sinks: prometheus_exporter: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
+		auth: configuration._http_auth & {_args: {
+			password_example: "${PROMETHEUS_PASSWORD}"
+			username_example: "${PROMETHEUS_USERNAME}"
+		}}
 		buckets: {
 			common:      false
 			description: """
@@ -128,7 +132,7 @@ components: sinks: prometheus_exporter: {
 			common:      false
 			description: "Whether or not to strip metric timestamp in the response."
 			required:    false
-			type: bool: default: true
+			type: bool: default: false
 		}
 	}
 

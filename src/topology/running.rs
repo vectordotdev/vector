@@ -99,6 +99,7 @@ impl RunningTopology {
     /// poll for when the tasks have completed. Once the returned future is
     /// dropped then everything from this RunningTopology instance is fully
     /// dropped.
+    #[allow(unreachable_code)]
     pub fn stop(self) -> impl Future<Output = ()> {
         // Update the API's health endpoint to signal shutdown
         self.running.store(false, Ordering::Relaxed);
@@ -235,7 +236,8 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        if let Some(mut new_pieces) = build_or_log_errors(&mut new_config, &diff, buffers.clone()).await
+        if let Some(mut new_pieces) =
+            build_or_log_errors(&mut new_config, &diff, buffers.clone()).await
         {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks

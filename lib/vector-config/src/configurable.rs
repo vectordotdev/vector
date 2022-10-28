@@ -1,4 +1,4 @@
-use crate::Metadata;
+use crate::{GenerateError, Metadata};
 
 /// A type that can be represented in a Vector configuration.
 ///
@@ -20,15 +20,6 @@ where
         None
     }
 
-    /// Gets the human-readable description of this value, if any.
-    ///
-    /// For standard types, this will be `None`. Commonly, custom types would implement this
-    /// directly, while fields using standard types would provide a field-specific description that
-    /// would be used instead of the default descrption.
-    fn description() -> Option<&'static str> {
-        None
-    }
-
     /// Whether or not this value is optional.
     fn is_optional() -> bool {
         false
@@ -36,16 +27,20 @@ where
 
     /// Gets the metadata for this value.
     fn metadata() -> Metadata<Self> {
-        let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
-        metadata
+        Metadata::default()
+    }
+
+    fn validate_metadata(_metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        Ok(())
     }
 
     /// Generates the schema for this value.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs while generating the schema, an error variant will be returned describing
+    /// the issue.
     fn generate_schema(
         gen: &mut schemars::gen::SchemaGenerator,
-        overrides: Metadata<Self>,
-    ) -> schemars::schema::SchemaObject;
+    ) -> Result<schemars::schema::SchemaObject, GenerateError>;
 }

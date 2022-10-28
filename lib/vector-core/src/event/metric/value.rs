@@ -2,51 +2,84 @@ use core::fmt;
 use std::collections::BTreeSet;
 
 use float_eq::FloatEq;
-use serde::{Deserialize, Serialize};
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_config::configurable_component;
 
 use super::{samples_to_buckets, write_list, write_word};
 use crate::metrics::AgentDDSketch;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+/// Metric value.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 /// Container for the actual value of a metric.
 pub enum MetricValue {
-    /// A simple value that can not decrease except to reset it to zero.
-    Counter { value: f64 },
-    /// A sampled numerical value.
-    Gauge { value: f64 },
+    /// A cumulative numerical value that can only increase or be reset to zero.
+    Counter {
+        /// The value of the counter.
+        value: f64,
+    },
+
+    /// A single numerical value that can arbitrarily go up and down.
+    Gauge {
+        /// The value of the gauge.
+        value: f64,
+    },
+
     /// A set of (unordered) unique values for a key.
-    Set { values: BTreeSet<String> },
-    /// A set of sampled values.
+    Set {
+        /// The values in the set.
+        values: BTreeSet<String>,
+    },
+
+    /// A set of observations without any aggregation or sampling.
     Distribution {
+        /// The observed values within this distribution.
         samples: Vec<Sample>,
+
+        /// The type of statistics to derive for this distribution.
         statistic: StatisticKind,
     },
+
     /// A set of observations which are counted into buckets.
     ///
     /// It also contains the total count of all observations and their sum to allow calculating the mean.
     AggregatedHistogram {
+        /// The buckets within this histogram.
         buckets: Vec<Bucket>,
+
+        /// The total number of observations contained within this histogram.
         count: u64,
+
+        /// The sum of all observations contained within this histogram.
         sum: f64,
     },
+
     /// A set of observations which are represented by quantiles.
     ///
     /// Each quantile contains the upper value of the quantile (0 <= φ <= 1). It also contains the total count of all
     /// observations and their sum to allow calculating the mean.
     AggregatedSummary {
+        /// The quantiles measured from this summary.
         quantiles: Vec<Quantile>,
+
+        /// The total number of observations contained within this summary.
         count: u64,
+
+        /// The sum of all observations contained within this histogram.
         sum: f64,
     },
+
     /// A data structure that can answer questions about the cumulative distribution of the contained samples in
     /// space-efficient way.
     ///
     /// Sketches represent the data in a way that queries over it have bounded error guarantees without needing to hold
     /// every single sample in memory. They are also, typically, able to be merged with other sketches of the same type
     /// such that client-side _and_ server-side aggregation can be accomplished without loss of accuracy in the queries.
-    Sketch { sketch: MetricSketch },
+    Sketch {
+        #[configurable(derived)]
+        sketch: MetricSketch,
+    },
 }
 
 impl MetricValue {
@@ -480,23 +513,32 @@ impl From<MetricValue> for ::value::Value {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Deserialize, Serialize)]
+/// Type of statistics to generate for a distribution.
+#[configurable_component]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 #[serde(rename_all = "snake_case")]
 pub enum StatisticKind {
+    /// A histogram representation.
     Histogram,
+
     /// Corresponds to Datadog's Distribution Metric
     /// <https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition>
     Summary,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+/// A generalized metrics sketch.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MetricSketch {
-    /// DDSketch implementation based on the Datadog Agent.
+    /// [DDSketch][ddsketch] implementation based on the [Datadog Agent][ddagent].
     ///
     /// While DDSketch has open-source implementations based on the white paper, the version used in
-    /// the Datadog Agent itself is subtly different.  This version is suitable for sending directly
+    /// the Datadog Agent itself is subtly different. This version is suitable for sending directly
     /// to Datadog's sketch ingest endpoint.
-    AgentDDSketch(AgentDDSketch),
+    ///
+    /// [ddsketch]: https://www.vldb.org/pvldb/vol12/p2195-masson.pdf
+    /// [ddagent]: https://github.com/DataDog/datadog-agent
+    AgentDDSketch(#[configurable(derived)] AgentDDSketch),
 }
 
 impl MetricSketch {
@@ -533,11 +575,14 @@ impl From<MetricSketch> for ::value::Value {
     }
 }
 
-/// A single sample from a `MetricValue::Distribution`, containing the
-/// sampled value paired with the rate at which it was observed.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+/// A single observation.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Sample {
+    /// The value of the observation.
     pub value: f64,
+
+    /// The rate at which the value was observed.
     pub rate: u32,
 }
 
@@ -547,13 +592,17 @@ impl ByteSizeOf for Sample {
     }
 }
 
-/// A single value from a `MetricValue::AggregatedHistogram`. The value
-/// of the bucket is the upper bound on the range of values within the
-/// bucket. The lower bound on the range is just higher than the
-/// previous bucket, or zero for the first bucket.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+/// A histogram bucket.
+///
+/// Histogram buckets represent the `count` of observations where the value of the observations does
+/// not exceed the specified `upper_limit`.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Bucket {
+    /// The upper limit of values in the bucket.
     pub upper_limit: f64,
+
+    /// The number of values tracked in this bucket.
     pub count: u64,
 }
 
@@ -563,10 +612,30 @@ impl ByteSizeOf for Bucket {
     }
 }
 
-/// A single value from a `MetricValue::AggregatedSummary`.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+/// A single quantile observation.
+///
+/// Quantiles themselves are "cut points diviing the range of a probability distribution into
+/// continuous intervals with equal probabilities". [[1][quantiles_wikipedia]].
+///
+/// We use quantiles to measure the value along these probability distributions for representing
+/// client-side aggregations of distributions, which represent a collection of observations over a
+/// specific time window.
+///
+/// In general, we typically use the term "quantile" to represent the concept of _percentiles_,
+/// which deal with whole integers -- 0, 1, 2, .., 99, 100 -- even though quantiles are
+/// floating-point numbers and can represent higher-precision cut points, such as 0.9999, or the
+/// 99.99th percentile.
+///
+/// [quantile_wikipedia]: https://en.wikipedia.org/wiki/Quantile
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Quantile {
+    /// The value of the quantile.
+    ///
+    /// This value must be between 0.0 and 1.0, inclusive.
     pub quantile: f64,
+
+    /// The estimated value of the given quantile within the probability distribution.
     pub value: f64,
 }
 

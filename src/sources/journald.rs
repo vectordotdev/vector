@@ -39,8 +39,9 @@ use crate::{
     config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
     internal_events::{
-        JournaldCheckpointFileOpenError, JournaldCheckpointSetError, JournaldInvalidRecordError,
-        JournaldReadError, JournaldStartJournalctlError, OldEventsReceived, StreamClosedError,
+        EventsReceived, JournaldCheckpointFileOpenError, JournaldCheckpointSetError,
+        JournaldInvalidRecordError, JournaldReadError, JournaldStartJournalctlError,
+        StreamClosedError,
     },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
@@ -447,7 +448,7 @@ impl<'a> Batch<'a> {
 
         if !self.events.is_empty() {
             let count = self.events.len();
-            emit!(OldEventsReceived {
+            emit!(EventsReceived {
                 count,
                 byte_size: self.events.size_of(),
             });

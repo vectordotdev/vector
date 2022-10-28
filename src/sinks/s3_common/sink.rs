@@ -10,15 +10,18 @@ use vector_core::{
     stream::{BatcherSettings, DriverResponse},
 };
 
+use crate::internal_events::SinkRequestBuildError;
 use crate::{
     event::Event,
-    sinks::util::{partitioner::KeyPartitioner, RequestBuilder, SinkBuilderExt},
+    sinks::util::{RequestBuilder, SinkBuilderExt},
 };
+
+use super::partitioner::{S3KeyPartitioner, S3PartitionKey};
 
 pub struct S3Sink<Svc, RB> {
     service: Svc,
     request_builder: RB,
-    partitioner: KeyPartitioner,
+    partitioner: S3KeyPartitioner,
     batcher_settings: BatcherSettings,
 }
 
@@ -26,7 +29,7 @@ impl<Svc, RB> S3Sink<Svc, RB> {
     pub const fn new(
         service: Svc,
         request_builder: RB,
-        partitioner: KeyPartitioner,
+        partitioner: S3KeyPartitioner,
         batcher_settings: BatcherSettings,
     ) -> Self {
         Self {
@@ -44,8 +47,8 @@ where
     Svc::Future: Send + 'static,
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
-    RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Error: fmt::Debug + Send,
+    RB: RequestBuilder<(S3PartitionKey, Vec<Event>)> + Send + Sync + 'static,
+    RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -61,8 +64,8 @@ where
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build S3 request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -81,8 +84,8 @@ where
     Svc::Future: Send + 'static,
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
-    RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Error: fmt::Debug + Send,
+    RB: RequestBuilder<(S3PartitionKey, Vec<Event>)> + Send + Sync + 'static,
+    RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + Send,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {

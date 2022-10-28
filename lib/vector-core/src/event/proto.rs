@@ -2,12 +2,11 @@ use chrono::TimeZone;
 use ordered_float::NotNan;
 
 use crate::{
-    event::{self, BTreeMap, WithMetadata},
+    event::{self, BTreeMap, MetricTags, WithMetadata},
     metrics::AgentDDSketch,
 };
 
-#[allow(warnings)] // Ignore some clippy warnings
-#[allow(clippy::all)]
+#[allow(warnings, clippy::all, clippy::pedantic)]
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
@@ -92,7 +91,7 @@ impl From<Trace> for Event {
 
 impl From<Log> for event::LogEvent {
     fn from(log: Log) -> Self {
-        if let Some(value) = log.value {
+        let mut event_log = if let Some(value) = log.value {
             Self::from(decode_value(value).unwrap_or(::value::Value::Null))
         } else {
             // This is for backwards compatibility. Only `value` should be set
@@ -103,7 +102,14 @@ impl From<Log> for event::LogEvent {
                 .collect::<BTreeMap<_, _>>();
 
             Self::from(fields)
+        };
+
+        if let Some(metadata_value) = log.metadata {
+            if let Some(decoded_value) = decode_value(metadata_value) {
+                *event_log.metadata_mut().value_mut() = decoded_value;
+            }
         }
+        event_log
     }
 }
 
@@ -115,7 +121,14 @@ impl From<Trace> for event::TraceEvent {
             .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
             .collect::<BTreeMap<_, _>>();
 
-        Self::from(event::LogEvent::from(fields))
+        let mut log = event::LogEvent::from(fields);
+        if let Some(metadata_value) = trace.metadata {
+            if let Some(decoded_value) = decode_value(metadata_value) {
+                *log.metadata_mut().value_mut() = decoded_value;
+            }
+        }
+
+        Self::from(log)
     }
 }
 
@@ -200,9 +213,16 @@ impl From<Metric> for event::Metric {
             },
         };
 
-        Self::new(name, kind, value)
+        let mut metadata = event::EventMetadata::default();
+        if let Some(metadata_value) = metric.metadata {
+            if let Some(decoded_value) = decode_value(metadata_value) {
+                *metadata.value_mut() = decoded_value;
+            }
+        }
+
+        Self::new_with_metadata(name, kind, value, metadata)
             .with_namespace(namespace)
-            .with_tags(tags)
+            .with_tags(tags.map(MetricTags))
             .with_timestamp(timestamp)
             .with_interval_ms(std::num::NonZeroU32::new(metric.interval_ms))
     }
@@ -252,6 +272,7 @@ impl From<event::LogEvent> for WithMetadata<Log> {
                     .map(|(k, v)| (k, encode_value(v)))
                     .collect::<BTreeMap<_, _>>(),
                 value: None,
+                metadata: Some(encode_value(metadata.value().clone())),
             }
         } else {
             let mut dummy = BTreeMap::new();
@@ -261,6 +282,7 @@ impl From<event::LogEvent> for WithMetadata<Log> {
             Log {
                 fields: dummy,
                 value: Some(encode_value(value)),
+                metadata: Some(encode_value(metadata.value().clone())),
             }
         };
 
@@ -276,7 +298,10 @@ impl From<event::TraceEvent> for WithMetadata<Trace> {
             .map(|(k, v)| (k, encode_value(v)))
             .collect::<BTreeMap<_, _>>();
 
-        let data = Trace { fields };
+        let data = Trace {
+            fields,
+            metadata: Some(encode_value(metadata.value().clone())),
+        };
         Self { data, metadata }
     }
 }
@@ -368,10 +393,11 @@ impl From<event::Metric> for WithMetadata<Metric> {
             name,
             namespace,
             timestamp,
-            tags,
+            tags: tags.0,
             kind,
             interval_ms,
             value: Some(metric),
+            metadata: Some(encode_value(metadata.value().clone())),
         };
         Self { data, metadata }
     }

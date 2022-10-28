@@ -115,7 +115,7 @@ impl Function for ParseXml {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -295,7 +295,11 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
             }
         }
 
-        for n in node.children().into_iter().filter(|n| !n.is_comment()) {
+        for n in node
+            .children()
+            .into_iter()
+            .filter(|n| n.is_element() || n.is_text())
+        {
             let name = match n.node_type() {
                 NodeType::Element => n.tag_name().name().to_string(),
                 NodeType::Text => config.text_key.to_string(),
@@ -493,6 +497,18 @@ mod tests {
                         "from": "Jani",
                         "heading": "Reminder",
                         "body": "Don't forget me this weekend!"
+                    }
+                }
+            )),
+            tdef: type_def(),
+        }
+
+        header_inside_element {
+            args: func_args![ value: r#"<p><?xml?>text123</p>"# ],
+            want: Ok(value!(
+                {
+                    "p": {
+                        "text": "text123"
                     }
                 }
             )),

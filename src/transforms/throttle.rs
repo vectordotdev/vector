@@ -1,7 +1,7 @@
 use std::{num::NonZeroU32, pin::Pin, time::Duration};
 
 use async_stream::stream;
-use futures::{stream, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use governor::{clock, Quota, RateLimiter};
 use snafu::Snafu;
 use vector_config::configurable_component;
@@ -35,7 +35,6 @@ pub struct ThrottleConfig {
     /// Each unique key will create a bucket of related events to be rate limited separately. If
     /// left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate
     /// limited separately.
-    #[configurable(metadata(templatable))]
     key_field: Option<Template>,
 
     /// A logical condition used to exclude events from sampling.
@@ -121,74 +120,68 @@ where
     {
         let mut flush_keys = tokio::time::interval(self.flush_keys_interval * 2);
 
-        let mut flush_stream = tokio::time::interval(Duration::from_millis(1000));
-
         let limiter = RateLimiter::dashmap_with_clock(self.quota, &self.clock);
 
-        Box::pin(
-            stream! {
-              loop {
-                let mut output = Vec::new();
-                let done = tokio::select! {
-                    biased;
+        Box::pin(stream! {
+          loop {
+            let done = tokio::select! {
+                biased;
 
-                    maybe_event = input_rx.next() => {
-                        match maybe_event {
-                            None => true,
-                            Some(event) => {
-                                let (throttle, event) = match self.exclude.as_ref() {
-                                        Some(condition) => {
-                                            let (result, event) = condition.check(event);
-                                            (!result, event)
-                                        },
-                                        _ => (true, event)
-                                    };
-                                    if throttle {
-                                        let key = self.key_field.as_ref().and_then(|t| {
-                                            t.render_string(&event)
-                                                .map_err(|error| {
-                                                    emit!(TemplateRenderingError {
-                                                        error,
-                                                        field: Some("key_field"),
-                                                        drop_event: false,
-                                                    })
-                                                })
-                                                .ok()
-                                        });
+                maybe_event = input_rx.next() => {
+                    match maybe_event {
+                        None => true,
+                        Some(event) => {
+                            let (throttle, event) = match self.exclude.as_ref() {
+                                Some(condition) => {
+                                    let (result, event) = condition.check(event);
+                                    (!result, event)
+                                },
+                                _ => (true, event)
+                            };
+                            let output = if throttle {
+                                let key = self.key_field.as_ref().and_then(|t| {
+                                    t.render_string(&event)
+                                        .map_err(|error| {
+                                            emit!(TemplateRenderingError {
+                                                error,
+                                                field: Some("key_field"),
+                                                drop_event: false,
+                                            })
+                                        })
+                                        .ok()
+                                });
 
-                                        match limiter.check_key(&key) {
-                                            Ok(()) => {
-                                                output.push(event);
-                                            }
-                                            _ => {
-                                                if let Some(key) = key {
-                                                  emit!(ThrottleEventDiscarded{key})
-                                                } else {
-                                                  emit!(ThrottleEventDiscarded{key: "None".to_string()})
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        output.push(event)
+                                match limiter.check_key(&key) {
+                                    Ok(()) => {
+                                        Some(event)
                                     }
-                                false
+                                    _ => {
+                                        if let Some(key) = key {
+                                            emit!(ThrottleEventDiscarded{key})
+                                        } else {
+                                            emit!(ThrottleEventDiscarded{key: "None".to_string()})
+                                        }
+                                        None
+                                    }
+                                }
+                            } else {
+                                Some(event)
+                            };
+                            if let Some(event) = output {
+                                yield event;
                             }
+                            false
                         }
                     }
-                    _ = flush_keys.tick() => {
-                        limiter.retain_recent();
-                        false
-                    }
-                    _ = flush_stream.tick() => {
-                        false
-                    }
-                };
-                yield stream::iter(output.into_iter());
-                if done { break }
-              }
-            }
-            .flatten(),
-        )
+                }
+                _ = flush_keys.tick() => {
+                    limiter.retain_recent();
+                    false
+                }
+            };
+            if done { break }
+          }
+        })
     }
 }
 
@@ -205,7 +198,12 @@ mod tests {
     use futures::SinkExt;
 
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{
+        event::LogEvent, test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -399,5 +397,29 @@ key_field = "{{ bucket }}"
 
         // And still nothing there
         assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+    }
+
+    #[tokio::test]
+    async fn emits_internal_events() {
+        assert_transform_compliance(async move {
+            let config = ThrottleConfig {
+                threshold: 1,
+                window_secs: 1.0,
+                key_field: None,
+                exclude: None,
+            };
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let log = LogEvent::from("hello world");
+            tx.send(log.into()).await.unwrap();
+
+            _ = out.recv().await;
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 }

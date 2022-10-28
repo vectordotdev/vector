@@ -31,7 +31,7 @@ mod compliance;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
 mod doesnt_reload;
-#[cfg(all(feature = "sources-http", feature = "sinks-http"))]
+#[cfg(all(feature = "sources-http_server", feature = "sinks-http"))]
 mod end_to_end;
 #[cfg(all(
     feature = "sources-prometheus",
@@ -68,6 +68,7 @@ fn into_message(event: Event) -> String {
         .get(crate::config::log_schema().message_key())
         .unwrap()
         .to_string_lossy()
+        .into_owned()
 }
 
 fn into_message_stream(array: EventArray) -> impl futures::Stream<Item = String> {
@@ -780,14 +781,12 @@ async fn topology_disk_buffer_flushes_on_idle() {
     let mut sink1_outer = SinkOuter::new(
         // read from both the source and the transform
         vec![String::from("in1"), String::from("t1")],
-        Box::new(sink1),
+        sink1,
     );
-    sink1_outer.buffer = BufferConfig {
-        stages: vec![BufferType::DiskV1 {
-            max_size: std::num::NonZeroU64::new(1024).unwrap(),
-            when_full: WhenFull::DropNewest,
-        }],
-    };
+    sink1_outer.buffer = BufferConfig::Single(BufferType::DiskV1 {
+        max_size: std::num::NonZeroU64::new(1024).unwrap(),
+        when_full: WhenFull::DropNewest,
+    });
     config.add_sink_outer("out1", sink1_outer);
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;

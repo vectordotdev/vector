@@ -7,7 +7,7 @@ pub mod logs;
 pub mod metrics;
 pub mod traces;
 
-#[allow(warnings)]
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
@@ -195,49 +195,49 @@ impl SourceConfig for DatadogAgentConfig {
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
                 self.get_component_name(),
-                "message",
+                Some("message"),
                 "message",
                 Kind::bytes(),
                 Some("message"),
             )
             .with_source_metadata(
                 self.get_component_name(),
-                "status",
+                Some("status"),
                 "status",
                 Kind::bytes(),
                 Some("severity"),
             )
             .with_source_metadata(
                 self.get_component_name(),
-                "timestamp",
+                Some("timestamp"),
                 "timestamp",
                 Kind::timestamp(),
                 Some("timestamp"),
             )
             .with_source_metadata(
                 self.get_component_name(),
-                "hostname",
+                Some("hostname"),
                 "hostname",
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
                 self.get_component_name(),
-                "service",
+                Some("service"),
                 "service",
                 Kind::bytes(),
                 Some("service"),
             )
             .with_source_metadata(
                 self.get_component_name(),
-                "ddsource",
+                Some("ddsource"),
                 "ddsource",
                 Kind::bytes(),
                 Some("source"),
             )
             .with_source_metadata(
                 self.get_component_name(),
-                "ddtags",
+                Some("ddtags"),
                 "ddtags",
                 Kind::bytes(),
                 Some("tags"),

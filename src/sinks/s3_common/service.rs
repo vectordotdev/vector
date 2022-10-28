@@ -1,8 +1,10 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_s3::error::PutObjectError;
-use aws_sdk_s3::types::{ByteStream, SdkError};
-use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::{
+    error::PutObjectError,
+    types::{ByteStream, SdkError},
+    Client as S3Client,
+};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
@@ -10,11 +12,12 @@ use tower::Service;
 use tracing::Instrument;
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
 use super::config::S3Options;
+use super::partitioner::S3PartitionKey;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -33,7 +36,8 @@ impl Finalizable for S3Request {
 
 #[derive(Clone, Debug)]
 pub struct S3Metadata {
-    pub partition_key: String,
+    pub partition_key: S3PartitionKey,
+    pub s3_key: String,
     pub count: usize,
     pub byte_size: usize,
     pub finalizers: EventFinalizers,
@@ -50,12 +54,8 @@ impl DriverResponse for S3Response {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.count, self.events_byte_size)
     }
 }
 
@@ -85,10 +85,12 @@ impl Service<S3Request> for S3Service {
     type Error = SdkError<PutObjectError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: S3Request) -> Self::Future {
         let options = request.options;
 
@@ -119,7 +121,7 @@ impl Service<S3Request> for S3Service {
                 .put_object()
                 .body(bytes_to_bytestream(request.body))
                 .bucket(request.bucket)
-                .key(request.metadata.partition_key)
+                .key(request.metadata.s3_key)
                 .set_content_encoding(content_encoding)
                 .set_content_type(content_type)
                 .set_acl(options.acl.map(Into::into))

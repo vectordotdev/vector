@@ -33,6 +33,7 @@ pub struct PipelineConfig {
 
     /// A list of sequential transforms that will process any event that is passed to the pipeline.
     #[serde(default)]
+    #[configurable(metadata(docs::cycle_entrypoint))]
     transforms: Vec<Transforms>,
 }
 
@@ -145,7 +146,7 @@ impl PipelineConfig {
             name.clone(),
             InnerTopologyTransform {
                 inputs: inputs.to_vec(),
-                inner: Transforms::Pipeline(self.clone()),
+                inner: self.clone().into(),
             },
         );
         result
