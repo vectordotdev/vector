@@ -90,14 +90,54 @@ components: sinks: clickhouse: {
 			description: "The endpoint of the [Clickhouse](\(urls.clickhouse)) server."
 			required:    true
 			type: string: {
-				examples: ["http://localhost:8123"]
+				examples: ["http://localhost:8123", "tcp://localhost:9223"]
 			}
+		}
+		use_native_proto: {
+			description: "If true`, ClickHouse Native Protocol is used. Defaults to `false`, using `JSONEachRow` over HTTP."
+			required:    false
+			type: bool: default: false	
 		}
 		table: {
 			description: "The table that data will be inserted into."
 			required:    true
 			type: string: {
 				examples: ["mytable"]
+			}
+		}
+		sql_table_col_def: {
+			description: """
+				The clickhouse table column definition.
+				If use_native_proto is true, this field must be configured!
+				The key represents not only the column name of clickhouse table but also the key of the log.
+				The value now only supports limited type:
+				_type: UInt8,16,32,64  Int8,16,32,64  String FixedString(int) Float32,64 Date DateTime IPv4,6
+				Array(_type) Nullable(_type) Map(String, _type)
+
+				Note: for now, empty space is not acceptable in type definition, which means
+				Map(String,UInt8) Nullable(Date) are valid
+				Map( String, UInt8) Nullable(Date ) is invalid
+				"""
+			required:    false
+			type: object: {
+				examples: [
+					{
+						"name": "String"
+						"age": "UInt8"
+						"hobbites": "Map(String,String)"
+					}
+				]
+				options: {
+					"*": {
+						common:      false
+						description: "clickhouse table difinition"
+						required:    false
+						type: string: {
+							default: null
+							examples: ["String", "Map(String,Date)", "Array(Int64)"]
+						}
+					}
+				}
 			}
 		}
 		skip_unknown_fields: {
