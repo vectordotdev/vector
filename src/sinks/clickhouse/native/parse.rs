@@ -175,7 +175,8 @@ mod tests {
             ("IPv6", SqlType::Ipv6),
         ];
         for (s, expect) in table {
-            let (_, actual) = parse_field_type(s).unwrap();
+            let (rest, actual) = parse_field_type(s).unwrap();
+            assert!(rest.is_empty());
             assert_eq!(actual, expect);
         }
     }

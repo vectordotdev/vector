@@ -18,7 +18,7 @@ pub async fn build_native_sink(
     cfg: &ClickhouseConfig,
     cx: SinkContext,
 ) -> crate::Result<(VectorSink, Healthcheck)> {
-    let table_schema = gen_table_schema(&cfg.table_def)?;
+    let table_schema = gen_table_schema(&cfg.sql_table_col_def)?;
     let batch = cfg.batch.into_batcher_settings()?;
     let pool = Pool::new(cfg.endpoint.to_string());
     let sink = NativeClickhouseSink::new(pool.clone(), batch, cfg.table.clone(), table_schema);

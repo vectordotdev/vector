@@ -39,7 +39,7 @@ pub struct ClickhouseConfig {
     pub skip_unknown_fields: bool,
     /// SQL table column definition. For example: {"col1":"String", "col_2":"Nullable(UInt16)", ...}
     #[serde(default)]
-    pub table_def: BTreeMap<String, String>,
+    pub sql_table_col_def: BTreeMap<String, String>,
 
     #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
@@ -94,5 +94,15 @@ impl SinkConfig for ClickhouseConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ClickhouseConfig;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ClickhouseConfig>();
     }
 }
