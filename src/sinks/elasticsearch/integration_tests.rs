@@ -110,7 +110,7 @@ async fn ensure_pipeline_in_params() {
     let pipeline = String::from("test-pipeline");
 
     let config = ElasticsearchConfig {
-        endpoints: vec![http_server()],
+        endpoints: vec!["http://localhost:9200".to_string()],
         bulk: Some(BulkConfig {
             index: Some(index),
             action: None,
@@ -206,65 +206,6 @@ async fn structures_events_correctly() {
 }
 
 #[tokio::test]
-async fn auto_version_http() {
-    trace_init();
-
-    let config = ElasticsearchConfig {
-        endpoints: vec![http_server()],
-        doc_type: Some("log_lines".into()),
-        compression: Compression::None,
-        api_version: ElasticsearchApiVersion::Auto,
-        ..config()
-    };
-    let _ = ElasticsearchCommon::parse_single(&config)
-        .await
-        .expect("Config error");
-}
-
-#[tokio::test]
-async fn auto_version_https() {
-    trace_init();
-
-    let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Basic {
-            user: "elastic".to_string(),
-            password: "vector".to_string().into(),
-        }),
-        endpoints: vec![https_server()],
-        doc_type: Some("log_lines".into()),
-        compression: Compression::None,
-        tls: Some(TlsConfig {
-            ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
-            ..Default::default()
-        }),
-        api_version: ElasticsearchApiVersion::Auto,
-        ..config()
-    };
-    let _ = ElasticsearchCommon::parse_single(&config)
-        .await
-        .expect("Config error");
-}
-
-#[tokio::test]
-async fn auto_version_aws() {
-    trace_init();
-
-    let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
-            load_timeout_secs: Some(5),
-        })),
-        endpoints: vec![aws_server()],
-        aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
-        api_version: ElasticsearchApiVersion::Auto,
-        ..config()
-    };
-
-    let _ = ElasticsearchCommon::parse_single(&config)
-        .await
-        .expect("Config error");
-}
-
-#[tokio::test]
 async fn insert_events_over_http() {
     trace_init();
 
@@ -317,7 +258,6 @@ async fn insert_events_on_aws() {
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
-            api_version: ElasticsearchApiVersion::V6,
             ..config()
         },
         false,
@@ -338,7 +278,6 @@ async fn insert_events_on_aws_with_compression() {
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
-            api_version: ElasticsearchApiVersion::V6,
             ..config()
         },
         false,
@@ -424,30 +363,18 @@ async fn distributed_insert_events() {
 async fn distributed_insert_events_failover() {
     trace_init();
 
-    let mut config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Basic {
-            user: "elastic".into(),
-            password: "vector".to_string().into(),
-        }),
-        // Valid endpoints and some random non elasticsearch endpoint
-        endpoints: vec![
-            http_server(),
-            https_server(),
-            "http://localhost:2347".into(),
-        ],
-        doc_type: Some("log_lines".into()),
-        compression: Compression::None,
-        tls: Some(TlsConfig {
-            ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
-            ..Default::default()
-        }),
-        ..config()
-    };
-    config.bulk = Some(BulkConfig {
-        index: Some(gen_index()),
-        action: None,
-    });
-    run_insert_tests_with_multiple_endpoints(&config).await;
+    run_insert_tests(
+        ElasticsearchConfig {
+            // A valid endpoint and some random non elasticsearch endpoint
+            endpoints: vec![http_server(), "http://localhost:2347".into()],
+            doc_type: Some("log_lines".into()),
+            compression: Compression::None,
+            ..config()
+        },
+        false,
+        BatchStatus::Delivered,
+    )
+    .await;
 }
 
 async fn run_insert_tests(
@@ -482,9 +409,10 @@ async fn run_insert_tests_with_config(
     break_events: bool,
     batch_status: BatchStatus,
 ) {
-    let common = ElasticsearchCommon::parse_single(config)
+    let common = ElasticsearchCommon::parse_many(config)
         .await
-        .expect("Config error");
+        .expect("Config error")
+        .remove(0);
     let index = match config.mode {
         // Data stream mode uses an index name generated from the event.
         ElasticsearchMode::DataStream => format!(
@@ -583,8 +511,7 @@ async fn run_insert_tests_with_config(
 }
 
 async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) {
-    let cx = SinkContext::new_test();
-    let commons = ElasticsearchCommon::parse_many(config, cx.proxy())
+    let commons = ElasticsearchCommon::parse_many(config)
         .await
         .expect("Config error");
     let index = match config.mode {
@@ -600,6 +527,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
             .unwrap(),
     };
 
+    let cx = SinkContext::new_test();
     let (sink, healthcheck) = config
         .build(cx.clone())
         .await
@@ -620,13 +548,13 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
 
     // make sure writes all all visible
     for common in commons {
-        let _ = flush(common).await;
+        flush(common).await.expect("Flushing writes failed");
     }
 
     let client = create_http_client();
     let mut total = 0;
     for base_url in base_urls {
-        if let Ok(response) = client
+        let response = client
             .get(&format!("{}/{}/_search", base_url, index))
             .basic_auth("elastic", Some("vector"))
             .json(&json!({
@@ -634,23 +562,22 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
             }))
             .send()
             .await
-        {
-            let response = response.json::<Value>().await.unwrap();
+            .unwrap()
+            .json::<Value>()
+            .await
+            .unwrap();
 
-            let endpoint_total = response["hits"]["total"]["value"]
-                .as_u64()
-                .or_else(|| response["hits"]["total"].as_u64())
-                .expect(
-                    "Elasticsearch response does not include hits->total nor hits->total->value",
-                );
+        let endpoint_total = response["hits"]["total"]["value"]
+            .as_u64()
+            .or_else(|| response["hits"]["total"].as_u64())
+            .expect("Elasticsearch response does not include hits->total nor hits->total->value");
 
-            assert!(
-                input.len() as u64 > endpoint_total,
-                "One of the endpoints received all of the events."
-            );
+        assert!(
+            input.len() as u64 > endpoint_total,
+            "One of the endpoints received all of the events."
+        );
 
-            total += endpoint_total;
-        }
+        total += endpoint_total;
     }
 
     assert_eq!(input.len() as u64, total);
