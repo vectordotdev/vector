@@ -112,8 +112,8 @@ impl Finalizable for DatadogMetricsRequest {
 }
 
 impl MetaDescriptive for DatadogMetricsRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

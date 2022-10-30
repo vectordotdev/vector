@@ -143,7 +143,7 @@ where
                         );
                         let finalizers = req.take_finalizers();
 
-                        let metadata = req.get_metadata().clone();
+                        let metadata = req.get_metadata();
 
                         let fut = svc.call(req)
                             .err_into()
@@ -270,8 +270,8 @@ mod tests {
     }
 
     impl MetaDescriptive for DelayRequest {
-        fn get_metadata(&self) -> &RequestMetadata {
-            &self.2
+        fn get_metadata(&self) -> RequestMetadata {
+            self.2
         }
     }
 

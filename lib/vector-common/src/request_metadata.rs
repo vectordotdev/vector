@@ -63,11 +63,11 @@ impl RequestMetadata {
 
     /// Constructs a `RequestMetadata` by summation of the "batch" of `RequestMetadata` provided.
     #[must_use]
-    pub fn from_batch<'a, T: IntoIterator<Item = &'a RequestMetadata>>(metadata_iter: T) -> Self {
+    pub fn from_batch<T: IntoIterator<Item = RequestMetadata>>(metadata_iter: T) -> Self {
         let mut metadata_sum = RequestMetadata::new(0, 0, 0, 0, 0);
 
         for metadata in metadata_iter {
-            metadata_sum = metadata_sum + metadata;
+            metadata_sum = metadata_sum + &metadata;
         }
         metadata_sum
     }
@@ -92,5 +92,5 @@ impl<'a> Add<&'a RequestMetadata> for RequestMetadata {
 /// Objects implementing this trait have metadata that describes the request.
 pub trait MetaDescriptive {
     /// Returns the `RequestMetadata` associated with this object.
-    fn get_metadata(&self) -> &RequestMetadata;
+    fn get_metadata(&self) -> RequestMetadata;
 }

@@ -32,8 +32,8 @@ impl Finalizable for AzureBlobRequest {
 }
 
 impl MetaDescriptive for AzureBlobRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.request_metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
     }
 }
 

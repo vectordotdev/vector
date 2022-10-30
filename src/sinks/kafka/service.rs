@@ -57,8 +57,8 @@ impl Finalizable for KafkaRequest {
 }
 
 impl MetaDescriptive for KafkaRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.request_metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
     }
 }
 

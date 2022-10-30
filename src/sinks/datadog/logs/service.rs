@@ -54,8 +54,8 @@ impl Finalizable for LogApiRequest {
 }
 
 impl MetaDescriptive for LogApiRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

@@ -81,8 +81,8 @@ impl Finalizable for TraceApiRequest {
 }
 
 impl MetaDescriptive for TraceApiRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

@@ -148,8 +148,8 @@ impl Finalizable for BatchKinesisRequest {
 }
 
 impl MetaDescriptive for BatchKinesisRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

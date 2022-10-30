@@ -86,8 +86,8 @@ impl Finalizable for LokiRequest {
 }
 
 impl MetaDescriptive for LokiRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -124,7 +124,7 @@ impl Service<LokiRequest> for LokiService {
         let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
         let protocol = get_http_scheme_from_uri(&self.endpoint.uri);
 
-        let metadata = request.get_metadata().clone();
+        let metadata = request.get_metadata();
 
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);

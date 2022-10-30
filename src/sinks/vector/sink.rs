@@ -16,10 +16,19 @@ use crate::{
     sinks::util::{metadata::RequestMetadataBuilder, SinkBuilderExt, StreamSink},
 };
 
+/// Data for a single event.
 struct EventData {
     byte_size: usize,
     finalizers: EventFinalizers,
     wrapper: EventWrapper,
+}
+
+/// Temporary struct to collect events during batching.
+#[derive(Clone, Default)]
+struct EventCollection {
+    pub finalizers: EventFinalizers,
+    pub events: Vec<EventWrapper>,
+    pub events_byte_size: usize,
 }
 
 pub struct VectorSink<S> {
@@ -43,31 +52,32 @@ where
             })
             .batched(self.batch_settings.into_reducer_config(
                 |data: &EventData| data.wrapper.encoded_len(),
-                |req: &mut VectorRequest, item: EventData| {
-                    req.finalizers.merge(item.finalizers);
-                    req.events.push(item.wrapper);
-                    req.events_byte_size += item.byte_size;
+                |event_collection: &mut EventCollection, item: EventData| {
+                    event_collection.finalizers.merge(item.finalizers);
+                    event_collection.events.push(item.wrapper);
+                    event_collection.events_byte_size += item.byte_size;
                 },
             ))
-            .map(|mut v_request| {
+            .map(|event_collection| {
                 let builder = RequestMetadataBuilder::new(
-                    v_request.events.len(),
-                    v_request.events_byte_size,
-                    v_request.events_byte_size, // this is fine as it isn't being used
+                    event_collection.events.len(),
+                    event_collection.events_byte_size,
+                    event_collection.events_byte_size, // this is fine as it isn't being used
                 );
 
                 let encoded_events = proto_vector::PushEventsRequest {
-                    events: v_request.events.clone(),
+                    events: event_collection.events,
                 };
 
                 let byte_size = encoded_events.encoded_len();
                 let bytes_len =
                     NonZeroUsize::new(byte_size).expect("payload should never be zero length");
 
-                v_request.metadata = builder.with_request_size(bytes_len);
-                v_request.request = encoded_events;
-
-                v_request
+                VectorRequest {
+                    finalizers: event_collection.finalizers,
+                    metadata: builder.with_request_size(bytes_len),
+                    request: encoded_events,
+                }
             })
             .into_driver(self.service)
             .run()

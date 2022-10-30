@@ -52,8 +52,8 @@ impl Finalizable for AmqpRequest {
 }
 
 impl MetaDescriptive for AmqpRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

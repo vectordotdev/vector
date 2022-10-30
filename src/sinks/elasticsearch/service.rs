@@ -54,8 +54,8 @@ impl Finalizable for ElasticsearchRequest {
 }
 
 impl MetaDescriptive for ElasticsearchRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

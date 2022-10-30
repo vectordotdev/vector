@@ -42,8 +42,8 @@ impl Finalizable for NewRelicApiRequest {
 }
 
 impl MetaDescriptive for NewRelicApiRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -102,7 +102,7 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
         };
 
         let payload_len = request.payload.len();
-        let metadata = request.get_metadata().clone();
+        let metadata = request.get_metadata();
         let http_request = http_request
             .header(CONTENT_LENGTH, payload_len)
             .body(Body::from(request.payload))

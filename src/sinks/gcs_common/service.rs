@@ -50,8 +50,8 @@ impl Finalizable for GcsRequest {
 }
 
 impl MetaDescriptive for GcsRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
