@@ -73,7 +73,7 @@ impl ByteSizeOf for KinesisRequest {
 }
 
 impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
-    type Metadata = (KinesisMetadata, RequestMetadataBuilder);
+    type Metadata = KinesisMetadata;
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
@@ -88,24 +88,26 @@ impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, mut event: KinesisProcessedEvent) -> (Self::Metadata, Self::Events) {
-        let metadata = KinesisMetadata {
+    fn split_input(
+        &self,
+        mut event: KinesisProcessedEvent,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let kinesis_metadata = KinesisMetadata {
             finalizers: event.take_finalizers(),
             partition_key: event.metadata.partition_key,
         };
         let event = Event::from(event.event);
         let builder = RequestMetadataBuilder::from_events(&event);
 
-        ((metadata, builder), event)
+        (kinesis_metadata, builder, event)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        kinesis_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (kinesis_metadata, builder) = metadata;
-        let metadata = builder.build(&payload);
         let payload_bytes = payload.into_payload();
 
         KinesisRequest {

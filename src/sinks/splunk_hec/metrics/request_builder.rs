@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{encoder::HecMetricsEncoder, sink::HecProcessedEvent};
@@ -17,7 +18,7 @@ pub struct HecMetricsRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRequestBuilder {
-    type Metadata = (EventFinalizers, Option<Arc<str>>, RequestMetadataBuilder);
+    type Metadata = (EventFinalizers, Option<Arc<str>>);
     type Events = Vec<HecProcessedEvent>;
     type Encoder = HecMetricsEncoder;
     type Payload = Bytes;
@@ -35,22 +36,22 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
     fn split_input(
         &self,
         input: (Option<Arc<str>>, Vec<HecProcessedEvent>),
-    ) -> (Self::Metadata, Self::Events) {
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (passthrough_token, mut events) = input;
         let finalizers = events.take_finalizers();
 
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
 
-        ((finalizers, passthrough_token, metadata_builder), events)
+        ((finalizers, passthrough_token), metadata_builder, events)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        hec_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (finalizers, passthrough_token, metadata_builder) = metadata;
-        let metadata = metadata_builder.build(&payload);
+        let (finalizers, passthrough_token) = hec_metadata;
         HecRequest {
             body: payload.into_payload(),
             finalizers,

@@ -45,7 +45,7 @@ impl SqsRequestBuilder {
 }
 
 impl RequestBuilder<Event> for SqsRequestBuilder {
-    type Metadata = (SqsMetadata, RequestMetadataBuilder);
+    type Metadata = SqsMetadata;
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
@@ -60,7 +60,10 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, mut event: Event) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        mut event: Event,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let message_group_id = match self.message_group_id {
             Some(ref tpl) => match tpl.render_string(&event) {
                 Ok(value) => Some(value),
@@ -92,22 +95,20 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
 
         let builder = RequestMetadataBuilder::from_events(&event);
 
-        let metadata = SqsMetadata {
+        let sqs_metadata = SqsMetadata {
             finalizers: event.take_finalizers(),
             message_group_id,
             message_deduplication_id,
         };
-        ((metadata, builder), event)
+        (sqs_metadata, builder, event)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        sqs_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (sqs_metadata, builder) = metadata;
-        let metadata = builder.build(&payload);
-
         let payload_bytes = payload.into_payload();
         let message_body = String::from(std::str::from_utf8(&payload_bytes).unwrap());
 

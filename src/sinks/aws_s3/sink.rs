@@ -34,7 +34,7 @@ pub struct S3RequestOptions {
 }
 
 impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
-    type Metadata = (S3Metadata, RequestMetadataBuilder);
+    type Metadata = S3Metadata;
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
@@ -49,29 +49,31 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         &self.encoder
     }
 
-    fn split_input(&self, input: (S3PartitionKey, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (S3PartitionKey, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
         let builder = RequestMetadataBuilder::from_events(&events);
 
         let finalizers = events.take_finalizers();
         let s3_key_prefix = partition_key.key_prefix.clone();
 
-        let metadata = S3Metadata {
+        let s3metadata = S3Metadata {
             partition_key,
             s3_key: s3_key_prefix,
             finalizers,
         };
 
-        ((metadata, builder), events)
+        (s3metadata, builder, events)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        s3metadata: Self::Metadata,
+        request_metadata_builder: RequestMetadataBuilder,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (mut s3metadata, builder) = metadata;
-
         let filename = {
             let formatted_ts = Utc::now().format(self.filename_time_format.as_str());
 
@@ -92,7 +94,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
 
         s3metadata.s3_key = format!("{}{}.{}", s3metadata.s3_key, filename, extension);
 
-        let request_metadata = builder.build(&payload);
+        let request_metadata = request_metadata_builder.build(&payload);
 
         S3Request {
             body: payload.into_payload(),
