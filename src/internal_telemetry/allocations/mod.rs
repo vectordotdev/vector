@@ -33,7 +33,7 @@ impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
         GROUP_MEM_DEALLOCS[source_group_id.as_raw()]
-            .fetch_sub(object_size as u64, Ordering::Relaxed);
+            .fetch_add(object_size as u64, Ordering::Relaxed);
     }
 }
 
