@@ -67,7 +67,10 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
                 // and that includes even if we just used the rule of "always attribute allocations to the root
                 // allocation group by default".
                 group_id_ptr.write(group_id.as_raw());
-                self.tracer.trace_allocation(object_size, group_id);
+                // only track allocations greater than 4096 bytes
+                if object_size > 4096 {
+                    self.tracer.trace_allocation(object_size, group_id);
+                }
             },
         );
 
@@ -99,7 +102,12 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
         try_with_suspended_allocation_group(
             #[inline(always)]
-            |_| self.tracer.trace_deallocation(object_size, source_group_id),
+            |_| {
+                // only track allocations greater than 4096 bytes
+                if object_size > 4096 {
+                    self.tracer.trace_deallocation(object_size, source_group_id);
+                }
+            },
         );
     }
 }
