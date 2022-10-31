@@ -177,6 +177,7 @@ urls: {
 	elasticsearch_id_field:                     "https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html"
 	elasticsearch_id_performance:               "https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids"
 	elasticsearch_ignore_malformed:             "https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-malformed.html"
+	encoded_word:                               "https://datatracker.ietf.org/doc/html/rfc2047#section-2"
 	encoding_charset_labels:                    "https://encoding.spec.whatwg.org/#concept-encoding-get"
 	encoding_standard:                          "https://encoding.spec.whatwg.org/"
 	endler_dev:                                 "https://endler.dev/"
