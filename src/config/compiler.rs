@@ -132,6 +132,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             tests,
             expansions,
             secret,
+            demo_components: Vec::new(),
         };
 
         config.propagate_acknowledgements()?;

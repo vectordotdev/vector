@@ -5,6 +5,7 @@ use enum_dispatch::enum_dispatch;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{AcknowledgementsConfig, GlobalOptions, LogNamespace, Output},
+    event::Event,
     source::Source,
 };
 
@@ -26,6 +27,10 @@ pub struct SourceOuter {
     #[serde(default, skip)]
     pub sink_acknowledgements: bool,
 
+    /// Determines if the component should run in demo mode.
+    #[serde(default)]
+    pub demo_mode: bool,
+
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
     pub(crate) inner: Sources,
@@ -36,6 +41,7 @@ impl SourceOuter {
         Self {
             proxy: Default::default(),
             sink_acknowledgements: false,
+            demo_mode: false,
             inner: inner.into(),
         }
     }
@@ -82,6 +88,10 @@ pub trait SourceConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// well as emit contextual warnings when end-to-end acknowledgements are enabled, but the
     /// topology as configured does not actually support the use of end-to-end acknowledgements.
     fn can_acknowledge(&self) -> bool;
+
+    fn generate_demo_data(&self) -> Event {
+        unimplemented!()
+    }
 }
 
 pub struct SourceContext {

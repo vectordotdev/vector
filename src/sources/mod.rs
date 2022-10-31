@@ -81,11 +81,15 @@ pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
 
+pub(crate) mod demo_mode;
 pub mod util;
 
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LogNamespace, Output};
 pub use vector_core::source::Source;
+use vector_core::{
+    config::{LogNamespace, Output},
+    event::Event,
+};
 
 use crate::config::{
     unit_test::{UnitTestSourceConfig, UnitTestStreamSourceConfig},

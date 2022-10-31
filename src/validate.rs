@@ -102,7 +102,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
 
     if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
-            validated &= validate_environment(opts, &config, &mut fmt).await;
+            validated &= validate_environment(opts, &mut config, &mut fmt).await;
             remove_tmp_directory(tmp_directory);
         } else {
             validated = false;
@@ -175,7 +175,7 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     Some(config)
 }
 
-async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
+async fn validate_environment(opts: &Opts, config: &mut Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
     let mut pieces = if let Some(pieces) = validate_components(config, &diff, fmt).await {
@@ -188,7 +188,7 @@ async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter)
 }
 
 async fn validate_components(
-    config: &Config,
+    config: &mut Config,
     diff: &ConfigDiff,
     fmt: &mut Formatter,
 ) -> Option<Pieces> {

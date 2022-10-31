@@ -439,9 +439,9 @@ async fn build_unit_test(
             .sinks
             .insert(ComponentKey::from(Uuid::new_v4().to_string()), sink);
     }
-    let config = config_builder.build()?;
+    let mut config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
-    let pieces = builder::build_pieces(&config, &diff, HashMap::new()).await?;
+    let pieces = builder::build_pieces(&mut config, &diff, HashMap::new()).await?;
 
     Ok(UnitTest {
         name: test.name,

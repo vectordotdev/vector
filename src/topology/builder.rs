@@ -46,6 +46,7 @@ use crate::{
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     source_sender::CHUNK_SIZE,
+    sources::demo_mode::DemoMode,
     spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
@@ -137,7 +138,7 @@ pub struct Pieces {
 
 /// Builds only the new pieces, and doesn't check their topology.
 pub async fn build_pieces(
-    config: &super::Config,
+    config: &mut super::Config,
     diff: &ConfigDiff,
     mut buffers: HashMap<ComponentKey, BuiltBuffer>,
 ) -> Result<Pieces, Vec<String>> {
@@ -153,6 +154,8 @@ pub async fn build_pieces(
 
     let (enrichment_tables, enrichment_errors) = load_enrichment_tables(config, diff).await;
     errors.extend(enrichment_errors);
+
+    let mut demo_components = Vec::new();
 
     // Build sources
     for (key, source) in config
@@ -267,12 +270,19 @@ pub async fn build_pieces(
             schema_definitions,
             schema: config.schema,
         };
-        let server = match source.inner.build(context).await {
-            Err(error) => {
-                errors.push(format!("Source \"{}\": {}", key, error));
-                continue;
+        let server = if source.demo_mode {
+            let demo_mode = DemoMode::new(source.inner.clone());
+            let server = demo_mode.build(context);
+            demo_components.push(demo_mode);
+            server
+        } else {
+            match source.inner.build(context).await {
+                Err(error) => {
+                    errors.push(format!("Source \"{}\": {}", key, error));
+                    continue;
+                }
+                Ok(server) => server,
             }
-            Ok(server) => server,
         };
 
         // Build a wrapper future that drives the actual source future, but returns early if we've
@@ -331,6 +341,8 @@ pub async fn build_pieces(
         tasks.insert(key.clone(), pump);
         source_tasks.insert(key.clone(), server);
     }
+
+    config.demo_components.append(&mut demo_components);
 
     let mut definition_cache = HashMap::default();
 

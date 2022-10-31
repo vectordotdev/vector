@@ -11,7 +11,10 @@ pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDes
 use vector_config::configurable_component;
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
 
-use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
+use crate::{
+    conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany,
+    sources::demo_mode::DemoMode,
+};
 
 pub mod api;
 mod builder;
@@ -113,6 +116,7 @@ pub struct Config {
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
     secret: IndexMap<ComponentKey, SecretBackends>,
+    pub demo_components: Vec<DemoMode>,
 }
 
 impl Config {
@@ -576,12 +580,12 @@ mod tests {
 
     async fn load(config: &str, format: config::Format) -> Result<Vec<String>, Vec<String>> {
         match config::load_from_str(config, format) {
-            Ok(c) => {
+            Ok(mut c) => {
                 let diff = ConfigDiff::initial(&c);
                 let c2 = config::load_from_str(config, format).unwrap();
                 match (
                     config::warnings(&c2),
-                    topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
+                    topology::builder::build_pieces(&mut c, &diff, HashMap::new()).await,
                 ) {
                     (warnings, Ok(_pieces)) => Ok(warnings),
                     (_, Err(errors)) => Err(errors),
