@@ -110,9 +110,8 @@ where
             // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, which allows callers to skip trying to run
             // `f` if they cannot mutably borrow the current allocation group. As `try_borrow_mut` will only let one
             // mutable borrow happen at a time, the tracker logic is never reentrant.
-            if let Ok(stack) = group_stack.try_borrow_mut() {
-                f(stack.current());
-            }
+            let stack = group_stack.borrow_mut();
+            f(stack.current());
         },
     );
 }
@@ -126,6 +125,7 @@ where
 /// `try_with_suspended_allocation_group` is primarily useful for "run this function if nobody else is tracing
 /// an (de)allocation right now".
 #[inline(always)]
+#[allow(dead_code)]
 pub(super) fn with_suspended_allocation_group<F>(f: F)
 where
     F: FnOnce(),
