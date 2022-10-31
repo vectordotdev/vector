@@ -42,7 +42,7 @@ use crate::{
     SourceSender,
 };
 use lookup::path;
-use vector_core::{config::LogNamespace, event::Event::Log, ByteSizeOf};
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -517,71 +517,71 @@ impl IngestorProcess {
             None => lines,
         };
 
-        let bucket_name = Bytes::from(s3_event.s3.bucket.name.as_str().as_bytes().to_vec());
-        let object_key = Bytes::from(s3_event.s3.object.key.as_str().as_bytes().to_vec());
-        let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
-
-        let mut stream = lines.filter_map(move |line| {
+        let mut stream = lines.map(|line| {
             let deserializer = BytesDeserializer::new();
             match deserializer.parse(line, log_namespace) {
-                Ok(events) => {
-                    let event = events.get(0);
-                    if let Some(Log(ref mut log)) = event {
-                        log_namespace.insert_source_metadata(
-                            AwsS3Config::NAME,
-                            log,
-                            path!("bucket"),
-                            path!("bucket"),
-                            bucket_name.clone(),
-                        );
-                        log_namespace.insert_source_metadata(
-                            AwsS3Config::NAME,
-                            log,
-                            path!("object"),
-                            path!("object"),
-                            object_key.clone(),
-                        );
-                        log_namespace.insert_source_metadata(
-                            AwsS3Config::NAME,
-                            log,
-                            path!("region"),
-                            path!("region"),
-                            aws_region.clone(),
-                        );
+                Ok(mut events) => {
+                    // BytesDeserializer::parse() always returns a single event
+                    let event = events.pop().expect("there will only be one.");
 
-                        if let Some(metadata) = &metadata {
-                            for (key, value) in metadata {
-                                log_namespace.insert_source_metadata(
-                                    AwsS3Config::NAME,
-                                    log,
-                                    key.as_str(),
-                                    key.as_str(),
-                                    value.clone(),
-                                );
-                            }
+                    let mut log = event.into_log().with_batch_notifier_option(&batch);
+                    log_namespace.insert_source_metadata(
+                        AwsS3Config::NAME,
+                        &mut log,
+                        path!("bucket"),
+                        path!("bucket"),
+                        Bytes::from(s3_event.s3.bucket.name.as_bytes().to_vec()),
+                    );
+                    log_namespace.insert_source_metadata(
+                        AwsS3Config::NAME,
+                        &mut log,
+                        path!("object"),
+                        path!("object"),
+                        Bytes::from(s3_event.s3.object.key.as_bytes().to_vec()),
+                    );
+                    log_namespace.insert_source_metadata(
+                        AwsS3Config::NAME,
+                        &mut log,
+                        path!("region"),
+                        path!("region"),
+                        Bytes::from(s3_event.aws_region.as_bytes().to_vec()),
+                    );
+
+                    if let Some(metadata) = &metadata {
+                        for (key, value) in metadata {
+                            log_namespace.insert_source_metadata(
+                                AwsS3Config::NAME,
+                                &mut log,
+                                key.as_str(),
+                                key.as_str(),
+                                value.clone(),
+                            );
                         }
-
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            path!(log_schema().source_type_key()),
-                            path!("source_type"),
-                            Bytes::from(AwsS3Config::NAME),
-                        );
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            path!(log_schema().timestamp_key()),
-                            path!("ingest_timestamp"),
-                            timestamp,
-                        );
-                        emit!(EventsReceived {
-                            count: 1,
-                            byte_size: log.size_of()
-                        });
-
-                        ready(Some(log))
                     }
+
+                    log_namespace.insert_vector_metadata(
+                        &mut log,
+                        path!(log_schema().source_type_key()),
+                        path!("source_type"),
+                        Bytes::from(AwsS3Config::NAME),
+                    );
+                    log_namespace.insert_vector_metadata(
+                        &mut log,
+                        path!(log_schema().timestamp_key()),
+                        path!("ingest_timestamp"),
+                        timestamp,
+                    );
+
+                    emit!(EventsReceived {
+                        count: 1,
+                        byte_size: log.size_of()
+                    });
+
+                    log
                 }
-                Err(_) => {}
+                Err(_) => {
+                    unreachable!("BytesDeserializer::parse() should always return Ok()")
+                }
             }
         });
 
