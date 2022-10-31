@@ -9,7 +9,7 @@ use crate::{
         SinkContext,
     },
     sinks::{
-        elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchConfig},
+        elasticsearch::{ElasticsearchAuth, ElasticsearchConfig},
         util::{http::RequestConfig, Compression},
         Healthcheck, VectorSink,
     },
@@ -100,7 +100,6 @@ impl SinkConfig for AxiomConfig {
             query: Some(query),
             tls: self.tls.clone(),
             request,
-            api_version: ElasticsearchApiVersion::V6,
             ..Default::default()
         };
 
