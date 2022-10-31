@@ -26,7 +26,7 @@ use tokio_util::codec::FramedRead;
 use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
 use vector_config::configurable_component;
 use vector_core::{
-    config::{AcknowledgementsConfig, LogNamespace},
+    config::{LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
     ByteSizeOf,
 };
@@ -88,7 +88,7 @@ pub struct AmqpSourceConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    pub(crate) acknowledgements: AcknowledgementsConfig,
+    pub(crate) acknowledgements: SourceAcknowledgementsConfig,
 }
 
 fn default_queue() -> String {
@@ -123,7 +123,7 @@ impl AmqpSourceConfig {
 impl SourceConfig for AmqpSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         amqp_source(self, cx.shutdown, cx.out, log_namespace, acknowledgements).await
     }

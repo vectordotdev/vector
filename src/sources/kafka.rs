@@ -28,7 +28,9 @@ use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext},
+    config::{
+        log_schema, LogSchema, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+    },
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
         KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
@@ -152,7 +154,7 @@ pub struct KafkaSourceConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 const fn default_session_timeout_ms() -> u64 {
@@ -207,7 +209,7 @@ impl SourceConfig for KafkaSourceConfig {
             LogNamespace::Legacy,
         )
         .build();
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
             self.clone(),
