@@ -88,17 +88,19 @@ impl PartialOrd for TagValueSet {
 
 impl<const N: usize> From<[TagValue; N]> for TagValueSet {
     fn from(values: [TagValue; N]) -> Self {
-        // See logic in `TagValueSet::insert` to why we can't just use `Self(values.into())`
-        let mut result = Self::default();
-        for value in values {
-            result.insert(value);
-        }
-        result
+        values.into_iter().collect()
     }
 }
 
 impl From<Vec<TagValue>> for TagValueSet {
     fn from(values: Vec<TagValue>) -> Self {
+        values.into_iter().collect()
+    }
+}
+
+impl FromIterator<TagValue> for TagValueSet {
+    fn from_iter<T: IntoIterator<Item = TagValue>>(values: T) -> Self {
+        // See logic in `TagValueSet::insert` to why we can't just use `Self(values.into())`
         let mut result = Self::default();
         for value in values {
             result.insert(value);
@@ -348,68 +350,70 @@ mod test_support {
 
 #[cfg(test)]
 mod tests {
-    use quickcheck_macros::quickcheck;
+    use proptest::prelude::*;
 
     use super::*;
 
-    #[quickcheck]
-    fn eq_implies_hash_matches(values1: TagValueSet, values2: TagValueSet) -> bool {
-        fn hash<T: Hash>(values: &T) -> u64 {
-            let mut hasher = DefaultHasher::default();
-            values.hash(&mut hasher);
-            hasher.finish()
-        }
-        values1 != values2 || hash(&values1) == hash(&values2)
-    }
-
-    #[quickcheck]
-    fn tag_value_set_checks(values: Vec<TagValue>, addition: TagValue) -> bool {
-        let mut set = TagValueSet::from(values.clone());
-        assert_eq!(set.is_empty(), values.is_empty());
-        // All input values are contained in the set.
-        assert!(values.iter().all(|v| set.contains(v.as_str())));
-        // All set values were in the input.
-        assert!(set.iter().all(|v| values.contains(v)));
-        // Critical: the "single value" of the set is the last value added.
-        assert_eq!(set.as_single(), values.last().map(String::as_str));
-
-        let start_len = set.len();
-
-        // Is the input value set unique?
-        if values
-            .iter()
-            .enumerate()
-            .any(|(i, v1)| values[i + 1..].iter().any(|v2| v1 == v2))
-        {
-            // Input values are not unique, so the resulting set will be shorter.
-            assert!(start_len < values.len());
-        } else {
-            // All input values were unique, so the resulting set will have all of them.
-            assert_eq!(start_len, values.len());
-
-            if !values.is_empty() {
-                // Check that re-adding the last value doesn't change the set.
-                set.insert(values.last().unwrap().clone());
-                assert_eq!(set.len(), start_len);
-                assert_eq!(set.as_single(), values.last().map(String::as_str));
-
-                // But re-adding the first value makes it the last.
-                set.insert(values.first().unwrap().clone());
-                assert_eq!(set.len(), start_len);
-                assert_eq!(set.as_single(), values.first().map(String::as_str));
+    proptest! {
+        #[test]
+        fn eq_implies_hash_matches_proptest(values1: TagValueSet, values2: TagValueSet) {
+            fn hash<T: Hash>(values: &T) -> u64 {
+                let mut hasher = DefaultHasher::default();
+                values.hash(&mut hasher);
+                hasher.finish()
+            }
+            if values1 == values2{
+                assert_eq!(hash(&values1), hash(&values2));
             }
         }
 
-        let new_addition = !values.iter().any(|v| v == &addition);
-        assert_eq!(new_addition, !set.contains(&addition));
-        set.insert(addition.clone());
-        assert!(set.contains(&addition));
+        #[test]
+        fn tag_value_set_checks(values: Vec<TagValue>, addition: TagValue) {
+            let mut set = TagValueSet::from(values.clone());
+            assert_eq!(set.is_empty(), values.is_empty());
+            // All input values are contained in the set.
+            assert!(values.iter().all(|v| set.contains(v.as_str())));
+            // All set values were in the input.
+            assert!(set.iter().all(|v| values.contains(v)));
+            // Critical: the "single value" of the set is the last value added.
+            assert_eq!(set.as_single(), values.last().map(String::as_str));
 
-        // If the addition wasn't in the start set, it will increase the length.
-        assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
-        // The "single" value will match the addition.
-        assert_eq!(set.as_single(), Some(addition.as_str()));
+            let start_len = set.len();
 
-        true
+            // Is the input value set unique?
+            if values
+                .iter()
+                .enumerate()
+                .any(|(i, v1)| values[i + 1..].iter().any(|v2| v1 == v2))
+            {
+                // Input values are not unique, so the resulting set will be shorter.
+                assert!(start_len < values.len());
+            } else {
+                // All input values were unique, so the resulting set will have all of them.
+                assert_eq!(start_len, values.len());
+
+                if !values.is_empty() {
+                    // Check that re-adding the last value doesn't change the set.
+                    set.insert(values.last().unwrap().clone());
+                    assert_eq!(set.len(), start_len);
+                    assert_eq!(set.as_single(), values.last().map(String::as_str));
+
+                    // But re-adding the first value makes it the last.
+                    set.insert(values.first().unwrap().clone());
+                    assert_eq!(set.len(), start_len);
+                    assert_eq!(set.as_single(), values.first().map(String::as_str));
+                }
+            }
+
+            let new_addition = !values.iter().any(|v| v == &addition);
+            assert_eq!(new_addition, !set.contains(&addition));
+            set.insert(addition.clone());
+            assert!(set.contains(&addition));
+
+            // If the addition wasn't in the start set, it will increase the length.
+            assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
+            // The "single" value will match the addition.
+            assert_eq!(set.as_single(), Some(addition.as_str()));
+        }
     }
 }
