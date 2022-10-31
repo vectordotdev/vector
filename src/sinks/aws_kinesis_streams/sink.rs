@@ -4,20 +4,30 @@ use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use rand::random;
 use tower::Service;
-use vector_core::stream::{BatcherSettings, DriverResponse};
+use vector_common::{
+    finalization::{EventFinalizers, Finalizable},
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
+use vector_core::{
+    partition::Partitioner,
+    stream::{BatcherSettings, DriverResponse},
+};
 
 use crate::{
     event::{Event, LogEvent},
-    internal_events::SinkRequestBuildError,
+    internal_events::{AwsKinesisStreamNoPartitionKeyError, SinkRequestBuildError},
     sinks::{
-        aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder},
+        aws_kinesis_streams::request_builder::KinesisRequestBuilder,
         util::{processed_event::ProcessedEvent, SinkBuilderExt, StreamSink},
     },
 };
 
-pub type KinesisProcessedEvent = ProcessedEvent<LogEvent, KinesisMetadata>;
+use super::request_builder::KinesisRequest;
 
-pub struct KinesisMetadata {
+pub type KinesisProcessedEvent = ProcessedEvent<LogEvent, KinesisKey>;
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct KinesisKey {
     pub partition_key: String,
 }
 
@@ -30,7 +40,7 @@ pub struct KinesisSink<S> {
 
 impl<S> KinesisSink<S>
 where
-    S: Service<Vec<KinesisRequest>> + Send + 'static,
+    S: Service<BatchKinesisRequest> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
@@ -39,12 +49,15 @@ where
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
         let partition_key_field = self.partition_key_field.clone();
-        let sink = input
-            .map(|event| {
+
+        input
+            .filter_map(|event| {
                 // Panic: This sink only accepts Logs, so this should never panic
-                event.into_log()
+                let log = event.into_log();
+                let processed = process_log(log, &partition_key_field);
+
+                future::ready(processed)
             })
-            .filter_map(move |log| future::ready(process_log(log, &partition_key_field)))
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -55,17 +68,26 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .batched(self.batch_settings.into_byte_size_config())
-            .into_driver(self.service);
-
-        sink.run().await
+            .batched_partitioned(KinesisPartitioner, self.batch_settings)
+            .map(|(key, events)| {
+                let metadata =
+                    RequestMetadata::from_batch(events.iter().map(|req| req.get_metadata()));
+                BatchKinesisRequest {
+                    key,
+                    events,
+                    metadata,
+                }
+            })
+            .into_driver(self.service)
+            .run()
+            .await
     }
 }
 
 #[async_trait]
 impl<S> StreamSink<Event> for KinesisSink<S>
 where
-    S: Service<Vec<KinesisRequest>> + Send + 'static,
+    S: Service<BatchKinesisRequest> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
@@ -75,7 +97,7 @@ where
     }
 }
 
-pub fn process_log(
+pub(crate) fn process_log(
     log: LogEvent,
     partition_key_field: &Option<String>,
 ) -> Option<KinesisProcessedEvent> {
@@ -83,11 +105,9 @@ pub fn process_log(
         if let Some(v) = log.get(partition_key_field.as_str()) {
             v.to_string_lossy()
         } else {
-            warn!(
-                message = "Partition key does not exist; dropping event.",
-                %partition_key_field,
-                internal_log_rate_limit = true,
-            );
+            emit!(AwsKinesisStreamNoPartitionKeyError {
+                partition_key_field
+            });
             return None;
         }
     } else {
@@ -101,7 +121,7 @@ pub fn process_log(
 
     Some(KinesisProcessedEvent {
         event: log,
-        metadata: KinesisMetadata { partition_key },
+        metadata: KinesisKey { partition_key },
     })
 }
 
@@ -112,4 +132,34 @@ fn gen_partition_key() -> String {
             s.push(*c);
             s
         })
+}
+
+#[derive(Clone)]
+pub struct BatchKinesisRequest {
+    pub key: KinesisKey,
+    pub events: Vec<KinesisRequest>,
+    metadata: RequestMetadata,
+}
+
+impl Finalizable for BatchKinesisRequest {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.events.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for BatchKinesisRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
+    }
+}
+
+struct KinesisPartitioner;
+
+impl Partitioner for KinesisPartitioner {
+    type Item = KinesisRequest;
+    type Key = KinesisKey;
+
+    fn partition(&self, item: &Self::Item) -> Self::Key {
+        item.key.clone()
+    }
 }

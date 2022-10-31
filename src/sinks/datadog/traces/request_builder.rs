@@ -1,9 +1,10 @@
-use std::{collections::BTreeMap, io::Write, sync::Arc};
+use std::{collections::BTreeMap, io::Write, num::NonZeroUsize, sync::Arc};
 
 use bytes::Bytes;
 use prost::Message;
 use rmp_serde;
 use snafu::Snafu;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{
@@ -15,7 +16,9 @@ use super::{
 };
 use crate::{
     event::{Event, TraceEvent, Value},
-    sinks::util::{Compression, Compressor, IncrementalRequestBuilder},
+    sinks::util::{
+        metadata::RequestMetadataBuilder, Compression, Compressor, IncrementalRequestBuilder,
+    },
 };
 
 #[derive(Debug, Snafu)]
@@ -71,9 +74,8 @@ impl DatadogTracesRequestBuilder {
     }
 }
 
-pub struct RequestMetadata {
+pub struct DDTracesMetadata {
     api_key: Arc<str>,
-    batch_size: usize,
     endpoint: DatadogTracesEndpoint,
     finalizers: EventFinalizers,
     uncompressed_size: usize,
@@ -81,7 +83,7 @@ pub struct RequestMetadata {
 }
 
 impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequestBuilder {
-    type Metadata = RequestMetadata;
+    type Metadata = (DDTracesMetadata, RequestMetadata);
     type Payload = Bytes;
     type Request = TraceApiRequest;
     type Error = RequestBuilderError;
@@ -111,20 +113,30 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
             .for_each(|r| match r {
                 Ok((payload, mut processed)) => {
                     let uncompressed_size = payload.len();
-                    let metadata = RequestMetadata {
+                    let metadata = DDTracesMetadata {
                         api_key: key
                             .api_key
                             .clone()
                             .unwrap_or_else(|| Arc::clone(&self.api_key)),
-                        batch_size: n,
                         endpoint: DatadogTracesEndpoint::Traces,
                         finalizers: processed.take_finalizers(),
                         uncompressed_size,
                         content_type: "application/x-protobuf".to_string(),
                     };
+
                     let mut compressor = Compressor::from(self.compression);
                     match compressor.write_all(&payload) {
-                        Ok(()) => results.push(Ok((metadata, compressor.into_inner().freeze()))),
+                        Ok(()) => {
+                            let bytes = compressor.into_inner().freeze();
+
+                            // build RequestMetadata
+                            let builder = RequestMetadataBuilder::new(n, uncompressed_size);
+                            let bytes_len = NonZeroUsize::new(bytes.len())
+                                .expect("payload should never be zero length");
+                            let request_metadata = builder.with_request_size(bytes_len);
+
+                            results.push(Ok(((metadata, request_metadata), bytes)))
+                        }
                         Err(e) => results.push(Err(RequestBuilderError::FailedToEncode {
                             message: "Payload compression failed.",
                             reason: e.to_string(),
@@ -142,21 +154,25 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
     }
 
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+        let (ddtraces_metadata, request_metadata) = metadata;
         let mut headers = BTreeMap::<String, String>::new();
-        headers.insert("Content-Type".to_string(), metadata.content_type);
-        headers.insert("DD-API-KEY".to_string(), metadata.api_key.to_string());
+        headers.insert("Content-Type".to_string(), ddtraces_metadata.content_type);
+        headers.insert(
+            "DD-API-KEY".to_string(),
+            ddtraces_metadata.api_key.to_string(),
+        );
         if let Some(ce) = self.compression.content_encoding() {
             headers.insert("Content-Encoding".to_string(), ce.to_string());
         }
         TraceApiRequest {
-            batch_size: metadata.batch_size,
             body: payload,
             headers,
-            finalizers: metadata.finalizers,
+            finalizers: ddtraces_metadata.finalizers,
             uri: self
                 .endpoint_configuration
-                .get_uri_for_endpoint(metadata.endpoint),
-            uncompressed_size: metadata.uncompressed_size,
+                .get_uri_for_endpoint(ddtraces_metadata.endpoint),
+            uncompressed_size: ddtraces_metadata.uncompressed_size,
+            metadata: request_metadata,
         }
     }
 }
@@ -410,8 +426,9 @@ fn build_apm_stats_request(
     events: &[TraceEvent],
     compression: Compression,
     default_api_key: &Arc<str>,
-) -> Result<(RequestMetadata, Bytes), RequestBuilderError> {
+) -> Result<((DDTracesMetadata, RequestMetadata), Bytes), RequestBuilderError> {
     let payload = stats::compute_apm_stats(key, events);
+
     let encoded_payload =
         rmp_serde::to_vec_named(&payload).map_err(|e| RequestBuilderError::FailedToEncode {
             message: "APM stats encoding failed.",
@@ -419,20 +436,30 @@ fn build_apm_stats_request(
             dropped_events: 0,
         })?;
     let uncompressed_size = encoded_payload.len();
-    let metadata = RequestMetadata {
+    let metadata = DDTracesMetadata {
         api_key: key
             .api_key
             .clone()
             .unwrap_or_else(|| Arc::clone(default_api_key)),
-        batch_size: 0,
         endpoint: DatadogTracesEndpoint::APMStats,
         finalizers: EventFinalizers::default(),
         uncompressed_size,
         content_type: "application/msgpack".to_string(),
     };
+
     let mut compressor = Compressor::from(compression);
     match compressor.write_all(&encoded_payload) {
-        Ok(()) => Ok((metadata, compressor.into_inner().freeze())),
+        Ok(()) => {
+            let bytes = compressor.into_inner().freeze();
+
+            // build RequestMetadata
+            let builder = RequestMetadataBuilder::new(0, uncompressed_size);
+            let bytes_len =
+                NonZeroUsize::new(bytes.len()).expect("payload should never be zero length");
+            let request_metadata = builder.with_request_size(bytes_len);
+
+            Ok(((metadata, request_metadata), bytes))
+        }
         Err(e) => Err(RequestBuilderError::FailedToEncode {
             message: "APM stats payload compression failed.",
             reason: e.to_string(),

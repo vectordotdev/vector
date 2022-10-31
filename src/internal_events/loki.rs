@@ -1,9 +1,6 @@
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, INTENTIONAL},
-};
+use crate::emit;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
 
 #[derive(Debug)]
 pub struct LokiEventUnlabeled;
@@ -18,7 +15,7 @@ impl InternalEvent for LokiEventUnlabeled {
 
 #[derive(Debug)]
 pub struct LokiOutOfOrderEventDropped {
-    pub count: u64,
+    pub count: usize,
 }
 
 impl InternalEvent for LokiOutOfOrderEventDropped {
@@ -29,7 +26,7 @@ impl InternalEvent for LokiOutOfOrderEventDropped {
         });
 
         // Deprecated
-        counter!("events_discarded_total", self.count,
+        counter!("events_discarded_total", self.count as u64,
                 "reason" => "out_of_order");
         counter!("processing_errors_total", 1,
                 "error_type" => "out_of_order");
@@ -38,7 +35,7 @@ impl InternalEvent for LokiOutOfOrderEventDropped {
 
 #[derive(Debug)]
 pub struct LokiOutOfOrderEventRewritten {
-    pub count: u64,
+    pub count: usize,
 }
 
 impl InternalEvent for LokiOutOfOrderEventRewritten {
@@ -49,7 +46,7 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
             reason = "out_of_order",
             internal_log_rate_limit = true,
         );
-        counter!("rewritten_timestamp_events_total", self.count);
+        counter!("rewritten_timestamp_events_total", self.count as u64);
 
         // Deprecated
         counter!("processing_errors_total", 1,

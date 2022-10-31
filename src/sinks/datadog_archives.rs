@@ -24,6 +24,7 @@ use rand::{thread_rng, Rng};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use vector_common::request_metadata::RequestMetadata;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{log_schema, AcknowledgementsConfig, LogSchema},
@@ -60,11 +61,9 @@ use crate::{
             sink::S3Sink,
         },
         util::{
-            metadata::{RequestMetadata, RequestMetadataBuilder},
-            partitioner::KeyPartitioner,
-            request_builder::EncodeResult,
-            BatchConfig, Compression, RequestBuilder, ServiceBuilderExt, SinkBatchSettings,
-            TowerRequestConfig,
+            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, BatchConfig, Compression, RequestBuilder,
+            ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
         },
         VectorSink,
     },
@@ -614,22 +613,26 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (String, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
-        let metadata = S3Metadata {
+        let s3metadata = S3Metadata {
             partition_key,
-            count: events.len(),
-            byte_size: events.size_of(),
             finalizers,
         };
 
-        (metadata, events)
+        let builder = RequestMetadataBuilder::from_events(&events);
+
+        (s3metadata, builder, events)
     }
 
     fn build_request(
         &self,
         mut metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         metadata.partition_key =
@@ -639,7 +642,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         trace!(
             message = "Sending events.",
             bytes = ?body.len(),
-            events_len = ?metadata.byte_size,
+            events_len = ?request_metadata.events_byte_size(),
             bucket = ?self.bucket,
             key = ?metadata.partition_key
         );
@@ -649,6 +652,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
             body,
             bucket: self.bucket.clone(),
             metadata,
+            request_metadata,
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             options: s3_common::config::S3Options {
                 acl: s3_options.acl,
@@ -679,31 +683,34 @@ struct DatadogGcsRequestBuilder {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
-    type Metadata = (String, EventFinalizers, RequestMetadataBuilder);
+    type Metadata = (String, EventFinalizers);
     type Events = Vec<Event>;
     type Payload = Bytes;
     type Request = GcsRequest;
     type Encoder = DatadogArchivesEncoding;
     type Error = io::Error;
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (String, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
-        let metadata_builder = RequestMetadata::builder(&events);
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let finalizers = events.take_finalizers();
 
-        ((partition_key, finalizers, metadata_builder), events)
+        ((partition_key, finalizers), metadata_builder, events)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        dd_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (key, finalizers, metadata_builder) = metadata;
+        let (key, finalizers) = dd_metadata;
 
         let key = generate_object_key(self.key_prefix.clone(), key);
 
-        let metadata = metadata_builder.build(&payload);
         let body = payload.into_payload();
 
         trace!(
@@ -779,7 +786,10 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (String, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
         let metadata = AzureBlobMetadata {
@@ -788,13 +798,15 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
             byte_size: events.size_of(),
             finalizers,
         };
+        let builder = RequestMetadataBuilder::from_events(&events);
 
-        (metadata, events)
+        (metadata, builder, events)
     }
 
     fn build_request(
         &self,
         mut metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         metadata.partition_key =
@@ -815,6 +827,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             content_type: "application/gzip",
             metadata,
+            request_metadata,
         }
     }
 }
@@ -1055,9 +1068,13 @@ mod tests {
             Default::default(),
         );
 
-        let (metadata, _events) = request_builder.split_input((key, vec![log]));
-        let req =
-            request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf.clone()));
+        let (metadata, metadata_request_builder, _events) =
+            request_builder.split_input((key, vec![log]));
+
+        let payload = EncodeResult::uncompressed(fake_buf.clone());
+        let request_metadata = metadata_request_builder.build(&payload);
+        let req = request_builder.build_request(metadata, request_metadata, payload);
+
         let expected_key_prefix = "audit/dt=20210823/hour=16/";
         let expected_key_ext = ".json.gz";
         println!("{}", req.metadata.partition_key);
@@ -1071,8 +1088,12 @@ mod tests {
         let log2 = LogEvent::default().into();
 
         let key = partitioner.partition(&log2).expect("key wasn't provided");
-        let (metadata, _events) = request_builder.split_input((key, vec![log2]));
-        let req = request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf));
+
+        let (metadata, metadata_request_builder, _events) =
+            request_builder.split_input((key, vec![log2]));
+        let payload = EncodeResult::uncompressed(fake_buf);
+        let request_metadata = metadata_request_builder.build(&payload);
+        let req = request_builder.build_request(metadata, request_metadata, payload);
         let uuid2 = &req.metadata.partition_key
             [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
 

@@ -2,34 +2,47 @@ use std::io;
 
 use aws_sdk_firehose::{model::Record, types::Blob};
 use bytes::Bytes;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, Transformer},
-    event::{Event, EventFinalizers, Finalizable, LogEvent},
-    sinks::util::{request_builder::EncodeResult, Compression, RequestBuilder},
+    event::{Event, EventFinalizers, Finalizable},
+    sinks::util::{
+        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+        RequestBuilder,
+    },
 };
+
+use super::sink::{KinesisKey, KinesisProcessedEvent};
 
 pub struct KinesisRequestBuilder {
     pub(super) compression: Compression,
     pub(super) encoder: (Transformer, Encoder<()>),
 }
 
-pub struct Metadata {
+pub struct KinesisMetadata {
     pub finalizers: EventFinalizers,
-    pub event_byte_size: usize,
+    pub partition_key: String,
 }
 
 #[derive(Clone)]
 pub struct KinesisRequest {
+    pub key: KinesisKey,
     pub record: Record,
     pub finalizers: EventFinalizers,
-    pub event_byte_size: usize,
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for KinesisRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for KinesisRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -59,8 +72,8 @@ impl ByteSizeOf for KinesisRequest {
     }
 }
 
-impl RequestBuilder<LogEvent> for KinesisRequestBuilder {
-    type Metadata = Metadata;
+impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
+    type Metadata = KinesisMetadata;
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
@@ -75,24 +88,37 @@ impl RequestBuilder<LogEvent> for KinesisRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, mut event: LogEvent) -> (Self::Metadata, Self::Events) {
-        let metadata = Metadata {
+    fn split_input(
+        &self,
+        mut event: KinesisProcessedEvent,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let kinesis_metadata = KinesisMetadata {
             finalizers: event.take_finalizers(),
-            event_byte_size: event.size_of(),
+            partition_key: event.metadata.partition_key,
         };
-        (metadata, Event::from(event))
+        let event = Event::from(event.event);
+        let builder = RequestMetadataBuilder::from_events(&event);
+
+        (kinesis_metadata, builder, event)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        kinesis_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let payload = payload.into_payload();
+        let payload_bytes = payload.into_payload();
+
         KinesisRequest {
-            record: Record::builder().data(Blob::new(&payload[..])).build(),
-            finalizers: metadata.finalizers,
-            event_byte_size: metadata.event_byte_size,
+            key: KinesisKey {
+                partition_key: kinesis_metadata.partition_key,
+            },
+            record: Record::builder()
+                .data(Blob::new(&payload_bytes[..]))
+                .build(),
+            finalizers: kinesis_metadata.finalizers,
+            metadata,
         }
     }
 }

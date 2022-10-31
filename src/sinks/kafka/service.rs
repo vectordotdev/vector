@@ -9,6 +9,7 @@ use rdkafka::{
     util::Timeout,
 };
 use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, InternalEventHandle as _, Protocol, Registered,
@@ -24,7 +25,7 @@ use crate::{
 pub struct KafkaRequest {
     pub body: Bytes,
     pub metadata: KafkaRequestMetadata,
-    pub event_byte_size: usize,
+    pub request_metadata: RequestMetadata,
 }
 
 pub struct KafkaRequestMetadata {
@@ -52,6 +53,12 @@ impl DriverResponse for KafkaResponse {
 impl Finalizable for KafkaRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.metadata.finalizers)
+    }
+}
+
+impl MetaDescriptive for KafkaRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
     }
 }
 
@@ -83,6 +90,8 @@ impl Service<KafkaRequest> for KafkaService {
         let this = self.clone();
 
         Box::pin(async move {
+            let event_byte_size = request.get_metadata().events_byte_size();
+
             let mut record =
                 FutureRecord::to(&request.metadata.topic).payload(request.body.as_ref());
             if let Some(key) = &request.metadata.key {
@@ -101,9 +110,7 @@ impl Service<KafkaRequest> for KafkaService {
                     this.bytes_sent.emit(ByteSize(
                         request.body.len() + request.metadata.key.map(|x| x.len()).unwrap_or(0),
                     ));
-                    Ok(KafkaResponse {
-                        event_byte_size: request.event_byte_size,
-                    })
+                    Ok(KafkaResponse { event_byte_size })
                 }
                 Err((kafka_err, _original_record)) => Err(kafka_err),
             }

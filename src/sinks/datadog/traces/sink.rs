@@ -96,7 +96,7 @@ where
                         emit!(DatadogTracesEncodingError {
                             error_message,
                             error_reason,
-                            dropped_events,
+                            dropped_events: dropped_events as usize,
                         });
                         None
                     }
