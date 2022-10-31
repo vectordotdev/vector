@@ -27,6 +27,23 @@ releases: "0.24.0": {
 			`internal_metrics` source as they show the incremental metrics rather than absolute.
 			Fixed in 0.24.1.
 			""",
+		"""
+			The `expire_metrics_secs` option added in this release was not correctly applied. Fixed
+			in 0.24.2.
+			""",
+		"""
+			Supplying an empty string (`""`) for options that take a field name started panicking in
+			0.24.0 rather than disabling the option as it previously did. Fixed in 0.24.2.
+			""",
+		"""
+			This release was intended to add support for sending rate metrics to the
+			`datadog_metrics` sink, but there was a regression in it prior to release. Fixed in
+			0.24.2.
+			""",
+		"""
+			VRL code using closures sometimes returned an incorrect type error ("block returns
+			invalid value type"). Fixed in 0.24.2.
+			""",
 	]
 
 	description: """

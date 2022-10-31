@@ -1568,6 +1568,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "charset"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18e9079d1a12a2cc2bffb5db039c43661836ead4082120d5844f02555aca2d46"
+dependencies = [
+ "base64",
+ "encoding_rs",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.22"
 source = "git+https://github.com/vectordotdev/chrono.git?branch=no-default-time-v0.4.22-1#920ff24cabedcec0f8459b8d9681cbac186dfb58"
@@ -6195,6 +6205,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "quoted_printable"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fee2dce59f7a43418e3382c766554c614e06a552d53a8f07ef499ea4b332c0f"
+
+[[package]]
 name = "radix_trie"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9356,12 +9372,14 @@ dependencies = [
  "bytes 1.2.1",
  "cbc",
  "cfb-mode",
+ "charset",
  "chrono",
  "chrono-tz",
  "cidr-utils",
  "criterion",
  "csv",
  "ctr",
+ "data-encoding",
  "datadog-filter",
  "datadog-grok",
  "datadog-search-syntax",
@@ -9376,6 +9394,7 @@ dependencies = [
  "ofb",
  "once_cell",
  "percent-encoding",
+ "quoted_printable",
  "rand 0.8.5",
  "regex",
  "roxmltree",
