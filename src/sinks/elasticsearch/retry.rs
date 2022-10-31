@@ -34,6 +34,10 @@ impl EsResultResponse {
         })
     }
 
+    // Selects the first error since logging all errors would be quite verbose and many are duplicates.
+    // If partial retry is enabled and we don't retry, this is because there is no retriable error in the
+    // response, thus all errors are equally interesting so logging the first is sufficient.
+    // When partial retry is disabled, we don't retry on any error.
     fn get_error_reason(&self, body: &str) -> String {
         match self
             .items
