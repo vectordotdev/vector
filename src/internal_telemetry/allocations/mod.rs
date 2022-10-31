@@ -15,6 +15,7 @@ pub(crate) use self::allocator::{AllocationGroupId, AllocationLayer, GroupedTrac
 
 use crossbeam_utils::CachePadded;
 /// These arrays represent the allocations and deallocations for each group.
+/// We pad each Atomic to reduce false sharing effects.
 static GROUP_MEM_ALLOCS: [CachePadded<AtomicU64>; 256] =
     arr![CachePadded::new(AtomicU64::new(0)); 256];
 static GROUP_MEM_DEALLOCS: [CachePadded<AtomicU64>; 256] =
