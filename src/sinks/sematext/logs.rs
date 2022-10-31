@@ -10,7 +10,7 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::EventArray,
     sinks::{
-        elasticsearch::{BulkConfig, ElasticsearchApiVersion, ElasticsearchConfig},
+        elasticsearch::{BulkConfig, ElasticsearchConfig},
         util::{
             http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
             StreamSink, TowerRequestConfig,
@@ -98,7 +98,6 @@ impl SinkConfig for SematextLogsConfig {
                 ..Default::default()
             },
             encoding: self.encoding.clone(),
-            api_version: ElasticsearchApiVersion::V6,
             ..Default::default()
         }
         .build(cx)
