@@ -1,9 +1,10 @@
 use std::io;
 
+use bytes::Bytes;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::LogNamespace,
+    config::{log_schema, LogNamespace},
     event::{Event, LogEvent},
 };
 
@@ -94,6 +95,21 @@ impl SourceConfig for StdinConfig {
 
     fn generate_demo_data(&self) -> Event {
         let mut event = LogEvent::default();
+
+        let host_key = self
+            .host_key()
+            .unwrap_or_else(|| log_schema().host_key().to_string());
+        let hostname = crate::get_hostname().ok();
+
+        let source_type = Bytes::from_static(Self::NAME.as_bytes());
+
+        event.try_insert(log_schema().source_type_key(), source_type.clone());
+        event.try_insert(log_schema().timestamp_key(), chrono::Utc::now());
+
+        if let Some(hostname) = &hostname {
+            event.try_insert(host_key.as_str(), hostname.clone());
+        }
+
         event.insert("message", demo_mode::random_message());
         Event::Log(event)
     }
