@@ -404,6 +404,7 @@ target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "r
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator"]
+allocation-tracing = []
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.

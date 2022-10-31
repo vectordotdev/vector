@@ -38,7 +38,7 @@ use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Rep
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
         SourceConfig, SourceContext,
     },
     event::Event,
@@ -104,7 +104,7 @@ pub struct DatadogAgentConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -115,7 +115,7 @@ impl GenerateConfig for DatadogAgentConfig {
             store_api_key: true,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
@@ -158,7 +158,7 @@ impl SourceConfig for DatadogAgentConfig {
             log_namespace,
         );
         let listener = tls.bind(&self.address).await?;
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
         let shutdown = cx.shutdown;
 
