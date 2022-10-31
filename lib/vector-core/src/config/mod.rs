@@ -112,8 +112,7 @@ pub struct Output {
     ///
     /// For *sources*, a `None` schema is identical to a `Some(Definition::source_default())`.
     ///
-    /// For a *transform*, a `None` schema means the transform inherits the merged [`Definition`]
-    /// of its inputs, without modifying the schema further.
+    /// For a *transform*, a schema [`Definition`] is required if `Datatype` is Log.
     pub log_schema_definition: Option<schema::Definition>,
 }
 
