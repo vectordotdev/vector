@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::Args;
 
 use crate::app::Application;
@@ -10,11 +11,13 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) {
+    pub fn exec(&self, app: &Application) -> Result<()> {
         let path = app.platform.canonicalize_path(&self.path);
 
         let mut config = app.config.clone();
         config.repo = path;
         app.config_file.save(config);
+
+        Ok(())
     }
 }

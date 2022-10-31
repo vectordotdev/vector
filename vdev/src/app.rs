@@ -4,15 +4,15 @@ use owo_colors::{
     Stream::{Stderr, Stdout},
 };
 use std::env;
-use std::process::Command;
 
 use crate::config::{Config, ConfigFile};
 use crate::platform::Platform;
+use crate::repo::core::Repository;
 
 pub struct Application {
-    pub(crate) path: String,
     pub(crate) config_file: ConfigFile,
     pub(crate) config: Config,
+    pub(crate) repo: Repository,
     pub(crate) platform: Platform,
     verbosity: LevelFilter,
 }
@@ -34,9 +34,9 @@ impl Application {
         };
 
         Application {
-            path: path.to_string(),
             config_file: config_file,
             config: config_model,
+            repo: Repository::new(path),
             platform: platform,
             verbosity: verbosity,
         }
@@ -49,12 +49,6 @@ impl Application {
     pub fn abort<T: AsRef<str>>(&self, text: T) {
         self.display_error(text);
         self.exit(1);
-    }
-
-    pub fn command<T: AsRef<str>>(&self, program: T) -> Command {
-        let mut cmd = Command::new(program.as_ref());
-        cmd.current_dir(self.path.clone());
-        cmd
     }
 
     pub fn display<T: AsRef<str>>(&self, text: T) {

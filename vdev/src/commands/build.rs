@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::Args;
 
 use crate::app::Application;
@@ -19,8 +20,8 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) {
-        let mut command = app.command("cargo");
+    pub fn exec(&self, app: &Application) -> Result<()> {
+        let mut command = app.repo.command("cargo");
         command.args(["build", "--no-default-features"]);
 
         if self.release {
@@ -44,9 +45,11 @@ impl Cli {
             command.args(["--target", &app.platform.default_target()]);
         };
 
-        let status = command.status().expect("failed to execute cargo");
+        let status = command.status()?;
         if !status.success() {
             app.abort(format!("failed with exit code: {status}"));
         }
+
+        Ok(())
     }
 }

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::Args;
 use std::fs::File;
 use std::io::{prelude::*, BufReader};
@@ -11,10 +12,10 @@ use crate::app::Application;
 pub struct Cli {}
 
 impl Cli {
-    pub fn exec(&self, app: &Application) {
+    pub fn exec(&self, app: &Application) -> Result<()> {
         let mut contexts = vec![];
 
-        let path: PathBuf = [&app.path, "Cargo.toml"].iter().collect();
+        let path: PathBuf = [&app.repo.path, "Cargo.toml"].iter().collect();
         if let Ok(file) = File::open(path) {
             let reader = BufReader::new(file);
 
@@ -30,5 +31,7 @@ impl Cli {
 
         contexts.push(format!("org: {}", app.config.org));
         app.display(format!("vector{{ {} }}", contexts.join(", ")));
+
+        Ok(())
     }
 }

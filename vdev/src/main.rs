@@ -2,12 +2,14 @@ mod app;
 mod commands;
 mod config;
 mod platform;
+mod repo;
 
 use crate::app::Application;
 use crate::commands::cli::Cli;
+use anyhow::Result;
 use clap::Parser;
 
-fn main() {
+fn main() -> Result<()> {
     let cli = Cli::parse();
     env_logger::Builder::new()
         .filter_level(cli.verbose.log_level_filter())
@@ -15,6 +17,5 @@ fn main() {
 
     let app = Application::new(cli.verbose.log_level_filter());
 
-    // TODO: some error handling
-    cli.exec(&app);
+    cli.exec(&app)
 }

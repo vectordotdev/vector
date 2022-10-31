@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::Args;
 
 use crate::app::Application;
@@ -11,11 +12,13 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) {
-        let mut command = app.command(&self.args[0]);
+    pub fn exec(&self, app: &Application) -> Result<()> {
+        let mut command = app.repo.command(&self.args[0]);
         command.args(&self.args[1..]);
 
-        let status = command.status().expect("failed to execute command");
+        let status = command.status()?;
         app.exit(status.code().unwrap());
+
+        Ok(())
     }
 }

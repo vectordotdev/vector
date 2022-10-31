@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::{Args, Subcommand};
 
 use crate::app::Application;
@@ -18,7 +19,7 @@ enum Commands {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) {
+    pub fn exec(&self, app: &Application) -> Result<()> {
         match &self.command {
             Commands::Starship(cli) => cli.exec(&app),
         }

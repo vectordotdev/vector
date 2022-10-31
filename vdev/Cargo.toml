@@ -8,6 +8,7 @@ readme = "README.md"
 publish = false
 
 [dependencies]
+anyhow = "1.0.66"
 cached = "0.40.0"
 clap = { version = "4.0.18", features = ["derive"] }
 clap-verbosity-flag = "2.0.0"
