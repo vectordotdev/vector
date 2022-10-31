@@ -412,7 +412,7 @@ components: sinks: elasticsearch: {
 				setting](\(urls.elasticsearch_ignore_malformed)).
 
 				By default, partial failures are not retried. To enable retries, set `request_retry_partial`. Once enabled it will
-				retry whole partially failed requests as such it is advised to use `id_key` to avoid duplicates.
+				retry whole partially failed requests. As such it is advised to use `id_key` to avoid duplicates.
 				"""
 		}
 
