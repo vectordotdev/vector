@@ -404,13 +404,13 @@ impl Application {
                                 }
                             },
                             Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
-                            Err(RecvError::Closed) => break dbg!(SignalTo::Shutdown),
+                            Err(RecvError::Closed) => break SignalTo::Shutdown,
                             Ok(signal) => break signal,
                         }
                     }
                     // Trigger graceful shutdown if a component crashed, or all sources have ended.
-                    _ = graceful_crash.next() => break dbg!(SignalTo::Shutdown),
-                    _ = &mut sources_finished => break dbg!(SignalTo::Shutdown),
+                    _ = graceful_crash.next() => break SignalTo::Shutdown,
+                    _ = &mut sources_finished => break SignalTo::Shutdown,
                     else => unreachable!("Signal streams never end"),
                 }
             };
