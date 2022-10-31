@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use indexmap::{IndexMap, IndexSet};
 
 use super::{
-    builder::ConfigBuilder, graph::Graph, schema, validation, ComponentKey, Config, OutputId,
-    SourceConfig, TransformConfig,
+    builder::ConfigBuilder, graph::Graph, id::Inputs, schema, validation, ComponentKey, Config,
+    OutputId, SourceConfig, TransformConfig,
 };
 
 /// to handle the expansions when building the graph we need to be able to get the list of inputs
@@ -224,7 +224,7 @@ impl InputMatcher {
     }
 }
 
-fn expand_globs_inner(inputs: &mut Vec<String>, id: &str, candidates: &IndexSet<String>) {
+fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexSet<String>) {
     let raw_inputs = std::mem::take(inputs);
     for raw_input in raw_inputs {
         let matcher = glob::Pattern::new(&raw_input)
@@ -237,13 +237,13 @@ fn expand_globs_inner(inputs: &mut Vec<String>, id: &str, candidates: &IndexSet<
         for input in candidates {
             if matcher.matches(input) && input != id {
                 matched = true;
-                inputs.push(input.clone())
+                inputs.extend(Some(input.to_string()))
             }
         }
         // If it didn't work as a glob pattern, leave it in the inputs as-is. This lets us give
         // more accurate error messages about non-existent inputs.
         if !matched {
-            inputs.push(raw_input)
+            inputs.extend(Some(raw_input))
         }
     }
 }
@@ -309,7 +309,7 @@ mod test {
         );
     }
 
-    fn without_ports(outputs: Vec<OutputId>) -> Vec<ComponentKey> {
+    fn without_ports(outputs: Inputs<OutputId>) -> Vec<ComponentKey> {
         outputs
             .into_iter()
             .map(|output| {

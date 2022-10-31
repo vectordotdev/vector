@@ -126,7 +126,7 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 
 #[cfg(test)]
 pub(self) mod tests {
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_core::event::metric::{MetricKind::*, MetricTags, MetricValue, StatisticKind};
     use vector_core::event::MetricKind;
 

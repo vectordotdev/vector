@@ -606,7 +606,7 @@ mod test {
     use std::collections::BTreeSet;
 
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::*;
 

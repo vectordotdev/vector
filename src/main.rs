@@ -5,6 +5,10 @@ use vector::app::Application;
 
 #[cfg(unix)]
 fn main() {
+    // Configure our tracking allocator.
+    #[cfg(feature = "allocation-tracing")]
+    vector::internal_telemetry::allocations::init_allocation_tracing();
+
     let app = Application::prepare().unwrap_or_else(|code| {
         std::process::exit(code);
     });
