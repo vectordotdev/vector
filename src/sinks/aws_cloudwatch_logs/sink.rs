@@ -80,8 +80,8 @@ impl Finalizable for BatchCloudwatchRequest {
 }
 
 impl MetaDescriptive for BatchCloudwatchRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

@@ -13,13 +13,22 @@ use super::service::VectorRequest;
 use crate::{
     event::{proto::EventWrapper, Event, EventFinalizers, Finalizable},
     proto::vector as proto_vector,
-    sinks::util::{SinkBuilderExt, StreamSink},
+    sinks::util::{metadata::RequestMetadataBuilder, SinkBuilderExt, StreamSink},
 };
 
+/// Data for a single event.
 struct EventData {
     byte_size: usize,
     finalizers: EventFinalizers,
     wrapper: EventWrapper,
+}
+
+/// Temporary struct to collect events during batching.
+#[derive(Clone, Default)]
+struct EventCollection {
+    pub finalizers: EventFinalizers,
+    pub events: Vec<EventWrapper>,
+    pub events_byte_size: usize,
 }
 
 pub struct VectorSink<S> {
@@ -43,22 +52,33 @@ where
             })
             .batched(self.batch_settings.into_reducer_config(
                 |data: &EventData| data.wrapper.encoded_len(),
-                |req: &mut VectorRequest, item: EventData| {
-                    req.finalizers.merge(item.finalizers);
-                    req.events.push(item.wrapper);
-
-                    req.builder.increment(1, item.byte_size);
-
-                    let events = req.events.clone();
-                    req.request = proto_vector::PushEventsRequest { events };
-
-                    let byte_size = req.request.encoded_len();
-                    let bytes_len =
-                        NonZeroUsize::new(byte_size).expect("payload should never be zero length");
-
-                    req.metadata = req.builder.with_request_size(bytes_len);
+                |event_collection: &mut EventCollection, item: EventData| {
+                    event_collection.finalizers.merge(item.finalizers);
+                    event_collection.events.push(item.wrapper);
+                    event_collection.events_byte_size += item.byte_size;
                 },
             ))
+            .map(|event_collection| {
+                let builder = RequestMetadataBuilder::new(
+                    event_collection.events.len(),
+                    event_collection.events_byte_size,
+                    event_collection.events_byte_size, // this is fine as it isn't being used
+                );
+
+                let encoded_events = proto_vector::PushEventsRequest {
+                    events: event_collection.events,
+                };
+
+                let byte_size = encoded_events.encoded_len();
+                let bytes_len =
+                    NonZeroUsize::new(byte_size).expect("payload should never be zero length");
+
+                VectorRequest {
+                    finalizers: event_collection.finalizers,
+                    metadata: builder.with_request_size(bytes_len),
+                    request: encoded_events,
+                }
+            })
             .into_driver(self.service)
             .run()
             .await

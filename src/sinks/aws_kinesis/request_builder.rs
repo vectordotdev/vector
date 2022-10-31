@@ -53,8 +53,8 @@ impl<R> MetaDescriptive for KinesisRequest<R>
 where
     R: Record,
 {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -78,7 +78,7 @@ impl<R> RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder<R>
 where
     R: Record,
 {
-    type Metadata = (KinesisMetadata, RequestMetadataBuilder);
+    type Metadata = KinesisMetadata;
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
@@ -96,24 +96,23 @@ where
     fn split_input(
         &self,
         mut processed_event: KinesisProcessedEvent,
-    ) -> (Self::Metadata, Self::Events) {
-        let metadata = KinesisMetadata {
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let kinesis_metadata = KinesisMetadata {
             finalizers: processed_event.event.take_finalizers(),
             partition_key: processed_event.metadata.partition_key,
         };
         let event = Event::from(processed_event.event);
         let builder = RequestMetadataBuilder::from_events(&event);
 
-        ((metadata, builder), event)
+        (kinesis_metadata, builder, event)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        kinesis_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (kinesis_metadata, builder) = metadata;
-        let metadata = builder.build(&payload);
         let payload_bytes = payload.into_payload();
 
         let record = R::new(&payload_bytes, &kinesis_metadata.partition_key);

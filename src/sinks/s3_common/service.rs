@@ -37,8 +37,8 @@ impl Finalizable for S3Request {
 }
 
 impl MetaDescriptive for S3Request {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.request_metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
     }
 }
 

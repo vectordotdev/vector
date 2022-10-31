@@ -6,20 +6,17 @@ use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use prost::Message;
-use proto_event::EventWrapper;
 use tonic::{body::BoxBody, IntoRequest};
 use tower::Service;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::proto as proto_event, internal_event::CountByteSize, stream::DriverResponse,
-};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use super::VectorSinkError;
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
-    sinks::util::{metadata::RequestMetadataBuilder, uri},
+    sinks::util::uri,
     Error,
 };
 
@@ -47,11 +44,9 @@ impl DriverResponse for VectorResponse {
 
 #[derive(Clone, Default)]
 pub struct VectorRequest {
-    pub events: Vec<EventWrapper>,
     pub finalizers: EventFinalizers,
-    pub request: proto_vector::PushEventsRequest,
     pub metadata: RequestMetadata,
-    pub builder: RequestMetadataBuilder,
+    pub request: proto_vector::PushEventsRequest,
 }
 
 impl Finalizable for VectorRequest {
@@ -61,8 +56,8 @@ impl Finalizable for VectorRequest {
 }
 
 impl MetaDescriptive for VectorRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

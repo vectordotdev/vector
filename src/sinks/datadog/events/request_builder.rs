@@ -42,8 +42,8 @@ impl ElementCount for DatadogEventsRequest {
 }
 
 impl MetaDescriptive for DatadogEventsRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.request_metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
     }
 }
 
@@ -70,7 +70,7 @@ impl DatadogEventsRequestBuilder {
 }
 
 impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
-    type Metadata = (Metadata, RequestMetadataBuilder);
+    type Metadata = Metadata;
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
@@ -85,7 +85,7 @@ impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, event: Event) -> (Self::Metadata, Self::Events) {
+    fn split_input(&self, event: Event) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let builder = RequestMetadataBuilder::from_events(&event);
 
         let mut log = event.into_log();
@@ -94,16 +94,15 @@ impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
             api_key: log.metadata_mut().datadog_api_key(),
         };
 
-        ((metadata, builder), Event::from(log))
+        (metadata, builder, Event::from(log))
     }
 
     fn build_request(
         &self,
         metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (metadata, builder) = metadata;
-        let request_metadata = builder.build(&payload);
         DatadogEventsRequest {
             body: payload.into_payload(),
             metadata,

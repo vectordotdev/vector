@@ -186,8 +186,8 @@ impl<R> MetaDescriptive for BatchKinesisRequest<R>
 where
     R: Record + Clone,
 {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

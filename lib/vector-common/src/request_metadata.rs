@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 /// Metadata for batch requests.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RequestMetadata {
@@ -61,28 +63,28 @@ impl RequestMetadata {
 
     /// Constructs a `RequestMetadata` by summation of the "batch" of `RequestMetadata` provided.
     #[must_use]
-    pub fn from_batch<'a, T: Iterator<Item = &'a RequestMetadata>>(metadata_iter: T) -> Self {
-        let mut event_count = 0;
-        let mut events_byte_size = 0;
-        let mut request_encoded_size = 0;
-        let mut request_wire_size = 0;
-        let mut events_estimated_json_encoded_byte_size = 0;
+    pub fn from_batch<T: IntoIterator<Item = RequestMetadata>>(metadata_iter: T) -> Self {
+        let mut metadata_sum = RequestMetadata::new(0, 0, 0, 0, 0);
 
-        for m in metadata_iter {
-            event_count += m.event_count();
-            events_byte_size += m.events_byte_size();
-            request_encoded_size += m.request_encoded_size();
-            request_wire_size += m.request_wire_size();
-            request_wire_size += m.request_wire_size();
-            events_estimated_json_encoded_byte_size += m.events_estimated_json_encoded_byte_size();
+        for metadata in metadata_iter {
+            metadata_sum = metadata_sum + &metadata;
         }
+        metadata_sum
+    }
+}
 
-        Self {
-            event_count,
-            events_byte_size,
-            events_estimated_json_encoded_byte_size,
-            request_encoded_size,
-            request_wire_size,
+impl<'a> Add<&'a RequestMetadata> for RequestMetadata {
+    type Output = RequestMetadata;
+
+    /// Adds the other `RequestMetadata` to this one.
+    fn add(self, other: &'a Self::Output) -> Self::Output {
+        Self::Output {
+            event_count: self.event_count + other.event_count,
+            events_byte_size: self.events_byte_size + other.events_byte_size,
+            events_estimated_json_encoded_byte_size: self.events_estimated_json_encoded_byte_size
+                + other.events_estimated_json_encoded_byte_size,
+            request_encoded_size: self.request_encoded_size + other.request_encoded_size,
+            request_wire_size: self.request_wire_size + other.request_wire_size,
         }
     }
 }
@@ -90,5 +92,5 @@ impl RequestMetadata {
 /// Objects implementing this trait have metadata that describes the request.
 pub trait MetaDescriptive {
     /// Returns the `RequestMetadata` associated with this object.
-    fn get_metadata(&self) -> &RequestMetadata;
+    fn get_metadata(&self) -> RequestMetadata;
 }
