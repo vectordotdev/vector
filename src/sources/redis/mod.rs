@@ -338,7 +338,7 @@ mod integration_test {
             redis_key: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            log_namespace: Some(LogNamespace::Legacy),
+            log_namespace: Some(false),
         };
 
         let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
@@ -372,6 +372,7 @@ mod integration_test {
             redis_key: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            log_namespace: Some(false),
         };
 
         let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
@@ -395,6 +396,7 @@ mod integration_test {
             redis_key: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            log_namespace: Some(false),
         };
 
         let (tx, rx) = SourceSender::new_test();
