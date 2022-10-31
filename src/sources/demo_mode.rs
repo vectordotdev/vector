@@ -23,20 +23,15 @@ impl DemoMode {
 
         Box::pin(async move {
             loop {
-                interval.tick().await;
-
-                let event = this.inner.generate_demo_data();
-                cx.out.send_event(event).await.unwrap();
+                tokio::select! {
+                    _ = &mut cx.shutdown => break,
+                    _ =  interval.tick() =>  {
+                        let event = this.inner.generate_demo_data();
+                        cx.out.send_event(event).await.unwrap();
+                    }
+                }
             }
-
-            dbg!("out of scope");
+            Ok(())
         })
-    }
-}
-
-impl Drop for DemoMode {
-    fn drop(&mut self) {
-        dbg!("Dropping!", self);
-        panic!("arg");
     }
 }
