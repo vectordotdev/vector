@@ -2,13 +2,36 @@ mod payloads;
 mod resources;
 
 use std::{
-    future::{ready, Future},
-    sync::{Arc, atomic::{AtomicUsize, Ordering}}, collections::VecDeque,
+    collections::{HashMap, VecDeque},
+    future::Future,
+    iter,
+    marker::PhantomData,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
-use futures_util::future::OptionFuture;
-use tokio::{sync::{oneshot, mpsc::{self, error::SendError, OwnedPermit}, Barrier, Notify}, task::JoinSet, select};
-use vector_core::event::EventArray;
+use async_trait::async_trait;
+use tokio::{
+    pin, select,
+    sync::{oneshot, Barrier, Notify},
+};
+use vector_buffers::topology::channel::{limited, LimitedReceiver, LimitedSender};
+use vector_common::{config::ComponentKey, shutdown::ShutdownSignal};
+use vector_core::{
+    config::{proxy::ProxyConfig, GlobalOptions},
+    event::{Event, EventArray, LogEvent},
+    sink::VectorSink,
+    source::Source,
+    transform::Transform,
+};
+
+use crate::{
+    config::{schema, SinkContext, SinkHealthcheckOptions, SourceContext, TransformContext},
+    SourceSender,
+};
 
 use self::resources::HttpConfig;
 
@@ -16,6 +39,41 @@ pub enum ComponentType {
     Source,
     Transform,
     Sink,
+}
+
+pub enum ComponentBuilderParts {
+    Source(SourceContext),
+    Transform(TransformContext),
+    Sink(SinkContext),
+}
+
+pub enum BuiltComponent {
+    Source(Source),
+    Transform(Transform),
+    Sink(VectorSink),
+}
+
+impl BuiltComponent {
+    fn into_source_component(self) -> Source {
+        match self {
+            Self::Source(source) => source,
+            _ => panic!("source component returned built component of different type"),
+        }
+    }
+
+    fn into_transform_component(self) -> Transform {
+        match self {
+            Self::Transform(transform) => transform,
+            _ => panic!("transform component returned built component of different type"),
+        }
+    }
+
+    fn into_sink_component(self) -> VectorSink {
+        match self {
+            Self::Sink(sink) => sink,
+            _ => panic!("sink component returned built component of different type"),
+        }
+    }
 }
 
 pub enum ResourceDirection {
@@ -31,6 +89,21 @@ pub enum ComponentPayload {
     Json,
 }
 
+impl ComponentPayload {
+    pub fn into_event(self) -> Event {
+        match self {
+            Self::Json => {
+                // Dummy event for now.
+                let mut log = LogEvent::default();
+                log.insert("field_a", "value_a");
+                log.insert("field_b.subfield_a", 42);
+                log.insert("field_b.subfield_b", vec!["foo", "bar"]);
+                log.into()
+            }
+        }
+    }
+}
+
 pub struct ExternalResource {
     direction: ResourceDirection,
     resource: ResourceDefinition,
@@ -39,12 +112,12 @@ pub struct ExternalResource {
 /// Validator input mechanism.
 ///
 /// This is the mechanism by which the validator task pushes input to the component being validated.
-pub struct ValidatorInput(mpsc::Sender<EventArray>);
+pub struct ValidatorInput(LimitedSender<EventArray>);
 /// Validator output mechanism.
 ///
 /// This is the mechanism by which the validator task captures output from the component being
 /// validated.
-pub struct ValidatorOutput(mpsc::Receiver<EventArray>);
+pub struct ValidatorOutput(LimitedReceiver<EventArray>);
 
 /// Component input mechanism.
 ///
@@ -55,7 +128,7 @@ pub enum ComponentInput {
     ///
     /// We link this channel to the output side of the validator task so that events pushed to this
     /// channel arrive directly at the component being validated.
-    Channel(mpsc::Receiver<EventArray>),
+    Channel(LimitedSender<EventArray>),
 
     /// Component takes its input from an external resource.
     External,
@@ -70,12 +143,13 @@ pub enum ComponentOutput {
     ///
     /// We link this channel to the input side of the validator task so that events pushed to this
     /// channel arrive directly at the validator task.
-    Channel(mpsc::Sender<EventArray>),
+    Channel(LimitedReceiver<EventArray>),
 
     /// Component pushes its output to an external resource.
     External,
 }
 
+#[async_trait]
 pub trait Component {
     /// Gets the type of the component.
     fn component_type() -> ComponentType;
@@ -102,6 +176,19 @@ pub trait Component {
     /// to sources, or convert to an equivalent internal event representation when sent to a
     /// transform or sink, and so on.
     fn payload() -> ComponentPayload;
+
+    /// Builds a future that represents the runnable portion of a component.
+    ///
+    /// Given that this trait covers multiple component types, `ComponentBuilderParts` provides an
+    /// opaque set of component type-specific parts needed for building a component. If the builder
+    /// parts do not match the actual component type, `Err(...)` is returned with an error
+    /// describing this. Alternatively, if the builder parts are correct but there is a general
+    /// error with building the component, `Err(...)` is also returned.
+    ///
+    /// Otherwise, `Ok(...)` is returned, containing the built component.
+    async fn build_component(
+        builder_parts: ComponentBuilderParts,
+    ) -> Result<BuiltComponent, String>;
 }
 
 struct WaitGroupState {
@@ -125,7 +212,7 @@ impl WaitGroup {
             state: Arc::new(WaitGroupState {
                 outstanding: AtomicUsize::new(1),
                 notify: Notify::new(),
-            })
+            }),
         }
     }
 
@@ -148,7 +235,7 @@ impl WaitGroup {
         // or they've all completed, and we can short-circuit waiting to be notified entirely.
         let previous = self.state.outstanding.load(Ordering::Acquire);
         if previous == 1 {
-            return
+            return;
         }
 
         self.state.notify.notified().await
@@ -169,7 +256,7 @@ impl WaitGroupChild {
     ///
     /// If the wait group has been finalized and is waiting for all children to be marked as done,
     /// and this is the last outstanding child to be marked as done, the wait group will be notified.
-    pub fn mark_as_done(self) {
+    pub fn mark_as_done(mut self) {
         self.done = true;
 
         // Decrement the `outstanding` count, and if the value is now at zero, that means the wait
@@ -249,39 +336,196 @@ impl ShutdownHandle {
     }
 }
 
-pub struct ValidationResults;
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ValidatorState {
+    Running,
+    InputDone,
+    WaitingOnComponent,
+    WaitingOnOutputs,
+    Completed,
+}
 
-pub struct ComplianceRunner;
+impl ValidatorState {
+    fn is_running(self) -> bool {
+        self == ValidatorState::Running
+    }
 
-impl ComplianceRunner {
-    fn build_component_task<C: Component>(
+    fn is_component_active(self) -> bool {
+        match self {
+            Self::Running | Self::InputDone | Self::WaitingOnComponent => true,
+            _ => false,
+        }
+    }
+
+    fn is_completed(self) -> bool {
+        self == ValidatorState::Completed
+    }
+}
+
+pub struct ValidatorResults {
+    inputs: Vec<EventArray>,
+    outputs: Vec<EventArray>,
+}
+
+pub struct Validator<C> {
+    _c: PhantomData<C>,
+}
+
+impl<C: Component + 'static> Validator<C> {
+    async fn build_source_component_task(
+        &mut self,
+        mut shutdown_handle: ShutdownHandle,
+        resource: ExternalResource,
+        tasks_started: &WaitGroup,
+        tasks_completed: &WaitGroup,
+    ) -> (
+        Pin<Box<dyn Future<Output = ()>>>,
+        ValidatorInput,
+        ValidatorOutput,
+    ) {
+        // First we'll spawn the external input resource. We ensure that the external resource is
+        // ready via `tasks_started` when the validator actually runs.
+        let (input_tx, input_rx) = limited(1024);
+        self.spawn_external_input_resource(resource, input_rx, tasks_started, tasks_completed);
+
+        // Now actually build the source itself. We end up wrapping it in a very thin layer of glue to
+        // drive it properly and ensure that we trigger it to shutdown when the validator tells us
+        // that it's time to shutdown from its perspective.
+        let (source_tx, validator_rx) = SourceSender::new_with_buffer(1024);
+        let (shutdown_trigger, shutdown, _) = ShutdownSignal::new_wired();
+        let source_context = SourceContext {
+            key: ComponentKey::from("validator_source"),
+            globals: GlobalOptions::default(),
+            shutdown,
+            out: source_tx,
+            proxy: ProxyConfig::default(),
+            acknowledgements: true,
+            schema: schema::Options::default(),
+            schema_definitions: HashMap::new(),
+        };
+
+        let source_builder_parts = ComponentBuilderParts::Source(source_context);
+        let source_component = C::build_component(source_builder_parts)
+            .await
+            .expect("failed to build source component")
+            .into_source_component();
+
+        let fut = Box::pin(async move {
+            let mut shutdown_trigger = Some(shutdown_trigger);
+            pin!(source_component);
+
+            loop {
+                select! {
+                    // Wait for the shutdown signal from the validator, and then trigger
+                    // shutdown of the source with its native shutdown signal.
+                    _ = shutdown_handle.wait_for_shutdown(), if shutdown_trigger.is_some() => {
+                        drop(shutdown_trigger.take());
+                    },
+
+                    // Drive the source component until it completes, in which case we're done. This
+                    // should really only occur once we've triggered shutdown.
+                    // TODO: Do something with the result of `source_component`.
+                    _result = &mut source_component => {
+                        if shutdown_trigger.is_some() {
+                            panic!("source component completed prior to shutdown being triggered");
+                        }
+
+                        break
+                    },
+                }
+            }
+
+            shutdown_handle.mark_as_done().await;
+        });
+
+        (fut, ValidatorInput(input_tx), ValidatorOutput(validator_rx))
+    }
+
+    async fn build_transform_component_task(
+        &mut self,
         shutdown_handle: ShutdownHandle,
-        input: ComponentInput,
-        output: ComponentOutput,
-    ) -> impl Future<Output = ()> {
-        ready(())
+    ) -> (
+        Pin<Box<dyn Future<Output = ()>>>,
+        ValidatorInput,
+        ValidatorOutput,
+    ) {
+        // As transforms have no external resources, we simply build the transform component and
+        // wrap it so that we can drive it depending on which specific type of transform it is.
+        let (input_tx, _input_rx) = limited(1024);
+        let (_output_tx, output_rx) = limited(1024);
+
+        let transform_context = TransformContext::default();
+        let transform_builder_parts = ComponentBuilderParts::Transform(transform_context);
+        let transform_component = C::build_component(transform_builder_parts)
+            .await
+            .expect("failed to build transform component")
+            .into_transform_component();
+
+        let fut = Box::pin(async move {
+            match transform_component {
+                Transform::Function(_ft) => {}
+                Transform::Synchronous(_st) => (),
+                Transform::Task(_tt) => {}
+            };
+
+            shutdown_handle.mark_as_done().await;
+        });
+
+        (fut, ValidatorInput(input_tx), ValidatorOutput(output_rx))
     }
 
-    fn spawn_external_input_resource(resource: ExternalResource, input_rx: mpsc::Receiver<EventArray>, tasks_started: &WaitGroup, tasks_completed: &WaitGroup) {
-        
+    async fn build_sink_component_task(
+        &mut self,
+        shutdown_handle: ShutdownHandle,
+        resource: ExternalResource,
+        tasks_started: &WaitGroup,
+        tasks_completed: &WaitGroup,
+    ) -> (
+        Pin<Box<dyn Future<Output = ()>>>,
+        ValidatorInput,
+        ValidatorOutput,
+    ) {
+        // First we'll spawn the external output resource. We ensure that the external resource is
+        // ready via `tasks_started` when the validator actually runs.
+        let (input_tx, input_rx) = limited(1024);
+        let (output_tx, validator_rx) = limited(1024);
+        self.spawn_external_output_resource(resource, output_tx, tasks_started, tasks_completed);
+
+        // Now actually build the sink itself. We end up wrapping it in a very thin layer of glue to
+        // drive it properly and mark when the component completes.
+        let sink_context = SinkContext {
+            healthcheck: SinkHealthcheckOptions::default(),
+            globals: GlobalOptions::default(),
+            proxy: ProxyConfig::default(),
+            schema: schema::Options::default(),
+        };
+
+        let sink_builder_parts = ComponentBuilderParts::Sink(sink_context);
+        let sink_component = C::build_component(sink_builder_parts)
+            .await
+            .expect("failed to build sink component")
+            .into_sink_component();
+
+        let fut = Box::pin(async move {
+            // TODO: Do something with the result of `VectorSink::run`.
+            let _result = sink_component.run(input_rx.into_stream()).await;
+            shutdown_handle.mark_as_done().await;
+        });
+
+        (fut, ValidatorInput(input_tx), ValidatorOutput(validator_rx))
     }
 
-    fn spawn_external_output_resource(resource: ExternalResource, output_tx: mpsc::Sender<EventArray>, tasks_started: &WaitGroup, tasks_completed: &WaitGroup) {
-        
-    }
-
-    pub async fn validate<C: Component + 'static>() -> Result<(), Vec<String>> {
-        // Build and spawn any necessary validator tasks that will drive the sending/receiving of events
-        // related to the component being validated. We get back handles to all of those validator
-        // tasks so we can ensure they shutdown cleanly, as well as a handle that can be used to
-        // wait until all validator tasks have reported being "ready" -- ready to send data, or
-        // receive it, etc -- before proceeding.
-        let (input_tx, input_rx) = mpsc::channel(65_536);
-        let (output_tx, output_rx) = mpsc::channel(65_536);
-        let tasks_started = WaitGroup::new();
-        let tasks_completed = WaitGroup::new();
-
-        let (component_input, component_output) = match (C::component_type(), C::external_resource()) {
+    async fn build_component_task(
+        &mut self,
+        shutdown_handle: ShutdownHandle,
+        tasks_started: &WaitGroup,
+        tasks_completed: &WaitGroup,
+    ) -> (
+        Pin<Box<dyn Future<Output = ()>>>,
+        ValidatorInput,
+        ValidatorOutput,
+    ) {
+        match (C::component_type(), C::external_resource()) {
             // Sources and sinks implicitly must have an external resource configured, regardless of
             // whether or not the resource is push or pull.
             (ComponentType::Source, None) | (ComponentType::Sink, None) => {
@@ -292,36 +536,99 @@ impl ComplianceRunner {
             (ComponentType::Transform, Some(_)) => {
                 panic!("transforms should never have an external resource declared")
             }
-            // Transforms are simple: pure channel-based communication. The validator can simply
-            // send events directly into the transform component, and receive any output events
-            // directly as well.
-            (ComponentType::Transform, None) => {
-               (ComponentInput::Channel(input_rx), ComponentOutput::Channel(output_tx))
-            },
-            // Sources always have an external resource for their input side.
-            //
-            // We wire up the validator input to the external resource and the validator output to
-            // the component.
             (ComponentType::Source, Some(resource)) => {
-                Self::spawn_external_input_resource(resource, input_rx, &tasks_started, &tasks_completed);
-
-                (ComponentInput::External, ComponentOutput::Channel(output_tx))
-            },
-            // Sinks always have an external resource for their output side.
-            //
-            // We wire up the validator output to the external resource and the validator input to
-            // the component.
+                self.build_source_component_task(
+                    shutdown_handle,
+                    resource,
+                    &tasks_started,
+                    &tasks_completed,
+                )
+                .await
+            }
+            (ComponentType::Transform, None) => {
+                self.build_transform_component_task(shutdown_handle).await
+            }
             (ComponentType::Sink, Some(resource)) => {
-                Self::spawn_external_output_resource(resource, output_tx, &tasks_started, &tasks_completed);
+                self.build_sink_component_task(
+                    shutdown_handle,
+                    resource,
+                    &tasks_started,
+                    &tasks_completed,
+                )
+                .await
+            }
+        }
+    }
 
-                (ComponentInput::Channel(input_rx), ComponentOutput::External)
-            },
-        };
+    fn spawn_external_input_resource(
+        &mut self,
+        _resource: ExternalResource,
+        _input_rx: LimitedReceiver<EventArray>,
+        _tasks_started: &WaitGroup,
+        _tasks_completed: &WaitGroup,
+    ) {
+    }
 
-        // Build our component future, which is a wrapper around any necessary logic/behavior in
-        // order to drive the component correctly.
+    fn spawn_external_output_resource(
+        &mut self,
+        _resource: ExternalResource,
+        _output_tx: LimitedSender<EventArray>,
+        _tasks_started: &WaitGroup,
+        _tasks_completed: &WaitGroup,
+    ) {
+    }
+
+    fn generate_input_payloads(&self) -> VecDeque<EventArray> {
+        let component_payload = C::payload();
+        iter::once(component_payload.into_event())
+            .cycle()
+            .take(3)
+            .enumerate()
+            .map(|(i, event)| {
+                if let Event::Log(mut log) = event {
+                    log.insert("event_id", i);
+                    log.into()
+                } else {
+                    event.into()
+                }
+            })
+            .collect()
+    }
+
+    pub async fn validate(mut self) -> Result<ValidatorResults, Vec<String>> {
+        // Build and spawn any necessary validator tasks that will drive the sending/receiving of events
+        // related to the component being validated. We get back handles to all of those validator
+        // tasks so we can ensure they shutdown cleanly, as well as a handle that can be used to
+        // wait until all validator tasks have reported being "ready" -- ready to send data, or
+        // receive it, etc -- before proceeding.
+        let tasks_started = WaitGroup::new();
+        let tasks_completed = WaitGroup::new();
+
+        // Build our component future, which gets us the resulting input/output objects necessary to
+        // drive it. We also spawn any external resource necessary for the given component, which
+        // also gets us the input/output objects necessary to send input payloads, or receive output
+        // payloads.
         let (shutdown_trigger, shutdown_handle) = ShutdownTrigger::new();
-        let component_future = Self::build_component_future::<C>(shutdown_handle, component_input, component_output);
+        let (component_future, mut validator_input, mut validator_output) = self
+            .build_component_task(shutdown_handle, &tasks_started, &tasks_completed)
+            .await;
+
+        // diagrams:
+        //
+        // source:
+        //   [           channel #1           ]             [            channel #2            ]
+        //   [  channel tx  ]    [ channel rx ]             [  channel tx ]     [  channel rx  ]
+        //   ( validator tx ) -> (  external  ) -> ( source (  source tx  )) -> ( validator rx )
+        //
+        // transform:
+        //   [            channel #1             ]           [            channel #2             ]
+        //   [  channel tx  ]     [  channel rx  ]           [  channel tx  ]     [  channel rx  ]
+        //   ( validator tx ) -> (( transform rx ) transform ( transform tx )) -> ( validator rx )
+        //
+        // sink:
+        //   [           channel #1            ]           [           channel #2           ]
+        //   [  channel tx  ]     [ channel rx ]           [ channel tx ]    [  channel rx  ]
+        //   ( validator tx ) -> ((   sink rx  ) sink ) -> (  external  ) -> ( validator rx )
 
         // Wait for our validator tasks, if any, to have started and signalled that they're ready.
         //
@@ -329,37 +636,6 @@ impl ComplianceRunner {
         // inject events, drive the component itself to run and process those events, and then
         // collect all results at the end.
         tasks_started.wait_for_children().await;
-
-        // Generate a number of payloads that will be fed as the input to the component, and create
-        // a place to store the payloads we get back.
-        let mut input_payloads = VecDeque::new();
-        let mut output_payloads = Vec::new();
-
-        let mut validator_input = Some(input_tx);
-        let validator_output = &mut output_rx;
-        let mut shutdown_trigger = Some(shutdown_trigger);
-
-        #[derive(Debug, Clone, Copy, PartialEq)]
-        enum ValidatorState {
-            Running,
-            InputDone,
-            WaitingOnComponent,
-            WaitingOnOutputs,
-            Completed
-        }
-
-        impl ValidatorState {
-            fn is_completed(self) -> bool {
-                self == ValidatorState::Completed
-            }
-
-            fn is_component_active(self) -> bool {
-                match self {
-                    Self::Running | Self::InputDone | Self::WaitingOnComponent => true,
-                    _ => false,
-                }
-            }
-        }
 
         // Our core logic is straightforward: send inputs from the validator to the component, let
         // the component process them, and have the validator collect any outputs from the
@@ -374,42 +650,61 @@ impl ComplianceRunner {
         // Below, we have this logic represented as a small state machine loop that ensures we're
         // sending inputs to the component, driving the component so it can process those inputs and
         // possibly generate outputs, and then collecting those outputs.
+        let mut input_payloads = self.generate_input_payloads();
+        let input_payloads_result = Vec::from_iter(input_payloads.iter().cloned());
+        let mut output_payloads = Vec::new();
+
+        let mut shutdown_trigger = Some(shutdown_trigger);
+        let mut input_task_handle = tokio::spawn(async move {
+            while let Some(input) = input_payloads.pop_front() {
+                validator_input
+                    .0
+                    .send(input)
+                    .await
+                    .expect("should not fail to send validator input to component");
+                debug!("Sent input from validator to component.");
+            }
+
+            debug!("No input items left.");
+        });
+
+        pin!(component_future);
+
+        // TODO: We need a way to signal to the external resource to close when we're all done.
+        //
+        // Generally, we can figure this out based on the position of the external resource: if it's
+        // driving a source, it should be complete when our validator input channel closes, and if
+        // it's driving a sink, it should be finished when the sink finishes.
+        //
+        // This is mostly important for sinks where we need to be able to meaningfully signal to the
+        // external output resource that the sink is done, and so it should flush whatever it has left,
+        // etc, if it needs to do anything like that... and then close.
+        //
+        // The actual completion of the external resource can funnel back to us in one of two ways:
+        // the wait group completes if we wait on it, or the output channel closes and no items are
+        // left. The former is how we'd detect an external input resource finishing, and the latter
+        // is how we'd detect an external output resource finishing.
+        //
+        // Our core logic loop, however, is a bit more agnostic, so we need a way to almost
+        // idempotently be able to signal the external resource to shutdown both after we finish
+        // sending all of our inputs _and_ after the component completes, where the external
+        // resource would only pay attention to the usage that mattered for itself i.e. an external
+        // output resource only caring about the shutdown signal sent when a sink component
+        // completes.. or we could just generate a shutdown trigger for both and fire them blindly,
+        // and let the "spawn the external resource" code chose which one it needs to hold on to/pay
+        // attention to. :shrug:
+
         let mut validator_state = ValidatorState::Running;
         loop {
-            let maybe_input_reserve: OptionFuture<Result<OwnedPermit<_>, SendError<()>>> = validator_input.take().map(|i| i.reserve_owned()).into();
-
             let maybe_new_validator_state = select! {
-                // While our validator input is alive, try and reserve a slot to send the next input
-                // to the component. As long as we have a sender, that implies we still have inputs
-                // to send. When we have no more items to send, the permit we acquired will drop,
-                // which in turn drops the channel and lets the component be signalled that the
-                // input stream is now closed.
-                //
-                // We reserve our sending slot because otherwise we would risk losing inputs via
-                // `send` if another future completed before the send did, and we additionally use
-                // `reserve_owned` so that we can hold the sender in `Option<T>`, 
-                maybe_permit = maybe_input_reserve, if !input_payloads.is_empty() => match maybe_permit {
-                    Some(Err(_)) => panic!("validator input rx dropped unexpectedly"),
-                    Some(Ok(permit)) => if let Some(input) = input_payloads.pop_front() {
-                        debug!("Sent input from validator to component.");
-
-                        // Send the input and re-arm our sender for the next send.
-                        let sender = permit.send(input);
-                        validator_input = Some(sender);
-
-                        None
-                    } else {
-                        debug!("No input items left.");
-
-                        // We got a permit but have no more inputs left to send, so transition to
-                        // the `InputDone` state which will initiate the shutdown sequence for the component.
-                        Some(ValidatorState::InputDone)
-                    },
-                    None => panic!("validator input channel should not be dropped before input payloads are all sent"),
+                // Drive our input sender until it's done sending all of the inputs.
+                result = &mut input_task_handle, if validator_state.is_running() => match result {
+                    Ok(()) => Some(ValidatorState::InputDone),
+                    Err(_) => panic!("Validator input sender task panicked unexpectedly."),
                 },
 
                 // Drive the component if it is still actively processing.
-                result = &mut component_future, if validator_state.is_component_active() => {
+                _ = &mut component_future, if validator_state.is_component_active() => {
                     debug!("Component finished.");
 
                     // If the component has finished, transition to the `WaitingOnOutputs` state to
@@ -419,7 +714,7 @@ impl ComplianceRunner {
                 },
 
                 // We got an output from the component, so stash it off to the side for now.
-                maybe_output = validator_output.recv(), if !validator_state.is_completed() => match maybe_output {
+                maybe_output = validator_output.0.next(), if !validator_state.is_completed() => match maybe_output {
                     Some(output) => {
                         debug!("Got output item from component.");
 
@@ -448,7 +743,7 @@ impl ComplianceRunner {
                         debug!("Input stage done, triggering component shutdown...");
 
                         shutdown_trigger.take().expect("shutdown trigger already taken").trigger_and_wait().await;
-                        
+
                         Some(ValidatorState::WaitingOnComponent)
                     },
 
@@ -469,14 +764,79 @@ impl ComplianceRunner {
                 }
             };
 
-            if let Some(new_validation_state) = maybe_new_validation_state {
-                let existing_validation_state = validation_state;
-                validation_state = new_validation_state;
+            if let Some(new_validator_state) = maybe_new_validator_state {
+                let existing_validator_state = validator_state;
+                validator_state = new_validator_state;
 
-                debug!("Validation state transitioned from {} to {}.", existing_validation_state, new_validation_state);
+                debug!(
+                    "Validator state transitioned from {:?} to {:?}.",
+                    existing_validator_state, new_validator_state
+                );
             }
         }
 
-        Ok(())
+        Ok(ValidatorResults {
+            inputs: input_payloads_result,
+            outputs: output_payloads,
+        })
+    }
+}
+
+impl<C: Component + 'static> Default for Validator<C> {
+    fn default() -> Self {
+        Self { _c: PhantomData }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use vector_core::{
+        event::Event,
+        transform::{FunctionTransform, OutputBuffer},
+    };
+
+    use super::*;
+
+    // A simple transform that just forwards its event untouched.
+    #[derive(Clone)]
+    struct ValidatableTransform;
+
+    impl FunctionTransform for ValidatableTransform {
+        fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+            output.push(event);
+        }
+    }
+
+    #[async_trait]
+    impl Component for ValidatableTransform {
+        fn component_type() -> ComponentType {
+            ComponentType::Transform
+        }
+
+        fn external_resource() -> Option<ExternalResource> {
+            None
+        }
+
+        fn payload() -> ComponentPayload {
+            ComponentPayload::Json
+        }
+
+        async fn build_component(
+            _builder_parts: ComponentBuilderParts,
+        ) -> Result<BuiltComponent, String> {
+            Ok(BuiltComponent::Transform(Transform::Function(Box::new(
+                ValidatableTransform,
+            ))))
+        }
+    }
+
+    #[tokio::test]
+    async fn basic() {
+        let validator = Validator::<ValidatableTransform>::default();
+        let results = validator.validate().await;
+        assert!(results.is_ok());
+
+        let results = results.expect("results should be ok");
+        assert_eq!(results.inputs, results.outputs);
     }
 }
