@@ -100,13 +100,21 @@ pub trait SinkBuilderExt: Stream {
 
             Box::pin(async move {
                 // Split the input into metadata and events.
-                let (metadata, events) = builder.split_input(input);
+                let (metadata, request_metadata_builder, events) = builder.split_input(input);
 
                 // Encode the events.
                 let payload = builder.encode_events(events)?;
 
+                // Note: it would be nice for the RequestMetadataBuilder to build be created from the
+                // events here, and not need to be requred by split_input(). But this then requires
+                // each Event type to implement Serialize, and that causes conflicts with the Serialize
+                // implementation for EstimatedJsonEncodedSizeOf.
+
+                // Build the request metadata.
+                let request_metadata = request_metadata_builder.build(&payload);
+
                 // Now build the actual request.
-                Ok(builder.build_request(metadata, payload))
+                Ok(builder.build_request(metadata, request_metadata, payload))
             })
         })
     }

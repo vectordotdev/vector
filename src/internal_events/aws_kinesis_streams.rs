@@ -1,35 +1,33 @@
+use crate::emit;
 use metrics::counter;
 use vector_common::internal_event::{
     error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
 use vector_core::internal_event::InternalEvent;
 
-use crate::emit;
-
 #[derive(Debug)]
-pub struct AwsCloudwatchLogsMessageSizeError {
-    pub size: usize,
-    pub max_size: usize,
+pub struct AwsKinesisStreamNoPartitionKeyError<'a> {
+    pub partition_key_field: &'a str,
 }
 
-impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
+impl InternalEvent for AwsKinesisStreamNoPartitionKeyError<'_> {
     fn emit(self) {
-        let reason = "Encoded event is too long.";
+        let reason = "Partition key does not exist.";
+
         error!(
             message = reason,
-            size = self.size as u64,
-            max_size = self.max_size as u64,
-            error_code = "message_too_long",
-            error_type = error_type::ENCODER_FAILED,
+            partition_key_field = %self.partition_key_field,
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
         );
+
         counter!(
             "component_errors_total", 1,
-            "error_code" => "message_too_long",
-            "error_type" => error_type::ENCODER_FAILED,
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
+
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

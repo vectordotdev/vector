@@ -359,7 +359,7 @@ async fn run_amqp_source(
         )
         .await
         .map_err(|error| {
-            error!(message = "Failed to consume.", error = ?error, internal_log_rate_secs = 10);
+            error!(message = "Failed to consume.", error = ?error, internal_log_rate_secs = true);
         })?
         .fuse();
     let mut shutdown = shutdown.fuse();
