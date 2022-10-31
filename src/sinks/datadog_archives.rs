@@ -638,7 +638,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for DatadogS3RequestBuilder {
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        mut metadata: Self::Metadata,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -811,7 +811,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        mut metadata: Self::Metadata,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {

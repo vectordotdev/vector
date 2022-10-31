@@ -10,7 +10,10 @@ use crate::{
 };
 use bytes::Bytes;
 use std::io;
-use vector_common::finalization::{EventFinalizers, Finalizable};
+use vector_common::{
+    finalization::{EventFinalizers, Finalizable},
+    request_metadata::RequestMetadata,
+};
 
 use super::{encoder::AmqpEncoder, service::AmqpRequest, sink::AmqpEvent};
 
@@ -28,7 +31,7 @@ pub(super) struct AmqpRequestBuilder {
 }
 
 impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
-    type Metadata = (AmqpMetadata, RequestMetadataBuilder);
+    type Metadata = AmqpMetadata;
     type Events = Event;
     type Encoder = AmqpEncoder;
     type Payload = Bytes;
@@ -43,7 +46,10 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, mut input: AmqpEvent) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        mut input: AmqpEvent,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let builder = RequestMetadataBuilder::from_events(&input);
 
         let metadata = AmqpMetadata {
@@ -52,16 +58,15 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
             finalizers: input.event.take_finalizers(),
         };
 
-        ((metadata, builder), input.event)
+        (metadata, builder, input.event)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        amqp_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (amqp_metadata, builder) = metadata;
-        let metadata = builder.build(&payload);
         let body = payload.into_payload();
         AmqpRequest::new(
             body,

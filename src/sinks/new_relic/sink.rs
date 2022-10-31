@@ -98,7 +98,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
             self.transformer.transform(event);
         }
 
-        let metadata_builder = RequestMetadataBuilder::from_events(&input);
+        let builder = RequestMetadataBuilder::from_events(&input);
 
         let finalizers = input.take_finalizers();
         let api_model = || -> Result<NewRelicApiModel, Self::Error> {
@@ -113,7 +113,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
             }
         }();
 
-        (finalizers, metadata_builder, api_model)
+        (finalizers, builder, api_model)
     }
 
     fn build_request(

@@ -357,7 +357,7 @@ impl AsRef<[u8]> for ChronicleRequestPayload {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
-    type Metadata = (EventFinalizers, RequestMetadataBuilder);
+    type Metadata = EventFinalizers;
     type Events = (String, Vec<Event>);
     type Encoder = ChronicleEncoder;
     type Payload = ChronicleRequestPayload;
@@ -372,26 +372,25 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         &self.encoder
     }
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (String, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
 
-        let metadata = RequestMetadataBuilder::from_events(&events);
-        ((finalizers, metadata), (partition_key, events))
+        let builder = RequestMetadataBuilder::from_events(&events);
+        (finalizers, builder, (partition_key, events))
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        finalizers: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (finalizers, metadata_builder) = metadata;
-
-        let metadata = metadata_builder.build(&payload);
-        let body = payload.into_payload().bytes;
-
         ChronicleRequest {
-            body,
+            body: payload.into_payload().bytes,
             finalizers,
             metadata,
         }

@@ -7,6 +7,7 @@ use futures::{stream::BoxStream, StreamExt};
 use lookup::event_path;
 use snafu::Snafu;
 use tower::Service;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
     config::{log_schema, LogSchema},
     event::{Event, EventFinalizers, Finalizable, Value},
@@ -198,7 +199,7 @@ struct LogRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
-    type Metadata = (Arc<str>, EventFinalizers, RequestMetadataBuilder);
+    type Metadata = (Arc<str>, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = JsonEncoding;
     type Payload = Bytes;
@@ -213,13 +214,16 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: (Option<Arc<str>>, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (Option<Arc<str>>, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (api_key, mut events) = input;
         let finalizers = events.take_finalizers();
-        let builder = RequestMetadataBuilder::from_events(&events);
         let api_key = api_key.unwrap_or_else(|| Arc::clone(&self.default_api_key));
+        let builder = RequestMetadataBuilder::from_events(&events);
 
-        ((api_key, finalizers, builder), events)
+        ((api_key, finalizers), builder, events)
     }
 
     fn encode_events(
@@ -258,11 +262,11 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        dd_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (api_key, finalizers, builder) = metadata;
-        let metadata = builder.build(&payload);
+        let (api_key, finalizers) = dd_metadata;
         let uncompressed_size = payload.uncompressed_byte_size;
 
         LogApiRequest {
@@ -283,7 +287,7 @@ struct SemanticLogRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilder {
-    type Metadata = (Arc<str>, EventFinalizers, RequestMetadataBuilder);
+    type Metadata = (Arc<str>, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = SemanticJsonEncoding;
     type Payload = Bytes;
@@ -298,16 +302,19 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
         &self.encoding
     }
 
-    fn split_input(&self, input: (Option<Arc<str>>, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (Option<Arc<str>>, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (api_key, mut events) = input;
+
+        let builder = RequestMetadataBuilder::from_events(&events);
 
         let finalizers = events.take_finalizers();
 
         let api_key = api_key.unwrap_or_else(|| Arc::clone(&self.default_api_key));
 
-        let builder = RequestMetadataBuilder::from_events(&events);
-
-        ((api_key, finalizers, builder), events)
+        ((api_key, finalizers), builder, events)
     }
 
     fn encode_events(
@@ -346,12 +353,12 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        dd_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (api_key, finalizers, builder) = metadata;
+        let (api_key, finalizers) = dd_metadata;
         let uncompressed_size = payload.uncompressed_byte_size;
-        let metadata = builder.build(&payload);
 
         LogApiRequest {
             api_key,

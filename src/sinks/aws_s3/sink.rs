@@ -4,6 +4,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::encoding::Framer;
 use uuid::Uuid;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::Finalizable;
 
 use crate::{
@@ -59,19 +60,19 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         let finalizers = events.take_finalizers();
         let s3_key_prefix = partition_key.key_prefix.clone();
 
-        let s3metadata = S3Metadata {
+        let metadata = S3Metadata {
             partition_key,
             s3_key: s3_key_prefix,
             finalizers,
         };
 
-        (s3metadata, builder, events)
+        (metadata, builder, events)
     }
 
     fn build_request(
         &self,
-        s3metadata: Self::Metadata,
-        request_metadata_builder: RequestMetadataBuilder,
+        mut s3metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let filename = {
@@ -93,8 +94,6 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
             .unwrap_or_else(|| self.compression.extension().into());
 
         s3metadata.s3_key = format!("{}{}.{}", s3metadata.s3_key, filename, extension);
-
-        let request_metadata = request_metadata_builder.build(&payload);
 
         S3Request {
             body: payload.into_payload(),

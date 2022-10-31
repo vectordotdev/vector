@@ -62,7 +62,7 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
 
     fn build_request(
         &self,
-        azure_metadata: Self::Metadata,
+        mut azure_metadata: Self::Metadata,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
