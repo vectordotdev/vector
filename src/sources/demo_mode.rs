@@ -35,3 +35,16 @@ impl DemoMode {
         })
     }
 }
+
+const MESSAGES: [&'static str; 5] = [
+    "something happened",
+    "all these things went wrong",
+    "ohno look what went down here",
+    "this is a great log message",
+    "i find this all very interesting",
+];
+
+/// Returns a random message from a preset list of messages.
+pub fn random_message() -> &'static str {
+    MESSAGES[rand::random::<usize>() % 5]
+}

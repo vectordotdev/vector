@@ -10,6 +10,7 @@ use vector_core::{
 use crate::{
     config::{Output, Resource, SourceConfig, SourceContext},
     serde::default_decoding,
+    sources::demo_mode,
 };
 
 use super::FileDescriptorConfig;
@@ -93,7 +94,7 @@ impl SourceConfig for StdinConfig {
 
     fn generate_demo_data(&self) -> Event {
         let mut event = LogEvent::default();
-        event.insert("message", "zork floog");
+        event.insert("message", demo_mode::random_message());
         Event::Log(event)
     }
 }

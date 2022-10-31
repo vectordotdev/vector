@@ -343,7 +343,6 @@ pub async fn build_pieces(
     }
 
     config.demo_components.append(&mut demo_components);
-    dbg!(&config.demo_components);
 
     let mut definition_cache = HashMap::default();
 
