@@ -66,7 +66,12 @@ pub struct GlobalOptions {
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub proxy: ProxyConfig,
 
-    #[configurable(derived)]
+    /// Controls how acknowledgements are handled for all sinks by default.
+    ///
+    /// See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event
+    /// acknowledgement.
+    ///
+    /// [e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
     #[serde(
         default,
         deserialize_with = "bool_or_struct",

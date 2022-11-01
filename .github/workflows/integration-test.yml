@@ -90,6 +90,7 @@ jobs:
             env:
               SPLUNK_VERSION: 7.3.9
           - test: 'splunk'
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3
       - run: make ci-sweep

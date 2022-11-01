@@ -3,7 +3,7 @@ use std::path::Path;
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use glob::{Pattern, PatternError};
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(windows))]
 use heim::units::ratio::ratio;
 use heim::units::time::second;
 use tokio::time;
@@ -623,7 +623,7 @@ pub(self) mod tests {
     }
 
     // Windows does not produce load average metrics.
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(windows))]
     #[tokio::test]
     async fn generates_loadavg_metrics() {
         let mut buffer = MetricsBuffer::new(None);

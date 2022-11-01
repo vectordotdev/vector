@@ -1,3 +1,4 @@
+use serde::Serialize;
 use vector_core::{
     event::{EventFinalizers, Finalizable, LogEvent, MaybeAsLogMut},
     ByteSizeOf,
@@ -5,6 +6,7 @@ use vector_core::{
 
 /// An event alongside metadata from preprocessing. This is useful for sinks
 /// like Splunk HEC that process events prior to encoding.
+#[derive(Serialize)]
 pub struct ProcessedEvent<E, M> {
     pub event: E,
     pub metadata: M,
