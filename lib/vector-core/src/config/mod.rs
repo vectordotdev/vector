@@ -307,6 +307,25 @@ impl LogNamespace {
         }
     }
 
+    /// Vector: This is retrieved from the "event metadata", nested under the source name.
+    ///
+    /// Legacy: This is retrieved from the event.
+    pub fn get_source_metadata<'a, 'b>(
+        &self,
+        source_name: &'a str,
+        log: &'b mut LogEvent,
+        legacy_key: impl ValuePath<'a>,
+        metadata_key: impl ValuePath<'a>,
+    ) -> Option<&'b Value> {
+        match self {
+            LogNamespace::Vector => log
+                .metadata()
+                .value()
+                .get(path!(source_name).concat(metadata_key)),
+            LogNamespace::Legacy => log.get((PathPrefix::Event, legacy_key)),
+        }
+    }
+
     /// Vector: This is added to the "event metadata", nested under the name "vector". This data
     /// will be marked as read-only in VRL.
     ///
@@ -325,6 +344,24 @@ impl LogNamespace {
                     .insert(path!("vector").concat(metadata_key), value);
             }
             LogNamespace::Legacy => log.try_insert((PathPrefix::Event, legacy_key), value),
+        }
+    }
+
+    /// Vector: This is retrieved from the "event metadata", nested under the name "vector".
+    ///
+    /// Legacy: This is retrieved from the event.
+    pub fn get_vector_metadata<'a, 'b>(
+        &self,
+        log: &'b mut LogEvent,
+        legacy_key: impl ValuePath<'a>,
+        metadata_key: impl ValuePath<'a>,
+    ) -> Option<&'b Value> {
+        match self {
+            LogNamespace::Vector => log
+                .metadata()
+                .value()
+                .get(path!("vector").concat(metadata_key)),
+            LogNamespace::Legacy => log.get((PathPrefix::Event, legacy_key)),
         }
     }
 
