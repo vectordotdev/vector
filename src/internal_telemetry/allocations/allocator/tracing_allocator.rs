@@ -22,6 +22,7 @@ impl<A, T> GroupedTraceableAllocator<A, T> {
 }
 
 impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
+    #[inline(always)]
     unsafe fn get_wrapped_allocation(
         &self,
         object_layout: Layout,
@@ -106,6 +107,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
     }
 }
 
+#[inline(always)]
 fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
     static HEADER_LAYOUT: Layout = Layout::new::<usize>();
 
