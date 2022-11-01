@@ -186,7 +186,7 @@ jobs:
           push: true
 
   build-comparison:
-    name: Build baseline Vector container
+    name: Build comparison Vector container
     runs-on: [linux, soak-builder]
     needs:
       - confirm-valid-credentials
