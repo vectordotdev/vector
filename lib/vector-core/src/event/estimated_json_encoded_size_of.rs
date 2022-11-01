@@ -28,7 +28,7 @@ pub trait EstimatedJsonEncodedSizeOf {
 
 impl<T: EstimatedJsonEncodedSizeOf> EstimatedJsonEncodedSizeOf for &T {
     fn estimated_json_encoded_size_of(&self) -> usize {
-        T::estimated_json_encoded_size_of(&*self)
+        T::estimated_json_encoded_size_of(self)
     }
 }
 
