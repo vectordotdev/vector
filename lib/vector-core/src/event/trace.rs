@@ -85,6 +85,10 @@ impl TraceEvent {
     ) -> Option<Value> {
         self.0.insert(key.as_ref(), value.into())
     }
+
+    pub fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0.estimated_json_encoded_size_of()
+    }
 }
 
 impl From<LogEvent> for TraceEvent {

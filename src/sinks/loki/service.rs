@@ -6,6 +6,7 @@ use http::StatusCode;
 use snafu::Snafu;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -15,7 +16,7 @@ use vector_core::{
 use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
     http::{get_http_scheme_from_uri, Auth, HttpClient},
-    sinks::util::{metadata::RequestMetadata, retries::RetryLogic, UriSerde},
+    sinks::util::{retries::RetryLogic, UriSerde},
 };
 
 #[derive(Clone)]
@@ -60,7 +61,7 @@ impl DriverResponse for LokiResponse {
     fn events_sent(&self) -> CountByteSize {
         CountByteSize(
             self.metadata.event_count(),
-            self.metadata.events_byte_size(),
+            self.metadata.events_estimated_json_encoded_byte_size(),
         )
     }
 
@@ -81,6 +82,12 @@ pub struct LokiRequest {
 impl Finalizable for LokiRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for LokiRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -117,6 +124,8 @@ impl Service<LokiRequest> for LokiService {
         let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
         let protocol = get_http_scheme_from_uri(&self.endpoint.uri);
 
+        let metadata = request.get_metadata();
+
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
         }
@@ -134,7 +143,6 @@ impl Service<LokiRequest> for LokiService {
 
         let mut client = self.client.clone();
 
-        let metadata = request.metadata;
         Box::pin(async move {
             match client.call(req).in_current_span().await {
                 Ok(response) => {

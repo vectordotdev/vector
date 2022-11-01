@@ -17,9 +17,15 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GeoipConfig {
-    /// The field name that contains the IP address.
+    /// The field name in the event that contains the IP address.
     ///
     /// This field should contain a valid IPv4 or IPv6 address.
+    #[configurable(metadata(
+        docs::examples = "ip_address",
+        docs::examples = "x-forwarded-for",
+        docs::examples = "parent.child",
+        docs::examples = "array[0]",
+    ))]
     pub source: String,
 
     /// Path to the [MaxMind GeoIP2][geoip2] or [GeoLite2 binary city database file][geolite2]
@@ -29,12 +35,17 @@ pub struct GeoipConfig {
     ///
     /// [geoip2]: https://dev.maxmind.com/geoip/geoip2/downloadable
     /// [geolite2]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
+    #[configurable(metadata(
+        docs::examples = "/path/to/GeoLite2-City.mmdb",
+        docs::examples = "/path/to/GeoLite2-ISP.mmdb",
+    ))]
     pub database: String,
 
-    /// The default field to insert the resulting GeoIP data into.
+    /// The field to insert the resulting GeoIP data into.
     ///
-    /// See output for more info.
+    /// See [output](#output-data) for more info.
     #[serde(default = "default_geoip_target_field")]
+    #[configurable(metadata(docs::examples = "geoip", docs::examples = "parent.child",))]
     pub target: String,
 
     /// The locale to use when querying the database.
@@ -48,6 +59,7 @@ pub struct GeoipConfig {
     ///
     /// [locale_docs]: https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q
     #[serde(default = "default_locale")]
+    #[configurable(metadata(docs::examples = "de", docs::examples = "zh-CN",))]
     pub locale: String,
 }
 

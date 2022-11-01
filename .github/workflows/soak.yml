@@ -172,6 +172,7 @@ jobs:
     name: Build baseline 'soak-vector' container
     runs-on: [linux, soak-builder]
     needs: [compute-soak-meta]
+    timeout-minutes: 20
     steps:
       - uses: colpal/actions-clean@v1
 
@@ -184,11 +185,11 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.1.0
+        uses: docker/setup-buildx-action@v2.2.1
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@12cce9efe0d49980455aaaca9b071c0befcdd702
+        uses: docker/metadata-action@57396166ad8aefe6098280995947635806a0e6ea
         with:
           flavor: |
             latest=false
@@ -217,6 +218,7 @@ jobs:
     name: Build comparison 'soak-vector' container
     runs-on: [linux, soak-builder]
     needs: [compute-soak-meta]
+    timeout-minutes: 20
     steps:
       - uses: colpal/actions-clean@v1
 
@@ -229,11 +231,11 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.1.0
+        uses: docker/setup-buildx-action@v2.2.1
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@12cce9efe0d49980455aaaca9b071c0befcdd702
+        uses: docker/metadata-action@57396166ad8aefe6098280995947635806a0e6ea
         with:
           flavor: |
             latest=false

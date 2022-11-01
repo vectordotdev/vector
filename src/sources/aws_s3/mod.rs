@@ -18,7 +18,9 @@ use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsConfig;
 use crate::{
     aws::auth::AwsAuthentication,
-    config::{AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext},
+    config::{
+        DataType, Output, ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+    },
     line_agg,
     serde::bool_or_struct,
 };
@@ -101,7 +103,7 @@ pub struct AwsS3Config {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 
     #[configurable(derived)]
     tls_options: Option<TlsConfig>,
@@ -365,7 +367,7 @@ mod integration_tests {
     use aws_sdk_s3::Client as S3Client;
     use aws_sdk_sqs::model::QueueAttributeName;
     use aws_sdk_sqs::Client as SqsClient;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::aws::create_client;

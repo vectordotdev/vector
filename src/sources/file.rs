@@ -1,4 +1,4 @@
-use std::{convert::TryInto, path::PathBuf, time::Duration};
+use std::{convert::TryInto, future, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -17,7 +17,9 @@ use vector_core::config::LogNamespace;
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
-    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
+    config::{
+        log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+    },
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
@@ -62,14 +64,17 @@ enum BuildError {
 /// Configuration for the `file` source.
 #[configurable_component(source("file"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[serde(deny_unknown_fields, default)]
+#[serde(deny_unknown_fields)]
 pub struct FileConfig {
     /// Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
     pub include: Vec<PathBuf>,
 
     /// Array of file patterns to exclude. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
     ///
-    /// Takes precedence over the `include` option.
+    /// Takes precedence over the `include` option. Note that the `exclude` patterns are applied _after_ Vector attempts to glob everything
+    /// in `include`. That is, Vector will still try to list all of the files matched by `include` and then filter them by the `exclude`
+    /// patterns. This can be impactful if `include` contains directories with contents that vector does not have access to.
+    #[serde(default)]
     pub exclude: Vec<PathBuf>,
 
     /// Overrides the name of the log field used to add the file path to each event.
@@ -77,24 +82,28 @@ pub struct FileConfig {
     /// The value will be the full path to the file where the event was read message.
     ///
     /// By default, `file` is used.
+    #[serde(default = "default_file_key")]
     pub file_key: Option<String>,
 
     /// Whether or not to start reading from the beginning of a new file.
     ///
     /// DEPRECATED: This is a deprecated option -- replaced by `ignore_checkpoints`/`read_from` -- and should be removed.
     #[configurable(deprecated)]
+    #[serde(default)]
     pub start_at_beginning: Option<bool>,
 
     /// Whether or not to ignore existing checkpoints when determining where to start reading a file.
     ///
     /// Checkpoints are still written normally.
+    #[serde(default)]
     pub ignore_checkpoints: Option<bool>,
 
     #[configurable(derived)]
+    #[serde(default)]
     pub read_from: Option<ReadFromConfig>,
 
     /// Ignore files with a data modification date older than the specified number of seconds.
-    #[serde(alias = "ignore_older")]
+    #[serde(alias = "ignore_older", default)]
     pub ignore_older_secs: Option<u64>,
 
     /// The maximum number of bytes a line can contain before being discarded.
@@ -110,11 +119,13 @@ pub struct FileConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    #[serde(default)]
     pub host_key: Option<String>,
 
     /// The directory used to persist file checkpoint positions.
     ///
     /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
+    #[serde(default)]
     pub data_dir: Option<PathBuf>,
 
     /// Enables adding the file offset to each event and sets the name of the log field used.
@@ -122,61 +133,97 @@ pub struct FileConfig {
     /// The value will be the byte offset of the start of the line within the file.
     ///
     /// Off by default, the offset is only added to the event if this is set.
+    #[serde(default)]
     pub offset_key: Option<String>,
 
     /// Delay between file discovery calls, in milliseconds.
     ///
     /// This controls the interval at which Vector searches for files. Higher value result in greater chances of some short living files being missed between searches, but lower value increases the performance impact of file discovery.
-    #[serde(alias = "glob_minimum_cooldown")]
+    #[serde(
+        alias = "glob_minimum_cooldown",
+        default = "default_glob_minimum_cooldown_ms"
+    )]
     pub glob_minimum_cooldown_ms: u64,
 
     #[configurable(derived)]
-    #[serde(alias = "fingerprinting")]
+    #[serde(alias = "fingerprinting", default)]
     fingerprint: FingerprintConfig,
 
     /// Ignore missing files when fingerprinting.
     ///
     /// This may be useful when used with source directories containing dangling symlinks.
+    #[serde(default)]
     pub ignore_not_found: bool,
 
     /// String value used to identify the start of a multi-line message.
     ///
     /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
     #[configurable(deprecated)]
+    #[serde(default)]
     pub message_start_indicator: Option<String>,
 
     /// How long to wait for more data when aggregating a multi-line message, in milliseconds.
     ///
     /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
     #[configurable(deprecated)]
+    #[serde(default = "default_multi_line_timeout")]
     pub multi_line_timeout: u64,
 
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
+    #[serde(default)]
     pub multiline: Option<MultilineConfig>,
 
     /// An approximate limit on the amount of data read from a single file at a given time.
+    #[serde(default = "default_max_read_bytes")]
     pub max_read_bytes: usize,
 
     /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
+    #[serde(default)]
     pub oldest_first: bool,
 
     /// Timeout from reaching `EOF` after which file will be removed from filesystem, unless new data is written in the meantime.
     ///
     /// If not specified, files will not be removed.
-    #[serde(alias = "remove_after")]
+    #[serde(alias = "remove_after", default)]
     pub remove_after_secs: Option<u64>,
 
     /// String sequence used to separate one file line from another.
+    #[serde(default = "default_line_delimiter")]
     pub line_delimiter: String,
 
     #[configurable(derived)]
+    #[serde(default)]
     pub encoding: Option<EncodingConfig>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
+}
+
+fn default_max_line_bytes() -> usize {
+    bytesize::kib(100u64) as usize
+}
+
+fn default_file_key() -> Option<String> {
+    Some("file".to_string())
+}
+
+const fn default_glob_minimum_cooldown_ms() -> u64 {
+    1000
+}
+
+const fn default_multi_line_timeout() -> u64 {
+    1000
+}
+
+const fn default_max_read_bytes() -> usize {
+    2048
+}
+
+fn default_line_delimiter() -> String {
+    "\n".to_string()
 }
 
 /// Configuration for how files should be identified.
@@ -214,6 +261,19 @@ pub enum FingerprintConfig {
     DevInode,
 }
 
+impl Default for FingerprintConfig {
+    fn default() -> Self {
+        Self::Checksum {
+            bytes: None,
+            ignored_header_bytes: 0,
+            lines: default_lines(),
+        }
+    }
+}
+
+const fn default_lines() -> usize {
+    1
+}
 /// File position to use when reading a new file.
 #[configurable_component]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -261,14 +321,6 @@ impl From<FingerprintConfig> for FingerprintStrategy {
     }
 }
 
-fn default_max_line_bytes() -> usize {
-    bytesize::kib(100u64) as usize
-}
-
-const fn default_lines() -> usize {
-    1
-}
-
 #[derive(Debug)]
 pub(crate) struct FinalizerEntry {
     pub(crate) file_id: FileFingerprint,
@@ -278,31 +330,27 @@ pub(crate) struct FinalizerEntry {
 impl Default for FileConfig {
     fn default() -> Self {
         Self {
-            include: vec![],
+            include: vec![PathBuf::from("/var/log/**/*.log")],
             exclude: vec![],
-            file_key: Some("file".to_string()),
+            file_key: default_file_key(),
             start_at_beginning: None,
             ignore_checkpoints: None,
             read_from: None,
             ignore_older_secs: None,
             max_line_bytes: default_max_line_bytes(),
-            fingerprint: FingerprintConfig::Checksum {
-                bytes: None,
-                ignored_header_bytes: 0,
-                lines: 1,
-            },
+            fingerprint: FingerprintConfig::default(),
             ignore_not_found: false,
             host_key: None,
             offset_key: None,
             data_dir: None,
-            glob_minimum_cooldown_ms: 1000, // millis
+            glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(), // millis
             message_start_indicator: None,
-            multi_line_timeout: 1000, // millis
+            multi_line_timeout: default_multi_line_timeout(), // millis
             multiline: None,
-            max_read_bytes: 2048,
+            max_read_bytes: default_max_read_bytes(),
             oldest_first: false,
             remove_after_secs: None,
-            line_delimiter: "\n".to_string(),
+            line_delimiter: default_line_delimiter(),
             encoding: None,
             acknowledgements: Default::default(),
         }
@@ -336,7 +384,7 @@ impl SourceConfig for FileConfig {
             }
         }
 
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(file_source(
             self,
@@ -363,6 +411,12 @@ pub fn file_source(
     mut out: SourceSender,
     acknowledgements: bool,
 ) -> super::Source {
+    // the include option must be specified but also must contain at least one entry.
+    if config.include.is_empty() {
+        error!(message = "`include` configuration option must contain at least one file pattern.");
+        return Box::pin(future::ready(Err(())));
+    }
+
     let ignore_before = config
         .ignore_older_secs
         .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
@@ -648,7 +702,7 @@ mod tests {
     };
 
     use encoding_rs::UTF_16LE;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
 
@@ -687,6 +741,12 @@ mod tests {
     fn parse_config() {
         let config: FileConfig = toml::from_str(
             r#"
+            include = [ "/var/log/**/*.log" ]
+            file_key = "file"
+            glob_minimum_cooldown_ms = 1000
+            multi_line_timeout = 1000
+            max_read_bytes = 2048
+            line_delimiter = "\n"
         "#,
         )
         .unwrap();
@@ -702,6 +762,7 @@ mod tests {
 
         let config: FileConfig = toml::from_str(
             r#"
+        include = [ "/var/log/**/*.log" ]
         [fingerprint]
         strategy = "device_and_inode"
         "#,
@@ -711,6 +772,7 @@ mod tests {
 
         let config: FileConfig = toml::from_str(
             r#"
+        include = [ "/var/log/**/*.log" ]
         [fingerprint]
         strategy = "checksum"
         bytes = 128
@@ -729,6 +791,7 @@ mod tests {
 
         let config: FileConfig = toml::from_str(
             r#"
+        include = [ "/var/log/**/*.log" ]
         [encoding]
         charset = "utf-16le"
         "#,
@@ -738,6 +801,7 @@ mod tests {
 
         let config: FileConfig = toml::from_str(
             r#"
+        include = [ "/var/log/**/*.log" ]
         read_from = "beginning"
         "#,
         )
@@ -746,6 +810,7 @@ mod tests {
 
         let config: FileConfig = toml::from_str(
             r#"
+        include = [ "/var/log/**/*.log" ]
         read_from = "end"
         "#,
         )
@@ -1888,7 +1953,11 @@ mod tests {
         received
             .into_iter()
             .map(Event::into_log)
-            .map(|log| log[log_schema().message_key()].to_string_lossy())
+            .map(|log| {
+                log[log_schema().message_key()]
+                    .to_string_lossy()
+                    .into_owned()
+            })
             .collect()
     }
 
