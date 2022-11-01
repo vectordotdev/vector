@@ -180,7 +180,7 @@ type Result<T> = std::result::Result<T, Error>;
 
 /// A serializer that counts the number of JSON-encoded bytes in a serializable type.
 ///
-/// See [`estimated_size_of`] for an easy-to-use wrapper function around this serializer.
+/// See [`from_value`] for an easy-to-use wrapper function around this serializer.
 ///
 /// This serializer is **optimized for performance**. This means that it is allowed to *approximate*
 /// the size of a type, if doing an exact calculation is too expensive.
@@ -761,7 +761,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use quickcheck::{Arbitrary, Gen, TestResult};
+    use ::quickcheck::{Arbitrary, Gen, TestResult};
     use quickcheck_macros::quickcheck;
     use serde_json::json;
 
@@ -815,7 +815,7 @@ mod tests {
             seq: vec!["a", "b"],
         };
         let expected = r#"{"int":1,"seq":["a","b"]}"#;
-        assert_eq!(estimated_size_of(&test), expected.len());
+        assert_eq!(from_value(&test), expected.len());
     }
 
     #[test]
@@ -830,24 +830,24 @@ mod tests {
 
         let u = E::Unit;
         let expected = r#""Unit""#;
-        assert_eq!(estimated_size_of(&u), expected.len());
+        assert_eq!(from_value(&u), expected.len());
 
         let n = E::Newtype(1);
         let expected = r#"{"Newtype":1}"#;
-        assert_eq!(estimated_size_of(&n), expected.len());
+        assert_eq!(from_value(&n), expected.len());
 
         let t = E::Tuple(1, 2);
         let expected = r#"{"Tuple":[1,2]}"#;
-        assert_eq!(estimated_size_of(&t), expected.len());
+        assert_eq!(from_value(&t), expected.len());
 
         let s = E::Struct { a: 1 };
         let expected = r#"{"Struct":{"a":1}}"#;
-        assert_eq!(estimated_size_of(&s), expected.len());
+        assert_eq!(from_value(&s), expected.len());
     }
 
     #[quickcheck]
     fn serialize_i8(v: i8) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -855,7 +855,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_i16(v: i16) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -863,7 +863,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_i32(v: i32) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -871,7 +871,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_i64(v: i64) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -879,7 +879,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_isize(v: isize) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -887,7 +887,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_u8(v: u8) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -895,7 +895,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_u16(v: u16) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -903,7 +903,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_u32(v: u32) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -911,7 +911,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_u64(v: u64) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -919,7 +919,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_usize(v: usize) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -937,7 +937,7 @@ mod tests {
         // output compared to the default `Display` implementation of `f32`/`f64`.
         let v = json!(v);
 
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -955,7 +955,7 @@ mod tests {
         // output compared to the default `Display` implementation of `f32`/`f64`.
         let v = json!(v);
 
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -967,7 +967,7 @@ mod tests {
             return TestResult::discard();
         }
 
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         TestResult::from_bool(got == want.len())
@@ -979,7 +979,7 @@ mod tests {
             return TestResult::discard();
         }
 
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         TestResult::from_bool(got == want.len())
@@ -991,7 +991,7 @@ mod tests {
             return TestResult::discard();
         }
 
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         TestResult::from_bool(got == want.len())
@@ -999,7 +999,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_option(v: Option<bool>) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -1007,7 +1007,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_seq(v: Vec<bool>) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -1015,7 +1015,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_map(v: HashMap<ValidString, bool>) -> TestResult {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         TestResult::from_bool(got == want.len())
@@ -1023,7 +1023,7 @@ mod tests {
 
     #[quickcheck]
     fn serialize_struct(v: MyEvent) -> bool {
-        let got = estimated_size_of(&v);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         got == want.len()
@@ -1037,7 +1037,7 @@ mod tests {
 
         let b = JsonEncodedByteCountingValue(&v);
 
-        let got = estimated_size_of(&b);
+        let got = from_value(&b);
         let want = serde_json::to_string(&v).unwrap();
 
         TestResult::from_bool(got == want.len())
