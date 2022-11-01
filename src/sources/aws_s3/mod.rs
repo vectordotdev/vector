@@ -257,9 +257,7 @@ async fn s3_object_decoder(
     ));
 
     let compression = match compression {
-        Auto => {
-            determine_compression(content_encoding, content_type, key).unwrap_or(Compression::None)
-        }
+        Auto => determine_compression(content_encoding, content_type, key).unwrap_or(None),
         _ => compression,
     };
 
@@ -385,29 +383,30 @@ mod test {
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use std::fs::File;
-    use std::io::{self, BufRead};
-    use std::path::Path;
-    use std::time::Duration;
+    use std::{
+        fs::File,
+        io::{self, BufRead},
+        path::Path,
+        time::Duration,
+    };
 
-    use aws_sdk_s3::types::ByteStream;
-    use aws_sdk_s3::Client as S3Client;
-    use aws_sdk_sqs::model::QueueAttributeName;
-    use aws_sdk_sqs::Client as SqsClient;
+    use aws_sdk_s3::{types::ByteStream, Client as S3Client};
+    use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
+    use lookup::path;
     use similar_asserts::assert_eq;
+    use value::Value;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
-    use crate::aws::create_client;
-    use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-    use crate::common::sqs::SqsClientBuilder;
-    use crate::config::ProxyConfig;
-    use crate::sources::aws_s3::sqs::S3Event;
-    use crate::sources::aws_s3::S3ClientBuilder;
     use crate::{
-        config::{SourceConfig, SourceContext},
+        aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+        common::sqs::SqsClientBuilder,
+        config::{ProxyConfig, SourceConfig, SourceContext},
         event::EventStatus::{self, *},
         line_agg,
-        sources::util::MultilineConfig,
+        sources::{
+            aws_s3::{sqs::S3Event, S3ClientBuilder},
+            util::MultilineConfig,
+        },
         test_util::{
             collect_n,
             components::{assert_source_compliance, SOURCE_TAGS},
@@ -435,6 +434,26 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             logs,
             Delivered,
+            false,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_message_with_log_namespace() {
+        trace_init();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        test_event(
+            None,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Delivered,
+            true,
         )
         .await;
     }
@@ -454,6 +473,7 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             logs,
             Delivered,
+            false,
         )
         .await;
     }
@@ -473,6 +493,7 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             logs,
             Delivered,
+            false,
         )
         .await;
     }
@@ -486,13 +507,23 @@ mod integration_tests {
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         let mut gz = flate2::read::GzEncoder::new(
-            std::io::Cursor::new(logs.join("\n").into_bytes()),
+            io::Cursor::new(logs.join("\n").into_bytes()),
             flate2::Compression::fast(),
         );
         let mut buffer = Vec::new();
         gz.read_to_end(&mut buffer).unwrap();
 
-        test_event(None, Some("gzip"), None, None, buffer, logs, Delivered).await;
+        test_event(
+            None,
+            Some("gzip"),
+            None,
+            None,
+            buffer,
+            logs,
+            Delivered,
+            false,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -504,14 +535,24 @@ mod integration_tests {
         let logs = lines_from_gzip_file("tests/data/multipart-gzip.log.gz");
 
         let buffer = {
-            let mut file = std::fs::File::open("tests/data/multipart-gzip.log.gz")
-                .expect("file can be opened");
+            let mut file =
+                File::open("tests/data/multipart-gzip.log.gz").expect("file can be opened");
             let mut data = Vec::new();
             file.read_to_end(&mut data).expect("file can be read");
             data
         };
 
-        test_event(None, Some("gzip"), None, None, buffer, logs, Delivered).await;
+        test_event(
+            None,
+            Some("gzip"),
+            None,
+            None,
+            buffer,
+            logs,
+            Delivered,
+            false,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -523,14 +564,24 @@ mod integration_tests {
         let logs = lines_from_plaintext("tests/data/multipart-zst.log");
 
         let buffer = {
-            let mut file = std::fs::File::open("tests/data/multipart-zst.log.zst")
-                .expect("file can be opened");
+            let mut file =
+                File::open("tests/data/multipart-zst.log.zst").expect("file can be opened");
             let mut data = Vec::new();
             file.read_to_end(&mut data).expect("file can be read");
             data
         };
 
-        test_event(None, Some("zstd"), None, None, buffer, logs, Delivered).await;
+        test_event(
+            None,
+            Some("zstd"),
+            None,
+            None,
+            buffer,
+            logs,
+            Delivered,
+            false,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -555,6 +606,7 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             vec!["abc\ndef\ngeh".to_owned()],
             Delivered,
+            false,
         )
         .await;
     }
@@ -573,6 +625,7 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             logs,
             Errored,
+            false,
         )
         .await;
     }
@@ -591,6 +644,7 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             logs,
             Rejected,
+            false,
         )
         .await;
     }
@@ -599,7 +653,11 @@ mod integration_tests {
         std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
     }
 
-    fn config(queue_url: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
+    fn config(
+        queue_url: &str,
+        multiline: Option<MultilineConfig>,
+        log_namespace: bool,
+    ) -> AwsS3Config {
         AwsS3Config {
             region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
             strategy: Strategy::Sqs,
@@ -613,6 +671,7 @@ mod integration_tests {
                 ..Default::default()
             }),
             acknowledgements: true.into(),
+            log_namespace: Some(log_namespace),
             ..Default::default()
         }
     }
@@ -626,6 +685,7 @@ mod integration_tests {
         payload: Vec<u8>,
         expected_lines: Vec<String>,
         status: EventStatus,
+        log_namespace: bool,
     ) {
         assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
@@ -638,7 +698,7 @@ mod integration_tests {
 
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            let config = config(&queue, multiline);
+            let config = config(&queue, multiline, log_namespace);
 
             s3.put_object()
                 .bucket(bucket.clone())
@@ -717,14 +777,26 @@ mod integration_tests {
             let events = collect_n(rx, expected_lines.len()).await;
 
             assert_eq!(expected_lines.len(), events.len());
-            for (i, event) in events.iter().enumerate() {
-                let message = expected_lines[i].as_str();
+            if !log_namespace {
+                for (i, event) in events.iter().enumerate() {
+                    let message = expected_lines[i].as_str();
 
-                let log = event.as_log();
-                assert_eq!(log["message"], message.into());
-                assert_eq!(log["bucket"], bucket.clone().into());
-                assert_eq!(log["object"], key.clone().into());
-                assert_eq!(log["region"], "us-east-1".into());
+                    let log = event.as_log();
+                    assert_eq!(log["message"], message.into());
+                    assert_eq!(log["bucket"], bucket.clone().into());
+                    assert_eq!(log["object"], key.clone().into());
+                    assert_eq!(log["region"], "us-east-1".into());
+                }
+            } else {
+                for (i, event) in events.iter().enumerate() {
+                    let message = expected_lines[i].as_str();
+
+                    let log = event.as_log();
+                    assert_eq!(log.value(), &Value::from(message));
+                    assert_eq!(log.metadata().value().get(path!("aws_s3", "bucket")).unwrap(), &Value::from(bucket.clone()));
+                    assert_eq!(log.metadata().value().get(path!("aws_s3", "object")).unwrap(), &Value::from(key.clone()));
+                    assert_eq!(log.metadata().value().get(path!("aws_s3", "region")).unwrap(), &Value::from("us-east-1"));
+                }
             }
 
             // Make sure the SQS message is deleted
