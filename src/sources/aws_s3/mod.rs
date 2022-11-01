@@ -784,10 +784,10 @@ mod integration_tests {
 
             let (tx, rx) = SourceSender::new_test_finalize(status);
             let cx = SourceContext::new_test(tx, None);
+            let namespace = cx.log_namespace(Some(log_namespace));
             let source = config.build(cx).await.unwrap();
             tokio::spawn(async move { source.await.unwrap() });
 
-            let namespace = cx.log_namespace(Some(log_namespace));
             let events = collect_n(rx, expected_lines.len()).await;
 
             assert_eq!(expected_lines.len(), events.len());
@@ -800,9 +800,9 @@ mod integration_tests {
                 } else {
                     assert_eq!(log["message"], message.into());
                 }
-                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("bucket"), path!("bucket")), &bucket.clone().into());
-                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("object"), path!("object")), &key.clone().into());
-                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("region"), path!("region")), &"us-east-1".into());
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("bucket"), path!("bucket")).unwrap(), &bucket.clone().into());
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("object"), path!("object")).unwrap(), &key.clone().into());
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("region"), path!("region")).unwrap(), &"us-east-1".into());
             }
 
             // Make sure the SQS message is deleted
