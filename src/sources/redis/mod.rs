@@ -349,6 +349,47 @@ mod integration_test {
     }
 
     #[tokio::test]
+    async fn redis_source_list_rpop_with_log_namespace() {
+        // Push some test data into a list object which we'll read from.
+        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let mut conn = client.get_tokio_connection_manager().await.unwrap();
+
+        let key = format!("test-key-{}", random_string(10));
+        debug!("Test key name: {}.", key);
+
+        let _: i32 = conn.rpush(&key, "1").await.unwrap();
+
+        // Now run the source and make sure we get all three events.
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::List,
+            list: Some(ListOption {
+                method: Method::Rpop,
+            }),
+            url: REDIS_SERVER.to_owned(),
+            key: key.clone(),
+            redis_key: Some("remapped_key".to_string()),
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(true),
+        };
+
+        let events = run_and_assert_source_compliance_n(config, 1, &SOURCE_TAGS).await;
+
+        assert_eq!(events[0].as_log().value(), &value::Value::from("1"));
+        assert_eq!(
+            events[0]
+                .as_log()
+                .metadata()
+                .value()
+                .get("redis")
+                .unwrap()
+                .get("key")
+                .unwrap(),
+            &value::Value::from(key)
+        )
+    }
+
+    #[tokio::test]
     async fn redis_source_list_lpop() {
         // Push some test data into a list object which we'll read from.
         let client = redis::Client::open(REDIS_SERVER).unwrap();
