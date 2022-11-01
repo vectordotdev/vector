@@ -548,7 +548,7 @@ impl IngestorProcess {
                         AwsS3Config::NAME,
                         &mut log,
                         key.as_str(),
-                        key.as_str(),
+                        path!("metadata", key.as_str()),
                         value.clone(),
                     );
                 }

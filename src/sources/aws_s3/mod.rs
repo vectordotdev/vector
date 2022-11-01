@@ -4,9 +4,10 @@ use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
 use codecs::BytesDeserializerConfig;
 use futures::{stream, stream::StreamExt, TryStreamExt};
+use lookup::path;
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
-use value::Kind;
+use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{DataType, LogNamespace};
 
@@ -134,27 +135,34 @@ impl SourceConfig for AwsS3Config {
         let schema_definition = BytesDeserializerConfig
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
-                self.get_component_name(),
-                Some("bucket"),
-                "bucket",
+                Self::NAME,
+                Some(path!("bucket")),
+                path!("bucket"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("object"),
-                "object",
+                Self::NAME,
+                Some(path!("object")),
+                path!("object"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("region"),
-                "region",
+                Self::NAME,
+                Some(path!("region")),
+                path!("region"),
                 Kind::bytes(),
                 None,
             )
-            .unknown_fields(Kind::bytes())
+            .with_source_metadata(
+                //TODO this doesn't actually work!
+                Self::Name,
+                Some(path!(".")),
+                path!("metadata"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                None,
+            )
             .with_standard_vector_source_metadata();
 
         vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
