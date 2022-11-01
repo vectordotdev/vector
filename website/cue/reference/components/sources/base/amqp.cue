@@ -2,10 +2,19 @@ package metadata
 
 base: components: sources: amqp: configuration: {
 	acknowledgements: {
-		description: "Configuration of acknowledgement behavior."
-		required:    false
+		description: """
+			Controls how acknowledgements are handled by this source.
+
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+
+			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
 		type: object: options: enabled: {
-			description: "Enables end-to-end acknowledgements."
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
 			type: bool: {}
 		}

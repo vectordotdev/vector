@@ -8,6 +8,7 @@ use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
@@ -21,11 +22,18 @@ pub struct AzureBlobRequest {
     pub content_encoding: Option<&'static str>,
     pub content_type: &'static str,
     pub metadata: AzureBlobMetadata,
+    pub request_metadata: RequestMetadata,
 }
 
 impl Finalizable for AzureBlobRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.metadata.finalizers)
+    }
+}
+
+impl MetaDescriptive for AzureBlobRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
     }
 }
 

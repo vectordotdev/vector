@@ -145,11 +145,82 @@ impl Output {
     }
 }
 
-/// Configuration of acknowledgement behavior.
+/// Source-specific end-to-end acknowledgements configuration.
+///
+/// This type exists solely to provide a source-specific description of the `acknowledgements`
+/// setting, as it is deprecated, and we still need to maintain a way to expose it in the
+/// documentation before it's removed while also making sure people know it shouldn't be used.
 #[configurable_component]
+#[configurable(title = "Controls how acknowledgements are handled by this source.")]
+#[configurable(
+    description = "This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. \
+Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+
+[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/"
+)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SourceAcknowledgementsConfig {
+    /// Whether or not end-to-end acknowledgements are enabled for this source.
+    enabled: Option<bool>,
+}
+
+impl SourceAcknowledgementsConfig {
+    pub const DEFAULT: Self = Self { enabled: None };
+
+    #[must_use]
+    pub fn merge_default(&self, other: &Self) -> Self {
+        let enabled = self.enabled.or(other.enabled);
+        Self { enabled }
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled.unwrap_or(false)
+    }
+}
+
+impl From<Option<bool>> for SourceAcknowledgementsConfig {
+    fn from(enabled: Option<bool>) -> Self {
+        Self { enabled }
+    }
+}
+
+impl From<bool> for SourceAcknowledgementsConfig {
+    fn from(enabled: bool) -> Self {
+        Some(enabled).into()
+    }
+}
+
+impl From<SourceAcknowledgementsConfig> for AcknowledgementsConfig {
+    fn from(config: SourceAcknowledgementsConfig) -> Self {
+        Self {
+            enabled: config.enabled,
+        }
+    }
+}
+
+/// End-to-end acknowledgements configuration.
+#[configurable_component]
+#[configurable(title = "Controls how acknowledgements are handled for this sink.")]
+#[configurable(
+    description = "See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+
+[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/"
+)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AcknowledgementsConfig {
-    /// Enables end-to-end acknowledgements.
+    /// Whether or not end-to-end acknowledgements are enabled.
+    ///
+    /// When enabled for a sink, any source connected to that sink, where the source supports
+    /// end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+    /// before acknowledging them at the source.
+    ///
+    /// Enabling or disabling acknowledgements at the sink level takes precedence over any global
+    /// [`acknowledgements`][global_acks] configuration.
+    ///
+    /// [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
     enabled: Option<bool>,
 }
 

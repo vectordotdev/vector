@@ -1,13 +1,18 @@
+use std::num::NonZeroUsize;
+
 use bytes::{Bytes, BytesMut};
 use rdkafka::message::{Header, OwnedHeaders};
 use tokio_util::codec::Encoder as _;
-use vector_core::{config::LogSchema, ByteSizeOf};
+use vector_core::config::LogSchema;
 
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, Finalizable, Value},
     internal_events::{KafkaHeaderExtractionError, TemplateRenderingError},
-    sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata},
+    sinks::{
+        kafka::service::{KafkaRequest, KafkaRequestMetadata},
+        util::metadata::RequestMetadataBuilder,
+    },
     template::Template,
 };
 
@@ -34,6 +39,8 @@ impl KafkaRequestBuilder {
             })
             .ok()?;
 
+        let metadata_builder = RequestMetadataBuilder::from_events(&event);
+
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
@@ -41,15 +48,18 @@ impl KafkaRequestBuilder {
             headers: get_headers(&event, &self.headers_key),
             topic,
         };
-        let event_byte_size = event.size_of();
         self.transformer.transform(&mut event);
         let mut body = BytesMut::new();
         self.encoder.encode(event, &mut body).ok()?;
         let body = body.freeze();
+
+        let bytes_len = NonZeroUsize::new(body.len()).expect("payload should never be zero length");
+        let request_metadata = metadata_builder.with_request_size(bytes_len);
+
         Some(KafkaRequest {
             body,
             metadata,
-            event_byte_size,
+            request_metadata,
         })
     }
 }
