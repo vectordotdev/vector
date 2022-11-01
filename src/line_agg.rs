@@ -423,10 +423,13 @@ mod tests {
             ("some other usual line", 1),
             (concat!("first part\n", " second part\n", " last part"), 4),
             ("another normal message", 5),
-            (concat!(
-                "finishing message\n",
-                " last part of the incomplete finishing message"
-            ), 7),
+            (
+                concat!(
+                    "finishing message\n",
+                    " last part of the incomplete finishing message"
+                ),
+                7,
+            ),
         ];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -452,12 +455,18 @@ mod tests {
         let expected = vec![
             ("some usual line", 0),
             ("some other usual line", 1),
-            (concat!("first part \\\n", "second part \\\n", "last part"), 4),
+            (
+                concat!("first part \\\n", "second part \\\n", "last part"),
+                4,
+            ),
             ("another normal message", 5),
-            (concat!(
-                "finishing message \\\n",
-                "last part of the incomplete finishing message \\"
-            ), 7),
+            (
+                concat!(
+                    "finishing message \\\n",
+                    "last part of the incomplete finishing message \\"
+                ),
+                7,
+            ),
         ];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -483,12 +492,18 @@ mod tests {
         let expected = vec![
             ("INFO some usual line", 0),
             ("INFO some other usual line", 1),
-            (concat!("INFO first part\n", "second part\n", "last part"), 4),
+            (
+                concat!("INFO first part\n", "second part\n", "last part"),
+                4,
+            ),
             ("ERROR another normal message", 5),
-            (concat!(
-                "ERROR finishing message\n",
-                "last part of the incomplete finishing message"
-            ), 7),
+            (
+                concat!(
+                    "ERROR finishing message\n",
+                    "last part of the incomplete finishing message"
+                ),
+                7,
+            ),
         ];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -516,10 +531,13 @@ mod tests {
             ("some other usual line;", 1),
             (concat!("first part\n", "second part\n", "last part;"), 4),
             ("another normal message;", 5),
-            (concat!(
-                "finishing message\n",
-                "last part of the incomplete finishing message"
-            ), 7),
+            (
+                concat!(
+                    "finishing message\n",
+                    "last part of the incomplete finishing message"
+                ),
+                7,
+            ),
         ];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -537,11 +555,14 @@ mod tests {
             mode: Mode::ContinueThrough,
             timeout: Duration::from_millis(10),
         };
-        let expected = vec![(concat!(
-            "java.lang.Exception\n",
-            "    at com.foo.bar(bar.java:123)\n",
-            "    at com.foo.baz(baz.java:456)",
-        ), 2)];
+        let expected = vec![(
+            concat!(
+                "java.lang.Exception\n",
+                "    at com.foo.bar(bar.java:123)\n",
+                "    at com.foo.baz(baz.java:456)",
+            ),
+            2,
+        )];
         run_and_assert(&lines, config, &expected).await;
     }
 
@@ -559,12 +580,15 @@ mod tests {
             mode: Mode::ContinueThrough,
             timeout: Duration::from_millis(10),
         };
-        let expected = vec![(concat!(
-            "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n",
-            "\tfrom foobar.rb:6:in `bar'\n",
-            "\tfrom foobar.rb:2:in `foo'\n",
-            "\tfrom foobar.rb:9:in `<main>'",
-        ), 3)];
+        let expected = vec![(
+            concat!(
+                "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n",
+                "\tfrom foobar.rb:6:in `bar'\n",
+                "\tfrom foobar.rb:2:in `foo'\n",
+                "\tfrom foobar.rb:9:in `<main>'",
+            ),
+            3,
+        )];
         run_and_assert(&lines, config, &expected).await;
     }
 
@@ -657,12 +681,18 @@ mod tests {
         let expected = vec![
             ("INFO some usual line", 0),
             ("INFO some other usual line", 1),
-            (concat!("INFO first part\n", "second part\n", "last part"), 4),
+            (
+                concat!("INFO first part\n", "second part\n", "last part"),
+                4,
+            ),
             ("ERROR another normal message", 5),
-            (concat!(
-                "ERROR finishing message\n",
-                "last part of the incomplete finishing message"
-            ), 7),
+            (
+                concat!(
+                    "ERROR finishing message\n",
+                    "last part of the incomplete finishing message"
+                ),
+                7,
+            ),
         ];
 
         let stream = stream_from_lines(&lines);
@@ -721,7 +751,10 @@ mod tests {
         }
         drop(send);
 
-        assert_results(results.await.unwrap(), &[(expected.as_str(), lines.len() - 1)]);
+        assert_results(
+            results.await.unwrap(),
+            &[(expected.as_str(), lines.len() - 1)],
+        );
     }
 
     // Test helpers.
@@ -760,7 +793,11 @@ mod tests {
         );
     }
 
-    async fn run_and_assert(lines: &[&'static str], config: Config, expected: &[(&'static str, usize)]) {
+    async fn run_and_assert(
+        lines: &[&'static str],
+        config: Config,
+        expected: &[(&'static str, usize)],
+    ) {
         let stream = stream_from_lines(lines);
         let logic = Logic::new(config);
         let line_agg = LineAgg::new(stream, logic);
