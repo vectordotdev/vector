@@ -6,6 +6,8 @@ use std::path::PathBuf;
 
 use crate::app::Application;
 
+const VERSION_START: &str = "version = ";
+
 /// Custom Starship prompt plugin
 #[derive(Args, Debug)]
 #[command(hide = true)]
@@ -21,8 +23,11 @@ impl Cli {
 
             for line in reader.lines() {
                 if let Ok(line) = line {
-                    if line.starts_with("version = ") {
-                        contexts.push(format!("version: {}", &line[11..line.len() - 1]));
+                    if line.starts_with(VERSION_START) {
+                        contexts.push(format!(
+                            "version: {}",
+                            &line[VERSION_START.len() + 1..line.len() - 1]
+                        ));
                         break;
                     }
                 }

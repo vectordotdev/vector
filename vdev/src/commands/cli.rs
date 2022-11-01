@@ -29,7 +29,7 @@ pub struct Cli {
 enum Commands {
     /// Build Vector
     Build(commands::build::Cli),
-    /// Manage the config file
+    /// Manage the vdev config file
     Config(commands::config::cli::Cli),
     /// Execute a command within the repository
     Exec(commands::exec::Cli),
