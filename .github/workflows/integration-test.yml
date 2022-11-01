@@ -58,7 +58,8 @@ jobs:
           - test: 'amqp'
           - test: 'apex'
           - test: 'aws'
-          - test: 'axiom'
+          # Database container currently fails to start due to failing to validate the license
+          #- test: 'axiom'
           - test: 'azure'
           - test: 'clickhouse'
           - test: 'datadog-agent'
