@@ -302,7 +302,7 @@ jobs:
           RUST_LOG: info
         run: |
           chmod +x ${{ runner.temp }}/bin/smp
-          ${{ runner.temp }}/bin/smp job cancel --submission-metadata ${{ runner.temp }}/submission-metadata
+          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job cancel --submission-metadata ${{ runner.temp }}/submission-metadata
 
   ##
   ## ANALYZE
