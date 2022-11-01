@@ -4,7 +4,7 @@ use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
 use codecs::BytesDeserializerConfig;
 use futures::{stream, stream::StreamExt, TryStreamExt};
-use lookup::path;
+use lookup::{owned_value_path, LookupBuf};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
 use value::{kind::Collection, Kind};
@@ -132,33 +132,34 @@ impl SourceConfig for AwsS3Config {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition = BytesDeserializerConfig
-            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .schema_definition(log_namespace)
             .with_source_metadata(
                 Self::NAME,
-                Some(path!("bucket")),
-                path!("bucket"),
+                Some(owned_value_path!("bucket")),
+                owned_value_path!("bucket"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(path!("object")),
-                path!("object"),
+                Some(owned_value_path!("object")),
+                owned_value_path!("object"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(path!("region")),
-                path!("region"),
+                Some(owned_value_path!("region")),
+                owned_value_path!("region"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
-                Self::Name,
-                None,
-                path!("metadata"),
+                Self::NAME,
+                None::<LookupBuf>,
+                owned_value_path!("metadata"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
             )
@@ -406,6 +407,7 @@ mod integration_tests {
     use lookup::path;
     use similar_asserts::assert_eq;
     use value::Value;
+    use vector_config::NamedComponent;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{
@@ -785,29 +787,22 @@ mod integration_tests {
             let source = config.build(cx).await.unwrap();
             tokio::spawn(async move { source.await.unwrap() });
 
+            let namespace = cx.log_namespace(Some(log_namespace));
             let events = collect_n(rx, expected_lines.len()).await;
 
             assert_eq!(expected_lines.len(), events.len());
-            if !log_namespace {
-                for (i, event) in events.iter().enumerate() {
-                    let message = expected_lines[i].as_str();
+            for (i, event) in events.iter().enumerate() {
+                let message = expected_lines[i].as_str();
 
-                    let log = event.as_log();
-                    assert_eq!(log["message"], message.into());
-                    assert_eq!(log["bucket"], bucket.clone().into());
-                    assert_eq!(log["object"], key.clone().into());
-                    assert_eq!(log["region"], "us-east-1".into());
-                }
-            } else {
-                for (i, event) in events.iter().enumerate() {
-                    let message = expected_lines[i].as_str();
-
-                    let log = event.as_log();
+                let log = event.as_log();
+                if log_namespace {
                     assert_eq!(log.value(), &Value::from(message));
-                    assert_eq!(log.metadata().value().get(path!("aws_s3", "bucket")).unwrap(), &Value::from(bucket.clone()));
-                    assert_eq!(log.metadata().value().get(path!("aws_s3", "object")).unwrap(), &Value::from(key.clone()));
-                    assert_eq!(log.metadata().value().get(path!("aws_s3", "region")).unwrap(), &Value::from("us-east-1"));
+                } else {
+                    assert_eq!(log["message"], message.into());
                 }
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("bucket"), path!("bucket")), &bucket.clone().into());
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("object"), path!("object")), &key.clone().into());
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("region"), path!("region")), &"us-east-1".into());
             }
 
             // Make sure the SQS message is deleted
