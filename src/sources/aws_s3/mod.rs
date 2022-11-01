@@ -132,7 +132,7 @@ impl SourceConfig for AwsS3Config {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        let schema_definition = BytesDeserializerConfig
+        let mut schema_definition = BytesDeserializerConfig
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
                 Self::NAME,
@@ -156,14 +156,17 @@ impl SourceConfig for AwsS3Config {
                 None,
             )
             .with_source_metadata(
-                //TODO this doesn't actually work!
                 Self::Name,
-                Some(path!(".")),
+                None,
                 path!("metadata"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
             )
             .with_standard_vector_source_metadata();
+
+        if log_namespace == LogNamespace::Legacy {
+            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+        }
 
         vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
