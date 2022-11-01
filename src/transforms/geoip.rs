@@ -125,24 +125,35 @@ impl TransformConfig for GeoipConfig {
     fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
         let isp_kind = Kind::object(
             Collection::empty()
-                .with_known(
-                    owned_value_path!("autonomous_system_number"),
-                    Kind::integer(),
-                )
-                .with_known(
-                    owned_value_path!("autonomous_system_organization"),
-                    Kind::bytes(),
-                )
-                .with_known(owned_value_path!("isp"), Kind::bytes())
-                .with_known(owned_value_path!("organization"), Kind::bytes()),
+                .with_known("autonomous_system_number", Kind::integer())
+                .with_known("autonomous_system_organization", Kind::bytes())
+                .with_known("isp", Kind::bytes())
+                .with_known("organization", Kind::bytes()),
         );
+
+        let city_kind = Kind::object(
+            Collection::empty()
+                .with_known("city_name", Kind::bytes())
+                .with_known("continent_code", Kind::bytes())
+                .with_known("country_code", Kind::bytes())
+                .with_known("country_name", Kind::bytes())
+                .with_known("timezone", Kind::bytes())
+                .with_known("latitude", Kind::bytes())
+                .with_known("longitude", Kind::bytes())
+                .with_known("postal_code", Kind::bytes())
+                .with_known("region_code", Kind::bytes())
+                .with_known("region_name", Kind::bytes())
+                .with_known("metro_code", Kind::bytes()),
+        );
+
+        let geoip_kind = isp_kind.or_null().union(city_kind.or_null());
 
         let schema_definition =
             merged_definition
                 .clone()
-                .with_field(self.target.clone(), Kind::any(), None);
+                .with_field(self.target.clone(), geoip_kind, None);
 
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 }
 
@@ -204,8 +215,6 @@ struct City<'a> {
 
 impl FunctionTransform for Geoip {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let target_field = self.target.clone();
-
         let mut isp = Isp::default();
         let mut city = City::default();
 
@@ -239,7 +248,7 @@ impl FunctionTransform for Geoip {
             serde_json::to_value(city)
         };
         if let Ok(json_value) = json_value {
-            event.as_mut_log().insert(target_field.as_str(), json_value);
+            event.as_mut_log().insert(&self.target, json_value);
         }
 
         output.push(event);
