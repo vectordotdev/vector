@@ -11,7 +11,9 @@ use arr_macro::arr;
 
 use self::allocator::Tracer;
 
-pub(crate) use self::allocator::{AllocationGroupId, AllocationLayer, GroupedTraceableAllocator};
+pub(crate) use self::allocator::{
+    without_allocation_tracing, AllocationGroupId, AllocationLayer, GroupedTraceableAllocator,
+};
 
 use crossbeam_utils::CachePadded;
 /// These arrays represent the allocations and deallocations for each group.
@@ -46,23 +48,25 @@ impl Tracer for MainTracer {
 pub fn init_allocation_tracing() {
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
-        .spawn(move || loop {
-            for idx in 0..GROUP_MEM_ALLOCS.len() {
-                let allocs = GROUP_MEM_ALLOCS[idx].load(Ordering::Relaxed);
-                let deallocs = GROUP_MEM_DEALLOCS[idx].load(Ordering::Relaxed);
-                let mem_used = allocs - deallocs;
+        .spawn(|| {
+            without_allocation_tracing(|| loop {
+                for idx in 0..GROUP_MEM_ALLOCS.len() {
+                    let allocs = GROUP_MEM_ALLOCS[idx].load(Ordering::Relaxed);
+                    let deallocs = GROUP_MEM_DEALLOCS[idx].load(Ordering::Relaxed);
+                    let mem_used = allocs - deallocs;
 
-                if mem_used == 0 {
-                    continue;
+                    if mem_used == 0 {
+                        continue;
+                    }
+
+                    info!(
+                        message = "Allocation group memory usage.",
+                        group_id = idx,
+                        current_memory_allocated_in_bytes = mem_used
+                    );
                 }
-
-                info!(
-                    message = "Allocation group memory usage.",
-                    group_id = idx,
-                    current_memory_allocated_in_bytes = mem_used
-                );
-            }
-            thread::sleep(Duration::from_millis(10000));
+                thread::sleep(Duration::from_millis(10000));
+            })
         })
         .unwrap();
 }

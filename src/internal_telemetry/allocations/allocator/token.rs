@@ -1,5 +1,5 @@
 use std::{
-    cell::UnsafeCell,
+    cell::RefCell,
     num::NonZeroUsize,
     sync::atomic::{AtomicUsize, Ordering},
 };
@@ -14,8 +14,8 @@ thread_local! {
     ///
     /// Any allocations which occur on this thread will be associated with whichever token is
     /// present at the time of the allocation.
-    pub(crate) static LOCAL_ALLOCATION_GROUP_STACK: UnsafeCell<GroupStack<256>> =
-        UnsafeCell::new(GroupStack::new());
+    pub(crate) static LOCAL_ALLOCATION_GROUP_STACK: RefCell<GroupStack<256>> =
+        RefCell::new(GroupStack::new());
 }
 
 /// The identifier that uniquely identifiers an allocation group.
@@ -80,12 +80,11 @@ pub struct AllocationGroupToken {
 
 impl AllocationGroupToken {
     pub fn enter(&self) {
-        LOCAL_ALLOCATION_GROUP_STACK
-            .with(|stack| unsafe { stack.get().as_mut().unwrap() }.push(self.id));
+        LOCAL_ALLOCATION_GROUP_STACK.with(|stack| stack.borrow_mut().push(self.id));
     }
 
     pub fn exit(&self) {
-        LOCAL_ALLOCATION_GROUP_STACK.with(|stack| unsafe { stack.get().as_mut().unwrap() }.pop());
+        LOCAL_ALLOCATION_GROUP_STACK.with(|stack| stack.borrow_mut().pop());
     }
 }
 
@@ -111,7 +110,9 @@ where
             // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, which allows callers to skip trying to run
             // `f` if they cannot mutably borrow the current allocation group. As `try_borrow_mut` will only let one
             // mutable borrow happen at a time, the tracker logic is never reentrant.
-            f(unsafe { group_stack.get().as_ref().unwrap() }.current());
+            if let Ok(stack) = group_stack.try_borrow_mut() {
+                f(stack.current());
+            }
         },
     );
 }
@@ -125,20 +126,19 @@ where
 /// `try_with_suspended_allocation_group` is primarily useful for "run this function if nobody else is tracing
 /// an (de)allocation right now".
 #[inline(always)]
-#[allow(dead_code)]
 pub(super) fn with_suspended_allocation_group<F>(f: F)
 where
     F: FnOnce(),
 {
     let _result = LOCAL_ALLOCATION_GROUP_STACK.try_with(
         #[inline(always)]
-        |_group_stack| {
+        |group_stack| {
             // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, as `try_borrow_mut` will only let one
             // mutable borrow happen at a time. As we simply want to ensure that the allocation group is suspended, we
             // don't care what the return value is: calling `try_borrow_mut` and holding on to the result until the end
             // of the scope is sufficient to either suspend the allocation group or know that it's already suspended and
             // will stay that way until we're done in this method.
-            // let _result = group_stack.try_borrow_mut();
+            let _result = group_stack.try_borrow_mut();
             f();
         },
     );
