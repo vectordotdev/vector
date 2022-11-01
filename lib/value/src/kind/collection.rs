@@ -105,6 +105,12 @@ impl<T: Ord + Clone> Collection<T> {
         &mut self.known
     }
 
+    /// Returns a new collection that includes the known key.
+    pub fn with_known(mut self, key: impl Into<T>, kind: Kind) -> Self {
+        self.known_mut().insert(key.into(), kind);
+        self
+    }
+
     /// Gets the type of "unknown" elements in the collection.
     /// The returned type will always have "undefined" included.
     #[must_use]

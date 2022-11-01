@@ -1,8 +1,11 @@
 use std::net::IpAddr;
 use std::{str::FromStr, sync::Arc};
 
+use lookup::owned_value_path;
 use lookup::OwnedTargetPath;
 use serde::Serialize;
+use value::kind::Collection;
+use value::Kind;
 use vector_config::configurable_component;
 
 use crate::{
@@ -119,7 +122,26 @@ impl TransformConfig for GeoipConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        let isp_kind = Kind::object(
+            Collection::empty()
+                .with_known(
+                    owned_value_path!("autonomous_system_number"),
+                    Kind::integer(),
+                )
+                .with_known(
+                    owned_value_path!("autonomous_system_organization"),
+                    Kind::bytes(),
+                )
+                .with_known(owned_value_path!("isp"), Kind::bytes())
+                .with_known(owned_value_path!("organization"), Kind::bytes()),
+        );
+
+        let schema_definition =
+            merged_definition
+                .clone()
+                .with_field(self.target.clone(), Kind::any(), None);
+
         vec![Output::default(DataType::Log)]
     }
 }
@@ -184,6 +206,9 @@ impl FunctionTransform for Geoip {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let target_field = self.target.clone();
 
+        let mut isp = Isp::default();
+        let mut city = City::default();
+
         let ipaddress = event
             .as_log()
             .get(self.source.as_str())
@@ -191,7 +216,10 @@ impl FunctionTransform for Geoip {
 
         let geoip_data = if let Some(ipaddress) = &ipaddress {
             match FromStr::from_str(ipaddress) {
-                Ok(ip) => Some(self.lookup(ip)),
+                Ok(ip) => match self.lookup(ip) {
+                    GeoIpData::Isp(new_isp) => isp = new_isp,
+                    GeoIpData::City(new_city) => city = new_city,
+                },
                 Err(error) => {
                     emit!(GeoipIpAddressParseError {
                         error,
