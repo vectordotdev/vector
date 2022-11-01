@@ -104,7 +104,7 @@ pub struct AwsS3Config {
     #[configurable(derived)]
     tls_options: Option<TlsConfig>,
 
-    /// The namespace to use for logs. This overrides the global setting
+    /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     log_namespace: Option<bool>,
 }

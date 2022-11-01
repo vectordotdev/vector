@@ -343,7 +343,7 @@ test-integration: test-integration-redis test-integration-splunk test-integratio
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
 .PHONY: test-integration-aws-s3
-test-integration-aws-s3: ## Runs AWS SQS integration tests
+test-integration-aws-s3: ## Runs AWS S3 integration tests
 	FILTER=::aws_s3 make test-integration-aws
 
 .PHONY: test-integration-aws-sqs
