@@ -128,7 +128,7 @@ pub struct RedisSourceConfig {
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
 
-    /// The namespace to use for logs. This overrides the global setting
+    /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     log_namespace: Option<bool>,
 }
