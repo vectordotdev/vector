@@ -12,7 +12,7 @@ use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -215,13 +215,13 @@ async fn demo_logs_source(
                         let log = event.as_mut_log();
                         log_namespace.insert_vector_metadata(
                             log,
-                            log_schema().source_type_key(),
+                            LegacyKey::InsertIfEmpty(log_schema().source_type_key()),
                             "source_type",
                             "demo_logs",
                         );
                         log_namespace.insert_vector_metadata(
                             log,
-                            log_schema().timestamp_key(),
+                            LegacyKey::InsertIfEmpty(log_schema().timestamp_key()),
                             "ingest_timestamp",
                             now,
                         );

@@ -32,6 +32,7 @@ use codecs::{
     StreamDecodingError,
 };
 use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::LegacyKey;
 use vector_core::{
     config::{log_schema, LogNamespace, Output},
     event::Event,
@@ -207,13 +208,13 @@ impl HttpClientContext {
                 Event::Log(ref mut log) => {
                     self.log_namespace.insert_vector_metadata(
                         log,
-                        log_schema().source_type_key(),
+                        LegacyKey::InsertIfEmpty(log_schema().source_type_key()),
                         "source_type",
                         Bytes::from(HttpClientConfig::NAME),
                     );
                     self.log_namespace.insert_vector_metadata(
                         log,
-                        log_schema().timestamp_key(),
+                        LegacyKey::InsertIfEmpty(log_schema().timestamp_key()),
                         "ingest_timestamp",
                         Utc::now(),
                     );

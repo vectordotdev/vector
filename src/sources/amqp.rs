@@ -24,7 +24,7 @@ use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
 use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LegacyKey;
 use vector_core::{
     config::{LogNamespace, SourceAcknowledgementsConfig},
@@ -201,14 +201,14 @@ fn populate_event(
 
     log_namespace.insert_vector_metadata(
         log,
-        log_schema().timestamp_key(),
+        LegacyKey::InsertIfEmpty(log_schema().timestamp_key()),
         "ingest_timestamp",
         timestamp,
     );
 
     log_namespace.insert_vector_metadata(
         log,
-        log_schema().source_type_key(),
+        LegacyKey::InsertIfEmpty(log_schema().source_type_key()),
         "source_type",
         "amqp",
     );

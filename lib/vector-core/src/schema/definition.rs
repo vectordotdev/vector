@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::{log_schema, LogNamespace};
-use lookup::{LookupBuf, SegmentBuf};
+use lookup::lookup_v2::parse_value_path;
+use lookup::{owned_value_path, LookupBuf, OwnedValuePath};
 use value::{kind::Collection, Kind};
 
 /// The definition of a schema.
@@ -156,14 +157,14 @@ impl Definition {
     #[must_use]
     pub fn with_standard_vector_source_metadata(self) -> Self {
         self.with_vector_metadata(
-            LookupBuf::from_str(log_schema().source_type_key()).ok(),
-            "source_type",
+            parse_value_path(log_schema().source_type_key()).ok(),
+            owned_value_path!("source_type"),
             Kind::bytes(),
             None,
         )
         .with_vector_metadata(
-            LookupBuf::from_str(log_schema().timestamp_key()).ok(),
-            "ingest_timestamp",
+            parse_value_path(log_schema().timestamp_key()).ok(),
+            owned_value_path!("ingest_timestamp"),
             Kind::timestamp(),
             None,
         )
@@ -176,8 +177,8 @@ impl Definition {
     pub fn with_source_metadata(
         self,
         source_name: &str,
-        legacy_path: Option<impl Into<LookupBuf>>,
-        vector_path: impl Into<LookupBuf>,
+        legacy_path: Option<OwnedValuePath>,
+        vector_path: OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
@@ -190,8 +191,8 @@ impl Definition {
     #[must_use]
     pub fn with_vector_metadata(
         self,
-        legacy_path: Option<impl Into<LookupBuf>>,
-        vector_path: impl Into<LookupBuf>,
+        legacy_path: Option<OwnedValuePath>,
+        vector_path: OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
@@ -202,8 +203,8 @@ impl Definition {
     fn with_namespaced_metadata(
         self,
         prefix: &str,
-        legacy_path: Option<impl Into<LookupBuf>>,
-        vector_path: impl Into<LookupBuf>,
+        legacy_path: Option<OwnedValuePath>,
+        vector_path: OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
@@ -219,10 +220,10 @@ impl Definition {
         });
 
         let vector_definition = if self.log_namespaces.contains(&LogNamespace::Vector) {
-            let mut path_with_prefix = vector_path.into();
-            path_with_prefix.push_front(SegmentBuf::from(prefix));
-
-            Some(self.clone().with_metadata_field(path_with_prefix, kind))
+            Some(
+                self.clone()
+                    .with_metadata_field(vector_path.with_field_prefix(prefix), kind),
+            )
         } else {
             None
         };
@@ -242,13 +243,7 @@ impl Definition {
     /// - If the path is not root, and the definition does not allow the type to be an object.
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
-    pub fn with_field(
-        mut self,
-        path: impl Into<LookupBuf>,
-        kind: Kind,
-        meaning: Option<&str>,
-    ) -> Self {
-        let path = path.into();
+    pub fn with_field(mut self, path: OwnedValuePath, kind: Kind, meaning: Option<&str>) -> Self {
         let meaning = meaning.map(ToOwned::to_owned);
 
         if !path.is_root() {
@@ -261,7 +256,8 @@ impl Definition {
         self.event_kind.set_at_path(&path, kind);
 
         if let Some(meaning) = meaning {
-            self.meaning.insert(meaning, MeaningPointer::Valid(path));
+            self.meaning
+                .insert(meaning, MeaningPointer::Valid(path.into()));
         }
 
         self
@@ -272,12 +268,10 @@ impl Definition {
     #[must_use]
     pub fn try_with_field(
         mut self,
-        path: impl Into<LookupBuf>,
+        path: OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        let path = path.into();
-
         let existing_type = self.event_kind.at_path(&path);
 
         if existing_type.is_undefined() {
@@ -306,9 +300,7 @@ impl Definition {
     /// - If the path is not root, and the definition does not allow the type to be an object
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
-    pub fn with_metadata_field(mut self, path: impl Into<LookupBuf>, kind: Kind) -> Self {
-        let path = path.into();
-
+    pub fn with_metadata_field(mut self, path: OwnedValuePath, kind: Kind) -> Self {
         if !path.is_root() {
             assert!(
                 self.metadata_kind.as_object().is_some(),
@@ -326,12 +318,7 @@ impl Definition {
     ///
     /// See `Definition::require_field`.
     #[must_use]
-    pub fn optional_field(
-        self,
-        path: impl Into<LookupBuf>,
-        kind: Kind,
-        meaning: Option<&str>,
-    ) -> Self {
+    pub fn optional_field(self, path: OwnedValuePath, kind: Kind, meaning: Option<&str>) -> Self {
         self.with_field(path, kind.or_undefined(), meaning)
     }
 

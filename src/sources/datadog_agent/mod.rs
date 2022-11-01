@@ -25,6 +25,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
+use lookup::owned_value_path;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -194,51 +195,51 @@ impl SourceConfig for DatadogAgentConfig {
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
-                self.get_component_name(),
-                Some("message"),
-                "message",
+                Self::NAME,
+                Some(owned_value_path!("message")),
+                owned_value_path!("message"),
                 Kind::bytes(),
                 Some("message"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("status"),
-                "status",
+                Self::NAME,
+                Some(owned_value_path!("status")),
+                owned_value_path!("status"),
                 Kind::bytes(),
                 Some("severity"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("timestamp"),
-                "timestamp",
+                Self::NAME,
+                Some(owned_value_path!("timestamp")),
+                owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("hostname"),
-                "hostname",
+                Self::NAME,
+                Some(owned_value_path!("hostname")),
+                owned_value_path!("hostname"),
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("service"),
-                "service",
+                Self::NAME,
+                Some(owned_value_path!("service")),
+                owned_value_path!("service"),
                 Kind::bytes(),
                 Some("service"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("ddsource"),
-                "ddsource",
+                Self::NAME,
+                Some(owned_value_path!("ddsource")),
+                owned_value_path!("ddsource"),
                 Kind::bytes(),
                 Some("source"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("ddtags"),
-                "ddtags",
+                Self::NAME,
+                Some(owned_value_path!("ddtags")),
+                owned_value_path!("ddtags"),
                 Kind::bytes(),
                 Some("tags"),
             )
