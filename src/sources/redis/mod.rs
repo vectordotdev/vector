@@ -5,13 +5,14 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
+use lookup::path;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
@@ -206,7 +207,7 @@ impl SourceConfig for RedisSourceConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata()
             .with_source_metadata(
-                "redis",
+                Self::NAME,
                 self.redis_key.as_ref().map(|x| x.as_str()),
                 "key",
                 Kind::bytes(),
@@ -248,24 +249,37 @@ async fn handle_line(
                     if let Event::Log(ref mut log) = event {
                         log_namespace.insert_vector_metadata(
                             log,
-                            log_schema().source_type_key(),
-                            "source_type",
-                            Bytes::from("redis"),
+                            path!(log_schema().source_type_key()),
+                            path!("source_type"),
+                            Bytes::from(RedisSourceConfig::NAME),
                         );
                         log_namespace.insert_vector_metadata(
                             log,
-                            log_schema().timestamp_key(),
-                            "timestamp",
+                            path!(log_schema().timestamp_key()),
+                            path!("timestamp"),
                             now,
                         );
 
                         match log_namespace {
-                            LogNamespace::Vector => log_namespace
-                                .insert_source_metadata("redis", log, "key", "key", key),
+                            LogNamespace::Vector => log_namespace.insert_source_metadata(
+                                RedisSourceConfig::NAME,
+                                log,
+                                path!("key"),
+                                path!("key"),
+                                key,
+                            ),
                             LogNamespace::Legacy => {
                                 if let Some(redis_key) = redis_key {
-                                    log_namespace
-                                        .insert_source_metadata("redis", log, redis_key, "key", key)
+                                    // Optionally store the redis key
+                                    // in the event root under a
+                                    // user-provided name.
+                                    log_namespace.insert_source_metadata(
+                                        RedisSourceConfig::NAME,
+                                        log,
+                                        path!(redis_key),
+                                        path!("key"),
+                                        key,
+                                    )
                                 }
                             }
                         }
@@ -367,7 +381,7 @@ mod integration_test {
             }),
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
-            redis_key: Some("remapped_key".to_string()),
+            redis_key: Some("remapped_key".into()),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             log_namespace: Some(true),
@@ -375,18 +389,16 @@ mod integration_test {
 
         let events = run_and_assert_source_compliance_n(config, 1, &SOURCE_TAGS).await;
 
-        assert_eq!(events[0].as_log().value(), &value::Value::from("1"));
+        let log_event = events[0].as_log();
+        let meta = log_event.metadata();
+
+        assert_eq!(log_event.value(), &"1".into());
         assert_eq!(
-            events[0]
-                .as_log()
-                .metadata()
-                .value()
-                .get("redis")
-                .unwrap()
-                .get("key")
+            meta.value()
+                .get(path!(RedisSourceConfig::NAME, "key"))
                 .unwrap(),
-            &value::Value::from(key)
-        )
+            &vrl::value!(key)
+        );
     }
 
     #[tokio::test]
@@ -474,7 +486,7 @@ mod integration_test {
             assert_eq!(event.as_log()[log_schema().message_key()], text.into());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
-                "redis".into()
+                RedisSourceConfig::NAME.into()
             );
         }
     }
