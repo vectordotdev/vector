@@ -34,13 +34,10 @@ impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
             handle_alloc_error(actual_layout);
         }
 
-        // Zero out the group ID field to make sure it's in the `None` state.
-        //
         // SAFETY: We know that `actual_ptr` is at least aligned enough for casting it to `*mut usize` as the layout for
         // the allocation backing this pointer ensures the first field in the layout is `usize.
         #[allow(clippy::cast_ptr_alignment)]
         let group_id_ptr = actual_ptr.cast::<usize>();
-        group_id_ptr.write(0);
 
         // SAFETY: If the allocation succeeded and `actual_ptr` is valid, then it must be valid to advance by
         // `offset_to_object` as it would land within the allocation.
