@@ -1,5 +1,7 @@
+use std::net::IpAddr;
 use std::{str::FromStr, sync::Arc};
 
+use lookup::OwnedTargetPath;
 use serde::Serialize;
 use vector_config::configurable_component;
 
@@ -46,7 +48,7 @@ pub struct GeoipConfig {
     /// See [output](#output-data) for more info.
     #[serde(default = "default_geoip_target_field")]
     #[configurable(metadata(docs::examples = "geoip", docs::examples = "parent.child",))]
-    pub target: String,
+    pub target: OwnedTargetPath,
 
     /// The locale to use when querying the database.
     ///
@@ -70,12 +72,12 @@ pub struct Geoip {
     pub dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
     pub database: String,
     pub source: String,
-    pub target: String,
+    pub target: OwnedTargetPath,
     pub locale: String,
 }
 
-fn default_geoip_target_field() -> String {
-    "geoip".to_string()
+fn default_geoip_target_field() -> OwnedTargetPath {
+    OwnedTargetPath::event(owned_value_path!("geoip"))
 }
 
 fn default_locale() -> String {
@@ -132,7 +134,7 @@ impl Geoip {
     pub fn new(
         database: String,
         source: String,
-        target: String,
+        target: OwnedTargetPath,
         locale: String,
     ) -> crate::Result<Self> {
         Ok(Geoip {
@@ -148,6 +150,11 @@ impl Geoip {
         self.dbreader.metadata.database_type == ASN_DATABASE_TYPE
             || self.dbreader.metadata.database_type == ISP_DATABASE_TYPE
     }
+}
+
+enum GeoIpData<'a> {
+    Isp(Isp<'a>),
+    City(City<'a>),
 }
 
 #[derive(Default, Serialize)]
@@ -175,93 +182,16 @@ struct City<'a> {
 
 impl FunctionTransform for Geoip {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let mut isp: Isp = Default::default();
-        let mut city: City = Default::default();
         let target_field = self.target.clone();
+
         let ipaddress = event
             .as_log()
             .get(self.source.as_str())
             .map(|s| s.to_string_lossy());
-        if let Some(ipaddress) = &ipaddress {
+
+        let geoip_data = if let Some(ipaddress) = &ipaddress {
             match FromStr::from_str(ipaddress) {
-                Ok(ip) => {
-                    if self.has_isp_db() {
-                        if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
-                            if let Some(as_number) = data.autonomous_system_number {
-                                isp.autonomous_system_number = as_number as i64;
-                            }
-                            if let Some(as_organization) = data.autonomous_system_organization {
-                                isp.autonomous_system_organization = as_organization;
-                            }
-                            if let Some(isp_name) = data.isp {
-                                isp.isp = isp_name;
-                            }
-                            if let Some(organization) = data.organization {
-                                isp.organization = organization;
-                            }
-                        }
-                    } else if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
-                        if let Some(city_names) = data.city.and_then(|c| c.names) {
-                            if let Some(city_name) = city_names.get("en") {
-                                city.city_name = city_name;
-                            }
-                        }
-
-                        if let Some(continent_code) = data.continent.and_then(|c| c.code) {
-                            city.continent_code = continent_code;
-                        }
-
-                        if let Some(country) = data.country {
-                            if let Some(country_code) = country.iso_code {
-                                city.country_code = country_code;
-                            }
-                            if let Some(country_name) = country
-                                .names
-                                .as_ref()
-                                .and_then(|names| names.get(&*self.locale))
-                            {
-                                city.country_name = country_name;
-                            }
-                        }
-
-                        if let Some(location) = data.location {
-                            if let Some(time_zone) = location.time_zone {
-                                city.timezone = time_zone;
-                            }
-                            if let Some(latitude) = location.latitude {
-                                city.latitude = latitude.to_string();
-                            }
-
-                            if let Some(longitude) = location.longitude {
-                                city.longitude = longitude.to_string();
-                            }
-
-                            if let Some(metro_code) = location.metro_code {
-                                city.metro_code = metro_code.to_string();
-                            }
-                        }
-
-                        // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
-                        if let Some(subdivision) = data.subdivisions.as_ref().and_then(|s| s.last())
-                        {
-                            if let Some(name) = subdivision
-                                .names
-                                .as_ref()
-                                .and_then(|names| names.get(&*self.locale))
-                            {
-                                city.region_name = name;
-                            }
-
-                            if let Some(iso_code) = subdivision.iso_code {
-                                city.region_code = iso_code
-                            }
-                        }
-
-                        if let Some(postal_code) = data.postal.and_then(|p| p.code) {
-                            city.postal_code = postal_code;
-                        }
-                    }
-                }
+                Ok(ip) => Some(self.lookup(ip)),
                 Err(error) => {
                     emit!(GeoipIpAddressParseError {
                         error,
@@ -285,6 +215,92 @@ impl FunctionTransform for Geoip {
         }
 
         output.push(event);
+    }
+}
+
+impl Geoip {
+    fn lookup(&self, ip: IpAddr) -> GeoIpData {
+        if self.has_isp_db() {
+            let mut isp = Isp::default();
+            if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
+                if let Some(as_number) = data.autonomous_system_number {
+                    isp.autonomous_system_number = as_number as i64;
+                }
+                if let Some(as_organization) = data.autonomous_system_organization {
+                    isp.autonomous_system_organization = as_organization;
+                }
+                if let Some(isp_name) = data.isp {
+                    isp.isp = isp_name;
+                }
+                if let Some(organization) = data.organization {
+                    isp.organization = organization;
+                }
+            }
+            GeoIpData::Isp(isp)
+        } else {
+            let mut city = City::default();
+            if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
+                if let Some(city_names) = data.city.and_then(|c| c.names) {
+                    if let Some(city_name) = city_names.get("en") {
+                        city.city_name = city_name;
+                    }
+                }
+
+                if let Some(continent_code) = data.continent.and_then(|c| c.code) {
+                    city.continent_code = continent_code;
+                }
+
+                if let Some(country) = data.country {
+                    if let Some(country_code) = country.iso_code {
+                        city.country_code = country_code;
+                    }
+                    if let Some(country_name) = country
+                        .names
+                        .as_ref()
+                        .and_then(|names| names.get(&*self.locale))
+                    {
+                        city.country_name = country_name;
+                    }
+                }
+
+                if let Some(location) = data.location {
+                    if let Some(time_zone) = location.time_zone {
+                        city.timezone = time_zone;
+                    }
+                    if let Some(latitude) = location.latitude {
+                        city.latitude = latitude.to_string();
+                    }
+
+                    if let Some(longitude) = location.longitude {
+                        city.longitude = longitude.to_string();
+                    }
+
+                    if let Some(metro_code) = location.metro_code {
+                        city.metro_code = metro_code.to_string();
+                    }
+                }
+
+                // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
+                if let Some(subdivision) = data.subdivisions.as_ref().and_then(|s| s.last()) {
+                    if let Some(name) = subdivision
+                        .names
+                        .as_ref()
+                        .and_then(|names| names.get(&*self.locale))
+                    {
+                        city.region_name = name;
+                    }
+
+                    if let Some(iso_code) = subdivision.iso_code {
+                        city.region_code = iso_code
+                    }
+                }
+
+                if let Some(postal_code) = data.postal.and_then(|p| p.code) {
+                    city.postal_code = postal_code;
+                }
+            }
+            GeoIpData::City(city)
+        }
     }
 }
 
