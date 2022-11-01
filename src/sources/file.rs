@@ -1614,8 +1614,6 @@ mod tests {
 
         writeln!(&mut file, "INFO hello").unwrap();
         writeln!(&mut file, "part of hello").unwrap();
-        // writeln!(&mut file, "INFO goodbye").unwrap();
-        // writeln!(&mut file, "part of goodbye").unwrap();
 
         // Read and aggregate existing lines
         let received = run_file_source(&config, false, Acks, sleep_500_millis()).await;
@@ -1623,7 +1621,8 @@ mod tests {
         assert_eq!(lines, vec!["INFO hello\npart of hello"]);
 
         // After restart, we should not see any new lines
-        let received_after_restart = run_file_source(&config, false, Acks, sleep_500_millis()).await;
+        let received_after_restart =
+            run_file_source(&config, false, Acks, sleep_500_millis()).await;
         let lines = extract_messages_string(received_after_restart);
         assert_eq!(lines, Vec::<String>::new());
     }
