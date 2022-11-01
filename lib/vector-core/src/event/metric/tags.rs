@@ -10,19 +10,6 @@ use vector_config::configurable_component;
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct MetricTags(#[configurable(transparent)] pub(in crate::event) BTreeMap<String, String>);
 
-#[macro_export]
-macro_rules! metric_tags {
-    () => { $crate::event::MetricTags::default() };
-
-    ($($key:expr => $value:expr,)+) => { metric_tags!($($key => $value),+) };
-
-    ($($key:expr => $value:expr),*) => {
-        $crate::event::MetricTags::from([
-            $( ($key.into(), $value.into()), )*
-        ])
-    };
-}
-
 impl MetricTags {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
