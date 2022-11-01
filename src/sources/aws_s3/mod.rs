@@ -12,9 +12,10 @@ use vector_core::config::{DataType, LogNamespace};
 
 use super::util::MultilineConfig;
 use crate::{
-    aws::{auth::AwsAuthentication, create_client, RegionOrEndpoint},
-    common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
-    config::{AcknowledgementsConfig, Output, ProxyConfig, SourceConfig, SourceContext},
+    aws::auth::AwsAuthentication,
+    config::{
+        DataType, Output, ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+    },
     line_agg,
     serde::bool_or_struct,
     tls::TlsConfig,
@@ -98,7 +99,7 @@ pub struct AwsS3Config {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 
     #[configurable(derived)]
     tls_options: Option<TlsConfig>,

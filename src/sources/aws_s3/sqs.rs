@@ -24,7 +24,7 @@ use vector_common::internal_event::{
 use vector_config::{configurable_component, NamedComponent};
 
 use crate::{
-    config::{log_schema, AcknowledgementsConfig, SourceContext},
+    config::{log_schema, SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
@@ -224,10 +224,10 @@ impl Ingestor {
     pub(super) async fn run(
         self,
         cx: SourceContext,
-        acknowledgements: AcknowledgementsConfig,
+        acknowledgements: SourceAcknowledgementsConfig,
         log_namespace: LogNamespace,
     ) -> Result<(), ()> {
-        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(acknowledgements);
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {
             let process = IngestorProcess::new(

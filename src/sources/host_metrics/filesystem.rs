@@ -1,6 +1,6 @@
 use futures::StreamExt;
 use heim::units::information::byte;
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(windows))]
 use heim::units::ratio::ratio;
 use vector_config::configurable_component;
 use vector_core::metric_tags;
@@ -106,7 +106,7 @@ impl HostMetrics {
                         usage.used().get::<byte>() as f64,
                         tags.clone(),
                     );
-                    #[cfg(not(target_os = "windows"))]
+                    #[cfg(not(windows))]
                     output.gauge(
                         "filesystem_used_ratio",
                         usage.ratio().get::<ratio>() as f64,
@@ -134,7 +134,7 @@ mod tests {
         FilesystemConfig,
     };
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(windows))]
     #[tokio::test]
     async fn generates_filesystem_metrics() {
         let mut buffer = MetricsBuffer::new(None);
@@ -166,7 +166,7 @@ mod tests {
         assert_eq!(count_tag(&metrics, "mountpoint"), metrics.len());
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     #[tokio::test]
     async fn generates_filesystem_metrics() {
         let mut buffer = MetricsBuffer::new(None);

@@ -3,18 +3,23 @@ use std::{io, sync::Arc};
 use bytes::Bytes;
 use codecs::JsonSerializer;
 use lookup::lookup_v2::OwnedSegment;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, TimestampFormat, Transformer},
     event::{Event, EventFinalizers, Finalizable},
-    sinks::util::{request_builder::EncodeResult, Compression, ElementCount, RequestBuilder},
+    sinks::util::{
+        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression, ElementCount,
+        RequestBuilder,
+    },
 };
 
 #[derive(Clone)]
 pub struct DatadogEventsRequest {
     pub body: Bytes,
     pub metadata: Metadata,
+    request_metadata: RequestMetadata,
 }
 
 impl Finalizable for DatadogEventsRequest {
@@ -36,11 +41,16 @@ impl ElementCount for DatadogEventsRequest {
     }
 }
 
+impl MetaDescriptive for DatadogEventsRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
+    }
+}
+
 #[derive(Clone)]
 pub struct Metadata {
     pub finalizers: EventFinalizers,
     pub api_key: Option<Arc<str>>,
-    pub event_byte_size: usize,
 }
 
 pub struct DatadogEventsRequestBuilder {
@@ -75,24 +85,28 @@ impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, event: Event) -> (Self::Metadata, Self::Events) {
+    fn split_input(&self, event: Event) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let builder = RequestMetadataBuilder::from_events(&event);
+
         let mut log = event.into_log();
         let metadata = Metadata {
             finalizers: log.take_finalizers(),
             api_key: log.metadata_mut().datadog_api_key(),
-            event_byte_size: log.size_of(),
         };
-        (metadata, Event::from(log))
+
+        (metadata, builder, Event::from(log))
     }
 
     fn build_request(
         &self,
         metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         DatadogEventsRequest {
             body: payload.into_payload(),
             metadata,
+            request_metadata,
         }
     }
 }

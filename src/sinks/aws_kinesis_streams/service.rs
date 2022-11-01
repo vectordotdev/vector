@@ -8,9 +8,11 @@ use aws_types::region::Region;
 use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::request_metadata::MetaDescriptive;
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
-use crate::{event::EventStatus, sinks::aws_kinesis_streams::request_builder::KinesisRequest};
+use super::sink::BatchKinesisRequest;
+use crate::event::EventStatus;
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -34,7 +36,7 @@ impl DriverResponse for KinesisResponse {
     }
 }
 
-impl Service<Vec<KinesisRequest>> for KinesisService {
+impl Service<BatchKinesisRequest> for KinesisService {
     type Response = KinesisResponse;
     type Error = SdkError<PutRecordsError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -45,11 +47,12 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, requests: Vec<KinesisRequest>) -> Self::Future {
-        let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
-        let count = requests.len();
+    fn call(&mut self, requests: BatchKinesisRequest) -> Self::Future {
+        let events_byte_size = requests.get_metadata().events_byte_size();
+        let count = requests.get_metadata().event_count();
 
         let records = requests
+            .events
             .into_iter()
             .map(|req| req.put_records_request)
             .collect();
