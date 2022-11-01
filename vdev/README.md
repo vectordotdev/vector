@@ -12,6 +12,7 @@ Table of Contents:
   - [Starship](#starship)
 
 ## Installation
+Run the following command from the root of the vector repository:
 
 ```text
 cargo install -f --path vdev

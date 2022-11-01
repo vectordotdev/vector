@@ -7,8 +7,8 @@ pub struct Git {
 }
 
 impl Git {
-    pub fn new(path: String) -> Git {
-        Git { path: path }
+    pub fn new(path: String) -> Self {
+        Self { path: path }
     }
 
     pub fn current_branch(&self) -> Result<String> {

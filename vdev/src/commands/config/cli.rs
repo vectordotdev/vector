@@ -4,7 +4,7 @@ use clap::{Args, Subcommand};
 use crate::app::Application;
 use crate::commands;
 
-/// Manage the config file
+/// Manage the vdev config file
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {
