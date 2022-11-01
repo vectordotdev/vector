@@ -72,6 +72,10 @@ pub struct DnstapConfig {
     ///
     /// This should not typically needed to be changed.
     pub socket_send_buffer_size: Option<usize>,
+
+    /// The namespace to use for logs. This overrides the global settings
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 fn default_max_frame_length() -> usize {
@@ -104,6 +108,7 @@ impl Default for DnstapConfig {
             socket_file_mode: None,
             socket_receive_buffer_size: None,
             socket_send_buffer_size: None,
+            log_namespace: None,
         }
     }
 }
@@ -113,7 +118,8 @@ impl_generate_config_from_default!(DnstapConfig);
 #[async_trait::async_trait]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
-        let frame_handler = DnstapFrameHandler::new(self);
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let frame_handler = DnstapFrameHandler::new(self, log_namespace);
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
@@ -141,10 +147,11 @@ pub struct DnstapFrameHandler {
     host_key: String,
     timestamp_key: String,
     bytes_received: Registered<BytesReceived>,
+    log_namespace: LogNamespace,
 }
 
 impl DnstapFrameHandler {
-    pub fn new(config: &DnstapConfig) -> Self {
+    pub fn new(config: &DnstapConfig, log_namespace: LogNamespace) -> Self {
         let timestamp_key = log_schema().timestamp_key();
 
         let mut schema = DnstapEventSchema::new();
@@ -171,6 +178,7 @@ impl DnstapFrameHandler {
             host_key,
             timestamp_key: timestamp_key.to_string(),
             bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
+            log_namespace,
         }
     }
 }
@@ -195,8 +203,20 @@ impl FrameHandler for DnstapFrameHandler {
 
         let mut log_event = LogEvent::default();
 
+        self.log_namespace.insert_vector_metadata(
+            &mut log_event,
+            self.timestamp_key().as_str(),
+            "ingest_timestamp",
+            chrono::Utc::now(),
+        );
+
         if let Some(host) = received_from {
-            log_event.insert(self.host_key().as_str(), host);
+            self.log_namespace.insert_vector_metadata(
+                &mut log_event,
+                self.host_key().as_str(),
+                "host",
+                host,
+            );
         }
 
         if self.raw_data_only {
