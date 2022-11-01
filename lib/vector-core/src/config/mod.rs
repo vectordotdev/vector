@@ -307,9 +307,9 @@ impl LogNamespace {
         }
     }
 
-    /// Vector: This is added to "event metadata", nested under the source name.
+    /// Vector: This is retrieved from the "event metadata", nested under the source name.
     ///
-    /// Legacy: This is stored on the event root, only if a field with that name doesn't already exist.
+    /// Legacy: This is retrieved from the event.
     pub fn get_source_metadata<'a, 'b>(
         &self,
         source_name: &'a str,
