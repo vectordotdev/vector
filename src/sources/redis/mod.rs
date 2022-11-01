@@ -208,7 +208,7 @@ impl SourceConfig for RedisSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                self.redis_key.as_ref().map(|x| x.as_str()),
+                self.redis_key.as_deref(),
                 "key",
                 Kind::bytes(),
                 None,
