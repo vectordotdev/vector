@@ -25,6 +25,7 @@ use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
 use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
 use vector_config::configurable_component;
+use vector_core::config::LegacyKey;
 use vector_core::{
     config::{LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
@@ -213,9 +214,9 @@ fn populate_event(
     );
 
     log_namespace.insert_source_metadata(
-        "amqp",
+        AmqpSourceConfig::NAME,
         log,
-        keys.routing_key_field,
+        Some(LegacyKey::InsertIfEmpty(keys.routing_key_field)),
         "routing",
         keys.routing.to_string(),
     );
@@ -223,12 +224,18 @@ fn populate_event(
     log_namespace.insert_source_metadata(
         "amqp",
         log,
-        keys.exchange_key,
+        Some(LegacyKey::InsertIfEmpty(keys.exchange_key)),
         "exchange",
         keys.exchange.to_string(),
     );
 
-    log_namespace.insert_source_metadata("amqp", log, keys.offset_key, "offset", keys.delivery_tag);
+    log_namespace.insert_source_metadata(
+        "amqp",
+        log,
+        Some(LegacyKey::InsertIfEmpty(keys.offset_key)),
+        "offset",
+        keys.delivery_tag,
+    );
 }
 
 /// Receives an event from `AMQP` and pushes it along the pipeline.
