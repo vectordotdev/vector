@@ -90,6 +90,8 @@ All data received by the sink will be acknowledged as successfully delivered.
 
 Healthchecks are skipped.
 
+The config settings for `log_namespace` should be respected in demo mode.
+
 #### Reloading 
 
 Special care must be taken to ensure that reloading a config will move a 
@@ -157,3 +159,5 @@ Note: This can be filled out during the review process.
 - Allow users to configure the shape of the data if relevant.
 - Expand to generate Traces and Metrics.
 - Expand to Transforms that accept external data.
+- Add a config option to specify a seed so the demo logs produced are 
+  reproducible.
