@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
 use super::{
-    estimated_json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
@@ -78,9 +78,7 @@ impl EstimatedJsonEncodedSizeOf for Inner {
         self.json_encoded_size_cache
             .load()
             .unwrap_or_else(|| {
-                let value = JsonEncodedByteCountingValue(&self.fields);
-
-                let size = value.estimated_json_encoded_size_of();
+                let size = self.fields.estimated_json_encoded_size_of();
                 let size = NonZeroUsize::new(size).expect("Size cannot be zero");
 
                 self.json_encoded_size_cache.store(Some(size));

@@ -9,7 +9,6 @@ pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::{
     from_value as estimated_json_encoded_size_of, EstimatedJsonEncodedSizeOf,
-    JsonEncodedByteCountingValue,
 };
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,

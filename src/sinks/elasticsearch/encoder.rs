@@ -2,10 +2,7 @@ use std::{io, io::Write};
 
 use serde::Serialize;
 use vector_buffers::EventCount;
-use vector_core::{
-    event::{self, Event},
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
-};
+use vector_core::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
@@ -38,7 +35,7 @@ impl ByteSizeOf for ProcessedEvent {
 
 impl EstimatedJsonEncodedSizeOf for ProcessedEvent {
     fn estimated_json_encoded_size_of(&self) -> usize {
-        event::estimated_json_encoded_size_of(self)
+        self.log.estimated_json_encoded_size_of()
     }
 }
 

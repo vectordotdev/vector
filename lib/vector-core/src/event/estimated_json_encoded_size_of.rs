@@ -1,8 +1,5 @@
 use chrono::Timelike;
-use serde::{
-    ser::{self, Serializer as _},
-    Serialize,
-};
+use serde::{ser, Serialize};
 use smallvec::SmallVec;
 use value::Value;
 
@@ -22,69 +19,6 @@ const EPOCH_RFC3339_0: &str = "1970-01-01T00:00:00Z";
 const EPOCH_RFC3339_3: &str = "1970-01-01T00:00:00.000Z";
 const EPOCH_RFC3339_6: &str = "1970-01-01T00:00:00.000000Z";
 const EPOCH_RFC3339_9: &str = "1970-01-01T00:00:00.000000000Z";
-
-/// A wrapper type around the default `Value` type, to implement the `Serialize` trait in an
-/// efficient way to count the JSON encoded bytes of a `Value`.
-///
-/// See the comments in the `Serializer` implementation for more details.
-pub struct JsonEncodedByteCountingValue<'a>(pub &'a Value);
-
-// FIXME(Jean): Remove `Serializer` implementation completely, and do all the work inside the `impl
-// EstimatedJsonEncodedSizeOf for Value` impl.
-impl<'a> Serialize for JsonEncodedByteCountingValue<'a> {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        match &self.0 {
-            // The timestamp is converted to a static epoch timestamp, to avoid any unnecessary
-            // allocations.
-            //
-            // The following invariants must hold for the size of timestamps to remain correct:
-            //
-            // - `chrono::SecondsFormat::AutoSi` is used to calculate nanoseconds precision.
-            // - `chrono::offset::Utc` is used as the timezone.
-            // - `use_z` is `true` for the `chrono::DateTime#to_rfc3339_opts` function call.
-            Value::Timestamp(ts) => {
-                let ns = ts.nanosecond() % 1_000_000_000;
-                let epoch = if ns == 0 {
-                    EPOCH_RFC3339_0
-                } else if ns % 1_000_000 == 0 {
-                    EPOCH_RFC3339_3
-                } else if ns % 1_000 == 0 {
-                    EPOCH_RFC3339_6
-                } else {
-                    EPOCH_RFC3339_9
-                };
-
-                serializer.serialize_str(epoch)
-            }
-
-            // Collection types have their inner `Value`'s wrapped in `JsonEncodedValue`.
-            Value::Object(m) => serializer.collect_map(m.iter().map(|(k, v)| (k, Self(v)))),
-            Value::Array(a) => serializer.collect_seq(a.iter().map(Self)),
-
-            // The `Value` type serializes `Value::Bytes` using `serialize_str`, but this has two
-            // downsides:
-            //
-            // 1. For invalid UTF-8 encoded bytes, it will replace them with `U+FFFD REPLACEMENT,
-            //    requiring allocations before counting the bytes.
-            //
-            // 2. Even for valid UTF-8 encoded bytes, it will have to validate all individual bytes,
-            //    which our soaks have shown to cause a significant drop in throughput.
-            //
-            // Because of this, we take the assumption that all bytes passed through this serializer
-            // are valid UTF-8 encoded bytes, and thus can be counted as-is. If this is not the
-            // case, the final byte size will be off slightly, or significantly, depending on how
-            // many of the bytes need to be escaped, or replaced.
-            Value::Bytes(b) => serializer.serialize_bytes(b),
-
-            // All other `Value` variants are serialized according to the default serialization
-            // implementation of that type.
-            v => v.serialize(serializer),
-        }
-    }
-}
 
 /// A helper trait that is implemented for any `T` that implements `serde::Serialize`, to get the
 /// estimated JSON encoded size of that type.
@@ -112,12 +46,6 @@ impl<T: EstimatedJsonEncodedSizeOf, const N: usize> EstimatedJsonEncodedSizeOf
     }
 }
 
-impl<'a> EstimatedJsonEncodedSizeOf for JsonEncodedByteCountingValue<'a> {
-    fn estimated_json_encoded_size_of(&self) -> usize {
-        from_value(self)
-    }
-}
-
 impl EstimatedJsonEncodedSizeOf for Value {
     fn estimated_json_encoded_size_of(&self) -> usize {
         match self {
@@ -129,8 +57,8 @@ impl EstimatedJsonEncodedSizeOf for Value {
             // - `chrono::SecondsFormat::AutoSi` is used to calculate nanoseconds precision.
             // - `chrono::offset::Utc` is used as the timezone.
             // - `use_z` is `true` for the `chrono::DateTime#to_rfc3339_opts` function call.
-            Value::Timestamp(ts) => {
-                let ns = ts.nanosecond() % 1_000_000_000;
+            Value::Timestamp(v) => {
+                let ns = v.nanosecond() % 1_000_000_000;
                 let epoch = if ns == 0 {
                     EPOCH_RFC3339_0
                 } else if ns % 1_000_000 == 0 {
@@ -144,21 +72,13 @@ impl EstimatedJsonEncodedSizeOf for Value {
                 epoch.len()
             }
 
-            // Collection types have their inner `Value`'s wrapped in `JsonEncodedValue`.
-            Value::Object(m) => {
-                let mut serializer = Serializer::default();
-                serializer
-                    .collect_map(m.iter().map(|(k, v)| (k, JsonEncodedByteCountingValue(v))))
-                    .expect("infallible");
-                serializer.bytes
-            }
-            Value::Array(a) => {
-                let mut serializer = Serializer::default();
-                serializer
-                    .collect_seq(a.iter().map(JsonEncodedByteCountingValue))
-                    .expect("infallible");
-                serializer.bytes
-            }
+            Value::Object(v) => v.iter().fold(2, |acc, (k, v)| {
+                acc + QUOTES_SIZE + k.len() + COMMA_SIZE + v.estimated_json_encoded_size_of()
+            }),
+
+            Value::Array(v) => v.iter().fold(2, |acc, v| {
+                acc + COMMA_SIZE + v.estimated_json_encoded_size_of()
+            }),
 
             // The `Value` type serializes `Value::Bytes` using `serialize_str`, but this has two
             // downsides:
@@ -173,19 +93,69 @@ impl EstimatedJsonEncodedSizeOf for Value {
             // are valid UTF-8 encoded bytes, and thus can be counted as-is. If this is not the
             // case, the final byte size will be off slightly, or significantly, depending on how
             // many of the bytes need to be escaped, or replaced.
-            Value::Bytes(b) => {
-                let mut serializer = Serializer::default();
-                serializer.serialize_bytes(b).expect("infallible");
-                serializer.bytes
+            Value::Bytes(v) => QUOTES_SIZE + v.len(),
+
+            Value::Regex(v) => QUOTES_SIZE + v.as_str().len(),
+
+            #[rustfmt::skip]
+            Value::Integer(v) => {
+                let v = *v;
+
+                // -9_223_372_036_854_775_808 ..= 9_223_372_036_854_775_807
+                if        v <  -999_999_999_999_999_999 { 20
+                } else if v <   -99_999_999_999_999_999 { 19
+                } else if v <    -9_999_999_999_999_999 { 18
+                } else if v <      -999_999_999_999_999 { 17
+                } else if v <       -99_999_999_999_999 { 16
+                } else if v <        -9_999_999_999_999 { 15
+                } else if v <          -999_999_999_999 { 14
+                } else if v <           -99_999_999_999 { 13
+                } else if v <            -9_999_999_999 { 12
+                } else if v <              -999_999_999 { 11
+                } else if v <               -99_999_999 { 10
+                } else if v <                -9_999_999 {  9
+                } else if v <                  -999_999 {  8
+                } else if v <                   -99_999 {  7
+                } else if v <                    -9_999 {  6
+                } else if v <                      -999 {  5
+                } else if v <                       -99 {  4
+                } else if v <                        -9 {  3
+                } else if v <                         0 {  2
+                } else if v <                        10 {  1
+                } else if v <                       100 {  2
+                } else if v <                     1_000 {  3
+                } else if v <                    10_000 {  4
+                } else if v <                   100_000 {  5
+                } else if v <                 1_000_000 {  6
+                } else if v <                10_000_000 {  7
+                } else if v <               100_000_000 {  8
+                } else if v <             1_000_000_000 {  9
+                } else if v <            10_000_000_000 { 10
+                } else if v <           100_000_000_000 { 11
+                } else if v <         1_000_000_000_000 { 12
+                } else if v <        10_000_000_000_000 { 13
+                } else if v <       100_000_000_000_000 { 14
+                } else if v <     1_000_000_000_000_000 { 15
+                } else if v <    10_000_000_000_000_000 { 16
+                } else if v <   100_000_000_000_000_000 { 17
+                } else if v < 1_000_000_000_000_000_000 { 18
+                } else                                  { 19 }
             }
 
-            // All other `Value` variants are serialized according to the default serialization
-            // implementation of that type.
-            v => {
-                let mut serializer = Serializer::default();
-                v.serialize(&mut serializer).expect("infallible");
-                serializer.bytes
+            Value::Float(v) => {
+                let mut buffer = ryu::Buffer::new();
+                buffer.format_finite(v.into_inner()).len()
             }
+
+            Value::Boolean(v) => {
+                if *v {
+                    TRUE_SIZE
+                } else {
+                    FALSE_SIZE
+                }
+            }
+
+            Value::Null => NULL_SIZE,
         }
     }
 }

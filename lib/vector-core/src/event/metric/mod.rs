@@ -15,8 +15,8 @@ use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
     event::{
-        estimated_json_encoded_size_of::{self, EstimatedJsonEncodedSizeOf},
-        BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable,
+        estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
+        EventFinalizers, EventMetadata, Finalizable,
     },
     ByteSizeOf,
 };
@@ -438,7 +438,7 @@ impl ByteSizeOf for Metric {
 
 impl EstimatedJsonEncodedSizeOf for Metric {
     fn estimated_json_encoded_size_of(&self) -> usize {
-        estimated_json_encoded_size_of::from_value(self)
+        super::estimated_json_encoded_size_of::from_value(self)
     }
 }
 
