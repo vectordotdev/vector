@@ -1,15 +1,16 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use futures::FutureExt;
 use http::Uri;
 use indoc::indoc;
 use snafu::ResultExt;
+use tokio::sync::watch;
 use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::{proxy::ProxyConfig, AcknowledgementsConfig};
 
-use super::service::TraceApiRetry;
+use super::{service::TraceApiRetry, stats, Aggregator};
 use crate::{
     common::datadog::get_base_domain,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
@@ -116,6 +117,7 @@ pub enum DatadogTracesEndpoint {
 }
 
 /// Store traces & APM stats endpoints actual URIs.
+#[derive(Clone)]
 pub struct DatadogTracesEndpointConfiguration {
     traces_endpoint: Uri,
     stats_endpoint: Uri,
@@ -156,22 +158,46 @@ impl DatadogTracesConfig {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.inner());
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let endpoints = self.generate_traces_endpoint_configuration()?;
+
         let batcher_settings = self
             .batch
             .validate()?
             .limit_max_bytes(BATCH_GOAL_BYTES)?
             .limit_max_events(BATCH_MAX_EVENTS)?
             .into_batcher_settings()?;
+
         let service = ServiceBuilder::new()
             .settings(request_limits, TraceApiRetry)
-            .service(TraceApiService::new(client));
+            .service(TraceApiService::new(client.clone()));
+
+        // object responsible for computing APM stats from incoming trace events and sending APM stats payloads
+        let apm_stats_aggregator =
+            Arc::new(Mutex::new(Aggregator::new(Arc::clone(&default_api_key))));
+
+        let compression = self.compression.unwrap_or_else(Compression::gzip_default);
+
         let request_builder = DatadogTracesRequestBuilder::new(
             Arc::clone(&default_api_key),
-            endpoints,
-            self.compression.unwrap_or_else(Compression::gzip_default),
+            endpoints.clone(),
+            compression,
             PAYLOAD_LIMIT,
+            Arc::clone(&apm_stats_aggregator),
         )?;
-        let sink = TracesSink::new(service, request_builder, batcher_settings);
+
+        // shutdown= Sender that the sink sends to when input stream is exhauseted.
+        // tripwire= Receiver that APM stats flush thread listens for exit signal on.
+        let (shutdown, tripwire) = watch::channel(());
+
+        let sink = TracesSink::new(service, request_builder, batcher_settings, shutdown);
+
+        tokio::spawn(stats::flush_apm_stats_thread(
+            tripwire,
+            client,
+            compression,
+            endpoints,
+            Arc::clone(&apm_stats_aggregator),
+        ));
+
         Ok(VectorSink::from_event_streamsink(sink))
     }
 

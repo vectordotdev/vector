@@ -1,14 +1,30 @@
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    io::Write,
+    sync::{Arc, Mutex},
+};
 
+use bytes::Bytes;
 use chrono::Utc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use serde_bytes;
+use snafu::ResultExt;
+use tokio::sync::watch::Receiver;
+use vector_common::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
-use super::{ddsketch_full, sink::PartitionKey};
+use super::{
+    build_request,
+    config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
+    ddsketch_full,
+    request_builder::{DDTracesMetadata, RequestBuilderError},
+    sink::PartitionKey,
+};
 use crate::{
     event::{TraceEvent, Value},
+    http::{BuildRequestSnafu, HttpClient},
     metrics::AgentDDSketch,
+    sinks::util::{Compression, Compressor},
 };
 
 const MEASURED_KEY: &str = "_dd.measured";
@@ -280,20 +296,85 @@ impl Bucket {
     }
 }
 
-pub(crate) struct Aggregator {
+pub struct Aggregator {
     /// The key represents the timestamp (in nanoseconds) of the beginning of the time window (that lasts 10 seconds) on
     /// which the associated bucket will calculate statistics.
     buckets: BTreeMap<u64, Bucket>,
+
     /// The oldeest timestamp we will allow for the current time bucket.
     oldest_timestamp: u64,
+
+    /// Env asociated with the Agent
+    agent_env: Option<String>,
+
+    /// Hostname associated with the Agent
+    agent_hostname: Option<String>,
+
+    /// Version associated with the Agent
+    agent_version: Option<String>,
+
+    /// TODO
+    api_key: Option<Arc<str>>,
+
+    /// TODO
+    default_api_key: Arc<str>,
 }
 
 impl Aggregator {
-    pub fn new() -> Self {
+    pub fn new(default_api_key: Arc<str>) -> Self {
         Self {
             buckets: BTreeMap::new(),
             oldest_timestamp: align_timestamp(Utc::now().timestamp_nanos() as u64),
+            default_api_key,
+            // We can't know the below fields until have received a trace event
+            agent_env: None,
+            agent_hostname: None,
+            agent_version: None,
+            api_key: None,
         }
+    }
+
+    /// TODO
+    fn update_agent_properties(&mut self, partition_key: &PartitionKey) {
+        if self.agent_env.is_none() {
+            if let Some(env) = &partition_key.env {
+                self.agent_env = Some(env.clone());
+            }
+        }
+        if self.agent_hostname.is_none() {
+            if let Some(hostname) = &partition_key.hostname {
+                self.agent_hostname = Some(hostname.clone());
+            }
+        }
+        if self.agent_version.is_none() {
+            if let Some(version) = &partition_key.agent_version {
+                self.agent_version = Some(version.clone());
+            }
+        }
+        if self.api_key.is_none() {
+            if let Some(api_key) = &partition_key.api_key {
+                self.api_key = Some(api_key.clone());
+            }
+        }
+    }
+
+    pub fn get_agent_env(&self) -> String {
+        self.agent_env.clone().unwrap_or_default()
+        //self.agent_env.as_ref().unwrap_or_default()
+    }
+
+    pub fn get_agent_hostname(&self) -> String {
+        self.agent_hostname.clone().unwrap_or_default()
+    }
+
+    pub fn get_agent_version(&self) -> String {
+        self.agent_version.clone().unwrap_or_default()
+    }
+
+    pub fn get_api_key(&self) -> Arc<str> {
+        self.api_key
+            .clone()
+            .unwrap_or_else(|| Arc::clone(&self.default_api_key))
     }
 
     /// Iterates over a trace's constituting spans and upon matching conditions it updates statistics (mostly using the top level span).
@@ -379,13 +460,47 @@ impl Aggregator {
                     data: BTreeMap::new(),
                 };
                 b.add(span, weight, is_top, aggkey);
+                // TODO change to debug
+                info!("Created {} start_time bucket.", btime);
                 self.buckets.insert(btime, b);
             }
         }
     }
 
-    fn get_client_stats_payload(&self) -> Vec<ClientStatsPayload> {
-        let client_stats_buckets = self.export_buckets();
+    /// TODO
+    fn export_buckets(
+        &mut self,
+        flush_cutoff_time: u64,
+    ) -> BTreeMap<PayloadAggregationKey, Vec<ClientStatsBucket>> {
+        let mut m = BTreeMap::<PayloadAggregationKey, Vec<ClientStatsBucket>>::new();
+
+        self.buckets.retain(|&bucket_start, bucket| {
+            let retain = bucket_start > flush_cutoff_time;
+
+            if !retain {
+                // TODO change back to debug
+                info!("Flushing {} start_time bucket.", bucket_start);
+
+                bucket.export().into_iter().for_each(|(payload_key, csb)| {
+                    match m.get_mut(&payload_key) {
+                        None => {
+                            m.insert(payload_key.clone(), vec![csb]);
+                        }
+                        Some(s) => {
+                            s.push(csb);
+                        }
+                    };
+                })
+            }
+            retain
+        });
+
+        m
+    }
+
+    /// TODO
+    fn get_client_stats_payloads(&mut self, flush_cutoff_time: u64) -> Vec<ClientStatsPayload> {
+        let client_stats_buckets = self.export_buckets(flush_cutoff_time);
 
         client_stats_buckets
             .into_iter()
@@ -410,50 +525,28 @@ impl Aggregator {
             .collect::<Vec<ClientStatsPayload>>()
     }
 
-    fn export_buckets(&self) -> BTreeMap<PayloadAggregationKey, Vec<ClientStatsBucket>> {
-        let mut m = BTreeMap::<PayloadAggregationKey, Vec<ClientStatsBucket>>::new();
-        self.buckets.values().for_each(|b| {
-            b.export().into_iter().for_each(|(payload_key, csb)| {
-                match m.get_mut(&payload_key) {
-                    None => {
-                        m.insert(payload_key.clone(), vec![csb]);
-                    }
-                    Some(s) => {
-                        s.push(csb);
-                    }
-                };
-            })
-        });
-        m
-    }
-
-    /// Flushes the bucket cache of stale entries.
-    /// It means that we cache and can compute stats only for the last `BUCKET_WINDOW_LEN * BUCKET_DURATION_NANOSECONDS` and after such time,
+    /// Flushes the bucket cache.
+    /// We cache and can compute stats only for the last `BUCKET_WINDOW_LEN * BUCKET_DURATION_NANOSECONDS` and after such time,
     /// buckets are then flushed. This only applies to past buckets. Stats buckets in the future are cached with no restriction.
-    fn flush(&mut self) {
+    ///
+    /// # Arguments
+    ///
+    /// * `force` - If true, all cached buckets are flushed.
+    fn flush(&mut self, force: bool) -> Vec<ClientStatsPayload> {
         // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L38-L41
         // , and https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L195-L207
 
-        // NOTE: The Agent flushes on a specific time interval. We are currently flushing per batch
-        // input to the sink.
-        // If this becomes problematic for users, we will have to spin up a separate thread that
-        // flushes on a specific time interval.
-        // In theory the existing approach should work, and would just manifest as overall more stats payloads
-        // being output by Vector, but the payloads themselves should be correct.
-        // https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L83-L108
-
         let now = Utc::now().timestamp_nanos() as u64;
-        let flush_cutoff_time = now - (BUCKET_DURATION_NANOSECONDS * BUCKET_WINDOW_LEN);
 
-        // remove entries from the cache if the start time is outside the retaining window
-        self.buckets.retain(|&bucket_start, _bucket| {
-            let retain = bucket_start > flush_cutoff_time;
+        let flush_cutoff_time = if force {
+            // flush all the remaining buckets (the Vector process is exiting)
+            now
+        } else {
+            // maintain two buckets in the cache during normal operation
+            now - (BUCKET_DURATION_NANOSECONDS * BUCKET_WINDOW_LEN)
+        };
 
-            if !retain {
-                debug!("Flushing {} start_time bucket.", bucket_start);
-            }
-            retain
-        });
+        let client_stats_payloads = self.get_client_stats_payloads(flush_cutoff_time);
 
         // update the oldest_timestamp allowed, to prevent having stats for an already flushed
         // bucket
@@ -464,6 +557,8 @@ impl Aggregator {
             debug!("Updated oldest_timestamp to {}.", new_oldest_ts);
             self.oldest_timestamp = new_oldest_ts;
         }
+
+        client_stats_payloads
     }
 }
 
@@ -612,23 +707,161 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         })
 }
 
+/// TODO
+///
+/// # arguments
+///
+/// * `` -
 pub(crate) fn compute_apm_stats(
     key: &PartitionKey,
-    aggregator: &mut Aggregator,
-    traces: &[TraceEvent],
-) -> StatsPayload {
-    // flush stale entries from the cache
-    aggregator.flush();
+    aggregator: Arc<Mutex<Aggregator>>,
+    trace_events: &[TraceEvent],
+) {
+    let mut aggregator = aggregator.lock().unwrap();
+
+    // store properties that are available only at runtime
+    aggregator.update_agent_properties(&key);
 
     // process the incoming traces
-    traces.iter().for_each(|t| aggregator.handle_trace(key, t));
+    trace_events
+        .iter()
+        .for_each(|t| aggregator.handle_trace(key, t));
+}
 
-    StatsPayload {
-        agent_hostname: key.hostname.clone().unwrap_or_default(),
-        agent_env: key.env.clone().unwrap_or_default(),
-        stats: aggregator.get_client_stats_payload(),
-        agent_version: key.agent_version.clone().unwrap_or_default(),
-        client_computed: false,
+/// TODO
+///
+/// # arguments
+///
+/// * `` -
+pub async fn flush_apm_stats_thread(
+    mut tripwire: Receiver<()>,
+    client: HttpClient,
+    compression: Compression,
+    endpoint_configuration: DatadogTracesEndpointConfiguration,
+    aggregator: Arc<Mutex<Aggregator>>,
+) {
+    let sender = ApmStatsSender {
+        client,
+        compression,
+        endpoint_configuration,
+        aggregator,
+    };
+
+    // flush on the same interval as the stats buckets
+    let mut interval =
+        tokio::time::interval(std::time::Duration::from_nanos(BUCKET_DURATION_NANOSECONDS));
+
+    // TODO change to debug
+    info!("Starting APM stats flushing thread.");
+
+    loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                sender.flush_apm_stats(false).await;
+            },
+            _ = tripwire.changed() =>  {
+                // TODO change to debug
+                info!("Ending APM stats flushing thread.");
+                sender.flush_apm_stats(true).await;
+                break;
+            },
+        }
+    }
+}
+
+struct ApmStatsSender {
+    pub client: HttpClient,
+    pub compression: Compression,
+    pub endpoint_configuration: DatadogTracesEndpointConfiguration,
+    pub aggregator: Arc<Mutex<Aggregator>>,
+}
+
+impl ApmStatsSender {
+    async fn flush_apm_stats(&self, force: bool) {
+        // explicit scope to minimize duration that the Aggregator is locked.
+        if let Some((payload, api_key)) = {
+            let mut aggregator = self.aggregator.lock().unwrap();
+            let client_stats_payloads = aggregator.flush(force);
+
+            if client_stats_payloads.is_empty() {
+                // no sense proceeding if no payloads to flush
+                None
+            } else {
+                let payload = StatsPayload {
+                    agent_hostname: aggregator.get_agent_hostname(),
+                    agent_env: aggregator.get_agent_env(),
+                    stats: client_stats_payloads,
+                    agent_version: aggregator.get_agent_version(),
+                    client_computed: false,
+                };
+
+                Some((payload, aggregator.get_api_key()))
+            }
+        } {
+            if let Err(e) = self.compress_and_send(payload, api_key).await {
+                // TODO emit an internal `Error` event here, probably
+                error!(message = format!("Error while encoding APM stats payloads: {}", e));
+            }
+        }
+    }
+
+    async fn compress_and_send(
+        &self,
+        payload: StatsPayload,
+        api_key: Arc<str>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let (metadata, compressed_payload) = self.build_apm_stats_request_data(api_key, payload)?;
+
+        let request_metadata = RequestMetadata::new(0, 0, 0, 0, 0);
+        let trace_api_request = build_request(
+            (metadata, request_metadata),
+            compressed_payload,
+            &self.compression,
+            &self.endpoint_configuration,
+        );
+
+        let http_request = trace_api_request
+            .into_http_request()
+            .context(BuildRequestSnafu)?;
+
+        self.client.send(http_request).await?;
+
+        Ok(())
+    }
+
+    fn build_apm_stats_request_data(
+        &self,
+        api_key: Arc<str>,
+        payload: StatsPayload,
+    ) -> Result<(DDTracesMetadata, Bytes), RequestBuilderError> {
+        let encoded_payload =
+            rmp_serde::to_vec_named(&payload).map_err(|e| RequestBuilderError::FailedToEncode {
+                message: "APM stats encoding failed.",
+                reason: e.to_string(),
+                dropped_events: 0,
+            })?;
+        let uncompressed_size = encoded_payload.len();
+        let metadata = DDTracesMetadata {
+            api_key,
+            endpoint: DatadogTracesEndpoint::APMStats,
+            finalizers: EventFinalizers::default(),
+            uncompressed_size,
+            content_type: "application/msgpack".to_string(),
+        };
+
+        let mut compressor = Compressor::from(self.compression);
+        match compressor.write_all(&encoded_payload) {
+            Ok(()) => {
+                let bytes = compressor.into_inner().freeze();
+
+                Ok((metadata, bytes))
+            }
+            Err(e) => Err(RequestBuilderError::FailedToEncode {
+                message: "APM stats payload compression failed.",
+                reason: e.to_string(),
+                dropped_events: 0,
+            }),
+        }
     }
 }
 

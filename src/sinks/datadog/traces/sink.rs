@@ -5,6 +5,7 @@ use futures_util::{
     stream::{self, BoxStream},
     StreamExt,
 };
+use tokio::sync::watch::Sender;
 use tower::Service;
 use vector_core::{
     config::log_schema,
@@ -71,6 +72,7 @@ pub struct TracesSink<S> {
     service: S,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
+    shutdown: Sender<()>,
 }
 
 impl<S> TracesSink<S>
@@ -84,11 +86,13 @@ where
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
+        shutdown: Sender<()>,
     ) -> Self {
         TracesSink {
             service,
             request_builder,
             batch_settings,
+            shutdown,
         }
     }
 
@@ -113,7 +117,13 @@ where
             })
             .into_driver(self.service);
 
-        sink.run().await
+        sink.run().await?;
+
+        // TODO we seem to be exiting before this...
+        // Notify the stats thread task to flush remaining payloads and shutdown.
+        let _ = self.shutdown.send(());
+
+        Ok(())
     }
 }
 

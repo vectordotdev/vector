@@ -28,3 +28,5 @@ pub(crate) mod dd_proto {
 }
 
 pub use self::config::DatadogTracesConfig;
+pub use self::request_builder::build_request;
+pub use self::stats::Aggregator;
