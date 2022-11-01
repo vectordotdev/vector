@@ -761,7 +761,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use ::quickcheck::{Arbitrary, Gen, TestResult};
+    use quickcheck::{Arbitrary, Gen, TestResult};
     use quickcheck_macros::quickcheck;
     use serde_json::json;
 
@@ -1035,9 +1035,7 @@ mod tests {
             return TestResult::discard();
         }
 
-        let b = JsonEncodedByteCountingValue(&v);
-
-        let got = from_value(&b);
+        let got = from_value(&v);
         let want = serde_json::to_string(&v).unwrap();
 
         TestResult::from_bool(got == want.len())

@@ -72,5 +72,3 @@ vector-config-macros = { path = "../vector-config-macros" }
 [dev-dependencies]
 futures = { version = "0.3.25", default-features = false, features = ["async-await", "std"] }
 tokio = { version = "1.21.2", default-features = false, features = ["rt", "time"] }
-quickcheck = "1"
-quickcheck_macros = "1"
