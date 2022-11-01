@@ -10,7 +10,7 @@ use vector_common::internal_event::{
     ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
 };
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
@@ -265,12 +265,6 @@ impl EncodedLength for RedisKvEntry {
     }
 }
 
-impl ByteSizeOf for RedisKvEntry {
-    fn allocated_bytes(&self) -> usize {
-        self.key.len() + self.value.len()
-    }
-}
-
 fn encode_event(
     mut event: Event,
     key: &Template,
@@ -288,7 +282,7 @@ fn encode_event(
         })
         .ok()?;
 
-    let event_byte_size = event.size_of();
+    let event_byte_size = event.estimated_json_encoded_size_of();
 
     transformer.transform(&mut event);
 
