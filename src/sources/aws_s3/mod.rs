@@ -690,6 +690,7 @@ mod integration_tests {
     }
 
     // puts an object and asserts that the logs it gets back match
+    #[allow(clippy::too_many_arguments)]
     async fn test_event(
         key: Option<String>,
         content_encoding: Option<&str>,
