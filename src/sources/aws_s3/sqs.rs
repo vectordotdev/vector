@@ -26,7 +26,7 @@ use vector_config::configurable_component;
 use crate::tls::TlsConfig;
 use crate::{
     config::{log_schema, SourceAcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, LogEvent},
+    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, LogEvent},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,

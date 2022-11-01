@@ -1,5 +1,9 @@
 use chrono::Timelike;
-use serde::{ser, Serialize};
+use serde::{
+    ser::{self, Serializer as _},
+    Serialize,
+};
+use smallvec::SmallVec;
 use value::Value;
 
 const NULL_SIZE: usize = 4;
@@ -25,6 +29,8 @@ const EPOCH_RFC3339_9: &str = "1970-01-01T00:00:00.000000000Z";
 /// See the comments in the `Serializer` implementation for more details.
 pub struct JsonEncodedByteCountingValue<'a>(pub &'a Value);
 
+// FIXME(Jean): Remove `Serializer` implementation completely, and do all the work inside the `impl
+// EstimatedJsonEncodedSizeOf for Value` impl.
 impl<'a> Serialize for JsonEncodedByteCountingValue<'a> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -86,15 +92,101 @@ pub trait EstimatedJsonEncodedSizeOf {
     fn estimated_json_encoded_size_of(&self) -> usize;
 }
 
-impl<T> EstimatedJsonEncodedSizeOf for T
-where
-    T: serde::Serialize,
-{
-    /// Returns the estimated JSON encoded size of `self`, or `0` if the size cannot be calculated
-    /// because `T` errors during serialization.
-    #[inline]
+impl<T: EstimatedJsonEncodedSizeOf> EstimatedJsonEncodedSizeOf for &T {
     fn estimated_json_encoded_size_of(&self) -> usize {
-        estimated_size_of(self)
+        T::estimated_json_encoded_size_of(&*self)
+    }
+}
+
+impl<T: EstimatedJsonEncodedSizeOf> EstimatedJsonEncodedSizeOf for Vec<T> {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.iter().map(T::estimated_json_encoded_size_of).sum()
+    }
+}
+
+impl<T: EstimatedJsonEncodedSizeOf, const N: usize> EstimatedJsonEncodedSizeOf
+    for SmallVec<[T; N]>
+{
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.iter().map(T::estimated_json_encoded_size_of).sum()
+    }
+}
+
+impl<'a> EstimatedJsonEncodedSizeOf for JsonEncodedByteCountingValue<'a> {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        from_value(self)
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for Value {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        match self {
+            // The timestamp is converted to a static epoch timestamp, to avoid any unnecessary
+            // allocations.
+            //
+            // The following invariants must hold for the size of timestamps to remain correct:
+            //
+            // - `chrono::SecondsFormat::AutoSi` is used to calculate nanoseconds precision.
+            // - `chrono::offset::Utc` is used as the timezone.
+            // - `use_z` is `true` for the `chrono::DateTime#to_rfc3339_opts` function call.
+            Value::Timestamp(ts) => {
+                let ns = ts.nanosecond() % 1_000_000_000;
+                let epoch = if ns == 0 {
+                    EPOCH_RFC3339_0
+                } else if ns % 1_000_000 == 0 {
+                    EPOCH_RFC3339_3
+                } else if ns % 1_000 == 0 {
+                    EPOCH_RFC3339_6
+                } else {
+                    EPOCH_RFC3339_9
+                };
+
+                epoch.len()
+            }
+
+            // Collection types have their inner `Value`'s wrapped in `JsonEncodedValue`.
+            Value::Object(m) => {
+                let mut serializer = Serializer::default();
+                serializer
+                    .collect_map(m.iter().map(|(k, v)| (k, JsonEncodedByteCountingValue(v))))
+                    .expect("infallible");
+                serializer.bytes
+            }
+            Value::Array(a) => {
+                let mut serializer = Serializer::default();
+                serializer
+                    .collect_seq(a.iter().map(JsonEncodedByteCountingValue))
+                    .expect("infallible");
+                serializer.bytes
+            }
+
+            // The `Value` type serializes `Value::Bytes` using `serialize_str`, but this has two
+            // downsides:
+            //
+            // 1. For invalid UTF-8 encoded bytes, it will replace them with `U+FFFD REPLACEMENT,
+            //    requiring allocations before counting the bytes.
+            //
+            // 2. Even for valid UTF-8 encoded bytes, it will have to validate all individual bytes,
+            //    which our soaks have shown to cause a significant drop in throughput.
+            //
+            // Because of this, we take the assumption that all bytes passed through this serializer
+            // are valid UTF-8 encoded bytes, and thus can be counted as-is. If this is not the
+            // case, the final byte size will be off slightly, or significantly, depending on how
+            // many of the bytes need to be escaped, or replaced.
+            Value::Bytes(b) => {
+                let mut serializer = Serializer::default();
+                serializer.serialize_bytes(b).expect("infallible");
+                serializer.bytes
+            }
+
+            // All other `Value` variants are serialized according to the default serialization
+            // implementation of that type.
+            v => {
+                let mut serializer = Serializer::default();
+                v.serialize(&mut serializer).expect("infallible");
+                serializer.bytes
+            }
+        }
     }
 }
 
@@ -114,7 +206,7 @@ impl ser::Error for Error {
     }
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 /// A serializer that counts the number of JSON-encoded bytes in a serializable type.
 ///
@@ -140,7 +232,7 @@ pub struct Serializer {
 /// # Errors
 ///
 /// Returns an error if `T` cannot be serialized.
-pub fn estimated_size_of<T>(value: &T) -> usize
+pub fn from_value<T>(value: &T) -> usize
 where
     T: Serialize,
 {

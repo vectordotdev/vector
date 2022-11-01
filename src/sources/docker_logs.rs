@@ -28,7 +28,7 @@ use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     docker::{docker, DockerTlsConfig},
-    event::{self, merge_state::LogEventMergeState, LogEvent, Value},
+    event::{self, merge_state::LogEventMergeState, EstimatedJsonEncodedSizeOf, LogEvent, Value},
     internal_events::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,

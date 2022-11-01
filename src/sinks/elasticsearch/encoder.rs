@@ -2,7 +2,10 @@ use std::{io, io::Write};
 
 use serde::Serialize;
 use vector_buffers::EventCount;
-use vector_core::{event::Event, ByteSizeOf};
+use vector_core::{
+    event::{self, Event},
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::Transformer,
@@ -30,6 +33,12 @@ impl Finalizable for ProcessedEvent {
 impl ByteSizeOf for ProcessedEvent {
     fn allocated_bytes(&self) -> usize {
         self.index.allocated_bytes() + self.log.allocated_bytes() + self.id.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for ProcessedEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        event::estimated_json_encoded_size_of(self)
     }
 }
 

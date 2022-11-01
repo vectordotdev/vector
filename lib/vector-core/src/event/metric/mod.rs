@@ -14,7 +14,10 @@ use vector_config::configurable_component;
 use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
-    event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
+    event::{
+        estimated_json_encoded_size_of::{self, EstimatedJsonEncodedSizeOf},
+        BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable,
+    },
     ByteSizeOf,
 };
 
@@ -430,6 +433,12 @@ impl ByteSizeOf for Metric {
         self.series.allocated_bytes()
             + self.data.allocated_bytes()
             + self.metadata.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for Metric {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        estimated_json_encoded_size_of::from_value(self)
     }
 }
 

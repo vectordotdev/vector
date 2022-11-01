@@ -4,13 +4,11 @@ use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
 use vector_buffers::EventCount;
 use vector_core::{
-    event::{EventFinalizers, Finalizable},
+    event::{self, EventFinalizers, Finalizable},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use crate::sinks::util::encoding::{write_all, Encoder};
-
-use super::sink::LokiRecords;
 
 pub type Labels = Vec<(String, String)>;
 
@@ -23,9 +21,13 @@ pub enum LokiBatchEncoding {
 #[derive(Clone)]
 pub struct LokiBatchEncoder(pub LokiBatchEncoding);
 
-impl Encoder<LokiRecords> for LokiBatchEncoder {
-    fn encode_input(&self, input: LokiRecords, writer: &mut dyn io::Write) -> io::Result<usize> {
-        let count = input.0.len();
+impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
+    fn encode_input(
+        &self,
+        input: Vec<LokiRecord>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<usize> {
+        let count = input.len();
         let batch = LokiBatch::from(input);
         let body = match self.0 {
             LokiBatchEncoding::Json => {
@@ -60,10 +62,9 @@ pub struct LokiBatch {
     finalizers: EventFinalizers,
 }
 
-impl From<LokiRecords> for LokiBatch {
-    fn from(events: LokiRecords) -> Self {
+impl From<Vec<LokiRecord>> for LokiBatch {
+    fn from(events: Vec<LokiRecord>) -> Self {
         let mut result = events
-            .0
             .into_iter()
             .fold(Self::default(), |mut res, mut item| {
                 res.finalizers.merge(item.take_finalizers());
@@ -85,6 +86,12 @@ pub struct LokiEvent {
 impl ByteSizeOf for LokiEvent {
     fn allocated_bytes(&self) -> usize {
         self.timestamp.allocated_bytes() + self.event.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for LokiEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        event::estimated_json_encoded_size_of(self)
     }
 }
 

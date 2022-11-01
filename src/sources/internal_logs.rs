@@ -6,7 +6,7 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
-    event::Event,
+    event::{EstimatedJsonEncodedSizeOf, Event},
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace::TraceSubscription,

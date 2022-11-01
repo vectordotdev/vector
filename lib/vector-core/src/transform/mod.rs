@@ -2,14 +2,15 @@ use std::{collections::HashMap, error, pin::Pin};
 
 use futures::{Stream, StreamExt};
 use vector_common::{
-    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     internal_event::{emit, EventsSent, DEFAULT_OUTPUT},
     EventDataEq,
 };
 
 use crate::{
     config::Output,
-    event::{into_event_stream, Event, EventArray, EventContainer, EventRef},
+    event::{
+        into_event_stream, EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef,
+    },
     fanout::{self, Fanout},
     ByteSizeOf,
 };
