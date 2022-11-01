@@ -536,8 +536,8 @@ impl PostgresqlMetrics {
                 let (count, byte_size, received_byte_size) =
                     result.iter().fold((0, 0, 0), |res, (set, size)| {
                         (
-                            res.0 + set.estimated_json_encoded_size_of(),
-                            res.1 + set.size_of(),
+                            res.0 + set.len(),
+                            res.1 + set.estimated_json_encoded_size_of(),
                             res.2 + size,
                         )
                     });
