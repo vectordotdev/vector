@@ -66,7 +66,7 @@ impl From<Arc<regex::Regex>> for ValueRegex {
 
 impl From<Regex> for ValueRegex {
     fn from(r: Regex) -> Self {
-        ValueRegex::new(Arc::new(r))
+        Self::new(Arc::new(r))
     }
 }
 
