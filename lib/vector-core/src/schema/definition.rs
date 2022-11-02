@@ -154,6 +154,7 @@ impl Definition {
     }
 
     /// Adds the `source_type` and `ingest_timestamp` metadata fields, which are added to every Vector source.
+    /// This function should be called in the same order as the values are actually inserted into the event.
     #[must_use]
     pub fn with_standard_vector_source_metadata(self) -> Self {
         self.with_vector_metadata(
@@ -175,6 +176,7 @@ impl Definition {
     /// This should be used wherever `LogNamespace::insert_source_metadata` is used to insert metadata.
     /// This automatically detects which log namespaces are used, and also automatically
     /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
+    /// This function should be called in the same order as the values are actually inserted into the event.
     #[must_use]
     pub fn with_source_metadata(
         self,
@@ -190,6 +192,7 @@ impl Definition {
     /// This should be used wherever `LogNamespace::insert_vector_metadata` is used to insert metadata.
     /// This automatically detects which log namespaces are used, and also automatically
     /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
+    /// This function should be called in the same order as the values are actually inserted into the event.
     #[must_use]
     pub fn with_vector_metadata(
         self,
