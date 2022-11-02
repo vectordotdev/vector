@@ -210,8 +210,6 @@ impl Arbitrary for MetricValue {
                     let f = f64::arbitrary(g);
                     if f.is_normal() {
                         return f;
-                    } else {
-                        continue;
                     }
                 })
                 .take(num_samples as usize)
