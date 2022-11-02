@@ -216,3 +216,41 @@ impl GlobalOptions {
 fn conflicts<T: PartialEq>(this: &Option<T>, that: &Option<T>) -> bool {
     matches!((this, that), (Some(this), Some(that)) if this != that)
 }
+
+#[cfg(test)]
+mod tests {
+    use chrono_tz::Tz;
+
+    use super::*;
+
+    #[test]
+    fn merges_timezones() {
+        fn merge(tz1: Option<&str>, tz2: Option<&str>) -> Result<TimeZone, Vec<String>> {
+            // Use TOML parsing to match the behavior of what a user would actually configure.
+            let tz1 = tz1.map_or(String::new(), |tz| format!(r#"timezone = "{tz}""#));
+            let tz2 = tz2.map_or(String::new(), |tz| format!(r#"timezone = "{tz}""#));
+            toml::from_str::<GlobalOptions>(&tz1)
+                .unwrap()
+                .merge(toml::from_str::<GlobalOptions>(&tz2).unwrap())
+                .map(|go| go.timezone)
+        }
+
+        assert_eq!(merge(None, None), Ok(TimeZone::Local));
+        assert_eq!(merge(Some("local"), None), Ok(TimeZone::Local));
+        assert_eq!(merge(None, Some("local")), Ok(TimeZone::Local));
+        assert_eq!(merge(Some("local"), Some("local")), Ok(TimeZone::Local),);
+        assert_eq!(merge(Some("UTC"), None), Ok(TimeZone::Named(Tz::UTC)));
+        assert_eq!(
+            merge(None, Some("EST5EDT")),
+            Ok(TimeZone::Named(Tz::EST5EDT))
+        );
+        assert_eq!(
+            merge(Some("UTC"), Some("UTC")),
+            Ok(TimeZone::Named(Tz::UTC))
+        );
+        assert_eq!(
+            merge(Some("CST6CDT"), Some("GMT")),
+            Err(vec!["conflicting values for 'timezone' found".into()])
+        );
+    }
+}
