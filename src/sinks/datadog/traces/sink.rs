@@ -1,11 +1,14 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use futures_util::{
     stream::{self, BoxStream},
     StreamExt,
 };
-use tokio::sync::watch::Sender;
+use tokio::{
+    sync::oneshot::{channel, Sender},
+    time::sleep,
+};
 use tower::Service;
 use vector_core::{
     config::log_schema,
@@ -72,7 +75,7 @@ pub struct TracesSink<S> {
     service: S,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
-    shutdown: Sender<()>,
+    shutdown: Sender<Sender<()>>,
 }
 
 impl<S> TracesSink<S>
@@ -86,7 +89,7 @@ where
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
-        shutdown: Sender<()>,
+        shutdown: Sender<Sender<()>>,
     ) -> Self {
         TracesSink {
             service,
@@ -119,9 +122,24 @@ where
 
         sink.run().await?;
 
-        // TODO we seem to be exiting before this...
+        // create a channel for the stats flushing thread to communicate back that it has flushed
+        // remaining stats. This is necessary so that we do not terminate the process while the
+        // stats flushing thread is trying to complete the HTTP request.
+        let (sender, mut receiver) = channel();
+
         // Notify the stats thread task to flush remaining payloads and shutdown.
-        let _ = self.shutdown.send(());
+        let _ = self.shutdown.send(sender);
+
+        // allow the stats flushing thread 5 seconds to send the remaining stats payloads.
+        let timeout = sleep(Duration::from_secs(5));
+        tokio::pin!(timeout);
+
+        loop {
+            tokio::select! {
+                _ = &mut receiver => break,
+                _ = &mut timeout => break,
+            }
+        }
 
         Ok(())
     }

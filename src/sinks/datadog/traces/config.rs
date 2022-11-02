@@ -4,7 +4,7 @@ use futures::FutureExt;
 use http::Uri;
 use indoc::indoc;
 use snafu::ResultExt;
-use tokio::sync::watch;
+use tokio::sync::oneshot::{channel, Sender};
 use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
@@ -187,14 +187,15 @@ impl DatadogTracesConfig {
             Arc::clone(&apm_stats_aggregator),
         )?;
 
-        // shutdown= Sender that the sink sends to when input stream is exhauseted.
+        // shutdown= Sender that the sink signals when input stream is exhauseted.
         // tripwire= Receiver that APM stats flush thread listens for exit signal on.
-        let (shutdown, tripwire) = watch::channel(());
+        let (shutdown, tripwire) = channel::<Sender<()>>();
 
         let sink = TracesSink::new(service, request_builder, batcher_settings, shutdown);
 
-        // thread responsible for sending the APM stats payloads independently of the sink
-        // framework
+        // Send the APM stats payloads independently of the sink framework.
+        // This is necessary to comply with what the APM stats backend of Datadog expects with
+        // respect to receiving stats payloads.
         tokio::spawn(flush_apm_stats_thread(
             tripwire,
             client,

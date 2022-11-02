@@ -5,7 +5,7 @@ use std::{
 
 use bytes::Bytes;
 use snafu::ResultExt;
-use tokio::sync::watch::Receiver;
+use tokio::sync::oneshot::{Receiver, Sender};
 use vector_common::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
 use super::{
@@ -24,7 +24,7 @@ use crate::{
 ///
 /// * `` -
 pub async fn flush_apm_stats_thread(
-    mut tripwire: Receiver<()>,
+    mut tripwire: Receiver<Sender<()>>,
     client: HttpClient,
     compression: Compression,
     endpoint_configuration: DatadogTracesEndpointConfiguration,
@@ -46,15 +46,24 @@ pub async fn flush_apm_stats_thread(
 
     loop {
         tokio::select! {
-            _ = interval.tick() => {
-                sender.flush_apm_stats(false).await;
-            },
-            _ = tripwire.changed() =>  {
+
+        _ = interval.tick() => {
+            // flush the oldest bucket from the cache to Datadog
+            sender.flush_apm_stats(false).await;
+        },
+        signal = &mut tripwire =>  match signal {
+            // sink has signaled us that the process is shutting down
+            Ok(sink_shutdown_ack_sender) => {
                 // TODO change to debug
-                info!("Ending APM stats flushing thread.");
+                info!("APM stats flushing thread received exit condition. Flushing remaining stats before exiting.");
                 sender.flush_apm_stats(true).await;
+
+                // signal the sink (who tripped the tripwire), that we are done flushing
+                let _ = sink_shutdown_ack_sender.send(());
                 break;
-            },
+            }
+            Err(_) => error!(message = "tokio Sender unexpectedly dropped!", internal_log_rate_limit = true),
+        }
         }
     }
 }
@@ -90,7 +99,10 @@ impl ApmStatsSender {
         } {
             if let Err(e) = self.compress_and_send(payload, api_key).await {
                 // TODO emit an internal `Error` event here, probably
-                error!(message = format!("Error while encoding APM stats payloads: {}", e));
+                error!(
+                    message = format!("Error while encoding and sending APM stats payloads: {}", e),
+                    internal_log_rate_limit = true,
+                );
             }
         }
     }
