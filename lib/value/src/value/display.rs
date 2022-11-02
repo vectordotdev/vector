@@ -50,7 +50,6 @@ mod test {
     use indoc::indoc;
     use ordered_float::NotNan;
     use regex::Regex;
-    use std::sync::Arc;
 
     use super::Value;
 
@@ -147,7 +146,7 @@ mod test {
     #[test]
     fn test_display_regex() {
         assert_eq!(
-            Value::Regex(Arc::new(Regex::new(".*").unwrap()).into()).to_string(),
+            Value::Regex(Regex::new(".*").unwrap().into()).to_string(),
             "r'.*'"
         );
     }

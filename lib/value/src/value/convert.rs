@@ -362,6 +362,12 @@ impl From<Arc<Regex>> for Value {
     }
 }
 
+impl From<Regex> for Value {
+    fn from(r: Regex) -> Self {
+        Self::Regex(ValueRegex::new(Arc::new(r)))
+    }
+}
+
 impl From<ValueRegex> for Value {
     fn from(r: ValueRegex) -> Self {
         Self::Regex(r)

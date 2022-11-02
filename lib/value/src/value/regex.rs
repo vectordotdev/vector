@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use regex::Regex;
 use std::cmp::Ordering;
 use std::sync::Arc;
 use std::{
@@ -60,6 +61,12 @@ impl Deref for ValueRegex {
 impl From<Arc<regex::Regex>> for ValueRegex {
     fn from(regex: Arc<regex::Regex>) -> Self {
         Self(regex)
+    }
+}
+
+impl From<Regex> for ValueRegex {
+    fn from(r: Regex) -> Self {
+        ValueRegex::new(Arc::new(r))
     }
 }
 

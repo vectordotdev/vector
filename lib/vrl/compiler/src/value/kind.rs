@@ -2,7 +2,6 @@ use ::value::Value;
 use chrono::{TimeZone, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
-use std::sync::Arc;
 
 use crate::value;
 
@@ -64,7 +63,7 @@ impl DefaultValue for Kind {
 
         if self.is_regex() {
             #[allow(clippy::trivial_regex)]
-            return Arc::new(Regex::new("").unwrap()).into();
+            return Regex::new("").unwrap().into();
         }
 
         if self.is_array() {
