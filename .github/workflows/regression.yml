@@ -64,7 +64,7 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.3.0"
+          export SMP_CRATE_VERSION="0.5.0"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"
@@ -123,7 +123,7 @@ jobs:
       - compute-metadata
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v1-node16
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -158,7 +158,7 @@ jobs:
         uses: docker/setup-buildx-action@v2.2.1
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v1-node16
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -186,7 +186,7 @@ jobs:
           push: true
 
   build-comparison:
-    name: Build baseline Vector container
+    name: Build comparison Vector container
     runs-on: [linux, soak-builder]
     needs:
       - confirm-valid-credentials
@@ -206,7 +206,7 @@ jobs:
         uses: docker/setup-buildx-action@v2.2.1
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v1-node16
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -248,7 +248,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v1-node16
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -274,6 +274,8 @@ jobs:
             --replicas ${{ needs.compute-metadata.outputs.replicas }} \
             --baseline-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }} \
             --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }} \
+            --baseline-sha ${{ needs.compute-metadata.outputs.baseline }} \
+            --comparison-sha ${{ needs.compute-metadata.outputs.comparison }} \
             --target-config-dir ${{ github.workspace }}/regression/ \
             --target-name vector \
             --submission-metadata ${{ runner.temp }}/submission-metadata
@@ -302,7 +304,7 @@ jobs:
           RUST_LOG: info
         run: |
           chmod +x ${{ runner.temp }}/bin/smp
-          ${{ runner.temp }}/bin/smp job cancel --submission-metadata ${{ runner.temp }}/submission-metadata
+          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job cancel --submission-metadata ${{ runner.temp }}/submission-metadata
 
   ##
   ## ANALYZE
@@ -313,43 +315,58 @@ jobs:
   ## analysis in the background and shipping the analysis. That said, at this
   ## stage, it's still useful to know that you can sync if you want.
 
-  # download-artifacts:
-  #   name: Download job artifacts
-  #   runs-on: ubuntu-22.04
-  #   needs:
-  #     - submit-job
-  #   steps:
-  #     - uses: actions/checkout@v3
+  download-analysis:
+    name: Download regression analysis & upload report
+    runs-on: ubuntu-22.04
+    needs:
+      - submit-job
+      - compute-metadata
+    steps:
+      - uses: actions/checkout@v3
 
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v1
-  #       with:
-  #         aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
-  #         aws-region: us-west-2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1-node16
+        with:
+          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
 
-  #     - name: Download SMP binary
-  #       run: |
-  #         aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+      - name: Download SMP binary
+        run: |
+          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
-  #     - name: Download submission metadata
-  #       uses: actions/download-artifact@v3
-  #       with:
-  #         name: vector-submission-metadata
-  #         path: ${{ runner.temp }}/
+      - name: Download submission metadata
+        uses: actions/download-artifact@v3
+        with:
+          name: vector-submission-metadata
+          path: ${{ runner.temp }}/
 
-  #     - name: Sync output to local system
-  #       env:
-  #         RUST_LOG: info
-  #       run: |
-  #         chmod +x ${{ runner.temp }}/bin/smp
+      - name: Sync regression report to local system
+        env:
+          RUST_LOG: info
+        run: |
+          chmod +x ${{ runner.temp }}/bin/smp
 
-  #         ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
-  #           --submission-metadata ${{ runner.temp }}/submission-metadata \
-  #           --output-path "${{ runner.temp }}/outputs"
+          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
+            --submission-metadata ${{ runner.temp }}/submission-metadata \
+            --output-path "${{ runner.temp }}/outputs"
 
-  #     - name: Upload captures
-  #       uses: actions/upload-artifact@v3
-  #       with:
-  #         name: capture-artifacts
-  #         path: ${{ runner.temp }}/outputs/*
+      - name: Read regression report
+        id: read-analysis
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: ${{ runner.temp }}/outputs/report.html
+
+      - name: Post report to PR
+        uses: peter-evans/create-or-update-comment@v2
+        if: ${{ github.actor != 'dependabot[bot]' }}
+        with:
+          issue-number: ${{ github.event.number }}
+          edit-mode: append
+          body: ${{ steps.read-analysis.outputs.content }}
+
+      - name: Upload regression report to artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: capture-artifacts
+          path: ${{ runner.temp }}/outputs/*

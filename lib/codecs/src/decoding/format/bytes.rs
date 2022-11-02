@@ -71,6 +71,18 @@ impl BytesDeserializer {
             log_schema_message_key: log_schema().message_key(),
         }
     }
+
+    /// Deserializes the given bytes, which will always produce a single `LogEvent`.
+    pub fn parse_single(&self, bytes: Bytes, log_namespace: LogNamespace) -> LogEvent {
+        match log_namespace {
+            LogNamespace::Vector => log_namespace.new_log_from_data(bytes),
+            LogNamespace::Legacy => {
+                let mut log = LogEvent::default();
+                log.insert(self.log_schema_message_key, bytes);
+                log
+            }
+        }
+    }
 }
 
 impl Deserializer for BytesDeserializer {
@@ -79,14 +91,7 @@ impl Deserializer for BytesDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let log = match log_namespace {
-            LogNamespace::Vector => log_namespace.new_log_from_data(bytes),
-            LogNamespace::Legacy => {
-                let mut log = LogEvent::default();
-                log.insert(self.log_schema_message_key, bytes);
-                log
-            }
-        };
+        let log = self.parse_single(bytes, log_namespace);
         Ok(smallvec![log.into()])
     }
 }

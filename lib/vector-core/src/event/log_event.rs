@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use chrono::Utc;
 use std::{
-    cmp,
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::Debug,
@@ -136,13 +135,7 @@ impl PartialEq for Inner {
     }
 }
 
-impl PartialOrd for Inner {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.fields.partial_cmp(&other.fields)
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct LogEvent {
     #[serde(flatten)]
     inner: Arc<Inner>,
