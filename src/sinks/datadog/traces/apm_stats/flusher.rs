@@ -62,7 +62,7 @@ pub async fn flush_apm_stats_thread(
                 let _ = sink_shutdown_ack_sender.send(());
                 break;
             }
-            Err(_) => error!(message = "tokio Sender unexpectedly dropped!", internal_log_rate_limit = true),
+            Err(_) => error!(message = "Tokio Sender unexpectedly dropped.", internal_log_rate_limit = true),
         }
         }
     }
