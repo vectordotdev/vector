@@ -2,6 +2,7 @@ use core::Value;
 use diagnostic::{DiagnosticList, DiagnosticMessage, Note, Severity, Span};
 use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use parser::ast::{self, Node, QueryTarget};
+use std::sync::Arc;
 
 use crate::function::ArgumentList;
 use crate::state::TypeState;
@@ -177,7 +178,7 @@ impl<'a> Compiler<'a> {
             Boolean(v) => Ok(Literal::Boolean(v)),
             Regex(v) => regex::Regex::new(&v)
                 .map_err(|err| literal::Error::from((span, err)))
-                .map(|r| Literal::Regex(r.into())),
+                .map(|r| Literal::Regex(Arc::new(r).into())),
             // TODO: support more formats (similar to Vector's `Convert` logic)
             Timestamp(v) => v
                 .parse()

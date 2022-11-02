@@ -5,6 +5,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
+use std::sync::Arc;
 
 use crate::value::regex::ValueRegex;
 use crate::{Kind, Value};
@@ -355,8 +356,8 @@ impl FromIterator<(String, Self)> for Value {
     }
 }
 
-impl From<Regex> for Value {
-    fn from(r: Regex) -> Self {
+impl From<Arc<Regex>> for Value {
+    fn from(r: Arc<Regex>) -> Self {
         Self::Regex(ValueRegex::new(r))
     }
 }
