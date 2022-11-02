@@ -222,7 +222,7 @@ fn populate_event(
     );
 
     log_namespace.insert_source_metadata(
-        "amqp",
+        AmqpSourceConfig::NAME,
         log,
         Some(LegacyKey::InsertIfEmpty(keys.exchange_key)),
         "exchange",
@@ -230,7 +230,7 @@ fn populate_event(
     );
 
     log_namespace.insert_source_metadata(
-        "amqp",
+        AmqpSourceConfig::NAME,
         log,
         Some(LegacyKey::InsertIfEmpty(keys.offset_key)),
         "offset",
