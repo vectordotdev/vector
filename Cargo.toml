@@ -258,11 +258,11 @@ headers = { version = "0.3.8", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.8", default-features = false }
 http-body = { version = "0.4.5", default-features = false }
-hyper = { version = "0.14.20", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
+hyper = { version = "0.14.22", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.9.1", default-features = false, features = ["serde"] }
-infer = { version = "0.9.0", default-features = false, optional = true}
+infer = { version = "0.11.0", default-features = false, optional = true}
 indoc = { version = "1.0.7", default-features = false }
 inventory = { version = "0.3.2", default-features = false }
 k8s-openapi = { version = "0.16.0", default-features = false, features = ["api", "v1_19"], optional = true }
@@ -277,7 +277,7 @@ nats = { version = "0.23.0", default-features = false, optional = true }
 nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
-once_cell = { version = "1.15", default-features = false }
+once_cell = { version = "1.16", default-features = false }
 openssl = { version = "0.10.42", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
@@ -317,7 +317,7 @@ warp = { version = "0.3.3", default-features = false }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.8.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.8.5", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 # enterprise related dependencies
 jsonschema = { version = "0.16.1", default-features = false }

@@ -172,6 +172,7 @@ impl Definition {
     /// This should be used wherever `LogNamespace::insert_source_metadata` is used to insert metadata.
     /// This automatically detects which log namespaces are used, and also automatically
     /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
+    /// This assumes the legacy key is either guaranteed to not collide or is inserted with `try_insert`.
     #[must_use]
     pub fn with_source_metadata(
         self,
@@ -187,6 +188,7 @@ impl Definition {
     /// This should be used wherever `LogNamespace::insert_vector_metadata` is used to insert metadata.
     /// This automatically detects which log namespaces are used, and also automatically
     /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
+    /// This assumes the legacy key is either guaranteed to not collide or is inserted with `try_insert`.
     #[must_use]
     pub fn with_vector_metadata(
         self,
@@ -199,6 +201,7 @@ impl Definition {
     }
 
     /// This generalizes the `LogNamespace::insert_*` methods for type definitions.
+    /// This assumes the legacy key is either guaranteed to not collide or is inserted with `try_insert`.
     fn with_namespaced_metadata(
         self,
         prefix: &str,

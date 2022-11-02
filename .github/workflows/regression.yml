@@ -32,21 +32,6 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           all_but_latest: true # can cancel workflows scheduled later
 
-  confirm-valid-credentials:
-    name: Confirm AWS credentials are minimally valid
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-
-      - name: Download SMP binary
-        run: |
-          aws s3 cp s3://smp-cli-releases/v0.3.0/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
-
   compute-metadata:
     name: Compute metadata for regression experiments
     runs-on: ubuntu-22.04
@@ -65,6 +50,7 @@ jobs:
       warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
       total-samples: ${{ steps.experimental-meta.outputs.TOTAL_SAMPLES }}
       p-value: ${{ steps.experimental-meta.outputs.P_VALUE }}
+      smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -78,16 +64,19 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
+          export SMP_CRATE_VERSION="0.3.0"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"
           echo "total samples: ${TOTAL_SAMPLES}"
           echo "regression p-value: ${P_VALUE}"
+          echo "smp crate version: ${SMP_CRATE_VERSION}"
 
           echo "WARMUP_SECONDS=${WARMUP_SECONDS}" >> $GITHUB_OUTPUT
           echo "REPLICAS=${REPLICAS}" >> $GITHUB_OUTPUT
           echo "TOTAL_SAMPLES=${TOTAL_SAMPLES}" >> $GITHUB_OUTPUT
           echo "P_VALUE=${P_VALUE}" >> $GITHUB_OUTPUT
+          echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Setup baseline variables
         id: baseline
@@ -126,6 +115,23 @@ jobs:
 
           echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
           echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
+
+  confirm-valid-credentials:
+    name: Confirm AWS credentials are minimally valid
+    runs-on: ubuntu-22.04
+    needs:
+      - compute-metadata
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Download SMP binary
+        run: |
+          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
   ##
   ## BUILD
@@ -254,7 +260,7 @@ jobs:
 
       - name: Download SMP binary
         run: |
-          aws s3 cp s3://smp-cli-releases/v0.3.0/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
       - name: Submit job
         env:
@@ -324,7 +330,7 @@ jobs:
 
   #     - name: Download SMP binary
   #       run: |
-  #         aws s3 cp s3://smp-cli-releases/v0.3.0/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+  #         aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
   #     - name: Download submission metadata
   #       uses: actions/download-artifact@v3
