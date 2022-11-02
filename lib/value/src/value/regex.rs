@@ -1,10 +1,10 @@
 use bytes::Bytes;
 use std::cmp::Ordering;
+use std::sync::Arc;
 use std::{
     hash::{Hash, Hasher},
     ops::Deref,
 };
-use std::sync::Arc;
 
 /// Wraps a `Regex` and provides several trait implementations, such as `PartialOrd`
 #[derive(Debug, Clone)]
