@@ -11,7 +11,7 @@ use vector_core::{
 
 use crate::{
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
+        DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext,
     },
     internal_events::{EventsReceived, StreamClosedError},
@@ -116,7 +116,7 @@ pub struct VectorConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl GenerateConfig for VectorConfig {
@@ -135,7 +135,7 @@ impl GenerateConfig for VectorConfig {
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let service = proto::Server::new(Service {
             pipeline: cx.out,
             acknowledgements,

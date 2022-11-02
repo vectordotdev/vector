@@ -57,8 +57,9 @@ impl TransformConfig for ThrottleConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        // The event is not modified, so the definition is passed through as-is
+        vec![Output::default(DataType::Log).with_schema_definition(merged_definition.clone())]
     }
 }
 
