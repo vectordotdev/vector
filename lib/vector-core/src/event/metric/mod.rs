@@ -35,7 +35,7 @@ pub use self::value::*;
 
 /// A metric.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Metric {
     #[serde(flatten)]
     pub(super) series: MetricSeries,
