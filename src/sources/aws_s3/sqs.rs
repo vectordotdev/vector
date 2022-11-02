@@ -39,7 +39,7 @@ use crate::{
     SourceSender,
 };
 use lookup::path;
-use vector_core::{config::LogNamespace, ByteSizeOf};
+use vector_core::config::LogNamespace;
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
