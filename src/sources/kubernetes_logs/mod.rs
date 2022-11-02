@@ -34,7 +34,7 @@ use crate::{
         log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, SourceConfig,
         SourceContext,
     },
-    event::{Event, LogEvent},
+    event::Event,
     internal_events::{
         FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
@@ -63,9 +63,13 @@ use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use self::node_metadata_annotator::NodeMetadataAnnotator;
 use self::parser::Parser;
 use self::pod_metadata_annotator::PodMetadataAnnotator;
+use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
+use lookup::{owned_value_path, path, PathPrefix};
+use value::kind::Collection;
+use value::Kind;
 use vector_core::config::LogNamespace;
 
 /// The key we use for `file` field.
@@ -151,6 +155,10 @@ pub struct Config {
     /// How long to delay removing entries from our map when we receive a deletion
     /// event from the watched stream.
     delay_deletion_ms: usize,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl GenerateConfig for Config {
@@ -185,6 +193,7 @@ impl Default for Config {
             timezone: None,
             kube_config_file: None,
             delay_deletion_ms: default_delay_deletion_ms(),
+            log_namespace: None,
         }
     }
 }
@@ -192,16 +201,58 @@ impl Default for Config {
 #[async_trait::async_trait]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let source = Source::new(self, &cx.globals, &cx.key).await?;
-        Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
-            result.map_err(|error| {
-                error!(message = "Source future failed.", %error);
-            })
-        })))
+
+        Ok(Box::pin(
+            source
+                .run(cx.out, cx.shutdown, log_namespace)
+                .map(|result| {
+                    result.map_err(|error| {
+                        error!(message = "Source future failed.", %error);
+                    })
+                }),
+        ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let schema_definition = BytesDeserializerConfig
+            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .with_source_metadata(
+                Self::NAME,
+                Some(owned_value_path!("file")),
+                owned_value_path!("file"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(owned_value_path!("kubernetes")),
+                owned_value_path!("kubernetes"),
+                Kind::object(Collection::any()),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(owned_value_path!("stream")),
+                owned_value_path!("stream"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(owned_value_path!("timestamp")),
+                owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                // TODO: Should this be considered a `timestamp`, it's currently
+                // the time that the kubernetes logs subsystem processed the log.
+                // The log's timestamp is still in the `message` field, unparsed.
+                Some("timestamp"),
+            )
+            // TODO: This doesn't have the standard metadata.
+            .with_standard_vector_source_metadata();
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -313,6 +364,7 @@ impl Source {
         self,
         mut out: SourceSender,
         global_shutdown: ShutdownSignal,
+        log_namespace: LogNamespace,
     ) -> crate::Result<()> {
         let Self {
             client,
@@ -478,6 +530,7 @@ impl Source {
                 line.text,
                 &line.filename,
                 ingestion_timestamp_field.as_deref(),
+                log_namespace,
             );
             let file_info = annotator.annotate(&mut event, &line.filename);
 
@@ -571,26 +624,52 @@ impl Source {
     }
 }
 
-fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
-    let mut event = LogEvent::from_bytes_legacy(&line);
+fn create_event(
+    line: Bytes,
+    file: &str,
+    ingestion_timestamp_field: Option<&str>,
+    log_namespace: LogNamespace,
+) -> Event {
+    let deserializer = BytesDeserializer::new();
+    let mut log = deserializer.parse_single(line, log_namespace);
 
-    // Add source type.
-    event.insert(
-        log_schema().source_type_key(),
-        Bytes::from_static(Config::NAME.as_bytes()),
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        &mut log,
+        path!("file"),
+        path!("file"),
+        file,
+    );
+    // TODO: This gets overwritten by any timestamp parsed from the `message`
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        &mut log,
+        path!(log_schema().timestamp_key()),
+        path!("timestamp"),
+        Utc::now(),
     );
 
-    // Add file.
-    event.insert(FILE_KEY, file.to_owned());
+    log_namespace.insert_vector_metadata(
+        &mut log,
+        path!(log_schema().source_type_key()),
+        path!("source_type"),
+        Bytes::from(Config::NAME),
+    );
+    match (log_namespace, ingestion_timestamp_field) {
+        // When using LogNamespace::Vector always set the ingest_timestamp
+        (LogNamespace::Vector, _) => {
+            log.metadata_mut()
+                .value_mut()
+                .insert(path!("vector", "ingest_timestamp"), Utc::now());
+        }
+        // When LogNamespace::Legacy, only set when the option is configured
+        (LogNamespace::Legacy, Some(ingestion_timestamp_field)) => {
+            log.try_insert((PathPrefix::Event, ingestion_timestamp_field), Utc::now())
+        }
+        (LogNamespace::Legacy, None) => (),
+    };
 
-    // Add ingestion timestamp if requested.
-    if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
-        event.insert(ingestion_timestamp_field, Utc::now());
-    }
-
-    event.try_insert(log_schema().timestamp_key(), Utc::now());
-
-    event.into()
+    log.into()
 }
 
 /// This function returns the default value for `self_node_name` variable
