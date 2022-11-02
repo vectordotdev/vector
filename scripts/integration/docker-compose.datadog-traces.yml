@@ -4,7 +4,7 @@ services:
   datadog-trace-agent:
     # "latest" tag is always the most recent stable release
     # this is a fallback in case "breaking" changes in the Agent aren't surfaced to Vector
-    image: docker.io/datadog/agent:latest
+    image: docker.io/datadog/agent:7.39.1
     networks:
       - backend
     environment:
@@ -25,7 +25,7 @@ services:
   datadog-trace-agent-to-vector:
     # "latest" tag is always the most recent stable release
     # this is a fallback in case "breaking" changes in the Agent aren't surfaced to Vector
-    image: docker.io/datadog/agent:latest
+    image: docker.io/datadog/agent:7.39.1
     networks:
       - backend
     environment:

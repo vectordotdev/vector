@@ -7,11 +7,11 @@ use hyper::StatusCode;
 use indoc::indoc;
 use ordered_float::NotNan;
 use prost::Message;
-//use rmp_serde;
+use rmp_serde;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
-//use super::{apm_stats::StatsPayload, dd_proto, ddsketch_full, DatadogTracesConfig};
-use super::{dd_proto, DatadogTracesConfig};
+use super::{apm_stats::StatsPayload, dd_proto, ddsketch_full, DatadogTracesConfig};
+//use super::{dd_proto, DatadogTracesConfig};
 use crate::{
     config::SinkConfig,
     event::{TraceEvent, Value},
@@ -136,11 +136,11 @@ async fn smoke() {
     // encoded & emitted in the same payload but we also get an APM stats payload
     let mut output = rx.take(2).collect::<Vec<_>>().await;
 
+    let stats = output.pop();
     let trace = output.pop();
-    //let stats = output.pop();
 
     assert!(trace.is_some());
-    //assert!(stats.is_some());
+    assert!(stats.is_some());
 
     let (trace_parts, trace_body) = trace.unwrap();
     assert_eq!(
@@ -159,80 +159,80 @@ async fn smoke() {
     assert_eq!(chunk.spans.len(), 1);
     validate_simple_span(chunk.spans.pop().unwrap(), "a_resource".to_string());
 
-    // let (stats_parts, stats_body) = stats.unwrap();
-    // assert_eq!(
-    //     stats_parts.headers.get("Content-Type").unwrap(),
-    //     "application/msgpack"
-    // );
-    // assert_eq!(stats_parts.headers.get("DD-API-KEY").unwrap(), "a_key");
+    let (stats_parts, stats_body) = stats.unwrap();
+    assert_eq!(
+        stats_parts.headers.get("Content-Type").unwrap(),
+        "application/msgpack"
+    );
+    assert_eq!(stats_parts.headers.get("DD-API-KEY").unwrap(), "a_key");
 
-    // let mut sp: StatsPayload = rmp_serde::from_slice(&stats_body).unwrap();
-    // assert_eq!(sp.agent_hostname, "a_host");
-    // assert_eq!(sp.agent_env, "an_env");
-    // assert_eq!(sp.agent_version, "1.23456");
-    // assert_eq!(sp.stats.len(), 1);
-    // let mut csp = sp.stats.pop().unwrap();
-    // assert_eq!(csp.hostname, "a_host");
-    // assert_eq!(csp.env, "an_env");
+    let mut sp: StatsPayload = rmp_serde::from_slice(&stats_body).unwrap();
+    assert_eq!(sp.agent_hostname, "a_host");
+    assert_eq!(sp.agent_env, "an_env");
+    assert_eq!(sp.agent_version, "1.23456");
+    assert_eq!(sp.stats.len(), 1);
+    let mut csp = sp.stats.pop().unwrap();
+    assert_eq!(csp.hostname, "a_host");
+    assert_eq!(csp.env, "an_env");
 
-    // assert_eq!(csp.stats.len(), 1);
-    // let mut csb = csp.stats.pop().unwrap();
+    assert_eq!(csp.stats.len(), 1);
+    let mut csb = csp.stats.pop().unwrap();
 
-    // let cgs = csb.stats.pop().unwrap();
-    // assert_eq!(cgs.hits, 1);
-    // assert_eq!(cgs.top_level_hits, 1);
-    // assert_eq!(cgs.errors, 1);
-    // assert_eq!(cgs.duration, 1_000_000);
-    // assert_eq!(cgs.name, "a_name");
-    // assert_eq!(cgs.resource, "a_resource");
-    // assert_eq!(cgs.service, "a_service");
+    let cgs = csb.stats.pop().unwrap();
+    assert_eq!(cgs.hits, 1);
+    assert_eq!(cgs.top_level_hits, 1);
+    assert_eq!(cgs.errors, 1);
+    assert_eq!(cgs.duration, 1_000_000);
+    assert_eq!(cgs.name, "a_name");
+    assert_eq!(cgs.resource, "a_resource");
+    assert_eq!(cgs.service, "a_service");
 
-    // let ok_summary = ddsketch_full::DdSketch::decode(&cgs.ok_summary[..]).unwrap();
-    // let error_summary = ddsketch_full::DdSketch::decode(&cgs.error_summary[..]).unwrap();
+    let ok_summary = ddsketch_full::DdSketch::decode(&cgs.ok_summary[..]).unwrap();
+    let error_summary = ddsketch_full::DdSketch::decode(&cgs.error_summary[..]).unwrap();
 
-    // assert_eq!(ok_summary.mapping.unwrap().interpolation, 0);
-    // // No value there because the mocked span has an error field > 0
-    // assert_eq!(ok_summary.zero_count, 0.0);
-    // assert_eq!(
-    //     ok_summary
-    //         .positive_values
-    //         .as_ref()
-    //         .unwrap()
-    //         .bin_counts
-    //         .len(),
-    //     0
-    // );
-    // assert_eq!(
-    //     ok_summary
-    //         .negative_values
-    //         .as_ref()
-    //         .unwrap()
-    //         .bin_counts
-    //         .len(),
-    //     0
-    // );
+    assert_eq!(ok_summary.mapping.unwrap().interpolation, 0);
+    // No value there because the mocked span has an error field > 0
+    assert_eq!(ok_summary.zero_count, 0.0);
+    assert_eq!(
+        ok_summary
+            .positive_values
+            .as_ref()
+            .unwrap()
+            .bin_counts
+            .len(),
+        0
+    );
+    assert_eq!(
+        ok_summary
+            .negative_values
+            .as_ref()
+            .unwrap()
+            .bin_counts
+            .len(),
+        0
+    );
 
-    // assert_eq!(error_summary.mapping.unwrap().interpolation, 0);
-    // // We should have a single positive value
-    // assert_eq!(error_summary.zero_count, 0.0);
-    // assert_eq!(
-    //     error_summary
-    //         .positive_values
-    //         .as_ref()
-    //         .unwrap()
-    //         .bin_counts
-    //         .len(),
-    //     1
-    // );
-    // assert_eq!(
-    //     error_summary
-    //         .negative_values
-    //         .as_ref()
-    //         .unwrap()
-    //         .bin_counts
-    //         .len(),
-    //     0
-    // );
+    assert_eq!(error_summary.mapping.unwrap().interpolation, 0);
+    // We should have a single positive value
+    assert_eq!(error_summary.zero_count, 0.0);
+    assert_eq!(
+        error_summary
+            .positive_values
+            .as_ref()
+            .unwrap()
+            .bin_counts
+            .len(),
+        1
+    );
+    assert_eq!(
+        error_summary
+            .negative_values
+            .as_ref()
+            .unwrap()
+            .bin_counts
+            .len(),
+        0
+    );
 }
 
 #[tokio::test]
@@ -247,11 +247,11 @@ async fn multiple_traces() {
 
     let mut output = rx.take(2).collect::<Vec<_>>().await;
 
+    let stats = output.pop();
     let trace = output.pop();
-    //let stats = output.pop();
 
     assert!(trace.is_some());
-    //assert!(stats.is_some());
+    assert!(stats.is_some());
 
     let (trace_parts, trace_body) = trace.unwrap();
     assert_eq!(
@@ -273,43 +273,43 @@ async fn multiple_traces() {
         validate_simple_span(chunk.spans.pop().unwrap(), t.to_string());
     });
 
-    // let (stats_parts, stats_body) = stats.unwrap();
-    // assert_eq!(
-    //     stats_parts.headers.get("Content-Type").unwrap(),
-    //     "application/msgpack"
-    // );
-    // assert_eq!(stats_parts.headers.get("DD-API-KEY").unwrap(), "a_key");
+    let (stats_parts, stats_body) = stats.unwrap();
+    assert_eq!(
+        stats_parts.headers.get("Content-Type").unwrap(),
+        "application/msgpack"
+    );
+    assert_eq!(stats_parts.headers.get("DD-API-KEY").unwrap(), "a_key");
 
-    // let mut sp: StatsPayload = rmp_serde::from_slice(&stats_body).unwrap();
-    // assert_eq!(sp.agent_hostname, "a_host");
-    // assert_eq!(sp.agent_env, "an_env");
-    // assert_eq!(sp.agent_version, "1.23456");
-    // assert_eq!(sp.stats.len(), 1);
+    let mut sp: StatsPayload = rmp_serde::from_slice(&stats_body).unwrap();
+    assert_eq!(sp.agent_hostname, "a_host");
+    assert_eq!(sp.agent_env, "an_env");
+    assert_eq!(sp.agent_version, "1.23456");
+    assert_eq!(sp.stats.len(), 1);
 
-    // let mut csp = sp.stats.pop().unwrap();
-    // assert_eq!(csp.hostname, "a_host");
-    // assert_eq!(csp.env, "an_env");
-    // assert_eq!(csp.stats.len(), 1);
+    let mut csp = sp.stats.pop().unwrap();
+    assert_eq!(csp.hostname, "a_host");
+    assert_eq!(csp.env, "an_env");
+    assert_eq!(csp.stats.len(), 1);
 
-    // let mut csb = csp.stats.pop().unwrap();
-    // // Ensure we got separate ClientStatsBucket for different traces
-    // assert_eq!(csb.stats.len(), 2);
+    let mut csb = csp.stats.pop().unwrap();
+    // Ensure we got separate ClientStatsBucket for different traces
+    assert_eq!(csb.stats.len(), 2);
 
-    // let cgs_trace_2 = csb.stats.pop().unwrap();
-    // assert_eq!(cgs_trace_2.hits, 1);
-    // assert_eq!(cgs_trace_2.top_level_hits, 1);
-    // assert_eq!(cgs_trace_2.errors, 1);
-    // assert_eq!(cgs_trace_2.duration, 1_000_000);
-    // assert_eq!(cgs_trace_2.name, "a_name");
-    // assert_eq!(cgs_trace_2.resource, "trace_2");
-    // assert_eq!(cgs_trace_2.service, "a_service");
+    let cgs_trace_2 = csb.stats.pop().unwrap();
+    assert_eq!(cgs_trace_2.hits, 1);
+    assert_eq!(cgs_trace_2.top_level_hits, 1);
+    assert_eq!(cgs_trace_2.errors, 1);
+    assert_eq!(cgs_trace_2.duration, 1_000_000);
+    assert_eq!(cgs_trace_2.name, "a_name");
+    assert_eq!(cgs_trace_2.resource, "trace_2");
+    assert_eq!(cgs_trace_2.service, "a_service");
 
-    // let cgs_trace_1 = csb.stats.pop().unwrap();
-    // assert_eq!(cgs_trace_1.hits, 1);
-    // assert_eq!(cgs_trace_1.top_level_hits, 1);
-    // assert_eq!(cgs_trace_1.errors, 1);
-    // assert_eq!(cgs_trace_1.duration, 1_000_000);
-    // assert_eq!(cgs_trace_1.name, "a_name");
-    // assert_eq!(cgs_trace_1.resource, "trace_1");
-    // assert_eq!(cgs_trace_1.service, "a_service");
+    let cgs_trace_1 = csb.stats.pop().unwrap();
+    assert_eq!(cgs_trace_1.hits, 1);
+    assert_eq!(cgs_trace_1.top_level_hits, 1);
+    assert_eq!(cgs_trace_1.errors, 1);
+    assert_eq!(cgs_trace_1.duration, 1_000_000);
+    assert_eq!(cgs_trace_1.name, "a_name");
+    assert_eq!(cgs_trace_1.resource, "trace_1");
+    assert_eq!(cgs_trace_1.service, "a_service");
 }
