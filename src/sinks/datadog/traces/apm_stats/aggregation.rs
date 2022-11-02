@@ -103,19 +103,19 @@ pub struct Aggregator {
     /// The oldeest timestamp we will allow for the current time bucket.
     oldest_timestamp: u64,
 
-    /// Env asociated with the Agent
+    /// Env asociated with the Agent.
     agent_env: Option<String>,
 
-    /// Hostname associated with the Agent
+    /// Hostname associated with the Agent.
     agent_hostname: Option<String>,
 
-    /// Version associated with the Agent
+    /// Version associated with the Agent.
     agent_version: Option<String>,
 
-    /// TODO
+    /// API key associated with the Agent.
     api_key: Option<Arc<str>>,
 
-    /// TODO
+    /// Default API key to use if api_key not set.
     default_api_key: Arc<str>,
 }
 
@@ -133,7 +133,7 @@ impl Aggregator {
         }
     }
 
-    /// TODO
+    /// Updates cached properties from the Agent.
     pub(crate) fn update_agent_properties(&mut self, partition_key: &PartitionKey) {
         if self.agent_env.is_none() {
             if let Some(env) = &partition_key.env {
@@ -259,8 +259,8 @@ impl Aggregator {
                     data: BTreeMap::new(),
                 };
                 b.add(span, weight, is_top, aggkey);
-                // TODO change to debug
-                info!("Created {} start_time bucket.", btime);
+
+                debug!("Created {} start_time bucket.", btime);
                 self.buckets.insert(btime, b);
             }
         }
@@ -302,7 +302,11 @@ impl Aggregator {
         client_stats_payloads
     }
 
-    /// TODO
+    /// Builds the array of ClientStatsPayloads will be sent out as part of the StatsPayload.
+    ///
+    /// # Arguments
+    ///
+    /// * `flush_cutoff_time` - Timestamp in nanos to use to determine what buckets to keep in the cache and which to export.
     fn get_client_stats_payloads(&mut self, flush_cutoff_time: u64) -> Vec<ClientStatsPayload> {
         let client_stats_buckets = self.export_buckets(flush_cutoff_time);
 
@@ -329,7 +333,11 @@ impl Aggregator {
             .collect::<Vec<ClientStatsPayload>>()
     }
 
-    /// TODO
+    /// Exports the buckets that began before `flush_cutoff_time` and purges them from the cache.
+    ///
+    /// # Arguments
+    ///
+    /// * `flush_cutoff_time` - Timestamp in nanos to use to determine what buckets to keep in the cache and which to export.
     fn export_buckets(
         &mut self,
         flush_cutoff_time: u64,
@@ -340,8 +348,7 @@ impl Aggregator {
             let retain = bucket_start > flush_cutoff_time;
 
             if !retain {
-                // TODO change back to debug
-                info!("Flushing {} start_time bucket.", bucket_start);
+                debug!("Flushing {} start_time bucket.", bucket_start);
 
                 bucket.export().into_iter().for_each(|(payload_key, csb)| {
                     match m.get_mut(&payload_key) {

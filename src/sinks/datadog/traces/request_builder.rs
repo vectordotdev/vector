@@ -172,7 +172,14 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
     }
 }
 
-/// TODO
+/// Builds the `TraceApiRequest` from inputs.
+///
+/// # Arguments
+///
+/// * `metadata`                 - Tuple of Datadog traces specific metadata and the generic `RequestMetadata`.
+/// * `payload`                  - Compressed and encoded bytes to send.
+/// * `compression`              - `Compression` used to reference the Content-Encoding header.
+/// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
 pub fn build_request(
     metadata: (DDTracesMetadata, RequestMetadata),
     payload: Bytes,

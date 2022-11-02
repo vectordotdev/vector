@@ -1,5 +1,9 @@
-//! TODO
+//! APM stats
 //!
+//! This module contains the logic for compiting APM statistics based on the incoming trace
+//! events this sink receives. It is modelled closely to the trace-agent component of the
+//! Datadog Agent, and sends out StatsPayload packets formatted and Aggregated by the same
+//! algorithm, at ten second intervals, independently of the sink's trace payloads.
 
 use std::sync::{Arc, Mutex};
 
@@ -95,11 +99,13 @@ pub(crate) struct ClientGroupedStats {
     pub(crate) top_level_hits: u64,
 }
 
-/// TODO
+/// Computes APM stats from the incoming trace events.
 ///
 /// # arguments
 ///
-/// * `` -
+/// * `key`           - PartitionKey associated with this set of trace events.
+/// * `aggregator`    - Aggregator to use in computing and caching APM stats buckets.
+/// * `trace_events`  - Newly received trace events to process.
 pub(crate) fn compute_apm_stats(
     key: &PartitionKey,
     aggregator: Arc<Mutex<Aggregator>>,
