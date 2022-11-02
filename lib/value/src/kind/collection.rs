@@ -106,6 +106,7 @@ impl<T: Ord + Clone> Collection<T> {
     }
 
     /// Returns a new collection that includes the known key.
+    #[must_use]
     pub fn with_known(mut self, key: impl Into<T>, kind: Kind) -> Self {
         self.known_mut().insert(key.into(), kind);
         self

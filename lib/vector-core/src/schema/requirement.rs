@@ -298,7 +298,7 @@ mod tests {
                 "invalid required meaning kind",
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty_legacy_namespace().with_field(
+                    definition: Definition::empty_legacy_namespace().with_event_field(
                         &owned_value_path!("foo"),
                         Kind::integer(),
                         Some("foo"),
@@ -314,7 +314,7 @@ mod tests {
                 "invalid optional meaning kind",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty_legacy_namespace().with_field(
+                    definition: Definition::empty_legacy_namespace().with_event_field(
                         &owned_value_path!("foo"),
                         Kind::integer(),
                         Some("foo"),
@@ -331,8 +331,8 @@ mod tests {
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
                     definition: Definition::empty_legacy_namespace()
-                        .with_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"))
-                        .merge(Definition::empty_legacy_namespace().with_field(
+                        .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"))
+                        .merge(Definition::empty_legacy_namespace().with_event_field(
                             &owned_value_path!("bar"),
                             Kind::boolean(),
                             Some("foo"),

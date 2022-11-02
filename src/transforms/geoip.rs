@@ -151,7 +151,7 @@ impl TransformConfig for GeoipConfig {
         let schema_definition =
             merged_definition
                 .clone()
-                .with_field(self.target.clone(), geoip_kind, None);
+                .with_field(&self.target, geoip_kind, None);
 
         vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
@@ -223,7 +223,7 @@ impl FunctionTransform for Geoip {
             .get(self.source.as_str())
             .map(|s| s.to_string_lossy());
 
-        let geoip_data = if let Some(ipaddress) = &ipaddress {
+        if let Some(ipaddress) = &ipaddress {
             match FromStr::from_str(ipaddress) {
                 Ok(ip) => match self.lookup(ip) {
                     GeoIpData::Isp(new_isp) => isp = new_isp,
@@ -367,7 +367,7 @@ mod tests {
             let transform_config = GeoipConfig {
                 source: "remote_addr".to_owned(),
                 database: "tests/data/GeoIP2-City-Test.mmdb".to_owned(),
-                target: "geo".to_owned(),
+                target: OwnedTargetPath::event(owned_value_path!("geo")),
                 locale: "en".to_owned(),
             };
 
@@ -417,7 +417,7 @@ mod tests {
             let transform_config = GeoipConfig {
                 source: "remote_addr".to_owned(),
                 database: "tests/data/GeoIP2-City-Test.mmdb".to_owned(),
-                target: "geo".to_owned(),
+                target: OwnedTargetPath::event(owned_value_path!("geo")),
                 locale: "en".to_owned(),
             };
 
@@ -467,7 +467,7 @@ mod tests {
             let transform_config = GeoipConfig {
                 source: "remote_addr".to_owned(),
                 database: "tests/data/GeoIP2-City-Test.mmdb".to_owned(),
-                target: "geo".to_owned(),
+                target: OwnedTargetPath::event(owned_value_path!("geo")),
                 locale: "en".to_owned(),
             };
 
@@ -517,7 +517,7 @@ mod tests {
             let transform_config = GeoipConfig {
                 source: "remote_addr".to_owned(),
                 database: "tests/data/GeoIP2-ISP-Test.mmdb".to_owned(),
-                target: "geo".to_owned(),
+                target: OwnedTargetPath::event(owned_value_path!("geo")),
                 locale: "en".to_owned(),
             };
 
@@ -563,7 +563,7 @@ mod tests {
             let transform_config = GeoipConfig {
                 source: "remote_addr".to_owned(),
                 database: "tests/data/GeoLite2-ASN-Test.mmdb".to_owned(),
-                target: "geo".to_owned(),
+                target: OwnedTargetPath::event(owned_value_path!("geo")),
                 locale: "en".to_owned(),
             };
 
@@ -606,7 +606,7 @@ mod tests {
             let transform_config = GeoipConfig {
                 source: "remote_addr".to_owned(),
                 database: "tests/data/GeoLite2-ASN-Test.mmdb".to_owned(),
-                target: "geo".to_owned(),
+                target: OwnedTargetPath::event(owned_value_path!("geo")),
                 locale: "en".to_owned(),
             };
 
