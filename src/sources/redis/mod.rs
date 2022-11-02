@@ -171,29 +171,29 @@ impl SourceConfig for RedisSourceConfig {
         match self.data_type {
             DataTypeConfig::List => {
                 let list = self.list.unwrap_or_default();
-                list::watch(
+                list::watch(list::WatchInputs {
                     client,
-                    bytes_received.clone(),
-                    self.key.clone(),
-                    self.redis_key.clone(),
-                    list.method,
+                    bytes_received: bytes_received.clone(),
+                    key: self.key.clone(),
+                    redis_key: self.redis_key.clone(),
+                    method: list.method,
                     decoder,
                     cx,
                     log_namespace,
-                )
+                })
                 .await
             }
             DataTypeConfig::Channel => {
-                channel::subscribe(
+                channel::subscribe(channel::SubscribeInputs {
                     client,
                     connection_info,
-                    bytes_received.clone(),
-                    self.key.clone(),
-                    self.redis_key.clone(),
+                    bytes_received: bytes_received.clone(),
+                    key: self.key.clone(),
+                    redis_key: self.redis_key.clone(),
                     decoder,
                     cx,
                     log_namespace,
-                )
+                })
                 .await
             }
         }
