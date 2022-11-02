@@ -146,10 +146,11 @@ where
 
 /// JSON only support string keys, so `K` is constrainted to anything that can be converted into a
 /// `str`.
-impl<K, V> EstimatedJsonEncodedSizeOf for HashMap<K, V>
+impl<K, V, S> EstimatedJsonEncodedSizeOf for HashMap<K, V, S>
 where
     K: AsRef<str>,
     V: EstimatedJsonEncodedSizeOf,
+    S: ::std::hash::BuildHasher,
 {
     fn estimated_json_encoded_size_of(&self) -> usize {
         let size = self.iter().fold(BRACES_SIZE, |acc, (k, v)| {
@@ -527,7 +528,7 @@ mod tests {
 
     #[quickcheck]
     fn estimate_f32(v: f32) -> bool {
-        let v = v as f64;
+        let v = f64::from(v);
 
         // floats are expected to be finite.
         if !v.is_finite() {
