@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use chrono::Utc;
 use codecs::StreamDecodingError;
 use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder;
+use vector_config::NamedComponent;
 use vector_core::ByteSizeOf;
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
@@ -13,7 +13,9 @@ use crate::{
     event::Event,
     internal_events::EventsReceived,
     sources::{
-        datadog_agent::{handle_request, ApiKeyQueryParams, DatadogAgentSource, LogMsg},
+        datadog_agent::{
+            handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
+        },
         util::ErrorMessage,
     },
     SourceSender,
@@ -84,7 +86,6 @@ pub(crate) fn decode_log_body(
         )
     })?;
 
-    let now = Utc::now();
     let mut decoded = Vec::new();
 
     for LogMsg {
@@ -106,62 +107,53 @@ pub(crate) fn decode_log_body(
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
                             let namespace = &source.log_namespace;
-                            let source_name = "datadog_agent";
 
                             namespace.insert_source_metadata(
-                                source_name,
+                                DatadogAgentConfig::NAME,
                                 log,
                                 path!("status"),
                                 path!("status"),
                                 status.clone(),
                             );
                             namespace.insert_source_metadata(
-                                source_name,
+                                DatadogAgentConfig::NAME,
                                 log,
                                 path!("timestamp"),
                                 path!("timestamp"),
                                 timestamp,
                             );
                             namespace.insert_source_metadata(
-                                source_name,
+                                DatadogAgentConfig::NAME,
                                 log,
                                 path!("hostname"),
                                 path!("hostname"),
                                 hostname.clone(),
                             );
                             namespace.insert_source_metadata(
-                                source_name,
+                                DatadogAgentConfig::NAME,
                                 log,
                                 path!("service"),
                                 path!("service"),
                                 service.clone(),
                             );
                             namespace.insert_source_metadata(
-                                source_name,
+                                DatadogAgentConfig::NAME,
                                 log,
                                 path!("ddsource"),
                                 path!("ddsource"),
                                 ddsource.clone(),
                             );
                             namespace.insert_source_metadata(
-                                source_name,
+                                DatadogAgentConfig::NAME,
                                 log,
                                 path!("ddtags"),
                                 path!("ddtags"),
                                 ddtags.clone(),
                             );
 
-                            namespace.insert_vector_metadata(
+                            namespace.insert_standard_vector_source_metadata(
                                 log,
-                                path!(source.log_schema_source_type_key),
-                                path!("source_type"),
-                                Bytes::from("datadog_agent"),
-                            );
-                            namespace.insert_vector_metadata(
-                                log,
-                                path!(source.log_schema_timestamp_key),
-                                path!("ingest_timestamp"),
-                                now,
+                                DatadogAgentConfig::NAME,
                             );
 
                             if let Some(k) = &api_key {

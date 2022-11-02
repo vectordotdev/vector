@@ -2,7 +2,6 @@
 //! Calls an endpoint at an interval, decoding the HTTP responses into events.
 
 use bytes::{Bytes, BytesMut};
-use chrono::Utc;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
 use snafu::ResultExt;
@@ -205,18 +204,8 @@ impl HttpClientContext {
         for event in events {
             match event {
                 Event::Log(ref mut log) => {
-                    self.log_namespace.insert_vector_metadata(
-                        log,
-                        log_schema().source_type_key(),
-                        "source_type",
-                        Bytes::from(HttpClientConfig::NAME),
-                    );
-                    self.log_namespace.insert_vector_metadata(
-                        log,
-                        log_schema().timestamp_key(),
-                        "ingest_timestamp",
-                        Utc::now(),
-                    );
+                    self.log_namespace
+                        .insert_standard_vector_source_metadata(log, HttpClientConfig::NAME);
                 }
                 Event::Metric(ref mut metric) => {
                     metric.insert_tag(

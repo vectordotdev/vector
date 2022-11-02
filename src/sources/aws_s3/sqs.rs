@@ -9,7 +9,6 @@ use aws_sdk_sqs::Client as SqsClient;
 use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
-use chrono::{TimeZone, Utc};
 use codecs::{decoding::FramingError, BytesDeserializer, CharacterDelimitedDecoder};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
@@ -24,7 +23,7 @@ use vector_common::internal_event::{
 use vector_config::{configurable_component, NamedComponent};
 
 use crate::{
-    config::{log_schema, SourceAcknowledgementsConfig, SourceContext},
+    config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
@@ -458,10 +457,10 @@ impl IngestorProcess {
         let object = object_result?;
 
         let metadata = object.metadata;
-        let timestamp = object
-            .last_modified
-            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()))
-            .unwrap_or_else(Utc::now);
+        // let timestamp = object
+        //     .last_modified
+        //     .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()))
+        //     .unwrap_or_else(Utc::now);
 
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(
@@ -554,18 +553,7 @@ impl IngestorProcess {
                 }
             }
 
-            log_namespace.insert_vector_metadata(
-                &mut log,
-                path!(log_schema().source_type_key()),
-                path!("source_type"),
-                Bytes::from(AwsS3Config::NAME),
-            );
-            log_namespace.insert_vector_metadata(
-                &mut log,
-                path!(log_schema().timestamp_key()),
-                path!("ingest_timestamp"),
-                timestamp,
-            );
+            log_namespace.insert_standard_vector_source_metadata(&mut log, AwsS3Config::NAME);
 
             emit!(EventsReceived {
                 count: 1,

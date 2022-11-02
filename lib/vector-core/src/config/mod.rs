@@ -11,12 +11,11 @@ pub mod proxy;
 use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
-use lookup::lookup_v2::ValuePath;
-use lookup::{path, PathPrefix};
+use lookup::{lookup_v2::ValuePath, path, PathPrefix};
 use serde::{Deserialize, Serialize};
 use value::Value;
 pub use vector_common::config::ComponentKey;
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 
 use crate::schema;
 
@@ -333,15 +332,16 @@ impl LogNamespace {
     ///
     /// Legacy: The values of `source_type_key`, and `timestamp_key` are stored as keys on the event root,
     /// only if a field with that name doesn't already exist.
-    pub fn insert_standard_vector_source_metadata<S>(&self, log: &mut LogEvent, source: &S)
-    where
-        S: NamedComponent,
-    {
+    pub fn insert_standard_vector_source_metadata(
+        &self,
+        log: &mut LogEvent,
+        source_name: &'static str,
+    ) {
         self.insert_vector_metadata(
             log,
             path!(log_schema().source_type_key()),
             path!("source_type"),
-            Bytes::from_static(source.get_component_name().as_bytes()),
+            Bytes::from_static(source_name.as_bytes()),
         );
         self.insert_vector_metadata(
             log,

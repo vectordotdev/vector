@@ -1,4 +1,3 @@
-use chrono::Utc;
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
@@ -11,13 +10,13 @@ use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext},
+    config::{Output, SourceConfig, SourceContext},
     internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -209,22 +208,12 @@ async fn demo_logs_source(
                         count,
                         byte_size: events.size_of()
                     });
-                    let now = Utc::now();
 
                     let events = events.into_iter().map(|mut event| {
                         let log = event.as_mut_log();
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            log_schema().source_type_key(),
-                            "source_type",
-                            "demo_logs",
-                        );
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            log_schema().timestamp_key(),
-                            "ingest_timestamp",
-                            now,
-                        );
+
+                        log_namespace
+                            .insert_standard_vector_source_metadata(log, DemoLogsConfig::NAME);
 
                         event
                     });

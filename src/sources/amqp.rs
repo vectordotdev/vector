@@ -3,7 +3,7 @@
 use crate::{
     amqp::AmqpConfig,
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext},
+    config::{Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
@@ -15,7 +15,6 @@ use crate::{
 };
 use async_stream::stream;
 use bytes::Bytes;
-use chrono::{TimeZone, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
@@ -24,7 +23,7 @@ use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
 use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
@@ -190,30 +189,11 @@ struct Keys<'a> {
 }
 
 /// Populates the decoded event with extra metadata.
-fn populate_event(
-    event: &mut Event,
-    timestamp: chrono::DateTime<Utc>,
-    keys: &Keys<'_>,
-    log_namespace: LogNamespace,
-) {
+fn populate_event(event: &mut Event, keys: &Keys<'_>, log_namespace: LogNamespace) {
     let log = event.as_mut_log();
 
-    log_namespace.insert_vector_metadata(
-        log,
-        log_schema().timestamp_key(),
-        "ingest_timestamp",
-        timestamp,
-    );
-
-    log_namespace.insert_vector_metadata(
-        log,
-        log_schema().source_type_key(),
-        "source_type",
-        "amqp",
-    );
-
     log_namespace.insert_source_metadata(
-        "amqp",
+        AmqpSourceConfig::NAME,
         log,
         keys.routing_key_field,
         "routing",
@@ -221,14 +201,22 @@ fn populate_event(
     );
 
     log_namespace.insert_source_metadata(
-        "amqp",
+        AmqpSourceConfig::NAME,
         log,
         keys.exchange_key,
         "exchange",
         keys.exchange.to_string(),
     );
 
-    log_namespace.insert_source_metadata("amqp", log, keys.offset_key, "offset", keys.delivery_tag);
+    log_namespace.insert_source_metadata(
+        AmqpSourceConfig::NAME,
+        log,
+        keys.offset_key,
+        "offset",
+        keys.delivery_tag,
+    );
+
+    log_namespace.insert_standard_vector_source_metadata(log, AmqpSourceConfig::NAME);
 }
 
 /// Receives an event from `AMQP` and pushes it along the pipeline.
@@ -243,11 +231,11 @@ async fn receive_event(
     let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
 
     // Extract timestamp from amqp message
-    let timestamp = msg
-        .properties
-        .timestamp()
-        .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest())
-        .unwrap_or_else(Utc::now);
+    // let timestamp = msg
+    //     .properties
+    //     .timestamp()
+    //     .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest())
+    //     .unwrap_or_else(Utc::now);
 
     let routing = msg.routing_key.to_string();
     let exchange = msg.exchange.to_string();
@@ -276,9 +264,8 @@ async fn receive_event(
 
                     for mut event in events {
                         populate_event(&mut event,
-                                       timestamp,
-                                       &keys,
-                                       log_namespace);
+                            &keys,
+                            log_namespace);
 
                         yield event;
                     }
