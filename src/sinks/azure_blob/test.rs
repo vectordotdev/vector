@@ -67,8 +67,12 @@ fn azure_blob_build_request_without_compression() {
         compression,
     };
 
-    let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
+    let (metadata, request_metadata_builder, _events) =
+        request_options.split_input((key, vec![log]));
+
+    let payload = EncodeResult::uncompressed(Bytes::new());
+    let request_metadata = request_metadata_builder.build(&payload);
+    let request = request_options.build_request(metadata, request_metadata, payload);
 
     assert_eq!(request.metadata.partition_key, "blob.log".to_string());
     assert_eq!(request.content_encoding, None);
@@ -107,9 +111,12 @@ fn azure_blob_build_request_with_compression() {
         ),
         compression,
     };
+    let (metadata, request_metadata_builder, _events) =
+        request_options.split_input((key, vec![log]));
 
-    let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
+    let payload = EncodeResult::uncompressed(Bytes::new());
+    let request_metadata = request_metadata_builder.build(&payload);
+    let request = request_options.build_request(metadata, request_metadata, payload);
 
     assert_eq!(request.metadata.partition_key, "blob.log.gz".to_string());
     assert_eq!(request.content_encoding, Some("gzip"));
@@ -149,8 +156,12 @@ fn azure_blob_build_request_with_time_format() {
         compression,
     };
 
-    let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
+    let (metadata, request_metadata_builder, _events) =
+        request_options.split_input((key, vec![log]));
+
+    let payload = EncodeResult::uncompressed(Bytes::new());
+    let request_metadata = request_metadata_builder.build(&payload);
+    let request = request_options.build_request(metadata, request_metadata, payload);
 
     assert_eq!(
         request.metadata.partition_key,
@@ -193,8 +204,12 @@ fn azure_blob_build_request_with_uuid() {
         compression,
     };
 
-    let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
+    let (metadata, request_metadata_builder, _events) =
+        request_options.split_input((key, vec![log]));
+
+    let payload = EncodeResult::uncompressed(Bytes::new());
+    let request_metadata = request_metadata_builder.build(&payload);
+    let request = request_options.build_request(metadata, request_metadata, payload);
 
     assert_ne!(request.metadata.partition_key, "blob.log".to_string());
     assert_eq!(request.content_encoding, None);

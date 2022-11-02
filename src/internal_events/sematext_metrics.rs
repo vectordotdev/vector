@@ -1,12 +1,10 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use crate::{
-    emit,
-    event::metric::Metric,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+use crate::{emit, event::metric::Metric};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
-use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct SematextMetricsInvalidMetricError<'a> {

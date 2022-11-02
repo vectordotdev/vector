@@ -13,19 +13,19 @@ set -euo pipefail
 
 # Generate the Vector version, and build description.
 VERSION="${VERSION:-"$(awk -F ' = ' '$1 ~ /^version/ { gsub(/["]/, "", $2); printf("%s",$2) }' Cargo.toml)"}"
-echo "::set-output name=vector_version::${VERSION}"
+echo "name=vector_version::${VERSION}" >> "$GITHUB_OUTPUT"
 
 GIT_SHA=$(git rev-parse --short HEAD)
 CURRENT_DATE=$(date +%Y-%m-%d)
-echo "::set-output name=vector_build_desc::${GIT_SHA} ${CURRENT_DATE}"
+echo "name=vector_build_desc::${GIT_SHA} ${CURRENT_DATE}" >> "$GITHUB_OUTPUT"
 
 # Figure out what our release channel is.
 CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
-echo "::set-output name=vector_release_channel::${CHANNEL}"
+echo "name=vector_release_channel::${CHANNEL}" >> "$GITHUB_OUTPUT"
 
 # Depending on the channel, this influences which Cloudsmith repository we publish to.
 if [[ "${CHANNEL}" == "nightly" ]]; then
-	echo "::set-output name=vector_cloudsmith_repo::vector-nightly"
+	echo "name=vector_cloudsmith_repo::vector-nightly" >> "$GITHUB_OUTPUT"
 else
-	echo "::set-output name=vector_cloudsmith_repo::vector"
+	echo "name=vector_cloudsmith_repo::vector" >> "$GITHUB_OUTPUT"
 fi
