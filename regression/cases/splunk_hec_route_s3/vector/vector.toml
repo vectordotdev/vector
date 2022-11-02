@@ -34,6 +34,7 @@ address = "0.0.0.0:9090"
 
 [sinks.s3_sidecar]
 type = "aws_s3"
+acknowledgements.enabled = true
 inputs = ["container_type.sidecar"]
 
 region = "us-west-2"
@@ -51,6 +52,7 @@ secret_access_key = "BADDCAFE"
 
 [sinks.s3_service]
 type = "aws_s3"
+acknowledgements.enabled = true
 inputs = ["container_type.service"]
 
 region = "us-west-2"
