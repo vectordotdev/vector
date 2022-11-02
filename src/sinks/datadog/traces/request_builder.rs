@@ -7,17 +7,16 @@ use std::{
 
 use bytes::Bytes;
 use prost::Message;
-//use rmp_serde;
 use snafu::Snafu;
 use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{
+    apm_stats::{compute_apm_stats, Aggregator},
     config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
     dd_proto,
     service::TraceApiRequest,
     sink::PartitionKey,
-    stats, Aggregator,
 };
 use crate::{
     event::{Event, TraceEvent, Value},
@@ -110,8 +109,8 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
             .collect::<Vec<TraceEvent>>();
 
         // compute APM stats from the incoming events
-        // those payloads are sent out separately by the thread `flush_apm_stats_thread()`
-        stats::compute_apm_stats(&key, Arc::clone(&self.stats_aggregator), &trace_events);
+        // those payloads are sent out separately from the sink framework, by the thread `flush_apm_stats_thread()`
+        compute_apm_stats(&key, Arc::clone(&self.stats_aggregator), &trace_events);
 
         self.trace_encoder
             .encode_trace(&key, trace_events)
@@ -167,7 +166,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
         build_request(
             metadata,
             payload,
-            &self.compression,
+            self.compression,
             &self.endpoint_configuration,
         )
     }
@@ -177,7 +176,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
 pub fn build_request(
     metadata: (DDTracesMetadata, RequestMetadata),
     payload: Bytes,
-    compression: &Compression,
+    compression: Compression,
     endpoint_configuration: &DatadogTracesEndpointConfiguration,
 ) -> TraceApiRequest {
     let (ddtraces_metadata, request_metadata) = metadata;

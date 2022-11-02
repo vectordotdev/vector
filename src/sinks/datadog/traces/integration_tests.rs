@@ -19,7 +19,9 @@ use crate::{
     config::{ConfigBuilder, SinkConfig},
     event::Event,
     sinks::{
-        datadog::traces::{stats::StatsPayload, tests::simple_trace_event, DatadogTracesConfig},
+        datadog::traces::{
+            apm_stats::StatsPayload, tests::simple_trace_event, DatadogTracesConfig,
+        },
         util::test::load_sink,
     },
     sources::datadog_agent::DatadogAgentConfig,

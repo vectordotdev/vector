@@ -10,7 +10,10 @@ use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::{proxy::ProxyConfig, AcknowledgementsConfig};
 
-use super::{service::TraceApiRetry, stats, Aggregator};
+use super::{
+    apm_stats::{flush_apm_stats_thread, Aggregator},
+    service::TraceApiRetry,
+};
 use crate::{
     common::datadog::get_base_domain,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
@@ -170,7 +173,7 @@ impl DatadogTracesConfig {
             .settings(request_limits, TraceApiRetry)
             .service(TraceApiService::new(client.clone()));
 
-        // object responsible for computing APM stats from incoming trace events and sending APM stats payloads
+        // object responsible for caching/processing APM stats from incoming trace events
         let apm_stats_aggregator =
             Arc::new(Mutex::new(Aggregator::new(Arc::clone(&default_api_key))));
 
@@ -190,7 +193,9 @@ impl DatadogTracesConfig {
 
         let sink = TracesSink::new(service, request_builder, batcher_settings, shutdown);
 
-        tokio::spawn(stats::flush_apm_stats_thread(
+        // thread responsible for sending the APM stats payloads independently of the sink
+        // framework
+        tokio::spawn(flush_apm_stats_thread(
             tripwire,
             client,
             compression,
@@ -252,7 +257,7 @@ fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
 
 #[cfg(test)]
 mod test {
-    use crate::sinks::datadog::traces::DatadogTracesConfig;
+    use super::DatadogTracesConfig;
 
     #[test]
     fn generate_config() {
