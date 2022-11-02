@@ -11,7 +11,7 @@ use rmp_serde;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
 use super::{apm_stats::StatsPayload, dd_proto, ddsketch_full, DatadogTracesConfig};
-//use super::{dd_proto, DatadogTracesConfig};
+
 use crate::{
     config::SinkConfig,
     event::{TraceEvent, Value},

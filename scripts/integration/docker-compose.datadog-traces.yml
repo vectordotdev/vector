@@ -4,7 +4,7 @@ services:
   datadog-trace-agent:
     # "latest" tag is always the most recent stable release
     # this is a fallback in case "breaking" changes in the Agent aren't surfaced to Vector
-    image: docker.io/datadog/agent:7.39.1
+    image: docker.io/datadog/agent:latest
     networks:
       - backend
     environment:
@@ -22,10 +22,11 @@ services:
       - DD_APM_ERROR_TPS=999999
       - DD_APM_MAX_MEMORY=0
       - DD_APM_MAX_CPU_PERCENT=0
+      - DD_HOSTNAME=datadog-trace-agent
   datadog-trace-agent-to-vector:
     # "latest" tag is always the most recent stable release
     # this is a fallback in case "breaking" changes in the Agent aren't surfaced to Vector
-    image: docker.io/datadog/agent:7.39.1
+    image: docker.io/datadog/agent:latest
     networks:
       - backend
     environment:
@@ -43,6 +44,7 @@ services:
       - DD_APM_ERROR_TPS=999999
       - DD_APM_MAX_MEMORY=0
       - DD_APM_MAX_CPU_PERCENT=0
+      - DD_HOSTNAME=datadog-trace-agent-to-vector
   runner:
     build:
       context: ${PWD}

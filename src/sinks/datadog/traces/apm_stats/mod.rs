@@ -26,11 +26,6 @@ pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }
 
-//#[allow(warnings)]
-//pub(crate) mod dd_proto {
-//    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-//}
-
 // On the agent side APM Stats payload are encoded into the messagepack format using this
 // go code https://github.com/DataDog/datadog-agent/blob/b5bed4d/pkg/trace/pb/stats_gen.go.
 // Note that this code is generated from code itself generate from this .proto file
