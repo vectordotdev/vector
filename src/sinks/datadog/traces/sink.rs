@@ -122,22 +122,27 @@ where
 
         sink.run().await?;
 
-        // create a channel for the stats flushing thread to communicate back that it has flushed
-        // remaining stats. This is necessary so that we do not terminate the process while the
-        // stats flushing thread is trying to complete the HTTP request.
-        let (sender, mut receiver) = channel();
+        // Signals the APM stats flushing thread to send the remaining cached payloads and exit.
+        {
+            // create a channel for the stats flushing thread to communicate back that it has flushed
+            // remaining stats. This is necessary so that we do not terminate the process while the
+            // stats flushing thread is trying to complete the HTTP request.
+            let (sender, mut receiver) = channel();
 
-        // Notify the stats thread task to flush remaining payloads and shutdown.
-        let _ = self.shutdown.send(sender);
+            // Notify the stats thread task to flush remaining payloads and shutdown.
+            let _ = self.shutdown.send(sender);
 
-        // allow the stats flushing thread 5 seconds to send the remaining stats payloads.
-        let timeout = sleep(Duration::from_secs(5));
-        tokio::pin!(timeout);
+            // allow the stats flushing thread up to 50 seconds to send the remaining stats payloads
+            // Vector allows 59 seconds for components to shutdown. We shouldn't need more than 10 but
+            // doesn't hurt to be conservative for the timeout since we are using the oneshot.
+            let timeout = sleep(Duration::from_secs(50));
+            tokio::pin!(timeout);
 
-        loop {
-            tokio::select! {
-                _ = &mut receiver => break,
-                _ = &mut timeout => break,
+            loop {
+                tokio::select! {
+                    _ = &mut receiver => break,
+                    _ = &mut timeout => break,
+                }
             }
         }
 
