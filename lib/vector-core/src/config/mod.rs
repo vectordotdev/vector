@@ -326,7 +326,7 @@ impl LogNamespace {
     pub fn get_source_metadata<'a, 'b>(
         &self,
         source_name: &'a str,
-        log: &'b mut LogEvent,
+        log: &'b LogEvent,
         legacy_key: impl ValuePath<'a>,
         metadata_key: impl ValuePath<'a>,
     ) -> Option<&'b Value> {
@@ -367,7 +367,7 @@ impl LogNamespace {
     /// Legacy: This is retrieved from the event.
     pub fn get_vector_metadata<'a, 'b>(
         &self,
-        log: &'b mut LogEvent,
+        log: &'b LogEvent,
         legacy_key: impl ValuePath<'a>,
         metadata_key: impl ValuePath<'a>,
     ) -> Option<&'b Value> {

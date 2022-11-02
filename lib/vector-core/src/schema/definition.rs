@@ -211,6 +211,7 @@ impl Definition {
     }
 
     /// This generalizes the `LogNamespace::insert_*` methods for type definitions.
+    /// This assumes the legacy key is either guaranteed to not collide or is inserted with `try_insert`.
     fn with_namespaced_metadata(
         self,
         prefix: &str,
