@@ -1469,7 +1469,6 @@ fn test_config_outputs() {
                             .with_field(&owned_value_path!("ddsource"), Kind::json(), None)
                             .with_field(&owned_value_path!("ddtags"), Kind::json(), None)
                             .with_field(&owned_value_path!("hostname"), Kind::json(), None)
-                            .with_field(&owned_value_path!("message"), Kind::json(), None)
                             .with_field(&owned_value_path!("service"), Kind::json(), None)
                             .with_field(&owned_value_path!("status"), Kind::json(), None)
                             .unknown_fields(Kind::json()),
@@ -1496,7 +1495,6 @@ fn test_config_outputs() {
                                 .with_field(&owned_value_path!("ddsource"), Kind::json(), None)
                                 .with_field(&owned_value_path!("ddtags"), Kind::json(), None)
                                 .with_field(&owned_value_path!("hostname"), Kind::json(), None)
-                                .with_field(&owned_value_path!("message"), Kind::json(), None)
                                 .with_field(&owned_value_path!("service"), Kind::json(), None)
                                 .with_field(&owned_value_path!("status"), Kind::json(), None)
                                 .unknown_fields(Kind::json()),
@@ -1899,10 +1897,6 @@ fn test_output_schema_definition_json_vector_namespace() {
                 Kind::bytes()
             )
             .with_metadata_field(
-                &owned_value_path!("datadog_agent", "message"),
-                Kind::bytes()
-            )
-            .with_metadata_field(
                 &owned_value_path!("datadog_agent", "service"),
                 Kind::bytes()
             )
@@ -1912,13 +1906,10 @@ fn test_output_schema_definition_json_vector_namespace() {
                 Kind::timestamp()
             )
             .with_metadata_field(
-                &owned_value_path!("datadog_agent", "ingest_timestamp"),
+                &owned_value_path!("vector", "ingest_timestamp"),
                 Kind::timestamp()
             )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "source_type"),
-                Kind::bytes()
-            )
+            .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
     )
 }
 
@@ -1947,10 +1938,6 @@ fn test_output_schema_definition_bytes_vector_namespace() {
                 Kind::bytes()
             )
             .with_metadata_field(
-                &owned_value_path!("datadog_agent", "message"),
-                Kind::bytes()
-            )
-            .with_metadata_field(
                 &owned_value_path!("datadog_agent", "service"),
                 Kind::bytes()
             )
@@ -1960,13 +1947,10 @@ fn test_output_schema_definition_bytes_vector_namespace() {
                 Kind::timestamp()
             )
             .with_metadata_field(
-                &owned_value_path!("datadog_agent", "ingest_timestamp"),
+                &owned_value_path!("vector", "ingest_timestamp"),
                 Kind::timestamp()
             )
-            .with_metadata_field(
-                &owned_value_path!("datadog_agent", "source_type"),
-                Kind::bytes()
-            )
+            .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
             .with_meaning(LookupBuf::root(), "message")
     )
 }
@@ -1994,7 +1978,6 @@ fn test_output_schema_definition_json_legacy_namespace() {
             .with_field(&owned_value_path!("ddsource"), Kind::json(), None)
             .with_field(&owned_value_path!("ddtags"), Kind::json(), None)
             .with_field(&owned_value_path!("hostname"), Kind::json(), None)
-            .with_field(&owned_value_path!("message"), Kind::json(), None)
             .with_field(&owned_value_path!("service"), Kind::json(), None)
             .with_field(&owned_value_path!("source_type"), Kind::json(), None)
             .with_field(&owned_value_path!("status"), Kind::json(), None)
