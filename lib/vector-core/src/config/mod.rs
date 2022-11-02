@@ -1,6 +1,8 @@
 use std::{fmt, num::NonZeroUsize};
 
 use bitmask_enum::bitmask;
+use bytes::Bytes;
+use chrono::Utc;
 
 mod global_options;
 mod log_schema;
@@ -14,7 +16,7 @@ use lookup::{path, PathPrefix};
 use serde::{Deserialize, Serialize};
 use value::Value;
 pub use vector_common::config::ComponentKey;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 
 use crate::schema;
 
@@ -324,6 +326,29 @@ impl LogNamespace {
                 .get(path!(source_name).concat(metadata_key)),
             LogNamespace::Legacy => log.get((PathPrefix::Event, legacy_key)),
         }
+    }
+
+    /// Vector: The `ingest_timestamp`, and `source_type` fields are added to "event metadata", nested
+    /// under the name "vector". This data will be marked as read-only in VRL.
+    ///
+    /// Legacy: The values of `source_type_key`, and `timestamp_key` are stored as keys on the event root,
+    /// only if a field with that name doesn't already exist.
+    pub fn insert_standard_vector_source_metadata<S>(&self, log: &mut LogEvent, source: &S)
+    where
+        S: NamedComponent,
+    {
+        self.insert_vector_metadata(
+            log,
+            path!(log_schema().source_type_key()),
+            path!("source_type"),
+            Bytes::from_static(source.get_component_name().as_bytes()),
+        );
+        self.insert_vector_metadata(
+            log,
+            path!(log_schema().timestamp_key()),
+            path!("ingest_timestamp"),
+            Utc::now(),
+        );
     }
 
     /// Vector: This is added to the "event metadata", nested under the name "vector". This data
