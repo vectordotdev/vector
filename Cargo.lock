@@ -61,7 +61,6 @@ dependencies = [
  "cfg-if",
  "getrandom 0.2.8",
  "once_cell",
- "serde",
  "version_check",
 ]
 
@@ -1412,12 +1411,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bytecount"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c676a478f63e9fa2dd5368a42f28bba0d6c560b775f38583c8bbaa7fcd67c9c"
-
-[[package]]
 name = "bytemuck"
 version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2727,16 +2720,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
-name = "fancy-regex"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0678ab2d46fa5195aaf59ad034c083d351377d4af57f3e073c074d0da3e3c766"
-dependencies = [
- "bit-set",
- "regex",
-]
-
-[[package]]
 name = "fastrand"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2882,16 +2865,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9c384f161156f5260c24a097c56119f9be8c798586aecc13afbcbe7b7e26bf8"
 dependencies = [
  "percent-encoding",
-]
-
-[[package]]
-name = "fraction"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99df8100674344d1cee346c764684f7ad688a4dcaa1a3efb2fdb45daf9acf4f9"
-dependencies = [
- "lazy_static",
- "num",
 ]
 
 [[package]]
@@ -3814,15 +3787,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "iso8601"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f21abb3d09069861499d93d41a970243a90e215df0cf763ac9a31b9b27178d0"
-dependencies = [
- "nom",
-]
-
-[[package]]
 name = "itertools"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3916,33 +3880,6 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "jsonschema"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ca9e2b45609132ae2214d50482c03aeee78826cd6fd53a8940915b81acedf16"
-dependencies = [
- "ahash 0.8.0",
- "anyhow",
- "base64",
- "bytecount",
- "fancy-regex",
- "fraction",
- "iso8601",
- "itoa 1.0.1",
- "lazy_static",
- "memchr",
- "num-cmp",
- "parking_lot",
- "percent-encoding",
- "regex",
- "serde",
- "serde_json",
- "time",
- "url",
- "uuid 1.2.1",
 ]
 
 [[package]]
@@ -4985,20 +4922,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43db66d1170d347f9a065114077f7dccb00c1b9478c89384490a3425279a4606"
-dependencies = [
- "num-bigint 0.4.3",
- "num-complex",
- "num-integer",
- "num-iter",
- "num-rational 0.4.1",
- "num-traits",
-]
-
-[[package]]
 name = "num-bigint"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5019,12 +4942,6 @@ dependencies = [
  "num-integer",
  "num-traits",
 ]
-
-[[package]]
-name = "num-cmp"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63335b2e2c34fae2fb0aa2cecfd9f0832a1e24b3b32ecec612c3426d46dc8aaa"
 
 [[package]]
 name = "num-complex"
@@ -5057,35 +4974,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-iter"
-version = "0.1.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d03e6c028c5dc5cac6e2dec0efda81fc887605bb3d884578bb6d6bf7514e252"
-dependencies = [
- "autocfg",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
 name = "num-rational"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12ac428b1cb17fce6f731001d307d351ec70a6d202fc2e60f7d4c5e42d8f4f07"
 dependencies = [
  "autocfg",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-rational"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0638a1c9d0a3c0914158145bc76cff373a75a627e6ecbfb71cbe6f453a5a19b0"
-dependencies = [
- "autocfg",
- "num-bigint 0.4.3",
  "num-integer",
  "num-traits",
 ]
@@ -8640,7 +8534,7 @@ version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1ee6bfd0a27bf614353809a035cf6880b74239ec6c5e39a7b2860ca16809137"
 dependencies = [
- "num-rational 0.3.2",
+ "num-rational",
  "num-traits",
  "typenum",
 ]
@@ -8824,7 +8718,6 @@ dependencies = [
  "infer 0.11.0",
  "inventory",
  "itertools 0.10.5",
- "jsonschema",
  "k8s-openapi",
  "kube",
  "lapin",
