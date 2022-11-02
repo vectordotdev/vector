@@ -18,6 +18,9 @@ mod bucket;
 mod flusher;
 mod weight;
 
+#[cfg(all(test, feature = "datadog-traces-integration-tests"))]
+mod integration_tests;
+
 /// The duration of time in nanoseconds that a bucket covers.
 pub(crate) const BUCKET_DURATION_NANOSECONDS: u64 = 10_000_000_000;
 

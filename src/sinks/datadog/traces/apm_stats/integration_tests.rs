@@ -7,7 +7,6 @@ use axum::{
 };
 use chrono::Utc;
 use flate2::read::GzDecoder;
-use futures::stream;
 use indoc::indoc;
 use rmp_serde;
 use serde::Serialize;
@@ -16,22 +15,12 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::time::{sleep, Duration};
 
 use crate::{
-    config::{ConfigBuilder, SinkConfig},
-    event::Event,
-    sinks::{
-        datadog::traces::{
-            apm_stats::StatsPayload, tests::simple_trace_event, DatadogTracesConfig,
-        },
-        util::test::load_sink,
-    },
+    config::ConfigBuilder,
+    sinks::datadog::traces::{apm_stats::StatsPayload, DatadogTracesConfig},
     sources::datadog_agent::DatadogAgentConfig,
-    test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
-        map_event_batch_stream, start_topology, trace_init,
-    },
+    test_util::{start_topology, trace_init},
     topology::RunningTopology,
 };
-use vector_core::event::{BatchNotifier, BatchStatus};
 
 /// The port on which the Agent will send traces to vector, and vector `datadog_agent` source will
 /// listen on
@@ -308,8 +297,9 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
     assert!(agent_s.http_status_code == vector_s.http_status_code);
     assert!(agent_s.r#type == vector_s.r#type);
     assert!(agent_s.db_type == vector_s.db_type);
-    assert!(agent_s.hits == vector_s.hits);
 
+    // hit counts should match
+    assert!(agent_s.hits == vector_s.hits);
     assert!(agent_s.hits == 2);
 
     assert!(agent_s.errors == vector_s.errors);
@@ -432,32 +422,4 @@ async fn apm_stats_e2e_test_dd_agent_to_vector_correctness() {
 
     // compare the stats from agent and vector for consistency
     validate_stats(&stats_agent, &stats_vector);
-}
-
-#[tokio::test]
-async fn to_real_traces_endpoint() {
-    assert_sink_compliance(&SINK_TAGS, async {
-        let config = indoc! {r#"
-            default_api_key = "atoken"
-            compression = "none"
-        "#};
-        let api_key = std::env::var("TEST_DATADOG_API_KEY")
-            .expect("couldn't find the Datatog api key in environment variables");
-        assert!(!api_key.is_empty(), "TEST_DATADOG_API_KEY required");
-        let config = config.replace("atoken", &api_key);
-        let (config, cx) = load_sink::<DatadogTracesConfig>(config.as_str()).unwrap();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-        let (batch, receiver) = BatchNotifier::new_with_receiver();
-
-        let trace = vec![Event::Trace(
-            simple_trace_event("a_trace".to_string()).with_batch_notifier(&batch),
-        )];
-
-        let stream = map_event_batch_stream(stream::iter(trace), Some(batch));
-
-        sink.run(stream).await.unwrap();
-        assert_eq!(receiver.await, BatchStatus::Delivered);
-    })
-    .await;
 }
