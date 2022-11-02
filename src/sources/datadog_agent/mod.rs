@@ -196,13 +196,6 @@ impl SourceConfig for DatadogAgentConfig {
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("message"))),
-                &owned_value_path!("message"),
-                Kind::bytes(),
-                Some("message"),
-            )
-            .with_source_metadata(
-                Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(&owned_value_path!("status"))),
                 &owned_value_path!("status"),
                 Kind::bytes(),
