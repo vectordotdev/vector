@@ -37,7 +37,7 @@ impl BytesDeserializerConfig {
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => schema::Definition::empty_legacy_namespace().with_field(
-                parse_value_path(log_schema().message_key()).expect("valid message key"),
+                &parse_value_path(log_schema().message_key()).expect("valid message key"),
                 Kind::bytes(),
                 Some("message"),
             ),

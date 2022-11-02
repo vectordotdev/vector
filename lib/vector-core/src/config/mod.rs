@@ -346,7 +346,7 @@ impl LogNamespace {
     pub fn insert_vector_metadata<'a>(
         &self,
         log: &mut LogEvent,
-        legacy_key: LegacyKey<impl ValuePath<'a>>,
+        legacy_key: impl ValuePath<'a>,
         metadata_key: impl ValuePath<'a>,
         value: impl Into<Value>,
     ) {
@@ -356,14 +356,9 @@ impl LogNamespace {
                     .value_mut()
                     .insert(path!("vector").concat(metadata_key), value);
             }
-            LogNamespace::Legacy => match legacy_key {
-                LegacyKey::Overwrite(key) => {
-                    log.insert((PathPrefix::Event, key), value);
-                }
-                LegacyKey::InsertIfEmpty(key) => {
-                    log.try_insert((PathPrefix::Event, key), value);
-                }
-            },
+            LogNamespace::Legacy => {
+                log.try_insert((PathPrefix::Event, legacy_key), value);
+            }
         }
     }
 

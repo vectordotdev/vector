@@ -32,7 +32,7 @@ use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -196,50 +196,50 @@ impl SourceConfig for DatadogAgentConfig {
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("message")),
-                owned_value_path!("message"),
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("message"))),
+                &owned_value_path!("message"),
                 Kind::bytes(),
                 Some("message"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("status")),
-                owned_value_path!("status"),
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("status"))),
+                &owned_value_path!("status"),
                 Kind::bytes(),
                 Some("severity"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("timestamp")),
-                owned_value_path!("timestamp"),
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("timestamp"))),
+                &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("hostname")),
-                owned_value_path!("hostname"),
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("hostname"))),
+                &owned_value_path!("hostname"),
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("service")),
-                owned_value_path!("service"),
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("service"))),
+                &owned_value_path!("service"),
                 Kind::bytes(),
                 Some("service"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("ddsource")),
-                owned_value_path!("ddsource"),
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("ddsource"))),
+                &owned_value_path!("ddsource"),
                 Kind::bytes(),
                 Some("source"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("ddtags")),
-                owned_value_path!("ddtags"),
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("ddtags"))),
+                &owned_value_path!("ddtags"),
                 Kind::bytes(),
                 Some("tags"),
             )

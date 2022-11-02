@@ -201,14 +201,14 @@ fn populate_event(
 
     log_namespace.insert_vector_metadata(
         log,
-        LegacyKey::InsertIfEmpty(log_schema().timestamp_key()),
+        log_schema().timestamp_key(),
         "ingest_timestamp",
         timestamp,
     );
 
     log_namespace.insert_vector_metadata(
         log,
-        LegacyKey::InsertIfEmpty(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         "source_type",
         "amqp",
     );

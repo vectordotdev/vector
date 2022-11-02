@@ -39,29 +39,29 @@ impl SyslogDeserializerConfig {
                     // The `message` field is always defined. If parsing fails, the entire body becomes the
                     // message.
                     .with_field(
-                        parse_value_path(log_schema().message_key()).expect("valid message key"),
+                        &parse_value_path(log_schema().message_key()).expect("valid message key"),
                         Kind::bytes(),
                         Some("message"),
                     )
                     // All other fields are optional.
                     .optional_field(
-                        parse_value_path(log_schema().timestamp_key())
+                        &parse_value_path(log_schema().timestamp_key())
                             .expect("valid timestamp key"),
                         Kind::timestamp(),
                         Some("timestamp"),
                     )
-                    .optional_field(owned_value_path!("hostname"), Kind::bytes(), None)
+                    .optional_field(&owned_value_path!("hostname"), Kind::bytes(), None)
                     .optional_field(
-                        owned_value_path!("severity"),
+                        &owned_value_path!("severity"),
                         Kind::bytes(),
                         Some("severity"),
                     )
-                    .optional_field(owned_value_path!("facility"), Kind::bytes(), None)
-                    .optional_field(owned_value_path!("version"), Kind::integer(), None)
-                    .optional_field(owned_value_path!("appname"), Kind::bytes(), None)
-                    .optional_field(owned_value_path!("msgid"), Kind::bytes(), None)
+                    .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
+                    .optional_field(&owned_value_path!("version"), Kind::integer(), None)
+                    .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                    .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
                     .optional_field(
-                        owned_value_path!("procid"),
+                        &owned_value_path!("procid"),
                         Kind::integer().or_bytes(),
                         None,
                     )
@@ -73,24 +73,28 @@ impl SyslogDeserializerConfig {
                     Kind::object(Collection::empty()),
                     [log_namespace],
                 )
-                .with_field(owned_value_path!("message"), Kind::bytes(), Some("message"))
+                .with_field(
+                    &owned_value_path!("message"),
+                    Kind::bytes(),
+                    Some("message"),
+                )
                 .optional_field(
-                    owned_value_path!("timestamp"),
+                    &owned_value_path!("timestamp"),
                     Kind::timestamp(),
                     Some("timestamp"),
                 )
-                .optional_field(owned_value_path!("hostname"), Kind::bytes(), None)
+                .optional_field(&owned_value_path!("hostname"), Kind::bytes(), None)
                 .optional_field(
-                    owned_value_path!("severity"),
+                    &owned_value_path!("severity"),
                     Kind::bytes(),
                     Some("severity"),
                 )
-                .optional_field(owned_value_path!("facility"), Kind::bytes(), None)
-                .optional_field(owned_value_path!("version"), Kind::integer(), None)
-                .optional_field(owned_value_path!("appname"), Kind::bytes(), None)
-                .optional_field(owned_value_path!("msgid"), Kind::bytes(), None)
+                .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
+                .optional_field(&owned_value_path!("version"), Kind::integer(), None)
+                .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
                 .optional_field(
-                    owned_value_path!("procid"),
+                    &owned_value_path!("procid"),
                     Kind::integer().or_bytes(),
                     None,
                 )

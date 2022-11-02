@@ -154,13 +154,13 @@ pub(crate) fn decode_log_body(
 
                             namespace.insert_vector_metadata(
                                 log,
-                                LegacyKey::InsertIfEmpty(path!(source.log_schema_source_type_key)),
+                                source.log_schema_source_type_key,
                                 path!("source_type"),
                                 Bytes::from("datadog_agent"),
                             );
                             namespace.insert_vector_metadata(
                                 log,
-                                LegacyKey::InsertIfEmpty(path!(source.log_schema_timestamp_key)),
+                                source.log_schema_timestamp_key,
                                 path!("ingest_timestamp"),
                                 now,
                             );

@@ -254,7 +254,7 @@ impl TransformConfig for RemapConfig {
             .contains(&LogNamespace::Legacy)
         {
             dropped_definition = dropped_definition.merge(input_definition.clone().with_field(
-                parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
+                &parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
                 Kind::object(BTreeMap::from([
                     ("reason".into(), Kind::bytes()),
                     ("message".into(), Kind::bytes()),
@@ -273,11 +273,11 @@ impl TransformConfig for RemapConfig {
             dropped_definition = dropped_definition.merge(
                 input_definition
                     .clone()
-                    .with_metadata_field(owned_value_path!("reason"), Kind::bytes())
-                    .with_metadata_field(owned_value_path!("message"), Kind::bytes())
-                    .with_metadata_field(owned_value_path!("component_id"), Kind::bytes())
-                    .with_metadata_field(owned_value_path!("component_type"), Kind::bytes())
-                    .with_metadata_field(owned_value_path!("component_kind"), Kind::bytes()),
+                    .with_metadata_field(&owned_value_path!("reason"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("message"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("component_id"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("component_type"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("component_kind"), Kind::bytes()),
             );
         }
 
@@ -609,7 +609,7 @@ mod tests {
 
     fn test_default_schema_definition() -> schema::Definition {
         schema::Definition::empty_legacy_namespace().with_field(
-            owned_value_path!("a default field"),
+            &owned_value_path!("a default field"),
             Kind::integer().or_bytes(),
             Some("default"),
         )
@@ -617,7 +617,7 @@ mod tests {
 
     fn test_dropped_schema_definition() -> schema::Definition {
         schema::Definition::empty_legacy_namespace().with_field(
-            owned_value_path!("a dropped field"),
+            &owned_value_path!("a dropped field"),
             Kind::boolean().or_null(),
             Some("dropped"),
         )
@@ -1046,7 +1046,7 @@ mod tests {
                 Kind::any_object(),
                 [LogNamespace::Legacy],
             )
-            .with_field(owned_value_path!("hello"), Kind::bytes(), None),
+            .with_field(&owned_value_path!("hello"), Kind::bytes(), None),
             ..Default::default()
         };
         let mut tform = Remap::new_ast(conf, &context).unwrap().0;
@@ -1289,8 +1289,8 @@ mod tests {
             Kind::any_object(),
             [LogNamespace::Legacy],
         )
-        .with_field(owned_value_path!("foo"), Kind::any(), None)
-        .with_field(owned_value_path!("tags"), Kind::any(), None);
+        .with_field(&owned_value_path!("foo"), Kind::any(), None)
+        .with_field(&owned_value_path!("tags"), Kind::any(), None);
 
         assert_eq!(
             conf.outputs(&schema::Definition::new_with_default_metadata(
