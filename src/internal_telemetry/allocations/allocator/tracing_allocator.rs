@@ -57,10 +57,6 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
         try_with_suspended_allocation_group(
             #[inline(always)]
             |group_id| {
-                // We only set the group ID in the wrapper header if we're tracing an allocation, because when it
-                // comes back to us during deallocation, we want to skip doing any checks at all if it's already
-                // zero.
-                //
                 // If we never trace the allocation, tracing the deallocation will only produce incorrect numbers,
                 // and that includes even if we just used the rule of "always attribute allocations to the root
                 // allocation group by default".
@@ -109,12 +105,10 @@ fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
     static HEADER_LAYOUT: Layout = Layout::new::<usize>();
 
     // We generate a new allocation layout that gives us a location to store the active allocation group ID ahead
-    // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path. We'll
-    // always set this to zero, and conditionally update it to the actual allocation group ID if tracking is enabled.
+    // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path.
     let (actual_layout, offset_to_object) = HEADER_LAYOUT
         .extend(object_layout)
         .expect("wrapping requested layout resulted in overflow");
-    let actual_layout = actual_layout.pad_to_align();
 
     (actual_layout, offset_to_object)
 }
