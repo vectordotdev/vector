@@ -63,11 +63,11 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                     );
                     metric_data.insert(
                         "timestamp".to_owned(),
-                        if let Some(ts) = data.time.timestamp {
-                            Value::from(ts.timestamp())
-                        } else {
-                            Value::from(DateTime::<Utc>::from(SystemTime::now()).timestamp())
-                        },
+                        Value::from(data
+                            .time
+                            .timestamp
+                            .unwrap_or_else(|| DateTime::<Utc>::from(SystemTime::now()))
+                            .timestamp()),
                     );
                     if let Some(attr) = attr {
                         metric_data.insert("attributes".to_owned(), attr);
