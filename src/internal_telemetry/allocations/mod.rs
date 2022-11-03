@@ -84,14 +84,14 @@ pub fn init_allocation_tracing() {
                     if allocs == 0 {
                         continue;
                     }
-
+                    let group_info = GROUP_INFO[idx].lock().unwrap();
                     gauge!(
                         "component_bytes_allocated",
                         mem_used.to_f64().expect("failed to convert group_id from int to float"),
                         "group_id" => idx.to_string(),
-                        "component_kind" => GROUP_INFO[idx].lock().unwrap().component_kind.clone().unwrap_or_else(|| "root".to_string()),
-                        "component_type" => GROUP_INFO[idx].lock().unwrap().component_type.clone().unwrap_or_else(|| "root".to_string()),
-                        "component_id" => GROUP_INFO[idx].lock().unwrap().component_id.clone().unwrap_or_else(|| "root".to_string()));
+                        "component_kind" => group_info.component_kind.clone().unwrap_or_else(|| "root".to_string()),
+                        "component_type" => group_info.component_type.clone().unwrap_or_else(|| "root".to_string()),
+                        "component_id" => group_info.component_id.clone().unwrap_or_else(|| "root".to_string()));
                 }
                 thread::sleep(Duration::from_millis(5000));
             })
