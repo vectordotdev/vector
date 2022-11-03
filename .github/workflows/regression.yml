@@ -57,6 +57,11 @@ jobs:
           ref: ${{ github.base_ref }}
           path: baseline-vector
 
+      - name: Setup PR metadata
+        id: pr-metadata
+        run: |
+          echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_OUTPUT
+
       - name: Setup experimental metadata
         id: experimental-meta
         run: |
@@ -182,7 +187,7 @@ jobs:
           file: regression/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
           push: true
 
   build-comparison:
@@ -230,7 +235,7 @@ jobs:
           file: regression/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
           push: true
 
   ##
@@ -272,8 +277,8 @@ jobs:
             --total-samples ${{ needs.compute-metadata.outputs.total-samples }} \
             --warmup-seconds ${{ needs.compute-metadata.outputs.warmup-seconds }} \
             --replicas ${{ needs.compute-metadata.outputs.replicas }} \
-            --baseline-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }} \
-            --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }} \
+            --baseline-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }} \
+            --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }} \
             --baseline-sha ${{ needs.compute-metadata.outputs.baseline }} \
             --comparison-sha ${{ needs.compute-metadata.outputs.comparison }} \
             --target-config-dir ${{ github.workspace }}/regression/ \
