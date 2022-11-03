@@ -2,12 +2,17 @@
 
 mod allocator;
 use std::{
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        RwLock,
+    },
     thread,
     time::Duration,
 };
 
 use arr_macro::arr;
+use metrics::gauge;
+use rand_distr::num_traits::ToPrimitive;
 
 use self::allocator::Tracer;
 
@@ -22,6 +27,25 @@ static GROUP_MEM_ALLOCS: [CachePadded<AtomicU64>; 256] =
     arr![CachePadded::new(AtomicU64::new(0)); 256];
 static GROUP_MEM_DEALLOCS: [CachePadded<AtomicU64>; 256] =
     arr![CachePadded::new(AtomicU64::new(0)); 256];
+
+// By using the Option type, we can do statics w/o the need of other creates such as lazy_static
+struct GroupInfo {
+    component_kind: Option<String>,
+    component_type: Option<String>,
+    component_id: Option<String>,
+}
+
+impl GroupInfo {
+    const fn new() -> Self {
+        Self {
+            component_id: None,
+            component_kind: None,
+            component_type: None,
+        }
+    }
+}
+
+static GROUP_INFO: [RwLock<GroupInfo>; 256] = arr![RwLock::new(GroupInfo::new()); 256];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -59,11 +83,13 @@ pub fn init_allocation_tracing() {
                         continue;
                     }
 
-                    info!(
-                        message = "Allocation group memory usage.",
-                        group_id = idx,
-                        current_memory_allocated_in_bytes = mem_used
-                    );
+                    gauge!(
+                        "current_memory_allocated_in_bytes",
+                        mem_used.to_f64().expect("failed to convert group_id from int to float"),
+                        "group_id" => idx.to_string(),
+                        "component_kind" => GROUP_INFO[idx].read().unwrap().component_kind.clone().unwrap_or_else(|| "root".to_string()),
+                        "component_type" => GROUP_INFO[idx].read().unwrap().component_type.clone().unwrap_or_else(|| "root".to_string()),
+                        "component_id" => GROUP_INFO[idx].read().unwrap().component_id.clone().unwrap_or_else(|| "root".to_string()));
                 }
                 thread::sleep(Duration::from_millis(10000));
             })
@@ -78,6 +104,19 @@ pub fn init_allocation_tracing() {
 /// a [`tracing::Span`] to achieve this" we utilize the logical invariants provided by spans --
 /// entering, exiting, and how spans exist as a stack -- in order to handle keeping the "current
 /// allocation group" accurate across all threads.
-pub fn acquire_allocation_group_id() -> AllocationGroupId {
-    AllocationGroupId::register().expect("failed to register allocation group token")
+pub fn acquire_allocation_group_id(
+    component_id: String,
+    component_type: String,
+    component_kind: String,
+) -> AllocationGroupId {
+    let group_id =
+        AllocationGroupId::register().expect("failed to register allocation group token");
+    let idx = group_id.as_raw();
+    let mut writer = GROUP_INFO[idx].write().unwrap();
+    *writer = GroupInfo {
+        component_id: Some(component_id),
+        component_kind: Some(component_kind),
+        component_type: Some(component_type),
+    };
+    group_id
 }
