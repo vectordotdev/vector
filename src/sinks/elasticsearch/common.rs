@@ -146,12 +146,13 @@ impl ElasticsearchCommon {
                         // This error should be fatal, but for now we only emit it as a warning
                         // to make the transition smoother.
                         Err(error) => {
-                            warn!(message = "Failed to determine Elasticsearch version. Please set option `api_version`.", %error);
                             // For now, estimate version.
-                            match config.suppress_type_name {
+                            let assumed_version = match config.suppress_type_name {
                                 Some(true) => 8,
                                 _ => 6,
-                            }
+                            };
+                            warn!(message = "Failed to determine Elasticsearch version from `/_cluster/state/version`. Please fix the reported error or set an API version explicitly via `api_version`.",%assumed_version, %error);
+                            assumed_version
                         }
                     }
                 }
@@ -285,7 +286,7 @@ async fn get_version(
     let mut body = body::aggregate(body).await?;
     let body = body.copy_to_bytes(body.remaining());
     let ClusterState { version } = serde_json::from_slice(&body)?;
-    version.ok_or_else(||"Unexpected response from Elasticsearch endpoint /_cluster/state/version. Missing `version`. Consider setting `api_version` option.".into())
+    version.ok_or_else(||"Unexpected response from Elasticsearch endpoint `/_cluster/state/version`. Missing `version`. Consider setting `api_version` option.".into())
 }
 
 async fn get(
