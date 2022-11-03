@@ -72,7 +72,7 @@ impl GenerateConfig for LogstashConfig {
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = LogstashSource {
-            timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone),
+            timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone()),
         };
         let shutdown_secs = 30;
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());

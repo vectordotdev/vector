@@ -8959,6 +8959,7 @@ dependencies = [
  "bitmask-enum",
  "bytes 1.2.1",
  "chrono",
+ "chrono-tz",
  "criterion",
  "crossbeam-utils",
  "db-key",
