@@ -12,6 +12,14 @@ a uniform fashion in all components.
 - [Reroute discarded events from throttle transform](https://github.com/vectordotdev/vector/issues/13549)
 - Sink Error Handling RFC (internal document)
 
+## Cross cutting concerns
+
+- The proposed changes will impact emission and receipt of end-to-end acknowledgements.
+- The proposed configuration options should fit in the configuration schema, but may have
+  implications for its interpretation, particularly around the topology connections.
+- Handling discarded events in any way will change the interpretation of several exiting internal
+  metrics.
+
 ## Scope
 
 ### In scope
@@ -207,13 +215,14 @@ topology builder.
 ##### Output Buffer
 
 The output from transforms is fed into an `OutputBuffer` that is currently a newtype wrapper for a
-simple vector of event arrays. The additional output dispositions will be added as enum states:
+simple vector of event arrays (ie ```struct OutputBuffer(Vec<EventArray>);```). The additional
+output dispositions will be added as enum states:
 
 ```rust
 pub enum OutputBuffer {
-    Drop,
-    Reject,
-    Store(Vec<EventArray>),
+    Drop,                   // Mark events sent to this output as delivered and drop them.
+    Reject,                 // Mark events sent to this output as failed and drop them.
+    Store(Vec<EventArray>), // Forward the events to the next component, as before.
 }
 ```
 
