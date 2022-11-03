@@ -15,6 +15,7 @@ use super::{
 };
 use crate::{
     http::{BuildRequestSnafu, HttpClient},
+    internal_events::DatadogTracesAPMStatsError,
     sinks::util::{Compression, Compressor},
 };
 
@@ -105,12 +106,8 @@ impl ApmStatsSender {
                 Some((payload, aggregator.get_api_key()))
             }
         } {
-            if let Err(e) = self.compress_and_send(payload, api_key).await {
-                // TODO emit an internal `Error` event here, probably
-                error!(
-                    internal_log_rate_limit = true,
-                    "Error while encoding and sending APM stats payloads: {}", e,
-                );
+            if let Err(error) = self.compress_and_send(payload, api_key).await {
+                emit!(DatadogTracesAPMStatsError { error });
             }
         }
     }
