@@ -376,7 +376,7 @@ impl From<X509> for CertificateMetadata {
         for entry in cert.subject_name().entries() {
             let data_string = match entry.data().as_utf8() {
                 Ok(data) => data.to_string(),
-                Err(_) => "".to_string(),
+                Err(_) => String::new(),
             };
             subject_metadata.insert(entry.object().to_string(), data_string);
         }

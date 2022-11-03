@@ -55,7 +55,7 @@ impl TemplateString {
                 || {
                     Expr::Literal(Node::new(
                         diagnostic::Span::default(),
-                        RawString("".to_string()),
+                        RawString(String::new()),
                     ))
                 },
                 |(_span, expr)| expr,

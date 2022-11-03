@@ -169,7 +169,7 @@ impl<'a> EncodedWord<'a> {
                 // whitespace
                 let to_decode = self.input.replace('_', " ");
                 let trimmed = to_decode.trim_end();
-                let mut d = quoted_printable::decode(&trimmed, quoted_printable::ParseMode::Robust);
+                let mut d = quoted_printable::decode(trimmed, quoted_printable::ParseMode::Robust);
                 if d.is_ok() && to_decode.len() != trimmed.len() {
                     d.as_mut()
                         .unwrap()

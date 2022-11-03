@@ -155,7 +155,7 @@ fn parse_header_value(input: &str) -> IResult<&str, String, VerboseError<&str>> 
     preceded(
         opt(char('|')),
         alt((
-            map(peek(char('|')), |_| "".to_string()),
+            map(peek(char('|')), |_| String::new()),
             escaped_transform(
                 take_till1(|c: char| c == '\\' || c == '|'),
                 '\\',
@@ -175,7 +175,7 @@ fn parse_key_value(input: &str) -> IResult<&str, (&str, String), VerboseError<&s
 
 fn parse_value(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     alt((
-        map(peek(parse_key), |_| "".to_string()),
+        map(peek(parse_key), |_| String::new()),
         escaped_transform(
             take_till1_input(|input| alt((tag("\\"), tag("="), parse_key))(input).is_ok()),
             '\\',

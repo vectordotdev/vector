@@ -91,7 +91,7 @@ impl<T> Node<T> {
     where
         T: Deref,
     {
-        &**self.as_ref()
+        self.as_ref()
     }
 }
 

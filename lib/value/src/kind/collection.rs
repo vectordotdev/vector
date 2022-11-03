@@ -191,14 +191,12 @@ impl<T: Ord + Clone> Collection<T> {
 
         // All known fields in `other` need to either be a subset of a matching known field in
         // `self`, or a subset of self's `unknown` type state.
-        if !other
-            .known
-            .iter()
-            .all(|(key, other_kind)| match self.known.get(key) {
-                Some(self_kind) => self_kind.is_superset(other_kind),
-                None => self.unknown_kind().is_superset(other_kind),
-            })
-        {
+        if !other.known.iter().all(|(key, other_kind)| {
+            self.known.get(key).map_or_else(
+                || self.unknown_kind().is_superset(other_kind),
+                |self_kind| self_kind.is_superset(other_kind),
+            )
+        }) {
             return false;
         }
 

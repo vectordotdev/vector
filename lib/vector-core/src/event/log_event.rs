@@ -503,7 +503,7 @@ where
 
     fn index(&self, key: T) -> &Value {
         self.get(key.as_ref())
-            .expect(&*format!("Key is not found: {:?}", key.as_ref()))
+            .unwrap_or_else(|| panic!("Key is not found: {:?}", key.as_ref()))
     }
 }
 

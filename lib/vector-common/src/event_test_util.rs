@@ -14,7 +14,7 @@ thread_local! {
 pub fn contains_name_once(pattern: &str) -> Result<(), String> {
     EVENTS_RECORDED.with(|events| {
         let mut n_events = 0;
-        let mut names: String = "".to_string();
+        let mut names = String::new();
         for event in events.borrow().iter() {
             if event.ends_with(pattern) {
                 if n_events > 0 {

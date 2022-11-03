@@ -108,7 +108,7 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/vector.proto");
 
         let mut prost_build = prost_build::Config::new();
-        prost_build.btree_map(&["."]);
+        prost_build.btree_map(["."]);
 
         tonic_build::configure()
             .compile_with_config(

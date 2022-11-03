@@ -367,7 +367,7 @@ impl TlsConfig {
                 // This is just for error checking.
                 pkcs12.parse("").context(TlsIdentitySnafu)?;
 
-                Ok(Some(IdentityStore(identity, "".into())))
+                Ok(Some(IdentityStore(identity, String::new())))
             }
         }
     }

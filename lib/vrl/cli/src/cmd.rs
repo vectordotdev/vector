@@ -69,7 +69,7 @@ impl Opts {
             Some(source) => Ok(source.clone()),
             None => match self.program_file.as_ref() {
                 Some(path) => read(File::open(path)?),
-                None => Ok("".to_owned()),
+                None => Ok(String::new()),
             },
         }
     }

@@ -311,10 +311,7 @@ impl From<Cow<'_, str>> for Value {
 
 impl<T: Into<Self>> From<Option<T>> for Value {
     fn from(value: Option<T>) -> Self {
-        match value {
-            None => Self::Null,
-            Some(v) => v.into(),
-        }
+        value.map_or(Self::Null, Into::into)
     }
 }
 
