@@ -316,11 +316,7 @@ mod test {
             MetricValue::Counter { value: 1.0 },
         )
         .with_namespace(Some("namespace_example"))
-        .with_tags(Some(
-            vec![("example tag".to_string(), "example value".to_string())]
-                .into_iter()
-                .collect(),
-        ))
+        .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
         .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)));
         let assertions = vec![
             "type(metric) == 'table'",
@@ -509,11 +505,7 @@ mod test {
             MetricValue::Counter { value: 1.0 },
         )
         .with_namespace(Some("example_namespace"))
-        .with_tags(Some(
-            vec![("example tag".to_string(), "example value".to_string())]
-                .into_iter()
-                .collect(),
-        ))
+        .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
         .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
