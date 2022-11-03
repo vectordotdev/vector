@@ -8,13 +8,19 @@
 //!   - Call call() supplying the generic inputs for calling and the source-specific
 //!     context.
 
+use std::{
+    collections::HashMap,
+    future::ready,
+    time::{Duration, Instant},
+};
+
 use bytes::Bytes;
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::{response::Parts, Uri};
 use hyper::{Body, Request};
-use std::time::{Duration, Instant};
-use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::shutdown::ShutdownSignal;
+use vector_core::{config::proxy::ProxyConfig, event::Event, ByteSizeOf};
 
 use crate::{
     http::{Auth, HttpClient},
@@ -26,8 +32,6 @@ use crate::{
     tls::TlsSettings,
     Error, SourceSender,
 };
-use vector_common::shutdown::ShutdownSignal;
-use vector_core::{config::proxy::ProxyConfig, event::Event, ByteSizeOf};
 
 /// Contains the inputs generic to any http client.
 pub(crate) struct GenericHttpClientInputs {

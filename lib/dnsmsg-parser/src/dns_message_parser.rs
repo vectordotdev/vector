@@ -1,5 +1,4 @@
-use std::fmt::Write as _;
-use std::str::Utf8Error;
+use std::{fmt::Write as _, str::Utf8Error};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
 use thiserror::Error;

@@ -1,5 +1,4 @@
-use mlua::prelude::LuaResult;
-use mlua::{FromLua, Lua, ToLua, Value as LuaValue};
+use mlua::{prelude::LuaResult, FromLua, Lua, ToLua, Value as LuaValue};
 use ordered_float::NotNan;
 
 use crate::value::Value;

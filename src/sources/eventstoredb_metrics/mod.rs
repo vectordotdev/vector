@@ -6,8 +6,7 @@ use hyper::{Body, Request};
 use tokio_stream::wrappers::IntervalStream;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use self::types::Stats;
 use crate::{

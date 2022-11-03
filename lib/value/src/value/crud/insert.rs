@@ -1,10 +1,11 @@
-use crate::value::crud::{
-    get_matching_coalesce_key, skip_remaining_coalesce_segments, ValueCollection,
-};
-use crate::Value;
+use std::{borrow::Borrow, collections::BTreeMap};
+
 use lookup::lookup_v2::BorrowedSegment;
-use std::borrow::Borrow;
-use std::collections::BTreeMap;
+
+use crate::{
+    value::crud::{get_matching_coalesce_key, skip_remaining_coalesce_segments, ValueCollection},
+    Value,
+};
 
 pub fn insert<'a, T: ValueCollection>(
     value: &mut T,
@@ -65,8 +66,9 @@ pub fn insert<'a, T: ValueCollection>(
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     #[test]
     fn test_insert_coalesce() {

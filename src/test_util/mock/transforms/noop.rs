@@ -10,9 +10,8 @@ use vector_core::{
     transform::{FunctionTransform, OutputBuffer, TaskTransform, Transform},
 };
 
-use crate::config::{GenerateConfig, TransformConfig, TransformContext};
-
 use super::TransformType;
+use crate::config::{GenerateConfig, TransformConfig, TransformContext};
 
 /// Configuration for the `test_noop` transform.
 #[configurable_component(transform("test_noop"))]

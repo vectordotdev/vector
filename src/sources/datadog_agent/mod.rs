@@ -32,8 +32,10 @@ use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    event::{BatchNotifier, BatchStatus},
+};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
 use crate::{

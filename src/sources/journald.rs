@@ -28,10 +28,11 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalizer::OrderedFinalizer,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered},
 };
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
@@ -855,7 +856,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        config::ComponentKey, event::Event, event::EventStatus,
+        config::ComponentKey,
+        event::{Event, EventStatus},
         test_util::components::assert_source_compliance,
     };
 

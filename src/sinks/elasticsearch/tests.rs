@@ -1,5 +1,7 @@
 use std::{collections::BTreeMap, convert::TryFrom};
 
+use lookup::owned_value_path;
+
 use crate::{
     codecs::Transformer,
     event::{LogEvent, Metric, MetricKind, MetricValue, Value},
@@ -12,7 +14,6 @@ use crate::{
     },
     template::Template,
 };
-use lookup::owned_value_path;
 
 #[tokio::test]
 async fn sets_create_action_when_configured() {

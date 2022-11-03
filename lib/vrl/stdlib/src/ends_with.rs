@@ -1,6 +1,5 @@
 use ::value::Value;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 fn ends_with(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
     let substring = {

@@ -6,9 +6,9 @@ use futures_util::StreamExt;
 use vector_core::sink::StreamSink;
 
 use super::{config::SqsSinkConfig, request_builder::SqsRequestBuilder, service::SqsService};
-use crate::internal_events::SinkRequestBuildError;
 use crate::{
     event::Event,
+    internal_events::SinkRequestBuildError,
     sinks::util::{
         builder::SinkBuilderExt, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
     },

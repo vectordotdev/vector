@@ -6,8 +6,7 @@ use codecs::StreamDecodingError;
 use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder;
-use vector_core::config::LegacyKey;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LegacyKey, ByteSizeOf};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{

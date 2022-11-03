@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use crate::emit;
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
 use vector_common::internal_event::{
@@ -9,6 +8,7 @@ use vector_common::internal_event::{
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::io_error_code;
+use crate::emit;
 
 #[derive(Debug)]
 pub struct ExecEventsReceived<'a> {

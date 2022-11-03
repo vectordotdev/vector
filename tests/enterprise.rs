@@ -3,7 +3,6 @@
 use std::{env, path::PathBuf, thread};
 
 use http::StatusCode;
-
 use vector::{
     app::Application,
     cli::{Color, LogFormat, Opts, RootOpts},

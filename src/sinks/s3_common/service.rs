@@ -17,8 +17,7 @@ use vector_core::{
     stream::DriverResponse,
 };
 
-use super::config::S3Options;
-use super::partitioner::S3PartitionKey;
+use super::{config::S3Options, partitioner::S3PartitionKey};
 
 #[derive(Debug, Clone)]
 pub struct S3Request {

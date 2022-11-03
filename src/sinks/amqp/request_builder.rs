@@ -1,6 +1,15 @@
 //! Request builder for the `AMQP` sink.
 //! Responsible for taking the event (which includes rendered template values) and turning
 //! it into the raw bytes and other data needed to send the request to `AMQP`.
+use std::io;
+
+use bytes::Bytes;
+use vector_common::{
+    finalization::{EventFinalizers, Finalizable},
+    request_metadata::RequestMetadata,
+};
+
+use super::{encoder::AmqpEncoder, service::AmqpRequest, sink::AmqpEvent};
 use crate::{
     event::Event,
     sinks::util::{
@@ -8,14 +17,6 @@ use crate::{
         RequestBuilder,
     },
 };
-use bytes::Bytes;
-use std::io;
-use vector_common::{
-    finalization::{EventFinalizers, Finalizable},
-    request_metadata::RequestMetadata,
-};
-
-use super::{encoder::AmqpEncoder, service::AmqpRequest, sink::AmqpEvent};
 
 pub(super) struct AmqpMetadata {
     exchange: String,

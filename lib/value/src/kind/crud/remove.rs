@@ -1,10 +1,14 @@
 //! All code related to removing from a [`Kind`].
 
-use crate::kind::collection::{CollectionRemove, EmptyState};
-use crate::kind::{Collection, Field};
-use crate::Kind;
-use lookup::lookup_v2::OwnedSegment;
-use lookup::OwnedValuePath;
+use lookup::{lookup_v2::OwnedSegment, OwnedValuePath};
+
+use crate::{
+    kind::{
+        collection::{CollectionRemove, EmptyState},
+        Collection, Field,
+    },
+    Kind,
+};
 
 impl Kind {
     /// Removes the `Kind` at the given `path` within `self`.
@@ -266,10 +270,11 @@ impl From<EmptyState> for CompactOptions {
 #[cfg(test)]
 #[allow(clippy::manual_assert)]
 mod test {
-    use super::*;
-    use lookup::lookup_v2::parse_value_path;
-    use lookup::owned_value_path;
     use std::collections::BTreeMap;
+
+    use lookup::{lookup_v2::parse_value_path, owned_value_path};
+
+    use super::*;
 
     #[test]
     #[allow(clippy::too_many_lines)]

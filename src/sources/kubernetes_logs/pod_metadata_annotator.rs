@@ -7,8 +7,10 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::lookup_v2::{OptionalTargetPath, ValuePath};
-use lookup::{owned_value_path, path, OwnedTargetPath, PathPrefix};
+use lookup::{
+    lookup_v2::{OptionalTargetPath, ValuePath},
+    owned_value_path, path, OwnedTargetPath, PathPrefix,
+};
 use vector_config::configurable_component;
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};

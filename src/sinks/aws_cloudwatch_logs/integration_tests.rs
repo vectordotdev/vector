@@ -1,11 +1,9 @@
 #![cfg(feature = "aws-cloudwatch-logs-integration-tests")]
 #![cfg(test)]
 
-use std::convert::TryFrom;
-use std::str::FromStr;
+use std::{convert::TryFrom, str::FromStr};
 
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_sdk_cloudwatchlogs::{Endpoint, Region};
+use aws_sdk_cloudwatchlogs::{Client as CloudwatchLogsClient, Endpoint, Region};
 use chrono::Duration;
 use codecs::TextSerializerConfig;
 use futures::{stream, StreamExt};
@@ -13,13 +11,11 @@ use http::Uri;
 use similar_asserts::assert_eq;
 
 use super::*;
-use crate::aws::create_client;
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use crate::{
+    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     config::{log_schema, ProxyConfig, SinkConfig, SinkContext},
     event::{Event, LogEvent, Value},
-    sinks::util::BatchConfig,
+    sinks::{aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder, util::BatchConfig},
     template::Template,
     test_util::{
         components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},

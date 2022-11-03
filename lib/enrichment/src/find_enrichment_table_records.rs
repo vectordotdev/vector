@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 
 use ::value::Value;
-use vrl::prelude::*;
-use vrl::state::TypeState;
+use vrl::{prelude::*, state::TypeState};
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},

@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::iter::Peekable;
+use std::{collections::BTreeMap, iter::Peekable};
 
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 

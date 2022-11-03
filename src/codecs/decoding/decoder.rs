@@ -95,7 +95,6 @@ impl tokio_util::codec::Decoder for Decoder {
 
 #[cfg(test)]
 mod tests {
-    use super::Decoder;
     use bytes::Bytes;
     use codecs::{
         decoding::{Deserializer, Framer},
@@ -104,6 +103,8 @@ mod tests {
     use futures::{stream, StreamExt};
     use tokio_util::{codec::FramedRead, io::StreamReader};
     use value::Value;
+
+    use super::Decoder;
 
     #[tokio::test]
     async fn framed_read_recover_from_error() {

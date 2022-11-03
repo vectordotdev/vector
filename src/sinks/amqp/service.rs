@@ -1,14 +1,14 @@
 //! The main tower service that takes the request created by the request builder
 //! and sends it to `AMQP`.
-use crate::internal_events::sink::{AmqpAcknowledgementError, AmqpDeliveryError};
-use bytes::Bytes;
-use futures::future::BoxFuture;
-use lapin::{options::BasicPublishOptions, BasicProperties};
-use snafu::Snafu;
 use std::{
     sync::Arc,
     task::{Context, Poll},
 };
+
+use bytes::Bytes;
+use futures::future::BoxFuture;
+use lapin::{options::BasicPublishOptions, BasicProperties};
+use snafu::Snafu;
 use tower::Service;
 use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
@@ -16,6 +16,8 @@ use vector_common::{
     request_metadata::{MetaDescriptive, RequestMetadata},
 };
 use vector_core::stream::DriverResponse;
+
+use crate::internal_events::sink::{AmqpAcknowledgementError, AmqpDeliveryError};
 
 /// The request contains the data to send to `AMQP` together
 /// with the information need to route the message.

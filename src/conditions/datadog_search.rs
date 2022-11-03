@@ -6,8 +6,7 @@ use datadog_filter::{
     regex::{wildcard_regex, word_regex},
     Filter, Matcher, Resolver, Run,
 };
-use datadog_search_syntax::parse;
-use datadog_search_syntax::{Comparison, ComparisonValue, Field};
+use datadog_search_syntax::{parse, Comparison, ComparisonValue, Field};
 use vector_config::configurable_component;
 use vector_core::event::{Event, LogEvent, Value};
 

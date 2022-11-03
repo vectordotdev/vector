@@ -1,13 +1,13 @@
 use std::time::Instant;
 
-use crate::emit;
 use metrics::{counter, histogram};
-pub use vector_core::internal_event::EventsReceived;
-use vector_core::internal_event::InternalEvent;
-
 use vector_common::internal_event::{
     error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
+pub use vector_core::internal_event::EventsReceived;
+use vector_core::internal_event::InternalEvent;
+
+use crate::emit;
 
 #[derive(Debug)]
 pub struct EndpointBytesReceived<'a> {

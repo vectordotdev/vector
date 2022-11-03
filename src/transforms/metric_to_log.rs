@@ -143,12 +143,14 @@ mod tests {
     use vector_core::metric_tags;
 
     use super::*;
-    use crate::event::{
-        metric::{MetricKind, MetricTags, MetricValue, StatisticKind},
-        Metric, Value,
+    use crate::{
+        event::{
+            metric::{MetricKind, MetricTags, MetricValue, StatisticKind},
+            Metric, Value,
+        },
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
     };
-    use crate::test_util::components::assert_transform_compliance;
-    use crate::transforms::test::create_topology;
 
     #[test]
     fn generate_config() {

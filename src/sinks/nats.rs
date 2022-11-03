@@ -227,17 +227,20 @@ mod tests {
 #[cfg(feature = "nats-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use codecs::TextSerializerConfig;
     use std::{thread, time::Duration};
 
+    use codecs::TextSerializerConfig;
+
     use super::*;
-    use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
-    use crate::sinks::VectorSink;
-    use crate::test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
-        random_lines_with_stream, random_string, trace_init,
+    use crate::{
+        nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword},
+        sinks::VectorSink,
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            random_lines_with_stream, random_string, trace_init,
+        },
+        tls::TlsConfig,
     };
-    use crate::tls::TlsConfig;
 
     async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), BuildError> {
         // Publish `N` messages to NATS.

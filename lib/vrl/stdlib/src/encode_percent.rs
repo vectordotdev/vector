@@ -1,7 +1,6 @@
 use ::value::Value;
 use percent_encoding::{utf8_percent_encode, AsciiSet};
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 fn encode_percent(value: Value, ascii_set: &Bytes) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;

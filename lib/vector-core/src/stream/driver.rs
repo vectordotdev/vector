@@ -4,8 +4,10 @@ use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::{BytesSent, CallError, CountByteSize, PollReadyError};
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::{
+    internal_event::{BytesSent, CallError, CountByteSize, PollReadyError},
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 
 use super::FuturesUnorderedCount;
 use crate::{
@@ -220,7 +222,10 @@ mod tests {
     use std::{
         future::Future,
         pin::Pin,
-        sync::{atomic::AtomicUsize, atomic::Ordering, Arc},
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
         task::{ready, Context, Poll},
         time::Duration,
     };
@@ -236,9 +241,9 @@ mod tests {
     use tower::Service;
     use vector_common::{
         finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
-        request_metadata::RequestMetadata,
+        internal_event::CountByteSize,
+        request_metadata::{MetaDescriptive, RequestMetadata},
     };
-    use vector_common::{internal_event::CountByteSize, request_metadata::MetaDescriptive};
 
     use super::{Driver, DriverResponse};
 

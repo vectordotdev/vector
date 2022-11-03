@@ -1,15 +1,27 @@
 #![allow(clippy::module_name_repetitions)]
 
-use std::marker::{PhantomData, Unpin};
-use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll};
+use std::{
+    fmt::Debug,
+    future::Future,
+    marker::{PhantomData, Unpin},
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
-use futures::stream::{BoxStream, FuturesOrdered, FuturesUnordered};
-use futures::{FutureExt, Stream, StreamExt};
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use tokio::sync::Notify;
+use futures::{
+    stream::{BoxStream, FuturesOrdered, FuturesUnordered},
+    FutureExt, Stream, StreamExt,
+};
+use tokio::sync::{
+    mpsc::{self, UnboundedReceiver, UnboundedSender},
+    Notify,
+};
 
-use crate::finalization::{BatchStatus, BatchStatusReceiver};
-use crate::shutdown::ShutdownSignal;
+use crate::{
+    finalization::{BatchStatus, BatchStatusReceiver},
+    shutdown::ShutdownSignal,
+};
 
 /// The `OrderedFinalizer` framework produces a stream of acknowledged
 /// event batch identifiers from a source in a single background task

@@ -17,8 +17,7 @@ use crate::{
         UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
-    sources::util::change_socket_permissions,
-    sources::Source,
+    sources::{util::change_socket_permissions, Source},
     SourceSender,
 };
 

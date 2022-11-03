@@ -7,9 +7,8 @@ use heim::memory::os::SwapExt;
 use heim::units::information::byte;
 use vector_core::event::MetricTags;
 
-use crate::internal_events::HostMetricsScrapeDetailError;
-
 use super::HostMetrics;
+use crate::internal_events::HostMetricsScrapeDetailError;
 
 impl HostMetrics {
     pub async fn memory_metrics(&self, output: &mut super::MetricsBuffer) {

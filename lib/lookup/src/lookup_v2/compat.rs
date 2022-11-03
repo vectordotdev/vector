@@ -1,8 +1,9 @@
+use std::borrow::Cow;
+
 ///! Contains backwards compatibility with lookup "v1"
 ///! This is all temporary and will be deleted when migration to the V2 lookup code is complete.
 use crate::lookup_v2::{BorrowedSegment, OwnedSegment, OwnedValuePath, ValuePath};
 use crate::{FieldBuf, LookupBuf, SegmentBuf};
-use std::borrow::Cow;
 
 impl<'a> ValuePath<'a> for &'a LookupBuf {
     type Iter = LookupBufPathIter<'a>;
@@ -94,8 +95,7 @@ impl<'a> Iterator for LookupBufPathIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::ValuePath;
-    use crate::LookupBuf;
+    use crate::{lookup_v2::ValuePath, LookupBuf};
 
     #[test]
     fn test() {

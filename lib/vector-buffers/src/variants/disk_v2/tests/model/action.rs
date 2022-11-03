@@ -2,8 +2,7 @@ use proptest::{
     arbitrary::any,
     collection::{vec as arb_vec, SizeRange},
     prop_compose, prop_oneof,
-    strategy::Just,
-    strategy::Strategy,
+    strategy::{Just, Strategy},
 };
 
 use super::record::Record;

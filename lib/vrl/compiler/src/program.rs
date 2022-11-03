@@ -1,8 +1,8 @@
 use lookup::OwnedTargetPath;
 
-use crate::state::TypeState;
 use crate::{
     expression::{Block, Resolved},
+    state::TypeState,
     Context, Expression,
 };
 

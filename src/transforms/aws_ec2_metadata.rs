@@ -5,9 +5,10 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
-use lookup::owned_value_path;
-use lookup::OwnedTargetPath;
+use lookup::{
+    lookup_v2::{OptionalTargetPath, OwnedSegment},
+    owned_value_path, OwnedTargetPath,
+};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_with::serde_as;
@@ -625,10 +626,14 @@ enum Ec2MetadataError {
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
-    use lookup::{event_path, PathPrefix};
+    use lookup::{
+        event_path,
+        lookup_v2::{OwnedSegment, OwnedValuePath},
+        PathPrefix,
+    };
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use warp::Filter;
 
     use super::*;
     use crate::{
@@ -636,7 +641,6 @@ mod integration_tests {
         test_util::{components::assert_transform_compliance, next_addr},
         transforms::test::create_topology,
     };
-    use warp::Filter;
 
     fn ec2_metadata_address() -> String {
         std::env::var("EC2_METADATA_ADDRESS").unwrap_or_else(|_| "http://localhost:8111".into())

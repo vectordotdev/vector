@@ -299,6 +299,8 @@ impl TaskTransform<Event> for TagCardinalityLimit {
 
 #[cfg(test)]
 mod tests {
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
     use vector_core::metric_tags;
 
     use super::*;
@@ -310,8 +312,6 @@ mod tests {
             test::create_topology,
         },
     };
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {

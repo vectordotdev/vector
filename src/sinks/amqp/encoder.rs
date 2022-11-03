@@ -1,11 +1,13 @@
 //! Encoding for the `AMQP` sink.
+use std::io;
+
+use bytes::BytesMut;
+use tokio_util::codec::Encoder as _;
+
 use crate::{
     event::Event,
     sinks::util::encoding::{write_all, Encoder},
 };
-use bytes::BytesMut;
-use std::io;
-use tokio_util::codec::Encoder as _;
 
 #[derive(Clone, Debug)]
 pub(super) struct AmqpEncoder {

@@ -2,8 +2,7 @@ use std::result::Result;
 
 use ::value::Value;
 use vector_common::encode_key_value;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 /// Also used by `encode_logfmt`.
 pub(crate) fn encode_key_value(

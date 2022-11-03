@@ -3,8 +3,7 @@
 #![allow(clippy::print_stderr)] // test framework
 #![allow(clippy::print_stdout)] // test framework
 use diagnostic::Span;
-use lookup::lookup_v2::OwnedSegment;
-use lookup::{FieldBuf, LookupBuf, OwnedValuePath, SegmentBuf};
+use lookup::{lookup_v2::OwnedSegment, FieldBuf, LookupBuf, OwnedValuePath, SegmentBuf};
 use ordered_float::NotNan;
 use parser::ast::{
     Assignment, AssignmentOp, AssignmentTarget, Block, Container, Expr, FunctionArgument,

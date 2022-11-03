@@ -4,6 +4,7 @@ use futures::Stream;
 use futures_util::StreamExt;
 use serde_json::json;
 
+use super::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS};
 use crate::{
     config::{log_schema, SourceConfig, SourceContext},
     event::{into_event_stream, Event, EventStatus},
@@ -14,8 +15,6 @@ use crate::{
     },
     SourceSender,
 };
-
-use super::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS};
 
 fn otel_health_url() -> String {
     std::env::var("OTEL_HEALTH_URL").unwrap_or_else(|_| "http://0.0.0.0:13133".to_owned())

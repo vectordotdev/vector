@@ -14,8 +14,7 @@ use codecs::{
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
-use lookup::owned_value_path;
-use lookup::LookupBuf;
+use lookup::{owned_value_path, LookupBuf};
 use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
@@ -24,7 +23,6 @@ use value::Kind;
 use vector_core::config::LogNamespace;
 use vrl::prelude::Collection;
 
-use crate::schema::Definition;
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     config::{log_schema, SourceConfig, SourceContext},
@@ -34,6 +32,7 @@ use crate::{
         Event, EventStatus, Metric, Value,
     },
     schema,
+    schema::Definition,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
         ddmetric_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,

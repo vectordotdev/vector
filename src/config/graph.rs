@@ -1,5 +1,6 @@
-use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
+
+use indexmap::{set::IndexSet, IndexMap};
 
 use super::{
     schema, ComponentKey, DataType, Output, OutputId, SinkConfig, SinkOuter, SourceConfig,

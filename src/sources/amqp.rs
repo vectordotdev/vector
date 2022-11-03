@@ -1,5 +1,24 @@
 //! `AMQP` source.
 //! Handles version AMQP 0.9.1 which is used by RabbitMQ.
+use std::{io::Cursor, pin::Pin};
+
+use async_stream::stream;
+use bytes::Bytes;
+use chrono::{TimeZone, Utc};
+use codecs::decoding::{DeserializerConfig, FramingConfig};
+use futures::{FutureExt, StreamExt};
+use futures_util::Stream;
+use lapin::{acker::Acker, message::Delivery, Channel};
+use snafu::Snafu;
+use tokio_util::codec::FramedRead;
+use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    event::Event,
+    ByteSizeOf,
+};
+
 use crate::{
     amqp::AmqpConfig,
     codecs::{Decoder, DecodingConfig},
@@ -12,24 +31,6 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     SourceSender,
-};
-use async_stream::stream;
-use bytes::Bytes;
-use chrono::{TimeZone, Utc};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use futures::{FutureExt, StreamExt};
-use futures_util::Stream;
-use lapin::{acker::Acker, message::Delivery, Channel};
-use snafu::Snafu;
-use std::{io::Cursor, pin::Pin};
-use tokio_util::codec::FramedRead;
-use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LegacyKey;
-use vector_core::{
-    config::{LogNamespace, SourceAcknowledgementsConfig},
-    event::Event,
-    ByteSizeOf,
 };
 
 #[derive(Debug, Snafu)]
@@ -449,8 +450,11 @@ pub mod test {
 #[cfg(feature = "amqp-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::test::*;
-    use super::*;
+    use chrono::Utc;
+    use lapin::{options::*, BasicProperties};
+    use tokio::time::Duration;
+
+    use super::{test::*, *};
     use crate::{
         shutdown::ShutdownSignal,
         test_util::{
@@ -459,10 +463,6 @@ mod integration_test {
         },
         SourceSender,
     };
-    use chrono::Utc;
-    use lapin::options::*;
-    use lapin::BasicProperties;
-    use tokio::time::Duration;
 
     #[tokio::test]
     async fn amqp_source_create_ok() {

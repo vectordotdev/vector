@@ -1,9 +1,10 @@
-use crate::register;
 use metrics::{register_counter, Counter};
 use vector_common::internal_event::{
     ComponentEventsDropped, Count, InternalEventHandle, RegisterInternalEvent, Registered,
     INTENTIONAL,
 };
+
+use crate::register;
 
 #[derive(Debug)]
 pub struct FilterEventsDropped;

@@ -24,8 +24,10 @@ use kube::{
     },
     Client, Config as ClientConfig,
 };
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_common::TimeZone;
+use vector_common::{
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    TimeZone,
+};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{transform::TaskTransform, ByteSizeOf};
 
@@ -59,14 +61,16 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
-use self::node_metadata_annotator::NodeMetadataAnnotator;
-use self::parser::Parser;
-use self::pod_metadata_annotator::PodMetadataAnnotator;
 use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use vector_core::config::LogNamespace;
+
+use self::{
+    namespace_metadata_annotator::NamespaceMetadataAnnotator,
+    node_metadata_annotator::NodeMetadataAnnotator, parser::Parser,
+    pod_metadata_annotator::PodMetadataAnnotator,
+};
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";

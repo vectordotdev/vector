@@ -26,12 +26,13 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-pub use crate::value::regex::ValueRegex;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
 pub use iter::IterItem;
 use lookup::lookup_v2::ValuePath;
 use ordered_float::NotNan;
+
+pub use crate::value::regex::ValueRegex;
 
 /// A boxed `std::error::Error`.
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -266,8 +267,7 @@ pub fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
 
 #[cfg(test)]
 mod test {
-    use lookup::lookup_v2::BorrowedSegment;
-    use lookup::path;
+    use lookup::{lookup_v2::BorrowedSegment, path};
     use quickcheck::{QuickCheck, TestResult};
 
     use super::*;

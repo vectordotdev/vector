@@ -1,8 +1,9 @@
+use std::{collections::BTreeMap, fmt};
+
 use datadog_grok::{
     parse_grok,
     parse_grok_rules::{self, GrokRule},
 };
-use std::{collections::BTreeMap, fmt};
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,

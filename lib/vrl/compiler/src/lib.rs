@@ -41,16 +41,15 @@ pub mod state;
 pub mod type_def;
 pub mod value;
 
-pub use self::compile_config::CompileConfig;
-pub use self::deprecation_warning::DeprecationWarning;
-pub use compiler::{CompilationResult, Compiler};
 pub use core::{
     value, ExpressionError, Resolved, SecretTarget, Target, TargetValue, TargetValueRef,
 };
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
-use std::fmt::Debug;
-use std::{fmt::Display, str::FromStr};
-
+pub use compiler::{CompilationResult, Compiler};
 pub use context::Context;
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
@@ -61,6 +60,8 @@ pub use program::{Program, ProgramInfo};
 pub use state::{TypeInfo, TypeState};
 pub use type_def::TypeDef;
 use vector_config::configurable_component;
+
+pub use self::{compile_config::CompileConfig, deprecation_warning::DeprecationWarning};
 
 pub type Result<T = CompilationResult> = std::result::Result<T, DiagnosticList>;
 

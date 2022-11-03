@@ -1,6 +1,7 @@
+use std::collections::BTreeSet;
+
 use anymap::AnyMap;
 use lookup::OwnedTargetPath;
-use std::collections::BTreeSet;
 
 pub struct CompileConfig {
     /// Custom context injected by the external environment

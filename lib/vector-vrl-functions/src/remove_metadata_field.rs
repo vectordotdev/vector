@@ -1,7 +1,7 @@
-use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
-use vrl::prelude::state::TypeState;
-use vrl::prelude::*;
+use vrl::prelude::{state::TypeState, *};
+
+use crate::{get_metadata_key, MetadataKey};
 
 fn remove_metadata_field(
     ctx: &mut Context,

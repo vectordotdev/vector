@@ -1,19 +1,21 @@
 use std::collections::HashMap;
-use tokio::time::Duration;
-use warp::{http::HeaderMap, Filter};
 
-use crate::sources::util::http::HttpMethod;
-use crate::{serde::default_decoding, serde::default_framing_message_based};
 use codecs::decoding::{
     CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,
     NewlineDelimitedDecoderOptions,
 };
+use tokio::time::Duration;
 use vector_core::event::Event;
+use warp::{http::HeaderMap, Filter};
 
 use super::HttpClientConfig;
-use crate::test_util::{
-    components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
-    next_addr, test_generate_config, wait_for_tcp,
+use crate::{
+    serde::{default_decoding, default_framing_message_based},
+    sources::util::http::HttpMethod,
+    test_util::{
+        components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+        next_addr, test_generate_config, wait_for_tcp,
+    },
 };
 
 pub(crate) const INTERVAL_SECS: u64 = 1;

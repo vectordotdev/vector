@@ -13,14 +13,16 @@ use hyper::StatusCode;
 use indoc::indoc;
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
+use super::service::LogApiRetry;
 use crate::{
     config::SinkConfig,
     http::HttpError,
     sinks::{
-        datadog::logs::DatadogLogsConfig,
-        datadog::DatadogApiError,
-        util::retries::RetryLogic,
-        util::test::{build_test_server_status, load_sink},
+        datadog::{logs::DatadogLogsConfig, DatadogApiError},
+        util::{
+            retries::RetryLogic,
+            test::{build_test_server_status, load_sink},
+        },
     },
     test_util::{
         components::{
@@ -31,8 +33,6 @@ use crate::{
     },
     tls::TlsError,
 };
-
-use super::service::LogApiRetry;
 
 // The sink must support v1 and v2 API endpoints which have different codes for
 // signaling status. This enum allows us to signal which API endpoint and what

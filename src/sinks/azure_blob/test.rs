@@ -6,12 +6,15 @@ use codecs::{
 };
 use vector_core::partition::Partitioner;
 
-use super::config::AzureBlobSinkConfig;
-use super::request_builder::AzureBlobRequestOptions;
-use crate::codecs::EncodingConfigWithFraming;
-use crate::event::{Event, LogEvent};
-use crate::sinks::util::{request_builder::RequestBuilder, Compression};
-use crate::{codecs::Encoder, sinks::util::request_builder::EncodeResult};
+use super::{config::AzureBlobSinkConfig, request_builder::AzureBlobRequestOptions};
+use crate::{
+    codecs::{Encoder, EncodingConfigWithFraming},
+    event::{Event, LogEvent},
+    sinks::util::{
+        request_builder::{EncodeResult, RequestBuilder},
+        Compression,
+    },
+};
 
 fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
     AzureBlobSinkConfig {

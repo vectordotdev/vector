@@ -1,13 +1,11 @@
-use std::fs::File;
-use std::io;
-use std::os::unix::io::FromRawFd;
+use std::{fs::File, io, os::unix::io::FromRawFd};
 
-use super::FileDescriptorConfig;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
+use super::FileDescriptorConfig;
 use crate::{
     config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     serde::default_decoding,
@@ -90,6 +88,7 @@ impl SourceConfig for FileDescriptorSourceConfig {
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
     use nix::unistd::{close, pipe, write};
 
     use super::*;
@@ -100,7 +99,6 @@ mod tests {
         },
         SourceSender,
     };
-    use futures::StreamExt;
 
     #[test]
     fn generate_config() {

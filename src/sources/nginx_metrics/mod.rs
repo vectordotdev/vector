@@ -268,12 +268,13 @@ mod tests {
 
 #[cfg(all(test, feature = "nginx-integration-tests"))]
 mod integration_tests {
+    use tokio::time::Duration;
+
     use super::*;
     use crate::{
         config::ProxyConfig,
         test_util::components::{run_and_assert_source_compliance_advanced, HTTP_PULL_SOURCE_TAGS},
     };
-    use tokio::time::Duration;
 
     fn nginx_proxy_address() -> String {
         std::env::var("NGINX_PROXY_ADDRESS").unwrap_or_else(|_| "http://nginx-proxy:8000".into())

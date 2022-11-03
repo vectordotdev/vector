@@ -1,14 +1,14 @@
-use crate::config::schema;
-use crate::topology::schema::merged_definition;
+use std::{collections::HashMap, path::PathBuf};
+
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
-use std::{collections::HashMap, path::PathBuf};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use super::{
     builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource, SourceConfig, TransformConfig,
 };
+use crate::{config::schema, topology::schema::merged_definition};
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {

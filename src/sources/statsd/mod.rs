@@ -322,16 +322,20 @@ mod test {
     use vector_core::{config::ComponentKey, event::EventContainer};
 
     use super::*;
-    use crate::test_util::{
-        collect_limited,
-        components::{
-            assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
-            SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS,
+    use crate::{
+        series,
+        test_util::{
+            collect_limited,
+            components::{
+                assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
+                SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS,
+            },
+            metrics::{
+                assert_counter, assert_distribution, assert_gauge, assert_set, AbsoluteMetricState,
+            },
+            next_addr,
         },
-        metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
-        next_addr,
     };
-    use crate::{series, test_util::metrics::AbsoluteMetricState};
 
     #[test]
     fn generate_config() {

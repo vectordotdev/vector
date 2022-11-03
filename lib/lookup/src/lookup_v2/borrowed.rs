@@ -1,7 +1,6 @@
+use std::{borrow::Cow, iter::Cloned, slice::Iter};
+
 use crate::lookup_v2::ValuePath;
-use std::borrow::Cow;
-use std::iter::Cloned;
-use std::slice::Iter;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BorrowedSegment<'a> {

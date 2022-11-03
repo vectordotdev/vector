@@ -1,16 +1,18 @@
-use super::proto::{
-    common::v1::{any_value::Value as PBValue, KeyValue},
-    logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
-    resource::v1::Resource,
-};
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use ordered_float::NotNan;
-use std::collections::BTreeMap;
 use value::Value;
 use vector_core::{
     config::log_schema,
     event::{Event, LogEvent},
+};
+
+use super::proto::{
+    common::v1::{any_value::Value as PBValue, KeyValue},
+    logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
+    resource::v1::Resource,
 };
 
 const RESOURCE_KEY: &str = "resources";

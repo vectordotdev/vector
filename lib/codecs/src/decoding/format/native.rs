@@ -3,9 +3,8 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
-use vector_core::config::LogNamespace;
 use vector_core::{
-    config::DataType,
+    config::{DataType, LogNamespace},
     event::{proto, Event, EventArray, EventContainer},
     schema,
 };

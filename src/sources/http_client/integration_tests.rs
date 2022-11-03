@@ -3,19 +3,9 @@
 //! It leverages a static file server ("dufs"), which serves the files in tests/data/http-client
 
 use std::collections::HashMap;
-use tokio::time::{Duration, Instant};
 
-use crate::sources::util::http::HttpMethod;
-use crate::{
-    config::{ComponentKey, SourceConfig, SourceContext},
-    http::Auth,
-    serde::default_decoding,
-    serde::default_framing_message_based,
-    tls,
-    tls::TlsConfig,
-    SourceSender,
-};
 use codecs::decoding::DeserializerConfig;
+use tokio::time::{Duration, Instant};
 use vector_config::NamedComponent;
 use vector_core::config::log_schema;
 
@@ -23,8 +13,16 @@ use super::{
     tests::{run_compliance, INTERVAL_SECS},
     HttpClientConfig,
 };
-
-use crate::test_util::components::{run_and_assert_source_error, COMPONENT_ERROR_TAGS};
+use crate::{
+    config::{ComponentKey, SourceConfig, SourceContext},
+    http::Auth,
+    serde::{default_decoding, default_framing_message_based},
+    sources::util::http::HttpMethod,
+    test_util::components::{run_and_assert_source_error, COMPONENT_ERROR_TAGS},
+    tls,
+    tls::TlsConfig,
+    SourceSender,
+};
 
 fn dufs_address() -> String {
     std::env::var("DUFS_ADDRESS").unwrap_or_else(|_| "http://localhost:5000".into())

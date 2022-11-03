@@ -19,6 +19,11 @@ use warp::{
     Filter,
 };
 
+use super::{
+    auth::{HttpSourceAuth, HttpSourceAuthConfig},
+    encoding::decode,
+    error::ErrorMessage,
+};
 use crate::{
     config::SourceContext,
     internal_events::{
@@ -27,12 +32,6 @@ use crate::{
     sources::util::http::HttpMethod,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
-};
-
-use super::{
-    auth::{HttpSourceAuth, HttpSourceAuthConfig},
-    encoding::decode,
-    error::ErrorMessage,
 };
 
 #[async_trait]

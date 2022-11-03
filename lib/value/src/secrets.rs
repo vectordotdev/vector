@@ -1,8 +1,10 @@
 //! Contains the `Secrets` type.
 
-use std::collections::BTreeMap;
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
+use std::{
+    collections::BTreeMap,
+    fmt::{Debug, Formatter},
+    sync::Arc,
+};
 
 /// A container that holds secrets accessible from Vector / VRL.
 #[derive(Clone, Default, PartialEq, Eq, PartialOrd)]

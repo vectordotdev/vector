@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
-use lookup::lookup_v2::OwnedSegment;
-use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
+use lookup::{lookup_v2::OwnedSegment, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use snafu::Snafu;
 use vrl_lib::{prelude::VrlValueConvert, ProgramInfo, SecretTarget};
 
@@ -555,8 +554,7 @@ mod test {
     use vector_common::btreemap;
     use vrl_lib::Target;
 
-    use super::super::MetricValue;
-    use super::*;
+    use super::{super::MetricValue, *};
     use crate::metric_tags;
 
     #[test]

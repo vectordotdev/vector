@@ -1,6 +1,8 @@
 use ::value::Value;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::{diagnostic::Note, prelude::*};
+use vrl::{
+    diagnostic::Note,
+    prelude::{expression::FunctionExpression, *},
+};
 
 fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Resolved {
     match condition.try_boolean()? {

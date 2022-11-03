@@ -8,13 +8,15 @@ use std::{
 };
 
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
-use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
-use openssl::x509::X509;
+use openssl::{
+    ssl::{Ssl, SslAcceptor, SslMethod},
+    x509::X509,
+};
 use snafu::ResultExt;
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::{
     io::{self, AsyncRead, AsyncWrite, ReadBuf},
     net::{TcpListener, TcpStream},
+    sync::{OwnedSemaphorePermit, Semaphore},
 };
 use tokio_openssl::SslStream;
 use tonic::transport::{server::Connected, Certificate};

@@ -2,9 +2,10 @@ use std::{borrow::Cow, collections::BTreeMap, fmt};
 
 use bytes::Bytes;
 use ordered_float::NotNan;
-use serde::de::Error as SerdeError;
-use serde::de::{MapAccess, SeqAccess, Visitor};
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{
+    de::{Error as SerdeError, MapAccess, SeqAccess, Visitor},
+    Deserialize, Serialize, Serializer,
+};
 
 use crate::value::{timestamp_to_string, StdError, Value};
 
@@ -217,9 +218,7 @@ impl TryInto<serde_json::Value> for Value {
 
 #[cfg(test)]
 mod test {
-    use std::fs;
-    use std::io::Read;
-    use std::path::Path;
+    use std::{fs, io::Read, path::Path};
 
     use crate::value::Value;
 

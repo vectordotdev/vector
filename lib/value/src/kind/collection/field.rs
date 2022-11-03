@@ -1,5 +1,4 @@
-use crate::kind::collection::CollectionRemove;
-use crate::kind::Collection;
+use crate::kind::{collection::CollectionRemove, Collection};
 
 /// A `field` type that can be used in `Collection<Field>`
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]

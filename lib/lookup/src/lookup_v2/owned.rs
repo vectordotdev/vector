@@ -1,9 +1,11 @@
-use crate::lookup_v2::{
-    parse_target_path, parse_value_path, BorrowedSegment, PathParseError, ValuePath,
-};
-use crate::PathPrefix;
 use std::fmt::{Debug, Display, Formatter};
+
 use vector_config::configurable_component;
+
+use crate::{
+    lookup_v2::{parse_target_path, parse_value_path, BorrowedSegment, PathParseError, ValuePath},
+    PathPrefix,
+};
 
 /// A lookup path.
 #[configurable_component]

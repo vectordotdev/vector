@@ -572,7 +572,10 @@ impl<'a> Response for &'a str {}
 mod tests {
     use std::{
         convert::Infallible,
-        sync::{atomic::AtomicUsize, atomic::Ordering::Relaxed, Arc, Mutex},
+        sync::{
+            atomic::{AtomicUsize, Ordering::Relaxed},
+            Arc, Mutex,
+        },
     };
 
     use bytes::Bytes;

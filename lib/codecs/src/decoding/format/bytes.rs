@@ -1,12 +1,10 @@
 use bytes::Bytes;
-use lookup::lookup_v2::parse_value_path;
-use lookup::LookupBuf;
+use lookup::{lookup_v2::parse_value_path, LookupBuf};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
-use vector_core::config::LogNamespace;
 use vector_core::{
-    config::{log_schema, DataType},
+    config::{log_schema, DataType, LogNamespace},
     event::{Event, LogEvent},
     schema,
 };

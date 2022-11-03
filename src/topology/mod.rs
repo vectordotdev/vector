@@ -28,13 +28,12 @@ pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
 use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
+use self::task::{TaskError, TaskResult};
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, Inputs, OutputId},
     event::EventArray,
     topology::{builder::Pieces, task::Task},
 };
-
-use self::task::{TaskError, TaskResult};
 
 type TaskHandle = tokio::task::JoinHandle<TaskResult>;
 

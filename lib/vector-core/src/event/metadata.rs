@@ -1,15 +1,13 @@
 #![deny(missing_docs)]
 
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 use value::{Kind, Secrets, Value};
 use vector_common::EventDataEq;
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
-use crate::config::LogNamespace;
-use crate::{schema, ByteSizeOf};
+use crate::{config::LogNamespace, schema, ByteSizeOf};
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
 const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";

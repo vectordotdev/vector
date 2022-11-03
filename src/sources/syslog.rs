@@ -21,8 +21,7 @@ use crate::{
     codecs::Decoder,
     config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
-    internal_events::StreamClosedError,
-    internal_events::{SocketBindError, SocketMode, SocketReceiveError},
+    internal_events::{SocketBindError, SocketMode, SocketReceiveError, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
@@ -359,7 +358,6 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
 
 #[cfg(test)]
 mod test {
-    use lookup::event_path;
     use std::{
         collections::{BTreeMap, HashMap},
         fmt,
@@ -368,6 +366,7 @@ mod test {
 
     use chrono::prelude::*;
     use codecs::decoding::format::Deserializer;
+    use lookup::event_path;
     use rand::{thread_rng, Rng};
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
@@ -858,12 +857,13 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_unix_stream_syslog() {
-        use crate::test_util::components::SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS;
-        use futures_util::{stream, SinkExt};
         use std::os::unix::net::UnixStream as StdUnixStream;
-        use tokio::io::AsyncWriteExt;
-        use tokio::net::UnixStream;
+
+        use futures_util::{stream, SinkExt};
+        use tokio::{io::AsyncWriteExt, net::UnixStream};
         use tokio_util::codec::{FramedWrite, LinesCodec};
+
+        use crate::test_util::components::SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS;
 
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 1;

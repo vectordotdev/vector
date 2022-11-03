@@ -5,8 +5,6 @@ use stream_cancel::Trigger;
 use tokio::sync::oneshot::Sender;
 use vector_core::event::EventArray;
 
-use crate::SourceSender;
-
 use self::{
     sinks::{
         BackpressureSinkConfig, BasicSinkConfig, ErrorSinkConfig, OneshotSinkConfig,
@@ -18,6 +16,7 @@ use self::{
     },
     transforms::BasicTransformConfig,
 };
+use crate::SourceSender;
 
 pub mod sinks;
 pub mod sources;

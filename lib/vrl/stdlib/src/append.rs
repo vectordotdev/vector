@@ -1,6 +1,5 @@
 use ::value::Value;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 fn append(value: Value, items: Value) -> Resolved {
     let mut value = value.try_array()?;

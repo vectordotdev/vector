@@ -16,8 +16,7 @@ use snafu::Snafu;
 use tracing::Span;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::{event::BatchNotifier, ByteSizeOf};
+use vector_core::{config::LogNamespace, event::BatchNotifier, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
@@ -1002,8 +1001,7 @@ mod tests {
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::{Event, LogEvent},
         sinks::{
-            splunk_hec::common::timestamp_key,
-            splunk_hec::logs::config::HecLogsSinkConfig,
+            splunk_hec::{common::timestamp_key, logs::config::HecLogsSinkConfig},
             util::{BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
         },

@@ -7,8 +7,7 @@
 //! should pre-compile all paths. Once that happens it might make sense to re-write in something
 //! more readable.
 
-use std::borrow::Cow;
-use std::str::CharIndices;
+use std::{borrow::Cow, str::CharIndices};
 
 use crate::lookup_v2::{BorrowedSegment, ValuePath};
 

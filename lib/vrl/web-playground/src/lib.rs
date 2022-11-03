@@ -2,10 +2,12 @@ use ::value::Value;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
 use value::Secrets;
-use vrl::diagnostic::DiagnosticList;
-use vrl::state::TypeState;
-use vrl::{diagnostic::Formatter, prelude::BTreeMap, CompileConfig, Runtime};
-use vrl::{TargetValue, TimeZone};
+use vrl::{
+    diagnostic::{DiagnosticList, Formatter},
+    prelude::BTreeMap,
+    state::TypeState,
+    CompileConfig, Runtime, TargetValue, TimeZone,
+};
 use wasm_bindgen::prelude::*;
 
 #[derive(Serialize, Deserialize)]

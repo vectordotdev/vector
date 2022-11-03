@@ -1,6 +1,5 @@
 use ::value::Value;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 fn downcase(value: Value) -> Resolved {
     Ok(value.try_bytes_utf8_lossy()?.to_lowercase().into())

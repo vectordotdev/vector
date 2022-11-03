@@ -1,17 +1,19 @@
 use std::{future::ready, panic, sync::Arc};
 
-use aws_sdk_s3::error::GetObjectError;
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sqs::error::{DeleteMessageBatchError, ReceiveMessageError};
-use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, Message};
-use aws_sdk_sqs::output::DeleteMessageBatchOutput;
-use aws_sdk_sqs::Client as SqsClient;
+use aws_sdk_s3::{error::GetObjectError, Client as S3Client};
+use aws_sdk_sqs::{
+    error::{DeleteMessageBatchError, ReceiveMessageError},
+    model::{DeleteMessageBatchRequestEntry, Message},
+    output::DeleteMessageBatchOutput,
+    Client as SqsClient,
+};
 use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use codecs::{decoding::FramingError, BytesDeserializer, CharacterDelimitedDecoder};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
+use lookup::path;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
@@ -22,6 +24,10 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    ByteSizeOf,
+};
 
 use crate::{
     config::{log_schema, SourceAcknowledgementsConfig, SourceContext},
@@ -38,9 +44,6 @@ use crate::{
     tls::TlsConfig,
     SourceSender,
 };
-use lookup::path;
-use vector_core::config::LegacyKey;
-use vector_core::{config::LogNamespace, ByteSizeOf};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());

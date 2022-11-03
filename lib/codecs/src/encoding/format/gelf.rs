@@ -1,4 +1,3 @@
-use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
 use serde::{Deserialize, Serialize};
@@ -6,10 +5,11 @@ use snafu::Snafu;
 use tokio_util::codec::Encoder;
 use vector_core::{
     config::{log_schema, DataType},
-    event::Event,
-    event::LogEvent,
+    event::{Event, LogEvent},
     schema,
 };
+
+use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
 /// On GELF encoding behavior:
 ///   Graylog has a relaxed parsing. They are much more lenient than the spec would
@@ -222,12 +222,12 @@ fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::encoding::SerializerConfig;
-
-    use super::*;
     use value::Value;
     use vector_common::btreemap;
     use vector_core::event::{Event, EventMetadata};
+
+    use super::*;
+    use crate::encoding::SerializerConfig;
 
     fn do_serialize(
         expect_success: bool,

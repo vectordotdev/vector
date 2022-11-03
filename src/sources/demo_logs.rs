@@ -1,3 +1,5 @@
+use std::task::Poll;
+
 use chrono::Utc;
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -7,13 +9,11 @@ use fakedata::logs::*;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
 use snafu::Snafu;
-use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},

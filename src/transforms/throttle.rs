@@ -201,14 +201,14 @@ mod tests {
     use std::task::Poll;
 
     use futures::SinkExt;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
     use crate::{
         event::LogEvent, test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
     };
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {

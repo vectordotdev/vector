@@ -14,7 +14,10 @@ use once_cell::sync::OnceCell;
 use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
-use self::{label_filter::VectorLabelFilter, recorder::Registry, recorder::VectorRecorder};
+use self::{
+    label_filter::VectorLabelFilter,
+    recorder::{Registry, VectorRecorder},
+};
 use crate::event::{Metric, MetricValue};
 
 type Result<T> = std::result::Result<T, Error>;
@@ -247,7 +250,6 @@ macro_rules! update_counter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::event::MetricKind;
 
     const IDLE_TIMEOUT: f64 = 0.5;

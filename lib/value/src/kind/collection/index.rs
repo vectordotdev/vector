@@ -1,5 +1,4 @@
-use crate::kind::collection::CollectionRemove;
-use crate::kind::Collection;
+use crate::kind::{collection::CollectionRemove, Collection};
 
 /// An `index` type that can be used in `Collection<Index>`
 #[derive(Debug, Clone, Default, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]

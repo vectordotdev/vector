@@ -11,13 +11,12 @@ use vector_core::{
     stream::{BatcherSettings, DriverResponse},
 };
 
-use crate::internal_events::SinkRequestBuildError;
+use super::partitioner::{S3KeyPartitioner, S3PartitionKey};
 use crate::{
     event::Event,
+    internal_events::SinkRequestBuildError,
     sinks::util::{RequestBuilder, SinkBuilderExt},
 };
-
-use super::partitioner::{S3KeyPartitioner, S3PartitionKey};
 
 pub struct S3Sink<Svc, RB> {
     service: Svc,

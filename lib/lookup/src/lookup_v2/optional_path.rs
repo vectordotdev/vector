@@ -1,6 +1,6 @@
-use crate::lookup_v2::PathParseError;
-use crate::OwnedTargetPath;
 use vector_config::configurable_component;
+
+use crate::{lookup_v2::PathParseError, OwnedTargetPath};
 
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]

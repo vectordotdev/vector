@@ -4,8 +4,7 @@ use clap::Parser;
 use serde_json::Value;
 
 use super::{load_builder_from_paths, load_source_from_paths, process_paths, ConfigBuilder};
-use crate::cli::handle_config_errors;
-use crate::config;
+use crate::{cli::handle_config_errors, config};
 
 #[derive(Parser, Debug, Clone)]
 #[command(rename_all = "kebab-case")]
@@ -202,12 +201,11 @@ mod tests {
     use serde_json::json;
     use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
 
+    use super::merge_json;
     use crate::{
         config::{cmd::serialize_to_json, vars, ConfigBuilder},
         generate::{generate_example, TransformInputsStrategy},
     };
-
-    use super::merge_json;
 
     #[test]
     fn test_array_override() {

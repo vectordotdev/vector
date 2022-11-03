@@ -1,11 +1,13 @@
 use std::collections::BTreeMap;
 
 use value::{kind::Collection, Kind, Value};
-use vrl::prelude::FunctionExpression;
-use vrl::state::TypeState;
 use vrl::{
     function::{ArgumentList, Compiled, Example, FunctionCompileContext, Parameter},
-    prelude::{expression, DiagnosticMessage, Resolved, Result, TypeDef, VrlValueConvert},
+    prelude::{
+        expression, DiagnosticMessage, FunctionExpression, Resolved, Result, TypeDef,
+        VrlValueConvert,
+    },
+    state::TypeState,
     value::kind,
     Context, Expression, Function,
 };

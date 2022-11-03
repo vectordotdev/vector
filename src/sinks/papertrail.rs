@@ -183,12 +183,11 @@ mod tests {
     use tokio_util::codec::Encoder as _;
     use vector_core::event::{Event, LogEvent};
 
+    use super::*;
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         http::{always_200_response, spawn_blackhole_http_server},
     };
-
-    use super::*;
 
     #[test]
     fn generate_config() {

@@ -407,21 +407,22 @@ fn format_error(error: &mlua::Error) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::future::Future;
-    use std::sync::Arc;
-    use tokio::sync::mpsc;
-    use tokio::sync::mpsc::{Receiver, Sender};
+    use std::{future::Future, sync::Arc};
+
+    use tokio::sync::{
+        mpsc,
+        mpsc::{Receiver, Sender},
+    };
     use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
-    use crate::test_util::components::assert_transform_compliance;
-    use crate::transforms::test::create_topology;
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue},
             Event, LogEvent, Value,
         },
-        test_util::trace_init,
+        test_util::{components::assert_transform_compliance, trace_init},
+        transforms::test::create_topology,
     };
 
     fn from_config(config: &str) -> crate::Result<Box<Lua>> {

@@ -1,8 +1,7 @@
 use std::net::Ipv4Addr;
 
 use ::value::Value;
-use vrl::prelude::*;
-use vrl::state::TypeState;
+use vrl::{prelude::*, state::TypeState};
 
 fn is_ipv4(value: Value) -> Resolved {
     let value_str = value.try_bytes_utf8_lossy()?;

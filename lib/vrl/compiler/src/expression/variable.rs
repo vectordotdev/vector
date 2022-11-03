@@ -1,12 +1,12 @@
-use diagnostic::{DiagnosticMessage, Label};
 use std::fmt;
+
+use diagnostic::{DiagnosticMessage, Label};
 use value::Value;
 
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
-    state::LocalEnv,
+    state::{LocalEnv, TypeInfo, TypeState},
     Context, Expression, Span, TypeDef,
 };
 

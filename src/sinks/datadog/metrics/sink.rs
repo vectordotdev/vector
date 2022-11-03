@@ -23,8 +23,7 @@ use super::{
 use crate::{
     internal_events::DatadogMetricsEncodingError,
     sinks::util::{
-        buffer::metrics::sort::sort_for_compression,
-        buffer::metrics::{AggregatedSummarySplitter, MetricSplitter},
+        buffer::metrics::{sort::sort_for_compression, AggregatedSummarySplitter, MetricSplitter},
         SinkBuilderExt,
     },
 };

@@ -202,11 +202,12 @@ pub enum TimestampFormat {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use indoc::indoc;
     use vector_core::config::log_schema;
 
     use super::*;
-    use std::collections::BTreeMap;
 
     #[test]
     fn serialize() {

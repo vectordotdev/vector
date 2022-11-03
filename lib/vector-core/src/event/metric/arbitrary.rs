@@ -1,10 +1,9 @@
 use proptest::{collection::btree_set, prelude::*};
 
-use crate::metrics::AgentDDSketch;
-
 use super::{
     samples_to_buckets, Bucket, MetricSketch, MetricValue, Quantile, Sample, StatisticKind,
 };
+use crate::metrics::AgentDDSketch;
 
 fn realistic_float() -> proptest::num::f64::Any {
     proptest::num::f64::POSITIVE | proptest::num::f64::NEGATIVE | proptest::num::f64::ZERO

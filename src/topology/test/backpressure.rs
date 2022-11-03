@@ -1,13 +1,21 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 use tokio::time::Duration;
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
 use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
-use crate::{config::Config, test_util, test_util::start_topology};
-use crate::{config::SinkOuter, test_util::mock::backpressure_source};
-use crate::{test_util::mock::backpressure_sink, topology::builder::SOURCE_SENDER_BUFFER_SIZE};
+use crate::{
+    config::{Config, SinkOuter},
+    test_util,
+    test_util::{
+        mock::{backpressure_sink, backpressure_source},
+        start_topology,
+    },
+    topology::builder::SOURCE_SENDER_BUFFER_SIZE,
+};
 
 // Based on how we pump events from `SourceSender` into `Fanout`, there's always one extra event we
 // may pull out of `SourceSender` but can't yet send into `Fanout`, so we account for that here.

@@ -1,9 +1,10 @@
-use crate::emit;
 use metrics::counter;
 use vector_common::internal_event::{
     error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
 use vector_core::internal_event::InternalEvent;
+
+use crate::emit;
 
 #[derive(Debug)]
 pub struct InfluxdbEncodingError {

@@ -6,9 +6,8 @@ use std::sync::{
 use async_trait::async_trait;
 use vector_buffers::topology::channel::{limited, LimitedReceiver};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
 use vector_core::{
-    config::{DataType, Output},
+    config::{DataType, LogNamespace, Output},
     event::{EventArray, EventContainer},
     source::Source,
 };

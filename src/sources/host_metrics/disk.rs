@@ -1,10 +1,10 @@
-use crate::internal_events::HostMetricsScrapeDetailError;
 use futures::StreamExt;
 use heim::units::information::byte;
 use vector_config::configurable_component;
 use vector_core::metric_tags;
 
 use super::{filter_result, FilterList, HostMetrics};
+use crate::internal_events::HostMetricsScrapeDetailError;
 
 /// Options for the “disk” metrics collector.
 #[configurable_component]

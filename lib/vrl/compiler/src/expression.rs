@@ -41,7 +41,6 @@ pub mod query;
 
 pub use core::{ExpressionError, Resolved};
 
-use crate::state::{TypeInfo, TypeState};
 #[cfg(feature = "expr-abort")]
 pub use abort::Abort;
 pub use array::Array;
@@ -72,6 +71,8 @@ pub use query::{Query, Target};
 #[cfg(feature = "expr-unary")]
 pub use unary::Unary;
 pub use variable::Variable;
+
+use crate::state::{TypeInfo, TypeState};
 
 pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to a concrete [`Value`].

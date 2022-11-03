@@ -4,8 +4,7 @@ use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 
-use super::super::default_data_dir;
-use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
+use super::{super::default_data_dir, proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
 use crate::serde::bool_or_struct;
 
 #[derive(Debug, Snafu)]

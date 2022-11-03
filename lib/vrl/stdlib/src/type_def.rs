@@ -1,7 +1,8 @@
 use ::value::Value;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::{TypeDef as VrlTypeDef, *};
-use vrl::state::TypeState;
+use vrl::{
+    prelude::{expression::FunctionExpression, TypeDef as VrlTypeDef, *},
+    state::TypeState,
+};
 
 fn type_def(type_def: &VrlTypeDef) -> Value {
     let mut tree = type_def.kind().canonicalize().debug_info();

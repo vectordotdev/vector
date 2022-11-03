@@ -11,9 +11,7 @@ use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::NamedComponent;
-use vector_core::config::LogNamespace;
-use vector_core::event::Event;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, event::Event, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},

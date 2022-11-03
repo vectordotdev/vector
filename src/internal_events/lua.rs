@@ -1,11 +1,10 @@
 use metrics::{counter, gauge};
-use vector_core::internal_event::InternalEvent;
-
-use crate::emit;
-use crate::transforms::lua::v2::BuildError;
 use vector_common::internal_event::{
     error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
+use vector_core::internal_event::InternalEvent;
+
+use crate::{emit, transforms::lua::v2::BuildError};
 
 #[derive(Debug)]
 pub struct LuaGcTriggered {

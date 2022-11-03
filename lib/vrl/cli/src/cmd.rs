@@ -12,9 +12,10 @@ use clap::Parser;
 use lookup::{owned_value_path, OwnedTargetPath};
 use value::Secrets;
 use vector_common::TimeZone;
-use vrl::state::TypeState;
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
-use vrl::{CompilationResult, CompileConfig};
+use vrl::{
+    diagnostic::Formatter, state, state::TypeState, CompilationResult, CompileConfig, Program,
+    Runtime, Target, VrlRuntime,
+};
 
 #[cfg(feature = "repl")]
 use super::repl;

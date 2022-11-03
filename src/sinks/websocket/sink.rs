@@ -37,8 +37,10 @@ use crate::{
         ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished,
         WsConnectionFailedError, WsConnectionShutdown,
     },
-    sinks::util::{retries::ExponentialBackoff, StreamSink},
-    sinks::websocket::config::WebSocketSinkConfig,
+    sinks::{
+        util::{retries::ExponentialBackoff, StreamSink},
+        websocket::config::WebSocketSinkConfig,
+    },
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
 };
 
@@ -378,8 +380,10 @@ mod tests {
     use tokio::time::timeout;
     use tokio_tungstenite::{
         accept_async, accept_hdr_async,
-        tungstenite::error::{Error as WsError, ProtocolError},
-        tungstenite::handshake::server::{Request, Response},
+        tungstenite::{
+            error::{Error as WsError, ProtocolError},
+            handshake::server::{Request, Response},
+        },
     };
 
     use super::*;

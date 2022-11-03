@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 
 use ::value::Value;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 use crate::util;
 

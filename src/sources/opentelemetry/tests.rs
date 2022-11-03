@@ -1,3 +1,16 @@
+use std::collections::BTreeMap;
+
+use chrono::{TimeZone, Utc};
+use futures::Stream;
+use futures_util::StreamExt;
+use opentelemetry_proto::proto::{
+    collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
+    common::v1::{any_value, AnyValue, KeyValue},
+    logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
+    resource::v1::Resource as OtelResource,
+};
+use tonic::Request;
+
 use crate::{
     config::{SourceConfig, SourceContext},
     event::{into_event_stream, Event, EventStatus, LogEvent, Value},
@@ -9,17 +22,6 @@ use crate::{
     },
     SourceSender,
 };
-use chrono::{TimeZone, Utc};
-use futures::Stream;
-use futures_util::StreamExt;
-use opentelemetry_proto::proto::{
-    collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-    common::v1::{any_value, AnyValue, KeyValue},
-    logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
-    resource::v1::Resource as OtelResource,
-};
-use std::collections::BTreeMap;
-use tonic::Request;
 
 #[test]
 fn generate_config() {

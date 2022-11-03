@@ -12,9 +12,7 @@ use bollard::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
-use lookup::lookup_v2::ValuePath;
-use lookup::path;
-use lookup::PathPrefix;
+use lookup::{lookup_v2::ValuePath, path, PathPrefix};
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
@@ -22,8 +20,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use super::util::MultilineConfig;
 use crate::{

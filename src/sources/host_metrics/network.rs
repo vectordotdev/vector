@@ -7,9 +7,8 @@ use heim::units::information::byte;
 use vector_config::configurable_component;
 use vector_core::metric_tags;
 
-use crate::internal_events::HostMetricsScrapeDetailError;
-
 use super::{filter_result, FilterList, HostMetrics};
+use crate::internal_events::HostMetricsScrapeDetailError;
 
 /// Options for the “network” metrics collector.
 #[configurable_component]

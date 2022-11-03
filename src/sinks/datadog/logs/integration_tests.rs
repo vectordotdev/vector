@@ -3,8 +3,7 @@ use vector_core::event::{BatchNotifier, BatchStatus};
 
 use crate::{
     config::SinkConfig,
-    sinks::datadog::logs::DatadogLogsConfig,
-    sinks::util::test::load_sink,
+    sinks::{datadog::logs::DatadogLogsConfig, util::test::load_sink},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         generate_lines_with_stream,

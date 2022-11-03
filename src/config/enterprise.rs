@@ -14,6 +14,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
+use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
 use super::{
@@ -35,7 +36,6 @@ use crate::{
     },
     transforms::{filter::FilterConfig, remap::RemapConfig},
 };
-use vector_config::configurable_component;
 
 static HOST_METRICS_KEY: &str = "_datadog_host_metrics";
 static TAG_METRICS_KEY: &str = "_datadog_tag_metrics";
@@ -818,8 +818,7 @@ mod test {
     use value::Kind;
     use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
-    use vrl::prelude::Collection;
-    use vrl::CompileConfig;
+    use vrl::{prelude::Collection, CompileConfig};
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use super::{

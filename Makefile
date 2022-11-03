@@ -643,7 +643,7 @@ clean: environment-clean ## Clean everything
 
 .PHONY: fmt
 fmt: ## Format code
-	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
+	${MAYBE_ENVIRONMENT_EXEC} cargo +nightly fmt
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
 
 .PHONY: generate-kubernetes-manifests

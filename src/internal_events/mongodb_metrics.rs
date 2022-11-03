@@ -1,8 +1,7 @@
 use metrics::counter;
 use mongodb::{bson, error::Error as MongoError};
-use vector_core::internal_event::InternalEvent;
-
 use vector_common::internal_event::{error_stage, error_type};
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct MongoDbMetricsEventsReceived<'a> {

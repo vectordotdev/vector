@@ -2,8 +2,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},

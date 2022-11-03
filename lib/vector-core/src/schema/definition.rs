@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::config::{log_schema, LegacyKey, LogNamespace};
-use lookup::lookup_v2::parse_value_path;
-use lookup::{owned_value_path, LookupBuf, OwnedValuePath};
+use lookup::{lookup_v2::parse_value_path, owned_value_path, LookupBuf, OwnedValuePath};
 use value::{kind::Collection, Kind};
+
+use crate::config::{log_schema, LegacyKey, LogNamespace};
 
 /// The definition of a schema.
 ///
@@ -428,8 +428,9 @@ impl Definition {
 
 #[cfg(test)]
 mod tests {
-    use lookup::owned_value_path;
     use std::collections::{BTreeMap, HashMap};
+
+    use lookup::owned_value_path;
 
     use super::*;
 

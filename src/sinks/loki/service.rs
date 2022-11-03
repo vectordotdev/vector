@@ -13,10 +13,12 @@ use vector_core::{
     stream::DriverResponse,
 };
 
-use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
     http::{get_http_scheme_from_uri, Auth, HttpClient},
-    sinks::util::{retries::RetryLogic, UriSerde},
+    sinks::{
+        loki::config::{CompressionConfigAdapter, ExtendedCompression},
+        util::{retries::RetryLogic, UriSerde},
+    },
 };
 
 #[derive(Clone)]

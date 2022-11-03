@@ -1,6 +1,5 @@
 use ::value::Value;
-use vrl::prelude::*;
-use vrl::state::TypeState;
+use vrl::{prelude::*, state::TypeState};
 
 fn set_secret(
     ctx: &mut Context,

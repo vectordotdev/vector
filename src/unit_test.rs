@@ -3,8 +3,10 @@ use std::path::PathBuf;
 use clap::Parser;
 use colored::*;
 
-use crate::config::{self, UnitTestResult};
-use crate::signal;
+use crate::{
+    config::{self, UnitTestResult},
+    signal,
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]

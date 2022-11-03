@@ -218,13 +218,15 @@ mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
     use super::*;
-    use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
-    use crate::test_util::{
-        collect_n,
-        components::{assert_source_compliance, SOURCE_TAGS},
-        random_string,
+    use crate::{
+        nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword},
+        test_util::{
+            collect_n,
+            components::{assert_source_compliance, SOURCE_TAGS},
+            random_string,
+        },
+        tls::TlsConfig,
     };
-    use crate::tls::TlsConfig;
 
     async fn publish_and_check(conf: NatsSourceConfig) -> Result<(), BuildError> {
         let subject = conf.subject.clone();

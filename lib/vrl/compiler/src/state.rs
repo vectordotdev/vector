@@ -1,5 +1,6 @@
-use lookup::PathPrefix;
 use std::collections::{hash_map::Entry, HashMap};
+
+use lookup::PathPrefix;
 use value::{Kind, Value};
 
 use crate::{parser::ast::Ident, type_def::Details, value::Collection, TypeDef};

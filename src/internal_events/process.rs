@@ -1,9 +1,8 @@
-use metrics::counter;
-use metrics::gauge;
+use metrics::{counter, gauge};
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
 use crate::{built_info, config};
-use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct VectorStarted;

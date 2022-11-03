@@ -303,9 +303,9 @@ mod test {
         };
         use tokio_stream::wrappers::IntervalStream;
 
-        use crate::event::EventArray;
-        use crate::tls::{
-            self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsEnableableConfig,
+        use crate::{
+            event::EventArray,
+            tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsEnableableConfig},
         };
 
         trace_init();

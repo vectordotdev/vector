@@ -5,15 +5,13 @@ use chrono::Utc;
 use codecs::encoding::Framer;
 use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
-use snafu::ResultExt;
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_common::request_metadata::RequestMetadata;
 use vector_config::configurable_component;
 use vector_core::event::{EventFinalizers, Finalizable};
 
-use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -30,9 +28,9 @@ use crate::{
             sink::GcsSink,
         },
         util::{
-            batch::BatchConfig, partitioner::KeyPartitioner, request_builder::EncodeResult,
-            BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig,
+            batch::BatchConfig, metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, BulkSizeBasedDefaultBatchSettings, Compression,
+            RequestBuilder, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -381,18 +379,21 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 
 #[cfg(test)]
 mod tests {
-    use codecs::encoding::FramingConfig;
-    use codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig};
+    use codecs::{
+        encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+        TextSerializerConfig,
+    };
     use futures_util::{future::ready, stream};
     use vector_core::partition::Partitioner;
 
-    use crate::event::LogEvent;
-    use crate::test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
-        http::{always_200_response, spawn_blackhole_http_server},
-    };
-
     use super::*;
+    use crate::{
+        event::LogEvent,
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
 
     #[test]
     fn generate_config() {

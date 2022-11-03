@@ -258,8 +258,10 @@ mod tests {
 
     use super::TopologyBuilder;
     use crate::{
-        topology::builder::TopologyError,
-        topology::test_util::{assert_current_send_capacity, Sample},
+        topology::{
+            builder::TopologyError,
+            test_util::{assert_current_send_capacity, Sample},
+        },
         variants::MemoryBuffer,
         WhenFull,
     };

@@ -1,9 +1,10 @@
-use crate::codecs::Transformer;
 use codecs::{
     encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };
 use vector_config::configurable_component;
+
+use crate::codecs::Transformer;
 
 /// Encoding configuration.
 #[configurable_component]

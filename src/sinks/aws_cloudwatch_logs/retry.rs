@@ -1,12 +1,14 @@
 use std::marker::PhantomData;
 
-use aws_sdk_cloudwatchlogs::error::{
-    CreateLogStreamErrorKind, DescribeLogStreamsErrorKind, PutLogEventsErrorKind,
+use aws_sdk_cloudwatchlogs::{
+    error::{CreateLogStreamErrorKind, DescribeLogStreamsErrorKind, PutLogEventsErrorKind},
+    types::SdkError,
 };
-use aws_sdk_cloudwatchlogs::types::SdkError;
 
-use crate::aws::is_retriable_error;
-use crate::sinks::{aws_cloudwatch_logs::service::CloudwatchError, util::retries::RetryLogic};
+use crate::{
+    aws::is_retriable_error,
+    sinks::{aws_cloudwatch_logs::service::CloudwatchError, util::retries::RetryLogic},
+};
 
 #[derive(Debug)]
 pub struct CloudwatchRetryLogic<T> {
@@ -66,14 +68,16 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
 
 #[cfg(test)]
 mod test {
-    use aws_sdk_cloudwatchlogs::error::{PutLogEventsError, PutLogEventsErrorKind};
-    use aws_sdk_cloudwatchlogs::types::SdkError;
-    use aws_smithy_http::body::SdkBody;
-    use aws_smithy_http::operation::Response;
+    use aws_sdk_cloudwatchlogs::{
+        error::{PutLogEventsError, PutLogEventsErrorKind},
+        types::SdkError,
+    };
+    use aws_smithy_http::{body::SdkBody, operation::Response};
 
-    use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
-    use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
-    use crate::sinks::util::retries::RetryLogic;
+    use crate::sinks::{
+        aws_cloudwatch_logs::{retry::CloudwatchRetryLogic, service::CloudwatchError},
+        util::retries::RetryLogic,
+    };
 
     #[test]
     fn test_throttle_retry() {

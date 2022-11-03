@@ -30,8 +30,7 @@ use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
 };
-use lookup::lookup_v2::OwnedValuePath;
-use lookup::PathPrefix;
+use lookup::{lookup_v2::OwnedValuePath, PathPrefix};
 
 use super::{
     dns_message::{

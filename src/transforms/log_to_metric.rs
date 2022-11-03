@@ -356,21 +356,22 @@ impl FunctionTransform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, DateTime, Utc};
     use std::time::Duration;
+
+    use chrono::{offset::TimeZone, DateTime, Utc};
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_core::metric_tags;
 
     use super::*;
-    use crate::test_util::components::assert_transform_compliance;
-    use crate::transforms::test::create_topology;
     use crate::{
         config::log_schema,
         event::{
             metric::{Metric, MetricKind, MetricValue, StatisticKind},
             Event, LogEvent,
         },
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
     };
 
     #[test]

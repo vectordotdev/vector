@@ -1,17 +1,19 @@
-use crate::{
-    shutdown::{ShutdownSignal, ShutdownSignalToken},
-    tls::MaybeTlsSettings,
-};
+use std::{convert::Infallible, net::SocketAddr};
+
 use futures::FutureExt;
 use http::{Request, Response};
 use hyper::Body;
-use std::{convert::Infallible, net::SocketAddr};
 use tonic::{
     body::BoxBody,
     transport::server::{NamedService, Server},
 };
 use tower::Service;
 use tracing::{Instrument, Span};
+
+use crate::{
+    shutdown::{ShutdownSignal, ShutdownSignalToken},
+    tls::MaybeTlsSettings,
+};
 
 mod decompression;
 pub use self::decompression::{DecompressionAndMetrics, DecompressionAndMetricsLayer};

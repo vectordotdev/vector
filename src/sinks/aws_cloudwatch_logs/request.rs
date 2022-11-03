@@ -4,16 +4,18 @@ use std::{
     task::{ready, Context, Poll},
 };
 
-use aws_sdk_cloudwatchlogs::error::{
-    CreateLogGroupError, CreateLogGroupErrorKind, CreateLogStreamError, CreateLogStreamErrorKind,
-    DescribeLogStreamsError, DescribeLogStreamsErrorKind, PutLogEventsError,
+use aws_sdk_cloudwatchlogs::{
+    error::{
+        CreateLogGroupError, CreateLogGroupErrorKind, CreateLogStreamError,
+        CreateLogStreamErrorKind, DescribeLogStreamsError, DescribeLogStreamsErrorKind,
+        PutLogEventsError,
+    },
+    model::InputLogEvent,
+    operation::PutLogEvents,
+    output::{DescribeLogStreamsOutput, PutLogEventsOutput},
+    types::SdkError,
+    Client as CloudwatchLogsClient,
 };
-use aws_sdk_cloudwatchlogs::operation::PutLogEvents;
-
-use aws_sdk_cloudwatchlogs::model::InputLogEvent;
-use aws_sdk_cloudwatchlogs::output::{DescribeLogStreamsOutput, PutLogEventsOutput};
-use aws_sdk_cloudwatchlogs::types::SdkError;
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_smithy_http::operation::{Operation, Request};
 use futures::{future::BoxFuture, FutureExt};
 use indexmap::IndexMap;

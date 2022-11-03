@@ -27,7 +27,6 @@ use vector_core::{
 };
 
 use super::S3SinkConfig;
-use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     common::s3::S3ClientBuilder,
@@ -37,7 +36,10 @@ use crate::{
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        components::{
+            run_and_assert_sink_compliance, run_and_assert_sink_error, AWS_SINK_TAGS,
+            COMPONENT_ERROR_TAGS,
+        },
         random_lines_with_stream, random_string,
     },
 };

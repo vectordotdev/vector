@@ -1,6 +1,8 @@
 //! This sink sends data to Google Chronicles unstructured log entries endpoint.
 //! See https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries
 //! for more information.
+use std::io;
+
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
@@ -9,7 +11,6 @@ use hyper::Body;
 use indoc::indoc;
 use serde_json::json;
 use snafu::Snafu;
-use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};

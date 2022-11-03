@@ -1,8 +1,10 @@
 //! All types related to finding a [`Kind`] nested into another one.
 
-use crate::Kind;
-use lookup::lookup_v2::{BorrowedSegment, ValuePath};
 use std::borrow::Cow;
+
+use lookup::lookup_v2::{BorrowedSegment, ValuePath};
+
+use crate::Kind;
 
 impl Kind {
     /// Returns the type of a value that is retrieved from a certain path.
@@ -157,9 +159,12 @@ impl Kind {
 
 #[cfg(test)]
 mod tests {
-    use lookup::lookup_v2::{parse_value_path, OwnedValuePath};
-    use lookup::owned_value_path;
     use std::collections::BTreeMap;
+
+    use lookup::{
+        lookup_v2::{parse_value_path, OwnedValuePath},
+        owned_value_path,
+    };
 
     use super::*;
     use crate::kind::Collection;

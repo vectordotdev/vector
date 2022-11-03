@@ -10,10 +10,9 @@ use crate::{
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
-pub use proto_event::*;
-
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
+pub use proto_event::*;
 
 use super::{array, metric::MetricSketch};
 

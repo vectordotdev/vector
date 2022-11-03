@@ -1,39 +1,53 @@
 pub mod auth;
 pub mod region;
 
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::{Duration, SystemTime};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    task::{Context, Poll},
+    time::{Duration, SystemTime},
+};
 
 pub use auth::AwsAuthentication;
 use aws_config::meta::region::ProvideRegion;
-use aws_sigv4::http_request::{SignableRequest, SigningSettings};
-use aws_sigv4::SigningParams;
+use aws_sigv4::{
+    http_request::{SignableRequest, SigningSettings},
+    SigningParams,
+};
 use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
-use aws_smithy_client::bounds::SmithyMiddleware;
-use aws_smithy_client::erase::{DynConnector, DynMiddleware};
-use aws_smithy_client::{Builder, SdkError};
-use aws_smithy_http::callback::BodyCallback;
-use aws_smithy_http::endpoint::Endpoint;
-use aws_smithy_http::event_stream::BoxError;
-use aws_smithy_http::operation::{Request, Response};
+use aws_smithy_client::{
+    bounds::SmithyMiddleware,
+    erase::{DynConnector, DynMiddleware},
+    Builder, SdkError,
+};
+use aws_smithy_http::{
+    callback::BodyCallback,
+    endpoint::Endpoint,
+    event_stream::BoxError,
+    operation::{Request, Response},
+};
 use aws_smithy_types::retry::RetryConfig;
-use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
-use aws_types::region::Region;
-use aws_types::SdkConfig;
+use aws_types::{
+    credentials::{ProvideCredentials, SharedCredentialsProvider},
+    region::Region,
+    SdkConfig,
+};
 use bytes::Bytes;
 use once_cell::sync::OnceCell;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
 use tower::{Layer, Service, ServiceBuilder};
 
-use crate::config::ProxyConfig;
-use crate::http::{build_proxy_connector, build_tls_connector};
-use crate::internal_events::AwsBytesSent;
-use crate::tls::{MaybeTlsSettings, TlsConfig};
+use crate::{
+    config::ProxyConfig,
+    http::{build_proxy_connector, build_tls_connector},
+    internal_events::AwsBytesSent,
+    tls::{MaybeTlsSettings, TlsConfig},
+};
 
 static RETRIABLE_CODES: OnceCell<RegexSet> = OnceCell::new();
 

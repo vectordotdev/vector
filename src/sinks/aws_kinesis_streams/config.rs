@@ -9,7 +9,8 @@ use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
 use super::{
-    request_builder::KinesisRequestBuilder, service::KinesisResponse, service::KinesisService,
+    request_builder::KinesisRequestBuilder,
+    service::{KinesisResponse, KinesisService},
     sink::KinesisSink,
 };
 use crate::{

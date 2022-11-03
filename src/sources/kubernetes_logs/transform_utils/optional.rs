@@ -6,8 +6,7 @@ use std::pin::Pin;
 
 use futures::Stream;
 
-use crate::event::EventContainer;
-use crate::transforms::TaskTransform;
+use crate::{event::EventContainer, transforms::TaskTransform};
 
 /// Optional transform.
 /// Passes events through the specified transform is any, otherwise passes them,

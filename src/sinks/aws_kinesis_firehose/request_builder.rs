@@ -5,6 +5,7 @@ use bytes::Bytes;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
+use super::sink::{KinesisKey, KinesisProcessedEvent};
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
@@ -13,8 +14,6 @@ use crate::{
         RequestBuilder,
     },
 };
-
-use super::sink::{KinesisKey, KinesisProcessedEvent};
 
 pub struct KinesisRequestBuilder {
     pub(super) compression: Compression,

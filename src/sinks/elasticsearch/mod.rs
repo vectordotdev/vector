@@ -24,8 +24,8 @@ use snafu::Snafu;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
-use crate::aws::AwsAuthentication;
 use crate::{
+    aws::AwsAuthentication,
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
     template::{Template, TemplateParseError},

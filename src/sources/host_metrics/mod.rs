@@ -10,8 +10,7 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
@@ -481,10 +480,10 @@ impl From<PatternWrapper> for String {
 
 #[cfg(test)]
 pub(self) mod tests {
-    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
     use std::{collections::HashSet, future::Future, time::Duration};
 
     use super::*;
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
 
     #[test]
     fn filterlist_default_includes_everything() {

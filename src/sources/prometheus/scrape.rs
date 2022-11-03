@@ -3,22 +3,23 @@ use std::collections::HashMap;
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
-
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, event::Event};
 
 use super::parser;
-use crate::sources::util::http::HttpMethod;
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
     http::Auth,
     internal_events::PrometheusParseError,
     sources::{
         self,
-        util::http_client::{
-            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
-            HttpClientBuilder, HttpClientContext,
+        util::{
+            http::HttpMethod,
+            http_client::{
+                build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
+                HttpClientBuilder, HttpClientContext,
+            },
         },
     },
     tls::{TlsConfig, TlsSettings},

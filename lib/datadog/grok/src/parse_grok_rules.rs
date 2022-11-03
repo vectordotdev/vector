@@ -8,9 +8,9 @@ use once_cell::sync::Lazy;
 use tracing::error;
 use value::Value;
 
-use crate::grok::Grok;
 use crate::{
     ast::{self, Destination, GrokPattern},
+    grok::Grok,
     grok_filter::GrokFilter,
     matchers::{date, date::DateFilter},
     parse_grok_pattern::parse_grok_pattern,

@@ -1,6 +1,5 @@
 use clap::Parser;
 use serde::Serialize;
-
 use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
 
 #[derive(Parser, Debug)]

@@ -151,12 +151,11 @@ pub mod schema;
 pub mod ser;
 mod stdlib;
 mod str;
-pub use self::str::ConfigurableString;
-
 use vector_config_common::attributes::CustomAttribute;
-
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;
+
+pub use self::str::ConfigurableString;
 
 // Re-export of both `Format` and `Validation` from `vector_config_common`.
 //

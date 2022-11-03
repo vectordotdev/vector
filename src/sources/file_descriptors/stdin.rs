@@ -4,12 +4,11 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 
+use super::FileDescriptorConfig;
 use crate::{
     config::{Output, Resource, SourceConfig, SourceContext},
     serde::default_decoding,
 };
-
-use super::FileDescriptorConfig;
 
 /// Configuration for the `stdin` source.
 #[configurable_component(source("stdin"))]
@@ -93,13 +92,15 @@ impl SourceConfig for StdinConfig {
 mod tests {
     use std::io::Cursor;
 
+    use futures::StreamExt;
+
     use super::*;
     use crate::{
-        config::log_schema, shutdown::ShutdownSignal,
-        test_util::components::assert_source_compliance, test_util::components::SOURCE_TAGS,
+        config::log_schema,
+        shutdown::ShutdownSignal,
+        test_util::components::{assert_source_compliance, SOURCE_TAGS},
         SourceSender,
     };
-    use futures::StreamExt;
 
     #[test]
     fn generate_config() {

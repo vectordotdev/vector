@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
 use std::{
-    collections::{hash_map, HashMap},
+    collections::{hash_map, BTreeMap, HashMap},
     pin::Pin,
     time::{Duration, Instant},
 };
@@ -22,8 +21,9 @@ use crate::{
 
 mod merge_strategy;
 
-use crate::event::Value;
 pub use merge_strategy::*;
+
+use crate::event::Value;
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
@@ -364,9 +364,11 @@ mod test {
     use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
-    use crate::event::{LogEvent, Value};
-    use crate::test_util::components::assert_transform_compliance;
-    use crate::transforms::test::create_topology;
+    use crate::{
+        event::{LogEvent, Value},
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
 
     #[test]
     fn generate_config() {

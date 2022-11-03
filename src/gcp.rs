@@ -1,5 +1,7 @@
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 pub use goauth::scopes::Scope;
 use goauth::{
@@ -16,7 +18,10 @@ use tokio::{sync::watch, time::Instant};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
-use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
+use crate::{
+    config::ProxyConfig,
+    http::{HttpClient, HttpError},
+};
 
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";

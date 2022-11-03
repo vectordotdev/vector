@@ -8,8 +8,10 @@
 
 include!(concat!(env!("OUT_DIR"), "/patterns.rs"));
 
-use std::collections::{btree_map, BTreeMap};
-use std::sync::Arc;
+use std::{
+    collections::{btree_map, BTreeMap},
+    sync::Arc,
+};
 
 use onig::{Captures, Regex};
 use thiserror::Error;

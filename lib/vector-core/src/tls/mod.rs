@@ -1,13 +1,12 @@
 #![allow(clippy::missing_errors_doc)]
 
-use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{fmt::Debug, net::SocketAddr, num::TryFromIntError, path::PathBuf, time::Duration};
 
 use openssl::{
     error::ErrorStack,
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
-use std::num::TryFromIntError;
 use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
 

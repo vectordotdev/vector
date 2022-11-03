@@ -2,7 +2,7 @@ use std::{cmp, num::NonZeroUsize, pin::Pin};
 
 use futures::{
     task::{Context, Poll},
-    {Stream, StreamExt},
+    Stream, StreamExt,
 };
 
 use crate::event::{EventArray, EventContainer};

@@ -6,17 +6,15 @@ mod global_options;
 mod log_schema;
 pub mod proxy;
 
-use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
-use lookup::lookup_v2::ValuePath;
-use lookup::{path, PathPrefix};
+use lookup::{lookup_v2::ValuePath, path, PathPrefix};
 use serde::{Deserialize, Serialize};
 use value::Value;
 pub use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
 
-use crate::schema;
+use crate::{event::LogEvent, schema};
 
 pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: NonZeroUsize =
     vector_buffers::config::memory_buffer_default_max_events();

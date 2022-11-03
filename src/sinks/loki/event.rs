@@ -8,9 +8,8 @@ use vector_core::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
-use crate::sinks::util::encoding::{write_all, Encoder};
-
 use super::sink::LokiRecords;
+use crate::sinks::util::encoding::{write_all, Encoder};
 
 pub type Labels = Vec<(String, String)>;
 

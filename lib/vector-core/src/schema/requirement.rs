@@ -225,8 +225,9 @@ impl std::error::Error for ValidationError {}
 
 #[cfg(test)]
 mod tests {
-    use lookup::owned_value_path;
     use std::collections::HashMap;
+
+    use lookup::owned_value_path;
 
     use super::*;
 

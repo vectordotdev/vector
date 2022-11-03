@@ -1,9 +1,9 @@
 pub mod logs;
 pub mod metrics;
 
-pub use self::{logs::SematextLogsConfig, metrics::SematextMetricsConfig};
-
 use vector_config::configurable_component;
+
+pub use self::{logs::SematextLogsConfig, metrics::SematextMetricsConfig};
 
 /// Sematext region.
 #[configurable_component]

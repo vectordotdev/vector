@@ -1,11 +1,10 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
-use crate::emit;
-use crate::event::Event;
 use vector_common::internal_event::{
     error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
+use vector_core::internal_event::InternalEvent;
+
+use crate::{emit, event::Event};
 
 #[derive(Debug)]
 pub struct KubernetesLogsEventsReceived<'a> {

@@ -6,7 +6,11 @@ use codecs::StreamDecodingError;
 use tokio_util::codec::Decoder as _;
 use vector_core::{internal_event::EventsReceived, ByteSizeOf};
 
-use crate::{codecs::Decoder, config::log_schema, event::BatchNotifier, event::Event};
+use crate::{
+    codecs::Decoder,
+    config::log_schema,
+    event::{BatchNotifier, Event},
+};
 
 pub fn decode_message<'a>(
     mut decoder: Decoder,

@@ -1,6 +1,5 @@
 use ::value::Value;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 fn boolean(value: Value) -> Resolved {
     match value {

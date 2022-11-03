@@ -1,17 +1,18 @@
-use crate::Value;
+use std::{
+    borrow::{Borrow, Cow},
+    collections::BTreeMap,
+};
+
 use lookup::lookup_v2::BorrowedSegment;
-use std::borrow::{Borrow, Cow};
-use std::collections::BTreeMap;
+
+use crate::Value;
 
 mod get;
 mod get_mut;
 mod insert;
 mod remove;
 
-pub use self::get::get;
-pub use self::get_mut::get_mut;
-pub use self::insert::insert;
-pub use self::remove::remove;
+pub use self::{get::get, get_mut::get_mut, insert::insert, remove::remove};
 
 pub trait ValueCollection {
     type Key: Borrow<Self::BorrowedKey>;

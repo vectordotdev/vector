@@ -1,15 +1,14 @@
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
-use lookup::lookup_v2::parse_value_path;
-use lookup::{event_path, owned_value_path};
+use lookup::{event_path, lookup_v2::parse_value_path, owned_value_path};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use value::{kind::Collection, Kind};
-use vector_core::config::LogNamespace;
 use vector_core::{
-    config::{log_schema, DataType},
+    config::{log_schema, DataType, LogNamespace},
     event::{Event, LogEvent, Value},
     schema,
 };

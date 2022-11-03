@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use aws_types::credentials::SharedCredentialsProvider;
-use aws_types::region::Region;
+use aws_types::{credentials::SharedCredentialsProvider, region::Region};
 use bytes::Bytes;
 use http::{StatusCode, Uri};
 use snafu::ResultExt;

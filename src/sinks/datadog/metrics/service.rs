@@ -1,5 +1,7 @@
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
@@ -19,8 +21,10 @@ use vector_core::{
 
 use crate::{
     http::{BuildRequestSnafu, CallRequestSnafu, HttpClient},
-    sinks::datadog::DatadogApiError,
-    sinks::util::retries::{RetryAction, RetryLogic},
+    sinks::{
+        datadog::DatadogApiError,
+        util::retries::{RetryAction, RetryLogic},
+    },
 };
 
 /// Retry logic specific to the Datadog metrics endpoints.

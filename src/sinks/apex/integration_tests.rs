@@ -1,6 +1,7 @@
 #![cfg(feature = "apex-integration-tests")]
 #![cfg(test)]
 
+use serde_json::json;
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use super::ApexSinkConfig;
@@ -12,7 +13,6 @@ use crate::{
         generate_events_with_stream,
     },
 };
-use serde_json::json;
 
 fn mock_apex_address() -> String {
     std::env::var("MOCK_APEX_ADDRESS").unwrap_or_else(|_| "http://localhost:4567".into())

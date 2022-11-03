@@ -4,9 +4,8 @@ use async_trait::async_trait;
 use futures_util::{future, FutureExt};
 use stream_cancel::{Trigger, Tripwire};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
 use vector_core::{
-    config::{DataType, Output},
+    config::{DataType, LogNamespace, Output},
     source::Source,
 };
 

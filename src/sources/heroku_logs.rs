@@ -11,9 +11,11 @@ use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
+use lookup::event_path;
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use warp::http::{HeaderMap, StatusCode};
 
 use crate::{
@@ -30,8 +32,6 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
-use lookup::event_path;
-use vector_core::config::LogNamespace;
 
 /// Configuration for `heroku_logs` source.
 #[configurable_component(source("heroku_logs"))]

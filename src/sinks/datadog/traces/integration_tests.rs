@@ -1,3 +1,5 @@
+use std::{collections::HashMap, io::Read, net::SocketAddr, sync::Arc};
+
 use axum::{
     body::Body,
     extract::Extension,
@@ -11,9 +13,11 @@ use futures::stream;
 use indoc::indoc;
 use rmp_serde;
 use serde::Serialize;
-use std::{collections::HashMap, io::Read, net::SocketAddr, sync::Arc};
-use tokio::sync::mpsc::{self, Receiver, Sender};
-use tokio::time::{sleep, Duration};
+use tokio::{
+    sync::mpsc::{self, Receiver, Sender},
+    time::{sleep, Duration},
+};
+use vector_core::event::{BatchNotifier, BatchStatus};
 
 use crate::{
     config::{ConfigBuilder, SinkConfig},
@@ -29,7 +33,6 @@ use crate::{
     },
     topology::RunningTopology,
 };
-use vector_core::event::{BatchNotifier, BatchStatus};
 
 /// The port on which the Agent will send traces to vector, and vector `datadog_agent` source will
 /// listen on

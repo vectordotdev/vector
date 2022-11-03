@@ -11,12 +11,15 @@ mod status;
 use std::net::SocketAddr;
 
 use futures::{future::join, FutureExt, TryFutureExt};
-
 use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
 use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
+use self::{
+    grpc::Service,
+    http::{build_warp_filter, run_http_server},
+};
 use crate::{
     config::{
         DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
@@ -25,11 +28,6 @@ use crate::{
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-};
-
-use self::{
-    grpc::Service,
-    http::{build_warp_filter, run_http_server},
 };
 
 pub const LOGS: &str = "logs";

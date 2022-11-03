@@ -2,8 +2,10 @@ use std::convert::TryFrom;
 
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
-use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
-use vector_core::metric_tags;
+use vector_core::{
+    event::{BatchNotifier, BatchStatus, Event, MetricValue},
+    metric_tags,
+};
 
 use super::config::HecMetricsSinkConfig;
 use crate::{

@@ -1,12 +1,14 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use value::kind::Collection;
-use value::Kind;
-use vector_core::{config::DataType, event::Event, schema};
+use value::{kind::Collection, Kind};
+use vector_core::{
+    config::{DataType, LogNamespace},
+    event::Event,
+    schema,
+};
 
 use super::Deserializer;
-use vector_core::config::LogNamespace;
 
 /// Config used to build a `NativeJsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

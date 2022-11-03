@@ -7,8 +7,7 @@ use aes::cipher::{
 use cfb_mode::Decryptor as Cfb;
 use ctr::Ctr64LE;
 use ofb::Ofb;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 use crate::encrypt::{get_iv_bytes, get_key_bytes, is_valid_algorithm};
 

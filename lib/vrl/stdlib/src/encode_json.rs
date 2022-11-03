@@ -1,6 +1,5 @@
 use ::value::Value;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 fn encode_json(value: Value) -> Resolved {
     // With `vrl::Value` it should not be possible to get `Err`.

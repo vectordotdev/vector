@@ -1,5 +1,3 @@
-use bytes::Bytes;
-use chrono::Utc;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -10,9 +8,10 @@ use std::{
     sync::Arc,
 };
 
+use bytes::Bytes;
+use chrono::Utc;
 use crossbeam_utils::atomic::AtomicCell;
-use lookup::lookup_v2::TargetPath;
-use lookup::PathPrefix;
+use lookup::{lookup_v2::TargetPath, path, PathPrefix};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
     estimated_json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
@@ -24,10 +23,11 @@ use super::{
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
 };
-use crate::config::log_schema;
-use crate::config::LogNamespace;
-use crate::{event::MaybeAsLogMut, ByteSizeOf};
-use lookup::path;
+use crate::{
+    config::{log_schema, LogNamespace},
+    event::MaybeAsLogMut,
+    ByteSizeOf,
+};
 
 #[derive(Debug, Deserialize)]
 struct Inner {
@@ -598,10 +598,11 @@ impl tracing::field::Visit for LogEvent {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::test_util::open_fixture;
     use lookup::event_path;
     use vrl_lib::value;
+
+    use super::*;
+    use crate::test_util::open_fixture;
 
     // The following two tests assert that renaming a key has no effect if the
     // keys are equivalent, whether the key exists in the log or not.

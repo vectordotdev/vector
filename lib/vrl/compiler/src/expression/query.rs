@@ -1,14 +1,15 @@
+use std::fmt;
+
+use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
+use value::Value;
+
 use crate::{
     expression::{Container, Resolved, Variable},
     parser::ast::Ident,
-    state::ExternalEnv,
-    state::{TypeInfo, TypeState},
+    state::{ExternalEnv, TypeInfo, TypeState},
     type_def::Details,
     Context, Expression,
 };
-use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
-use std::fmt;
-use value::Value;
 
 #[derive(Clone, PartialEq)]
 pub struct Query {

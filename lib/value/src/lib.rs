@@ -42,5 +42,7 @@ pub mod value;
 
 pub use kind::Kind;
 
-pub use self::secrets::Secrets;
-pub use self::value::{Value, ValueRegex};
+pub use self::{
+    secrets::Secrets,
+    value::{Value, ValueRegex},
+};

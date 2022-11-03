@@ -11,9 +11,8 @@ use vector_core::{
     transform::Transform,
 };
 
-use crate::transforms::Transforms;
-
 use super::{id::Inputs, ComponentKey};
+use crate::transforms::Transforms;
 
 /// Fully resolved transform component.
 #[configurable_component]

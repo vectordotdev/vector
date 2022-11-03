@@ -2,12 +2,12 @@
 
 #![deny(missing_docs)]
 
-use crate::event::{Event, LogEvent};
 use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::lookup_v2::ValuePath;
-use lookup::{owned_value_path, path, OwnedTargetPath, PathPrefix};
+use lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath, PathPrefix};
 use vector_config::configurable_component;
+
+use crate::event::{Event, LogEvent};
 
 /// Configuration for how the events are annotated with Node metadata.
 #[configurable_component]

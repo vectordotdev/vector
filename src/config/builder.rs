@@ -8,11 +8,6 @@ use serde_json::Value;
 use vector_config::configurable_component;
 use vector_core::config::GlobalOptions;
 
-use crate::{
-    enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
-    sinks::Sinks, sources::Sources, transforms::Transforms,
-};
-
 #[cfg(feature = "api")]
 use super::api;
 #[cfg(feature = "enterprise")]
@@ -20,6 +15,10 @@ use super::enterprise;
 use super::{
     compiler, schema, ComponentKey, Config, EnrichmentTableOuter, HealthcheckOptions, SinkOuter,
     SourceOuter, TestDefinition, TransformOuter,
+};
+use crate::{
+    enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
+    sinks::Sinks, sources::Sources, transforms::Transforms,
 };
 
 /// A complete Vector configuration.
@@ -403,12 +402,11 @@ impl ConfigBuilder {
 mod tests {
     use indexmap::IndexMap;
 
+    use super::ConfigBuilderHash;
     use crate::config::{
         builder::{sort_json_value, to_sorted_json_string},
         enterprise, ConfigBuilder,
     };
-
-    use super::ConfigBuilderHash;
 
     #[test]
     /// If this test fails, it likely means an implementation detail has changed

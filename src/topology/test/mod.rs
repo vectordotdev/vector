@@ -7,6 +7,13 @@ use std::{
     },
 };
 
+use futures::{future, stream, StreamExt};
+use tokio::{
+    task::yield_now,
+    time::{sleep, Duration},
+};
+use vector_buffers::{BufferConfig, BufferType, WhenFull};
+
 use crate::{
     config::{Config, ConfigDiff, SinkOuter},
     event::{into_event_stream, Event, EventArray, EventContainer, LogEvent},
@@ -19,12 +26,6 @@ use crate::{
     },
     topology,
 };
-use futures::{future, stream, StreamExt};
-use tokio::{
-    task::yield_now,
-    time::{sleep, Duration},
-};
-use vector_buffers::{BufferConfig, BufferType, WhenFull};
 
 mod backpressure;
 mod compliance;

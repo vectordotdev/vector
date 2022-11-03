@@ -11,6 +11,8 @@ mod native_json;
 #[cfg(feature = "syslog")]
 mod syslog;
 
+use std::fmt::Debug;
+
 use ::bytes::Bytes;
 use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig};
@@ -18,9 +20,7 @@ pub use json::{JsonDeserializer, JsonDeserializerConfig};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{NativeJsonDeserializer, NativeJsonDeserializerConfig};
 use smallvec::SmallVec;
-use std::fmt::Debug;
-use vector_core::config::LogNamespace;
-use vector_core::event::Event;
+use vector_core::{config::LogNamespace, event::Event};
 
 pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
 #[cfg(feature = "syslog")]

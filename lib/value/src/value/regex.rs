@@ -1,11 +1,12 @@
-use bytes::Bytes;
-use regex::Regex;
-use std::cmp::Ordering;
-use std::sync::Arc;
 use std::{
+    cmp::Ordering,
     hash::{Hash, Hasher},
     ops::Deref,
+    sync::Arc,
 };
+
+use bytes::Bytes;
+use regex::Regex;
 
 /// Wraps a `Regex` and provides several trait implementations, such as `PartialOrd`
 #[derive(Debug, Clone)]

@@ -7,11 +7,8 @@ use async_trait::async_trait;
 use futures_util::FutureExt;
 use vector_config::configurable_component;
 use vector_core::{
-    config::LogNamespace,
+    config::{DataType, LogNamespace, Output},
     event::{Event, LogEvent},
-};
-use vector_core::{
-    config::{DataType, Output},
     source::Source,
 };
 

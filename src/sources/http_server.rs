@@ -306,9 +306,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 
 #[cfg(test)]
 mod tests {
-    use lookup::event_path;
-    use std::str::FromStr;
-    use std::{collections::BTreeMap, io::Write, net::SocketAddr};
+    use std::{collections::BTreeMap, io::Write, net::SocketAddr, str::FromStr};
 
     use codecs::{
         decoding::{DeserializerConfig, FramingConfig},
@@ -320,13 +318,14 @@ mod tests {
     };
     use futures::Stream;
     use http::{HeaderMap, Method};
+    use lookup::event_path;
     use similar_asserts::assert_eq;
 
     use super::SimpleHttpConfig;
-    use crate::sources::http_server::HttpMethod;
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
+        sources::http_server::HttpMethod,
         test_util::{
             components::{self, assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
             next_addr, spawn_collect_n, trace_init, wait_for_tcp,

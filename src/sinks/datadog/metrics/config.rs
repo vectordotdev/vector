@@ -11,7 +11,6 @@ use super::{
     service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
 };
-use crate::tls::{MaybeTlsSettings, TlsEnableableConfig};
 use crate::{
     common::datadog::get_base_domain,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
@@ -24,6 +23,7 @@ use crate::{
         },
         Healthcheck, UriParseSnafu, VectorSink,
     },
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // TODO: revisit our concurrency and batching defaults

@@ -1,6 +1,7 @@
-use crate::emit;
 use metrics::counter;
 use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
+
+use crate::emit;
 
 #[derive(Debug)]
 pub struct LokiEventUnlabeled;

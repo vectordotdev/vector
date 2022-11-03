@@ -258,11 +258,15 @@ mod integration_tests {
     use vector_core::event::{BatchNotifier, BatchStatus};
 
     use super::*;
-    use crate::gcp;
-    use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
-    use crate::test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
-        random_events_with_stream, random_string, trace_init,
+    use crate::{
+        gcp,
+        test_util::{
+            components::{
+                run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+                HTTP_SINK_TAGS,
+            },
+            random_events_with_stream, random_string, trace_init,
+        },
     };
 
     const PROJECT: &str = "testproject";

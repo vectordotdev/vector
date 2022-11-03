@@ -1,14 +1,11 @@
-use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
-use std::sync::Arc;
 
-use crate::value::regex::ValueRegex;
-use crate::{Kind, Value};
+use crate::{value::regex::ValueRegex, Kind, Value};
 
 impl Value {
     /// Returns self as `NotNan<f64>`, only if self is `Value::Float`.

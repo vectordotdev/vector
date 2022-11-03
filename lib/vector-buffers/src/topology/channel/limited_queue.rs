@@ -255,8 +255,8 @@ mod tests {
 
     use super::limited;
     use crate::{
-        test::MultiEventRecord, topology::channel::limited_queue::SendError,
-        topology::test_util::Sample,
+        test::MultiEventRecord,
+        topology::{channel::limited_queue::SendError, test_util::Sample},
     };
 
     #[tokio::test]

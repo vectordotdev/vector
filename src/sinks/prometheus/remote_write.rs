@@ -1,8 +1,6 @@
-use std::sync::Arc;
-use std::task;
+use std::{sync::Arc, task};
 
-use aws_types::credentials::SharedCredentialsProvider;
-use aws_types::region::Region;
+use aws_types::{credentials::SharedCredentialsProvider, region::Region};
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::{Request, Uri};

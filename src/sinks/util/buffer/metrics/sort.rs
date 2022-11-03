@@ -9,11 +9,13 @@ pub fn sort_for_compression(metrics: &mut [Metric]) {
 
 #[cfg(test)]
 mod test {
+    use rand::{prelude::SliceRandom, thread_rng};
+    use vector_core::{
+        event::{Metric, MetricKind},
+        metric_tags,
+    };
+
     use crate::event::MetricValue;
-    use rand::prelude::SliceRandom;
-    use rand::thread_rng;
-    use vector_core::event::{Metric, MetricKind};
-    use vector_core::metric_tags;
 
     // This just ensures the sorting does not change. `sort_for_compression` relies on
     // the default `PartialOrd` on `MetricSeries`.

@@ -1,9 +1,8 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_kinesis::error::PutRecordsError;
-use aws_sdk_kinesis::output::PutRecordsOutput;
-use aws_sdk_kinesis::types::SdkError;
-use aws_sdk_kinesis::Client as KinesisClient;
+use aws_sdk_kinesis::{
+    error::PutRecordsError, output::PutRecordsOutput, types::SdkError, Client as KinesisClient,
+};
 use aws_types::region::Region;
 use futures::future::BoxFuture;
 use tower::Service;

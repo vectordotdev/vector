@@ -7,8 +7,7 @@ use aes::cipher::{
 use cfb_mode::Encryptor as Cfb;
 use ctr::Ctr64LE;
 use ofb::Ofb;
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 type Aes128Cbc = cbc::Encryptor<aes::Aes128>;
 type Aes192Cbc = cbc::Encryptor<aes::Aes192>;

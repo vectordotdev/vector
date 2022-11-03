@@ -1,19 +1,20 @@
 use core::Value;
+
 use diagnostic::{DiagnosticList, DiagnosticMessage, Note, Severity, Span};
 use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use parser::ast::{self, Node, QueryTarget};
 
-use crate::function::ArgumentList;
-use crate::state::TypeState;
-use crate::value::VrlValueConvert;
 use crate::{
     expression::{
         assignment, function_call, literal, predicate, query, Abort, Array, Assignment, Block,
         Container, Error, Expr, Expression, FunctionArgument, FunctionCall, Group, IfStatement,
         Literal, Noop, Not, Object, Op, Predicate, Query, Target, Unary, Variable,
     },
+    function::ArgumentList,
     parser::ast::RootExpr,
     program::ProgramInfo,
+    state::TypeState,
+    value::VrlValueConvert,
     CompileConfig, DeprecationWarning, Function, Program, TypeDef,
 };
 

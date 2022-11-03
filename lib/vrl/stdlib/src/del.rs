@@ -1,6 +1,5 @@
 use ::value::Value;
-use vrl::prelude::*;
-use vrl::state::TypeInfo;
+use vrl::{prelude::*, state::TypeInfo};
 
 #[inline]
 fn del(query: &expression::Query, compact: bool, ctx: &mut Context) -> Resolved {

@@ -1,5 +1,9 @@
-use serde::Serializer;
 use std::fmt;
+
+use serde::{
+    de::{self, Unexpected, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 use vector_config::{
     schema::{
         apply_metadata, generate_const_string_schema, generate_number_schema,
@@ -9,11 +13,6 @@ use vector_config::{
     Configurable, GenerateError, Metadata,
 };
 use vector_config_common::attributes::CustomAttribute;
-
-use serde::{
-    de::{self, Unexpected, Visitor},
-    Deserialize, Deserializer, Serialize,
-};
 
 /// Configuration for outbound request concurrency.
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]

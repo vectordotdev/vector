@@ -1,6 +1,9 @@
-use crate::value::crud::{get_matching_coalesce_key, ValueCollection};
-use crate::Value;
 use lookup::lookup_v2::BorrowedSegment;
+
+use crate::{
+    value::crud::{get_matching_coalesce_key, ValueCollection},
+    Value,
+};
 
 pub fn get_mut<'a>(
     mut value: &mut Value,
@@ -38,8 +41,9 @@ pub fn get_mut<'a>(
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     #[test]
     fn test_coalesce() {

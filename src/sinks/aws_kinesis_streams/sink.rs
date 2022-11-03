@@ -13,6 +13,7 @@ use vector_core::{
     stream::{BatcherSettings, DriverResponse},
 };
 
+use super::request_builder::KinesisRequest;
 use crate::{
     event::{Event, LogEvent},
     internal_events::{AwsKinesisStreamNoPartitionKeyError, SinkRequestBuildError},
@@ -21,8 +22,6 @@ use crate::{
         util::{processed_event::ProcessedEvent, SinkBuilderExt, StreamSink},
     },
 };
-
-use super::request_builder::KinesisRequest;
 
 pub type KinesisProcessedEvent = ProcessedEvent<LogEvent, KinesisKey>;
 

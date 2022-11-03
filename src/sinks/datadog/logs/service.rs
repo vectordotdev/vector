@@ -21,8 +21,10 @@ use vector_core::{
 
 use crate::{
     http::HttpClient,
-    sinks::datadog::DatadogApiError,
-    sinks::util::{retries::RetryLogic, Compression},
+    sinks::{
+        datadog::DatadogApiError,
+        util::{retries::RetryLogic, Compression},
+    },
 };
 
 #[derive(Debug, Default, Clone)]

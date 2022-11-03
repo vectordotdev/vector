@@ -4,8 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use aws_types::credentials::SharedCredentialsProvider;
-use aws_types::region::Region;
+use aws_types::{credentials::SharedCredentialsProvider, region::Region};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{Response, Uri};
@@ -14,17 +13,18 @@ use tower::ServiceExt;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf};
 
-use crate::sinks::elasticsearch::sign_request;
+use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     http::{Auth, HttpClient},
-    sinks::util::{
-        http::{HttpBatchService, RequestConfig},
-        Compression, ElementCount,
+    sinks::{
+        elasticsearch::sign_request,
+        util::{
+            http::{HttpBatchService, RequestConfig},
+            Compression, ElementCount,
+        },
     },
 };
-
-use super::{ElasticsearchCommon, ElasticsearchConfig};
 
 #[derive(Clone)]
 pub struct ElasticsearchRequest {

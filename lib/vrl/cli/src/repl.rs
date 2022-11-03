@@ -18,9 +18,9 @@ use rustyline::{
 use value::Secrets;
 use vector_common::TimeZone;
 use vector_vrl_functions::vrl_functions;
-use vrl::state::TypeState;
 use vrl::{
-    diagnostic::Formatter, prelude::BTreeMap, state, CompileConfig, Runtime, Target, VrlRuntime,
+    diagnostic::Formatter, prelude::BTreeMap, state, state::TypeState, CompileConfig, Runtime,
+    Target, VrlRuntime,
 };
 
 // Create a list of all possible error values for potential docs lookup

@@ -19,8 +19,7 @@ use tokio_postgres::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::{metric_tags, ByteSizeOf};
+use vector_core::{config::LogNamespace, metric_tags, ByteSizeOf};
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},

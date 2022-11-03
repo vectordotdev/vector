@@ -1,8 +1,8 @@
 use std::fmt;
 
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
+    state::{TypeInfo, TypeState},
     Context, Expression, TypeDef,
 };
 

@@ -4,11 +4,10 @@ use vector_config::configurable_component;
 use vector_core::compile_vrl;
 use vrl::{diagnostic::Formatter, CompilationResult, CompileConfig, Program, Runtime, VrlRuntime};
 
-use crate::event::TargetEvents;
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
     emit,
-    event::{Event, VrlTarget},
+    event::{Event, TargetEvents, VrlTarget},
     internal_events::VrlConditionExecutionError,
 };
 

@@ -1,10 +1,13 @@
-use crate::state::{TypeInfo, TypeState};
-use crate::{Context, Expression, TypeDef};
 use core::Resolved;
+use std::{fmt, fmt::Debug};
+
 use dyn_clone::DynClone;
-use std::fmt;
-use std::fmt::Debug;
 use value::Value;
+
+use crate::{
+    state::{TypeInfo, TypeState},
+    Context, Expression, TypeDef,
+};
 
 /// A trait similar to `Expression`, but simplified specifically for functions.
 /// The main difference is this trait prevents mutation of variables both at runtime

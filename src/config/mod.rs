@@ -570,10 +570,10 @@ pub struct TestOutput<T = OutputId> {
 mod tests {
     use std::{collections::HashMap, path::PathBuf};
 
-    use crate::{config, topology};
     use indoc::indoc;
 
     use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, ConfigDiff, Format};
+    use crate::{config, topology};
 
     async fn load(config: &str, format: config::Format) -> Result<Vec<String>, Vec<String>> {
         match config::load_from_str(config, format) {
@@ -1431,10 +1431,11 @@ mod resource_tests {
     #[allow(clippy::print_stdout)]
     #[allow(clippy::print_stderr)]
     fn generate_component_config_schema() {
-        use crate::config::{SinkOuter, SourceOuter, TransformOuter};
         use indexmap::IndexMap;
         use vector_common::config::ComponentKey;
         use vector_config::configurable_component;
+
+        use crate::config::{SinkOuter, SourceOuter, TransformOuter};
 
         /// Top-level Vector configuration.
         #[configurable_component]

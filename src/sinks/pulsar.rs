@@ -4,21 +4,16 @@ use std::{
     task::{ready, Context, Poll},
 };
 
-use crate::{
-    codecs::{Encoder, EncodingConfig, Transformer},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    event::{Event, EventFinalizers, EventStatus, Finalizable},
-    internal_events::PulsarSendingError,
-    sinks::util::metadata::RequestMetadataBuilder,
-};
 use bytes::BytesMut;
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, Sink, Stream};
-use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
-use pulsar::error::AuthenticationError;
 use pulsar::{
-    message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
-    Error as PulsarError, Producer, Pulsar, TokioExecutor,
+    authentication::oauth2::{OAuth2Authentication, OAuth2Params},
+    error::AuthenticationError,
+    message::proto,
+    producer::SendFuture,
+    proto::CommandSendReceipt,
+    Authentication, Error as PulsarError, Producer, Pulsar, TokioExecutor,
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
@@ -32,6 +27,14 @@ use vector_common::{
 };
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
+
+use crate::{
+    codecs::{Encoder, EncodingConfig, Transformer},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    event::{Event, EventFinalizers, EventStatus, Finalizable},
+    internal_events::PulsarSendingError,
+    sinks::util::metadata::RequestMetadataBuilder,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -415,10 +418,12 @@ mod integration_tests {
     use pulsar::SubType;
 
     use super::*;
-    use crate::sinks::VectorSink;
-    use crate::test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
-        random_lines_with_stream, random_string, trace_init,
+    use crate::{
+        sinks::VectorSink,
+        test_util::{
+            components::{assert_sink_compliance, SINK_TAGS},
+            random_lines_with_stream, random_string, trace_init,
+        },
     };
 
     fn pulsar_address() -> String {

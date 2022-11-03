@@ -1,6 +1,5 @@
 use std::io::Error;
 
-use crate::emit;
 use metrics::counter;
 use vector_common::internal_event::{
     error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
@@ -8,6 +7,7 @@ use vector_common::internal_event::{
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::io_error_code;
+use crate::emit;
 
 #[derive(Debug)]
 pub struct NatsEventSendError {

@@ -18,6 +18,7 @@ use vector_core::{
 };
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
+use super::{reply::protobuf, status::Status};
 use crate::{
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
@@ -26,8 +27,6 @@ use crate::{
     tls::MaybeTlsSettings,
     SourceSender,
 };
-
-use super::{reply::protobuf, status::Status};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {

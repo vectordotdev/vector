@@ -10,8 +10,7 @@ use nom::{
     sequence::{delimited, pair, separated_pair},
     IResult,
 };
-use vrl::prelude::expression::FunctionExpression;
-use vrl::prelude::*;
+use vrl::prelude::{expression::FunctionExpression, *};
 
 #[derive(Clone, Copy, Debug)]
 pub struct DecodeMimeQ;
@@ -191,8 +190,9 @@ impl<'a> EncodedWord<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use nom::error::VerboseError;
+
+    use super::*;
 
     #[test]
     fn internal() {

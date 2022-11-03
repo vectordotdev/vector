@@ -8,9 +8,9 @@ use futures::StreamExt;
 use lookup::event_path;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_common::finalization::AddBatchNotifier;
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Registered,
+use vector_common::{
+    finalization::AddBatchNotifier,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Registered},
 };
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::reject;

@@ -1,12 +1,13 @@
 pub mod closure;
 
-use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::OwnedTargetPath;
-use parser::ast::Ident;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
 };
+
+use diagnostic::{DiagnosticMessage, Label, Note};
+use lookup::OwnedTargetPath;
+use parser::ast::Ident;
 use value::{kind::Collection, Value};
 
 use crate::{
@@ -433,8 +434,7 @@ fn required<T>(argument: Option<T>) -> T {
 #[cfg(any(test, feature = "test"))]
 mod test_impls {
     use super::*;
-    use crate::expression::FunctionArgument;
-    use crate::parser::Node;
+    use crate::{expression::FunctionArgument, parser::Node};
 
     impl From<HashMap<&'static str, Value>> for ArgumentList {
         fn from(map: HashMap<&'static str, Value>) -> Self {

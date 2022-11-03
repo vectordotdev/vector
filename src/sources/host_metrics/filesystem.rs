@@ -5,9 +5,8 @@ use heim::units::ratio::ratio;
 use vector_config::configurable_component;
 use vector_core::metric_tags;
 
-use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
-
 use super::{filter_result, FilterList, HostMetrics};
+use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
 
 /// Options for the “filesystem” metrics collector.
 #[configurable_component]

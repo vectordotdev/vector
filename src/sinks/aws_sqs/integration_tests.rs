@@ -1,7 +1,6 @@
 #![cfg(all(test, feature = "aws-sqs-integration-tests"))]
 
-use std::collections::HashMap;
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Endpoint, Region};
 use codecs::TextSerializerConfig;

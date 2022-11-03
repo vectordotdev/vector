@@ -1,6 +1,12 @@
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::{
-    error::Error as _, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll,
+    error::Error as _,
+    future::Future,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
+    },
+    task::{Context, Poll},
     time::Duration,
 };
 
@@ -18,10 +24,11 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalizer::UnorderedFinalizer,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered},
 };
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
@@ -692,10 +699,19 @@ mod integration_tests {
     use vector_common::btreemap;
 
     use super::*;
-    use crate::config::{ComponentKey, ProxyConfig};
-    use crate::test_util::components::{assert_source_compliance, SOURCE_TAGS};
-    use crate::test_util::{self, components, random_string};
-    use crate::{event::EventStatus, gcp, http::HttpClient, shutdown, SourceSender};
+    use crate::{
+        config::{ComponentKey, ProxyConfig},
+        event::EventStatus,
+        gcp,
+        http::HttpClient,
+        shutdown,
+        test_util::{
+            self, components,
+            components::{assert_source_compliance, SOURCE_TAGS},
+            random_string,
+        },
+        SourceSender,
+    };
 
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: Lazy<String> =

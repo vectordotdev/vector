@@ -21,11 +21,6 @@ use super::{
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
-use crate::sinks::loki::event::LokiBatchEncoding;
-use crate::sinks::{
-    loki::config::{CompressionConfigAdapter, ExtendedCompression},
-    util::metadata::RequestMetadataBuilder,
-};
 use crate::{
     codecs::{Encoder, Transformer},
     config::log_schema,
@@ -34,11 +29,18 @@ use crate::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
         SinkRequestBuildError, TemplateRenderingError,
     },
-    sinks::util::{
-        builder::SinkBuilderExt,
-        request_builder::EncodeResult,
-        service::{ServiceBuilderExt, Svc},
-        Compression, RequestBuilder,
+    sinks::{
+        loki::{
+            config::{CompressionConfigAdapter, ExtendedCompression},
+            event::LokiBatchEncoding,
+        },
+        util::{
+            builder::SinkBuilderExt,
+            metadata::RequestMetadataBuilder,
+            request_builder::EncodeResult,
+            service::{ServiceBuilderExt, Svc},
+            Compression, RequestBuilder,
+        },
     },
     template::Template,
 };

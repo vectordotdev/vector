@@ -1,8 +1,8 @@
-use std::net::SocketAddr;
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
     io::{self, Read},
+    net::SocketAddr,
 };
 
 use bytes::{Buf, Bytes, BytesMut};

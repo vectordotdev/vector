@@ -1,5 +1,7 @@
-use std::io::{self, Read};
-use std::net::SocketAddr;
+use std::{
+    io::{self, Read},
+    net::SocketAddr,
+};
 
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
@@ -465,11 +467,12 @@ impl From<FluentEvent> for LogEvent {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
     use serde::Serialize;
-    use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::{error::Elapsed, timeout, Duration},

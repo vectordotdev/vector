@@ -1,5 +1,4 @@
-use vector_core::internal_event::CountByteSize;
-use vector_core::{event::EventStatus, stream::DriverResponse};
+use vector_core::{event::EventStatus, internal_event::CountByteSize, stream::DriverResponse};
 
 pub struct HecResponse {
     pub event_status: EventStatus,

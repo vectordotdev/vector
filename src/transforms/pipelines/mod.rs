@@ -104,8 +104,6 @@
 //! # any sink configuration
 //! ```
 mod config;
-pub use self::config::PipelineConfig;
-
 use std::{collections::HashSet, fmt::Debug};
 
 use config::EventTypeConfig;
@@ -116,9 +114,9 @@ use vector_core::{
     transform::Transform,
 };
 
+pub use self::config::PipelineConfig;
 use crate::{
-    conditions::AnyCondition,
-    conditions::ConditionConfig,
+    conditions::{AnyCondition, ConditionConfig},
     config::{
         GenerateConfig, InnerTopology, InnerTopologyTransform, Inputs, TransformConfig,
         TransformContext,
@@ -300,9 +298,11 @@ mod tests {
     use tokio_stream::wrappers::ReceiverStream;
 
     use super::{GenerateConfig, PipelinesConfig};
-    use crate::config::{ComponentKey, TransformOuter};
-    use crate::test_util::components::assert_transform_compliance;
-    use crate::transforms::test::create_topology;
+    use crate::{
+        config::{ComponentKey, TransformOuter},
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
 
     #[test]
     fn generate_config() {

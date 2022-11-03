@@ -1,8 +1,6 @@
 mod request_limiter;
 
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
-use std::{io, mem::drop, time::Duration};
+use std::{collections::BTreeMap, io, mem::drop, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use codecs::StreamDecodingError;

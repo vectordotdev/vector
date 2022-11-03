@@ -9,11 +9,10 @@ mod debug;
 
 pub mod merge;
 
-pub use crud::*;
-
 use std::collections::BTreeMap;
 
 pub use collection::{Collection, Field, Index, Unknown};
+pub use crud::*;
 
 use crate::Value;
 

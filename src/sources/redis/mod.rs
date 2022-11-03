@@ -11,8 +11,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -267,10 +266,13 @@ mod integration_test {
     use redis::AsyncCommands;
 
     use super::*;
-    use crate::config::log_schema;
-    use crate::test_util::components::{run_and_assert_source_compliance_n, SOURCE_TAGS};
     use crate::{
-        test_util::{collect_n, random_string},
+        config::log_schema,
+        test_util::{
+            collect_n,
+            components::{run_and_assert_source_compliance_n, SOURCE_TAGS},
+            random_string,
+        },
         SourceSender,
     };
 

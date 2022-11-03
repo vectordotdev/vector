@@ -121,8 +121,9 @@ async fn default_credentials_provider(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde::{Deserialize, Serialize};
+
+    use super::*;
 
     #[derive(Serialize, Deserialize, Clone, Debug)]
     struct ComponentConfig {

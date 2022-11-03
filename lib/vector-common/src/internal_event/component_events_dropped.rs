@@ -1,5 +1,6 @@
-use super::{Count, InternalEvent, InternalEventHandle, RegisterInternalEvent};
 use metrics::{register_counter, Counter};
+
+use super::{Count, InternalEvent, InternalEventHandle, RegisterInternalEvent};
 
 pub const INTENTIONAL: bool = true;
 pub const UNINTENTIONAL: bool = false;

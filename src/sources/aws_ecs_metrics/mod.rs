@@ -6,8 +6,7 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext},

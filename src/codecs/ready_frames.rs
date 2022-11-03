@@ -2,7 +2,7 @@ use std::pin::Pin;
 
 use futures::{
     task::{Context, Poll},
-    {Stream, StreamExt},
+    Stream, StreamExt,
 };
 
 const DEFAULT_CAPACITY: usize = 1024;

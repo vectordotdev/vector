@@ -10,8 +10,10 @@ use tokio::{
     io::{AsyncSeekExt, AsyncWriteExt},
 };
 use tracing::Instrument;
-use vector_common::byte_size_of::ByteSizeOf;
-use vector_common::finalization::{AddBatchNotifier, BatchNotifier};
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalization::{AddBatchNotifier, BatchNotifier},
+};
 
 use super::{create_buffer_v2_with_max_data_file_size, create_default_buffer_v2};
 use crate::{

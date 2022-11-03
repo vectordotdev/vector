@@ -3,10 +3,10 @@ use std::fmt;
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
 use value::Value;
 
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{self, Expr, Resolved},
     parser::{ast, Node},
+    state::{TypeInfo, TypeState},
     value::VrlValueArithmetic,
     Context, Expression, TypeDef,
 };

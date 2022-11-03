@@ -1,10 +1,11 @@
 //! All types related to inserting one [`Kind`] into another.
 
-use lookup::lookup_v2::{BorrowedSegment, ValuePath};
+use lookup::{
+    lookup_v2::{BorrowedSegment, ValuePath},
+    path,
+};
 
-use crate::kind::Collection;
-use crate::Kind;
-use lookup::path;
+use crate::{kind::Collection, Kind};
 
 impl Kind {
     /// Insert the `Kind` at the given `path` within `self`.
@@ -230,9 +231,12 @@ impl Kind {
 
 #[cfg(test)]
 mod tests {
-    use lookup::lookup_v2::{parse_value_path, OwnedValuePath};
-    use lookup::owned_value_path;
     use std::collections::BTreeMap;
+
+    use lookup::{
+        lookup_v2::{parse_value_path, OwnedValuePath},
+        owned_value_path,
+    };
 
     use super::*;
     use crate::kind::Collection;

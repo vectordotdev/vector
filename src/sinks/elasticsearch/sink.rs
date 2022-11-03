@@ -8,6 +8,7 @@ use vector_core::{
     ByteSizeOf,
 };
 
+use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     codecs::Transformer,
     event::{Event, LogEvent, Value},
@@ -21,8 +22,6 @@ use crate::{
     },
     transforms::metric_to_log::MetricToLog,
 };
-
-use super::{ElasticsearchCommon, ElasticsearchConfig};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {

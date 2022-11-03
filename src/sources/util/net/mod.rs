@@ -8,12 +8,11 @@ use std::{fmt, net::SocketAddr};
 use serde::{de, Deserialize, Deserializer};
 use vector_config::configurable_component;
 
-use crate::config::{Protocol, Resource};
-
 #[cfg(feature = "sources-utils-net-tcp")]
 pub use self::tcp::{TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker};
 #[cfg(feature = "sources-utils-net-udp")]
 pub use self::udp::try_bind_udp_socket;
+use crate::config::{Protocol, Resource};
 
 /// A listening address that can be given directly or be managed via `systemd` socket activation.
 #[configurable_component]

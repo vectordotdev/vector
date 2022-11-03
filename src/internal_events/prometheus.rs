@@ -5,12 +5,12 @@ use hyper::StatusCode;
 use metrics::counter;
 #[cfg(feature = "sources-prometheus")]
 use prometheus_parser::ParserError;
-use vector_core::internal_event::InternalEvent;
-
-use crate::emit;
 use vector_common::internal_event::{
     error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
+use vector_core::internal_event::InternalEvent;
+
+use crate::emit;
 
 #[cfg(feature = "sources-prometheus")]
 #[derive(Debug)]

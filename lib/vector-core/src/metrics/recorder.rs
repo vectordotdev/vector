@@ -1,5 +1,7 @@
-use std::sync::{atomic::Ordering, Arc, RwLock};
-use std::time::Duration;
+use std::{
+    sync::{atomic::Ordering, Arc, RwLock},
+    time::Duration,
+};
 
 use chrono::Utc;
 use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
@@ -7,8 +9,10 @@ use metrics_util::{registry::Registry as MetricsRegistry, MetricKindMask};
 use once_cell::unsync::OnceCell;
 use quanta::Clock;
 
-use super::recency::{GenerationalStorage, Recency};
-use super::storage::VectorStorage;
+use super::{
+    recency::{GenerationalStorage, Recency},
+    storage::VectorStorage,
+};
 use crate::event::{Metric, MetricValue};
 
 thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = OnceCell::new());

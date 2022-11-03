@@ -135,6 +135,8 @@ impl FunctionTransform for Sample {
 #[cfg(test)]
 mod tests {
     use approx::assert_relative_eq;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
     use crate::{
@@ -144,8 +146,6 @@ mod tests {
         test_util::{components::assert_transform_compliance, random_lines},
         transforms::test::{create_topology, transform_one},
     };
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
 
     fn condition_contains(key: &str, needle: &str) -> Condition {
         let vrl_config = VrlConfig {

@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use lookup::event_path;
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
 
@@ -9,7 +10,6 @@ use crate::{
     internal_events::KubernetesLogsDockerFormatParseError,
     transforms::{FunctionTransform, OutputBuffer},
 };
-use lookup::event_path;
 
 pub const TIME: &str = "time";
 pub const LOG: &str = "log";

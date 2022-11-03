@@ -2,6 +2,7 @@ use std::{fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{stream::BoxStream, StreamExt};
+use lookup::event_path;
 use serde::Serialize;
 use tower::Service;
 use vector_buffers::EventCount;
@@ -16,9 +17,9 @@ use vector_core::{
 use super::request_builder::HecLogsRequestBuilder;
 use crate::{
     config::SinkContext,
-    internal_events::SplunkEventTimestampInvalidType,
-    internal_events::SplunkEventTimestampMissing,
-    internal_events::TemplateRenderingError,
+    internal_events::{
+        SplunkEventTimestampInvalidType, SplunkEventTimestampMissing, TemplateRenderingError,
+    },
     sinks::{
         splunk_hec::common::{
             render_template_string, request::HecRequest, EndpointTarget, INDEX_FIELD,
@@ -28,7 +29,6 @@ use crate::{
     },
     template::Template,
 };
-use lookup::event_path;
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,

@@ -2,8 +2,7 @@ use futures::StreamExt;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},

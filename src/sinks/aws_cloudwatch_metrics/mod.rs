@@ -1,6 +1,8 @@
 mod integration_tests;
 mod tests;
 
+use std::task::{Context, Poll};
+
 use aws_sdk_cloudwatch::{
     error::PutMetricDataError,
     model::{Dimension, MetricDatum},
@@ -10,7 +12,6 @@ use aws_sdk_cloudwatch::{
 use aws_smithy_types::DateTime as AwsDateTime;
 use futures::{stream, FutureExt, SinkExt};
 use futures_util::{future, future::BoxFuture};
-use std::task::{Context, Poll};
 use tower::Service;
 use vector_config::configurable_component;
 use vector_core::{sink::VectorSink, ByteSizeOf};

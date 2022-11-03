@@ -1,24 +1,33 @@
 //! Generalized HTTP client source.
 //! Calls an endpoint at an interval, decoding the HTTP responses into events.
 
+use std::collections::HashMap;
+
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
 use snafu::ResultExt;
-use std::collections::HashMap;
 use tokio_util::codec::Decoder as _;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{log_schema, LogNamespace, Output},
+    event::Event,
+};
 
-use crate::sources::util::http_client;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     http::Auth,
-    serde::default_decoding,
-    serde::default_framing_message_based,
+    serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
         http::HttpMethod,
+        http_client,
         http_client::{
             build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
             HttpClientBuilder,
@@ -26,15 +35,6 @@ use crate::{
     },
     tls::{TlsConfig, TlsSettings},
     Result,
-};
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::{
-    config::{log_schema, LogNamespace, Output},
-    event::Event,
 };
 
 /// Configuration for the `http_client` source.

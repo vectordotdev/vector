@@ -1,5 +1,4 @@
-use std::fmt::Write as _;
-use std::path::PathBuf;
+use std::{fmt::Write as _, path::PathBuf};
 
 use clap::Parser;
 

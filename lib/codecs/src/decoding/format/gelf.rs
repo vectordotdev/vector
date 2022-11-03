@@ -1,16 +1,14 @@
+use std::collections::HashMap;
+
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use std::collections::HashMap;
-use value::kind::Collection;
-use value::Kind;
-use vector_core::config::LogNamespace;
+use value::{kind::Collection, Kind};
 use vector_core::{
-    config::{log_schema, DataType},
-    event::Event,
-    event::LogEvent,
+    config::{log_schema, DataType, LogNamespace},
+    event::{Event, LogEvent},
     schema,
 };
 
@@ -206,7 +204,6 @@ impl Deserializer for GelfDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::Bytes;
     use chrono::{DateTime, NaiveDateTime, Utc};
     use lookup::event_path;
@@ -215,6 +212,8 @@ mod tests {
     use smallvec::SmallVec;
     use value::Value;
     use vector_core::{config::log_schema, event::Event};
+
+    use super::*;
 
     fn deserialize_gelf_input(
         input: &serde_json::Value,

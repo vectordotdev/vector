@@ -698,10 +698,11 @@ mod tests {
 
     use std::collections::HashMap;
 
-    use super::*;
     use quickcheck::{Arbitrary, Gen, TestResult};
     use quickcheck_macros::quickcheck;
     use serde_json::json;
+
+    use super::*;
 
     #[derive(Serialize, Clone, Debug)]
     struct MyEvent {

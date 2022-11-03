@@ -20,10 +20,10 @@ use crate::{
         filter::{self, filter_items},
         relay, sort,
     },
-    config::{ComponentKey, Config, TransformConfig},
+    config::{ComponentKey, Config, SourceConfig, TransformConfig},
     filter_check,
+    topology::schema::merged_definition,
 };
-use crate::{config::SourceConfig, topology::schema::merged_definition};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(

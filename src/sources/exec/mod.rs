@@ -11,6 +11,7 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
+use lookup::event_path;
 use smallvec::SmallVec;
 use snafu::Snafu;
 use tokio::{
@@ -23,7 +24,7 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -37,8 +38,6 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use lookup::event_path;
-use vector_core::config::LogNamespace;
 
 pub mod sized_bytes_codec;
 

@@ -11,15 +11,15 @@ pub mod prelude;
 mod runtime;
 
 pub use compiler::{
-    function, state, value, CompilationResult, CompileConfig, Compiler, Context, Expression,
-    Function, Program, ProgramInfo, SecretTarget, Target, TargetValue, TargetValueRef, VrlRuntime,
+    expression::query, function, state, value, CompilationResult, CompileConfig, Compiler, Context,
+    Expression, Function, Program, ProgramInfo, SecretTarget, Target, TargetValue, TargetValueRef,
+    VrlRuntime,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
 pub use vector_common::TimeZone;
 
 use crate::state::TypeState;
-pub use compiler::expression::query;
 
 /// Compile a given source into the final [`Program`].
 pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {

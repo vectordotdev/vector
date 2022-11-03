@@ -1,9 +1,9 @@
 //! All types related to merging one [`Kind`] into another.
 
-use crate::kind::Field;
 use std::ops::BitOr;
 
 use super::{Collection, Kind};
+use crate::kind::Field;
 
 impl Kind {
     /// Merge `other` into `self`, using the provided `Strategy`.

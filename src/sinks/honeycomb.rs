@@ -210,6 +210,7 @@ mod test {
     use futures::{future::ready, stream};
     use vector_core::event::{Event, LogEvent};
 
+    use super::HoneycombConfig;
     use crate::{
         config::{GenerateConfig, SinkConfig, SinkContext},
         test_util::{
@@ -217,8 +218,6 @@ mod test {
             http::{always_200_response, spawn_blackhole_http_server},
         },
     };
-
-    use super::HoneycombConfig;
 
     #[test]
     fn generate_config() {

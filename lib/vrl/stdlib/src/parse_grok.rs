@@ -1,10 +1,10 @@
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use ::value::Value;
-use vrl::state::TypeState;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
+    state::TypeState,
 };
 
 fn parse_grok(value: Value, pattern: Arc<grok::Pattern>) -> Resolved {

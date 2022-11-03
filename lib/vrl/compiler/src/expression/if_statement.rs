@@ -2,9 +2,9 @@ use std::fmt;
 
 use value::Value;
 
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Block, Predicate, Resolved},
+    state::{TypeInfo, TypeState},
     value::VrlValueConvert,
     Context, Expression,
 };

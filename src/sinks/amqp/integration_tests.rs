@@ -1,3 +1,8 @@
+use std::{sync::Arc, time::Duration};
+
+use futures::StreamExt;
+use vector_core::config::LogNamespace;
+
 use super::*;
 use crate::{
     config::{SinkConfig, SinkContext},
@@ -10,9 +15,6 @@ use crate::{
     },
     SourceSender,
 };
-use futures::StreamExt;
-use std::{sync::Arc, time::Duration};
-use vector_core::config::LogNamespace;
 
 pub fn make_config() -> AmqpSinkConfig {
     let mut config = AmqpSinkConfig {

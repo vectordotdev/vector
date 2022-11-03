@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::fmt::Formatter;
+use std::{collections::BTreeMap, fmt::Formatter};
 
 use bytes::Bytes;
 use lookup::{Lookup, LookupBuf};

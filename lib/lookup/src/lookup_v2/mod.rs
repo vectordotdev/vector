@@ -5,14 +5,15 @@ mod jit;
 mod optional_path;
 mod owned;
 
-use self::jit::{JitValuePath, JitValuePathIter};
-use snafu::Snafu;
 use std::fmt::Debug;
 
 pub use borrowed::BorrowedSegment;
 pub use concat::PathConcat;
 pub use optional_path::OptionalTargetPath;
 pub use owned::{OwnedSegment, OwnedTargetPath, OwnedValuePath};
+use snafu::Snafu;
+
+use self::jit::{JitValuePath, JitValuePathIter};
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum PathParseError {
@@ -233,8 +234,7 @@ pub enum PathPrefix {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::parse_target_path;
-    use crate::OwnedTargetPath;
+    use crate::{lookup_v2::parse_target_path, OwnedTargetPath};
 
     #[test]
     fn test_parse_target_path() {

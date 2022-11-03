@@ -1,5 +1,6 @@
 use vector_config::configurable_component;
 
+use super::http_sink::build_http_sink;
 use crate::{
     codecs::Transformer,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
@@ -13,8 +14,6 @@ use crate::{
     },
     tls::TlsConfig,
 };
-
-use super::http_sink::build_http_sink;
 
 /// Configuration for the `clickhouse` sink.
 #[configurable_component(sink("clickhouse"))]

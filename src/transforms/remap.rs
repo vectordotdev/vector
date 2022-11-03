@@ -1,26 +1,24 @@
-use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     fs::File,
     io::{self, Read},
     path::PathBuf,
+    sync::Arc,
 };
 
-use lookup::lookup_v2::{parse_value_path, ValuePath};
-use lookup::{metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{
+    lookup_v2::{parse_value_path, ValuePath},
+    metadata_path, owned_value_path, path, PathPrefix,
+};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
-use vector_core::compile_vrl;
-use vector_core::config::LogNamespace;
-use vector_core::schema::Definition;
-
+use vector_core::{compile_vrl, config::LogNamespace, schema::Definition};
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
-use vrl::prelude::state::TypeState;
 use vrl::{
     diagnostic::{Formatter, Note},
-    prelude::{DiagnosticMessage, ExpressionError},
+    prelude::{state::TypeState, DiagnosticMessage, ExpressionError},
     CompileConfig, Program, Runtime, Terminate, VrlRuntime,
 };
 
@@ -587,6 +585,8 @@ mod tests {
     use std::collections::HashMap;
 
     use indoc::{formatdoc, indoc};
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
     use vector_common::btreemap;
     use vector_core::{event::EventMetadata, metric_tags};
 
@@ -601,11 +601,8 @@ mod tests {
         test_util::components::{
             assert_transform_compliance, init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS,
         },
-        transforms::test::create_topology,
-        transforms::OutputBuffer,
+        transforms::{test::create_topology, OutputBuffer},
     };
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
 
     fn test_default_schema_definition() -> schema::Definition {
         schema::Definition::empty_legacy_namespace().with_field(

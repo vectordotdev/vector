@@ -71,8 +71,10 @@ mod tests {
     use bytes::BytesMut;
     use chrono::{TimeZone, Utc};
     use vector_common::btreemap;
-    use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
-    use vector_core::metric_tags;
+    use vector_core::{
+        event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value},
+        metric_tags,
+    };
 
     use super::*;
 

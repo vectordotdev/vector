@@ -1,6 +1,8 @@
-use crate::Span;
-use diagnostic::{DiagnosticMessage, Label, Note, Severity};
 use std::fmt::{Display, Formatter};
+
+use diagnostic::{DiagnosticMessage, Label, Note, Severity};
+
+use crate::Span;
 
 #[derive(Debug)]
 pub struct DeprecationWarning {

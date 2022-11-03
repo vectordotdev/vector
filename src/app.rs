@@ -34,12 +34,12 @@ use crate::{tap, top};
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
+use tokio::sync::broadcast::error::RecvError;
+
 use crate::internal_events::{
     VectorConfigLoadError, VectorQuit, VectorRecoveryError, VectorReloadError, VectorReloaded,
     VectorStarted, VectorStopped,
 };
-
-use tokio::sync::broadcast::error::RecvError;
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,

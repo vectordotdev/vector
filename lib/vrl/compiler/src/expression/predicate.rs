@@ -2,9 +2,8 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
-use crate::expression::Block;
 use crate::{
-    expression::{Expr, Resolved},
+    expression::{Block, Expr, Resolved},
     parser::Node,
     state::{TypeInfo, TypeState},
     value::Kind,

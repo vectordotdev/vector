@@ -1,5 +1,6 @@
-use crate::{Kind, Value};
 use std::collections::BTreeMap;
+
+use crate::{Kind, Value};
 
 impl Kind {
     /// Returns a tree representation of `Kind`, in a more human readable format.

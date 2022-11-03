@@ -1,8 +1,8 @@
-use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use std::{fmt, sync::Arc};
 
+use diagnostic::{DiagnosticMessage, Label, Note, Urls};
+
 use super::Block;
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{levenstein, ExpressionError, FunctionArgument},
     function::{
@@ -10,7 +10,7 @@ use crate::{
         ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
     },
     parser::{Ident, Node},
-    state::LocalEnv,
+    state::{LocalEnv, TypeInfo, TypeState},
     type_def::Details,
     value::Kind,
     CompileConfig, Context, Expression, Function, Resolved, Span, TypeDef,

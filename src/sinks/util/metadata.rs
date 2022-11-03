@@ -1,9 +1,8 @@
 use std::num::NonZeroUsize;
 
 use vector_buffers::EventCount;
-use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
-
 use vector_common::request_metadata::RequestMetadata;
+use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::request_builder::EncodeResult;
 

@@ -154,7 +154,6 @@ pub(crate) use self::aws_kinesis_firehose::*;
 pub(crate) use self::aws_kinesis_streams::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
-pub(crate) use self::codecs::*;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub(crate) use self::datadog_metrics::*;
 #[cfg(feature = "sinks-datadog_traces")]
@@ -212,7 +211,6 @@ pub(crate) use self::journald::*;
 pub(crate) use self::kafka::*;
 #[cfg(feature = "sources-kubernetes_logs")]
 pub(crate) use self::kubernetes_logs::*;
-pub(crate) use self::log_to_metric::*;
 #[cfg(feature = "sources-heroku_logs")]
 pub(crate) use self::logplex::*;
 #[cfg(feature = "sinks-loki")]
@@ -225,7 +223,6 @@ pub(crate) use self::metric_to_log::*;
 pub(crate) use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
-pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
@@ -268,8 +265,9 @@ pub(crate) use self::websocket::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
 pub(crate) use self::{
-    adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
-    heartbeat::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
+    adaptive_concurrency::*, batch::*, codecs::*, common::*, conditions::*, encoding_transcode::*,
+    heartbeat::*, log_to_metric::*, open::*, parser::*, process::*, socket::*, tcp::*, template::*,
+    udp::*,
 };
 
 // this version won't be needed once all `InternalEvent`s implement `name()`

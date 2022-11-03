@@ -13,8 +13,10 @@ use vector_buffers::{
     },
     BufferType, EventCount,
 };
-use vector_common::byte_size_of::ByteSizeOf;
-use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Message<const N: usize> {

@@ -4,6 +4,7 @@ use std::{
 };
 
 use futures::{FutureExt, TryFutureExt};
+use lookup::event_path;
 use snafu::ResultExt;
 use vector_config::configurable_component;
 
@@ -33,7 +34,6 @@ use crate::{
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
-use lookup::event_path;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";

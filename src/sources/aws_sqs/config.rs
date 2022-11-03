@@ -2,15 +2,14 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-use crate::aws::create_client;
-use crate::codecs::DecodingConfig;
-use crate::common::sqs::SqsClientBuilder;
-use crate::tls::TlsConfig;
 use crate::{
-    aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
+    aws::{auth::AwsAuthentication, create_client, region::RegionOrEndpoint},
+    codecs::DecodingConfig,
+    common::sqs::SqsClientBuilder,
     config::{Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
+    tls::TlsConfig,
 };
 
 /// Configuration for the `aws_sqs` source.

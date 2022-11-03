@@ -1,7 +1,11 @@
 use std::{fmt, iter::IntoIterator, pin::Pin};
 
 use async_trait::async_trait;
-use futures::{stream, task::Context, task::Poll, Sink, SinkExt, Stream, StreamExt};
+use futures::{
+    stream,
+    task::{Context, Poll},
+    Sink, SinkExt, Stream, StreamExt,
+};
 
 use crate::event::{into_event_stream, Event, EventArray, EventContainer};
 

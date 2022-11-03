@@ -1,12 +1,10 @@
 use ::value::Value;
-use vrl::function::ArgumentList;
-use vrl::function::Compiled;
-use vrl::function::Example;
-use vrl::function::FunctionCompileContext;
-use vrl::prelude::*;
-use vrl::state::TypeState;
-use vrl::Expression;
-use vrl::Function;
+use vrl::{
+    function::{ArgumentList, Compiled, Example, FunctionCompileContext},
+    prelude::*,
+    state::TypeState,
+    Expression, Function,
+};
 
 fn values(value: Value) -> Resolved {
     let object = value.try_object()?;
