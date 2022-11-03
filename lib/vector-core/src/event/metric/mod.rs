@@ -33,6 +33,19 @@ pub use self::tags::*;
 mod value;
 pub use self::value::*;
 
+#[macro_export]
+macro_rules! metric_tags {
+    () => { $crate::event::MetricTags::default() };
+
+    ($($key:expr => $value:expr,)+) => { $crate::metric_tags!($($key => $value),+) };
+
+    ($($key:expr => $value:expr),*) => {
+        $crate::event::MetricTags::from([
+            $( ($key.into(), $value.into()), )*
+        ])
+    };
+}
+
 /// A metric.
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq)]
@@ -615,13 +628,11 @@ mod test {
     }
 
     fn tags() -> MetricTags {
-        vec![
-            ("normal_tag".to_owned(), "value".to_owned()),
-            ("true_tag".to_owned(), "true".to_owned()),
-            ("empty_tag".to_owned(), "".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+        metric_tags!(
+            "normal_tag" => "value",
+            "true_tag" => "true",
+            "empty_tag" => "",
+        )
     }
 
     #[test]

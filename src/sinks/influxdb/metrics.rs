@@ -939,6 +939,7 @@ mod integration_tests {
     use chrono::{SecondsFormat, Utc};
     use futures::stream;
     use similar_asserts::assert_eq;
+    use vector_core::metric_tags;
 
     use crate::{
         config::{SinkConfig, SinkContext},
@@ -1104,14 +1105,10 @@ mod integration_tests {
                     MetricValue::Counter { value: i as f64 },
                 )
                 .with_namespace(Some("ns"))
-                .with_tags(Some(
-                    vec![
-                        ("region".to_owned(), "us-west-1".to_owned()),
-                        ("production".to_owned(), "true".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                )),
+                .with_tags(Some(metric_tags!(
+                    "region" => "us-west-1",
+                    "production" => "true",
+                ))),
             );
             events.push(event);
         }
@@ -1189,14 +1186,10 @@ mod integration_tests {
                 MetricValue::Counter { value: i as f64 },
             )
             .with_namespace(Some("ns"))
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west-1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west-1",
+                "production" => "true",
+            )))
             .with_timestamp(Some(Utc::now())),
         )
     }

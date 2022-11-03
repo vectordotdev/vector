@@ -360,6 +360,7 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::test_util::components::assert_transform_compliance;
@@ -491,15 +492,11 @@ mod tests {
                 metadata,
             )
             .with_namespace(Some("app"))
-            .with_tags(Some(
-                vec![
-                    ("method".to_owned(), "post".to_owned()),
-                    ("code".to_owned(), "200".to_owned()),
-                    ("host".to_owned(), "localhost".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "method" => "post",
+                "code" => "200",
+                "host" => "localhost",
+            )))
             .with_timestamp(Some(ts()))
         );
     }
