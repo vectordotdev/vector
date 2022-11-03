@@ -4,18 +4,20 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::path;
+use vector_common::shutdown::ShutdownSignal;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 
 use crate::{
     codecs::Decoder,
-    config::{log_schema, SourceContext},
+    config::log_schema,
     event::Event,
     serde::default_decoding,
     sources::{
         util::{build_unix_datagram_source, build_unix_stream_source},
         Source,
     },
+    SourceSender,
 };
 
 use super::SocketConfig;
@@ -80,18 +82,12 @@ impl UnixConfig {
 /// Function to pass to `build_unix_*_source`, specific to the basic unix source
 /// Takes a single line of a received message and handles an `Event` object.
 fn handle_events(
-    cx: &SourceContext,
     events: &mut [Event],
-    config: UnixConfig,
+    config: &UnixConfig,
     received_from: Option<Bytes>,
+    log_namespace: LogNamespace,
 ) {
     let now = Utc::now();
-
-    let log_namespace = cx.log_namespace(config.log_namespace);
-
-    let legacy_host_key = config
-        .host_key
-        .unwrap_or_else(|| log_schema().host_key().to_string());
 
     for event in events {
         let log = event.as_mut_log();
@@ -123,6 +119,7 @@ fn handle_events(
                 ),
                 LogNamespace::Legacy => {
                     let host_key = config
+                        .clone()
                         .host_key
                         .unwrap_or_else(|| log_schema().host_key().to_string());
 
@@ -140,10 +137,14 @@ fn handle_events(
 }
 
 pub(super) fn unix_datagram(
-    cx: &SourceContext,
     config: UnixConfig,
     decoder: Decoder,
+    shutdown: ShutdownSignal,
+    out: SourceSender,
+    log_namespace: LogNamespace,
 ) -> crate::Result<Source> {
+    let config_clone = config.clone();
+
     build_unix_datagram_source(
         config.path,
         config.socket_file_mode,
@@ -151,23 +152,31 @@ pub(super) fn unix_datagram(
             .max_length
             .unwrap_or_else(crate::serde::default_max_length),
         decoder,
-        move |events, received_from| handle_events(cx, events, config, received_from),
-        cx.shutdown,
-        cx.out,
+        move |events, received_from| {
+            handle_events(events, &config_clone, received_from, log_namespace)
+        },
+        shutdown,
+        out,
     )
 }
 
 pub(super) fn unix_stream(
-    cx: &SourceContext,
     config: UnixConfig,
     decoder: Decoder,
+    shutdown: ShutdownSignal,
+    out: SourceSender,
+    log_namespace: LogNamespace,
 ) -> crate::Result<Source> {
+    let config_clone = config.clone();
+
     build_unix_stream_source(
         config.path,
         config.socket_file_mode,
         decoder,
-        move |events, received_from| handle_events(cx, events, config, received_from),
-        cx.shutdown,
-        cx.out,
+        move |events, received_from| {
+            handle_events(events, &config_clone, received_from, log_namespace)
+        },
+        shutdown,
+        out,
     )
 }

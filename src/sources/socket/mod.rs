@@ -156,30 +156,23 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
-                let host_key = config
-                    .host_key
-                    .unwrap_or_else(|| log_schema().host_key().to_string());
                 let decoder = DecodingConfig::new(
-                    config.framing.unwrap_or_else(default_framing_message_based),
+                    config
+                        .clone()
+                        .framing
+                        .unwrap_or_else(default_framing_message_based),
                     config.decoding.clone(),
                     LogNamespace::Legacy,
                 )
                 .build();
-                unix::unix_datagram(
-                    config.path,
-                    config.socket_file_mode,
-                    config
-                        .max_length
-                        .unwrap_or_else(crate::serde::default_max_length),
-                    host_key,
-                    decoder,
-                    cx.shutdown,
-                    cx.out,
-                )
+
+                let log_namespace = cx.log_namespace(config.log_namespace);
+
+                unix::unix_datagram(config.clone(), decoder, cx.shutdown, cx.out, log_namespace)
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let (framing, decoding) = match (config.framing, config.max_length) {
+                let (framing, decoding) = match (config.clone().framing, config.max_length) {
                     (Some(_), Some(_)) => {
                         return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
                     }
@@ -202,17 +195,9 @@ impl SourceConfig for SocketConfig {
 
                 let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
 
-                let host_key = config
-                    .host_key
-                    .unwrap_or_else(|| log_schema().host_key().to_string());
-                unix::unix_stream(
-                    config.path,
-                    config.socket_file_mode,
-                    host_key,
-                    decoder,
-                    cx.shutdown,
-                    cx.out,
-                )
+                let log_namespace = cx.log_namespace(config.log_namespace);
+
+                unix::unix_stream(config.clone(), decoder, cx.shutdown, cx.out, log_namespace)
             }
         }
     }
