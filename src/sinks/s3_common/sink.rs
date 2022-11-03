@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
 use tower::Service;
+use vector_common::request_metadata::MetaDescriptive;
 use vector_core::{
     event::Finalizable,
     sink::StreamSink,
@@ -49,7 +50,7 @@ where
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(S3PartitionKey, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
-    RB::Request: Finalizable + Send,
+    RB::Request: Finalizable + MetaDescriptive + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let partitioner = self.partitioner;
@@ -86,7 +87,7 @@ where
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(S3PartitionKey, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
-    RB::Request: Finalizable + Send,
+    RB::Request: Finalizable + MetaDescriptive + Send,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await

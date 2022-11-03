@@ -1,5 +1,7 @@
 use std::{io, io::Write};
 
+use serde::Serialize;
+use vector_buffers::EventCount;
 use vector_core::{event::Event, ByteSizeOf};
 
 use crate::{
@@ -11,6 +13,7 @@ use crate::{
     },
 };
 
+#[derive(Serialize)]
 pub struct ProcessedEvent {
     pub index: String,
     pub bulk_action: BulkAction,
@@ -27,6 +30,13 @@ impl Finalizable for ProcessedEvent {
 impl ByteSizeOf for ProcessedEvent {
     fn allocated_bytes(&self) -> usize {
         self.index.allocated_bytes() + self.log.allocated_bytes() + self.id.allocated_bytes()
+    }
+}
+
+impl EventCount for ProcessedEvent {
+    fn event_count(&self) -> usize {
+        // An Elasticsearch ProcessedEvent is mapped one-to-one with an event.
+        1
     }
 }
 

@@ -172,6 +172,7 @@ jobs:
     name: Build baseline 'soak-vector' container
     runs-on: [linux, soak-builder]
     needs: [compute-soak-meta]
+    timeout-minutes: 20
     steps:
       - uses: colpal/actions-clean@v1
 
@@ -217,6 +218,7 @@ jobs:
     name: Build comparison 'soak-vector' container
     runs-on: [linux, soak-builder]
     needs: [compute-soak-meta]
+    timeout-minutes: 20
     steps:
       - uses: colpal/actions-clean@v1
 
