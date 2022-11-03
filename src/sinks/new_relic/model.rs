@@ -50,9 +50,10 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                         .collect::<BTreeMap<_, _>>())
                 });
 
-                let mut metric_data = KeyValData::new();
-
+                // We only handle gauge and counter metrics
                 if let MetricValue::Gauge { value } | MetricValue::Counter { value } = data.value {
+                    let mut metric_data = KeyValData::new();
+                    // Set name, value, and timestamp
                     metric_data.insert("name".to_owned(), Value::from(series.name.name));
                     metric_data.insert(
                         "value".to_owned(),
@@ -72,10 +73,8 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                     if let Some(attr) = attr {
                         metric_data.insert("attributes".to_owned(), attr);
                     }
-                }
-
-                match (data.value, data.kind) {
-                    (MetricValue::Counter { .. }, MetricKind::Incremental) => {
+                    // Set type and type related attributes
+                    if let (MetricValue::Counter { .. }, MetricKind::Incremental) = (data.value, data.kind) {
                         if let Some(interval_ms) = data.time.interval_ms {
                             metric_data.insert(
                                 "interval.ms".to_owned(),
@@ -86,17 +85,13 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                             continue;
                         }
                         metric_data.insert("type".to_owned(), Value::from("count"));
-                    }
-                    (
-                        MetricValue::Gauge { .. } | MetricValue::Counter { .. },
-                        MetricKind::Absolute,
-                    ) => {
+                    } else {
+                        // Anything that's not an incremental counter is considered a gauge, that is gauge and absolute counters metrics.
                         metric_data.insert("type".to_owned(), Value::from("gauge"));
                     }
-                    _ => {}
-                }
 
-                metric_array.push(metric_data);
+                    metric_array.push(metric_data);
+                }
             }
         }
 
