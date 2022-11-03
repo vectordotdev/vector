@@ -7,7 +7,7 @@ pub struct ConfigFile {}
 
 impl ConfigFile {
     pub fn new() -> Self {
-        ConfigFile {}
+        Self {}
     }
 
     pub fn path(&self) -> PathBuf {

@@ -18,7 +18,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn new(verbosity: LevelFilter) -> Application {
+    pub fn new(verbosity: LevelFilter) -> Self {
         let platform = Platform::new();
         let config_file = ConfigFile::new();
         let config_model = config_file.load();
@@ -33,7 +33,7 @@ impl Application {
             }
         };
 
-        Application {
+        Self {
             config_file: config_file,
             config: config_model,
             repo: Repository::new(path),

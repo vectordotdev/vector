@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod platform;
 mod repo;
+mod testing;
 
 use crate::app::Application;
 use crate::commands::cli::Cli;

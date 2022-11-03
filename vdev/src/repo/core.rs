@@ -8,8 +8,8 @@ pub struct Repository {
 }
 
 impl Repository {
-    pub fn new(path: String) -> Repository {
-        Repository {
+    pub fn new(path: String) -> Self {
+        Self {
             path: path.to_string(),
             git: Git::new(path.to_string()),
         }

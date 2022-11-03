@@ -1,13 +1,16 @@
 use cached::proc_macro::once;
-use dunce;
-use home;
-use os_info;
+use directories::ProjectDirs;
 use std::env::consts::ARCH;
 use std::path::{Path, PathBuf};
 
 #[once]
 fn _os_info() -> os_info::Info {
     os_info::get()
+}
+
+#[once]
+fn _project_dirs() -> Option<ProjectDirs> {
+    ProjectDirs::from("", "vector", "vdev")
 }
 
 pub struct Platform {}
@@ -24,11 +27,19 @@ impl Platform {
         }
     }
 
-    #[allow(dead_code)]
     pub fn home(&self) -> PathBuf {
         match home::home_dir() {
             Some(path) => path,
             None => ["~"].iter().collect(),
+        }
+    }
+
+    pub fn data_dir(&self) -> PathBuf {
+        match _project_dirs() {
+            Some(path) => path.data_local_dir().to_path_buf(),
+            None => [self.home().to_str().unwrap(), ".local", "vector", "vdev"]
+                .iter()
+                .collect(),
         }
     }
 

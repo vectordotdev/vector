@@ -33,6 +33,8 @@ enum Commands {
     Config(commands::config::cli::Cli),
     /// Execute a command within the repository
     Exec(commands::exec::Cli),
+    /// Manage integrations
+    Int(commands::int::cli::Cli),
     /// Collection of useful utilities
     Meta(commands::meta::cli::Cli),
     /// Show information about the current environment
@@ -45,6 +47,7 @@ impl Cli {
             Commands::Build(cli) => cli.exec(&app),
             Commands::Config(cli) => cli.exec(&app),
             Commands::Exec(cli) => cli.exec(&app),
+            Commands::Int(cli) => cli.exec(&app),
             Commands::Meta(cli) => cli.exec(&app),
             Commands::Status(cli) => cli.exec(&app),
         }
