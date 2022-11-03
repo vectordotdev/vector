@@ -1,14 +1,11 @@
-use std::{fmt::Debug, sync::Arc, time::Duration};
+use std::{fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{
     stream::{self, BoxStream},
     StreamExt,
 };
-use tokio::{
-    sync::oneshot::{channel, Sender},
-    time::sleep,
-};
+use tokio::sync::oneshot::{channel, Sender};
 use tower::Service;
 use vector_core::{
     config::log_schema,
@@ -122,31 +119,18 @@ where
 
         sink.run().await?;
 
-        // Signals the APM stats flushing thread to send the remaining cached payloads and exit.
-        {
-            // create a channel for the stats flushing thread to communicate back that it has flushed
-            // remaining stats. This is necessary so that we do not terminate the process while the
-            // stats flushing thread is trying to complete the HTTP request.
-            let (sender, mut receiver) = channel();
+        // Create a channel for the stats flushing thread to communicate back that it has flushed
+        // remaining stats. This is necessary so that we do not terminate the process while the
+        // stats flushing thread is trying to complete the HTTP request.
+        let (sender, receiver) = channel();
 
-            // Notify the stats thread task to flush remaining payloads and shutdown.
-            let _ = self.shutdown.send(sender);
+        // Signal the stats thread task to flush remaining payloads and shutdown.
+        let _ = self.shutdown.send(sender);
 
-            // allow the stats flushing thread up to 50 seconds to send the remaining stats payloads
-            // Vector allows 59 seconds for components to shutdown. We shouldn't need more than 10 but
-            // doesn't hurt to be conservative for the timeout since we are using the oneshot.
-            let timeout = sleep(Duration::from_secs(50));
-            tokio::pin!(timeout);
-
-            loop {
-                tokio::select! {
-                    _ = &mut receiver => break,
-                    _ = &mut timeout => break,
-                }
-            }
-        }
-
-        Ok(())
+        // The stats flushing thread has until the component shutdown grace period to end
+        // gracefully. Otherwise the sink + stats flushing thread will be killed and an error
+        // reported upstream.
+        receiver.await.map_err(|_| ())
     }
 }
 

@@ -27,8 +27,12 @@ use crate::{
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
-    #[snafu(display("Encoding of a request payload failed ({}, {})", message, reason))]
-    FailedToEncode {
+    #[snafu(display(
+        "Building an APM stats request payload failed ({}, {})",
+        message,
+        reason
+    ))]
+    FailedToBuild {
         message: &'static str,
         reason: String,
         dropped_events: u64,
@@ -42,7 +46,7 @@ impl RequestBuilderError {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_parts(self) -> (&'static str, String, u64) {
         match self {
-            Self::FailedToEncode {
+            Self::FailedToBuild {
                 message,
                 reason,
                 dropped_events,
@@ -108,8 +112,8 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
             .filter_map(|e| e.try_into_trace())
             .collect::<Vec<TraceEvent>>();
 
-        // compute APM stats from the incoming events
-        // those payloads are sent out separately from the sink framework, by the thread `flush_apm_stats_thread()`
+        // Compute APM stats from the incoming events. The stats payloads are sent out
+        // separately from the sink framework, by the thread `flush_apm_stats_thread()`
         compute_apm_stats(&key, Arc::clone(&self.stats_aggregator), &trace_events);
 
         self.trace_encoder
@@ -146,14 +150,14 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
 
                             results.push(Ok(((metadata, request_metadata), bytes)))
                         }
-                        Err(e) => results.push(Err(RequestBuilderError::FailedToEncode {
+                        Err(e) => results.push(Err(RequestBuilderError::FailedToBuild {
                             message: "Payload compression failed.",
                             reason: e.to_string(),
                             dropped_events: n as u64,
                         })),
                     }
                 }
-                Err(err) => results.push(Err(RequestBuilderError::FailedToEncode {
+                Err(err) => results.push(Err(RequestBuilderError::FailedToBuild {
                     message: err.parts().0,
                     reason: err.parts().1.into(),
                     dropped_events: err.parts().2,

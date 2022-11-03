@@ -173,7 +173,7 @@ impl DatadogTracesConfig {
             .settings(request_limits, TraceApiRetry)
             .service(TraceApiService::new(client.clone()));
 
-        // object responsible for caching/processing APM stats from incoming trace events
+        // Object responsible for caching/processing APM stats from incoming trace events.
         let apm_stats_aggregator =
             Arc::new(Mutex::new(Aggregator::new(Arc::clone(&default_api_key))));
 

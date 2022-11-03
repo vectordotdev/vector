@@ -67,7 +67,10 @@ pub async fn flush_apm_stats_thread(
                 let _ = sink_shutdown_ack_sender.send(());
                 break;
             }
-            Err(_) => error!(message = "Tokio Sender unexpectedly dropped.", internal_log_rate_limit = true),
+            Err(_) => {
+                error!(message = "Tokio Sender unexpectedly dropped.", internal_log_rate_limit = true);
+                break;
+            },
         }
         }
     }
@@ -105,8 +108,8 @@ impl ApmStatsSender {
             if let Err(e) = self.compress_and_send(payload, api_key).await {
                 // TODO emit an internal `Error` event here, probably
                 error!(
-                    message = format!("Error while encoding and sending APM stats payloads: {}", e),
                     internal_log_rate_limit = true,
+                    "Error while encoding and sending APM stats payloads: {}", e,
                 );
             }
         }
@@ -119,7 +122,7 @@ impl ApmStatsSender {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let (metadata, compressed_payload) = self.build_apm_stats_request_data(api_key, payload)?;
 
-        let request_metadata = RequestMetadata::new(0, 0, 0, 0, 0);
+        let request_metadata = RequestMetadata::default();
         let trace_api_request = build_request(
             (metadata, request_metadata),
             compressed_payload,
@@ -142,8 +145,8 @@ impl ApmStatsSender {
         payload: StatsPayload,
     ) -> Result<(DDTracesMetadata, Bytes), RequestBuilderError> {
         let encoded_payload =
-            rmp_serde::to_vec_named(&payload).map_err(|e| RequestBuilderError::FailedToEncode {
-                message: "APM stats encoding failed.",
+            rmp_serde::to_vec_named(&payload).map_err(|e| RequestBuilderError::FailedToBuild {
+                message: "Encoding failed.",
                 reason: e.to_string(),
                 dropped_events: 0,
             })?;
@@ -163,8 +166,8 @@ impl ApmStatsSender {
 
                 Ok((metadata, bytes))
             }
-            Err(e) => Err(RequestBuilderError::FailedToEncode {
-                message: "APM stats payload compression failed.",
+            Err(e) => Err(RequestBuilderError::FailedToBuild {
+                message: "Compression failed.",
                 reason: e.to_string(),
                 dropped_events: 0,
             }),
