@@ -22,8 +22,23 @@ const EPOCH_RFC3339_3: &str = "1970-01-01T00:00:00.000Z";
 const EPOCH_RFC3339_6: &str = "1970-01-01T00:00:00.000000Z";
 const EPOCH_RFC3339_9: &str = "1970-01-01T00:00:00.000000000Z";
 
-/// A helper trait that is implemented for any `T` that implements `serde::Serialize`, to get the
-/// estimated JSON encoded size of that type.
+/// Return the estimated size of a type in bytes when encoded as JSON.
+///
+/// The result of this function is not guaranteed to be accurate but is intended to give a good
+/// approximation to be used by internal events in Vector.
+///
+/// It should *NOT* be used for exact size calculations, as it may lead to incorrect results.
+///
+/// Implementaors of this trait should strive to provide as accurate numbers as possible, without
+/// introducing a significant performance penalty.
+///
+/// As an example, the size of a type that results in a JSON string should not iterate over
+/// individual bytes of that string to check for the need of escape sequences or the need for UTF-8
+/// REPLACEMENT CHARACTER, as those operations are too expensive to do. Instead, the size of the
+/// string is the estimation of the actual size of the string in memory, combined with two
+/// surrounding quotes.
+///
+/// Ideally, no allocations should take place in any implementation of this function.
 pub trait EstimatedJsonEncodedSizeOf {
     fn estimated_json_encoded_size_of(&self) -> usize;
 }
@@ -106,12 +121,9 @@ impl EstimatedJsonEncodedSizeOf for f64 {
     }
 }
 
-/// This implementation delegates to `f64`'s implementation, as that is what `serde_json` does as
-/// well. Not doing so would result in a small difference in the reported byte size of the
-/// serialized value.
 impl EstimatedJsonEncodedSizeOf for f32 {
     fn estimated_json_encoded_size_of(&self) -> usize {
-        f64::from(*self).estimated_json_encoded_size_of()
+        ryu::Buffer::new().format_finite(*self).len()
     }
 }
 
@@ -189,7 +201,7 @@ impl EstimatedJsonEncodedSizeOf for DateTime<Utc> {
     /// The timestamp is converted to a static epoch timestamp, to avoid any unnecessary
     /// allocations.
     ///
-    /// The following invariants must hold for the size of timestamps to remain correct:
+    /// The following invariants must hold for the size of timestamps to remain accurate:
     ///
     /// - `chrono::SecondsFormat::AutoSi` is used to calculate nanoseconds precision.
     /// - `use_z` is `true` for the `chrono::DateTime#to_rfc3339_opts` function call.
@@ -405,8 +417,6 @@ impl EstimatedJsonEncodedSizeOf for isize {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 #[cfg(test)]
 mod tests {
     #![allow(clippy::needless_pass_by_value)]
@@ -434,14 +444,6 @@ mod tests {
 
     impl AsRef<str> for ValidString {
         fn as_ref(&self) -> &str {
-            &self.0
-        }
-    }
-
-    impl std::ops::Deref for ValidString {
-        type Target = String;
-
-        fn deref(&self) -> &Self::Target {
             &self.0
         }
     }
@@ -528,8 +530,6 @@ mod tests {
 
     #[quickcheck]
     fn estimate_f32(v: f32) -> bool {
-        let v = f64::from(v);
-
         // floats are expected to be finite.
         if !v.is_finite() {
             return true;
@@ -625,8 +625,8 @@ mod tests {
         }
     }
 
-    // Some strings are known to report invalid sizes with the byte size counting serializer. This
-    // is done for performance reasons.
+    // Some strings are known to report invalid sizes for `EstimatedJsonEncodedSizeOf`. We accept
+    // this difference for performance reasons, and skip any test case that exposes this difference.
     fn is_inaccurately_counted_bytes<'a>(
         v: impl IntoIterator<Item = &'a u8> + std::fmt::Debug + Clone,
     ) -> bool {

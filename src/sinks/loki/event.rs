@@ -89,8 +89,7 @@ impl ByteSizeOf for LokiEvent {
     }
 }
 
-/// This implementation approximates the `Serialize` implementation below, without any potential
-/// allocations.
+/// This implementation approximates the `Serialize` implementation below, without any allocations.
 impl EstimatedJsonEncodedSizeOf for LokiEvent {
     fn estimated_json_encoded_size_of(&self) -> usize {
         static BRACKETS_SIZE: usize = 2;
