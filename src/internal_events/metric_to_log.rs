@@ -3,8 +3,9 @@ use serde_json::Error;
 use vector_core::internal_event::InternalEvent;
 
 use crate::emit;
-use crate::internal_events::{ComponentEventsDropped, UNINTENTIONAL};
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
 pub struct MetricToLogSerializeError {

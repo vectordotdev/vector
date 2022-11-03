@@ -48,6 +48,7 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing::Instrument;
+use vector_common::internal_event::CallError;
 // === StreamSink<Event> ===
 use vector_core::internal_event::EventsSent;
 pub use vector_core::sink::StreamSink;
@@ -442,15 +443,29 @@ where
             .call(items)
             .err_into()
             .map(move |result| {
-                let status = result_status(result);
+                let status = result_status(&result);
                 finalizers.update_status(status);
-                if status == EventStatus::Delivered {
-                    emit!(EventsSent {
-                        count,
-                        byte_size,
-                        output: None
-                    });
-                    // TODO: Emit a BytesSent event here too
+
+                match status {
+                    EventStatus::Delivered => {
+                        emit!(EventsSent {
+                            count,
+                            byte_size,
+                            output: None
+                        });
+                        // TODO: Emit a BytesSent event here too
+                    }
+                    EventStatus::Rejected => {
+                        // Emit the `Error` and `EventsDropped` internal events.
+                        // This scenario occurs after retries have been attempted.
+                        let error = result.err().unwrap_or_else(|| "Response failed.".into());
+                        emit!(CallError {
+                            error,
+                            request_id,
+                            count,
+                        });
+                    }
+                    _ => {} // do nothing
                 }
 
                 // If the rx end is dropped we still completed
@@ -490,7 +505,7 @@ where
 
 pub trait ServiceLogic: Clone {
     type Response: Response;
-    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus;
+    fn result_status(&self, result: &crate::Result<Self::Response>) -> EventStatus;
 }
 
 #[derive(Derivative)]
@@ -511,12 +526,12 @@ where
 {
     type Response = R;
 
-    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus {
+    fn result_status(&self, result: &crate::Result<Self::Response>) -> EventStatus {
         result_status(result)
     }
 }
 
-fn result_status<R: Response + Send>(result: crate::Result<R>) -> EventStatus {
+fn result_status<R: Response + Send>(result: &crate::Result<R>) -> EventStatus {
     match result {
         Ok(response) => {
             if response.is_successful() {
