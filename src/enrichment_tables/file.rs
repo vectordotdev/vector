@@ -235,7 +235,7 @@ impl EnrichmentTableConfig for FileConfig {
         &self,
         globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        let (headers, data, modified) = self.load_file(globals.timezone)?;
+        let (headers, data, modified) = self.load_file(globals.timezone())?;
 
         Ok(Box::new(File::new(self.clone(), modified, data, headers)))
     }
