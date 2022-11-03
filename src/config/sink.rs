@@ -9,7 +9,10 @@ use vector_core::{
 };
 
 use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
-use crate::sinks::{util::UriSerde, Healthcheck, Sinks};
+use crate::{
+    sinks::{util::UriSerde, Healthcheck, Sinks},
+    topology::builder::SourceDetails,
+};
 
 /// Fully resolved sink component.
 #[configurable_component]
@@ -211,6 +214,7 @@ pub struct SinkContext {
     pub globals: GlobalOptions,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
+    pub sources_details: Vec<SourceDetails>,
 }
 
 impl SinkContext {
@@ -221,6 +225,7 @@ impl SinkContext {
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),
             schema: schema::Options::default(),
+            sources_details: vec![],
         }
     }
 
@@ -230,5 +235,9 @@ impl SinkContext {
 
     pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
+    }
+
+    pub fn source_details(&self, id: usize) -> Option<&SourceDetails> {
+        self.sources_details.get(id)
     }
 }

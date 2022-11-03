@@ -135,6 +135,16 @@ pub struct Pieces {
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
 }
 
+// #[derive(Debug, Clone, Default, Eq, PartialEq)]
+// pub struct PipelineDetails {
+//     pub sources: Vec<SourceDetails>,
+// }
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct SourceDetails {
+    pub key: ComponentKey,
+}
+
 /// Builds only the new pieces, and doesn't check their topology.
 pub async fn build_pieces(
     config: &super::Config,
@@ -150,6 +160,8 @@ pub async fn build_pieces(
     let mut detach_triggers = HashMap::new();
 
     let mut errors = vec![];
+
+    let mut sources_details = vec![];
 
     let (enrichment_tables, enrichment_errors) = load_enrichment_tables(config, diff).await;
     errors.extend(enrichment_errors);
@@ -178,9 +190,13 @@ pub async fn build_pieces(
             key.id()
         );
 
+        sources_details.push(SourceDetails { key: key.clone() });
+
+        let pipeline_source_id = sources_details.len() - 1;
+
         let mut builder = {
             let _span = span.enter();
-            SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+            SourceSender::builder(pipeline_source_id).with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
         };
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
@@ -439,6 +455,7 @@ pub async fn build_pieces(
             globals: config.global.clone(),
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
             schema: config.schema,
+            sources_details: sources_details.clone(),
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
