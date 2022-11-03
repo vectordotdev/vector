@@ -304,6 +304,7 @@ mod tests {
     use chrono::{offset::TimeZone, Utc};
     use futures::StreamExt;
     use indoc::indoc;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -423,11 +424,7 @@ mod tests {
                     MetricValue::Counter { value: *val as f64 },
                 )
                 .with_namespace(Some(*namespace))
-                .with_tags(Some(
-                    vec![("os.host".to_owned(), "somehost".to_owned())]
-                        .into_iter()
-                        .collect(),
-                ))
+                .with_tags(Some(metric_tags!("os.host" => "somehost")))
                 .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32))),
             );
             events.push(event);

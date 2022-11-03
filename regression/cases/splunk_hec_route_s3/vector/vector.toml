@@ -36,6 +36,7 @@ address = "0.0.0.0:9090"
 type = "aws_s3"
 inputs = ["container_type.sidecar"]
 
+region = "us-west-2"
 endpoint = "http://localhost:8080"
 bucket = "vector-soak-sidecar"
 
@@ -52,6 +53,7 @@ secret_access_key = "BADDCAFE"
 type = "aws_s3"
 inputs = ["container_type.service"]
 
+region = "us-west-2"
 endpoint = "http://localhost:8080"
 bucket = "vector-soak-service"
 
