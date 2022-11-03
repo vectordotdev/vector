@@ -39,6 +39,7 @@ use crate::{
     SourceSender,
 };
 use lookup::path;
+use vector_core::config::LegacyKey;
 use vector_core::{config::LogNamespace, ByteSizeOf};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
@@ -523,21 +524,21 @@ impl IngestorProcess {
             log_namespace.insert_source_metadata(
                 AwsS3Config::NAME,
                 &mut log,
-                path!("bucket"),
+                Some(LegacyKey::Overwrite(path!("bucket"))),
                 path!("bucket"),
                 Bytes::from(s3_event.s3.bucket.name.as_bytes().to_vec()),
             );
             log_namespace.insert_source_metadata(
                 AwsS3Config::NAME,
                 &mut log,
-                path!("object"),
+                Some(LegacyKey::Overwrite(path!("object"))),
                 path!("object"),
                 Bytes::from(s3_event.s3.object.key.as_bytes().to_vec()),
             );
             log_namespace.insert_source_metadata(
                 AwsS3Config::NAME,
                 &mut log,
-                path!("region"),
+                Some(LegacyKey::Overwrite(path!("region"))),
                 path!("region"),
                 Bytes::from(s3_event.aws_region.as_bytes().to_vec()),
             );
@@ -547,7 +548,7 @@ impl IngestorProcess {
                     log_namespace.insert_source_metadata(
                         AwsS3Config::NAME,
                         &mut log,
-                        key.as_str(),
+                        Some(LegacyKey::Overwrite(key.as_str())),
                         path!("metadata", key.as_str()),
                         value.clone(),
                     );

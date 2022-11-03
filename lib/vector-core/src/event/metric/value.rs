@@ -1,12 +1,11 @@
 use core::fmt;
 use std::collections::BTreeSet;
 
-use float_eq::FloatEq;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
 use super::{samples_to_buckets, write_list, write_word};
-use crate::metrics::AgentDDSketch;
+use crate::{float_eq, metrics::AgentDDSketch};
 
 /// Metric value.
 #[configurable_component]
@@ -373,7 +372,7 @@ impl PartialEq for MetricValue {
         match (self, other) {
             (Self::Counter { value: l_value }, Self::Counter { value: r_value })
             | (Self::Gauge { value: l_value }, Self::Gauge { value: r_value }) => {
-                l_value.eq_ulps(r_value, &1)
+                float_eq(*l_value, *r_value)
             }
             (Self::Set { values: l_values }, Self::Set { values: r_values }) => {
                 l_values == r_values
@@ -399,7 +398,7 @@ impl PartialEq for MetricValue {
                     count: r_count,
                     sum: r_sum,
                 },
-            ) => l_buckets == r_buckets && l_count == r_count && l_sum.eq_ulps(r_sum, &1),
+            ) => l_buckets == r_buckets && l_count == r_count && float_eq(*l_sum, *r_sum),
             (
                 Self::AggregatedSummary {
                     quantiles: l_quantiles,
@@ -411,7 +410,7 @@ impl PartialEq for MetricValue {
                     count: r_count,
                     sum: r_sum,
                 },
-            ) => l_quantiles == r_quantiles && l_count == r_count && l_sum.eq_ulps(r_sum, &1),
+            ) => l_quantiles == r_quantiles && l_count == r_count && float_eq(*l_sum, *r_sum),
             (Self::Sketch { sketch: l_sketch }, Self::Sketch { sketch: r_sketch }) => {
                 l_sketch == r_sketch
             }
@@ -577,13 +576,19 @@ impl From<MetricSketch> for ::value::Value {
 
 /// A single observation.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug)]
 pub struct Sample {
     /// The value of the observation.
     pub value: f64,
 
     /// The rate at which the value was observed.
     pub rate: u32,
+}
+
+impl PartialEq for Sample {
+    fn eq(&self, other: &Self) -> bool {
+        self.rate == other.rate && float_eq(self.value, other.value)
+    }
 }
 
 impl ByteSizeOf for Sample {
@@ -597,13 +602,19 @@ impl ByteSizeOf for Sample {
 /// Histogram buckets represent the `count` of observations where the value of the observations does
 /// not exceed the specified `upper_limit`.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug)]
 pub struct Bucket {
     /// The upper limit of values in the bucket.
     pub upper_limit: f64,
 
     /// The number of values tracked in this bucket.
     pub count: u64,
+}
+
+impl PartialEq for Bucket {
+    fn eq(&self, other: &Self) -> bool {
+        self.count == other.count && float_eq(self.upper_limit, other.upper_limit)
+    }
 }
 
 impl ByteSizeOf for Bucket {
@@ -628,7 +639,7 @@ impl ByteSizeOf for Bucket {
 ///
 /// [quantile_wikipedia]: https://en.wikipedia.org/wiki/Quantile
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug)]
 pub struct Quantile {
     /// The value of the quantile.
     ///
@@ -637,6 +648,12 @@ pub struct Quantile {
 
     /// The estimated value of the given quantile within the probability distribution.
     pub value: f64,
+}
+
+impl PartialEq for Quantile {
+    fn eq(&self, other: &Self) -> bool {
+        float_eq(self.quantile, other.quantile) && float_eq(self.value, other.value)
+    }
 }
 
 impl Quantile {

@@ -348,10 +348,11 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
+    use lookup::metadata_path;
+    use vector_core::metric_tags;
 
     use super::*;
-    use crate::event::{Event, LogEvent, MetricKind, MetricTags, MetricValue};
-    use lookup::metadata_path;
+    use crate::event::{Event, LogEvent, MetricKind, MetricValue};
 
     #[test]
     fn get_fields() {
@@ -557,10 +558,10 @@ mod tests {
     #[test]
     fn render_metric_with_tags() {
         let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
-        let metric = sample_metric().with_tags(Some(MetricTags::from([
-            (String::from("test"), String::from("true")),
-            (String::from("component"), String::from("template")),
-        ])));
+        let metric = sample_metric().with_tags(Some(metric_tags!(
+            "test" => "true",
+            "component" => "template",
+        )));
         assert_eq!(
             Ok(Bytes::from("name=a-counter component=template")),
             template.render(&metric)

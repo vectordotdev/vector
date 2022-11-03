@@ -1,7 +1,5 @@
 mod config_builder;
 mod loader;
-#[cfg(feature = "enterprise")]
-pub(crate) mod schema;
 mod secret;
 mod source;
 
@@ -152,12 +150,6 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "No secret placeholder found, skipping secret resolution.");
         load_builder_from_paths(config_paths)?
     };
-
-    // Check secrets in configuration
-    #[cfg(feature = "enterprise")]
-    {
-        crate::config::loading::schema::check_sensitive_fields_from_paths(config_paths, &builder)?;
-    }
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -395,7 +387,32 @@ mod tests {
 
     #[test]
     fn load_directory_ignores_unknown_file_formats() {
-        let path = PathBuf::from(".").join("tests").join("config-dir");
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("ignore-unknown");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn load_directory_globals() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("globals");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn load_directory_globals_duplicates() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("globals-duplicate");
         let configs = vec![ConfigPath::Dir(path)];
         let (_, warnings) = load_builder_from_paths(&configs).unwrap();
         assert!(warnings.is_empty());
