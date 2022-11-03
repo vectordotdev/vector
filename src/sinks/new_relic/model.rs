@@ -43,15 +43,12 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
             if let Event::Metric(metric) = buf_event {
                 // Generate Value::Object() from BTreeMap<String, String>
                 let (series, data, _) = metric.into_parts();
-                let attr = if let Some(tags) = series.tags {
-                    let mut bt = BTreeMap::new();
-                    for (key, value) in tags {
-                        bt.insert(key, Value::from(value));
-                    }
-                    Some(Value::from(bt))
-                } else {
-                    None
-                };
+                let attr = series.tags.map(|tags| {
+                    Value::from(tags
+                        .into_iter()
+                        .map(|(key, value)| (key, Value::from(value)))
+                        .collect::<BTreeMap<_, _>())
+                });
 
                 let mut metric_data = KeyValData::new();
 
