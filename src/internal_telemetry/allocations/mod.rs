@@ -4,7 +4,7 @@ mod allocator;
 use std::{
     sync::{
         atomic::{AtomicU64, Ordering},
-        RwLock,
+        Mutex,
     },
     thread,
     time::Duration,
@@ -21,11 +21,13 @@ pub(crate) use self::allocator::{
 };
 
 use crossbeam_utils::CachePadded;
+
+const NUM_GROUPS: usize = 256;
 /// These arrays represent the allocations and deallocations for each group.
 /// We pad each Atomic to reduce false sharing effects.
-static GROUP_MEM_ALLOCS: [CachePadded<AtomicU64>; 256] =
+static GROUP_MEM_ALLOCS: [CachePadded<AtomicU64>; NUM_GROUPS] =
     arr![CachePadded::new(AtomicU64::new(0)); 256];
-static GROUP_MEM_DEALLOCS: [CachePadded<AtomicU64>; 256] =
+static GROUP_MEM_DEALLOCS: [CachePadded<AtomicU64>; NUM_GROUPS] =
     arr![CachePadded::new(AtomicU64::new(0)); 256];
 
 // By using the Option type, we can do statics w/o the need of other creates such as lazy_static
@@ -45,7 +47,7 @@ impl GroupInfo {
     }
 }
 
-static GROUP_INFO: [RwLock<GroupInfo>; 256] = arr![RwLock::new(GroupInfo::new()); 256];
+static GROUP_INFO: [Mutex<GroupInfo>; NUM_GROUPS] = arr![Mutex::new(GroupInfo::new()); 256];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -79,19 +81,19 @@ pub fn init_allocation_tracing() {
                     let deallocs = GROUP_MEM_DEALLOCS[idx].load(Ordering::Relaxed);
                     let mem_used = allocs - deallocs;
 
-                    if mem_used == 0 {
+                    if allocs == 0 {
                         continue;
                     }
 
                     gauge!(
-                        "current_memory_allocated_in_bytes",
+                        "component_bytes_allocated",
                         mem_used.to_f64().expect("failed to convert group_id from int to float"),
                         "group_id" => idx.to_string(),
-                        "component_kind" => GROUP_INFO[idx].read().unwrap().component_kind.clone().unwrap_or_else(|| "root".to_string()),
-                        "component_type" => GROUP_INFO[idx].read().unwrap().component_type.clone().unwrap_or_else(|| "root".to_string()),
-                        "component_id" => GROUP_INFO[idx].read().unwrap().component_id.clone().unwrap_or_else(|| "root".to_string()));
+                        "component_kind" => GROUP_INFO[idx].lock().unwrap().component_kind.clone().unwrap_or_else(|| "root".to_string()),
+                        "component_type" => GROUP_INFO[idx].lock().unwrap().component_type.clone().unwrap_or_else(|| "root".to_string()),
+                        "component_id" => GROUP_INFO[idx].lock().unwrap().component_id.clone().unwrap_or_else(|| "root".to_string()));
                 }
-                thread::sleep(Duration::from_millis(10000));
+                thread::sleep(Duration::from_millis(5000));
             })
         })
         .unwrap();
@@ -112,11 +114,19 @@ pub fn acquire_allocation_group_id(
     let group_id =
         AllocationGroupId::register().expect("failed to register allocation group token");
     let idx = group_id.as_raw();
-    let mut writer = GROUP_INFO[idx].write().unwrap();
-    *writer = GroupInfo {
-        component_id: Some(component_id),
-        component_kind: Some(component_kind),
-        component_type: Some(component_type),
-    };
-    group_id
+    match GROUP_INFO.get(idx) {
+        Some(mutex) => {
+            let mut writer = mutex.lock().unwrap();
+            *writer = GroupInfo {
+                component_id: Some(component_id),
+                component_kind: Some(component_kind),
+                component_type: Some(component_type),
+            };
+            group_id
+        }
+        None => {
+            info!("We've reached the maximum number of allocation group IDs: {}. The allocations for the component {} will be attributed to the root allocation group.", NUM_GROUPS, component_id);
+            AllocationGroupId::ROOT
+        }
+    }
 }
