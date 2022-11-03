@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
-use lookup::event_path;
+use lookup::lookup_v2::parse_value_path;
+use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::BTreeMap;
@@ -37,20 +38,33 @@ impl SyslogDeserializerConfig {
                 schema::Definition::empty_legacy_namespace()
                     // The `message` field is always defined. If parsing fails, the entire body becomes the
                     // message.
-                    .with_field(log_schema().message_key(), Kind::bytes(), Some("message"))
+                    .with_field(
+                        &parse_value_path(log_schema().message_key()).expect("valid message key"),
+                        Kind::bytes(),
+                        Some("message"),
+                    )
                     // All other fields are optional.
                     .optional_field(
-                        log_schema().timestamp_key(),
+                        &parse_value_path(log_schema().timestamp_key())
+                            .expect("valid timestamp key"),
                         Kind::timestamp(),
                         Some("timestamp"),
                     )
-                    .optional_field("hostname", Kind::bytes(), None)
-                    .optional_field("severity", Kind::bytes(), Some("severity"))
-                    .optional_field("facility", Kind::bytes(), None)
-                    .optional_field("version", Kind::integer(), None)
-                    .optional_field("appname", Kind::bytes(), None)
-                    .optional_field("msgid", Kind::bytes(), None)
-                    .optional_field("procid", Kind::integer().or_bytes(), None)
+                    .optional_field(&owned_value_path!("hostname"), Kind::bytes(), None)
+                    .optional_field(
+                        &owned_value_path!("severity"),
+                        Kind::bytes(),
+                        Some("severity"),
+                    )
+                    .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
+                    .optional_field(&owned_value_path!("version"), Kind::integer(), None)
+                    .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                    .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
+                    .optional_field(
+                        &owned_value_path!("procid"),
+                        Kind::integer().or_bytes(),
+                        None,
+                    )
                     // "structured data" is placed at the root. It will always be a map of strings
                     .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
             }
@@ -59,15 +73,31 @@ impl SyslogDeserializerConfig {
                     Kind::object(Collection::empty()),
                     [log_namespace],
                 )
-                .with_field("message", Kind::bytes(), Some("message"))
-                .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                .optional_field("hostname", Kind::bytes(), None)
-                .optional_field("severity", Kind::bytes(), Some("severity"))
-                .optional_field("facility", Kind::bytes(), None)
-                .optional_field("version", Kind::integer(), None)
-                .optional_field("appname", Kind::bytes(), None)
-                .optional_field("msgid", Kind::bytes(), None)
-                .optional_field("procid", Kind::integer().or_bytes(), None)
+                .with_field(
+                    &owned_value_path!("message"),
+                    Kind::bytes(),
+                    Some("message"),
+                )
+                .optional_field(
+                    &owned_value_path!("timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp"),
+                )
+                .optional_field(&owned_value_path!("hostname"), Kind::bytes(), None)
+                .optional_field(
+                    &owned_value_path!("severity"),
+                    Kind::bytes(),
+                    Some("severity"),
+                )
+                .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
+                .optional_field(&owned_value_path!("version"), Kind::integer(), None)
+                .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
+                .optional_field(
+                    &owned_value_path!("procid"),
+                    Kind::integer().or_bytes(),
+                    None,
+                )
                 // "structured data" is placed at the root. It will always be a map strings
                 .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
             }
