@@ -4,7 +4,8 @@ use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::{service, BytesSent, CountByteSize};
+use vector_common::internal_event::{BytesSent, CallError, CountByteSize, PollReadyError};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 
 use super::FuturesUnorderedCount;
 use crate::{
@@ -53,7 +54,7 @@ impl<St, Svc> Driver<St, Svc> {
 impl<St, Svc> Driver<St, Svc>
 where
     St: Stream,
-    St::Item: Finalizable,
+    St::Item: Finalizable + MetaDescriptive,
     Svc: Service<St::Item>,
     Svc::Error: fmt::Debug + 'static,
     Svc::Future: Send + 'static,
@@ -122,7 +123,7 @@ where
                         let svc = match maybe_ready {
                             Poll::Ready(Ok(())) => &mut service,
                             Poll::Ready(Err(error)) => {
-                                emit(service::PollReadyError{ error });
+                                emit(PollReadyError{ error });
                                 return Err(())
                             }
                             Poll::Pending => {
@@ -142,9 +143,11 @@ where
                         );
                         let finalizers = req.take_finalizers();
 
+                        let metadata = req.get_metadata();
+
                         let fut = svc.call(req)
                             .err_into()
-                            .map(move |result| Self::handle_response(result, request_id, finalizers))
+                            .map(move |result| Self::handle_response(result, request_id, finalizers, &metadata))
                             .instrument(info_span!("request", request_id).or_current());
 
                         in_flight.push(fut);
@@ -167,11 +170,11 @@ where
         result: Result<Svc::Response, Svc::Error>,
         request_id: usize,
         finalizers: EventFinalizers,
+        metadata: &RequestMetadata,
     ) {
         match result {
             Err(error) => {
-                // `Error` and `EventsDropped` internal events are emitted in the sink retry logic.
-                error!(message = "Service call failed.", ?error, request_id);
+                Self::emit_call_error(Some(error), request_id, metadata.event_count());
                 finalizers.update_status(EventStatus::Rejected);
             }
             Ok(response) => {
@@ -190,10 +193,25 @@ where
                         byte_size: cbs.1,
                         output: None,
                     });
+
+                // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
+                } else if response.event_status() == EventStatus::Rejected {
+                    Self::emit_call_error(None, request_id, metadata.event_count());
+                    finalizers.update_status(EventStatus::Rejected);
                 }
             }
         };
         drop(finalizers); // suppress "argument not consumed" warning
+    }
+
+    /// Emit the `Error` and `EventsDropped` internal events.
+    /// This scenario occurs after retries have been attempted.
+    fn emit_call_error(error: Option<Svc::Error>, request_id: usize, count: usize) {
+        emit(CallError {
+            error,
+            request_id,
+            count,
+        });
     }
 }
 
@@ -216,17 +234,18 @@ mod tests {
     };
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
-    use vector_common::finalization::{
-        BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+    use vector_common::{
+        finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
+        request_metadata::RequestMetadata,
     };
-    use vector_common::internal_event::CountByteSize;
+    use vector_common::{internal_event::CountByteSize, request_metadata::MetaDescriptive};
 
     use super::{Driver, DriverResponse};
 
     type Counter = Arc<AtomicUsize>;
 
     #[derive(Debug)]
-    struct DelayRequest(usize, EventFinalizers);
+    struct DelayRequest(usize, EventFinalizers, RequestMetadata);
 
     impl DelayRequest {
         fn new(value: usize, counter: &Counter) -> Self {
@@ -236,13 +255,23 @@ mod tests {
                 receiver.await;
                 counter.fetch_add(value, Ordering::Relaxed);
             });
-            Self(value, EventFinalizers::new(EventFinalizer::new(batch)))
+            Self(
+                value,
+                EventFinalizers::new(EventFinalizer::new(batch)),
+                RequestMetadata::default(),
+            )
         }
     }
 
     impl Finalizable for DelayRequest {
         fn take_finalizers(&mut self) -> crate::event::EventFinalizers {
             std::mem::take(&mut self.1)
+        }
+    }
+
+    impl MetaDescriptive for DelayRequest {
+        fn get_metadata(&self) -> RequestMetadata {
+            self.2
         }
     }
 

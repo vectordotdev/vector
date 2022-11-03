@@ -13,7 +13,7 @@ use vector_core::{
 
 use crate::transforms::Transforms;
 
-use super::ComponentKey;
+use super::{id::Inputs, ComponentKey};
 
 /// Fully resolved transform component.
 #[configurable_component]
@@ -23,16 +23,8 @@ pub struct TransformOuter<T>
 where
     T: Configurable + Serialize,
 {
-    /// A list of upstream [source][sources] or [transform][transforms] IDs.
-    ///
-    /// Wildcards (`*`) are supported.
-    ///
-    /// See [configuration][configuration] for more info.
-    ///
-    /// [sources]: https://vector.dev/docs/reference/configuration/sources/
-    /// [transforms]: https://vector.dev/docs/reference/configuration/transforms/
-    /// [configuration]: https://vector.dev/docs/reference/configuration/
-    pub inputs: Vec<T>,
+    #[configurable(derived)]
+    pub inputs: Inputs<T>,
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
@@ -43,9 +35,13 @@ impl<T> TransformOuter<T>
 where
     T: Configurable + Serialize,
 {
-    pub(crate) fn new<I: Into<Transforms>>(inputs: Vec<T>, inner: I) -> Self {
+    pub(crate) fn new<I, IT>(inputs: I, inner: IT) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        IT: Into<Transforms>,
+    {
         TransformOuter {
-            inputs,
+            inputs: Inputs::from_iter(inputs),
             inner: inner.into(),
         }
     }
@@ -54,16 +50,17 @@ where
     where
         U: Configurable + Serialize,
     {
-        let inputs = self.inputs.iter().map(f).collect();
+        let inputs = self.inputs.iter().map(f).collect::<Vec<_>>();
         self.with_inputs(inputs)
     }
 
-    pub(crate) fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U>
+    pub(crate) fn with_inputs<I, U>(self, inputs: I) -> TransformOuter<U>
     where
+        I: IntoIterator<Item = U>,
         U: Configurable + Serialize,
     {
         TransformOuter {
-            inputs,
+            inputs: Inputs::from_iter(inputs),
             inner: self.inner,
         }
     }
@@ -261,7 +258,7 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
 
 #[derive(Debug, Serialize)]
 pub struct InnerTopologyTransform {
-    pub inputs: Vec<String>,
+    pub inputs: Inputs<String>,
     pub inner: Transforms,
 }
 

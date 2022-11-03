@@ -16,7 +16,7 @@ const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
-#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct EventMetadata {
     /// Arbitrary data stored with an event
     #[serde(default = "default_metadata_value", skip)]

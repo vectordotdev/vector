@@ -1,11 +1,8 @@
+use crate::register;
 use metrics::{register_counter, Counter};
 use vector_common::internal_event::{
-    Count, InternalEventHandle, RegisterInternalEvent, Registered,
-};
-
-use crate::{
-    internal_events::{ComponentEventsDropped, INTENTIONAL},
-    register,
+    ComponentEventsDropped, Count, InternalEventHandle, RegisterInternalEvent, Registered,
+    INTENTIONAL,
 };
 
 #[derive(Debug)]

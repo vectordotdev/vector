@@ -1,11 +1,10 @@
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
 pub struct DecoderFramingError<E> {
@@ -106,7 +105,7 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
 #[derive(Debug)]
 pub struct EncoderWriteError<'a, E> {
     pub error: &'a E,
-    pub count: u64,
+    pub count: usize,
 }
 
 impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {

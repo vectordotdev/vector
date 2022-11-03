@@ -1,15 +1,14 @@
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct InfluxdbEncodingError {
     pub error_message: &'static str,
-    pub count: u64,
+    pub count: usize,
 }
 
 impl InternalEvent for InfluxdbEncodingError {
