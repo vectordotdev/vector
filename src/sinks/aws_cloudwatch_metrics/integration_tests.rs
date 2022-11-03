@@ -3,6 +3,7 @@
 
 use chrono::{offset::TimeZone, Utc};
 use rand::seq::SliceRandom;
+use vector_core::metric_tags;
 
 use super::*;
 use crate::{
@@ -51,15 +52,11 @@ async fn cloudwatch_metrics_put_data() {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: i as f64 },
             )
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west-1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                    ("e".to_owned(), "".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            )),
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west-1",
+                "production" => "true",
+                "e" => "",
+            ))),
         );
         events.push(event);
     }
