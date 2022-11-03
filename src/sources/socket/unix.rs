@@ -3,20 +3,22 @@ use std::path::PathBuf;
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_config::configurable_component;
+use lookup::path;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::LogNamespace;
 
 use crate::{
     codecs::Decoder,
-    config::log_schema,
+    config::{log_schema, SourceContext},
     event::Event,
     serde::default_decoding,
-    shutdown::ShutdownSignal,
     sources::{
         util::{build_unix_datagram_source, build_unix_stream_source},
         Source,
     },
-    SourceSender,
 };
+
+use super::SocketConfig;
 
 /// Unix domain socket configuration for the `socket` source.
 #[configurable_component]
@@ -55,6 +57,10 @@ pub struct UnixConfig {
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 impl UnixConfig {
@@ -66,14 +72,26 @@ impl UnixConfig {
             host_key: None,
             framing: None,
             decoding: default_decoding(),
+            log_namespace: Some(true),
         }
     }
 }
 
 /// Function to pass to `build_unix_*_source`, specific to the basic unix source
 /// Takes a single line of a received message and handles an `Event` object.
-fn handle_events(events: &mut [Event], host_key: &str, received_from: Option<Bytes>) {
+fn handle_events(
+    cx: &SourceContext,
+    events: &mut [Event],
+    config: UnixConfig,
+    received_from: Option<Bytes>,
+) {
     let now = Utc::now();
+
+    let log_namespace = cx.log_namespace(config.log_namespace);
+
+    let legacy_host_key = config
+        .host_key
+        .unwrap_or_else(|| log_schema().host_key().to_string());
 
     for event in events {
         let log = event.as_mut_log();
@@ -81,46 +99,75 @@ fn handle_events(events: &mut [Event], host_key: &str, received_from: Option<Byt
         log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
         log.try_insert(log_schema().timestamp_key(), now);
 
+        log_namespace.insert_vector_metadata(
+            log,
+            path!(log_schema().source_type_key()),
+            path!("source_type"),
+            Bytes::from(SocketConfig::NAME),
+        );
+        log_namespace.insert_vector_metadata(
+            log,
+            path!(log_schema().timestamp_key()),
+            path!("timestamp"),
+            now,
+        );
+
         if let Some(ref host) = received_from {
-            log.try_insert(host_key, host.clone());
+            match log_namespace {
+                LogNamespace::Vector => log_namespace.insert_source_metadata(
+                    SocketConfig::NAME,
+                    log,
+                    path!(log_schema().host_key()),
+                    path!(log_schema().host_key()),
+                    host.clone(),
+                ),
+                LogNamespace::Legacy => {
+                    let host_key = config
+                        .host_key
+                        .unwrap_or_else(|| log_schema().host_key().to_string());
+
+                    log_namespace.insert_source_metadata(
+                        SocketConfig::NAME,
+                        log,
+                        path!(&host_key),
+                        path!(log_schema().host_key()),
+                        host.clone(),
+                    )
+                }
+            }
         }
     }
 }
 
 pub(super) fn unix_datagram(
-    path: PathBuf,
-    socket_file_mode: Option<u32>,
-    max_length: usize,
-    host_key: String,
+    cx: &SourceContext,
+    config: UnixConfig,
     decoder: Decoder,
-    shutdown: ShutdownSignal,
-    out: SourceSender,
 ) -> crate::Result<Source> {
     build_unix_datagram_source(
-        path,
-        socket_file_mode,
-        max_length,
+        config.path,
+        config.socket_file_mode,
+        config
+            .max_length
+            .unwrap_or_else(crate::serde::default_max_length),
         decoder,
-        move |events, received_from| handle_events(events, &host_key, received_from),
-        shutdown,
-        out,
+        move |events, received_from| handle_events(cx, events, config, received_from),
+        cx.shutdown,
+        cx.out,
     )
 }
 
 pub(super) fn unix_stream(
-    path: PathBuf,
-    socket_file_mode: Option<u32>,
-    host_key: String,
+    cx: &SourceContext,
+    config: UnixConfig,
     decoder: Decoder,
-    shutdown: ShutdownSignal,
-    out: SourceSender,
 ) -> crate::Result<Source> {
     build_unix_stream_source(
-        path,
-        socket_file_mode,
+        config.path,
+        config.socket_file_mode,
         decoder,
-        move |events, received_from| handle_events(events, &host_key, received_from),
-        shutdown,
-        out,
+        move |events, received_from| handle_events(cx, events, config, received_from),
+        cx.shutdown,
+        cx.out,
     )
 }
