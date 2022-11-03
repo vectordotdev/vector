@@ -47,7 +47,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                     Value::from(tags
                         .into_iter()
                         .map(|(key, value)| (key, Value::from(value)))
-                        .collect::<BTreeMap<_, _>())
+                        .collect::<BTreeMap<_, _>>())
                 });
 
                 let mut metric_data = KeyValData::new();
