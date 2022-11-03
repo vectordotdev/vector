@@ -372,7 +372,7 @@ async fn start_vector() -> (RunningTopology, tokio::sync::mpsc::UnboundedReceive
 
     let config = builder.build().expect("building config should not fail");
 
-    let (topology, shutdown) = start_topology(config, false).await;
+    let (topology, _, shutdown) = start_topology(config, false).await;
     info!("Started vector.");
 
     (topology, shutdown)

@@ -13,7 +13,11 @@ use tokio::sync::oneshot;
 use warp::{filters::BoxedFilter, http::Response, ws::Ws, Filter, Reply};
 
 use super::{handler, schema, ShutdownTx};
-use crate::{config, topology};
+use crate::{
+    config,
+    internal_events::{SocketBindError, SocketMode},
+    topology,
+};
 
 pub struct Server {
     _shutdown: ShutdownTx,
@@ -27,16 +31,24 @@ impl Server {
         config: &config::Config,
         watch_rx: topology::WatchRx,
         running: Arc<AtomicBool>,
-    ) -> Self {
+    ) -> crate::Result<Self> {
         let routes = make_routes(config.api.playground, watch_rx, running);
 
         let (_shutdown, rx) = oneshot::channel();
-        let (addr, server) = warp::serve(routes).bind_with_graceful_shutdown(
-            config.api.address.expect("No socket address"),
-            async {
-                rx.await.ok();
-            },
-        );
+        let (addr, server) = warp::serve(routes)
+            .try_bind_with_graceful_shutdown(
+                config.api.address.expect("No socket address"),
+                async {
+                    rx.await.ok();
+                },
+            )
+            .map_err(|error| {
+                emit!(SocketBindError {
+                    mode: SocketMode::Tcp,
+                    error: &error,
+                });
+                error
+            })?;
 
         // Update component schema with the config before starting the server.
         schema::components::update_config(config);
@@ -44,7 +56,7 @@ impl Server {
         // Spawn the server in the background.
         tokio::spawn(server);
 
-        Self { _shutdown, addr }
+        Ok(Self { _shutdown, addr })
     }
 
     /// Returns a copy of the SocketAddr that the server was started on.
