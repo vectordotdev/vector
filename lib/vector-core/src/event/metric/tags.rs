@@ -9,24 +9,45 @@ use vector_config::{configurable_component, Configurable};
 
 type TagValue = String;
 
-/// Tag values for a metric series.
-#[derive(Clone, Configurable, Debug, Default, Eq, PartialEq)]
-// An index set is used for this set, as it preserves the insertion order of the contained
-// elements. This allows us to retrieve the last element inserted which in turn allows us to emulate
-// the set having a single value.
-pub struct TagValueSet(#[configurable(transparent)] IndexSet<TagValue>);
+/// Tag values for a metric series.  This may be empty, a single value, or a set of values. This is
+/// used to provide the storage for `TagValueSet`.
+#[derive(Clone, Configurable, Debug, Eq, PartialEq)]
+pub enum TagValueSet {
+    /// This represents a set containing a no value or a single value. This is stored separately to
+    /// avoid the overhead of allocating a hash table for the common case of a single value for a
+    /// tag.
+    Single(#[configurable(transparent)] Option<TagValue>),
+    /// This holds an actual set of values. This variant will be automatically created when a single
+    /// value is added to, and reduced down to a single value when the length is reduced to 1.  An
+    /// index set is used for this set, as it preserves the insertion order of the contained
+    /// elements. This allows us to retrieve the last element inserted which in turn allows us to
+    /// emulate the set having a single value.
+    Set(#[configurable(transparent)] IndexSet<TagValue>),
+}
+
+impl Default for TagValueSet {
+    fn default() -> Self {
+        Self::Single(None)
+    }
+}
 
 impl TagValueSet {
     /// Convert this set into a single value, mimicking the behavior of this set being just a plain
     /// single string while still storing all of the values.
     pub(crate) fn into_single(self) -> Option<String> {
-        self.0.into_iter().last()
+        match self {
+            Self::Single(tag) => tag,
+            Self::Set(set) => set.into_iter().last(),
+        }
     }
 
     /// Get the "single" value of this set, mimicking the behavior of this set being just a plain
     /// single string while still storing all of the values.
     pub(crate) fn as_single(&self) -> Option<&str> {
-        self.0.iter().last().map(String::as_ref)
+        match self {
+            Self::Single(tag) => tag.as_ref().map(String::as_str),
+            Self::Set(set) => set.iter().last().map(String::as_ref),
+        }
     }
 
     fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
@@ -34,28 +55,73 @@ impl TagValueSet {
     }
 
     fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        match self {
+            Self::Single(None) => true,
+            Self::Single(Some(_)) | Self::Set(_) => false, // the `Set` variant will never be empty
+        }
     }
 
     #[cfg(test)]
     fn len(&self) -> usize {
-        self.0.len()
+        match self {
+            Self::Single(None) => 0,
+            Self::Single(Some(_)) => 1,
+            Self::Set(set) => set.len(),
+        }
     }
 
     #[cfg(test)]
     fn contains(&self, value: &str) -> bool {
-        self.0.contains(value)
+        match self {
+            Self::Single(None) => false,
+            Self::Single(Some(tag)) => tag == value,
+            Self::Set(set) => set.contains(value),
+        }
     }
 
     fn retain(&mut self, mut f: impl FnMut(&str) -> bool) {
-        self.0.retain(|value| f(value.as_str()));
+        match self {
+            Self::Single(None) => (),
+            Self::Single(Some(tag)) => {
+                if !f(tag) {
+                    *self = Self::Single(None);
+                }
+            }
+            Self::Set(set) => {
+                set.retain(|value| f(value.as_str()));
+                match set.len() {
+                    0 | 1 => *self = Self::Single(set.pop()),
+                    _ => {}
+                }
+            }
+        }
     }
 
     fn insert(&mut self, value: TagValue) -> bool {
-        // If the value was previously present, we want to move it to become the last element. The
-        // only way to do this is to remove any existing value.
-        self.0.remove(&value);
-        self.0.insert(value)
+        match self {
+            // Need to take ownership of the single value to optionally move it into a set.
+            Self::Single(single) => match single.take() {
+                None => {
+                    *self = Self::Single(Some(value));
+                    false
+                }
+                Some(tag) => {
+                    if tag == value {
+                        *self = Self::Single(Some(value));
+                        true
+                    } else {
+                        *self = Self::Set(IndexSet::from([tag, value]));
+                        false
+                    }
+                }
+            },
+            Self::Set(set) => {
+                // If the value was previously present, we want to move it to become the last element. The
+                // only way to do this is to remove any existing value.
+                set.remove(&value);
+                set.insert(value)
+            }
+        }
     }
 }
 
@@ -64,18 +130,22 @@ impl TagValueSet {
 #[allow(clippy::derive_hash_xor_eq)]
 impl Hash for TagValueSet {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        // Hash each contained value individually and then combine the hash values using
-        // exclusive-or. This results in the same value no matter what order the storage order.
-        let combined = self
-            .0
-            .iter()
-            .map(|tag| {
-                let mut hasher = DefaultHasher::default();
-                tag.hash(&mut hasher);
-                hasher.finish()
-            })
-            .reduce(|a, b| a ^ b);
-        combined.hash(hasher);
+        match self {
+            Self::Single(tag) => tag.hash(hasher),
+            Self::Set(set) => {
+                // Hash each contained value individually and then combine the hash values using
+                // exclusive-or. This results in the same value no matter what order the storage order.
+                let combined = set
+                    .iter()
+                    .map(|tag| {
+                        let mut hasher = DefaultHasher::default();
+                        tag.hash(&mut hasher);
+                        hasher.finish()
+                    })
+                    .reduce(|a, b| a ^ b);
+                combined.hash(hasher);
+            }
+        }
     }
 }
 
@@ -119,26 +189,68 @@ impl FromIterator<TagValue> for TagValueSet {
 }
 
 impl IntoIterator for TagValueSet {
-    type IntoIter = <IndexSet<TagValue> as IntoIterator>::IntoIter;
+    type IntoIter = TagValueIter;
     type Item = TagValue;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        match self {
+            Self::Single(tag) => TagValueIter::Single(tag),
+            Self::Set(set) => TagValueIter::Set(set.into_iter()),
+        }
+    }
+}
+
+pub enum TagValueIter {
+    Single(Option<String>),
+    Set(<IndexSet<TagValue> as IntoIterator>::IntoIter),
+}
+
+impl Iterator for TagValueIter {
+    type Item = TagValue;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Single(single) => single.take(),
+            Self::Set(set) => set.next(),
+        }
     }
 }
 
 impl<'a> IntoIterator for &'a TagValueSet {
-    type IntoIter = <&'a IndexSet<TagValue> as IntoIterator>::IntoIter;
-    type Item = &'a String;
+    type IntoIter = TagValueRefIter<'a>;
+    type Item = &'a str;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        match self {
+            TagValueSet::Single(tag) => TagValueRefIter::Single(tag.as_ref()),
+            TagValueSet::Set(set) => TagValueRefIter::Set(set.into_iter()),
+        }
+    }
+}
+
+pub enum TagValueRefIter<'a> {
+    Single(Option<&'a String>),
+    Set(<&'a IndexSet<TagValue> as IntoIterator>::IntoIter),
+}
+
+impl<'a> Iterator for TagValueRefIter<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Single(single) => single.take(),
+            Self::Set(set) => set.next(),
+        }
+        .map(String::as_str)
     }
 }
 
 impl ByteSizeOf for TagValueSet {
     fn allocated_bytes(&self) -> usize {
-        self.0.allocated_bytes()
+        match self {
+            Self::Single(tag) => tag.allocated_bytes(),
+            Self::Set(set) => set.allocated_bytes(),
+        }
     }
 }
 
@@ -179,7 +291,7 @@ impl MetricTags {
     pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
         self.0
             .iter()
-            .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_ref(), tag.as_ref())))
+            .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_ref(), tag)))
     }
 
     pub fn contains_key(&self, name: &str) -> bool {
@@ -342,7 +454,7 @@ mod test_support {
 
     impl Arbitrary for TagValueSet {
         fn arbitrary(g: &mut Gen) -> Self {
-            Self(HashSet::<TagValue>::arbitrary(g).into_iter().collect())
+            HashSet::<TagValue>::arbitrary(g).into_iter().collect()
         }
     }
 
@@ -383,7 +495,7 @@ mod tests {
             // All input values are contained in the set.
             assert!(values.iter().all(|v| set.contains(v.as_str())));
             // All set values were in the input.
-            assert!(set.iter().all(|v| values.contains(v)));
+            assert!(set.iter().all(|v| values.contains(&v.into())));
             // Critical: the "single value" of the set is the last value added.
             assert_eq!(set.as_single(), values.last().map(String::as_str));
 
