@@ -6,10 +6,14 @@ use codecs::{
 };
 use futures::StreamExt;
 use listenfd::ListenFd;
+use lookup::path;
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    ByteSizeOf,
+};
 
 use crate::{
     codecs::Decoder,
@@ -21,6 +25,7 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::{
+        socket::SocketConfig,
         util::net::{try_bind_udp_socket, SocketListenAddr},
         Source,
     },
@@ -108,10 +113,10 @@ impl UdpConfig {
 
 pub(super) fn udp(
     config: UdpConfig,
-    host_key: String,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
+    log_namespace: LogNamespace,
 ) -> Source {
     Box::pin(async move {
         let listenfd = ListenFd::from_env();
@@ -204,14 +209,46 @@ pub(super) fn udp(
 
                                 for event in &mut events {
                                     if let Event::Log(ref mut log) = event {
-                                        log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
-                                        log.try_insert(log_schema().timestamp_key(), now);
-                                        log.try_insert(host_key.as_str(), address.ip().to_string());
+					log_namespace.insert_vector_metadata(
+					    log,
+					    path!(log_schema().source_type_key()),
+					    path!("source_type"),
+					    Bytes::from(SocketConfig::NAME),
+					);
 
-                                        if let Some(port_key) = &config.port_key {
-                                            log.try_insert(port_key.as_str(), address.port());
-                                        }
-                                    }
+					log_namespace.insert_vector_metadata(
+					    log,
+					    path!(log_schema().timestamp_key()),
+					    path!("ingest_timestamp"),
+					    now,
+					);
+
+					let legacy_host_key = config
+					    .host_key()
+					    .as_deref()
+					    .unwrap_or_else(|| log_schema().host_key());
+
+					let legacy_port_key = config
+					    .port_key
+					    .as_deref()
+					    .unwrap_or_else(|| "port");
+
+					log_namespace.insert_source_metadata(
+					    SocketConfig::NAME,
+					    log,
+					    Some(LegacyKey::InsertIfEmpty(path!(legacy_host_key))),
+					    path!(log_schema().host_key()),
+					    address.ip().to_string(),
+					);
+
+					log_namespace.insert_source_metadata(
+					    SocketConfig::NAME,
+					    log,
+					    Some(LegacyKey::InsertIfEmpty(path!(legacy_port_key))),
+					    path!("port"),
+					    address.port(),
+					);
+				    }
                                 }
 
                                 tokio::select!{

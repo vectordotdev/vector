@@ -11,7 +11,7 @@ use vector_core::config::LogNamespace;
 use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
-    config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
+    config::{DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
@@ -143,17 +143,20 @@ impl SourceConfig for SocketConfig {
                 )
             }
             Mode::Udp(config) => {
-                let host_key = config
-                    .host_key()
-                    .clone()
-                    .unwrap_or_else(|| log_schema().host_key().to_string());
+                let log_namespace = cx.log_namespace(config.log_namespace);
                 let decoder = DecodingConfig::new(
                     config.framing().clone(),
                     config.decoding().clone(),
                     LogNamespace::Legacy,
                 )
                 .build();
-                Ok(udp::udp(config, host_key, decoder, cx.shutdown, cx.out))
+                Ok(udp::udp(
+                    config,
+                    decoder,
+                    cx.shutdown,
+                    cx.out,
+                    log_namespace,
+                ))
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {

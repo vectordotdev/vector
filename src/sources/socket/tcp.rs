@@ -201,7 +201,7 @@ impl TcpSource for RawTcpSource {
                 self.log_namespace.insert_vector_metadata(
                     log,
                     path!(log_schema().timestamp_key()),
-                    path!("timestamp"),
+                    path!("ingest_timestamp"),
                     now,
                 );
 
@@ -211,6 +211,8 @@ impl TcpSource for RawTcpSource {
                     .as_deref()
                     .unwrap_or_else(|| log_schema().host_key());
 
+                let legacy_port_key = self.config.port_key.as_deref().unwrap_or_else(|| "port");
+
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,
                     log,
@@ -219,15 +221,13 @@ impl TcpSource for RawTcpSource {
                     host.ip().to_string(),
                 );
 
-                let legacy_port_key = self.config.port_key.as_deref().unwrap_or_else(|| "port");
-
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,
                     log,
                     Some(LegacyKey::InsertIfEmpty(path!(legacy_port_key))),
                     path!("port"),
                     host.port(),
-                )
+                );
             }
         }
     }
