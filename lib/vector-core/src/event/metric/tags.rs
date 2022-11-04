@@ -79,7 +79,7 @@ impl Ord for TagValueSet {
         // TODO: This will give wrong answers much of the time when the set has more than one item,
         // but comparing hash sets for ordering is non-trivial and this at least gives _an_ answer.
         // This is required to provide an ordering on the metric series, which is used by the
-        // metrics sink buffer `sort_for_compression` and the `apache_metrics` source parser tests.
+        // metrics sink buffer `sort_for_compression` and is hard to emulate there.
         self.as_single().cmp(&that.as_single())
     }
 }
