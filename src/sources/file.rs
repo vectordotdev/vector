@@ -1596,6 +1596,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_multi_line_checkpointing() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            multiline: Some(MultilineConfig {
+                start_pattern: "INFO".to_owned(),
+                condition_pattern: "INFO".to_owned(),
+                mode: line_agg::Mode::HaltBefore,
+                timeout_ms: 25, // less than 50 in sleep()
+            }),
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        writeln!(&mut file, "INFO hello").unwrap();
+        writeln!(&mut file, "part of hello").unwrap();
+
+        // Read and aggregate existing lines
+        let received = run_file_source(&config, false, Acks, sleep_500_millis()).await;
+        let lines = extract_messages_string(received);
+        assert_eq!(lines, vec!["INFO hello\npart of hello"]);
+
+        // After restart, we should not see any part of the previously aggregated lines
+        let received_after_restart = run_file_source(&config, false, Acks, async {
+            writeln!(&mut file, "INFO goodbye").unwrap();
+        })
+        .await;
+        let lines = extract_messages_string(received_after_restart);
+        assert_eq!(lines, vec!["INFO goodbye"]);
+    }
+
+    #[tokio::test]
     async fn test_fair_reads() {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
