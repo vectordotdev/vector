@@ -106,29 +106,18 @@ fn handle_events(
         );
 
         if let Some(ref host) = received_from {
-            match log_namespace {
-                LogNamespace::Vector => log_namespace.insert_source_metadata(
-                    SocketConfig::NAME,
-                    log,
-                    None::<LegacyKey<&'static str>>,
-                    path!(log_schema().host_key()),
-                    host.clone(),
-                ),
-                LogNamespace::Legacy => {
-                    let host_key = config
-                        .clone()
-                        .host_key
-                        .unwrap_or_else(|| log_schema().host_key().to_string());
+            let host_key = config
+                .clone()
+                .host_key
+                .unwrap_or_else(|| log_schema().host_key().to_string());
 
-                    log_namespace.insert_source_metadata(
-                        SocketConfig::NAME,
-                        log,
-                        Some(LegacyKey::InsertIfEmpty(path!(&host_key))),
-                        path!(log_schema().host_key()),
-                        host.clone(),
-                    )
-                }
-            }
+            log_namespace.insert_source_metadata(
+                SocketConfig::NAME,
+                log,
+                Some(LegacyKey::InsertIfEmpty(path!(&host_key))),
+                path!(log_schema().host_key()),
+                host.clone(),
+            );
         }
     }
 }

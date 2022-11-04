@@ -219,17 +219,15 @@ impl TcpSource for RawTcpSource {
                     host.ip().to_string(),
                 );
 
-                if let (LogNamespace::Legacy, Some(port_key)) =
-                    (self.log_namespace, &self.config.port_key)
-                {
-                    self.log_namespace.insert_source_metadata(
-                        SocketConfig::NAME,
-                        log,
-                        Some(LegacyKey::InsertIfEmpty(path!(port_key))),
-                        path!("port"),
-                        host.port(),
-                    )
-                }
+                let legacy_port_key = self.config.port_key.as_deref().unwrap_or_else(|| "port");
+
+                self.log_namespace.insert_source_metadata(
+                    SocketConfig::NAME,
+                    log,
+                    Some(LegacyKey::InsertIfEmpty(path!(legacy_port_key))),
+                    path!("port"),
+                    host.port(),
+                )
             }
         }
     }
