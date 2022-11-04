@@ -20,8 +20,14 @@ decoding.codec = "bytes"
 type = "remap"
 inputs = ["logs"]
 source = '''
-., err = parse_apache_log(.message, format: "common")
-.custom = {}
+if starts_with(strip_whitespace!(.message), "{") {
+  custom, err = parse_json(.message)
+  if (err == null) {
+    .custom, err = compact(custom, string: false)
+  }
+}
+.custom.message = .message
+.tags = []
 '''
 
 [transforms.processing]
