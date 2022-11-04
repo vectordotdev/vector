@@ -1,11 +1,12 @@
 use std::{future::ready, panic, sync::Arc};
 
-use aws_sdk_s3::error::GetObjectError;
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sqs::error::{DeleteMessageBatchError, ReceiveMessageError};
-use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, Message};
-use aws_sdk_sqs::output::DeleteMessageBatchOutput;
-use aws_sdk_sqs::Client as SqsClient;
+use aws_sdk_s3::{error::GetObjectError, Client as S3Client};
+use aws_sdk_sqs::{
+    error::{DeleteMessageBatchError, ReceiveMessageError},
+    model::{DeleteMessageBatchRequestEntry, Message},
+    output::DeleteMessageBatchOutput,
+    Client as SqsClient,
+};
 use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
@@ -24,7 +25,7 @@ use vector_common::internal_event::{
 use vector_config::{configurable_component, NamedComponent};
 
 use crate::{
-    config::{log_schema, SourceAcknowledgementsConfig, SourceContext},
+    config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
@@ -39,8 +40,10 @@ use crate::{
     SourceSender,
 };
 use lookup::path;
-use vector_core::config::LegacyKey;
-use vector_core::{config::LogNamespace, ByteSizeOf};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    ByteSizeOf,
+};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -459,6 +462,7 @@ impl IngestorProcess {
         let object = object_result?;
 
         let metadata = object.metadata;
+        // TODO: Insert last_modified as source metadata?
         let timestamp = object
             .last_modified
             .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()))
@@ -555,16 +559,10 @@ impl IngestorProcess {
                 }
             }
 
-            log_namespace.insert_vector_metadata(
+            // TODO: This ingest timestamp may be the S3 object's last modified time.
+            log_namespace.insert_standard_vector_source_metadata(
                 &mut log,
-                path!(log_schema().source_type_key()),
-                path!("source_type"),
-                Bytes::from(AwsS3Config::NAME),
-            );
-            log_namespace.insert_vector_metadata(
-                &mut log,
-                path!(log_schema().timestamp_key()),
-                path!("ingest_timestamp"),
+                AwsS3Config::NAME,
                 timestamp,
             );
 

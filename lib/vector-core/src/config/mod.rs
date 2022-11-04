@@ -2,7 +2,7 @@ use std::{fmt, num::NonZeroUsize};
 
 use bitmask_enum::bitmask;
 use bytes::Bytes;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 
 mod global_options;
 mod log_schema;
@@ -349,6 +349,7 @@ impl LogNamespace {
         &self,
         log: &mut LogEvent,
         source_name: &'static str,
+        now: DateTime<Utc>,
     ) {
         self.insert_vector_metadata(
             log,
@@ -360,7 +361,7 @@ impl LogNamespace {
             log,
             path!(log_schema().timestamp_key()),
             path!("ingest_timestamp"),
-            Utc::now(),
+            now,
         );
     }
 

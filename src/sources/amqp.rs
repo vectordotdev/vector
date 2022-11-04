@@ -3,7 +3,7 @@
 use crate::{
     amqp::AmqpConfig,
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext},
+    config::{Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
@@ -25,9 +25,8 @@ use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
 use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LegacyKey;
 use vector_core::{
-    config::{LogNamespace, SourceAcknowledgementsConfig},
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
     ByteSizeOf,
 };
@@ -199,20 +198,6 @@ fn populate_event(
 ) {
     let log = event.as_mut_log();
 
-    log_namespace.insert_vector_metadata(
-        log,
-        log_schema().timestamp_key(),
-        "ingest_timestamp",
-        timestamp,
-    );
-
-    log_namespace.insert_vector_metadata(
-        log,
-        log_schema().source_type_key(),
-        "source_type",
-        "amqp",
-    );
-
     log_namespace.insert_source_metadata(
         AmqpSourceConfig::NAME,
         log,
@@ -236,6 +221,9 @@ fn populate_event(
         "offset",
         keys.delivery_tag,
     );
+
+    // TODO: This ingest timestamp may be the AMQP message's timestamp.
+    log_namespace.insert_standard_vector_source_metadata(log, AmqpSourceConfig::NAME, timestamp);
 }
 
 /// Receives an event from `AMQP` and pushes it along the pipeline.
@@ -249,7 +237,8 @@ async fn receive_event(
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
     let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
 
-    // Extract timestamp from amqp message
+    // Extract timestamp from AMQP message
+    // TODO: Insert timestamp as source metadata?
     let timestamp = msg
         .properties
         .timestamp()
