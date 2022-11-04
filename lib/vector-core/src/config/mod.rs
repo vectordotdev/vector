@@ -282,6 +282,9 @@ impl Default for LogNamespace {
     }
 }
 
+/// A shortcut to specify no `LegacyKey` should be used (since otherwise a turbofish would be required)
+pub const NO_LEGACY_KEY: Option<LegacyKey<&'static str>> = None;
+
 pub enum LegacyKey<T> {
     /// Always insert the data, even if the field previously existed
     Overwrite(T),
