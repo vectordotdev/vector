@@ -552,7 +552,6 @@ transforms-logs = [
   "transforms-aws_ec2_metadata",
   "transforms-dedupe",
   "transforms-filter",
-  "transforms-geoip",
   "transforms-lua",
   "transforms-metric_to_log",
   "transforms-pipelines",
@@ -577,7 +576,6 @@ transforms-aggregate = []
 transforms-aws_ec2_metadata = ["dep:arc-swap", "dep:serde_with"]
 transforms-dedupe = ["dep:lru"]
 transforms-filter = []
-transforms-geoip = ["dep:maxminddb"]
 transforms-lua = ["dep:mlua", "vector-core/lua", "dep:serde_with"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
