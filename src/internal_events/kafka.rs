@@ -160,7 +160,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
     fn emit(self) {
         error!(
             message = "Failed to extract header. Value should be a map of String -> Bytes.",
-            error_code = "extracing_header",
+            error_code = "extracting_header",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
             header_field = self.header_field,
@@ -168,7 +168,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
         );
         counter!(
             "component_errors_total", 1,
-            "error_code" => "extracing_header",
+            "error_code" => "extracting_header",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
