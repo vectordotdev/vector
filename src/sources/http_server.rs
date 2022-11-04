@@ -1,5 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr};
 
+use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codecs::{
@@ -7,7 +8,7 @@ use codecs::{
     BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
     NewlineDelimitedDecoderConfig,
 };
-use http::StatusCode;
+use http::{Method, StatusCode, Uri};
 use lookup::event_path;
 use tokio_util::codec::Decoder as _;
 use vector_config::configurable_component;
@@ -16,6 +17,10 @@ use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
+    components::compliance::{
+        BuiltComponent, Codec, Component, ComponentBuilderParts, ComponentType, ExternalResource,
+        ResourceDefinition, ResourceDirection,
+    },
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
         SourceConfig, SourceContext,
@@ -124,9 +129,9 @@ pub struct SimpleHttpConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-impl GenerateConfig for SimpleHttpConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+impl Default for SimpleHttpConfig {
+    fn default() -> Self {
+        Self {
             address: "0.0.0.0:8080".parse().unwrap(),
             encoding: None,
             headers: Vec::new(),
@@ -140,8 +145,54 @@ impl GenerateConfig for SimpleHttpConfig {
             framing: None,
             decoding: Some(default_decoding()),
             acknowledgements: AcknowledgementsConfig::default(),
-        })
-        .unwrap()
+        }
+    }
+}
+
+impl_generate_config_from_default!(SimpleHttpConfig);
+
+#[async_trait]
+impl Component for SimpleHttpConfig {
+    fn component_type(&self) -> ComponentType {
+        ComponentType::Source
+    }
+
+    fn external_resource(&self) -> Option<ExternalResource> {
+        let scheme = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.enabled)
+            .map(|e| if e { "https" } else { "http" })
+            .unwrap_or("http");
+        let uri = Uri::builder()
+            .scheme(scheme)
+            .authority(self.address.to_string())
+            .path_and_query(self.path.clone())
+            .build()
+            .expect("should not fail to build request URI");
+        // TODO: Why do we use our own custom method enum that isn't just a newtype wrapper of
+        // `http::Method`? :thinkies:
+        let method = Some(Method::POST);
+
+        Some(ExternalResource::new(
+            ResourceDirection::Push,
+            ResourceDefinition::Http(crate::components::compliance::HttpConfig::from_parts(
+                uri, method,
+            )),
+            // TODO: Figure out the right codec based on `self.encoding`.
+            Codec::JSON,
+        ))
+    }
+
+    async fn build_component(
+        &self,
+        builder_parts: ComponentBuilderParts,
+    ) -> Result<BuiltComponent, String> {
+        let source_context = builder_parts.into_source_builder_parts();
+        self.build(source_context)
+            .await
+            .map(BuiltComponent::Source)
+            .map_err(|e| format!("failed to build source component: {}", e))
     }
 }
 
