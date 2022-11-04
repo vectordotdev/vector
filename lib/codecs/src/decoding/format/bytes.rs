@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use lookup::lookup_v2::parse_value_path;
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -36,7 +37,7 @@ impl BytesDeserializerConfig {
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => schema::Definition::empty_legacy_namespace().with_field(
-                log_schema().message_key(),
+                &parse_value_path(log_schema().message_key()).expect("valid message key"),
                 Kind::bytes(),
                 Some("message"),
             ),

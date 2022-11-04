@@ -387,7 +387,32 @@ mod tests {
 
     #[test]
     fn load_directory_ignores_unknown_file_formats() {
-        let path = PathBuf::from(".").join("tests").join("config-dir");
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("ignore-unknown");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn load_directory_globals() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("globals");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn load_directory_globals_duplicates() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("globals-duplicate");
         let configs = vec![ConfigPath::Dir(path)];
         let (_, warnings) = load_builder_from_paths(&configs).unwrap();
         assert!(warnings.is_empty());
