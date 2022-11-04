@@ -12,20 +12,24 @@ mod sink {
     use vector_core::internal_event::InternalEvent;
 
     use crate::{
+        emit,
         event::metric::{MetricKind, MetricValue},
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
     };
-    use vector_common::internal_event::{error_stage, error_type};
+    use vector_common::internal_event::{
+        error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+    };
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
-        pub error: vector_core::Error,
+        pub error: vector_common::Error,
     }
 
     impl InternalEvent for SplunkEventEncodeError {
         fn emit(self) {
+            let reason = "Failed to encode Splunk HEC event as JSON.";
             error!(
-                message = "Error encoding Splunk HEC event to JSON.",
+                message = reason,
                 error = ?self.error,
                 error_code = "serializing_json",
                 error_type = error_type::ENCODER_FAILED,
@@ -38,6 +42,7 @@ mod sink {
                 "error_type" => error_type::ENCODER_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
         }
     }
 

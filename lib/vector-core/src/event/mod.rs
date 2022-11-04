@@ -13,7 +13,7 @@ pub use finalization::{
 };
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
-pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
+pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
@@ -43,7 +43,7 @@ mod vrl_target;
 
 pub const PARTIAL: &str = "_partial";
 
-#[derive(PartialEq, PartialOrd, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
 pub enum Event {

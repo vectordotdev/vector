@@ -1,8 +1,6 @@
 mod integration_tests;
 mod tests;
 
-use std::collections::BTreeMap;
-
 use aws_sdk_cloudwatch::{
     error::PutMetricDataError,
     model::{Dimension, MetricDatum},
@@ -23,7 +21,7 @@ use crate::{
     },
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     event::{
-        metric::{Metric, MetricValue},
+        metric::{Metric, MetricTags, MetricValue},
         Event,
     },
     sinks::util::{
@@ -197,7 +195,7 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
     }
 }
 
-fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
+fn tags_to_dimensions(tags: &MetricTags) -> Vec<Dimension> {
     // according to the API, up to 10 dimensions per metric can be provided
     tags.iter()
         .take(10)
@@ -308,15 +306,13 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
     type Error = SdkError<PutMetricDataError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        // Emission of Error internal event is handled upstream by the caller
-
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, items: PartitionInnerBuffer<Vec<Metric>, String>) -> Self::Future {
-        // Emission of Error internal event is handled upstream by the caller
-
         let (items, namespace) = items.into_parts();
         let metric_data = self.encode_events(items);
         if metric_data.is_empty() {

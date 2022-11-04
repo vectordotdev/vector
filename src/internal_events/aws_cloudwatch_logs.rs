@@ -1,11 +1,10 @@
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 use vector_core::internal_event::InternalEvent;
 
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 
 #[derive(Debug)]
 pub struct AwsCloudwatchLogsMessageSizeError {
@@ -23,6 +22,7 @@ impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
             error_code = "message_too_long",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

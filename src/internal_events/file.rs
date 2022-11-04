@@ -1,11 +1,8 @@
 use metrics::{counter, gauge};
 use std::borrow::Cow;
-use vector_core::internal_event::InternalEvent;
+use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
@@ -50,7 +47,7 @@ pub struct FileIoError<'a, P> {
     pub code: &'static str,
     pub message: &'static str,
     pub path: &'a P,
-    pub dropped_events: u64,
+    pub dropped_events: usize,
 }
 
 impl<'a, P: std::fmt::Debug> InternalEvent for FileIoError<'a, P> {

@@ -1,5 +1,4 @@
-use std::time::{Duration, Instant};
-
+use vector_common::internal_event::{Count, InternalEventHandle as _, Registered};
 use vector_config::configurable_component;
 
 use crate::{
@@ -17,6 +16,9 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
     #[configurable(derived)]
+    /// The condition that every input event is matched against.
+    ///
+    /// If an event is matched by the condition, it is forwarded. Otherwise, the event is dropped.
     condition: AnyCondition,
 }
 
@@ -28,11 +30,7 @@ impl From<AnyCondition> for FilterConfig {
 
 impl GenerateConfig for FilterConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"condition.type = "check_fields"
-            condition."message.eq" = "value""#,
-        )
-        .unwrap()
+        toml::from_str(r#"condition = ".message = \"value\"""#).unwrap()
     }
 }
 
@@ -48,8 +46,8 @@ impl TransformConfig for FilterConfig {
         Input::all()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all()).with_schema_definition(merged_definition.clone())]
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -57,23 +55,17 @@ impl TransformConfig for FilterConfig {
     }
 }
 
-#[derive(Derivative, Clone)]
-#[derivative(Debug)]
+#[derive(Clone)]
 pub struct Filter {
-    #[derivative(Debug = "ignore")]
     condition: Condition,
-    last_emission: Instant,
-    emissions_max_delay: Duration,
-    emissions_deferred: u64,
+    events_dropped: Registered<FilterEventsDropped>,
 }
 
 impl Filter {
     pub fn new(condition: Condition) -> Self {
         Self {
             condition,
-            last_emission: Instant::now(),
-            emissions_max_delay: Duration::new(2, 0),
-            emissions_deferred: 0,
+            events_dropped: register!(FilterEventsDropped),
         }
     }
 }
@@ -83,14 +75,8 @@ impl FunctionTransform for Filter {
         let (result, event) = self.condition.check(event);
         if result {
             output.push(event);
-        } else if self.last_emission.elapsed() >= self.emissions_max_delay {
-            emit!(FilterEventsDropped {
-                total: self.emissions_deferred,
-            });
-            self.emissions_deferred = 0;
-            self.last_emission = Instant::now();
         } else {
-            self.emissions_deferred += 1;
+            self.events_dropped.emit(Count(1));
         }
     }
 }

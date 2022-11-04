@@ -249,7 +249,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
+#[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
     use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
@@ -259,6 +259,7 @@ mod integration_tests {
 
     use super::*;
     use crate::gcp;
+    use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         random_events_with_stream, random_string, trace_init,
@@ -326,7 +327,7 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (_input, events) = random_events_with_stream(100, 100, Some(batch));
-        sink.run(events).await.expect("Sending events failed");
+        run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 

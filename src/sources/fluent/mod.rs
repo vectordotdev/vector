@@ -12,10 +12,10 @@ use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
         SourceConfig, SourceContext,
     },
     event::{Event, LogEvent},
@@ -51,7 +51,7 @@ pub struct FluentConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl GenerateConfig for FluentConfig {
@@ -97,7 +97,7 @@ impl SourceConfig for FluentConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![self.address.into()]
+        vec![self.address.as_tcp_resource()]
     }
 
     fn can_acknowledge(&self) -> bool {

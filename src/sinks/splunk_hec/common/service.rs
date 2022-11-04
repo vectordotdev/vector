@@ -1,21 +1,19 @@
 use std::{
     fmt,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use bytes::Bytes;
-use futures_util::{future::BoxFuture, ready};
+use futures_util::future::BoxFuture;
 use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use tokio::sync::{
-    mpsc::{self},
-    oneshot, OwnedSemaphorePermit, Semaphore,
-};
+use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
+use vector_common::request_metadata::MetaDescriptive;
 use vector_core::event::EventStatus;
 
 use super::{
@@ -115,8 +113,8 @@ where
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
         let ack_slot = self.current_ack_slot.take();
 
-        let events_count = req.events_count;
-        let events_byte_size = req.events_byte_size;
+        let events_count = req.get_metadata().event_count();
+        let events_byte_size = req.get_metadata().events_byte_size();
         let response = self.inner.call(req);
 
         Box::pin(async move {
@@ -261,7 +259,8 @@ impl HttpRequestBuilder {
 mod tests {
     use std::{
         collections::HashMap,
-        num::{NonZeroU64, NonZeroU8},
+        future::poll_fn,
+        num::{NonZeroU64, NonZeroU8, NonZeroUsize},
         sync::{
             atomic::{AtomicU64, Ordering},
             Arc,
@@ -270,7 +269,7 @@ mod tests {
     };
 
     use bytes::Bytes;
-    use futures_util::{future::poll_fn, poll, stream::FuturesUnordered, StreamExt};
+    use futures_util::{poll, stream::FuturesUnordered, StreamExt};
     use tower::{util::BoxService, Service, ServiceExt};
     use vector_core::{
         config::proxy::ProxyConfig,
@@ -293,7 +292,7 @@ mod tests {
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
                 EndpointTarget,
             },
-            util::Compression,
+            util::{metadata::RequestMetadataBuilder, Compression},
         },
     };
 
@@ -327,10 +326,15 @@ mod tests {
     fn get_hec_request() -> HecRequest {
         let body = Bytes::from("test-message");
         let events_byte_size = body.len();
+
+        let builder = RequestMetadataBuilder::new(1, events_byte_size, events_byte_size);
+        let bytes_len =
+            NonZeroUsize::new(events_byte_size).expect("payload should never be zero length");
+        let metadata = builder.with_request_size(bytes_len);
+
         HecRequest {
             body,
-            events_count: 1,
-            events_byte_size,
+            metadata,
             finalizers: EventFinalizers::default(),
             passthrough_token: None,
             index: None,

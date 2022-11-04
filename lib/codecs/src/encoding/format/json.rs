@@ -42,7 +42,7 @@ impl JsonSerializer {
     }
 
     /// Encode event and represent it as JSON value.
-    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_core::Error> {
+    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         match event {
             Event::Log(log) => serde_json::to_value(&log),
             Event::Metric(metric) => serde_json::to_value(&metric),
@@ -53,7 +53,7 @@ impl JsonSerializer {
 }
 
 impl Encoder<Event> for JsonSerializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();
@@ -72,6 +72,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use vector_common::btreemap;
     use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
+    use vector_core::metric_tags;
 
     use super::*;
 
@@ -99,15 +100,11 @@ mod tests {
                 MetricValue::Counter { value: 100.0 },
             )
             .with_namespace(Some("vector"))
-            .with_tags(Some(
-                vec![
-                    ("key2".to_owned(), "value2".to_owned()),
-                    ("key1".to_owned(), "value1".to_owned()),
-                    ("Key3".to_owned(), "Value3".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "key2" => "value2",
+                "key1" => "value1",
+                "Key3" => "Value3",
+            )))
             .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11))),
         );
 

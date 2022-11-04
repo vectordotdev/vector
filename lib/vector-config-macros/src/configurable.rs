@@ -138,11 +138,11 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
         fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::vec::Vec::new();
 
-            let schema_metadata = <Self as ::vector_config::Configurable>::metadata();
+            let enum_metadata = <Self as ::vector_config::Configurable>::metadata();
             #(#mapped_variants)*
 
-            let mut schema = ::vector_config::schema::generate_composite_schema(&subschemas);
-            ::vector_config::schema::apply_metadata(&mut schema, schema_metadata);
+            let mut schema = ::vector_config::schema::generate_one_of_schema(&subschemas);
+            ::vector_config::schema::apply_metadata(&mut schema, enum_metadata);
 
             Ok(schema)
         }
@@ -268,6 +268,8 @@ fn build_named_struct_generate_schema_fn(
             let metadata = <Self as ::vector_config::Configurable>::metadata();
             #(#mapped_fields)*
 
+            let had_unflatted_properties = !properties.is_empty();
+
             let additional_properties = None;
             let mut schema = ::vector_config::schema::generate_struct_schema(
                 properties,
@@ -277,6 +279,16 @@ fn build_named_struct_generate_schema_fn(
 
             // If we have any flattened subschemas, deal with them now.
             if !flattened_subschemas.is_empty() {
+                // A niche case here is if all fields were flattened, which would leave our main
+                // schema as simply validating that the value is an object, and _nothing_ else.
+                //
+                // That's kind of useless, and ends up as noise in the schema, so if we didn't have
+                // any of our own unflattened properties, then steal the first flattened subschema
+                // and swap our main schema for it before flattening things overall.
+                if !had_unflatted_properties {
+                    schema = flattened_subschemas.remove(0);
+                }
+
                 ::vector_config::schema::convert_to_flattened_schema(&mut schema, flattened_subschemas);
             }
 
@@ -346,6 +358,21 @@ fn generate_container_metadata(
     let maybe_deprecated = get_metadata_deprecated(meta_ident, container.deprecated());
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, container.metadata());
 
+    // We add a special metadata that informs consumers of the schema what the "tagging mode" of
+    // this enum is. This is important because when we're using the schema to generate
+    // documentation, it can be hard to generate something that is as succinct as how you might
+    // otherwise describe the configuration behavior using natural language. Additionally, we
+    // typically allow deserialization such that fields are overlapped, and if variants had, for
+    // example, 3 shared fields between all variants, and each variant only had 1 unique field, we
+    // wouldn't want to relist all the shared fields per variant.... we just want to be able to
+    // describe which variant has to be used for its unique (variant specific) fields to be
+    // relevant.
+    let enum_metadata_attrs = container
+        .tagging()
+        .map(|tagging| tagging.as_enum_metadata());
+    let enum_metadata =
+        get_metadata_custom_attributes(meta_ident, enum_metadata_attrs.into_iter().flatten());
+
     quote! {
         let mut #meta_ident = ::vector_config::Metadata::default();
         #maybe_title
@@ -353,6 +380,7 @@ fn generate_container_metadata(
         #maybe_default_value
         #maybe_deprecated
         #maybe_custom_attributes
+        #enum_metadata
     }
 }
 
@@ -360,12 +388,92 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let field_ty = field.ty();
     let field_schema_ty = get_field_schema_ty(field);
 
+    // Our rules around how we generate this metadata are slightly complex, but here it goes:
+    //
+    // - All `Configurable` types define their own metadata, which at a minimum is their
+    //   description. It can optionally include things like validation rules, and custom attributes,
+    //   of which we use to better document types for downstream consumption. An example would be
+    //   specifying the integer type (signed vs unsigned vs floating point) as JSON Schema does not
+    //   differentiate between the three.
+    // - Building on that, there are types like `bool` or `u64` (scalars, essentially) where having
+    //   a description for the `Configurable` implementation on `bool` or `u64` makes no sense,
+    //   because the type name is self-describing. These types set the "transparent" flag in their
+    //   metadata to indicate that they intentionally have no description and that it's fine to not
+    //   emit a description in the schema for this type.
+    // - Scalars are also not "referenceable" which means their schema is used inline, not pointed
+    //   to by a schema reference.
+    // - All other types, whether they have a derive-based or hand-written implementation of
+    //   `Configurable` should have a referenceable name.
+    // - When using a referenceable type for a named field (struct or enum variant), it can be
+    //   annotated with a derive helper attribute called `derived`, which informs the codegen that
+    //   the title/description for that field should come from the field type's schema itself.
+    //
+    // Now that we've laid out the rules and invariants, let's talk about this code below.
+    //
+    // For non-referenceable types, their schema -- and thus their metadata -- will be used inline
+    // as the schema for the field, so we want to simply _merge_ our field's metadata into the field
+    // type's metadata.
+    //
+    // For referenceable types, their schema will be referred to by an identifier, and the
+    // definition attached to that identifier will carry the field type's metadata. Any metadata
+    // specified on the field itself should live solely on the field's schema (which can exist
+    // alongside the schema reference) and vice versa.
+    //
+    // Conflating factors: transparent fields, derived fields, and flattened fields.
+    //
+    // For transparent fields -- where we're _explicitly_ opting out of requiring a
+    // title/description -- there's nothing to do except set the transparent flag on the field
+    // metadata, so that the schema generation code doesn't panic and yell at us about a missing
+    // description.
+    //
+    // For derived fields -- where we're _explictly_ stating that our title/description should come
+    // from the field type itself -- we don't necessarily need to have a title/description on the
+    // field's schema, because it can come from the referenced schema as part of schema processing.
+    // What we do need to do, however, is make sure the schema generation code, similar to
+    // `transparent`, doesn't yell at us that our field is missing a title/description. Thus, we
+    // also set the transparent flag on the field metadata.
+    //
+    // For flattened fields -- where we're taking a schema for a struct, etc, and replacing a single
+    // field with all of the fields in the struct itself -- we're in a similar situation as we are
+    // with derived fields. The struct we're flattening will by definition have to have a
+    // description present, but because we generate the schema on a per-field basis, and then
+    // flatten (merge) the schemas at the end of the schema generation step, we also hit the same
+    // logic/checks that yell at us if no description is present... unless the transparent flag is
+    // set, so we also set the transparent flag on the field metadata.
+    //
+    // We now come to the required logic:
+    //
+    // - if the field's type is referenceable, we start with an empty `Metadata` object, otherwise we
+    //   start with the output from `<T as Configurable>::metadata()`
+    // - if this field is transparent, we set the transparent flag
+    // - if this field is derived or flattened, we don't set the transparent flag, as when we
+    //   generate the schema for the field type, we'll check _then_ to see if the field type's
+    //   schema has a description defined... if it doesn't, and the field schema doesn't have a
+    //   description defined, _then_ we'll panic
     let spanned_metadata = quote_spanned! {field.span()=>
-        <#field_schema_ty as ::vector_config::Configurable>::metadata()
+        if <#field_schema_ty as ::vector_config::Configurable>::referenceable_name().is_none() {
+            <#field_schema_ty as ::vector_config::Configurable>::metadata()
+        } else {
+            ::vector_config::Metadata::default()
+        }
     };
 
     let maybe_title = get_metadata_title(meta_ident, field.title());
     let maybe_description = get_metadata_description(meta_ident, field.description());
+    let maybe_clear_title_description = field
+        .title()
+        .or_else(|| field.description())
+        .is_some()
+        .then(|| {
+            quote! {
+                // Fields with a title/description of their own cannot merge with the title/description
+                // of the field type itself, as this will generally lead to confusing output, so we
+                // explicitly clear the title/description first if we're about to set our own
+                // title/description.
+                #meta_ident.clear_title();
+                #meta_ident.clear_description();
+            }
+        });
     let maybe_default_value = if field_ty != field_schema_ty {
         get_metadata_default_value_delegated(meta_ident, field_schema_ty, field.default_value())
     } else {
@@ -378,6 +486,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
 
     quote! {
         let mut #meta_ident = #spanned_metadata;
+        #maybe_clear_title_description
         #maybe_title
         #maybe_description
         #maybe_default_value
@@ -402,6 +511,17 @@ fn generate_variant_metadata(
         get_metadata_transparent(meta_ident, variant.tagging() == &Tagging::None);
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, variant.metadata());
 
+    // We add a special metadata key (`logical_name`) that informs consumers of the schema what the
+    // variant name is for this variant's subschema. While the doc comments being coerced into title
+    // and/or description are typically good enough, sometimes we need a more mechanical mapping of
+    // the variant's name since shoving it into the title would mean doc comments with redundant
+    // information.
+    //
+    // You can think of this as an enum-specific additional title.
+    let logical_name_attrs = vec![CustomAttribute::kv("logical_name", variant.ident())];
+    let variant_logical_name =
+        get_metadata_custom_attributes(meta_ident, logical_name_attrs.into_iter());
+
     // We specifically use `()` as the type here because we need to generate the metadata for this
     // variant, but there's no unique concrete type for a variant, only the type of the enum
     // container it exists within. We also don't want to use the metadata of the enum container, as
@@ -413,6 +533,7 @@ fn generate_variant_metadata(
         #maybe_deprecated
         #maybe_transparent
         #maybe_custom_attributes
+        #variant_logical_name
     }
 }
 

@@ -108,14 +108,6 @@ components: _aws: {
 			}
 		}
 
-		AWS_CREDENTIAL_EXPIRATION: {
-			description: "Expiration time in RFC 3339 format. If unset, credentials won't expire."
-			type: string: {
-				default: null
-				examples: ["1996-12-19T16:39:57-08:00"]
-			}
-		}
-
 		AWS_DEFAULT_REGION: {
 			description:   "The default [AWS region](\(urls.aws_regions))."
 			relevant_when: "endpoint = null"
@@ -177,11 +169,6 @@ components: _aws: {
 				4. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance
 				   with an instance profile/role). Requires IMDSv2 to be enabled. For EKS, you may need to increase the
 				   metadata token response hop limit to 2.
-
-				Note that use of
-				[`credentials_process`](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html)
-				in AWS credentials files is not supported as the underlying AWS SDK currently [lacks
-				support](https://github.com/awslabs/aws-sdk-rust/issues/261).
 
 				If no credentials are found, Vector's health check fails and an error is [logged](\(urls.vector_monitoring)).
 				If your AWS credentials expire, Vector will automatically search for up-to-date

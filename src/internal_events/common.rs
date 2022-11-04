@@ -5,7 +5,9 @@ use metrics::{counter, histogram};
 pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
 pub struct EndpointBytesReceived<'a> {
@@ -53,6 +55,30 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
     }
 }
 
+#[derive(Debug)]
+pub struct SocketOutgoingConnectionError<E> {
+    pub error: E,
+}
+
+impl<E: std::error::Error> InternalEvent for SocketOutgoingConnectionError<E> {
+    fn emit(self) {
+        error!(
+            message = "Unable to connect.",
+            error = %self.error,
+            error_code = "failed_connecting",
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "failed_connecting",
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+    }
+}
+
 const STREAM_CLOSED: &str = "stream_closed";
 
 #[derive(Debug)]
@@ -68,6 +94,7 @@ impl InternalEvent for StreamClosedError {
             error_code = STREAM_CLOSED,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -76,7 +103,7 @@ impl InternalEvent for StreamClosedError {
             "stage" => error_stage::SENDING,
         );
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: self.count as u64,
+            count: self.count,
             reason: "Downstream is closed.",
         });
     }
@@ -110,44 +137,6 @@ impl InternalEvent for CollectionCompleted {
     }
 }
 
-#[allow(dead_code)]
-pub const INTENTIONAL: bool = true;
-pub const UNINTENTIONAL: bool = false;
-
-#[derive(Debug)]
-pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
-    pub count: u64,
-    pub reason: &'a str,
-}
-
-impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, INTENTIONAL> {
-    fn emit(self) {
-        let message = "Events dropped";
-        if INTENTIONAL {
-            debug!(
-                message,
-                intentional = INTENTIONAL,
-                count = self.count,
-                reason = self.reason,
-                internal_log_rate_limit = true,
-            );
-        } else {
-            error!(
-                message,
-                intentional = INTENTIONAL,
-                count = self.count,
-                reason = self.reason,
-                internal_log_rate_limit = true,
-            );
-        }
-        counter!(
-            "component_discarded_events_total",
-            self.count,
-            "intentional" => if INTENTIONAL { "true" } else { "false" },
-        );
-    }
-}
-
 #[derive(Debug)]
 pub struct SinkRequestBuildError<E> {
     pub error: E,
@@ -169,29 +158,6 @@ impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
             "component_errors_total", 1,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct SinkSendError<E> {
-    pub message: &'static str,
-    pub error: E,
-}
-
-impl<E: std::fmt::Display> InternalEvent for SinkSendError<E> {
-    fn emit(self) {
-        error!(
-            message = %self.message,
-            error = %self.error,
-            error_type = error_type::REQUEST_FAILED,
-            stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_type" => error_type::REQUEST_FAILED,
-            "stage" => error_stage::SENDING,
         );
     }
 }

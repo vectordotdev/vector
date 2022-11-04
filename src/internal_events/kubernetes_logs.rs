@@ -1,12 +1,11 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
+use crate::emit;
 use crate::event::Event;
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
-use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct KubernetesLogsEventsReceived<'a> {
@@ -65,6 +64,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -170,7 +170,7 @@ const KUBERNETES_LIFECYCLE: &str = "kubernetes_lifecycle";
 pub struct KubernetesLifecycleError<E> {
     pub message: &'static str,
     pub error: E,
-    pub count: u64,
+    pub count: usize,
 }
 
 impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {

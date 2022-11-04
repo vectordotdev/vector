@@ -6,9 +6,10 @@ use aws_sdk_firehose::{
 use futures::future::BoxFuture;
 use hyper::service::Service;
 use tracing::Instrument;
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_common::request_metadata::MetaDescriptive;
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
-use super::request_builder::KinesisRequest;
+use super::sink::BatchKinesisRequest;
 use crate::event::EventStatus;
 
 #[derive(Clone)]
@@ -28,33 +29,27 @@ impl DriverResponse for KinesisResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.count, self.events_byte_size)
     }
 }
 
-impl Service<Vec<KinesisRequest>> for KinesisService {
+impl Service<BatchKinesisRequest> for KinesisService {
     type Response = KinesisResponse;
     type Error = SdkError<PutRecordBatchError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        // Emission of Error internal event is handled upstream by the caller
-
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, requests: Vec<KinesisRequest>) -> Self::Future {
-        // Emission of Error internal event is handled upstream by the caller
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
+    fn call(&mut self, requests: BatchKinesisRequest) -> Self::Future {
+        let events_byte_size = requests.get_metadata().events_byte_size();
+        let count = requests.get_metadata().event_count();
 
-        let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
-        let count = requests.len();
-
-        let records = requests.into_iter().map(|req| req.record).collect();
+        let records = requests.events.into_iter().map(|req| req.record).collect();
 
         let client = self.client.clone();
 

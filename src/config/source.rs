@@ -4,7 +4,9 @@ use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::{AcknowledgementsConfig, GlobalOptions, LogNamespace, Output},
+    config::{
+        AcknowledgementsConfig, GlobalOptions, LogNamespace, Output, SourceAcknowledgementsConfig,
+    },
     source::Source,
 };
 
@@ -13,6 +15,7 @@ use crate::{shutdown::ShutdownSignal, sources::Sources, SourceSender};
 
 /// Fully resolved source component.
 #[configurable_component]
+#[configurable(metadata(docs::component_base_type = "source"))]
 #[derive(Clone, Debug)]
 pub struct SourceOuter {
     #[configurable(derived)]
@@ -25,6 +28,7 @@ pub struct SourceOuter {
     #[serde(default, skip)]
     pub sink_acknowledgements: bool,
 
+    #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
     pub(crate) inner: Sources,
 }
@@ -138,7 +142,8 @@ impl SourceContext {
         }
     }
 
-    pub fn do_acknowledgements(&self, config: &AcknowledgementsConfig) -> bool {
+    pub fn do_acknowledgements(&self, config: SourceAcknowledgementsConfig) -> bool {
+        let config = AcknowledgementsConfig::from(config);
         if config.enabled() {
             warn!(
                 message = "Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.",

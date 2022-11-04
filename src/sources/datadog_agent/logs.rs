@@ -6,6 +6,7 @@ use codecs::StreamDecodingError;
 use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder;
+use vector_core::config::LegacyKey;
 use vector_core::ByteSizeOf;
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
@@ -111,55 +112,55 @@ pub(crate) fn decode_log_body(
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("status"),
+                                Some(LegacyKey::InsertIfEmpty(path!("status"))),
                                 path!("status"),
                                 status.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("timestamp"),
+                                Some(LegacyKey::InsertIfEmpty(path!("timestamp"))),
                                 path!("timestamp"),
                                 timestamp,
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("hostname"),
+                                Some(LegacyKey::InsertIfEmpty(path!("hostname"))),
                                 path!("hostname"),
                                 hostname.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("service"),
+                                Some(LegacyKey::InsertIfEmpty(path!("service"))),
                                 path!("service"),
                                 service.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("ddsource"),
+                                Some(LegacyKey::InsertIfEmpty(path!("ddsource"))),
                                 path!("ddsource"),
                                 ddsource.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("ddtags"),
+                                Some(LegacyKey::InsertIfEmpty(path!("ddtags"))),
                                 path!("ddtags"),
                                 ddtags.clone(),
                             );
 
                             namespace.insert_vector_metadata(
                                 log,
-                                path!(source.log_schema_source_type_key),
+                                source.log_schema_source_type_key,
                                 path!("source_type"),
                                 Bytes::from("datadog_agent"),
                             );
                             namespace.insert_vector_metadata(
                                 log,
-                                path!(source.log_schema_timestamp_key),
+                                source.log_schema_timestamp_key,
                                 path!("ingest_timestamp"),
                                 now,
                             );

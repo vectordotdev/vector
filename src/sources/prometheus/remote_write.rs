@@ -9,14 +9,15 @@ use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
 use crate::{
-    config::{self, AcknowledgementsConfig, GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{
+        self, GenerateConfig, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+    },
     event::Event,
     internal_events::PrometheusRemoteWriteParseError,
     serde::bool_or_struct,
     sources::{
         self,
-        http::HttpMethod,
-        util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsEnableableConfig,
 };
@@ -38,7 +39,7 @@ pub struct PrometheusRemoteWriteConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl PrometheusRemoteWriteConfig {
@@ -59,7 +60,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -180,7 +181,7 @@ mod test {
                 address,
                 auth: None,
                 tls: tls.clone(),
-                acknowledgements: AcknowledgementsConfig::default(),
+                acknowledgements: SourceAcknowledgementsConfig::default(),
             };
             let source = source
                 .build(SourceContext::new_test(tx, None))
@@ -286,7 +287,7 @@ mod integration_tests {
             address: source_receive_address().parse().unwrap(),
             auth: None,
             tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
         };
 
         let events = run_and_assert_source_compliance(

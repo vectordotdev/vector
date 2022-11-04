@@ -19,7 +19,7 @@ use crate::{
 /// Configuration for the `aggregate` transform.
 #[configurable_component(transform("aggregate"))]
 #[derive(Clone, Debug, Default)]
-#[serde(deny_unknown_fields, default)]
+#[serde(deny_unknown_fields)]
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
     ///

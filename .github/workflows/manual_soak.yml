@@ -116,7 +116,7 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v3
 
-      - uses: actions/github-script@v6
+      - uses: actions/github-script@v6.3.3
         id: set-matrix
         with:
           script: |
@@ -156,11 +156,11 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.0.0
+        uses: docker/setup-buildx-action@v2.2.1
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@69f6fc9d46f2f8bf0d5491e4aabe0bb8c6a4678a
+        uses: docker/metadata-action@57396166ad8aefe6098280995947635806a0e6ea
         with:
           flavor: |
             latest=false
@@ -170,7 +170,7 @@ jobs:
           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.baseline-tag }}
 
       - name: Build and push 'soak-vector' image
-        uses: docker/build-push-action@v3.1.1
+        uses: docker/build-push-action@v3.2.0
         with:
           context: baseline-vector/
           file: soaks/Dockerfile
@@ -201,11 +201,11 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.0.0
+        uses: docker/setup-buildx-action@v2.2.1
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@69f6fc9d46f2f8bf0d5491e4aabe0bb8c6a4678a
+        uses: docker/metadata-action@57396166ad8aefe6098280995947635806a0e6ea
         with:
           flavor: |
             latest=false
@@ -215,7 +215,7 @@ jobs:
           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.comparison-tag }}
 
       - name: Build 'soak-vector' image
-        uses: docker/build-push-action@v3.1.1
+        uses: docker/build-push-action@v3.2.0
         with:
           context: comparison-vector/
           file: soaks/Dockerfile

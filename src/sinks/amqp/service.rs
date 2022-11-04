@@ -12,7 +12,8 @@ use std::{
 use tower::Service;
 use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
+    request_metadata::{MetaDescriptive, RequestMetadata},
 };
 use vector_core::stream::DriverResponse;
 
@@ -23,6 +24,7 @@ pub(super) struct AmqpRequest {
     exchange: String,
     routing_key: String,
     finalizers: EventFinalizers,
+    metadata: RequestMetadata,
 }
 
 impl AmqpRequest {
@@ -31,12 +33,14 @@ impl AmqpRequest {
         exchange: String,
         routing_key: String,
         finalizers: EventFinalizers,
+        metadata: RequestMetadata,
     ) -> Self {
         Self {
             body,
             exchange,
             routing_key,
             finalizers,
+            metadata,
         }
     }
 }
@@ -44,6 +48,12 @@ impl AmqpRequest {
 impl Finalizable for AmqpRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for AmqpRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -57,12 +67,8 @@ impl DriverResponse for AmqpResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.byte_size)
     }
 
     fn bytes_sent(&self) -> Option<(usize, &str)> {

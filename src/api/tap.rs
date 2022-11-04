@@ -429,7 +429,7 @@ mod tests {
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
     use crate::test_util::{start_topology, trace_init};
-    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
+    use crate::transforms::log_to_metric::{LogToMetricConfig, MetricConfig, MetricTypeConfig};
     use crate::transforms::remap::RemapConfig;
 
     #[test]
@@ -519,8 +519,14 @@ mod tests {
             MetricValue::Counter { value: 1.0 },
         );
 
-        fanout.send(vec![metric_event].into()).await;
-        fanout.send(vec![log_event].into()).await;
+        fanout
+            .send(vec![metric_event].into())
+            .await
+            .expect("should not fail");
+        fanout
+            .send(vec![log_event].into())
+            .await
+            .expect("should not fail");
 
         // 3rd payload should be the metric event
         assert!(matches!(
@@ -622,12 +628,13 @@ mod tests {
             "to_metric",
             &["in"],
             LogToMetricConfig {
-                metrics: vec![MetricConfig::Gauge(GaugeConfig {
-                    field: "message".to_string(),
+                metrics: vec![MetricConfig {
+                    field: "message".try_into().expect("Fixed template string"),
                     name: None,
                     namespace: None,
                     tags: None,
-                })],
+                    metric: MetricTypeConfig::Gauge,
+                }],
             },
         );
         config.add_sink(

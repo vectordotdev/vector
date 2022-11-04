@@ -190,6 +190,8 @@ impl vrl_lib::Target for VrlTarget {
                             ["tags"] => {
                                 let value =
                                     value.clone().try_object().map_err(|e| e.to_string())?;
+
+                                metric.remove_tags();
                                 for (field, value) in &value {
                                     metric.insert_tag(
                                         field.as_str().to_owned(),
@@ -549,14 +551,13 @@ enum MetricPathError<'a> {
 mod test {
     use chrono::{offset::TimeZone, Utc};
     use lookup::owned_value_path;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_common::btreemap;
     use vrl_lib::Target;
 
-    use super::{
-        super::{metric::MetricTags, MetricValue},
-        *,
-    };
+    use super::super::MetricValue;
+    use super::*;
+    use crate::metric_tags;
 
     #[test]
     fn log_get() {
@@ -898,11 +899,7 @@ mod test {
             MetricValue::Counter { value: 1.23 },
         )
         .with_namespace(Some("zoob"))
-        .with_tags(Some({
-            let mut map = MetricTags::new();
-            map.insert("tig".to_string(), "tog".to_string());
-            map
-        }))
+        .with_tags(Some(metric_tags!("tig" => "tog")))
         .with_timestamp(Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)));
 
         let info = ProgramInfo {
@@ -945,11 +942,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         )
-        .with_tags(Some({
-            let mut map = MetricTags::new();
-            map.insert("tig".to_string(), "tog".to_string());
-            map
-        }));
+        .with_tags(Some(metric_tags!("tig" => "tog")));
 
         let cases = vec![
             (
@@ -1017,6 +1010,36 @@ mod test {
                     target.target_get(&path).map(Option::<&Value>::cloned)
                 );
             }
+        }
+    }
+
+    #[test]
+    fn metric_set_tags() {
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.23 },
+        )
+        .with_tags(Some(metric_tags!("tig" => "tog")));
+
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Metric(metric), &info);
+        let _result = target.target_insert(
+            &OwnedTargetPath::event(owned_value_path!("tags")),
+            Value::Object(BTreeMap::from([("a".into(), "b".into())])),
+        );
+
+        match target {
+            VrlTarget::Metric { metric, value: _ } => {
+                assert!(metric.tags().is_some());
+                assert_eq!(metric.tags().unwrap(), &metric_tags!("a" => "b"));
+            }
+            _ => panic!("must be a metric"),
         }
     }
 

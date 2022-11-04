@@ -22,9 +22,26 @@ extern crate tracing;
 #[macro_use]
 extern crate derivative;
 
-#[cfg(feature = "tikv-jemallocator")]
+#[cfg(any(
+    all(feature = "tikv-jemallocator", target_os = "macos"),
+    all(feature = "tikv-jemallocator", not(feature = "allocation-tracing"))
+))]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+#[cfg(all(
+    feature = "tikv-jemallocator",
+    feature = "allocation-tracing",
+    not(target_os = "macos")
+))]
+#[global_allocator]
+static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
+    self::internal_telemetry::allocations::get_grouped_tracing_allocator(
+        tikv_jemallocator::Jemalloc,
+    );
+
+#[allow(unreachable_pub)]
+pub mod internal_telemetry;
 
 #[macro_use]
 #[allow(unreachable_pub)]
@@ -105,8 +122,8 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_common::shutdown;
-pub use vector_core::{event, metrics, schema, tcp, tls, Error, Result};
+pub use vector_common::{shutdown, Error, Result};
+pub use vector_core::{event, metrics, schema, tcp, tls};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

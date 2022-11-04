@@ -1,12 +1,11 @@
 use std::time::Duration;
 
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::io_error_code;
@@ -232,9 +231,9 @@ pub struct ExecChannelClosedError;
 
 impl InternalEvent for ExecChannelClosedError {
     fn emit(self) {
-        let reason = "Receive channel closed, unable to send.";
+        let exec_reason = "Receive channel closed, unable to send.";
         error!(
-            message = reason,
+            message = exec_reason,
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::RECEIVING,
             internal_log_rate_limit = true,
@@ -244,6 +243,9 @@ impl InternalEvent for ExecChannelClosedError {
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: exec_reason
+        });
     }
 }

@@ -5,7 +5,7 @@ use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
 use vector_core::{
-    event::EventStatus, internal_event::EventsSent, stream::DriverResponse, ByteSizeOf,
+    event::EventStatus, internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf,
 };
 
 use super::request_builder::SendMessageEntry;
@@ -26,15 +26,13 @@ impl Service<SendMessageEntry> for SqsService {
     type Error = SdkError<SendMessageError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        // Emission of Error internal event is handled upstream by the caller
-
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, entry: SendMessageEntry) -> Self::Future {
-        // Emission of Error internal event is handled upstream by the caller
-
         let byte_size = entry.size_of();
         let client = self.client.clone();
 
@@ -62,11 +60,7 @@ impl DriverResponse for SendMessageResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.byte_size)
     }
 }

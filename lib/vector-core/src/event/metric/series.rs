@@ -13,7 +13,7 @@ pub struct MetricSeries {
     #[serde(flatten)]
     pub name: MetricName,
 
-    /// Tags for this metric series.
+    #[configurable(derived)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<MetricTags>,
 }
@@ -44,6 +44,11 @@ impl MetricSeries {
     /// *Note:* This will create the tags map if it is not present.
     pub fn insert_tag(&mut self, key: String, value: String) -> Option<String> {
         (self.tags.get_or_insert_with(Default::default)).insert(key, value)
+    }
+
+    /// Removes all the tags.
+    pub fn remove_tags(&mut self) {
+        self.tags = None;
     }
 
     /// Removes the tag entry for the named key, if it exists, and returns the old value.

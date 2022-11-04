@@ -1,11 +1,10 @@
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
 pub struct LargeEventDroppedError {
@@ -19,9 +18,9 @@ impl InternalEvent for LargeEventDroppedError {
             message = "Event larger than batch max_bytes.",
             batch_max_bytes = %self.max_length,
             length = %self.length,
-            internal_log_rate_limit = true,
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

@@ -184,7 +184,7 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
-        let acknowledgements = cx.do_acknowledgements(&config.acknowledgements.inner);
+        let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
         let shutdown = cx.shutdown;
         let valid_tokens = config
             .valid_tokens
@@ -1010,7 +1010,10 @@ mod tests {
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
             collect_n,
-            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            components::{
+                assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
+                HTTP_PUSH_SOURCE_TAGS,
+            },
             next_addr, wait_for_tcp,
         },
         SourceSender,
@@ -1503,16 +1506,19 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_token() {
-        let (_source, address) = source(None).await;
-        let opts = SendWithOpts {
-            channel: Some(Channel::Header("channel")),
-            forwarded_for: None,
-        };
+        assert_source_error(&COMPONENT_ERROR_TAGS, async {
+            let (_source, address) = source(None).await;
+            let opts = SendWithOpts {
+                channel: Some(Channel::Header("channel")),
+                forwarded_for: None,
+            };
 
-        assert_eq!(
-            401,
-            send_with(address, "services/collector/event", "", "nope", &opts).await
-        );
+            assert_eq!(
+                401,
+                send_with(address, "services/collector/event", "", "nope", &opts).await
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -1856,7 +1862,7 @@ mod tests {
     #[tokio::test]
     async fn ack_json_event() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (source, address) = source(Some(ack_config)).await;
@@ -1901,7 +1907,7 @@ mod tests {
     #[tokio::test]
     async fn ack_raw_event() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (source, address) = source(Some(ack_config)).await;
@@ -1946,7 +1952,7 @@ mod tests {
     #[tokio::test]
     async fn ack_repeat_ack_query() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (source, address) = source(Some(ack_config)).await;
@@ -2002,7 +2008,7 @@ mod tests {
     #[tokio::test]
     async fn ack_exceed_max_number_of_ack_channels() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -2038,7 +2044,7 @@ mod tests {
     #[tokio::test]
     async fn ack_exceed_max_pending_acks_per_channel() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_pending_acks_per_channel: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -2113,7 +2119,7 @@ mod tests {
     async fn event_service_acknowledgements_enabled_channel_required() {
         let message = r#"{"event":"first", "color": "blue"}"#;
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (_, address) = source(Some(ack_config)).await;

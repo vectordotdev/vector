@@ -18,6 +18,8 @@ mod aws_ec2_metadata;
 mod aws_ecs_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
+#[cfg(feature = "sinks-aws_kinesis_streams")]
+mod aws_kinesis_streams;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
 mod batch;
@@ -36,12 +38,13 @@ mod demo_logs;
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
-mod elasticsearch;
 mod encoding_transcode;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
+#[cfg(any(feature = "sources-file-descriptor", feature = "sources-stdin"))]
+mod file_descriptor;
 #[cfg(feature = "transforms-filter")]
 mod filter;
 #[cfg(feature = "sources-fluent")]
@@ -50,13 +53,15 @@ mod fluent;
 mod gcp_pubsub;
 #[cfg(feature = "transforms-geoip")]
 mod geoip;
+#[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
+mod grpc;
 mod heartbeat;
 #[cfg(feature = "sources-host_metrics")]
 mod host_metrics;
 mod http;
 pub mod http_client;
-#[cfg(feature = "sources-utils-http-scrape")]
-mod http_scrape;
+#[cfg(feature = "sources-utils-http-client")]
+mod http_client_source;
 #[cfg(feature = "sinks-influxdb")]
 mod influxdb;
 #[cfg(feature = "sources-internal_logs")]
@@ -105,10 +110,6 @@ mod socket;
 mod splunk_hec;
 #[cfg(feature = "sinks-statsd")]
 mod statsd_sink;
-#[cfg(feature = "sources-statsd")]
-mod statsd_source;
-#[cfg(feature = "sources-syslog")]
-mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
 mod tcp;
@@ -149,6 +150,8 @@ pub(crate) use self::aws_ec2_metadata::*;
 pub(crate) use self::aws_ecs_metrics::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub(crate) use self::aws_kinesis_firehose::*;
+#[cfg(feature = "sinks-aws_kinesis_streams")]
+pub(crate) use self::aws_kinesis_streams::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
 pub(crate) use self::codecs::*;
@@ -164,8 +167,6 @@ pub(crate) use self::demo_logs::*;
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
 pub(crate) use self::docker_logs::*;
-#[cfg(feature = "sinks-elasticsearch")]
-pub(crate) use self::elasticsearch::*;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub(crate) use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]
@@ -176,6 +177,8 @@ pub(crate) use self::exec::*;
     feature = "sinks-file",
 ))]
 pub(crate) use self::file::*;
+#[cfg(any(feature = "sources-file-descriptor", feature = "sources-stdin"))]
+pub(crate) use self::file_descriptor::*;
 #[cfg(feature = "transforms-filter")]
 pub(crate) use self::filter::*;
 #[cfg(feature = "sources-fluent")]
@@ -184,6 +187,8 @@ pub(crate) use self::fluent::*;
 pub(crate) use self::gcp_pubsub::*;
 #[cfg(feature = "transforms-geoip")]
 pub(crate) use self::geoip::*;
+#[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
+pub(crate) use self::grpc::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
 #[cfg(any(
@@ -193,8 +198,8 @@ pub(crate) use self::host_metrics::*;
     feature = "sources-splunk_hec",
 ))]
 pub(crate) use self::http::*;
-#[cfg(feature = "sources-utils-http-scrape")]
-pub(crate) use self::http_scrape::*;
+#[cfg(feature = "sources-utils-http-client")]
+pub(crate) use self::http_client_source::*;
 #[cfg(feature = "sinks-influxdb")]
 pub(crate) use self::influxdb::*;
 #[cfg(feature = "sources-internal_logs")]
@@ -241,10 +246,6 @@ pub(crate) use self::sematext_metrics::*;
 pub(crate) use self::splunk_hec::*;
 #[cfg(feature = "sinks-statsd")]
 pub(crate) use self::statsd_sink::*;
-#[cfg(feature = "sources-statsd")]
-pub(crate) use self::statsd_source::*;
-#[cfg(feature = "sources-syslog")]
-pub(crate) use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]

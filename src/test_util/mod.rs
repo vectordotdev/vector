@@ -12,13 +12,11 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use flate2::read::MultiGzDecoder;
-use futures::{
-    ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
-};
+use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
 use rand::{thread_rng, Rng};
@@ -132,12 +130,7 @@ pub fn trace_init() {
     trace::init(color, false, &levels, 10);
 
     // Initialize metrics as well
-    if let Err(error) = vector_core::metrics::init_test() {
-        // Handle multiple initializations.
-        if error != vector_core::metrics::Error::AlreadyInitialized {
-            panic!("Failed to initialize metrics recorder: {:?}", error);
-        }
-    }
+    vector_core::metrics::init_test();
 }
 
 pub async fn send_lines(
@@ -344,7 +337,7 @@ pub fn random_maps(
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
 where
-    S: Stream + Unpin,
+    S: Stream,
 {
     rx.take(n).collect().await
 }
@@ -703,7 +696,7 @@ pub async fn start_topology(
 pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
-    S: Stream<Item = Event> + Unpin,
+    S: Stream<Item = Event>,
 {
     // TODO: Switch to using `select!` so that we can drive `future` to completion while also driving `collect_n`,
     // such that if `future` panics, we break out and don't continue driving `collect_n`. In most cases, `future`

@@ -63,32 +63,40 @@ impl Test {
                     line = line.strip_prefix("result:").expect("result").trim_start();
                 } else if line.starts_with("read_only:") {
                     let path_str = line.strip_prefix("read_only:").expect("read-only").trim();
-                    read_only_paths
-                        .push((OwnedTargetPath::event(parse_value_path(path_str)), false));
+                    read_only_paths.push((
+                        OwnedTargetPath::event(parse_value_path(path_str).expect("valid path")),
+                        false,
+                    ));
                     continue;
                 } else if line.starts_with("read_only_recursive:") {
                     let path_str = line
                         .strip_prefix("read_only_recursive:")
                         .expect("read-only")
                         .trim();
-                    read_only_paths
-                        .push((OwnedTargetPath::event(parse_value_path(path_str)), true));
+                    read_only_paths.push((
+                        OwnedTargetPath::event(parse_value_path(path_str).expect("valid path")),
+                        true,
+                    ));
                     continue;
                 } else if line.starts_with("read_only_metadata:") {
                     let path_str = line
                         .strip_prefix("read_only_metadata:")
                         .expect("read_only_metadata")
                         .trim();
-                    read_only_paths
-                        .push((OwnedTargetPath::metadata(parse_value_path(path_str)), false));
+                    read_only_paths.push((
+                        OwnedTargetPath::metadata(parse_value_path(path_str).expect("valid path")),
+                        false,
+                    ));
                     continue;
                 } else if line.starts_with("read_only_metadata_recursive:") {
                     let path_str = line
                         .strip_prefix("read_only_metadata_recursive:")
                         .expect("read-read_only_metadata_recursive")
                         .trim();
-                    read_only_paths
-                        .push((OwnedTargetPath::metadata(parse_value_path(path_str)), true));
+                    read_only_paths.push((
+                        OwnedTargetPath::metadata(parse_value_path(path_str).expect("valid path")),
+                        true,
+                    ));
                     continue;
                 }
 
