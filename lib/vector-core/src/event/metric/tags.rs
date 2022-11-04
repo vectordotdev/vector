@@ -11,42 +11,47 @@ type TagValue = String;
 
 /// Tag values for a metric series.
 #[derive(Clone, Configurable, Debug, Default, Eq, PartialEq)]
+// An index set is used for this set, as it preserves the insertion order of the contained
+// elements. This allows us to retrieve the last element inserted which in turn allows us to emulate
+// the set having a single value.
 pub struct TagValueSet(#[configurable(transparent)] IndexSet<TagValue>);
 
 impl TagValueSet {
     /// Convert this set into a single value, mimicking the behavior of this set being just a plain
     /// single string while still storing all of the values.
-    pub fn into_single(self) -> Option<String> {
+    pub(crate) fn into_single(self) -> Option<String> {
         self.0.into_iter().last()
     }
 
     /// Get the "single" value of this set, mimicking the behavior of this set being just a plain
     /// single string while still storing all of the values.
-    pub fn as_single(&self) -> Option<&str> {
+    pub(crate) fn as_single(&self) -> Option<&str> {
         self.0.iter().last().map(String::as_ref)
     }
 
-    pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+    fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
         self.into_iter()
     }
 
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    pub fn len(&self) -> usize {
+    #[cfg(test)]
+    fn len(&self) -> usize {
         self.0.len()
     }
 
-    pub fn contains(&self, value: &str) -> bool {
+    #[cfg(test)]
+    fn contains(&self, value: &str) -> bool {
         self.0.contains(value)
     }
 
-    pub fn retain(&mut self, mut f: impl FnMut(&str) -> bool) {
+    fn retain(&mut self, mut f: impl FnMut(&str) -> bool) {
         self.0.retain(|value| f(value.as_str()));
     }
 
-    pub fn insert(&mut self, value: TagValue) -> bool {
+    fn insert(&mut self, value: TagValue) -> bool {
         // If the value was previously present, we want to move it to become the last element. The
         // only way to do this is to remove any existing value.
         self.0.remove(&value);
@@ -75,14 +80,18 @@ impl Hash for TagValueSet {
 }
 
 impl Ord for TagValueSet {
-    fn cmp(&self, _: &Self) -> Ordering {
-        todo!() // Luke is removing Ord from Event, which will make this unnecessary
+    fn cmp(&self, that: &Self) -> Ordering {
+        // TODO: This will give wrong answers much of the time when the set has more than one item,
+        // but comparing hash sets for ordering is non-trivial and this at least gives _an_ answer.
+        // This is required to provide an ordering on the metric series, which is only used by the
+        // metrics sink buffer `sort_for_compression` and is hard to emulate there.
+        self.as_single().cmp(&that.as_single())
     }
 }
 
 impl PartialOrd for TagValueSet {
-    fn partial_cmp(&self, _: &Self) -> Option<Ordering> {
-        todo!() // Luke is removing PartialOrd from Event, which will make this unnecessary
+    fn partial_cmp(&self, that: &Self) -> Option<Ordering> {
+        Some(self.cmp(that))
     }
 }
 
