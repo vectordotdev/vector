@@ -149,6 +149,12 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
             "kafka_consumed_messages_bytes_total",
             self.statistics.rxmsg_bytes as u64
         );
+
+        for (topic_id, topic) in &self.statistics.topics {
+            for (partition_id, partition) in &topic.partitions {
+                gauge!("kafka_consumer_lag", partition.consumer_lag as f64, "topic_id" => topic_id.clone(), "partition_id" => partition_id.to_string());
+            }
+        }
     }
 }
 
