@@ -38,7 +38,7 @@ impl SyslogDeserializerConfig {
                 schema::Definition::empty_legacy_namespace()
                     // The `message` field is always defined. If parsing fails, the entire body becomes the
                     // message.
-                    .with_field(
+                    .with_event_field(
                         &parse_value_path(log_schema().message_key()).expect("valid message key"),
                         Kind::bytes(),
                         Some("message"),
@@ -73,7 +73,7 @@ impl SyslogDeserializerConfig {
                     Kind::object(Collection::empty()),
                     [log_namespace],
                 )
-                .with_field(
+                .with_event_field(
                     &owned_value_path!("message"),
                     Kind::bytes(),
                     Some("message"),

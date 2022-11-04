@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::{log_schema, LegacyKey, LogNamespace};
 use lookup::lookup_v2::parse_value_path;
-use lookup::{owned_value_path, LookupBuf, OwnedValuePath};
+use lookup::{owned_value_path, LookupBuf, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use value::{kind::Collection, Kind};
 
 /// The definition of a schema.
@@ -228,9 +228,11 @@ impl Definition {
                         kind.clone(),
                         meaning,
                     )),
-                    LegacyKey::Overwrite(legacy_path) => {
-                        Some(self.clone().with_field(legacy_path, kind.clone(), meaning))
-                    }
+                    LegacyKey::Overwrite(legacy_path) => Some(self.clone().with_event_field(
+                        legacy_path,
+                        kind.clone(),
+                        meaning,
+                    )),
                 }
             } else {
                 None
@@ -253,6 +255,25 @@ impl Definition {
         }
     }
 
+    /// Add type information for an event or metadata field.
+    /// A non-root required field means the root type must be an object, so the type will be automatically
+    /// restricted to an object.
+    ///
+    /// # Panics
+    /// - If the path is not root, and the definition does not allow the type to be an object.
+    #[must_use]
+    pub fn with_field(
+        self,
+        target_path: &OwnedTargetPath,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        match target_path.prefix {
+            PathPrefix::Event => self.with_event_field(&target_path.path, kind, meaning),
+            PathPrefix::Metadata => self.with_metadata_field(&target_path.path, kind),
+        }
+    }
+
     /// Add type information for an event field.
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
@@ -261,7 +282,12 @@ impl Definition {
     /// - If the path is not root, and the definition does not allow the type to be an object.
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
-    pub fn with_field(mut self, path: &OwnedValuePath, kind: Kind, meaning: Option<&str>) -> Self {
+    pub fn with_event_field(
+        mut self,
+        path: &OwnedValuePath,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
         let meaning = meaning.map(ToOwned::to_owned);
 
         if !path.is_root() {
@@ -294,7 +320,7 @@ impl Definition {
 
         if existing_type.is_undefined() {
             // Guaranteed to never be set, so the insertion will always succeed.
-            self.with_field(path, kind, meaning)
+            self.with_event_field(path, kind, meaning)
         } else if !existing_type.contains_undefined() {
             // Guaranteed to always be set (or is never), so the insertion will always fail.
             self
@@ -302,7 +328,7 @@ impl Definition {
             // Not sure if the insertion will be successful. The type definition should contain both
             // possibilities. The meaning is not set, since it can't be relied on.
 
-            let success_definition = self.clone().with_field(path, kind, None);
+            let success_definition = self.clone().with_event_field(path, kind, None);
             // If the existing type contains `undefined`, the new type will always be used, so remove it.
             self.event_kind
                 .set_at_path(path, existing_type.without_undefined());
@@ -337,7 +363,7 @@ impl Definition {
     /// See `Definition::require_field`.
     #[must_use]
     pub fn optional_field(self, path: &OwnedValuePath, kind: Kind, meaning: Option<&str>) -> Self {
-        self.with_field(path, kind.or_undefined(), meaning)
+        self.with_event_field(path, kind.or_undefined(), meaning)
     }
 
     /// Register a semantic meaning for the definition.
@@ -514,7 +540,7 @@ mod tests {
                 },
             ),
         ]) {
-            let got = Definition::empty_legacy_namespace().with_field(&path, kind, meaning);
+            let got = Definition::empty_legacy_namespace().with_event_field(&path, kind, meaning);
             assert_eq!(got.event_kind(), want.event_kind(), "{}", title);
         }
     }
