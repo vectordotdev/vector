@@ -782,7 +782,7 @@ mod tests {
                 (
                     "test.log".to_owned(),
                     Bytes::copy_from_slice(line.as_bytes()),
-                    context.clone(),
+                    *context,
                 )
             })
             .collect();
