@@ -121,8 +121,9 @@ impl SourceConfig for SocketConfig {
                 };
 
                 let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
+                let log_namespace = cx.log_namespace(config.log_namespace);
 
-                let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
+                let tcp = tcp::RawTcpSource::new(config.clone(), decoder, log_namespace);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
                 let tls_client_metadata_key = config
                     .tls()

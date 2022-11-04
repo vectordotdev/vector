@@ -6,7 +6,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::path;
 use vector_common::shutdown::ShutdownSignal;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
     codecs::Decoder,
@@ -92,9 +92,6 @@ fn handle_events(
     for event in events {
         let log = event.as_mut_log();
 
-        log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
-        log.try_insert(log_schema().timestamp_key(), now);
-
         log_namespace.insert_vector_metadata(
             log,
             path!(log_schema().source_type_key()),
@@ -113,7 +110,7 @@ fn handle_events(
                 LogNamespace::Vector => log_namespace.insert_source_metadata(
                     SocketConfig::NAME,
                     log,
-                    path!(log_schema().host_key()),
+                    None::<LegacyKey<&'static str>>,
                     path!(log_schema().host_key()),
                     host.clone(),
                 ),
@@ -126,7 +123,7 @@ fn handle_events(
                     log_namespace.insert_source_metadata(
                         SocketConfig::NAME,
                         log,
-                        path!(&host_key),
+                        Some(LegacyKey::InsertIfEmpty(path!(&host_key))),
                         path!(log_schema().host_key()),
                         host.clone(),
                     )

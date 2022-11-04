@@ -69,6 +69,10 @@ pub struct UdpConfig {
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 impl UdpConfig {
@@ -97,6 +101,7 @@ impl UdpConfig {
             receive_buffer_bytes: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            log_namespace: Some(true),
         }
     }
 }
