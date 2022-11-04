@@ -77,7 +77,7 @@ base: components: sources: aws_sqs: configuration: {
 			fetching the messages than processing them.
 			"""
 		required: false
-		type: uint: default: 24
+		type: uint: default: 10
 	}
 	decoding: {
 		description: "Configuration for building a `Deserializer`."

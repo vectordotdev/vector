@@ -44,9 +44,9 @@ impl GelfDeserializerConfig {
             Kind::object(Collection::empty()),
             [log_namespace],
         )
-        .with_field(&owned_value_path!(VERSION), Kind::bytes(), None)
-        .with_field(&owned_value_path!(HOST), Kind::bytes(), None)
-        .with_field(&owned_value_path!(SHORT_MESSAGE), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(VERSION), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(HOST), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(SHORT_MESSAGE), Kind::bytes(), None)
         .optional_field(&owned_value_path!(FULL_MESSAGE), Kind::bytes(), None)
         .optional_field(&owned_value_path!(TIMESTAMP), Kind::timestamp(), None)
         .optional_field(&owned_value_path!(LEVEL), Kind::integer(), None)
