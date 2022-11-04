@@ -36,6 +36,7 @@ pub struct ConfigBuilder {
     pub api: api::Options,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub schema: schema::Options,
 
