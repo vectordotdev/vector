@@ -14,6 +14,7 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
 };
+use crate::schema::Definition;
 
 /// Configuration for the `metric_to_log` transform.
 #[configurable_component(transform("metric_to_log"))]
@@ -64,6 +65,10 @@ impl TransformConfig for MetricToLogConfig {
     }
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+
+        let mut schema_definition = Definition::any()
+            .with_field(&owned_value)
+
         vec![Output::default(DataType::Log)]
     }
 
@@ -98,8 +103,10 @@ impl MetricToLog {
             .and_then(|value| match value {
                 Value::Object(object) => {
                     // TODO: Avoid a clone here
-                    let mut log = LogEvent::new_with_metadata(metric.metadata().clone());
+                    let (_, _, metadata) = metric.into_parts();
+                    let mut log = LogEvent::new_with_metadata(metadata);
 
+                    // converting all fields from serde `Value` to Vector `Value`
                     for (key, value) in object {
                         log.insert(event_path!(&key), value);
                     }
@@ -112,6 +119,7 @@ impl MetricToLog {
                                 .ok()
                         })
                         .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
+
                     log.insert(log_schema().timestamp_key(), timestamp);
 
                     if let Some(host) = log.remove_prune(self.host_tag.as_str(), true) {

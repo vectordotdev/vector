@@ -91,7 +91,7 @@ impl VrlTarget {
                 // We pre-generate [`Value`] types for the metric fields accessed in
                 // the event. This allows us to then return references to those
                 // values, even if the field is accessed more than once.
-                let value = precompute_metric_value(&metric, info);
+                let value = precompute_metric_value(&metric, &info.target_queries);
 
                 VrlTarget::Metric { metric, value }
             }
