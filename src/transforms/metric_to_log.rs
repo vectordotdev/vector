@@ -55,7 +55,7 @@ impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(MetricToLog::new(
             self.host_tag.clone(),
-            self.timezone.unwrap_or(context.globals.timezone),
+            self.timezone.unwrap_or_else(|| context.globals.timezone()),
         )))
     }
 

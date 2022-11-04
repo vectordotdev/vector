@@ -1,5 +1,7 @@
 use bytes::Bytes;
+use regex::Regex;
 use std::cmp::Ordering;
+use std::sync::Arc;
 use std::{
     hash::{Hash, Hasher},
     ops::Deref,
@@ -7,12 +9,12 @@ use std::{
 
 /// Wraps a `Regex` and provides several trait implementations, such as `PartialOrd`
 #[derive(Debug, Clone)]
-pub struct ValueRegex(regex::Regex);
+pub struct ValueRegex(Arc<regex::Regex>);
 
 impl ValueRegex {
     /// Create a new `ValueRegex` from the inner `Regex` that is wraps
     #[must_use]
-    pub const fn new(regex: regex::Regex) -> Self {
+    pub const fn new(regex: Arc<regex::Regex>) -> Self {
         Self(regex)
     }
 
@@ -31,7 +33,7 @@ impl ValueRegex {
     /// Returns the inner Regex value
     #[allow(clippy::missing_const_for_fn)] // false positive
     #[must_use]
-    pub fn into_inner(self) -> regex::Regex {
+    pub fn into_inner(self) -> Arc<regex::Regex> {
         self.0
     }
 }
@@ -56,9 +58,15 @@ impl Deref for ValueRegex {
     }
 }
 
-impl From<regex::Regex> for ValueRegex {
-    fn from(regex: regex::Regex) -> Self {
+impl From<Arc<regex::Regex>> for ValueRegex {
+    fn from(regex: Arc<regex::Regex>) -> Self {
         Self(regex)
+    }
+}
+
+impl From<Regex> for ValueRegex {
+    fn from(r: Regex) -> Self {
+        Self::new(Arc::new(r))
     }
 }
 
