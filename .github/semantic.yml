@@ -166,7 +166,6 @@ scopes:
   - aws_ec2_metadata transform # Anything `aws_ec2_metadata` transform related
   - dedupe transform # Anything `dedupe` transform related
   - filter transform # Anything `filter` transform related
-  - geoip transform # Anything `geoip` transform related
   - log_to_metric transform # Anything `log_to_metric` transform related
   - lua transform # Anything `lua` transform related
   - metric_to_log transform # Anything `metric_to_log` transform related

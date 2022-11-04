@@ -163,9 +163,7 @@ releases: "0.24.0": {
 				Additionally the `geoip` enrichment table has support for `Connection-Type`
 				databases.
 
-				This takes the place of the [`geoip`
-				transform](/docs/reference/configuration/transforms/geoip/), which has been
-				deprecated.
+				This takes the place of the `geoip`, which has been deprecated.
 				"""
 			contributors: ["ktff", "w4"]
 			pr_numbers: [13338, 13707]
