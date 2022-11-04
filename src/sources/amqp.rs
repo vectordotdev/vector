@@ -452,6 +452,7 @@ mod integration_test {
     use lapin::options::*;
     use lapin::BasicProperties;
     use tokio::time::Duration;
+    use vector_core::config::log_schema;
 
     #[tokio::test]
     async fn amqp_source_create_ok() {
