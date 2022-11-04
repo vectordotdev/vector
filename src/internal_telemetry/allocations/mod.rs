@@ -88,7 +88,6 @@ pub fn init_allocation_tracing() {
                     gauge!(
                         "component_allocated_bytes",
                         mem_used.to_f64().expect("failed to convert group_id from int to float"),
-                        "group_id" => idx.to_string(),
                         "component_kind" => group_info.component_kind.clone().unwrap_or_else(|| "root".to_string()),
                         "component_type" => group_info.component_type.clone().unwrap_or_else(|| "root".to_string()),
                         "component_id" => group_info.component_id.clone().unwrap_or_else(|| "root".to_string()));
