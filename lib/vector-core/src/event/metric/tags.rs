@@ -75,14 +75,18 @@ impl Hash for TagValueSet {
 }
 
 impl Ord for TagValueSet {
-    fn cmp(&self, _: &Self) -> Ordering {
-        todo!() // Luke is removing Ord from Event, which will make this unnecessary
+    fn cmp(&self, that: &Self) -> Ordering {
+        // TODO: This will give wrong answers much of the time when the set has more than one item,
+        // but comparing hash sets for ordering is non-trivial and this at least gives _an_ answer.
+        // This is required to provide an ordering on the metric series, which is used by the
+        // metrics sink buffer `sort_for_compression` and the `apache_metrics` source parser tests.
+        self.as_single().cmp(&that.as_single())
     }
 }
 
 impl PartialOrd for TagValueSet {
-    fn partial_cmp(&self, _: &Self) -> Option<Ordering> {
-        todo!() // Luke is removing PartialOrd from Event, which will make this unnecessary
+    fn partial_cmp(&self, that: &Self) -> Option<Ordering> {
+        Some(self.cmp(that))
     }
 }
 
