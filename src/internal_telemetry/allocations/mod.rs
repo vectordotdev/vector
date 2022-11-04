@@ -86,7 +86,7 @@ pub fn init_allocation_tracing() {
                     }
                     let group_info = GROUP_INFO[idx].lock().unwrap();
                     gauge!(
-                        "component_bytes_allocated",
+                        "component_allocated_bytes",
                         mem_used.to_f64().expect("failed to convert group_id from int to float"),
                         "group_id" => idx.to_string(),
                         "component_kind" => group_info.component_kind.clone().unwrap_or_else(|| "root".to_string()),
