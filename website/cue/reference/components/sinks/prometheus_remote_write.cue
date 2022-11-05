@@ -85,36 +85,100 @@ components: sinks: prometheus_remote_write: {
 			}
 		}
 		auth: {
-			common:      false
-			description: "Options for authentication."
+			description: "Authentication strategies."
 			required:    false
-			type: object: {
-				examples: []
-				options: components._aws.configuration.auth.type.object.options & {
-					password: {
-						description: "The basic authentication password."
-						required:    true
-						type: string: {
-							examples: ["${PROMETHEUS_PASSWORD}", "password"]
-						}
+			common:      true
+			type: object: options: {
+				access_key_id: {
+					description:   "The AWS access key ID."
+					relevant_when: "strategy = \"aws\""
+					required:      true
+					type: string: syntax: "literal"
+				}
+				assume_role: {
+					description:   "The ARN of the role to assume."
+					relevant_when: "strategy = \"aws\""
+					required:      true
+					type: string: syntax: "literal"
+				}
+				credentials_file: {
+					description:   "Path to the credentials file."
+					relevant_when: "strategy = \"aws\""
+					required:      true
+					type: string: syntax: "literal"
+				}
+				load_timeout_secs: {
+					description:   "Timeout for successfully loading any credentials, in seconds."
+					relevant_when: "strategy = \"aws\""
+					required:      false
+					common:        false
+					type: uint: {
+						unit:    "seconds"
+						default: 5
+						examples: [30]
 					}
-					strategy: {
-						description: "The authentication strategy to use."
-						required:    true
-						type: string: {
-							enum: {
-								aws:   "Authentication strategy used for the [AWS managed Prometheus service](\(urls.aws_prometheus))."
-								basic: "The [basic authentication strategy](\(urls.basic_auth))."
-							}
-						}
+				}
+				password: {
+					description:   "Basic authentication password."
+					relevant_when: "strategy = \"basic\""
+					required:      true
+					type: string: syntax: "literal"
+				}
+				profile: {
+					description:   "The credentials profile to use."
+					relevant_when: "strategy = \"aws\""
+					required:      false
+					common:        false
+					type: string: {
+						default: "default"
+						examples: ["develop"]
 					}
-					user: {
-						description: "The basic authentication user name."
-						required:    true
-						type: string: {
-							examples: ["${PROMETHEUS_USERNAME}", "username"]
-						}
+				}
+				region: {
+					description: """
+						The AWS region to send STS requests to.
+
+						If not set, this will default to the configured region
+						for the service itself.
+						"""
+					relevant_when: "strategy = \"aws\""
+					required:      false
+					common:        false
+					type: string: {
+						default: null
+						examples: ["us-west-2"]
 					}
+				}
+				secret_access_key: {
+					description:   "The AWS secret access key."
+					relevant_when: "strategy = \"aws\""
+					required:      true
+					type: string: syntax: "literal"
+				}
+				strategy: {
+					required:    true
+					description: "Which authentication strategy to use."
+					type: string: enum: {
+						aws:   "Amazon Prometheus Service-specific authentication."
+						basic: "HTTP Basic Authentication."
+						bearer: """
+						Bearer authentication.
+
+						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						"""
+					}
+				}
+				token: {
+					description:   "The bearer token to send."
+					relevant_when: "strategy = \"bearer\""
+					required:      true
+					type: string: syntax: "literal"
+				}
+				user: {
+					description:   "Basic authentication username."
+					relevant_when: "strategy = \"basic\""
+					required:      true
+					type: string: syntax: "literal"
 				}
 			}
 		}
