@@ -10,13 +10,12 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext, log_schema},
+    config::{log_schema, DataType, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     schema,
     template::Template,
     transforms::{TaskTransform, Transform},
-
 };
 
 /// Configuration for controlling how events will be throttled.
