@@ -23,13 +23,13 @@ base: components: transforms: throttle: configuration: {
 	}
 	mode: {
 		description: "The throttling mode used to determine each event's contribution against `threshold`."
-		required: false
+		required:    false
 		type: string: {
 			default: "events"
 			enum: {
-				"events": "Throttle by number of events."
+				"events":            "Throttle by number of events."
 				"log_message_bytes": "Throttle by number of bytes in each event's `message` field (logs only)."
-				"log_json_bytes": "Throttle by number of estimated bytes for JSON representation of each event (logs only)."
+				"log_json_bytes":    "Throttle by number of estimated bytes for JSON representation of each event (logs only)."
 			}
 		}
 	}
