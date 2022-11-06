@@ -3,15 +3,17 @@ pub mod udp;
 #[cfg(unix)]
 mod unix;
 
-use codecs::NewlineDelimitedDecoderConfig;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
+use lookup::owned_value_path;
+use value::Kind;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
-    config::{DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
+    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
@@ -55,14 +57,25 @@ impl SocketConfig {
         tcp::TcpConfig::from_address(addr.into()).into()
     }
 
-    fn output_type(&self) -> DataType {
-        match &self.mode {
-            Mode::Tcp(config) => config.decoding().output_type(),
-            Mode::Udp(config) => config.decoding().output_type(),
+    fn decoding(&self) -> DeserializerConfig {
+        match self.mode.clone() {
+            Mode::Tcp(config) => config.decoding().clone(),
+            Mode::Udp(config) => config.decoding().clone(),
             #[cfg(unix)]
-            Mode::UnixDatagram(config) => config.decoding.output_type(),
+            Mode::UnixDatagram(config) => config.decoding().clone(),
             #[cfg(unix)]
-            Mode::UnixStream(config) => config.decoding.output_type(),
+            Mode::UnixStream(config) => config.decoding().clone(),
+        }
+    }
+
+    fn log_namespace(&self) -> LogNamespace {
+        match self.mode.clone() {
+            Mode::Tcp(config) => config.log_namespace.unwrap_or(false).into(),
+            Mode::Udp(config) => config.log_namespace.unwrap_or(false).into(),
+            #[cfg(unix)]
+            Mode::UnixDatagram(config) => config.log_namespace.unwrap_or(false).into(),
+            #[cfg(unix)]
+            Mode::UnixStream(config) => config.log_namespace.unwrap_or(false).into(),
         }
     }
 }
@@ -206,8 +219,75 @@ impl SourceConfig for SocketConfig {
         }
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
+
+        let schema_definition = self
+            .decoding()
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
+
+        let schema_definition = match &self.mode {
+            Mode::Tcp(config) => schema_definition
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+                        &config.legacy_host_key()
+                    ))),
+                    &owned_value_path!(log_schema().host_key()),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+                        &config.legacy_port_key()
+                    ))),
+                    &owned_value_path!("port"),
+                    Kind::bytes(),
+                    None,
+                ),
+            Mode::Udp(config) => schema_definition
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+                        &config.legacy_host_key()
+                    ))),
+                    &owned_value_path!(log_schema().host_key()),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+                        &config.legacy_port_key()
+                    ))),
+                    &owned_value_path!("port"),
+                    Kind::bytes(),
+                    None,
+                ),
+            Mode::UnixDatagram(config) => schema_definition.with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+                    &config.legacy_host_key()
+                ))),
+                &owned_value_path!(log_schema().host_key()),
+                Kind::bytes(),
+                None,
+            ),
+            Mode::UnixStream(config) => schema_definition.with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+                    &config.legacy_host_key()
+                ))),
+                &owned_value_path!(log_schema().host_key()),
+                Kind::bytes(),
+                None,
+            ),
+        };
+
+        vec![Output::default(self.decoding().output_type())
+            .with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {

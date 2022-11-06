@@ -109,6 +109,20 @@ impl UdpConfig {
             log_namespace: Some(true),
         }
     }
+
+    pub fn legacy_host_key(&self) -> String {
+        self.host_key
+            .as_deref()
+            .unwrap_or_else(|| log_schema().host_key())
+            .to_string()
+    }
+
+    pub fn legacy_port_key(&self) -> String {
+        self.port_key
+            .as_deref()
+            .unwrap_or_else(|| "port")
+            .to_string()
+    }
 }
 
 pub(super) fn udp(

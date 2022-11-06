@@ -77,6 +77,16 @@ impl UnixConfig {
             log_namespace: Some(true),
         }
     }
+
+    pub const fn decoding(&self) -> &DeserializerConfig {
+        &self.decoding
+    }
+
+    pub fn legacy_host_key(&self) -> String {
+        self.clone()
+            .host_key
+            .unwrap_or_else(|| log_schema().host_key().to_string())
+    }
 }
 
 /// Function to pass to `build_unix_*_source`, specific to the basic unix source
@@ -106,15 +116,10 @@ fn handle_events(
         );
 
         if let Some(ref host) = received_from {
-            let host_key = config
-                .clone()
-                .host_key
-                .unwrap_or_else(|| log_schema().host_key().to_string());
-
             log_namespace.insert_source_metadata(
                 SocketConfig::NAME,
                 log,
-                Some(LegacyKey::InsertIfEmpty(path!(&host_key))),
+                Some(LegacyKey::InsertIfEmpty(path!(&config.legacy_host_key()))),
                 path!(log_schema().host_key()),
                 host.clone(),
             );
