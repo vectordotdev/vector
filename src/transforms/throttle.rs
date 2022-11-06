@@ -26,9 +26,9 @@ pub enum ThrottleMode {
     /// Throttle based on number of events
     Events,
     /// Throttle based on bytes of each event's estimated json bytes
-    EventBytes,
-    /// Throttle based on bytes of each event's message length
-    MessageLength,
+    EventJsonBytes,
+    /// Throttle based on bytes of each event's message length in bytes
+    MessageBytes,
 }
 
 /// Configuration for the `throttle` transform.
@@ -175,7 +175,17 @@ where
                                         .ok()
                                 });
 
-                                let throttle_count = match self.mode {
+                                let throttle_count = match self.mode.as_ref() {
+                                    Some(ThrottleMode::EventJsonBytes) => event.as_log().estimated_json_encoded_size_of(),
+                                    Some(ThrottleMode::MessageBytes) => {
+                                        event
+                                            .as_log()
+                                            .get("message")
+                                            .unwrap()
+                                            .to_string_lossy()
+                                            .into_owned()
+                                            .len()
+                                    },
                                     _ => 1,
                                 };
 
@@ -250,6 +260,7 @@ mod tests {
             r#"
 threshold = 2
 window_secs = 5
+mode = "events"
 "#,
         )
         .unwrap();
@@ -290,6 +301,140 @@ window_secs = 5
         clock.advance(Duration::from_secs(3));
 
         tx.send(LogEvent::default().into()).await.unwrap();
+
+        // The rate limiter should now be refreshed and allow an additional event through
+        if let Some(_event) = out_stream.next().await {
+        } else {
+            panic!("Unexpectedly received None in output stream");
+        }
+
+        // We should be back to pending, having nothing waiting for us
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        tx.disconnect();
+
+        // And still nothing there
+        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+    }
+
+    #[tokio::test]
+    async fn throttle_json_bytes() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 120
+window_secs = 5
+mode = "event_json_bytes"
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::event_task)
+            .unwrap();
+
+        let throttle = throttle.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
+
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // 60 bytes after JSON serialization (message + timestamp)
+        let event = Event::Log(LogEvent::from("test"));
+
+        tx.send(event.clone().into()).await.unwrap();
+        tx.send(event.clone().into()).await.unwrap();
+
+        let mut count = 0_u8;
+        while count < 2 {
+            if let Some(_event) = out_stream.next().await {
+                count += 1;
+            } else {
+                panic!("Unexpectedly received None in output stream");
+            }
+        }
+        assert_eq!(2, count);
+
+        clock.advance(Duration::from_secs(2));
+
+        tx.send(event.clone().into()).await.unwrap();
+
+        // We should be back to pending, having the second event dropped
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        clock.advance(Duration::from_secs(3));
+
+        tx.send(event.clone().into()).await.unwrap();
+
+        // The rate limiter should now be refreshed and allow an additional event through
+        if let Some(_event) = out_stream.next().await {
+        } else {
+            panic!("Unexpectedly received None in output stream");
+        }
+
+        // We should be back to pending, having nothing waiting for us
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        tx.disconnect();
+
+        // And still nothing there
+        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+    }
+
+    #[tokio::test]
+    async fn throttle_message_bytes() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 8
+window_secs = 5
+mode = "message_bytes"
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::event_task)
+            .unwrap();
+
+        let throttle = throttle.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
+
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // 60 bytes after JSON serialization (message + timestamp)
+        let event = Event::Log(LogEvent::from("test"));
+
+        tx.send(event.clone().into()).await.unwrap();
+        tx.send(event.clone().into()).await.unwrap();
+
+        let mut count = 0_u8;
+        while count < 2 {
+            if let Some(_event) = out_stream.next().await {
+                count += 1;
+            } else {
+                panic!("Unexpectedly received None in output stream");
+            }
+        }
+        assert_eq!(2, count);
+
+        clock.advance(Duration::from_secs(2));
+
+        tx.send(event.clone().into()).await.unwrap();
+
+        // We should be back to pending, having the second event dropped
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        clock.advance(Duration::from_secs(3));
+
+        tx.send(event.clone().into()).await.unwrap();
 
         // The rate limiter should now be refreshed and allow an additional event through
         if let Some(_event) = out_stream.next().await {
