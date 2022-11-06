@@ -157,17 +157,24 @@ where
                                         .ok()
                                 });
 
-                                match limiter.check_key(&key) {
-                                    Ok(()) => {
-                                        Some(event)
-                                    }
-                                    _ => {
-                                        if let Some(key) = key {
-                                            emit!(ThrottleEventDiscarded{key})
-                                        } else {
-                                            emit!(ThrottleEventDiscarded{key: "None".to_string()})
+                                let throttle_count = 1;
+
+                                match NonZeroU32::new(throttle_count as u32) {
+                                    None => Some(event),
+                                    Some(count) => {
+                                        match limiter.check_key_n(&key, count) {
+                                            Ok(()) => {
+                                                Some(event)
+                                            }
+                                            _ => {
+                                                if let Some(key) = key {
+                                                    emit!(ThrottleEventDiscarded{key})
+                                                } else {
+                                                    emit!(ThrottleEventDiscarded{key: "None".to_string()})
+                                                }
+                                                None
+                                            }
                                         }
-                                        None
                                     }
                                 }
                             } else {
