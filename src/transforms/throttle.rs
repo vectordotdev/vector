@@ -26,9 +26,9 @@ pub enum ThrottleMode {
     /// Throttle based on number of events
     Events,
     /// Throttle based on bytes of each event's estimated json bytes
-    EventJsonBytes,
+    LogJsonBytes,
     /// Throttle based on bytes of each event's message length in bytes
-    MessageBytes,
+    LogMessageBytes,
 }
 
 /// Configuration for the `throttle` transform.
@@ -176,8 +176,8 @@ where
                                 });
 
                                 let throttle_count = match self.mode.as_ref() {
-                                    Some(ThrottleMode::EventJsonBytes) => event.as_log().estimated_json_encoded_size_of(),
-                                    Some(ThrottleMode::MessageBytes) => {
+                                    Some(ThrottleMode::LogJsonBytes) => event.as_log().estimated_json_encoded_size_of(),
+                                    Some(ThrottleMode::LogMessageBytes) => {
                                         event
                                             .as_log()
                                             .get("message")
@@ -324,7 +324,7 @@ mode = "events"
             r#"
 threshold = 120
 window_secs = 5
-mode = "event_json_bytes"
+mode = "log_json_bytes"
 "#,
         )
         .unwrap();
@@ -391,7 +391,7 @@ mode = "event_json_bytes"
             r#"
 threshold = 8
 window_secs = 5
-mode = "message_bytes"
+mode = "log_message_bytes"
 "#,
         )
         .unwrap();
