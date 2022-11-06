@@ -3,7 +3,7 @@
 mod allocator;
 use std::{
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicI64, AtomicUsize, Ordering},
         Mutex,
     },
     thread,
@@ -22,14 +22,25 @@ pub(crate) use self::allocator::{
 
 use crossbeam_utils::CachePadded;
 
-const NUM_GROUPS: usize = 256;
+const NUM_GROUPS: usize = 128;
 /// These arrays represent the allocations and deallocations for each group.
 /// We pad each Atomic to reduce false sharing effects.
-static GROUP_MEM_ALLOCS: [CachePadded<AtomicU64>; NUM_GROUPS] =
-    arr![CachePadded::new(AtomicU64::new(0)); 256];
-static GROUP_MEM_DEALLOCS: [CachePadded<AtomicU64>; NUM_GROUPS] =
-    arr![CachePadded::new(AtomicU64::new(0)); 256];
+static GROUP_MEM_STATS: [[CachePadded<AtomicI64>; NUM_GROUPS]; 8] = [
+    arr![CachePadded::new(AtomicI64::new(0)); 128],
+    arr![CachePadded::new(AtomicI64::new(0)); 128],
+    arr![CachePadded::new(AtomicI64::new(0)); 128],
+    arr![CachePadded::new(AtomicI64::new(0)); 128],
+    arr![CachePadded::new(AtomicI64::new(0)); 128],
+    arr![CachePadded::new(AtomicI64::new(0)); 128],
+    arr![CachePadded::new(AtomicI64::new(0)); 128],
+    arr![CachePadded::new(AtomicI64::new(0)); 128],
+];
 
+static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+thread_local! {
+    static THREAD_ID: AtomicUsize = AtomicUsize::new(THREAD_COUNTER.fetch_add(1, Ordering::SeqCst) + 1);
+}
 // By using the Option type, we can do statics w/o the need of other creates such as lazy_static
 struct GroupInfo {
     component_kind: Option<String>,
@@ -47,7 +58,7 @@ impl GroupInfo {
     }
 }
 
-static GROUP_INFO: [Mutex<GroupInfo>; NUM_GROUPS] = arr![Mutex::new(GroupInfo::new()); 256];
+static GROUP_INFO: [Mutex<GroupInfo>; NUM_GROUPS] = arr![Mutex::new(GroupInfo::new()); 128];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -60,13 +71,15 @@ pub struct MainTracer;
 impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
-        GROUP_MEM_ALLOCS[group_id.as_raw()].fetch_add(object_size as u64, Ordering::Relaxed);
+        GROUP_MEM_STATS[THREAD_ID.with(|t| t.load(Ordering::Relaxed)) % 8][group_id.as_raw()]
+            .fetch_add(object_size as i64, Ordering::Relaxed);
     }
 
     #[inline(always)]
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
-        GROUP_MEM_DEALLOCS[source_group_id.as_raw()]
-            .fetch_add(object_size as u64, Ordering::Relaxed);
+        GROUP_MEM_STATS[THREAD_ID.with(|t| t.load(Ordering::Relaxed)) % 8]
+            [source_group_id.as_raw()]
+        .fetch_sub(object_size as i64, Ordering::Relaxed);
     }
 }
 
@@ -76,15 +89,15 @@ pub fn init_allocation_tracing() {
     alloc_processor
         .spawn(|| {
             without_allocation_tracing(|| loop {
-                for idx in 0..GROUP_MEM_ALLOCS.len() {
-                    let allocs = GROUP_MEM_ALLOCS[idx].load(Ordering::Relaxed);
-                    let deallocs = GROUP_MEM_DEALLOCS[idx].load(Ordering::Relaxed);
-                    let mem_used = allocs - deallocs;
-
-                    if allocs == 0 {
+                for group_idx in 0..NUM_GROUPS {
+                    let mut mem_used = 0;
+                    for bucket in &GROUP_MEM_STATS {
+                        mem_used += bucket[group_idx].load(Ordering::Relaxed);
+                    }
+                    if mem_used == 0 {
                         continue;
                     }
-                    let group_info = GROUP_INFO[idx].lock().unwrap();
+                    let group_info = GROUP_INFO[group_idx].lock().unwrap();
                     gauge!(
                         "component_allocated_bytes",
                         mem_used.to_f64().expect("failed to convert group_id from int to float"),
