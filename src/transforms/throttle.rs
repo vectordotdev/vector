@@ -18,6 +18,19 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
+/// Configuration for controlling how events will be throttled.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum ThrottleMode {
+    /// Throttle based on number of events
+    Events,
+    /// Throttle based on bytes of each event's estimated json bytes
+    EventBytes,
+    /// Throttle based on bytes of each event's message length
+    MessageLength,
+}
+
 /// Configuration for the `throttle` transform.
 #[serde_as]
 #[configurable_component(transform("throttle"))]
@@ -44,6 +57,9 @@ pub struct ThrottleConfig {
 
     /// A logical condition used to exclude events from sampling.
     exclude: Option<AnyCondition>,
+
+    /// The throttling mode to use.
+    mode: Option<ThrottleMode>,
 }
 
 impl_generate_config_from_default!(ThrottleConfig);
@@ -71,6 +87,7 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     key_field: Option<Template>,
     exclude: Option<Condition>,
     clock: C,
+    mode: Option<ThrottleMode>,
 }
 
 impl<C, I> Throttle<C, I>
@@ -108,6 +125,7 @@ where
             flush_keys_interval,
             key_field: config.key_field.clone(),
             exclude,
+            mode: config.mode.clone(),
         })
     }
 }
@@ -157,7 +175,9 @@ where
                                         .ok()
                                 });
 
-                                let throttle_count = 1;
+                                let throttle_count = match self.mode {
+                                    _ => 1,
+                                };
 
                                 match NonZeroU32::new(throttle_count as u32) {
                                     None => Some(event),
@@ -420,6 +440,7 @@ key_field = "{{ bucket }}"
                 window_secs: Duration::from_secs_f64(1.0),
                 key_field: None,
                 exclude: None,
+                mode: None,
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
