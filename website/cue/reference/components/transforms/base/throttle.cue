@@ -21,6 +21,18 @@ base: components: transforms: throttle: configuration: {
 			syntax: "template"
 		}
 	}
+	mode: {
+		description: "The throttling mode used to determine each event's contribution against `threshold`."
+		required: false
+		type: string: {
+			default: "events"
+			enum: {
+				"events": "Throttle by number of events."
+				"log_message_bytes": "Throttle by number of bytes in each event's `message` field (logs only)."
+				"log_json_bytes": "Throttle by number of estimated bytes for JSON representation of each event (logs only)."
+			}
+		}
+	}
 	threshold: {
 		description: """
 			The number of events allowed for a given bucket per configured `window_secs`.
