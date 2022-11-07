@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
-use crate::app::Application;
 use crate::commands;
 
 /// Modify the config file
@@ -21,10 +20,10 @@ enum Commands {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
+    pub fn exec(&self) -> Result<()> {
         match &self.command {
-            Commands::Org(cli) => cli.exec(&app),
-            Commands::Repo(cli) => cli.exec(&app),
+            Commands::Org(cli) => cli.exec(),
+            Commands::Repo(cli) => cli.exec(),
         }
     }
 }

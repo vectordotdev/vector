@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::app::Application;
+use crate::app;
 
 /// Set the target Datadog org
 #[derive(Args, Debug)]
@@ -11,10 +11,10 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
-        let mut config = app.config.clone();
+    pub fn exec(&self) -> Result<()> {
+        let mut config = app::config().clone();
         config.org = self.name.to_string();
-        app.config_file.save(config);
+        app::config_file().save(config);
 
         Ok(())
     }

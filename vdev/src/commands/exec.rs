@@ -1,7 +1,7 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Args;
 
-use crate::app::Application;
+use crate::app;
 
 /// Execute a command within the repository
 #[derive(Args, Debug)]
@@ -12,12 +12,14 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
-        let mut command = app.repo.command(&self.args[0]);
+    pub fn exec(&self) -> Result<()> {
+        let mut command = app::construct_command(&self.args[0]);
         command.args(&self.args[1..]);
 
         let status = command.status()?;
-        app.exit(status.code().unwrap());
+        if !status.success() {
+            bail!("failed with exit code: {}", status.code().unwrap());
+        }
 
         Ok(())
     }

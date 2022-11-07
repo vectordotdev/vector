@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{prelude::*, BufReader};
 use std::path::PathBuf;
 
-use crate::app::Application;
+use crate::app;
 
 const VERSION_START: &str = "version = ";
 
@@ -14,10 +14,10 @@ const VERSION_START: &str = "version = ";
 pub struct Cli {}
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
+    pub fn exec(&self) -> Result<()> {
         let mut contexts = vec![];
 
-        let path: PathBuf = [&app.repo.path, "Cargo.toml"].iter().collect();
+        let path: PathBuf = [app::path(), "Cargo.toml"].iter().collect();
         if let Ok(file) = File::open(path) {
             let reader = BufReader::new(file);
 
@@ -34,8 +34,8 @@ impl Cli {
             }
         };
 
-        contexts.push(format!("org: {}", app.config.org));
-        app.display(format!("vector{{ {} }}", contexts.join(", ")));
+        contexts.push(format!("org: {}", app::config().org));
+        app::display(format!("vector{{ {} }}", contexts.join(", ")));
 
         Ok(())
     }

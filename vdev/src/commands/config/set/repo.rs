@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::app::Application;
+use crate::app;
+use crate::platform;
 
 /// Set the path to the Vector repository
 #[derive(Args, Debug)]
@@ -11,12 +12,12 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
-        let path = app.platform.canonicalize_path(&self.path);
+    pub fn exec(&self) -> Result<()> {
+        let path = platform::canonicalize_path(&self.path);
 
-        let mut config = app.config.clone();
+        let mut config = app::config().clone();
         config.repo = path;
-        app.config_file.save(config);
+        app::config_file().save(config);
 
         Ok(())
     }

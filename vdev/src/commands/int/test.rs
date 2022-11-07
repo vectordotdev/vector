@@ -1,7 +1,8 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Args;
 
-use crate::app::Application;
+use crate::app;
+use crate::platform;
 use crate::testing::{
     config::{IntegrationTestConfig, RustToolchainConfig},
     runner::IntegrationTestRunner,
@@ -23,18 +24,17 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
-        let test_dir = IntegrationTestConfig::locate_source(&app.repo.path, &self.integration)?;
-        let toolchain_config = RustToolchainConfig::parse(&app.repo.path)?;
+    pub fn exec(&self) -> Result<()> {
+        let test_dir = IntegrationTestConfig::locate_source(app::path(), &self.integration)?;
+        let toolchain_config = RustToolchainConfig::parse(app::path())?;
         let runner = IntegrationTestRunner::new(
-            &app,
             &self.integration,
             &toolchain_config.channel,
         );
 
-        let envs_dir = state::envs_dir(&app.platform.data_dir(), &self.integration);
+        let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration);
         if !state::env_exists(&envs_dir, &self.environment) {
-            app.abort("Environment is not up");
+            bail!("environment is not up");
         }
 
         let config = IntegrationTestConfig::from_source(&test_dir)?;

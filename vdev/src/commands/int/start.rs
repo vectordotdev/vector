@@ -1,8 +1,9 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Args;
 use std::process::Command;
 
-use crate::app::Application;
+use crate::app;
+use crate::platform;
 use crate::testing::{
     config::{IntegrationTestConfig, RustToolchainConfig},
     runner::{IntegrationTestRunner, NETWORK_ENV_VAR},
@@ -21,14 +22,13 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
-        let test_dir = IntegrationTestConfig::locate_source(&app.repo.path, &self.integration)?;
+    pub fn exec(&self) -> Result<()> {
+        let test_dir = IntegrationTestConfig::locate_source(app::path(), &self.integration)?;
 
-        let envs_dir = state::envs_dir(&app.platform.data_dir(), &self.integration);
+        let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration);
         let config = IntegrationTestConfig::from_source(&test_dir)?;
-        let toolchain_config = RustToolchainConfig::parse(&app.repo.path)?;
+        let toolchain_config = RustToolchainConfig::parse(app::path())?;
         let runner = IntegrationTestRunner::new(
-            &app,
             &self.integration,
             &toolchain_config.channel,
         );
@@ -45,11 +45,11 @@ impl Cli {
             json = serde_json::to_string(config)?;
             command.arg(&json);
         } else {
-            app.abort(format!("Unknown environment: {}", self.environment));
+            bail!("unknown environment: {}", self.environment);
         }
 
         if state::env_exists(&envs_dir, &self.environment) {
-            app.abort("Environment is already up");
+            bail!("environment is already up");
         }
 
         if let Some(env_vars) = config.env {
@@ -58,7 +58,7 @@ impl Cli {
 
         let status = command.status()?;
         if !status.success() {
-            app.exit(status.code().unwrap());
+            bail!("failed with exit code: {}", status.code().unwrap());
         }
 
         state::save_env(&envs_dir, &self.environment, &json)?;

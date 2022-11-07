@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
-use crate::app::Application;
 use crate::commands;
 
 /// Manage the vdev config file
@@ -21,10 +20,10 @@ enum Commands {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
+    pub fn exec(&self) -> Result<()> {
         match &self.command {
-            Commands::Find(cli) => cli.exec(&app),
-            Commands::Set(cli) => cli.exec(&app),
+            Commands::Find(cli) => cli.exec(),
+            Commands::Set(cli) => cli.exec(),
         }
     }
 }

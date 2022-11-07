@@ -1,7 +1,8 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Args;
 
-use crate::app::Application;
+use crate::app;
+use crate::platform;
 
 /// Build Vector
 #[derive(Args, Debug)]
@@ -20,8 +21,8 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
-        let mut command = app.repo.command("cargo");
+    pub fn exec(&self) -> Result<()> {
+        let mut command = app::construct_command("cargo");
         command.args(["build", "--no-default-features"]);
 
         if self.release {
@@ -32,7 +33,7 @@ impl Cli {
         if !self.feature.is_empty() {
             command.args([self.feature.join(",")]);
         } else {
-            if app.platform.windows() {
+            if platform::windows() {
                 command.arg("default-msvc");
             } else {
                 command.arg("default");
@@ -42,12 +43,12 @@ impl Cli {
         if let Some(target) = self.target.as_deref() {
             command.args(["--target", target]);
         } else {
-            command.args(["--target", &app.platform.default_target()]);
+            command.args(["--target", &platform::default_target()]);
         };
 
         let status = command.status()?;
         if !status.success() {
-            app.abort(format!("failed with exit code: {status}"));
+            bail!("failed with exit code: {status}");
         }
 
         Ok(())

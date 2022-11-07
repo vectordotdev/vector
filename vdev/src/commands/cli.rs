@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 
-use crate::app::Application;
 use crate::commands;
 
 /// Vector's unified dev tool
@@ -42,14 +41,14 @@ enum Commands {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
+    pub fn exec(&self) -> Result<()> {
         match &self.command {
-            Commands::Build(cli) => cli.exec(&app),
-            Commands::Config(cli) => cli.exec(&app),
-            Commands::Exec(cli) => cli.exec(&app),
-            Commands::Int(cli) => cli.exec(&app),
-            Commands::Meta(cli) => cli.exec(&app),
-            Commands::Status(cli) => cli.exec(&app),
+            Commands::Build(cli) => cli.exec(),
+            Commands::Config(cli) => cli.exec(),
+            Commands::Exec(cli) => cli.exec(),
+            Commands::Int(cli) => cli.exec(),
+            Commands::Meta(cli) => cli.exec(),
+            Commands::Status(cli) => cli.exec(),
         }
     }
 }

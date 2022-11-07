@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+#[derive(Debug)]
 pub struct ConfigFile {}
 
 impl ConfigFile {

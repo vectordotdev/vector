@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
-use crate::app::Application;
 use crate::commands;
 
 /// Manage integrations
@@ -25,12 +24,12 @@ enum Commands {
 }
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
+    pub fn exec(&self) -> Result<()> {
         match &self.command {
-            Commands::Show(cli) => cli.exec(&app),
-            Commands::Start(cli) => cli.exec(&app),
-            Commands::Stop(cli) => cli.exec(&app),
-            Commands::Test(cli) => cli.exec(&app),
+            Commands::Show(cli) => cli.exec(),
+            Commands::Start(cli) => cli.exec(),
+            Commands::Stop(cli) => cli.exec(),
+            Commands::Test(cli) => cli.exec(),
         }
     }
 }

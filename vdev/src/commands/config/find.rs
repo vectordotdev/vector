@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::app::Application;
+use crate::app;
 
 /// Locate the config file
 #[derive(Args, Debug)]
@@ -9,8 +9,8 @@ use crate::app::Application;
 pub struct Cli {}
 
 impl Cli {
-    pub fn exec(&self, app: &Application) -> Result<()> {
-        app.display(format!("{}", app.config_file.path().display()));
+    pub fn exec(&self) -> Result<()> {
+        app::display(format!("{}", app::config_file().path().display()));
 
         Ok(())
     }

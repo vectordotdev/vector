@@ -1,134 +1,134 @@
 use log::{Level, LevelFilter};
+use once_cell::sync::OnceCell;
 use owo_colors::{
     OwoColorize,
     Stream::{Stderr, Stdout},
 };
-use std::env;
+use std::process::Command;
 
 use crate::config::{Config, ConfigFile};
-use crate::platform::Platform;
-use crate::repo::core::Repository;
 
-pub struct Application {
-    pub(crate) config_file: ConfigFile,
-    pub(crate) config: Config,
-    pub(crate) repo: Repository,
-    pub(crate) platform: Platform,
-    verbosity: LevelFilter,
+static VERBOSITY: OnceCell<LevelFilter> = OnceCell::new();
+static CONFIG_FILE: OnceCell<ConfigFile> = OnceCell::new();
+static CONFIG: OnceCell<Config> = OnceCell::new();
+static PATH: OnceCell<String> = OnceCell::new();
+
+pub fn verbosity() -> &'static LevelFilter {
+    VERBOSITY.get().expect("verbosity is not initialized")
 }
 
-impl Application {
-    pub fn new(verbosity: LevelFilter) -> Self {
-        let platform = Platform::new();
-        let config_file = ConfigFile::new();
-        let config_model = config_file.load();
+pub fn config_file() -> &'static ConfigFile {
+    CONFIG_FILE.get().expect("config file is not initialized")
+}
 
-        // Set the path to the repository for the entire application
-        let path = if !config_model.repo.is_empty() {
-            config_model.repo.to_string()
-        } else {
-            match env::current_dir() {
-                Ok(p) => p.display().to_string(),
-                Err(_) => ".".to_string(),
-            }
-        };
+pub fn config() -> &'static Config {
+    CONFIG.get().expect("config is not initialized")
+}
 
-        Self {
-            config_file: config_file,
-            config: config_model,
-            repo: Repository::new(path),
-            platform: platform,
-            verbosity: verbosity,
-        }
-    }
+pub fn path() -> &'static String {
+    PATH.get().expect("path is not initialized")
+}
 
-    pub fn exit(&self, code: i32) {
-        std::process::exit(code);
-    }
+pub fn display<T: AsRef<str>>(text: T) {
+    // Simply bold rather than bright white for terminals with white backgrounds
+    println!(
+        "{}",
+        text.as_ref().if_supports_color(Stdout, |text| text.bold())
+    );
+}
 
-    pub fn abort<T: AsRef<str>>(&self, text: T) {
-        self.display_error(text);
-        self.exit(1);
-    }
-
-    pub fn display<T: AsRef<str>>(&self, text: T) {
-        // Simply bold rather than bright white for terminals with white backgrounds
-        println!(
+#[allow(dead_code)]
+pub fn display_trace<T: AsRef<str>>(text: T) {
+    if Level::Trace <= *verbosity() {
+        eprintln!(
             "{}",
-            text.as_ref().if_supports_color(Stdout, |text| text.bold())
+            text.as_ref().if_supports_color(Stderr, |text| text.bold())
         );
     }
+}
 
-    #[allow(dead_code)]
-    pub fn display_trace<T: AsRef<str>>(&self, text: T) {
-        if Level::Trace <= self.verbosity {
-            eprintln!(
-                "{}",
-                text.as_ref().if_supports_color(Stderr, |text| text.bold())
-            );
-        }
+#[allow(dead_code)]
+pub fn display_debug<T: AsRef<str>>(text: T) {
+    if Level::Debug <= *verbosity() {
+        eprintln!(
+            "{}",
+            text.as_ref().if_supports_color(Stderr, |text| text.bold())
+        );
     }
+}
 
-    #[allow(dead_code)]
-    pub fn display_debug<T: AsRef<str>>(&self, text: T) {
-        if Level::Debug <= self.verbosity {
-            eprintln!(
-                "{}",
-                text.as_ref().if_supports_color(Stderr, |text| text.bold())
-            );
-        }
+#[allow(dead_code)]
+pub fn display_info<T: AsRef<str>>(text: T) {
+    if Level::Info <= *verbosity() {
+        eprintln!(
+            "{}",
+            text.as_ref().if_supports_color(Stderr, |text| text.bold())
+        );
     }
+}
 
-    #[allow(dead_code)]
-    pub fn display_info<T: AsRef<str>>(&self, text: T) {
-        if Level::Info <= self.verbosity {
-            eprintln!(
-                "{}",
-                text.as_ref().if_supports_color(Stderr, |text| text.bold())
-            );
-        }
+#[allow(dead_code)]
+pub fn display_success<T: AsRef<str>>(text: T) {
+    if Level::Info <= *verbosity() {
+        eprintln!(
+            "{}",
+            text.as_ref()
+                .if_supports_color(Stderr, |text| text.bright_cyan())
+        );
     }
+}
 
-    #[allow(dead_code)]
-    pub fn display_success<T: AsRef<str>>(&self, text: T) {
-        if Level::Info <= self.verbosity {
-            eprintln!(
-                "{}",
-                text.as_ref()
-                    .if_supports_color(Stderr, |text| text.bright_cyan())
-            );
-        }
+#[allow(dead_code)]
+pub fn display_waiting<T: AsRef<str>>(text: T) {
+    if Level::Info <= *verbosity() {
+        eprintln!(
+            "{}",
+            text.as_ref()
+                .if_supports_color(Stderr, |text| text.bright_magenta())
+        );
     }
+}
 
-    #[allow(dead_code)]
-    pub fn display_waiting<T: AsRef<str>>(&self, text: T) {
-        if Level::Info <= self.verbosity {
-            eprintln!(
-                "{}",
-                text.as_ref()
-                    .if_supports_color(Stderr, |text| text.bright_magenta())
-            );
-        }
+#[allow(dead_code)]
+pub fn display_warning<T: AsRef<str>>(text: T) {
+    if Level::Warn <= *verbosity() {
+        eprintln!(
+            "{}",
+            text.as_ref()
+                .if_supports_color(Stderr, |text| text.bright_yellow())
+        );
     }
+}
 
-    #[allow(dead_code)]
-    pub fn display_warning<T: AsRef<str>>(&self, text: T) {
-        if Level::Warn <= self.verbosity {
-            eprintln!(
-                "{}",
-                text.as_ref()
-                    .if_supports_color(Stderr, |text| text.bright_yellow())
-            );
-        }
+pub fn display_error<T: AsRef<str>>(text: T) {
+    if Level::Error <= *verbosity() {
+        eprintln!(
+            "{}",
+            text.as_ref()
+                .if_supports_color(Stderr, |text| text.bright_red())
+        );
     }
+}
 
-    pub fn display_error<T: AsRef<str>>(&self, text: T) {
-        if Level::Error <= self.verbosity {
-            eprintln!(
-                "{}",
-                text.as_ref()
-                    .if_supports_color(Stderr, |text| text.bright_red())
-            );
-        }
-    }
+pub fn construct_command(program: &str) -> Command {
+    let mut command = Command::new(program);
+    command.current_dir(path());
+
+    command
+}
+
+pub fn set_global_verbosity(verbosity: LevelFilter) {
+    VERBOSITY.set(verbosity).unwrap()
+}
+
+pub fn set_global_config_file(config_file: ConfigFile) {
+    CONFIG_FILE.set(config_file).unwrap()
+}
+
+pub fn set_global_config(config: Config) {
+    CONFIG.set(config).unwrap()
+}
+
+pub fn set_global_path(path: String) {
+    PATH.set(path).unwrap()
 }

@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::process::Command;
 
-use crate::app::Application;
+use crate::app;
 use crate::testing::config::IntegrationTestConfig;
 
 pub const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
@@ -26,19 +26,16 @@ pub enum RunnerState {
 }
 
 pub struct IntegrationTestRunner<'a> {
-    app: &'a Application,
     integration: &'a String,
     rust_version: &'a String,
 }
 
 impl<'a> IntegrationTestRunner<'a> {
     pub fn new(
-        app: &'a Application,
         integration: &'a String,
         rust_version: &'a String,
     ) -> IntegrationTestRunner {
         IntegrationTestRunner {
-            app,
             integration,
             rust_version,
         }
@@ -187,11 +184,11 @@ impl<'a> IntegrationTestRunner<'a> {
     }
 
     fn build(&self) -> Result<()> {
-        let dockerfile: PathBuf = [&self.app.repo.path, "scripts", "integration", "Dockerfile"]
+        let dockerfile: PathBuf = [app::path(), "scripts", "integration", "Dockerfile"]
             .iter()
             .collect();
         let mut command = Command::new("docker");
-        command.current_dir(&self.app.repo.path);
+        command.current_dir(app::path());
         command.arg("build");
         if atty::is(Stream::Stdout) {
             command.args(["--progress", "tty"]);
@@ -277,7 +274,7 @@ impl<'a> IntegrationTestRunner<'a> {
             "--workdir",
             MOUNT_PATH,
             "--volume",
-            &format!("{}:{}", &self.app.repo.path, MOUNT_PATH),
+            &format!("{}:{}", app::path(), MOUNT_PATH),
             "--volume",
             &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
             "--volume",
