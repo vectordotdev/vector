@@ -1,6 +1,6 @@
 //! APM stats
 //!
-//! This module contains the logic for compiting APM statistics based on the incoming trace
+//! This module contains the logic for computing APM statistics based on the incoming trace
 //! events this sink receives. It is modelled closely to the trace-agent component of the
 //! Datadog Agent, and sends out StatsPayload packets formatted and Aggregated by the same
 //! algorithm, at ten second intervals, independently of the sink's trace payloads.

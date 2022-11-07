@@ -370,8 +370,10 @@ async fn start_vector() -> (RunningTopology, tokio::sync::mpsc::UnboundedReceive
 /// The fields of the stats payloads are then compared.
 ///
 /// This test specifically verifies the Aggregation of stats across multiple batches of events
-/// through vector. Consumers of the Agent's stats payloads expect the Aggregation of stats for a
-/// 20 second time window on any given stats payload within that time window.
+/// through vector. Consumers of the Agent's stats payloads expect the Aggregation of stats to be
+/// "bucketed" within `datadog::traces::apm_stats::BUCKET_DURATION_NANOSECONDS` (10 second) windows.
+///  Each bucket must be sent only once.
+///  These are requirements from the APM stats backend of Datadog.
 #[tokio::test]
 async fn apm_stats_e2e_test_dd_agent_to_vector_correctness() {
     trace_init();

@@ -159,7 +159,6 @@ impl Aggregator {
 
     pub(crate) fn get_agent_env(&self) -> String {
         self.agent_env.clone().unwrap_or_default()
-        //self.agent_env.as_ref().unwrap_or_default()
     }
 
     pub(crate) fn get_agent_hostname(&self) -> String {

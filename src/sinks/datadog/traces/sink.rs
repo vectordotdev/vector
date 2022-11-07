@@ -25,7 +25,7 @@ struct EventPartitioner;
 
 // Use all fields from the top level protobuf contruct associated with the API key
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct PartitionKey {
+pub(crate) struct PartitionKey {
     pub(crate) api_key: Option<Arc<str>>,
     pub(crate) env: Option<String>,
     pub(crate) hostname: Option<String>,
