@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use cached::proc_macro::cached;
 use globset::{Glob, GlobSetBuilder};
 use hashlink::LinkedHashMap;
@@ -9,6 +9,27 @@ use std::fs;
 use std::iter;
 use std::path::PathBuf;
 
+#[derive(Deserialize, Debug)]
+pub struct RustToolchainRootConfig {
+    pub(crate) toolchain: RustToolchainConfig,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct RustToolchainConfig {
+    pub(crate) channel: String,
+}
+
+impl RustToolchainConfig {
+    pub fn parse(repo_path: &String) -> Result<Self> {
+        let config_file: PathBuf = [repo_path, "rust-toolchain.toml"].iter().collect();
+        let contents = fs::read_to_string(&config_file)?;
+        let config: RustToolchainRootConfig = toml::from_str(&contents)
+            .with_context(|| format!("failed to parse {}", config_file.display()))?;
+
+        Ok(config.toolchain)
+    }
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct IntegrationTestConfig {
     on: Vec<String>,
@@ -18,11 +39,11 @@ pub struct IntegrationTestConfig {
 }
 
 impl IntegrationTestConfig {
-    pub fn parse_file(config_file: PathBuf) -> Result<Self> {
-        let contents = fs::read_to_string(&config_file)?;
+    fn parse_file(config_file: &PathBuf) -> Result<Self> {
+        let contents = fs::read_to_string(config_file)?;
         let config: IntegrationTestConfig = toml::from_str(&contents).with_context(|| {
             format!(
-                "Failed to parse integration test configuration file {}",
+                "failed to parse integration test configuration file {}",
                 config_file.display()
             )
         })?;
@@ -59,12 +80,19 @@ impl IntegrationTestConfig {
         environments
     }
 
-    pub fn parse_integration(root: &String, integration: &str) -> Result<Self> {
-        let config_file: PathBuf = [&root, "scripts", "integration", integration, "test.toml"]
+    pub fn locate_source(root: &String, integration: &str) -> Result<PathBuf> {
+        let test_dir: PathBuf = [&root, "scripts", "integration", integration]
             .iter()
             .collect();
+        if !test_dir.is_dir() {
+            bail!("unknown integration: {}", integration);
+        }
 
-        parse_integration_test_config_file(config_file)
+        Ok(test_dir)
+    }
+
+    pub fn from_source(test_dir: &PathBuf) -> Result<Self> {
+        parse_integration_test_config_file(test_dir.join("test.toml"))
     }
 
     pub fn collect_all(root: &String) -> Result<BTreeMap<String, Self>> {
@@ -90,5 +118,5 @@ impl IntegrationTestConfig {
 
 #[cached(result = true)]
 fn parse_integration_test_config_file(config_file: PathBuf) -> Result<IntegrationTestConfig> {
-    IntegrationTestConfig::parse_file(config_file)
+    IntegrationTestConfig::parse_file(&config_file)
 }

@@ -1,10 +1,13 @@
 use anyhow::Result;
 use clap::Args;
-use std::path::PathBuf;
 use std::process::Command;
 
 use crate::app::Application;
-use crate::testing::{config::IntegrationTestConfig, state};
+use crate::testing::{
+    config::{IntegrationTestConfig, RustToolchainConfig},
+    runner::{IntegrationTestRunner, NETWORK_ENV_VAR},
+    state,
+};
 
 /// Start an environment
 #[derive(Args, Debug)]
@@ -19,18 +22,21 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(&self, app: &Application) -> Result<()> {
-        let test_dir: PathBuf = [&app.repo.path, "scripts", "integration", &self.integration]
-            .iter()
-            .collect();
-        if !test_dir.is_dir() {
-            app.abort(format!("Unknown integration: {}", self.integration));
-        }
+        let test_dir = IntegrationTestConfig::locate_source(&app.repo.path, &self.integration)?;
 
         let envs_dir = state::envs_dir(&app.platform.data_dir(), &self.integration);
-        let config = IntegrationTestConfig::parse_integration(&app.repo.path, &self.integration)?;
+        let config = IntegrationTestConfig::from_source(&test_dir)?;
+        let toolchain_config = RustToolchainConfig::parse(&app.repo.path)?;
+        let runner = IntegrationTestRunner::new(
+            &app,
+            &self.integration,
+            &toolchain_config.channel,
+        );
+        runner.ensure_network()?;
 
         let mut command = Command::new("cargo");
-        command.current_dir(test_dir);
+        command.current_dir(&test_dir);
+        command.env(NETWORK_ENV_VAR, runner.network_name());
         command.args(["run", "--quiet", "--", "start"]);
 
         let mut json = "".to_string();

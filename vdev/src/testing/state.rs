@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
@@ -13,6 +14,19 @@ pub fn envs_dir(data_dir: &PathBuf, integration: &str) -> PathBuf {
 
 pub fn env_exists(envs_dir: &PathBuf, environment: &str) -> bool {
     envs_dir.join(environment).is_dir()
+}
+
+pub fn active_envs(envs_dir: &PathBuf) -> Result<HashSet<String>> {
+    let mut environments = HashSet::new();
+    for entry in envs_dir.read_dir()? {
+        if let Ok(entry) = entry {
+            if entry.path().is_dir() {
+                environments.insert(entry.file_name().into_string().unwrap());
+            }
+        }
+    }
+
+    Ok(environments)
 }
 
 pub fn save_env(envs_dir: &PathBuf, environment: &str, config: &String) -> Result<()> {

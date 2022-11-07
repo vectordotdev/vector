@@ -1,7 +1,7 @@
 use cached::proc_macro::once;
 use directories::ProjectDirs;
 use std::env::consts::ARCH;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[once]
 fn _os_info() -> os_info::Info {
@@ -21,7 +21,7 @@ impl Platform {
     }
 
     pub fn canonicalize_path(&self, path: &String) -> String {
-        match dunce::canonicalize(Path::new(&path)) {
+        match dunce::canonicalize(path) {
             Ok(p) => p.display().to_string(),
             Err(_) => path.to_string(),
         }

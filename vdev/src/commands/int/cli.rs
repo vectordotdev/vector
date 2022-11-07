@@ -20,6 +20,8 @@ enum Commands {
     Start(commands::int::start::Cli),
     /// Stop an environment
     Stop(commands::int::stop::Cli),
+    /// Execute tests
+    Test(commands::int::test::Cli),
 }
 
 impl Cli {
@@ -28,6 +30,7 @@ impl Cli {
             Commands::Show(cli) => cli.exec(&app),
             Commands::Start(cli) => cli.exec(&app),
             Commands::Stop(cli) => cli.exec(&app),
+            Commands::Test(cli) => cli.exec(&app),
         }
     }
 }

@@ -3,7 +3,7 @@ use clap::Args;
 use std::path::PathBuf;
 
 use crate::app::Application;
-use crate::testing::config::IntegrationTestConfig;
+use crate::testing::{config::IntegrationTestConfig, state};
 
 /// Show information about integrations
 #[derive(Args, Debug)]
@@ -34,8 +34,16 @@ impl Cli {
             return Ok(());
         }
 
-        let integration = self.integration.as_ref().unwrap();
-        let config = IntegrationTestConfig::parse_integration(&app.repo.path, integration)?;
+        let test_dir = IntegrationTestConfig::locate_source(
+            &app.repo.path,
+            &self.integration.as_ref().unwrap(),
+        )?;
+        let config = IntegrationTestConfig::from_source(&test_dir)?;
+        let envs_dir = state::envs_dir(
+            &app.platform.data_dir(),
+            &self.integration.as_ref().unwrap(),
+        );
+        let active_envs = state::active_envs(&envs_dir)?;
 
         app.display(format!(
             "Tests triggered: {}",
@@ -45,7 +53,11 @@ impl Cli {
 
         app.display("Environments:");
         for environment in config.environments().keys() {
-            app.display(format!("  {}", environment));
+            if active_envs.contains(environment) {
+                app.display(format!("  {} (active)", environment));
+            } else {
+                app.display(format!("  {}", environment));
+            }
         }
 
         Ok(())

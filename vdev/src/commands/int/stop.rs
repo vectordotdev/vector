@@ -1,10 +1,13 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Args;
-use std::path::PathBuf;
 use std::process::Command;
 
 use crate::app::Application;
-use crate::testing::{config::IntegrationTestConfig, state};
+use crate::testing::{
+    config::{IntegrationTestConfig, RustToolchainConfig},
+    runner::{IntegrationTestRunner, NETWORK_ENV_VAR},
+    state,
+};
 
 /// Stop an environment
 #[derive(Args, Debug)]
@@ -15,33 +18,41 @@ pub struct Cli {
 
     /// The desired environment
     environment: String,
+
+    /// Use the currently defined configuration if the environment is not up
+    #[arg(short, long)]
+    force: bool,
 }
 
 impl Cli {
     pub fn exec(&self, app: &Application) -> Result<()> {
-        let test_dir: PathBuf = [&app.repo.path, "scripts", "integration", &self.integration]
-            .iter()
-            .collect();
-        if !test_dir.is_dir() {
-            app.abort(format!("Unknown integration: {}", self.integration));
-        }
-
+        let test_dir = IntegrationTestConfig::locate_source(&app.repo.path, &self.integration)?;
         let envs_dir = state::envs_dir(&app.platform.data_dir(), &self.integration);
-        if !state::env_exists(&envs_dir, &self.environment) {
-            app.abort("Environment is not up");
-        }
-
-        let config = IntegrationTestConfig::parse_integration(&app.repo.path, &self.integration)?;
+        let config = IntegrationTestConfig::from_source(&test_dir)?;
+        let toolchain_config = RustToolchainConfig::parse(&app.repo.path)?;
+        let runner = IntegrationTestRunner::new(
+            &app,
+            &self.integration,
+            &toolchain_config.channel,
+        );
 
         let mut command = Command::new("cargo");
-        command.current_dir(test_dir);
-        command.args([
-            "run",
-            "--quiet",
-            "--",
-            "stop",
-            &state::read_env_config(&envs_dir, &self.environment)?,
-        ]);
+        command.current_dir(&test_dir);
+        command.env(NETWORK_ENV_VAR, runner.network_name());
+        command.args(["run", "--quiet", "--", "stop"]);
+
+        if state::env_exists(&envs_dir, &self.environment) {
+            command.arg(state::read_env_config(&envs_dir, &self.environment)?);
+        } else if self.force {
+            let environments = config.environments();
+            if let Some(config) = environments.get(&self.environment) {
+                command.arg(serde_json::to_string(config)?);
+            } else {
+                bail!("unknown environment: {}", self.environment);
+            }
+        } else {
+            bail!("environment is not up");
+        }
 
         if let Some(env_vars) = config.env {
             command.envs(env_vars);
