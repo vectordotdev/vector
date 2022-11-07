@@ -2,7 +2,6 @@
 
 mod allocator;
 use std::{
-    cell::Cell,
     sync::{
         atomic::{AtomicI64, AtomicUsize, Ordering},
         Mutex,
@@ -49,7 +48,7 @@ static GROUP_MEM_STATS: [[CachePadded<AtomicI64>; NUM_GROUPS]; NUM_BUCKETS] = [
 static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 thread_local! {
-    static THREAD_ID: Cell<usize> = const { Cell::new(0) };
+    static THREAD_ID: usize = THREAD_COUNTER.fetch_add(1,Ordering::Relaxed);
 }
 // By using the Option type, we can do statics w/o the need of other creates such as lazy_static
 struct GroupInfo {
@@ -81,13 +80,13 @@ pub struct MainTracer;
 impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
-        GROUP_MEM_STATS[THREAD_ID.with(|t| t.get())][group_id.as_raw()]
+        GROUP_MEM_STATS[THREAD_ID.with(|t| *t)][group_id.as_raw()]
             .fetch_add(object_size as i64, Ordering::Relaxed);
     }
 
     #[inline(always)]
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
-        GROUP_MEM_STATS[THREAD_ID.with(|t| t.get())][source_group_id.as_raw()]
+        GROUP_MEM_STATS[THREAD_ID.with(|t| *t)][source_group_id.as_raw()]
             .fetch_sub(object_size as i64, Ordering::Relaxed);
     }
 }
@@ -132,8 +131,6 @@ pub fn acquire_allocation_group_id(
     component_type: String,
     component_kind: String,
 ) -> AllocationGroupId {
-    // try to init the thread id's here since they are lazily initialized.
-    let _ = THREAD_ID.with(|t| t.replace(THREAD_COUNTER.fetch_add(1, Ordering::Relaxed)));
     let group_id =
         AllocationGroupId::register().expect("failed to register allocation group token");
     let idx = group_id.as_raw();
