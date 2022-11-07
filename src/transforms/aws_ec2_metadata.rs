@@ -14,6 +14,7 @@ use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
+use value::Kind;
 use vector_config::configurable_component;
 
 use crate::{
@@ -223,8 +224,34 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Metric | DataType::Log)]
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        let added_keys = Keys::new(self.namespace.clone());
+
+        let paths = [
+            &added_keys.account_id_key.log_path,
+            &added_keys.ami_id_key.log_path,
+            &added_keys.availability_zone_key.log_path,
+            &added_keys.instance_id_key.log_path,
+            &added_keys.instance_type_key.log_path,
+            &added_keys.local_hostname_key.log_path,
+            &added_keys.local_ipv4_key.log_path,
+            &added_keys.public_hostname_key.log_path,
+            &added_keys.public_ipv4_key.log_path,
+            &added_keys.region_key.log_path,
+            &added_keys.subnet_id_key.log_path,
+            &added_keys.vpc_id_key.log_path,
+            &added_keys.role_name_key.log_path,
+        ];
+
+        let mut schema_definition = merged_definition.clone();
+
+        for path in paths {
+            schema_definition =
+                schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
+        }
+
+        vec![Output::default(DataType::Metric | DataType::Log)
+            .with_schema_definition(schema_definition)]
     }
 }
 
