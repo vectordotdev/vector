@@ -10,7 +10,7 @@ use vector_core::{
 use crate::{
     components::compliance::{
         sync::{Configured, ExternalResourceCoordinator, WaitHandle},
-        Component, ComponentBuilderParts, ComponentType,
+        ComponentBuilderParts, ComponentType, ValidatableComponent,
     },
     config::{schema, SourceContext},
     SourceSender,
@@ -18,7 +18,7 @@ use crate::{
 
 use super::{RunnerInput, RunnerOutput};
 
-pub(super) async fn build_source_component_future<C: Component>(
+pub(super) async fn build_source_component_future<C: ValidatableComponent>(
     component: C,
     mut component_shutdown_handle: WaitHandle,
 ) -> (

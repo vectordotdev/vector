@@ -11,15 +11,15 @@ use codecs::{
 use http::{Method, StatusCode, Uri};
 use lookup::event_path;
 use tokio_util::codec::Decoder as _;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     components::compliance::{
-        BuiltComponent, Codec, Component, ComponentBuilderParts, ComponentType, ExternalResource,
-        ResourceDefinition, ResourceDirection,
+        self, BuiltComponent, ComponentBuilderParts, ComponentType, ExternalResource,
+        ResourceDirection, ValidatableComponent,
     },
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
@@ -152,7 +152,11 @@ impl Default for SimpleHttpConfig {
 impl_generate_config_from_default!(SimpleHttpConfig);
 
 #[async_trait]
-impl Component for SimpleHttpConfig {
+impl ValidatableComponent for SimpleHttpConfig {
+    fn component_name(&self) -> &'static str {
+        Self::NAME
+    }
+
     fn component_type(&self) -> ComponentType {
         ComponentType::Source
     }
@@ -173,14 +177,14 @@ impl Component for SimpleHttpConfig {
         // TODO: Why do we use our own custom method enum that isn't just a newtype wrapper of
         // `http::Method`? :thinkies:
         let method = Some(Method::POST);
+        let decoding_config = self
+            .get_decoding_config()
+            .expect("should not fail to get decoding config");
 
         Some(ExternalResource::new(
             ResourceDirection::Push,
-            ResourceDefinition::Http(crate::components::compliance::HttpConfig::from_parts(
-                uri, method,
-            )),
-            // TODO: Figure out the right codec based on `self.encoding`.
-            Codec::JSON,
+            compliance::HttpConfig::from_parts(uri, method),
+            decoding_config,
         ))
     }
 
@@ -206,6 +210,44 @@ fn default_path() -> String {
 
 fn default_path_key() -> String {
     "path".to_string()
+}
+
+impl SimpleHttpConfig {
+    fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
+        if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {
+            return Err("Using `encoding` is deprecated and does not have any effect when `decoding` or `framing` is provided. Configure `framing` and `decoding` instead.".into());
+        }
+
+        let (framing, decoding) = if let Some(encoding) = self.encoding {
+            match encoding {
+                Encoding::Text => (
+                    NewlineDelimitedDecoderConfig::new().into(),
+                    BytesDeserializerConfig::new().into(),
+                ),
+                Encoding::Json => (
+                    BytesDecoderConfig::new().into(),
+                    JsonDeserializerConfig::new().into(),
+                ),
+                Encoding::Ndjson => (
+                    NewlineDelimitedDecoderConfig::new().into(),
+                    JsonDeserializerConfig::new().into(),
+                ),
+                Encoding::Binary => (
+                    BytesDecoderConfig::new().into(),
+                    BytesDeserializerConfig::new().into(),
+                ),
+            }
+        } else {
+            let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
+            let framing = self
+                .framing
+                .clone()
+                .unwrap_or_else(|| decoding.default_stream_framing());
+            (framing, decoding)
+        };
+
+        Ok(DecodingConfig::new(framing, decoding, LogNamespace::Legacy))
+    }
 }
 
 #[derive(Clone)]
@@ -265,39 +307,7 @@ impl HttpSource for SimpleHttpSource {
 #[async_trait::async_trait]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {
-            return Err("Using `encoding` is deprecated and does not have any effect when `decoding` or `framing` is provided. Configure `framing` and `decoding` instead.".into());
-        }
-
-        let (framing, decoding) = if let Some(encoding) = self.encoding {
-            match encoding {
-                Encoding::Text => (
-                    NewlineDelimitedDecoderConfig::new().into(),
-                    BytesDeserializerConfig::new().into(),
-                ),
-                Encoding::Json => (
-                    BytesDecoderConfig::new().into(),
-                    JsonDeserializerConfig::new().into(),
-                ),
-                Encoding::Ndjson => (
-                    NewlineDelimitedDecoderConfig::new().into(),
-                    JsonDeserializerConfig::new().into(),
-                ),
-                Encoding::Binary => (
-                    BytesDecoderConfig::new().into(),
-                    BytesDeserializerConfig::new().into(),
-                ),
-            }
-        } else {
-            let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
-            let framing = self
-                .framing
-                .clone()
-                .unwrap_or_else(|| decoding.default_stream_framing());
-            (framing, decoding)
-        };
-
-        let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
+        let decoder = self.get_decoding_config()?.build();
         let source = SimpleHttpSource {
             headers: self.headers.clone(),
             query_parameters: self.query_parameters.clone(),

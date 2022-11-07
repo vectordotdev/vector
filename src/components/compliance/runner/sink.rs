@@ -11,14 +11,14 @@ use vector_core::{
 use crate::{
     components::compliance::{
         sync::{Configured, ExternalResourceCoordinator},
-        Component, ComponentBuilderParts, ComponentType,
+        ComponentBuilderParts, ComponentType, ValidatableComponent,
     },
     config::{schema, SinkContext, SinkHealthcheckOptions},
 };
 
 use super::{RunnerInput, RunnerOutput};
 
-pub(super) async fn build_sink_component_future<C: Component>(
+pub(super) async fn build_sink_component_future<C: ValidatableComponent>(
     component: C,
 ) -> (
     Pin<Box<dyn Future<Output = ()>>>,

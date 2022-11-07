@@ -1,43 +1,167 @@
 mod http;
 
+use codecs::{
+    decoding::{self, DeserializerConfig},
+    encoding::{self, Framer, FramingConfig, SerializerConfig},
+    BytesEncoder,
+};
 use tokio::sync::mpsc;
 use vector_core::{config::DataType, event::Event};
+
+use crate::codecs::{DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
 pub use self::http::HttpConfig;
 
 use super::sync::{Configured, ExternalResourceCoordinator, WaitHandle};
 
-#[derive(Clone, Copy)]
-pub enum Codec {
-    JSON,
-    Syslog,
-    Plaintext,
+/// The codec used by the external resource.
+///
+/// This enum specifically exists to encapsulate the two main ways a component will configure the
+/// codec it uses, which ends up being with directionally-specific codec configuration: "encoding"
+/// when taking an `Event` and convert it to a raw output, and "decoding" when taking a raw output
+/// and converting it to an `Event`.
+///
+/// Encoding and decoding is generally tied to sinks and sources, respectively.
+#[derive(Clone)]
+pub enum ResourceCodec {
+    /// Component encodes events.
+    ///
+    /// As opposed to `EncodingWithFramer`, this variant uses the default framing method defined by
+    /// the encoding itself.
+    ///
+    /// Generally speaking, only sinks encode: going from `Event` to an encoded form.
+    Encoding(EncodingConfig),
+
+    /// Component encodes events, with a specific framer.
+    ///
+    /// Generally speaking, only sinks encode: going from `Event` to an encoded form.
+    EncodingWithFraming(EncodingConfigWithFraming),
+
+    /// Component decodes events.
+    ///
+    /// As opposed to `DecodingWithFramer`, this variant uses the default framing method defined by
+    /// the decoding itself.
+    ///
+    /// Generally speaking, only sources decode: going from an encoded form to `Event`.
+    Decoding(DecodingConfig),
+
+    /// Component decodes events, with a specific framer.
+    ///
+    /// Generally speaking, only sources decode: going from an encoded form to `Event`.
+    DecodingWithFraming(DecodingConfig, decoding::FramingConfig),
 }
 
-impl Codec {
-    pub fn allowed_event_types(self) -> DataType {
-        // TODO: Actually derive this from the supported data types declared for codecs defined in
-        // the `codecs` crate.
+impl ResourceCodec {
+    /// Gets the allowed event data types for the configured codec.
+    ///
+    /// Not all codecs support all possible event types (i.e. a codec has no means to losslessly
+    /// represent the data in a particular event type) so we must check at runtime to ensure that
+    /// we're only generating event payloads that can be encoded/decoded for the given component.
+    pub fn allowed_event_data_types(self) -> DataType {
         match self {
-            Self::JSON => DataType::Log,
-            Self::Syslog => DataType::Log,
-            Self::Plaintext => DataType::Log,
+            Self::Encoding(encoding) => encoding.config().input_type(),
+            Self::EncodingWithFraming(encoding) => encoding.config().1.input_type(),
+            Self::Decoding(decoding) | Self::DecodingWithFraming(decoding, _) => {
+                decoding.config().output_type()
+            }
         }
+    }
+
+    /// Gets an encoder for this codec.
+    ///
+    /// The encoder is generated as an inverse to the input codec: if a decoding configuration was
+    /// given, we generate an encoder that satisfies that decoding configuration, and vise versa.
+    pub fn into_encoder(&self) -> Encoder<encoding::Framer> {
+        let (framer, serializer) = match self {
+            Self::Encoding(config) => (
+                Framer::Bytes(BytesEncoder::new()),
+                config.build().expect("should not fail to build serializer"),
+            ),
+            Self::EncodingWithFraming(config) => {
+                let (maybe_framing, serializer) = config.config();
+                (
+                    maybe_framing
+                        .clone()
+                        .unwrap_or(FramingConfig::Bytes)
+                        .build(),
+                    serializer
+                        .build()
+                        .expect("building serializer should never fail"),
+                )
+            }
+            Self::Decoding(config) => (
+                decoder_framing_to_encoding_framer(&config.config().default_stream_framing()),
+                deserializer_config_to_serializer(config.config()),
+            ),
+            Self::DecodingWithFraming(config, framing) => (
+                decoder_framing_to_encoding_framer(framing),
+                deserializer_config_to_serializer(config.config()),
+            ),
+        };
+
+        Encoder::<encoding::Framer>::new(framer, serializer)
     }
 }
 
-pub struct Payload {
-    codec: Codec,
-    event_types: DataType,
+impl From<EncodingConfig> for ResourceCodec {
+    fn from(config: EncodingConfig) -> Self {
+        Self::Encoding(config)
+    }
 }
 
-impl Payload {
-    pub fn from_codec(codec: Codec) -> Self {
-        Self {
-            codec,
-            event_types: codec.allowed_event_types(),
-        }
+impl From<EncodingConfigWithFraming> for ResourceCodec {
+    fn from(config: EncodingConfigWithFraming) -> Self {
+        Self::EncodingWithFraming(config)
     }
+}
+
+impl From<DecodingConfig> for ResourceCodec {
+    fn from(config: DecodingConfig) -> Self {
+        Self::Decoding(config)
+    }
+}
+
+fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::Serializer {
+    let serializer_config = match config {
+        // TODO: This isn't necessarily a one-to-one conversion, at least not in the future when
+        // "bytes" can be a top-level field and we aren't implicitly decoding everything into the
+        // `message` field... but it's close enough for now.
+        DeserializerConfig::Bytes => SerializerConfig::Text,
+        DeserializerConfig::Json => SerializerConfig::Json,
+        // TODO: We need to create an Avro serializer because, certainly, for any source decoding
+        // the data as Avro, we can't possibly send anything else without the source just
+        // immediately barfing.
+        DeserializerConfig::Syslog => SerializerConfig::Logfmt,
+        DeserializerConfig::Native => SerializerConfig::Native,
+        DeserializerConfig::NativeJson => SerializerConfig::NativeJson,
+        DeserializerConfig::Gelf => SerializerConfig::Gelf,
+    };
+
+    serializer_config
+        .build()
+        .expect("building serializer should never fail")
+}
+
+fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> encoding::Framer {
+    let framing_config = match framing {
+        decoding::FramingConfig::Bytes => encoding::FramingConfig::Bytes,
+        decoding::FramingConfig::CharacterDelimited {
+            character_delimited,
+        } => encoding::FramingConfig::CharacterDelimited {
+            character_delimited: encoding::CharacterDelimitedEncoderOptions {
+                delimiter: character_delimited.delimiter,
+            },
+        },
+        decoding::FramingConfig::LengthDelimited => encoding::FramingConfig::LengthDelimited,
+        decoding::FramingConfig::NewlineDelimited { .. } => {
+            encoding::FramingConfig::NewlineDelimited
+        }
+        // TODO: There's no equivalent octet counting framer for encoding... although
+        // there's no particular reason that would make it hard to write.
+        decoding::FramingConfig::OctetCounting { .. } => todo!(),
+    };
+
+    framing_config.build()
 }
 
 /// Direction that the resource is operating in.
@@ -77,6 +201,12 @@ pub enum ResourceDefinition {
     Http(HttpConfig),
 }
 
+impl From<HttpConfig> for ResourceDefinition {
+    fn from(config: HttpConfig) -> Self {
+        Self::Http(config)
+    }
+}
+
 /// An external resource associated with a component.
 ///
 /// External resources represent the hypothetical location where, depending on whether the component
@@ -94,16 +224,20 @@ pub enum ResourceDefinition {
 pub struct ExternalResource {
     direction: ResourceDirection,
     definition: ResourceDefinition,
-    payload: Payload,
+    codec: ResourceCodec,
 }
 
 impl ExternalResource {
     /// Creates a new `ExternalResource` based on the given `direction`, `definition`, and `codec`.
-    pub fn new(direction: ResourceDirection, definition: ResourceDefinition, codec: Codec) -> Self {
+    pub fn new<D, C>(direction: ResourceDirection, definition: D, codec: C) -> Self
+    where
+        D: Into<ResourceDefinition>,
+        C: Into<ResourceCodec>,
+    {
         Self {
             direction,
-            definition,
-            payload: Payload::from_codec(codec),
+            definition: definition.into(),
+            codec: codec.into(),
         }
     }
 
@@ -117,6 +251,7 @@ impl ExternalResource {
         match self.definition {
             ResourceDefinition::Http(http_config) => http_config.spawn_as_input(
                 self.direction,
+                self.codec,
                 input_rx,
                 resource_coordinator,
                 resource_shutdown_handle,
@@ -134,6 +269,7 @@ impl ExternalResource {
         match self.definition {
             ResourceDefinition::Http(http_config) => http_config.spawn_as_output(
                 self.direction,
+                self.codec,
                 output_tx,
                 resource_coordinator,
                 resource_shutdown_handle,

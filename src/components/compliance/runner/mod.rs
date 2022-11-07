@@ -16,7 +16,9 @@ use vector_core::event::{Event, LogEvent};
 
 use crate::components::compliance::sync::ExternalResourceCoordinator;
 
-use super::{sync::Configured, Component, ComponentType, Validator, WaitHandle, WaitTrigger};
+use super::{
+    sync::Configured, ComponentType, ValidatableComponent, Validator, WaitHandle, WaitTrigger,
+};
 
 use self::sink::build_sink_component_future;
 use self::source::build_source_component_future;
@@ -50,11 +52,11 @@ impl RunnerState {
         self == RunnerState::InputDone
     }
 
-    fn is_component_active(self) -> bool {
-        match self {
-            Self::Running | Self::InputDone | Self::WaitingOnComponent => true,
-            _ => false,
-        }
+    const fn is_component_active(self) -> bool {
+        matches!(
+            self,
+            Self::Running | Self::InputDone | Self::WaitingOnComponent
+        )
     }
 
     fn is_completed(self) -> bool {
@@ -68,16 +70,30 @@ pub struct RunnerResults {
     validator_results: Vec<Result<Vec<String>, Vec<String>>>,
 }
 
+impl RunnerResults {
+    pub fn inputs(&self) -> &[Event] {
+        &self.inputs
+    }
+
+    pub fn outputs(&self) -> &[Event] {
+        &self.outputs
+    }
+
+    pub fn validator_results(&self) -> &[Result<Vec<String>, Vec<String>>] {
+        &self.validator_results
+    }
+}
+
 // TODO: We might actually want to make the runner spin up its own current-thread runtime so that we
 // can't shoot ourselves in the foot and run under a multi-threaded executor, since a lot of the
 // validation will depend on the component future running on the same thread as we're collecting the
 // validation results from i.e. metrics and so on.
 pub struct Runner<'comp, C: ?Sized> {
-    component: &'comp C,
     validators: HashMap<String, Box<dyn Validator>>,
+    component: &'comp C,
 }
 
-impl<'comp, C: Component + Send + Sync + ?Sized> Runner<'comp, C> {
+impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
     pub fn from_component(component: &'comp C) -> Self {
         Self {
             component,
@@ -104,10 +120,9 @@ impl<'comp, C: Component + Send + Sync + ?Sized> Runner<'comp, C> {
     }
 
     fn generate_input_payloads(&self) -> VecDeque<Event> {
-        iter::once(Event::Log(LogEvent::default()))
-            .cycle()
-            .take(3)
-            .collect()
+        let mut log_event = LogEvent::default();
+        log_event.insert("message", "compliance");
+        iter::once(Event::Log(log_event)).cycle().take(3).collect()
     }
 
     /// Adds a validator to this runner.
@@ -121,9 +136,10 @@ impl<'comp, C: Component + Send + Sync + ?Sized> Runner<'comp, C> {
     {
         let validator = validator.into();
         let validator_name = validator.name();
-        if let Some(_) = self
+        if self
             .validators
             .insert(validator_name.to_string(), validator)
+            .is_some()
         {
             panic!(
                 "attempted to add duplicate validator '{}' to runner",
@@ -132,7 +148,7 @@ impl<'comp, C: Component + Send + Sync + ?Sized> Runner<'comp, C> {
         }
     }
 
-    pub fn run_validation(mut self) -> Result<RunnerResults, Vec<String>> {
+    pub fn run_validation(mut self) -> Result<RunnerResults, String> {
         let runtime = Builder::new_current_thread()
             .enable_all()
             .build()
@@ -298,6 +314,7 @@ impl<'comp, C: Component + Send + Sync + ?Sized> Runner<'comp, C> {
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
+    use vector_config::NamedComponent;
     use vector_core::{
         event::Event,
         transform::{FunctionTransform, OutputBuffer, Transform},
@@ -317,8 +334,16 @@ mod tests {
         }
     }
 
+    impl NamedComponent for ValidatableTransform {
+        const NAME: &'static str = "validatable_transform";
+    }
+
     #[async_trait]
-    impl Component for ValidatableTransform {
+    impl ValidatableComponent for ValidatableTransform {
+        fn component_name(&self) -> &'static str {
+            Self::NAME
+        }
+
         fn component_type(&self) -> ComponentType {
             ComponentType::Transform
         }
@@ -340,7 +365,7 @@ mod tests {
     #[test]
     fn basic() {
         let component = ValidatableTransform;
-        let mut runner = Runner::from_component(&component);
+        let runner = Runner::from_component(&component);
         let results = runner.run_validation();
         assert!(results.is_ok());
 

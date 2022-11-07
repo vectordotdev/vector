@@ -1,11 +1,13 @@
+use bytes::BytesMut;
 use http::{Method, Request, Uri};
 use hyper::{Body, Client};
 use tokio::sync::mpsc;
+use tokio_util::codec::Encoder;
 use vector_core::event::Event;
 
 use crate::components::compliance::sync::{Configured, ExternalResourceCoordinator, WaitHandle};
 
-use super::ResourceDirection;
+use super::{ResourceCodec, ResourceDirection};
 
 /// An HTTP resource.
 pub struct HttpConfig {
@@ -14,13 +16,14 @@ pub struct HttpConfig {
 }
 
 impl HttpConfig {
-    pub fn from_parts(uri: Uri, method: Option<Method>) -> Self {
+    pub const fn from_parts(uri: Uri, method: Option<Method>) -> Self {
         Self { uri, method }
     }
 
     pub fn spawn_as_input(
         self,
         direction: ResourceDirection,
+        codec: ResourceCodec,
         input_rx: mpsc::Receiver<Event>,
         resource_coordinator: &ExternalResourceCoordinator<Configured>,
         resource_shutdown_handle: WaitHandle,
@@ -29,6 +32,7 @@ impl HttpConfig {
             // The source will pull data from us.
             ResourceDirection::Pull => spawn_input_http_server(
                 self,
+                codec,
                 input_rx,
                 resource_coordinator,
                 resource_shutdown_handle,
@@ -36,6 +40,7 @@ impl HttpConfig {
             // We'll push data to the source.
             ResourceDirection::Push => spawn_input_http_client(
                 self,
+                codec,
                 input_rx,
                 resource_coordinator,
                 resource_shutdown_handle,
@@ -46,6 +51,7 @@ impl HttpConfig {
     pub fn spawn_as_output(
         self,
         direction: ResourceDirection,
+        codec: ResourceCodec,
         output_tx: mpsc::Sender<Event>,
         resource_coordinator: &ExternalResourceCoordinator<Configured>,
         resource_shutdown_handle: WaitHandle,
@@ -54,6 +60,7 @@ impl HttpConfig {
             // We'll pull data from the sink.
             ResourceDirection::Pull => spawn_output_http_client(
                 self,
+                codec,
                 output_tx,
                 resource_coordinator,
                 resource_shutdown_handle,
@@ -61,6 +68,7 @@ impl HttpConfig {
             // The sink will push data data to us.
             ResourceDirection::Push => spawn_output_http_server(
                 self,
+                codec,
                 output_tx,
                 resource_coordinator,
                 resource_shutdown_handle,
@@ -69,8 +77,10 @@ impl HttpConfig {
     }
 }
 
+#[allow(clippy::missing_const_for_fn)]
 fn spawn_input_http_server(
     _config: HttpConfig,
+    _codec: ResourceCodec,
     _input_rx: mpsc::Receiver<Event>,
     _resource_coordinator: &ExternalResourceCoordinator<Configured>,
     _resource_shutdown_handle: WaitHandle,
@@ -82,6 +92,7 @@ fn spawn_input_http_server(
 
 fn spawn_input_http_client(
     config: HttpConfig,
+    codec: ResourceCodec,
     mut input_rx: mpsc::Receiver<Event>,
     resource_coordinator: &ExternalResourceCoordinator<Configured>,
     _resource_shutdown_handle: WaitHandle,
@@ -96,6 +107,7 @@ fn spawn_input_http_client(
     // request-per-input-item basis. This runs serially and has no parallelism.
     let started = resource_coordinator.track_started();
     let completed = resource_coordinator.track_completed();
+    let mut encoder = codec.into_encoder();
 
     tokio::spawn(async move {
         // Mark ourselves as started. We don't actually do anything until we get our first input
@@ -107,14 +119,18 @@ fn spawn_input_http_client(
         let request_uri = config.uri;
         let request_method = config.method.unwrap_or(Method::POST);
 
-        while let Some(_event) = input_rx.recv().await {
+        while let Some(event) = input_rx.recv().await {
             debug!("Got event to send from runner.");
+
+            let mut buffer = BytesMut::new();
+            encoder
+                .encode(event, &mut buffer)
+                .expect("should not fail to encode input event");
 
             let request = Request::builder()
                 .uri(request_uri.clone())
                 .method(request_method.clone())
-                // TODO: We actually need to encode the event in a meaningful way for sending.
-                .body(String::from("weeeoooo\n").into())
+                .body(buffer.freeze().into())
                 .expect("should not fail to build request");
 
             match client.request(request).await {
@@ -136,16 +152,20 @@ fn spawn_input_http_client(
     });
 }
 
+#[allow(clippy::missing_const_for_fn)]
 fn spawn_output_http_server(
     _config: HttpConfig,
+    _codec: ResourceCodec,
     _output_tx: mpsc::Sender<Event>,
     _resource_coordinator: &ExternalResourceCoordinator<Configured>,
     _resource_shutdown_handle: WaitHandle,
 ) {
 }
 
+#[allow(clippy::missing_const_for_fn)]
 fn spawn_output_http_client(
     _config: HttpConfig,
+    _codec: ResourceCodec,
     _output_tx: mpsc::Sender<Event>,
     _resource_coordinator: &ExternalResourceCoordinator<Configured>,
     _resource_shutdown_handle: WaitHandle,

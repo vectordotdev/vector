@@ -10,21 +10,36 @@ metric values, etc -- that make it suitable for production use.
 ## Context
 
 - [#8858](https://github.com/vectordotdev/vector/pull/8858) - chore: Add component specification
-- [#9308](https://github.com/vectordotdev/vector/pull/9308) - chore: Add script to surface-scan components against specification
-- [#9312](https://github.com/vectordotdev/vector/pull/9312) - enhancement(unit tests): Add testing for component specification features
-- [#9687](https://github.com/vectordotdev/vector/issues/9687) - Audit sources to ensure compliance with the component spec
-- [#9688](https://github.com/vectordotdev/vector/issues/9688) - Audit sinks to ensure compliance with the component spec
-- [#10832](https://github.com/vectordotdev/vector/issues/10832) - Update component instrumentation for multiple outputs
-- [#10882](https://github.com/vectordotdev/vector/issues/10882) - Vector Internal Metrics has no data for `component_errors_total`
-- [#11342](https://github.com/vectordotdev/vector/issues/11342) - Ensure all existing metric `error` tags comply with updated component spec
-- [#12492](https://github.com/vectordotdev/vector/pull/12492) - enhancement(datadog service): add bytes sent metrics to Datadog sinks
-- [#12572](https://github.com/vectordotdev/vector/pull/12572) - chore(observability): ensure all sources are checked for component spec compliance
-- [#12668](https://github.com/vectordotdev/vector/pull/12668) - chore(observability): ensure transforms are checked for component spec compliance
-- [#12755](https://github.com/vectordotdev/vector/pull/12755) - chore(observability): ensure sinks are checked for component spec compliance
-- [#12768](https://github.com/vectordotdev/vector/pull/12768) - chore(observability): make `RequestBuilder` provide (un)compressed payload sizes
-- [#12910](https://github.com/vectordotdev/vector/pull/12910) - chore(vector source): fix the `BytesReceived` event for v2 variant
-- [#12964](https://github.com/vectordotdev/vector/issues/12964) - bug(blackhole sink): does not report "network" bytes sent
-- [#14073](https://github.com/vectordotdev/vector/issues/14073) - verify `route` transform's `component_discarded_events_total`
+- [#9308](https://github.com/vectordotdev/vector/pull/9308) - chore: Add script to surface-scan
+  components against specification
+- [#9312](https://github.com/vectordotdev/vector/pull/9312) - enhancement(unit tests): Add testing
+  for component specification features
+- [#9687](https://github.com/vectordotdev/vector/issues/9687) - Audit sources to ensure compliance
+  with the component spec
+- [#9688](https://github.com/vectordotdev/vector/issues/9688) - Audit sinks to ensure compliance
+  with the component spec
+- [#10832](https://github.com/vectordotdev/vector/issues/10832) - Update component instrumentation
+  for multiple outputs
+- [#10882](https://github.com/vectordotdev/vector/issues/10882) - Vector Internal Metrics has no
+  data for `component_errors_total`
+- [#11342](https://github.com/vectordotdev/vector/issues/11342) - Ensure all existing metric `error`
+  tags comply with updated component spec
+- [#12492](https://github.com/vectordotdev/vector/pull/12492) - enhancement(datadog service): add
+  bytes sent metrics to Datadog sinks
+- [#12572](https://github.com/vectordotdev/vector/pull/12572) - chore(observability): ensure all
+  sources are checked for component spec compliance
+- [#12668](https://github.com/vectordotdev/vector/pull/12668) - chore(observability): ensure
+  transforms are checked for component spec compliance
+- [#12755](https://github.com/vectordotdev/vector/pull/12755) - chore(observability): ensure sinks
+  are checked for component spec compliance
+- [#12768](https://github.com/vectordotdev/vector/pull/12768) - chore(observability): make
+  `RequestBuilder` provide (un)compressed payload sizes
+- [#12910](https://github.com/vectordotdev/vector/pull/12910) - chore(vector source): fix the
+  `BytesReceived` event for v2 variant
+- [#12964](https://github.com/vectordotdev/vector/issues/12964) - bug(blackhole sink): does not
+  report "network" bytes sent
+- [#14073](https://github.com/vectordotdev/vector/issues/14073) - verify `route` transform's
+  `component_discarded_events_total`
 
 ## Cross cutting concerns
 
@@ -34,7 +49,8 @@ metric values, etc -- that make it suitable for production use.
 
 ### In scope
 
-- Validating components against the [Component Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md)
+- Validating components against the
+  [Component Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md)
   in terms of both events emitted as well as metrics emitted.
 - Validating the correctness of metric values: if a source is sent 100 bytes in a request, we
   properly increment the "bytes received" metric by 100 bytes, etc.
@@ -92,12 +108,15 @@ compliance of all components that can be used.
 
 #### Identifying a component as being validatable
 
-All components which seek to be validatable will implement a new trait, `Component`, that exposes
-the necessary information for the runner to actually build, run, and validate them. This is an
-abridged version of the trait:
+All components which seek to be validatable will implement a new trait, `ValidatableComponent`, that
+exposes the necessary information for the runner to actually build, run, and validate them. This is
+an abridged version of the trait:
 
 ```rust
-pub trait Component {
+pub trait ValidatableComponent: NamedComponent + Send + Sync {
+    /// Gets the name of the component.
+    fn component_name(&self) -> &'static str;
+
     /// Gets the type of the component.
     fn component_type(&self) -> ComponentType;
 
@@ -109,14 +128,16 @@ pub trait Component {
 }
 ```
 
-The `Component` trait exposes the minimum amount of information necessary to build, run, and
-validate the component, specifically:
+The `ValidatableComponent` trait exposes the minimum amount of information necessary to build, run,
+and validate the component, specifically:
 
+- the name of the component (via `vector_config::NamedComponent`)
 - the type of the component itself (source, transform, or sink)
 - the external resource the component depends on, if any (transforms have no external dependency,
   but the `http_server` source, for example, depends on an "external" HTTP client to send it events)
-- the built component that can actually be run as a future, which will generally be the same output of the
-  `build` method on the component type-relevant configuration trait (i.e. `SourceConfig::build`)
+- the built component that can actually be run as a future, which will generally be the same output
+  of the `build` method on the component type-relevant configuration trait (i.e.
+  `SourceConfig::build`)
 
 This trait overlaps heavily with the existing "component config" traits such as `SourceConfig`, in
 that they all have a method to actually generate a "built" version of the component (typically a
@@ -126,10 +147,11 @@ resources they depend on such as socket ports, or files on disk, and so on.
 The intent is to generate the implementation of this trait automatically if at all possible, even if
 only partially. As noted above, there's significant overlap with the already present traits such as
 `SourceConfig`, but they aren't directly deriveable. For example, the `http_server` source has an
-implementation of `SourceConfig` where it describes its only resources as a TCP socket at a given port. This is the resource
-the source itself needs to listen for HTTP traffic on that port. This is all fine and good, but the
-component runner cares about what external resources need to be provided to drive the functionality
-of the component, which in this example, is an HTTP client to actually send requests to the source.
+implementation of `SourceConfig` where it describes its only resources as a TCP socket at a given
+port. This is the resource the source itself needs to listen for HTTP traffic on that port. This is
+all fine and good, but the component runner cares about what external resources need to be provided
+to drive the functionality of the component, which in this example, is an HTTP client to actually
+send requests to the source.
 
 In this case, the external resource is essentially the inverse of whatever is specified at
 `SourceConfig::resources`, but even then, it's still missing all of the required information: what's
@@ -137,34 +159,30 @@ the protocol/encoding to use for that socket? Beyond that, this pattern generall
 resources that the component needs to run, and doesn't consider resources that the component will
 touch, such as the files that will be read from/written to if the component deals with files.
 
-For this reason, the implementation of `Component` won't be able to be automatically driven by the
-existing "component config" trait implementations, but future work could take place where we unify
-these traits, and add additional metadata to existing resource declarations.
+For this reason, the implementation of `ValidatableComponent` won't be able to be automatically
+driven by the existing "component config" trait implementations, but future work could take place
+where we unify these traits, and add additional metadata to existing resource declarations.
 
 For methods like `build_component`, we can likely provide helper methods to reduce the boilerplate
 to a bare minimum, as the code to build a source component, for example, always involves the same
-exact steps: have a component object value that implements `SourceConfig`, create a relevant `SourceContext`
-value, call `SourceConfig::build` on that component object value with the given source context, and
-the result is always the `vector_core::source::Source` type.
+exact steps: have a component object value that implements `SourceConfig`, create a relevant
+`SourceContext` value, call `SourceConfig::build` on that component object value with the given
+source context, and the result is always the `vector_core::source::Source` type.
 
 #### External resource definitions
 
-Arguably the most important part of the `Component` trait, **external resources** define what resource
-the runner must provide in order to functionally drive the component under test. At a high level, an
-external resource is a type of resource (network socket, files on disk, etc), which direction the
-resource operates in (is it pushing to the component? is the component pulling from it), and the
-payload type that the resource deals with (JSON, plaintext, etc):
+Arguably the most important part of the `ValidatableComponent` trait, **external resources** define
+what resource the runner must provide in order to functionally drive the component under test. At a
+high level, an external resource is a type of resource (network socket, files on disk, etc), which
+direction the resource operates in (is it pushing to the component? is the component pulling from
+it), and the payload type that the resource deals with (JSON, plaintext, etc):
 
 ```rust
-pub enum PayloadCodec {
-    JSON,
-    Syslog,
-    Plaintext,
-}
-
-pub struct Payload {
-    codec: PayloadCodec,
-    event_types: DataType,
+pub enum ResourceCodec {
+    Encoding(EncodingConfig),
+    EncodingWithFraming(EncodingConfigWithFraming),
+    Decoding(DecodingConfig),
+    DecodingWithFraming(DecodingConfig, decoding::FramingConfig),
 }
 
 pub enum ResourceDirection {
@@ -180,7 +198,7 @@ pub enum ResourceDefinition {
 pub struct ExternalResource {
     definition: ResourceDefinition,
     direction: ResourceDirection,
-    payload: Payload,
+    codec: ResourceCodec,
 }
 ```
 
@@ -206,7 +224,7 @@ would also describe an external HTTP resource with a direction of "push", but wh
 context of the component being a sink, this would dictate that we spin up an HTTP server to receive
 the output events, as the component is the one doing the "pushing."
 
-Beyond direction, external resources also dictate the payload type. Handling payloads is another
+Beyond direction, external resources also dictate the type of payload. Handling payloads is another
 tricky aspect of this design, as we need a generic way to specify the type of payload whether we're
 handling it in a raw form, such as the bytes we might send for it over a TCP socket, or the internal
 event form, such as if we wanted to generate a corresponding `Event` to pass to a transform. We also
@@ -215,20 +233,21 @@ the component received/sent: if we need to send a "raw" payload to a source, and
 got the expected output event, that means needing to compare the raw payload to the resulting
 `Event`.
 
-As such, components will define their expected payload via a combination of an all-encompassing enum
-of supported codecs, as well as the existing `DataType` enum. This will allow components to describe
-not only how the event should be encoded/decoded, but also what the actual contents should be, as
-not all components support all event types.
+As such, components will define their expected payload by using the existing support for declaring
+codecs via the common encoding/decoding configuration types, such as `EncodingConfig`,
+`EncodingConfigWithFraming`, and `DecodingConfig`. This allows components to use their existing
+encoding/decoding configuration directly with the runner, which ensures we can correct encode input
+events, and decode output events, when necessary.
 
-The aforementioned enum will cover all of our standard codecs -- and will support conversion trait
-implementations to make it easy to convert back-and-forth -- as well as any custom/specific codecs
-that need to be supported. For every combination of codec and event data type, we'll supply a mock
-event that has a fixed structure, such that for any combination, we would be able to translate
-between the "raw" form and the internal `Event` form. This provides the basis of being able to
-consistently and repeatably compare both inputs/outputs if such a validation pass is desirable. It
-also means that we can generate events based purely on their data type, and ensure that regardless
-of the external resource, those events can be converted to the correct "raw" form, depending on the
-configured codec.
+We'll provide batteries-included conversions from the aforementioned types into `ResourceCodec`.
+`ResourceCodec` is intended to work seamlessly with either an encoding or decoding configuration: it
+will be able to generate an inverse configuration when necessary. This is what will allow a sink,
+with an encoding configuration, to have an external resource generated that knows how to _decode_
+what the sink is sending. While the existing encoding/decoding enums --  where we declare all the
+standard supported codecs -- do not have parity between each other to seamlessly facilitate this,
+we'll look to remedy that situation as part of the work to actually implement support for each of
+these codecs. There's no fundamental reason why all of the currently supported encodings cannot have
+reciprocal decoders, and vise versa.
 
 #### Pluggable validators
 
@@ -295,7 +314,7 @@ actually driving the component and external resource until all outputs have been
 Here's a simple example of what I expect this to look like:
 
 ```rust
-fn get_all_validatable_components() -> Vec<&'static dyn Component> {
+fn get_all_validatable_components() -> Vec<&'static dyn ValidatableComponent> {
     // Collect all validatable components by using the existing component registration mechanism,
     // `inventory`/`inventory::submit!`, to iterate through sources, transforms, and sinks, collecting
     // them into a single vector.
@@ -309,38 +328,44 @@ fn compliance() {
     for validatable_component in validatable_components {
         let mut runner = Runner::from_component(validatable_component);
         runner.add_validator(StandardValidators::ComponentSpec);
-        runner.add_validator(StandardValidators::MetricsConsistency);
 
         match runner.run_validation() {
             Ok(results) => {
-              for validator_result in results.validator_results {
-                match validator_result {
-                  // Getting results in the success case will be rare, but perhaps we want to always print
-                  // successful validations so that we can verify that specific components are being validated,
-                  // and verify what things we're validating them against.
-                  Ok(success_results) => {},
-                  Err(failure_results) => {
-                    let formatted_failures = failure_results.map(|s| format!(" - {}\n", s)).collect::<Vec<_>>();
-                    panic!("Failed to validate component '{}':\n\n{}", validatable_component.name(), formatted_failures.join(""));
-                  }
+                for validator_result in results.validator_results() {
+                    match validator_result {
+                        // Getting results in the success case will be rare, but perhaps we want to always print
+                        // successful validations so that we can verify that specific components are being validated,
+                        // and verify what things we're validating them against.
+                        Ok(_success_results) => {}
+                        Err(failure_results) => {
+                            let formatted_failures = failure_results
+                                .iter()
+                                .map(|s| format!(" - {}\n", s))
+                                .collect::<Vec<_>>();
+                            panic!(
+                                "Failed to validate component '{}':\n\n{}",
+                                validatable_component.component_name(),
+                                formatted_failures.join("")
+                            );
+                        }
+                    }
                 }
-              }
-            },
-            Err(e) => panic!("Failed to complete validation run for component '{}': {}", validatable_component.name(), e),
+            }
+            Err(e) => panic!(
+                "Failed to complete validation run for component '{}': {}",
+                validatable_component.component_name(),
+                e
+            ),
         }
-        let results = runner.run_validation();
-        assert!(results.is_ok());
-
-        let validator_results = results.expect("results should be ok").validator_results;
-        for validator_result in valid
     }
 }
 ```
 
 In this example, we can see that we create a new `Runner` by passing it something that implements
-`Component`, which in this case we get from the existing `&'static` references to components that
-have registered themselves statically via the existing `#[configurable_component(<type>("name"))]`
-mechanism, which ultimately depends on `inventory` and `inventory::submit!`.
+`ValidatableComponent`, which in this case we get from the existing `&'static` references to
+components that have registered themselves statically via the existing
+`#[configurable_component(<type>("name"))]` mechanism, which ultimately depends on `inventory` and
+`inventory::submit!`.
 
 From there, we add the validators we care about. Similar to codecs, we'll have a standard set of
 validators that should be used, so the above demonstrates a simple enum that has a variant for each
@@ -354,51 +379,126 @@ collected, they're returned to the caller, which can then do normal error handli
 errors to signal that a component either passed validation or didn't, and if they didn't, why they
 didn't.
 
-We specifically spin up a current-thread Tokio runtime both to have a mechanism to drive asynchronous
-code, but also to ensure that all generated events/metrics are emitted in the same thread where the
-validators are running their pre/post hook logic. It also provides the invariant of "all components
-run on the same thread" such that for any other subsystem that may need to be refactored/mocked for
-the validators to capture necessary data, we can depend on it always being emitted on the same
-thread, if that would make such a refactoring/mocked implementation easier to achieve.
+We specifically spin up a current-thread Tokio runtime both to have a mechanism to drive
+asynchronous code, but also to ensure that all generated events/metrics are emitted in the same
+thread where the validators are running their pre/post hook logic. It also provides the invariant of
+"all components run on the same thread" such that for any other subsystem that may need to be
+refactored/mocked for the validators to capture necessary data, we can depend on it always being
+emitted on the same thread, if that would make such a refactoring/mocked implementation easier to
+achieve.
 
 ## Rationale
 
-- Why is this change worth it?
-- What is the impact of not doing this?
-- How does this position us for success in the future?
+Simply put, we need accurate internal telemetry. Vector must be able to provide accurate internal
+telemetry for users so that they can properly operate it: whether that's in terms of ensuring
+Vector is performing as expected or if users are getting the full benefit of their Vector
+deployments, perhaps in terms of cost savings by reducing data egress, and so on.
+
+When we ensure that all components are automatically tested as soon as they're fully added to the
+codebase, we can better ensure that not only do new components get properly tested, but that
+existing components are still being tested as well.
+
+If we don't do this, or something like this, we're likely to once again introduce regressions to
+components, and miss issues with new components, leading to a permanent trail of subtly-wrong
+internal telemetry.
 
 ## Drawbacks
 
-- Why should we not do this?
-- What kind on ongoing burden does this place on the team?
+The main drawback of this work is the additional boilerplate required for each component. While not
+particularly onerous, it does represent another bit of code that looks and feels a lot like
+boilerplate that already required, such as `SourceConfig`, and so on.
+
+Additionally, this proposal does not (at least not yet) provide any consideration to
+testing/validating components under a series of varying inputs -- i.e. sending all metrics vs
+sending all logs, changing an aspect of the component's configuration itself, etc -- which means
+that updating it to do so in the future could potentially be hard work, as all components may need
+to be slightly refactored to deal with changes to the core traits, and so on. This is relevant to
+the design, as it stands, having no clear way to automatically derive the implementation of the
+proposed trait from existing data, forcing all implementations to be written manually.
 
 ## Prior Art
 
-- List prior art, the good and bad.
-- Why can't we simply use or copy them?
+Vector already has existing mechanisms for validating components in terms of the Component
+Specification, and so on. This comes in the form of familiar helper methods like
+`assert_sink_compliance`. Those helpers operate with a similar approach to this proposal in that we
+run the relevant code in a way that ensures we can observe the state of the system before and after
+the code runs, calculating the validation results at the end.
+
+We do not have an existing mechanism for asserting the _correctness_ of internal telemetry, only
+that specific bits of internal telemetry are being emitted as intended. This is not necessarily a
+technical limitation, but a practical limitation of not yet having gotten to the point of adding
+support to validate the correctness.
+
+What both of these things do not provide, that this proposal does, is a mechanism to _ensure_ that a
+component that can be used has been actually tested against the intended criteria/specifications/etc
+and met them. While this doesn't happen as a result of the compiler/type system, and so is still
+somewhat fallible at the edges -- we have to actually do work to integrate this proposal with CI,
+etc -- it achieves uniform coverage across all components and provides the scaffolding to avoid the
+human fallibility aspect of "oops, we're not actually validating this component".
+
+It also heavily centralizes this validation logic such that any future work around updating what
+gets validated, or exposing more information during the validation step, and so on, can happen as a
+set of changes to a relatively small set of files, rather than, again, a change to every component
+involved, which is exactly where human fallibility has struck us in the past.
 
 ## Alternatives
 
-- What other approaches have been considered and why did you not choose them?
-- How about not doing this at all?
+One alternative approach could be to actually build Vector and run an entire configuration, much
+like an integration test, and we would send known data to Vector, collect the output, so on and so
+forth, much like this proposal... but we would simply collect it externally, much like `lading` does
+in our soak tests.
+
+The biggest reason not to go with this alternative approach is that it still involves much of the
+scaffolding present in this proposal, such as getting a list of all components that should be
+tested, and writing code that can emit that "external resource" information, since a Vector
+configuration may depend heavily on default values, and so we would not always be able to extract
+all of the necessary information from a Vector configuration that was otherwise valid by itself.
+
+We'd simply be writing all of the same code, but bundling it into a separate binary that ran Vector,
+without -- at least as far as I can see -- a meaningful benefit to the isolation.
 
 ## Outstanding Questions
 
-- List any remaining questions.
-- Use this to resolve ambiguity and collaborate with your team during the RFC process.
-- *These must be resolved before the RFC can be merged.*
+- Is the external resource definition approach flexible enough to cover all possible definitions of
+  an external resource? We know it works for simple use cases like "network socket w/ a specific
+  encoding", but will that extrapolate cleanly to all components that we'll need to support?
+- Can we fully represent all possible external resources in general? For example, can we actually
+  provide a Kafka broker meaningfully without having to, say, run an actual copy of Kafka
+  (regardless of whether or not it was through Docker, etc)? Do we care that much if we end up
+  having to actually spin up some external resources in that way versus being able to mock them all
+  out in-process?
+- Is the `Validator` trait hooked in enough? We know that it covers the ability to capture events
+  and metrics emitted, which is sufficient for validating against the Component Specification, as
+  well as validating metrics correctness... but are there other aspects of a component that we plan
+  on validating, or wish we could validate, that would not be able to be written based on the
+  proposed design?
 
 ## Plan Of Attack
 
-Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
-
-- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
-- [ ] Incremental change #1
-- [ ] Incremental change #2
-- [ ] ...
-
-Note: This can be filled out during the review process.
+- [ ] Merge the RFC PR, which contains the proof-of-concept approach as described in the RFC itself.
+- [ ] Implement the Component Specification validator: check for expected events/metrics based on
+  component type.
+- [ ] Implement the Metrics Correctness validator: check that the metric emitted for bytes received
+  by a source matches the number of bytes we actually sent to the source, and so on.
+- [ ] Implement more external resources: raw socket, specific services that can be emulated (i.e.
+  Elasticsearch is just HTTP with specific routes). This would likely be split into multiple items
+  after taking an accounting of which unique external resource variants need to exist.
+- [ ] Implement `ValidatableComponent` for more components, adding each component to the hard-coded
+  "validate these components" list prior to making it "all or nothing". This, likewise, will be able
+  to be split into a per-component set of tasks as implementation of `ValidatableComponent` for one
+  component should be highly localized.
+- [ ] Update the implementation of the "get all validatable components" method to source all
+  components from their respective `inventory`-based registration. This would effectively turn on
+  validation of any component that is compiled into the Vector binary and is configurable (i.e. it
+  uses `#[configurable_component(...)]`)
 
 ## Future Improvements
 
-- List any future improvements. Use this to keep your "plan of attack" scope small and project a sound design.
+- Add additional validators to validate other aspects of the component: high-cardinality detection,
+  functional validation, etc.
+- Add ability to vary the inputs and/or configuration of a component so that more than just the
+  happy path can be validated.
+- Drive the generated inputs in a manner similar to property testing, allowing the validation
+  process to potentially uncover scenarios where valid inputs should have been processed but
+  weren't, or a certain metric's value wasn't updated even though the component acknowledged
+  processing an event, and so on.

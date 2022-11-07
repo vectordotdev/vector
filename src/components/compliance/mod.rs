@@ -81,7 +81,10 @@ impl BuiltComponent {
 }
 
 #[async_trait]
-pub trait Component {
+pub trait ValidatableComponent: Send + Sync {
+    /// Gets the name of the component.
+    fn component_name(&self) -> &'static str;
+
     /// Gets the type of the component.
     fn component_type(&self) -> ComponentType;
 
@@ -117,23 +120,27 @@ pub trait Component {
 }
 
 #[async_trait]
-impl<'a, T> Component for &'a T
+impl<'a, T> ValidatableComponent for &'a T
 where
-    T: Component + Send + Sync + ?Sized,
+    T: ValidatableComponent + ?Sized,
 {
+    fn component_name(&self) -> &'static str {
+        (*self).component_name()
+    }
+
     fn component_type(&self) -> ComponentType {
-        self.component_type()
+        (*self).component_type()
     }
 
     fn external_resource(&self) -> Option<ExternalResource> {
-        self.external_resource()
+        (*self).external_resource()
     }
 
     async fn build_component(
         &self,
         builder_parts: ComponentBuilderParts,
     ) -> Result<BuiltComponent, String> {
-        self.build_component(builder_parts).await
+        (*self).build_component(builder_parts).await
     }
 }
 
@@ -145,9 +152,9 @@ mod tests {
         sources::http_server::SimpleHttpConfig,
     };
 
-    use super::Component;
+    use super::ValidatableComponent;
 
-    fn get_all_validatable_components() -> Vec<&'static dyn Component> {
+    fn get_all_validatable_components() -> Vec<&'static dyn ValidatableComponent> {
         // This method is the theoretical spot where we would collect all components that should be
         // validated by tapping into the component registration that we do with
         // `#[configurable_component]`, and so on.
@@ -169,11 +176,35 @@ mod tests {
         for validatable_component in validatable_components {
             let mut runner = Runner::from_component(validatable_component);
             runner.add_validator(StandardValidators::ComponentSpec);
-            let results = runner.run_validation();
-            assert!(results.is_ok());
 
-            let results = results.expect("results should be ok");
-            assert_eq!(results.inputs, results.outputs);
+            match runner.run_validation() {
+                Ok(results) => {
+                    for validator_result in results.validator_results() {
+                        match validator_result {
+                            // Getting results in the success case will be rare, but perhaps we want to always print
+                            // successful validations so that we can verify that specific components are being validated,
+                            // and verify what things we're validating them against.
+                            Ok(_success_results) => {}
+                            Err(failure_results) => {
+                                let formatted_failures = failure_results
+                                    .iter()
+                                    .map(|s| format!(" - {}\n", s))
+                                    .collect::<Vec<_>>();
+                                panic!(
+                                    "Failed to validate component '{}':\n\n{}",
+                                    validatable_component.component_name(),
+                                    formatted_failures.join("")
+                                );
+                            }
+                        }
+                    }
+                }
+                Err(e) => panic!(
+                    "Failed to complete validation run for component '{}': {}",
+                    validatable_component.component_name(),
+                    e
+                ),
+            }
         }
     }
 }
