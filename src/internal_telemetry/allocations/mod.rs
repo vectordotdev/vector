@@ -80,13 +80,13 @@ pub struct MainTracer;
 impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
-        GROUP_MEM_STATS[THREAD_ID.with(|t| *t)][group_id.as_raw()]
+        GROUP_MEM_STATS[THREAD_ID.with(|t| *t) % 8][group_id.as_raw()]
             .fetch_add(object_size as i64, Ordering::Relaxed);
     }
 
     #[inline(always)]
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
-        GROUP_MEM_STATS[THREAD_ID.with(|t| *t)][source_group_id.as_raw()]
+        GROUP_MEM_STATS[THREAD_ID.with(|t| *t) % 8][source_group_id.as_raw()]
             .fetch_sub(object_size as i64, Ordering::Relaxed);
     }
 }
