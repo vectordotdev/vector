@@ -1,8 +1,10 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
+use lookup::path;
 use regex::bytes::{CaptureLocations, Regex};
 use vector_common::conversion;
+use vector_config::NamedComponent;
 use vector_core::config::{log_schema, LogNamespace};
 
 use crate::{
@@ -10,13 +12,14 @@ use crate::{
     internal_events::{
         ParserConversionError, ParserMatchError, ParserMissingFieldError, DROP_EVENT,
     },
+    sources::kubernetes_logs::Config,
     transforms::{FunctionTransform, OutputBuffer},
 };
 
 pub const MULTILINE_TAG: &str = "multiline_tag";
-pub const NEW_LINE_TAG: &str = "new_line_tag";
+const MESSAGE_TAG: &str = "message";
 const TIMESTAMP_TAG: &str = "timestamp";
-const CRI_REGEX_PATTERN: &str = r"(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)(?P<new_line_tag>\n?)$";
+const CRI_REGEX_PATTERN: &str = r"(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)\n?$";
 
 /// Parser for the CRI log format.
 ///
@@ -61,19 +64,21 @@ impl Cri {
 
 impl FunctionTransform for Cri {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let field = match self.log_namespace {
+        let message_field = match self.log_namespace {
             LogNamespace::Vector => ".",
             LogNamespace::Legacy => log_schema().message_key(),
         };
 
         // Get the log field with the message, if it exists, and coerce it to bytes.
         let log = event.as_mut_log();
-        let value = log.get(field).map(|s| s.coerce_to_bytes());
+        let value = log.get(message_field).map(|s| s.coerce_to_bytes());
         match value {
             None => {
                 // The message field was missing, inexplicably. If we can't find the message field, there's nothing for
                 // us to actually decode, so there's no event we could emit, and so we just emit the error and return.
-                emit!(ParserMissingFieldError::<DROP_EVENT> { field });
+                emit!(ParserMissingFieldError::<DROP_EVENT> {
+                    field: message_field
+                });
                 return;
             }
             Some(s) => match self.pattern.captures_read(&mut self.capture_locations, &s) {
@@ -113,31 +118,26 @@ impl FunctionTransform for Cri {
                         })
                     });
 
-                    let mut drop_original = true;
                     for (name, value) in captures {
-                        // If we're already overriding the original field, don't remove it after.
-                        if name == self.field {
-                            drop_original = false;
+                        if name == MESSAGE_TAG {
+                            // Re-insert either directly into `.` or `log_schema().message_key()`,
+                            // overwriting the original "full" message that included additional fields.
+                            drop(log.insert(message_field, value));
+                        } else {
+                            // Insert additional fields from original message into the event root or source
+                            // metadata, depending on `log_namespace`.
+                            drop(self.log_namespace.insert_source_metadata(
+                                Config::NAME,
+                                log,
+                                path!(name),
+                                path!(name),
+                                value,
+                            ))
                         }
-
-                        // TODO: Insert with log_namespace.
-                        drop(log.insert(name.as_str(), value));
-                    }
-
-                    // If we didn't overwrite the original field, remove it now.
-                    if drop_original {
-                        // TODO: Remove with log_namespace
-                        drop(log.remove(self.field));
                     }
                 }
             },
         }
-
-        // Remove the newline tag field, if it exists.
-        //
-        // For additional details, see https://github.com/vectordotdev/vector/issues/8606.
-        // TODO: Remove with log_namespace
-        let _ = log.remove(NEW_LINE_TAG);
 
         // Detect if this is a partial event by examining the multiline tag field, and if it is, convert it to the more
         // generic `_partial` field that partial event merger will be looking for.

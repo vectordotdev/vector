@@ -42,25 +42,19 @@ impl FunctionTransform for Parser {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         match &mut self.state {
             ParserState::Uninitialized => {
-                let message = match self.log_namespace {
-                    LogNamespace::Vector => match event.as_log().get(".") {
-                        Some(message) => message,
-                        None => {
-                            emit!(KubernetesLogsFormatPickerEdgeCase {
-                                what: "got an event without a message at the root"
-                            });
-                            return;
-                        }
-                    },
-                    LogNamespace::Legacy => match event.as_log().get(log_schema().message_key()) {
-                        Some(message) => message,
-                        None => {
-                            emit!(KubernetesLogsFormatPickerEdgeCase {
-                                what: "got an event with no message field"
-                            });
-                            return;
-                        }
-                    },
+                let message_field = match self.log_namespace {
+                    LogNamespace::Vector => ".",
+                    LogNamespace::Legacy => log_schema().message_key(),
+                };
+
+                let message = match event.as_log().get(message_field) {
+                    Some(message) => message,
+                    None => {
+                        emit!(KubernetesLogsFormatPickerEdgeCase {
+                            what: "got an event without a message"
+                        });
+                        return;
+                    }
                 };
 
                 let bytes = match message {
