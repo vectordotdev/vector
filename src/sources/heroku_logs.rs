@@ -19,7 +19,7 @@ use warp::http::{HeaderMap, StatusCode};
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig,
+        log_schema, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext,
     },
     event::{Event, LogEvent},
@@ -62,7 +62,7 @@ pub struct LogplexConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl GenerateConfig for LogplexConfig {
@@ -74,7 +74,7 @@ impl GenerateConfig for LogplexConfig {
             auth: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -274,7 +274,7 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use futures::Stream;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_core::event::{Event, EventStatus, Value};
 
     use super::{HttpSourceAuthConfig, LogplexConfig};

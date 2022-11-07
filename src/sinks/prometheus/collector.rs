@@ -439,7 +439,7 @@ mod tests {
 
     use chrono::{DateTime, TimeZone};
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_core::metric_tags;
 
     use super::{super::default_summary_quantiles, *};

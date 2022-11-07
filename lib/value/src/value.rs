@@ -37,7 +37,7 @@ use ordered_float::NotNan;
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// The main value type used in Vector events, and VRL.
-#[derive(PartialOrd, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum Value {
     /// Bytes - usually representing a UTF8 String.
     Bytes(Bytes),

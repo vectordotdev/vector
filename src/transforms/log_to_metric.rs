@@ -43,6 +43,11 @@ pub struct CounterConfig {
 }
 
 /// Specification of a metric derived from a log event.
+// TODO: While we're resolving the schema for this enum somewhat reasonably (in
+// `generate-components-docs.rb`), we have a problem where an overlapping field (overlap between two
+// or more of the subschemas) takes the details of the last subschema to be iterated over that
+// contains that field, such that, for example, the `Summary` variant below is overriding the
+// description for almost all of the fields because they're shared across all of the variants.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct MetricConfig {
@@ -355,6 +360,7 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::test_util::components::assert_transform_compliance;
@@ -486,15 +492,11 @@ mod tests {
                 metadata,
             )
             .with_namespace(Some("app"))
-            .with_tags(Some(
-                vec![
-                    ("method".to_owned(), "post".to_owned()),
-                    ("code".to_owned(), "200".to_owned()),
-                    ("host".to_owned(), "localhost".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "method" => "post",
+                "code" => "200",
+                "host" => "localhost",
+            )))
             .with_timestamp(Some(ts()))
         );
     }

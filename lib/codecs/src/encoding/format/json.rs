@@ -72,6 +72,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use vector_common::btreemap;
     use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
+    use vector_core::metric_tags;
 
     use super::*;
 
@@ -99,15 +100,11 @@ mod tests {
                 MetricValue::Counter { value: 100.0 },
             )
             .with_namespace(Some("vector"))
-            .with_tags(Some(
-                vec![
-                    ("key2".to_owned(), "value2".to_owned()),
-                    ("key1".to_owned(), "value1".to_owned()),
-                    ("Key3".to_owned(), "Value3".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "key2" => "value2",
+                "key1" => "value1",
+                "Key3" => "Value3",
+            )))
             .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11))),
         );
 

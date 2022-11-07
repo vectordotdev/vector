@@ -3,7 +3,7 @@ use futures::StreamExt;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
-use vector_core::event::MetricTags;
+use vector_core::{event::MetricTags, metric_tags};
 
 use super::{filter_result, HostMetrics};
 
@@ -23,12 +23,7 @@ impl HostMetrics {
                     .await;
                 output.name = "cpu";
                 for (index, times) in times.into_iter().enumerate() {
-                    let tags = |name: &str| {
-                        MetricTags::from([
-                            (String::from(MODE), String::from(name)),
-                            (String::from("cpu"), index.to_string()),
-                        ])
-                    };
+                    let tags = |name: &str| metric_tags!(MODE => name, "cpu" => index.to_string());
                     output.counter(CPU_SECS_TOTAL, times.idle().get::<second>(), tags("idle"));
                     #[cfg(target_os = "linux")]
                     output.counter(

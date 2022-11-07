@@ -551,14 +551,13 @@ enum MetricPathError<'a> {
 mod test {
     use chrono::{offset::TimeZone, Utc};
     use lookup::owned_value_path;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_common::btreemap;
     use vrl_lib::Target;
 
-    use super::{
-        super::{MetricTags, MetricValue},
-        *,
-    };
+    use super::super::MetricValue;
+    use super::*;
+    use crate::metric_tags;
 
     #[test]
     fn log_get() {
@@ -900,11 +899,7 @@ mod test {
             MetricValue::Counter { value: 1.23 },
         )
         .with_namespace(Some("zoob"))
-        .with_tags(Some({
-            let mut map = MetricTags::default();
-            map.insert("tig".to_string(), "tog".to_string());
-            map
-        }))
+        .with_tags(Some(metric_tags!("tig" => "tog")))
         .with_timestamp(Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)));
 
         let info = ProgramInfo {
@@ -947,11 +942,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         )
-        .with_tags(Some({
-            let mut map = MetricTags::default();
-            map.insert("tig".to_string(), "tog".to_string());
-            map
-        }));
+        .with_tags(Some(metric_tags!("tig" => "tog")));
 
         let cases = vec![
             (
@@ -1029,11 +1020,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         )
-        .with_tags(Some({
-            let mut map = MetricTags::default();
-            map.insert("tig".to_string(), "tog".to_string());
-            map
-        }));
+        .with_tags(Some(metric_tags!("tig" => "tog")));
 
         let info = ProgramInfo {
             fallible: false,
@@ -1050,10 +1037,7 @@ mod test {
         match target {
             VrlTarget::Metric { metric, value: _ } => {
                 assert!(metric.tags().is_some());
-                assert_eq!(
-                    metric.tags().unwrap(),
-                    &MetricTags::from([("a".into(), "b".into())])
-                );
+                assert_eq!(metric.tags().unwrap(), &metric_tags!("a" => "b"));
             }
             _ => panic!("must be a metric"),
         }

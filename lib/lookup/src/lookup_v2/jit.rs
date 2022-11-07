@@ -375,74 +375,227 @@ impl<'a> Iterator for JitValuePathIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::{OwnedSegment, OwnedValuePath, ValuePath};
-    use crate::owned_value_path;
+    use crate::lookup_v2::{BorrowedSegment, ValuePath};
 
     #[test]
     fn parsing() {
-        let test_cases: Vec<(_, OwnedValuePath)> = vec![
-            ("", owned_value_path!(OwnedSegment::Invalid)),
-            (".", owned_value_path!()),
-            ("]", owned_value_path!(OwnedSegment::Invalid)),
-            ("]foo", owned_value_path!(OwnedSegment::Invalid)),
-            ("..", owned_value_path!(OwnedSegment::Invalid)),
-            ("...", owned_value_path!(OwnedSegment::Invalid)),
-            ("f", owned_value_path!("f")),
-            (".f", owned_value_path!("f")),
-            (".[", owned_value_path!(OwnedSegment::Invalid)),
-            ("f.", owned_value_path!("f", OwnedSegment::Invalid)),
-            ("foo", owned_value_path!("foo")),
+        let test_cases = vec![
+            ("", vec![BorrowedSegment::Invalid]),
+            (".", vec![]),
+            ("]", vec![BorrowedSegment::Invalid]),
+            ("]foo", vec![BorrowedSegment::Invalid]),
+            ("..", vec![BorrowedSegment::Invalid]),
+            ("...", vec![BorrowedSegment::Invalid]),
+            ("f", vec![BorrowedSegment::Field("f".into())]),
+            (".f", vec![BorrowedSegment::Field("f".into())]),
+            (".[", vec![BorrowedSegment::Invalid]),
+            (
+                "f.",
+                vec![BorrowedSegment::Field("f".into()), BorrowedSegment::Invalid],
+            ),
+            ("foo", vec![BorrowedSegment::Field("foo".into())]),
             (
                 "ec2.metadata.\"availability-zone\"",
-                owned_value_path!("ec2", "metadata", "availability-zone"),
+                vec![
+                    BorrowedSegment::Field("ec2".into()),
+                    BorrowedSegment::Field("metadata".into()),
+                    BorrowedSegment::Field("availability-zone".into()),
+                ],
             ),
-            (".foo", owned_value_path!("foo")),
-            (".@timestamp", owned_value_path!("@timestamp")),
-            ("foo[", owned_value_path!("foo", OwnedSegment::Invalid)),
-            ("foo$", owned_value_path!(OwnedSegment::Invalid)),
-            ("\"$peci@l chars\"", owned_value_path!("$peci@l chars")),
+            (".foo", vec![BorrowedSegment::Field("foo".into())]),
+            (
+                ".@timestamp",
+                vec![BorrowedSegment::Field("@timestamp".into())],
+            ),
+            (
+                "foo[",
+                vec![
+                    BorrowedSegment::Field("foo".into()),
+                    BorrowedSegment::Invalid,
+                ],
+            ),
+            ("foo$", vec![BorrowedSegment::Invalid]),
+            (
+                "\"$peci@l chars\"",
+                vec![BorrowedSegment::Field("$peci@l chars".into())],
+            ),
             (
                 ".foo.foo bar",
-                owned_value_path!("foo", OwnedSegment::Invalid),
+                vec![
+                    BorrowedSegment::Field("foo".into()),
+                    BorrowedSegment::Invalid,
+                ],
             ),
             (
                 ".foo.\"foo bar\".bar",
-                owned_value_path!("foo", "foo bar", "bar"),
+                vec![
+                    BorrowedSegment::Field("foo".into()),
+                    BorrowedSegment::Field("foo bar".into()),
+                    BorrowedSegment::Field("bar".into()),
+                ],
             ),
-            ("[1]", owned_value_path!(1)),
-            ("[42]", owned_value_path!(42)),
-            (".[42]", owned_value_path!(42)),
-            ("[42].foo", owned_value_path!(42, "foo")),
-            ("foo.[42]", owned_value_path!("foo", OwnedSegment::Invalid)),
-            ("foo..bar", owned_value_path!("foo", OwnedSegment::Invalid)),
-            ("[42]foo", owned_value_path!(42, "foo")),
-            ("[-1]", owned_value_path!(-1)),
-            ("[-42]", owned_value_path!(-42)),
-            (".[-42]", owned_value_path!(-42)),
-            ("[-42].foo", owned_value_path!(-42, "foo")),
-            ("[-42]foo", owned_value_path!(-42, "foo")),
-            (".\"[42]. {}-_\"", owned_value_path!("[42]. {}-_")),
-            ("\"a\\\"a\"", owned_value_path!("a\"a")),
-            (".\"a\\\"a\"", owned_value_path!("a\"a")),
+            ("[1]", vec![BorrowedSegment::Index(1)]),
+            ("[42]", vec![BorrowedSegment::Index(42)]),
+            (".[42]", vec![BorrowedSegment::Index(42)]),
+            (
+                "[42].foo",
+                vec![
+                    BorrowedSegment::Index(42),
+                    BorrowedSegment::Field("foo".into()),
+                ],
+            ),
+            (
+                "foo.[42]",
+                vec![
+                    BorrowedSegment::Field("foo".into()),
+                    BorrowedSegment::Invalid,
+                ],
+            ),
+            (
+                "foo..bar",
+                vec![
+                    BorrowedSegment::Field("foo".into()),
+                    BorrowedSegment::Invalid,
+                ],
+            ),
+            (
+                "[42]foo",
+                vec![
+                    BorrowedSegment::Index(42),
+                    BorrowedSegment::Field("foo".into()),
+                ],
+            ),
+            ("[-1]", vec![BorrowedSegment::Index(-1)]),
+            ("[-42]", vec![BorrowedSegment::Index(-42)]),
+            (".[-42]", vec![BorrowedSegment::Index(-42)]),
+            (
+                "[-42].foo",
+                vec![
+                    BorrowedSegment::Index(-42),
+                    BorrowedSegment::Field("foo".into()),
+                ],
+            ),
+            (
+                "[-42]foo",
+                vec![
+                    BorrowedSegment::Index(-42),
+                    BorrowedSegment::Field("foo".into()),
+                ],
+            ),
+            (
+                ".\"[42]. {}-_\"",
+                vec![BorrowedSegment::Field("[42]. {}-_".into())],
+            ),
+            ("\"a\\\"a\"", vec![BorrowedSegment::Field("a\"a".into())]),
+            (".\"a\\\"a\"", vec![BorrowedSegment::Field("a\"a".into())]),
             (
                 ".foo.\"a\\\"a\".\"b\\\\b\".bar",
-                owned_value_path!("foo", "a\"a", "b\\b", "bar"),
+                vec![
+                    BorrowedSegment::Field("foo".into()),
+                    BorrowedSegment::Field("a\"a".into()),
+                    BorrowedSegment::Field("b\\b".into()),
+                    BorrowedSegment::Field("bar".into()),
+                ],
             ),
-            (r#"."🤖""#, owned_value_path!("🤖")),
-            (".(a|b)", owned_value_path!(vec!["a", "b"])),
-            ("(a|b)", owned_value_path!(vec!["a", "b"])),
-            ("( a | b )", owned_value_path!(vec!["a", "b"])),
-            (".(a|b)[1]", owned_value_path!(vec!["a", "b"], 1)),
-            (".(a|b).foo", owned_value_path!(vec!["a", "b"], "foo")),
-            (".(a|b|c)", owned_value_path!(vec!["a", "b", "c"])),
-            ("[1](a|b)", owned_value_path!(1, vec!["a", "b"])),
-            ("[1].(a|b)", owned_value_path!(1, vec!["a", "b"])),
-            ("foo.(a|b)", owned_value_path!("foo", vec!["a", "b"])),
-            ("(\"a\"|b)", owned_value_path!(vec!["a", "b"])),
-            ("(a|\"b.c\")", owned_value_path!(vec!["a", "b.c"])),
-            ("(a|\"b\\\"c\")", owned_value_path!(vec!["a", "b\"c"])),
-            ("(\"b\\\"c\"|a)", owned_value_path!(vec!["b\"c", "a"])),
-            ("(a)", owned_value_path!(OwnedSegment::Invalid)),
+            (r#"."🤖""#, vec![BorrowedSegment::Field("🤖".into())]),
+            (
+                ".(a|b)",
+                vec![
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b".into()),
+                ],
+            ),
+            (
+                "(a|b)",
+                vec![
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b".into()),
+                ],
+            ),
+            (
+                "( a | b )",
+                vec![
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b".into()),
+                ],
+            ),
+            (
+                ".(a|b)[1]",
+                vec![
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b".into()),
+                    BorrowedSegment::Index(1),
+                ],
+            ),
+            (
+                ".(a|b).foo",
+                vec![
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b".into()),
+                    BorrowedSegment::Field("foo".into()),
+                ],
+            ),
+            (
+                ".(a|b|c)",
+                vec![
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceField("b".into()),
+                    BorrowedSegment::CoalesceEnd("c".into()),
+                ],
+            ),
+            (
+                "[1](a|b)",
+                vec![
+                    BorrowedSegment::Index(1),
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b".into()),
+                ],
+            ),
+            (
+                "[1].(a|b)",
+                vec![
+                    BorrowedSegment::Index(1),
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b".into()),
+                ],
+            ),
+            (
+                "foo.(a|b)",
+                vec![
+                    BorrowedSegment::Field("foo".into()),
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b".into()),
+                ],
+            ),
+            (
+                "(\"a\"|b)",
+                vec![
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b".into()),
+                ],
+            ),
+            (
+                "(a|\"b.c\")",
+                vec![
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b.c".into()),
+                ],
+            ),
+            (
+                "(a|\"b\\\"c\")",
+                vec![
+                    BorrowedSegment::CoalesceField("a".into()),
+                    BorrowedSegment::CoalesceEnd("b\"c".into()),
+                ],
+            ),
+            (
+                "(\"b\\\"c\"|a)",
+                vec![
+                    BorrowedSegment::CoalesceField("b\"c".into()),
+                    BorrowedSegment::CoalesceEnd("a".into()),
+                ],
+            ),
+            ("(a)", vec![BorrowedSegment::Invalid]),
         ];
 
         for (path, expected) in test_cases {
