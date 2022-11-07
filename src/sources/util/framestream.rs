@@ -651,6 +651,7 @@ mod test {
                 extra_task_handling_routine: extra_routine,
                 host_key: "test_framestream".to_string(),
                 timestamp_key: "my_timestamp".to_string(),
+                source_type_key: "source_type".to_string(),
             }
         }
     }
@@ -667,7 +668,7 @@ mod test {
             let mut event = LogEvent::from(frame);
             event.insert(log_schema().source_type_key(), "framestream");
             if let Some(host) = received_from {
-                event.insert(self.host_key().as_str(), host);
+                event.insert(self.host_key(), host);
             }
 
             (self.extra_task_handling_routine.clone())();
