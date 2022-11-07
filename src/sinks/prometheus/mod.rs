@@ -1,3 +1,4 @@
+use vector_common::sensitive_string::SensitiveString;
 #[cfg(test)]
 use vector_core::event::Metric;
 
@@ -21,6 +22,14 @@ pub enum PrometheusRemoteWriteAuth {
 
         /// Basic authentication password.
         password: String,
+    },
+
+    /// Bearer authentication.
+    ///
+    /// A bearer token (OAuth2, JWT, etc) is passed as-is.
+    Bearer {
+        /// The bearer token to send.
+        token: SensitiveString,
     },
 
     /// Amazon Prometheus Service-specific authentication.
