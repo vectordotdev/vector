@@ -5,7 +5,7 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
-use lookup::path;
+use lookup::{owned_value_path, path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use value::Kind;
@@ -13,7 +13,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -202,14 +202,16 @@ impl SourceConfig for RedisSourceConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
+        let legacy_key = self.redis_key.clone().unwrap_or("key".to_string());
+
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                self.redis_key.as_deref(),
-                "key",
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!(&legacy_key))),
+                &owned_value_path!("key"),
                 Kind::bytes(),
                 None,
             );
@@ -260,28 +262,25 @@ async fn handle_line(
                             now,
                         );
 
-                        match log_namespace {
-                            LogNamespace::Vector => log_namespace.insert_source_metadata(
+                        log_namespace.insert_source_metadata(
+                            RedisSourceConfig::NAME,
+                            log,
+                            Some(LegacyKey::InsertIfEmpty(path!("key"))),
+                            path!("key"),
+                            key,
+                        );
+
+                        if let (Some(redis_key), LogNamespace::Legacy) = (redis_key, log_namespace)
+                        {
+                            // Optionally store the redis key in the
+                            // event root under a user-provided name.
+                            log_namespace.insert_source_metadata(
                                 RedisSourceConfig::NAME,
                                 log,
-                                path!("key"),
+                                Some(LegacyKey::InsertIfEmpty(path!(redis_key))),
                                 path!("key"),
                                 key,
-                            ),
-                            LogNamespace::Legacy => {
-                                if let Some(redis_key) = redis_key {
-                                    // Optionally store the redis key
-                                    // in the event root under a
-                                    // user-provided name.
-                                    log_namespace.insert_source_metadata(
-                                        RedisSourceConfig::NAME,
-                                        log,
-                                        path!(redis_key),
-                                        path!("key"),
-                                        key,
-                                    )
-                                }
-                            }
+                            )
                         }
                     }
                     event
