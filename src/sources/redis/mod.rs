@@ -202,41 +202,6 @@ impl SourceConfig for RedisSourceConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        // let legacy_key = self
-        //     .redis_key
-        //     .as_ref()
-        //     .map(|key| LegacyKey::InsertIfEmpty(key));
-
-        // let legacy_key = self.redis_key.clone().unwrap_or_else(|| "".to_string());
-        // let legacy_key = owned_value_path!(&legacy_key);
-        // let legacy_key = self
-        //     .redis_key
-        //     .as_ref()
-        //     .map(|_| LegacyKey::InsertIfEmpty(&legacy_key));
-
-        // let legacy_key = self.redis_key.clone().unwrap_or_else(|| "".to_string());
-        // let legacy_key = owned_value_path!(&legacy_key);
-        // let legacy_key = self
-        //     .redis_key
-        //     .as_ref()
-        //     .map(|_| LegacyKey::InsertIfEmpty(&legacy_key));
-
-        // let legacy_key = legacy_key.map(|key| LegacyKey::InsertIfEmpty(&key));
-
-        // let legacy_key = if let Some(key) = legacy_key {
-        //     Some(LegacyKey::InsertIfEmpty(&key))
-        // } else {
-        //     None
-        // };
-
-        // let legacy_key = self.redis_key.clone().map(|key| owned_value_path!(&key));
-
-        // let legacy_key = if let Some(key) = legacy_key {
-        //     Some(LegacyKey::InsertIfEmpty(key))
-        // } else {
-        //     None
-        // };
-
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
