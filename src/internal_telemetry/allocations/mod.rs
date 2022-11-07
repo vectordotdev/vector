@@ -23,8 +23,15 @@ pub(crate) use self::allocator::{
 use crossbeam_utils::CachePadded;
 
 const NUM_GROUPS: usize = 128;
-/// These arrays represent the allocations and deallocations for each group.
+/// These arrays represent the memory usage for each group per thread.
+///
+/// Each thread is meant to update it's own group statistics, which significantly reduces atomic contention.
 /// We pad each Atomic to reduce false sharing effects.
+///
+/// TODO:
+///
+/// Currently, we reach atomic contention once the number of threads exceeds 8. One potential solution
+/// involves using thread locals to track memory stats.
 static GROUP_MEM_STATS: [[CachePadded<AtomicI64>; NUM_GROUPS]; 8] = [
     arr![CachePadded::new(AtomicI64::new(0)); 128],
     arr![CachePadded::new(AtomicI64::new(0)); 128],
@@ -36,10 +43,11 @@ static GROUP_MEM_STATS: [[CachePadded<AtomicI64>; NUM_GROUPS]; 8] = [
     arr![CachePadded::new(AtomicI64::new(0)); 128],
 ];
 
+// TODO: Replace this with [`std::thread::ThreadId::as_u64`] once it is stabilized.
 static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 thread_local! {
-    static THREAD_ID: AtomicUsize = AtomicUsize::new(THREAD_COUNTER.fetch_add(1, Ordering::SeqCst) + 1);
+    static THREAD_ID: usize = THREAD_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
 }
 // By using the Option type, we can do statics w/o the need of other creates such as lazy_static
 struct GroupInfo {
@@ -71,15 +79,14 @@ pub struct MainTracer;
 impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
-        GROUP_MEM_STATS[THREAD_ID.with(|t| t.load(Ordering::Relaxed)) % 8][group_id.as_raw()]
+        GROUP_MEM_STATS[THREAD_ID.with(|t| *t) % 8][group_id.as_raw()]
             .fetch_add(object_size as i64, Ordering::Relaxed);
     }
 
     #[inline(always)]
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
-        GROUP_MEM_STATS[THREAD_ID.with(|t| t.load(Ordering::Relaxed)) % 8]
-            [source_group_id.as_raw()]
-        .fetch_sub(object_size as i64, Ordering::Relaxed);
+        GROUP_MEM_STATS[THREAD_ID.with(|t| *t) % 8][source_group_id.as_raw()]
+            .fetch_sub(object_size as i64, Ordering::Relaxed);
     }
 }
 
