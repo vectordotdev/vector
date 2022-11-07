@@ -23,6 +23,7 @@ pub(crate) use self::allocator::{
 use crossbeam_utils::CachePadded;
 
 const NUM_GROUPS: usize = 128;
+const NUM_BUCKETS: usize = 8;
 /// These arrays represent the memory usage for each group per thread.
 ///
 /// Each thread is meant to update it's own group statistics, which significantly reduces atomic contention.
@@ -32,7 +33,7 @@ const NUM_GROUPS: usize = 128;
 ///
 /// Currently, we reach atomic contention once the number of threads exceeds 8. One potential solution
 /// involves using thread locals to track memory stats.
-static GROUP_MEM_STATS: [[CachePadded<AtomicI64>; NUM_GROUPS]; 8] = [
+static GROUP_MEM_STATS: [[CachePadded<AtomicI64>; NUM_GROUPS]; NUM_BUCKETS] = [
     arr![CachePadded::new(AtomicI64::new(0)); 128],
     arr![CachePadded::new(AtomicI64::new(0)); 128],
     arr![CachePadded::new(AtomicI64::new(0)); 128],
@@ -47,7 +48,7 @@ static GROUP_MEM_STATS: [[CachePadded<AtomicI64>; NUM_GROUPS]; 8] = [
 static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 thread_local! {
-    static THREAD_ID: usize = THREAD_COUNTER.fetch_add(1, Ordering::Relaxed) + 1;
+    static THREAD_ID: usize = THREAD_COUNTER.fetch_add(1, Ordering::Relaxed);
 }
 // By using the Option type, we can do statics w/o the need of other creates such as lazy_static
 struct GroupInfo {
