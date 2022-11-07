@@ -2,7 +2,7 @@
 
 This directory houses the exposed VRL function to WASM `run_vrl()` used to
 power [Vector Remap Language Playground][vrl-playground], or **VRL Playground**
-for short. Although there is already a [local REPL][vrl-repl] supported for 
+for short. Although there is already a [local REPL][vrl-repl] supported for
 use within the terminal, this playground will support running VRL in the web
 browser and test input via uploading event files, or specifying an event via
 a text input field.
@@ -64,7 +64,7 @@ List of functions that aren't supported at the moment:
 - `reverse_dns()`
 
 Functions from VRL stdlib that are currently not supported can be found
-with this [issue filter][vrl-wasm-unsupported-filter] 
+with this [issue filter][vrl-wasm-unsupported-filter]
 
 ## Examples
 
