@@ -247,7 +247,7 @@ impl SourceConfig for Config {
                 // TODO: Should this be considered a `timestamp`, it's currently
                 // the time that the kubernetes logs subsystem processed the log.
                 // The log's timestamp is still in the `message` field, unparsed.
-                Some("timestamp"),
+                None,
             )
             // TODO: This doesn't have the standard metadata.
             .with_standard_vector_source_metadata();
@@ -516,7 +516,7 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
-        let mut parser = Parser::new();
+        let mut parser = Parser::new(log_namespace);
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let checkpoints = checkpointer.view();
@@ -639,14 +639,6 @@ fn create_event(
         path!("file"),
         path!("file"),
         file,
-    );
-    // TODO: This gets overwritten by any timestamp parsed from the `message`
-    log_namespace.insert_source_metadata(
-        Config::NAME,
-        &mut log,
-        path!(log_schema().timestamp_key()),
-        path!("timestamp"),
-        Utc::now(),
     );
 
     log_namespace.insert_vector_metadata(

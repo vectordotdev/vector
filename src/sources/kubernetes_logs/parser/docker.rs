@@ -2,6 +2,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::log_schema,
@@ -21,16 +22,24 @@ pub const LOG: &str = "log";
 ///
 /// Normalizes parsed data for consistency.
 #[derive(Clone, Debug)]
-pub struct Docker;
+pub(super) struct Docker {
+    log_namespace: LogNamespace,
+}
+
+impl Docker {
+    pub fn new(log_namespace: LogNamespace) -> Self {
+        Self { log_namespace }
+    }
+}
 
 impl FunctionTransform for Docker {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        if let Err(err) = parse_json(log) {
+        if let Err(err) = parse_json(log, self.log_namespace) {
             emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
-        if let Err(err) = normalize_event(log) {
+        if let Err(err) = normalize_event(log, self.log_namespace) {
             emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
@@ -39,7 +48,8 @@ impl FunctionTransform for Docker {
 }
 
 /// Parses `message` as json object and removes it.
-fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
+fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), ParsingError> {
+    // TODO: Needs to reference log_namespace to access the correct key.
     let message = log
         .remove(log_schema().message_key())
         .ok_or(ParsingError::NoMessageField)?;
@@ -52,6 +62,7 @@ fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
     match serde_json::from_slice(bytes.as_ref()) {
         Ok(JsonValue::Object(object)) => {
             for (key, value) in object {
+                // TODO: Insert with log_namespace.
                 log.insert(event_path!(&key), value);
             }
             Ok(())
@@ -66,8 +77,12 @@ fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
 
 const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
-fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
+fn normalize_event(
+    log: &mut LogEvent,
+    log_namespace: LogNamespace,
+) -> Result<(), NormalizationError> {
     // Parse and rename timestamp.
+    // TODO: Remove with log_namespace
     let time = log.remove(TIME).context(TimeFieldMissingSnafu)?;
     let time = match time {
         Value::Bytes(val) => val,
@@ -75,9 +90,11 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     };
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
         .context(TimeParsingSnafu)?;
+    // TODO: Insert with log_namespace
     log.insert(log_schema().timestamp_key(), time.with_timezone(&Utc));
 
     // Parse message, remove trailing newline and detect if it's partial.
+    // TODO: Remove with log_namespace
     let message = log.remove(LOG).context(LogFieldMissingSnafu)?;
     let mut message = match message {
         Value::Bytes(val) => val,
@@ -99,10 +116,12 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
         message.truncate(message.len() - 1);
         is_partial = false;
     };
+    // TODO: Insert with log_namespace
     log.insert(log_schema().message_key(), message);
 
     // For partial messages add a partial event indicator.
     if is_partial {
+        // TODO: Insert with log_namespace
         log.insert(event::PARTIAL, true);
     }
 
@@ -207,7 +226,11 @@ pub mod tests {
         trace_init();
 
         test_util::test_parser(
-            || Transform::function(Docker),
+            || {
+                Transform::function(Docker {
+                    log_namespace: LogNamespace::Legacy,
+                })
+            },
             |s| Event::Log(LogEvent::from(s)),
             cases(),
         );
@@ -243,9 +266,10 @@ pub mod tests {
         ];
 
         for message in cases {
+            let parser = Docker::new(LogNamespace::Legacy);
             let input = LogEvent::from(message);
             let mut output = OutputBuffer::default();
-            Docker.transform(&mut output, input.into());
+            parser.transform(&mut output, input.into());
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
     }

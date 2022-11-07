@@ -2,7 +2,10 @@ mod cri;
 mod docker;
 mod test_util;
 
+use vector_core::config::LogNamespace;
+
 use crate::{
+    config::log_schema,
     event::{Event, Value},
     internal_events::KubernetesLogsFormatPickerEdgeCase,
     transforms::{FunctionTransform, OutputBuffer},
@@ -23,12 +26,14 @@ enum ParserState {
 #[derive(Clone, Debug)]
 pub struct Parser {
     state: ParserState,
+    log_namespace: LogNamespace,
 }
 
 impl Parser {
-    pub const fn new() -> Self {
+    pub const fn new(log_namespace: LogNamespace) -> Self {
         Self {
             state: ParserState::Uninitialized,
+            log_namespace,
         }
     }
 }
@@ -37,33 +42,41 @@ impl FunctionTransform for Parser {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         match &mut self.state {
             ParserState::Uninitialized => {
-                let message = match event
-                    .as_log()
-                    .get(crate::config::log_schema().message_key())
-                {
-                    Some(message) => message,
-                    None => {
-                        emit!(KubernetesLogsFormatPickerEdgeCase {
-                            what: "got an event with no message field"
-                        });
-                        return;
-                    }
+                let message = match self.log_namespace {
+                    LogNamespace::Vector => match event.as_log().get(".") {
+                        Some(message) => message,
+                        None => {
+                            emit!(KubernetesLogsFormatPickerEdgeCase {
+                                what: "got an event without a message at the root"
+                            });
+                            return;
+                        }
+                    },
+                    LogNamespace::Legacy => match event.as_log().get(log_schema().message_key()) {
+                        Some(message) => message,
+                        None => {
+                            emit!(KubernetesLogsFormatPickerEdgeCase {
+                                what: "got an event with no message field"
+                            });
+                            return;
+                        }
+                    },
                 };
 
                 let bytes = match message {
                     Value::Bytes(bytes) => bytes,
                     _ => {
                         emit!(KubernetesLogsFormatPickerEdgeCase {
-                            what: "got an event with non-bytes message field"
+                            what: "got an event with non-bytes message"
                         });
                         return;
                     }
                 };
 
                 self.state = if bytes.len() > 1 && bytes[0] == b'{' {
-                    ParserState::Docker(docker::Docker)
+                    ParserState::Docker(docker::Docker::new(self.log_namespace))
                 } else {
-                    ParserState::Cri(cri::Cri::default())
+                    ParserState::Cri(cri::Cri::new(self.log_namespace))
                 };
                 self.transform(output, event)
             }
@@ -90,7 +103,7 @@ mod tests {
     fn test_parsing() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Parser::new()),
+            || Transform::function(Parser::new(LogNamespace::Legacy)),
             |s| Event::Log(LogEvent::from(s)),
             cases(),
         );
@@ -104,7 +117,7 @@ mod tests {
 
         for message in cases {
             let input = LogEvent::from(message);
-            let mut parser = Parser::new();
+            let mut parser = Parser::new(LogNamespace::Legacy);
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
             assert!(output.is_empty(), "Expected no events: {:?}", output);
@@ -127,7 +140,7 @@ mod tests {
         ];
 
         for input in cases {
-            let mut parser = Parser::new();
+            let mut parser = Parser::new(LogNamespace::Legacy);
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input);
             assert!(output.is_empty(), "Expected no events: {:?}", output);

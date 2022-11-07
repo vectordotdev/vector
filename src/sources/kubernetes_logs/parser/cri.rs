@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use regex::bytes::{CaptureLocations, Regex};
 use vector_common::conversion;
+use vector_core::config::{log_schema, LogNamespace};
 
 use crate::{
     event::{self, Event, Value},
@@ -34,11 +35,11 @@ pub(super) struct Cri {
     pattern: Regex,
     capture_locations: CaptureLocations,
     capture_names: Vec<(usize, String)>,
-    field: &'static str,
+    log_namespace: LogNamespace,
 }
 
-impl Default for Cri {
-    fn default() -> Self {
+impl Cri {
+    pub fn new(log_namespace: LogNamespace) -> Self {
         let pattern =
             Regex::new(CRI_REGEX_PATTERN).expect("CRI log regex pattern should never fail");
 
@@ -53,21 +54,26 @@ impl Default for Cri {
             pattern,
             capture_locations,
             capture_names,
-            field: crate::config::log_schema().message_key(),
+            log_namespace,
         }
     }
 }
 
 impl FunctionTransform for Cri {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+        let field = match self.log_namespace {
+            LogNamespace::Vector => ".",
+            LogNamespace::Legacy => log_schema().message_key(),
+        };
+
         // Get the log field with the message, if it exists, and coerce it to bytes.
         let log = event.as_mut_log();
-        let value = log.get(self.field).map(|s| s.coerce_to_bytes());
+        let value = log.get(field).map(|s| s.coerce_to_bytes());
         match value {
             None => {
                 // The message field was missing, inexplicably. If we can't find the message field, there's nothing for
                 // us to actually decode, so there's no event we could emit, and so we just emit the error and return.
-                emit!(ParserMissingFieldError::<DROP_EVENT> { field: self.field });
+                emit!(ParserMissingFieldError::<DROP_EVENT> { field });
                 return;
             }
             Some(s) => match self.pattern.captures_read(&mut self.capture_locations, &s) {
@@ -114,11 +120,13 @@ impl FunctionTransform for Cri {
                             drop_original = false;
                         }
 
+                        // TODO: Insert with log_namespace.
                         drop(log.insert(name.as_str(), value));
                     }
 
                     // If we didn't overwrite the original field, remove it now.
                     if drop_original {
+                        // TODO: Remove with log_namespace
                         drop(log.remove(self.field));
                     }
                 }
@@ -128,14 +136,17 @@ impl FunctionTransform for Cri {
         // Remove the newline tag field, if it exists.
         //
         // For additional details, see https://github.com/vectordotdev/vector/issues/8606.
+        // TODO: Remove with log_namespace
         let _ = log.remove(NEW_LINE_TAG);
 
         // Detect if this is a partial event by examining the multiline tag field, and if it is, convert it to the more
         // generic `_partial` field that partial event merger will be looking for.
+        // TODO: Remove with log_namespace
         match log.remove(MULTILINE_TAG) {
             Some(Value::Bytes(val)) => {
                 let is_partial = val[0] == b'P';
                 if is_partial {
+                    // TODO: Insert with log_namespace
                     log.insert(event::PARTIAL, true);
                 }
             }
@@ -247,7 +258,7 @@ pub mod tests {
     fn test_parsing() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Cri::default()),
+            || Transform::function(Cri::new(LogNamespace::Legacy)),
             |s| Event::Log(LogEvent::from(s)),
             cases(),
         );
@@ -257,7 +268,7 @@ pub mod tests {
     fn test_parsing_bytes() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Cri::default()),
+            || Transform::function(Cri::new(LogNamespace::Legacy)),
             |bytes| LogEvent::from(bytes).into(),
             byte_cases(),
         );
