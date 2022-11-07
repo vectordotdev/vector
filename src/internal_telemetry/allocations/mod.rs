@@ -130,6 +130,8 @@ pub fn acquire_allocation_group_id(
     component_type: String,
     component_kind: String,
 ) -> AllocationGroupId {
+    // try to init the thread id's here since they are lazily initialized.
+    let _ = THREAD_ID.with(|t| *t);
     let group_id =
         AllocationGroupId::register().expect("failed to register allocation group token");
     let idx = group_id.as_raw();
