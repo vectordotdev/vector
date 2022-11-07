@@ -42,7 +42,7 @@ To see this in action we host `index.html` locally, for example by running:
 python3 -m http.server
 ```
 
-Remember to be in the `public` directory where index.html is located for the 
+Remember to be in the `public` directory where index.html is located for the
 relative paths specified in `index.html` to work.
 We should also be able to open the `index.html` file in chrome, or use Live Server
 in VSCode to see `index.html` working.
