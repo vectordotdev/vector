@@ -202,7 +202,27 @@ impl SourceConfig for RedisSourceConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let legacy_key = self.redis_key.clone().unwrap_or_else(|| "key".to_string());
+        // let legacy_key = self.redis_key.clone().map(|key| key);
+
+        let legacy_key = self
+            .redis_key
+            .as_ref()
+            .map(|key| LegacyKey::InsertIfEmpty(&owned_value_path!(key)));
+        // let legacy_key = legacy_key.map(|key| LegacyKey::InsertIfEmpty(&key));
+
+        // let legacy_key = if let Some(key) = legacy_key {
+        //     Some(LegacyKey::InsertIfEmpty(&key))
+        // } else {
+        //     None
+        // };
+
+        // let legacy_key = self.redis_key.clone().map(|key| owned_value_path!(&key));
+
+        // let legacy_key = if let Some(key) = legacy_key {
+        //     Some(LegacyKey::InsertIfEmpty(key))
+        // } else {
+        //     None
+        // };
 
         let schema_definition = self
             .decoding
@@ -210,7 +230,7 @@ impl SourceConfig for RedisSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!(&legacy_key))),
+                legacy_key,
                 &owned_value_path!("key"),
                 Kind::bytes(),
                 None,
