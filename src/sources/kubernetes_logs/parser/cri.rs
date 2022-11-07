@@ -122,11 +122,14 @@ impl FunctionTransform for Cri {
                     for (name, value) in captures {
                         match name.as_str() {
                             MESSAGE_TAG => {
-                                // Re-insert either directly into `.` or `log_schema().message_key()`,
-                                // overwriting the original "full" message that included additional fields.
+                                // Insert either directly into `.` or `log_schema().message_key()`,
+                                // overwriting the original "full" CRI log that included additional fields.
                                 drop(log.insert(message_field, value));
                             }
                             MULTILINE_TAG => {
+                                // If the MULTILINE_TAG is 'P' (partial), insert our generic `_partial` key.
+                                // This is safe to `unwrap()` as we've just ensured this value is a Value::Bytes
+                                // during the above capturing and mapping.
                                 if value.as_bytes().unwrap()[0] == b'P' {
                                     drop(self.log_namespace.insert_source_metadata(
                                         Config::NAME,
@@ -138,8 +141,8 @@ impl FunctionTransform for Cri {
                                 }
                             }
                             TIMESTAMP_TAG => {
-                                // Insert additional fields from original message into the event root or source
-                                // metadata, depending on `log_namespace`.
+                                // Insert the TIMESTAMP_TAG parsed out of the CRI log, this is the timestamp of
+                                // when the runtime processed this message.
                                 drop(self.log_namespace.insert_source_metadata(
                                     Config::NAME,
                                     log,
@@ -166,7 +169,6 @@ impl FunctionTransform for Cri {
             },
         }
 
-        // Since we successfully parsed the message, send it onward.
         output.push(event);
     }
 }
