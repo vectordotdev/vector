@@ -20,23 +20,170 @@ pub struct DnstapEventSchema {
 }
 
 impl DnstapEventSchema {
+    /// The message schema for the request and response message fields
+    fn request_message_schema_definition(&self) -> Collection<Field> {
+        btreemap! {
+            self.dns_query_message_schema().time() => Kind::integer().or_undefined(),
+            self.dns_update_message_schema().time() => Kind::bytes().or_undefined(),
+            self.dns_query_message_schema().time_precision() => Kind::integer().or_undefined(),
+            self.dns_update_message_schema().time_precision() => Kind::bytes().or_undefined(),
+            self.dns_query_message_schema().response_code() => Kind::integer().or_undefined(),
+            self.dns_update_message_schema().response_code() => Kind::integer().or_undefined(),
+            self.dns_query_message_schema().response() => Kind::bytes().or_undefined(),
+            self.dns_update_message_schema().response() => Kind::bytes().or_undefined(),
+            self.dns_query_message_schema().header() =>  Kind::object(self.dns_query_header_schema().schema_definition()).or_undefined(),
+            self.dns_update_message_schema().header() =>  Kind::object(self.dns_update_header_schema().schema_definition()).or_undefined(),
+            self.dns_update_message_schema().zone_section() => Kind::object(self.dns_update_zone_info_schema().schema_definition()).or_undefined(),
+
+            self.dns_query_message_schema().question_section() => Kind::array(
+                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
+            ).or_undefined(),
+
+            self.dns_query_message_schema().answer_section() => Kind::array(
+                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
+            ).or_undefined(),
+
+            self.dns_query_message_schema().authority_section() => Kind::array(
+                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
+            ).or_undefined(),
+
+            self.dns_query_message_schema().additional_section() => Kind::array(
+                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
+            ).or_undefined(),
+
+            self.dns_query_message_schema().opt_pseudo_section() => Kind::object(
+                self.dns_message_opt_pseudo_section_schema().schema_definition(self.dns_message_option_schema())
+            ).or_undefined(),
+
+            self.dns_query_message_schema().raw_data() => Kind::bytes().or_undefined(),
+
+            self.dns_update_message_schema().prerequisite_section() => Kind::array(
+                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
+            ).or_undefined(),
+
+            self.dns_update_message_schema().update_section() => Kind::array(
+                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
+            ).or_undefined(),
+
+            self.dns_update_message_schema().additional_section() => Kind::array(
+                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
+            ).or_undefined(),
+        }
+       .into()
+    }
+
+    /// Schema definition for fields stored in the root.
+    fn root_schema_definition(
+        &self,
+        schema: vector_core::schema::Definition,
+    ) -> vector_core::schema::Definition {
+        let schema = schema
+            .optional_field(
+                self.dnstap_root_data_schema().server_identity(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                self.dnstap_root_data_schema().server_version(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(self.dnstap_root_data_schema().extra(), Kind::bytes(), None)
+            .with_field(
+                self.dnstap_root_data_schema().data_type_id(),
+                Kind::integer(),
+                None,
+            )
+            .optional_field(
+                self.dnstap_root_data_schema().data_type(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(self.dnstap_root_data_schema().error(), Kind::bytes(), None)
+            .optional_field(
+                self.dnstap_root_data_schema().raw_data(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(self.dnstap_root_data_schema().time(), Kind::integer(), None)
+            .optional_field(
+                self.dnstap_root_data_schema().time_precision(),
+                Kind::bytes(),
+                None,
+            );
+
+        schema
+    }
+
+    /// Schema definition from the message.
+    pub fn message_schema_definition(
+        &self,
+        schema: vector_core::schema::Definition,
+    ) -> vector_core::schema::Definition {
+        schema
+            .optional_field(
+                self.dnstap_message_schema().socket_family(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                self.dnstap_message_schema().socket_protocol(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                self.dnstap_message_schema().query_address(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                self.dnstap_message_schema().query_port(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                self.dnstap_message_schema().response_address(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                self.dnstap_message_schema().response_port(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                self.dnstap_message_schema().query_zone(),
+                Kind::bytes(),
+                None,
+            )
+            .with_field(
+                self.dnstap_message_schema().dnstap_message_type_id(),
+                Kind::integer(),
+                None,
+            )
+            .optional_field(
+                self.dnstap_message_schema().dnstap_message_type(),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                self.dnstap_message_schema().request_message(),
+                Kind::object(self.request_message_schema_definition()),
+                None,
+            )
+            .optional_field(
+                self.dnstap_message_schema().response_message(),
+                Kind::object(self.request_message_schema_definition()),
+                None,
+            )
+    }
+
+    /// The schema definition for a dns tap message.
     pub fn schema_definition(
         &self,
         schema: vector_core::schema::Definition,
     ) -> vector_core::schema::Definition {
-        self.dnstap_root_data_schema().schema_definition(
-            self.dnstap_message_schema().schema_definition(
-                self.dns_query_message_schema(),
-                self.dns_update_message_schema(),
-                self.dns_query_header_schema(),
-                self.dns_update_header_schema(),
-                self.dns_update_zone_info_schema(),
-                self.dns_record_schema(),
-                self.dns_message_opt_pseudo_section_schema(),
-                self.dns_message_option_schema(),
-                schema,
-            ),
-        )
+        self.root_schema_definition(self.message_schema_definition(schema))
     }
 
     pub const fn dnstap_root_data_schema(&self) -> &DnstapRootDataSchema {
@@ -136,24 +283,6 @@ impl Default for DnstapRootDataSchema {
 }
 
 impl DnstapRootDataSchema {
-    pub fn schema_definition(
-        &self,
-        schema: vector_core::schema::Definition,
-    ) -> vector_core::schema::Definition {
-        let schema = schema
-            .optional_field(self.server_identity(), Kind::bytes(), None)
-            .optional_field(self.server_version(), Kind::bytes(), None)
-            .optional_field(self.extra(), Kind::bytes(), None)
-            .with_field(self.data_type_id(), Kind::integer(), None)
-            .optional_field(self.data_type(), Kind::bytes(), None)
-            .optional_field(self.error(), Kind::bytes(), None)
-            .optional_field(self.raw_data(), Kind::bytes(), None)
-            .optional_field(self.time(), Kind::integer(), None)
-            .optional_field(self.time_precision(), Kind::bytes(), None);
-
-        schema
-    }
-
     pub const fn server_identity(&self) -> &'static str {
         self.server_identity
     }
@@ -234,120 +363,6 @@ impl Default for DnstapMessageSchema {
 }
 
 impl DnstapMessageSchema {
-    /// The message schema for the request and response message fields
-    fn message_schema_definition(
-        &self,
-        dns_query_message_schema: &DnsQueryMessageSchema,
-        dns_update_message_schema: &DnsUpdateMessageSchema,
-        dns_query_header_schema: &DnsQueryHeaderSchema,
-        dns_update_header_schema: &DnsUpdateHeaderSchema,
-        dns_update_zone_info_schema: &DnsUpdateZoneInfoSchema,
-        dns_record_schema: &DnsRecordSchema,
-        dns_message_opt_pseudo_section_schema: &DnsMessageOptPseudoSectionSchema,
-        dns_message_option_schema: &DnsMessageOptionSchema
-    ) -> Collection<Field> {
-        btreemap! {
-            dns_query_message_schema.time() => Kind::integer().or_undefined(),
-            dns_update_message_schema.time() => Kind::bytes().or_undefined(),
-            dns_query_message_schema.time_precision() => Kind::integer().or_undefined(),
-            dns_update_message_schema.time_precision() => Kind::bytes().or_undefined(),
-            dns_query_message_schema.response_code() => Kind::integer().or_undefined(),
-            dns_update_message_schema.response_code() => Kind::integer().or_undefined(),
-            dns_query_message_schema.response() => Kind::bytes().or_undefined(),
-            dns_update_message_schema.response() => Kind::bytes().or_undefined(),
-            dns_query_message_schema.header() =>  Kind::object(dns_query_header_schema.schema_definition()).or_undefined(),
-            dns_update_message_schema.header() =>  Kind::object(dns_update_header_schema.schema_definition()).or_undefined(),
-            dns_update_message_schema.zone_section() => Kind::object(dns_update_zone_info_schema.schema_definition()).or_undefined(),
-            
-            dns_query_message_schema.question_section() => Kind::array( 
-                Collection::from_unknown(Kind::object(dns_record_schema.schema_definition()))
-            ).or_undefined(),
-            
-            dns_query_message_schema.answer_section() => Kind::array( 
-                Collection::from_unknown(Kind::object(dns_record_schema.schema_definition()))
-            ).or_undefined(),
-            
-            dns_query_message_schema.authority_section() => Kind::array( 
-                Collection::from_unknown(Kind::object(dns_record_schema.schema_definition()))
-            ).or_undefined(),
-            
-            dns_query_message_schema.additional_section() => Kind::array( 
-                Collection::from_unknown(Kind::object(dns_record_schema.schema_definition()))
-            ).or_undefined(),
-            
-            dns_query_message_schema.opt_pseudo_section() => Kind::object(
-                dns_message_opt_pseudo_section_schema.schema_definition(dns_message_option_schema)
-            ).or_undefined(),
-            
-            dns_query_message_schema.raw_data() => Kind::bytes().or_undefined(),
-            
-            dns_update_message_schema.prerequisite_section() => Kind::array( 
-                Collection::from_unknown(Kind::object(dns_record_schema.schema_definition()))
-            ).or_undefined(),
-
-            dns_update_message_schema.update_section() => Kind::array( 
-                Collection::from_unknown(Kind::object(dns_record_schema.schema_definition()))
-            ).or_undefined(),
-
-            dns_update_message_schema.additional_section() => Kind::array( 
-                Collection::from_unknown(Kind::object(dns_record_schema.schema_definition()))
-            ).or_undefined(),
-        }
-       .into()
-    }
-
-    pub fn schema_definition(
-        &self,
-        dns_query_message_schema: &DnsQueryMessageSchema,
-        dns_update_message_schema: &DnsUpdateMessageSchema,
-        dns_query_header_schema: &DnsQueryHeaderSchema,
-        dns_update_header_schema: &DnsUpdateHeaderSchema,
-        dns_update_zone_info_schema: &DnsUpdateZoneInfoSchema,
-        dns_record_schema: &DnsRecordSchema,
-        dns_message_opt_pseudo_section_schema: &DnsMessageOptPseudoSectionSchema,
-        dns_message_option_schema: &DnsMessageOptionSchema,
-        schema: vector_core::schema::Definition,
-    ) -> vector_core::schema::Definition {
-        schema
-            .optional_field(self.socket_family(), Kind::bytes(), None)
-            .optional_field(self.socket_protocol(), Kind::bytes(), None)
-            .optional_field(self.query_address(), Kind::bytes(), None)
-            .optional_field(self.query_port(), Kind::bytes(), None)
-            .optional_field(self.response_address(), Kind::bytes(), None)
-            .optional_field(self.response_port(), Kind::bytes(), None)
-            .optional_field(self.query_zone(), Kind::bytes(), None)
-            .with_field(self.dnstap_message_type_id(), Kind::integer(), None)
-            .optional_field(self.dnstap_message_type(), Kind::bytes(), None)
-            .optional_field(
-                self.request_message(),
-                Kind::object(self.message_schema_definition(
-                    dns_query_message_schema,
-                    dns_update_message_schema,
-                    dns_query_header_schema,
-                    dns_update_header_schema,
-                    dns_update_zone_info_schema,
-                    dns_record_schema,
-                    dns_message_opt_pseudo_section_schema,
-                    dns_message_option_schema,
-                )),
-                None,
-            )
-            .optional_field(
-                self.response_message(),
-                Kind::object(self.message_schema_definition(
-                    dns_query_message_schema,
-                    dns_update_message_schema,
-                    dns_query_header_schema,
-                    dns_update_header_schema,
-                    dns_update_zone_info_schema,
-                    dns_record_schema,
-                    dns_message_opt_pseudo_section_schema,
-                    dns_message_option_schema,
-                )),
-                None,
-            )
-    }
-
     pub const fn socket_family(&self) -> &'static str {
         self.socket_family
     }
@@ -839,7 +854,10 @@ impl Default for DnsMessageOptPseudoSectionSchema {
 }
 
 impl DnsMessageOptPseudoSectionSchema {
-    pub fn schema_definition(&self, dns_message_option_schema: &DnsMessageOptionSchema) -> Collection<Field> {
+    pub fn schema_definition(
+        &self,
+        dns_message_option_schema: &DnsMessageOptionSchema,
+    ) -> Collection<Field> {
         btreemap! {
             self.extended_rcode() => Kind::integer(),
             self.version() => Kind::integer(),
@@ -896,9 +914,10 @@ impl DnsMessageOptionSchema {
             self.opt_code() => Kind::integer(),
             self.opt_name() => Kind::bytes(),
             self.opt_data() => Kind::bytes(),
-        }.into()
+        }
+        .into()
     }
-    
+
     pub const fn opt_code(&self) -> &'static str {
         self.opt_code
     }

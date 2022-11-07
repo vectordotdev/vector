@@ -119,9 +119,7 @@ impl DnstapConfig {
                 if self.raw_data_only.unwrap_or(false) {
                     schema.with_field(log_schema().message_key(), Kind::bytes(), Some("message"))
                 } else {
-                    event_schema
-                        .dnstap_root_data_schema()
-                        .schema_definition(schema)
+                    event_schema.schema_definition(schema)
                 }
             }
             LogNamespace::Vector => {
@@ -133,9 +131,7 @@ impl DnstapConfig {
                 if self.raw_data_only.unwrap_or(false) {
                     schema.with_field("message", Kind::bytes(), Some("message"))
                 } else {
-                    event_schema
-                        .dnstap_root_data_schema()
-                        .schema_definition(schema)
+                    event_schema.schema_definition(schema)
                 }
             }
         }
@@ -374,6 +370,7 @@ mod integration_tests {
                     socket_file_mode: Some(511),
                     socket_receive_buffer_size: Some(10485760),
                     socket_send_buffer_size: Some(10485760),
+                    log_namespace: None,
                 }
                 .build(SourceContext::new_test(sender, None))
                 .await
