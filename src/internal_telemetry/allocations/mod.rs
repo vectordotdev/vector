@@ -47,7 +47,7 @@ static GROUP_MEM_STATS: [[CachePadded<AtomicI64>; NUM_GROUPS]; 8] = [
 static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 thread_local! {
-    static THREAD_ID: usize = THREAD_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
+    static THREAD_ID: usize = THREAD_COUNTER.fetch_add(1, Ordering::Relaxed) + 1;
 }
 // By using the Option type, we can do statics w/o the need of other creates such as lazy_static
 struct GroupInfo {
