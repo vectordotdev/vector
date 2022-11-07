@@ -1,24 +1,27 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use lookup::path;
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
-use vector_core::config::LogNamespace;
+use vector_config::NamedComponent;
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
     config::log_schema,
     event::{self, Event, LogEvent, Value},
     internal_events::KubernetesLogsDockerFormatParseError,
+    sources::kubernetes_logs::Config,
     transforms::{FunctionTransform, OutputBuffer},
 };
-use lookup::event_path;
 
-pub const TIME: &str = "time";
-pub const LOG: &str = "log";
+pub const MESSAGE_KEY: &str = "log";
+pub const STREAM_KEY: &str = "stream";
+pub const TIMESTAMP_KEY: &str = "time";
 
 /// Parser for the Docker log format.
 ///
 /// Expects logs to arrive in a JSONLines format with the fields names and
-/// contents specific to the implementation of the Docker `json` log driver.
+/// contents specific to the implementation of the Docker `json-file` log driver.
 ///
 /// Normalizes parsed data for consistency.
 #[derive(Clone, Debug)]
@@ -27,7 +30,7 @@ pub(super) struct Docker {
 }
 
 impl Docker {
-    pub fn new(log_namespace: LogNamespace) -> Self {
+    pub const fn new(log_namespace: LogNamespace) -> Self {
         Self { log_namespace }
     }
 }
@@ -48,13 +51,17 @@ impl FunctionTransform for Docker {
 }
 
 /// Parses `message` as json object and removes it.
-fn parse_json(log: &mut LogEvent, _log_namespace: LogNamespace) -> Result<(), ParsingError> {
-    // TODO: Needs to reference log_namespace to access the correct key.
-    let message = log
-        .remove(log_schema().message_key())
+fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), ParsingError> {
+    let message_field = match log_namespace {
+        LogNamespace::Vector => ".",
+        LogNamespace::Legacy => log_schema().message_key(),
+    };
+
+    let value = log
+        .remove(message_field)
         .ok_or(ParsingError::NoMessageField)?;
 
-    let bytes = match message {
+    let bytes = match value {
         Value::Bytes(bytes) => bytes,
         _ => return Err(ParsingError::MessageFieldNotInBytes),
     };
@@ -62,8 +69,25 @@ fn parse_json(log: &mut LogEvent, _log_namespace: LogNamespace) -> Result<(), Pa
     match serde_json::from_slice(bytes.as_ref()) {
         Ok(JsonValue::Object(object)) => {
             for (key, value) in object {
-                // TODO: Insert with log_namespace.
-                log.insert(event_path!(&key), value);
+                match key.as_str() {
+                    MESSAGE_KEY => drop(log.insert(message_field, value)),
+                    STREAM_KEY => log_namespace.insert_source_metadata(
+                        Config::NAME,
+                        log,
+                        Some(LegacyKey::Overwrite(path!(STREAM_KEY))),
+                        path!(STREAM_KEY),
+                        value,
+                    ),
+                    // TODO: Should this insert under the json-file key of "time"?
+                    TIMESTAMP_KEY => log_namespace.insert_source_metadata(
+                        Config::NAME,
+                        log,
+                        Some(LegacyKey::Overwrite(path!("timestamp"))),
+                        path!("timestamp"),
+                        value,
+                    ),
+                    _ => unreachable!("all json-file keys should be matched"),
+                };
             }
             Ok(())
         }
@@ -83,7 +107,7 @@ fn normalize_event(
 ) -> Result<(), NormalizationError> {
     // Parse and rename timestamp.
     // TODO: Remove with log_namespace
-    let time = log.remove(TIME).context(TimeFieldMissingSnafu)?;
+    let time = log.remove(TIMESTAMP_KEY).context(TimeFieldMissingSnafu)?;
     let time = match time {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::TimeValueUnexpectedType),
@@ -95,7 +119,7 @@ fn normalize_event(
 
     // Parse message, remove trailing newline and detect if it's partial.
     // TODO: Remove with log_namespace
-    let message = log.remove(LOG).context(LogFieldMissingSnafu)?;
+    let message = log.remove(MESSAGE_KEY).context(LogFieldMissingSnafu)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),

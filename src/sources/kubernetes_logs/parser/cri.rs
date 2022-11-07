@@ -16,11 +16,11 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer},
 };
 
-pub const MULTILINE_TAG: &str = "multiline_tag";
-const MESSAGE_TAG: &str = "message";
-const STREAM_TAG: &str = "stream";
-const TIMESTAMP_TAG: &str = "timestamp";
 const CRI_REGEX_PATTERN: &str = r"(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)\n?$";
+const MESSAGE_KEY: &str = "message";
+const MULTILINE_KEY: &str = "multiline_tag";
+const STREAM_KEY: &str = "stream";
+const TIMESTAMP_KEY: &str = "timestamp";
 
 /// Parser for the CRI log format.
 ///
@@ -72,7 +72,7 @@ impl FunctionTransform for Cri {
 
         // Get the log field with the message, if it exists, and coerce it to bytes.
         let log = event.as_mut_log();
-        let value = log.get(message_field).map(|s| s.coerce_to_bytes());
+        let value = log.remove(message_field).map(|s| s.coerce_to_bytes());
         match value {
             None => {
                 // The message field was missing, inexplicably. If we can't find the message field, there's nothing for
@@ -96,7 +96,7 @@ impl FunctionTransform for Cri {
                             // For all fields except `timestamp`, simply treat them as `Value::Bytes`. For
                             // `timestamp`, however, we actually make sure we can convert it correctly and feed it
                             // in as `Value::Timestamp`.
-                            let value = if name == TIMESTAMP_TAG {
+                            let value = if name == TIMESTAMP_KEY {
                                 let ds = String::from_utf8_lossy(raw);
                                 match DateTime::parse_from_str(&ds, "%+") {
                                     Ok(dt) => Some(Value::Timestamp(dt.with_timezone(&Utc))),
@@ -121,44 +121,44 @@ impl FunctionTransform for Cri {
 
                     for (name, value) in captures {
                         match name.as_str() {
-                            MESSAGE_TAG => {
+                            MESSAGE_KEY => {
                                 // Insert either directly into `.` or `log_schema().message_key()`,
                                 // overwriting the original "full" CRI log that included additional fields.
                                 drop(log.insert(message_field, value));
                             }
-                            MULTILINE_TAG => {
+                            MULTILINE_KEY => {
                                 // If the MULTILINE_TAG is 'P' (partial), insert our generic `_partial` key.
                                 // This is safe to `unwrap()` as we've just ensured this value is a Value::Bytes
                                 // during the above capturing and mapping.
                                 if value.as_bytes().unwrap()[0] == b'P' {
-                                    drop(self.log_namespace.insert_source_metadata(
+                                    self.log_namespace.insert_source_metadata(
                                         Config::NAME,
                                         log,
                                         Some(LegacyKey::Overwrite(path!(event::PARTIAL))),
                                         path!(event::PARTIAL),
                                         true,
-                                    ));
+                                    );
                                 }
                             }
-                            TIMESTAMP_TAG => {
+                            TIMESTAMP_KEY => {
                                 // Insert the TIMESTAMP_TAG parsed out of the CRI log, this is the timestamp of
                                 // when the runtime processed this message.
-                                drop(self.log_namespace.insert_source_metadata(
+                                self.log_namespace.insert_source_metadata(
                                     Config::NAME,
                                     log,
                                     Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
-                                    path!(TIMESTAMP_TAG),
+                                    path!(TIMESTAMP_KEY),
                                     value,
-                                ));
+                                );
                             }
-                            STREAM_TAG => {
-                                drop(self.log_namespace.insert_source_metadata(
+                            STREAM_KEY => {
+                                self.log_namespace.insert_source_metadata(
                                     Config::NAME,
                                     log,
-                                    Some(LegacyKey::Overwrite(path!(STREAM_TAG))),
-                                    path!(STREAM_TAG),
+                                    Some(LegacyKey::Overwrite(path!(STREAM_KEY))),
+                                    path!(STREAM_KEY),
                                     value,
-                                ));
+                                );
                             }
                             _ => {
                                 unreachable!("all CRI captures groups should be matched");
