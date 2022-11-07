@@ -18,6 +18,7 @@ use crate::{
 
 pub const MULTILINE_TAG: &str = "multiline_tag";
 const MESSAGE_TAG: &str = "message";
+const STREAM_TAG: &str = "stream";
 const TIMESTAMP_TAG: &str = "timestamp";
 const CRI_REGEX_PATTERN: &str = r"(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)\n?$";
 
@@ -119,46 +120,52 @@ impl FunctionTransform for Cri {
                     });
 
                     for (name, value) in captures {
-                        if name == MESSAGE_TAG {
-                            // Re-insert either directly into `.` or `log_schema().message_key()`,
-                            // overwriting the original "full" message that included additional fields.
-                            drop(log.insert(message_field, value));
-                        } else {
-                            // Insert additional fields from original message into the event root or source
-                            // metadata, depending on `log_namespace`.
-                            drop(self.log_namespace.insert_source_metadata(
-                                Config::NAME,
-                                log,
-                                path!(name),
-                                path!(name),
-                                value,
-                            ))
+                        match name.as_str() {
+                            MESSAGE_TAG => {
+                                // Re-insert either directly into `.` or `log_schema().message_key()`,
+                                // overwriting the original "full" message that included additional fields.
+                                drop(log.insert(message_field, value));
+                            }
+                            MULTILINE_TAG => {
+                                if value.as_bytes().unwrap()[0] == b'P' {
+                                    drop(self.log_namespace.insert_source_metadata(
+                                        Config::NAME,
+                                        log,
+                                        path!(event::PARTIAL),
+                                        path!(event::PARTIAL),
+                                        true,
+                                    ));
+                                }
+                            }
+                            TIMESTAMP_TAG => {
+                                dbg!(value.clone());
+                                // Insert additional fields from original message into the event root or source
+                                // metadata, depending on `log_namespace`.
+                                drop(self.log_namespace.insert_source_metadata(
+                                    Config::NAME,
+                                    log,
+                                    path!(log_schema().timestamp_key()),
+                                    path!(TIMESTAMP_TAG),
+                                    value,
+                                ));
+                            }
+                            STREAM_TAG => {
+                                drop(self.log_namespace.insert_source_metadata(
+                                    Config::NAME,
+                                    log,
+                                    path!(STREAM_TAG),
+                                    path!(STREAM_TAG),
+                                    value,
+                                ));
+                            }
+                            _ => {
+                                unreachable!("all CRI captures groups should be matched");
+                            }
                         }
                     }
                 }
             },
         }
-
-        // Detect if this is a partial event by examining the multiline tag field, and if it is, convert it to the more
-        // generic `_partial` field that partial event merger will be looking for.
-        // TODO: Remove with log_namespace
-        match log.remove(MULTILINE_TAG) {
-            Some(Value::Bytes(val)) => {
-                let is_partial = val[0] == b'P';
-                if is_partial {
-                    // TODO: Insert with log_namespace
-                    log.insert(event::PARTIAL, true);
-                }
-            }
-            _ => {
-                // The multiline tag always needs to exist in the message, and it needs to be a string, so if we didn't
-                // find it, or it's not a string, this is an invalid event overall so we don't emit the event.
-
-                // TODO: Should we actually emit an internal event/error here? It would definitely be weird if a
-                // mandated field in the log format wasn't present/the right type.
-                return;
-            }
-        };
 
         // Since we successfully parsed the message, send it onward.
         output.push(event);

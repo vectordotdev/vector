@@ -48,7 +48,7 @@ impl FunctionTransform for Docker {
 }
 
 /// Parses `message` as json object and removes it.
-fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), ParsingError> {
+fn parse_json(log: &mut LogEvent, _log_namespace: LogNamespace) -> Result<(), ParsingError> {
     // TODO: Needs to reference log_namespace to access the correct key.
     let message = log
         .remove(log_schema().message_key())
@@ -79,7 +79,7 @@ const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
 fn normalize_event(
     log: &mut LogEvent,
-    log_namespace: LogNamespace,
+    _log_namespace: LogNamespace,
 ) -> Result<(), NormalizationError> {
     // Parse and rename timestamp.
     // TODO: Remove with log_namespace
@@ -266,7 +266,7 @@ pub mod tests {
         ];
 
         for message in cases {
-            let parser = Docker::new(LogNamespace::Legacy);
+            let mut parser = Docker::new(LogNamespace::Legacy);
             let input = LogEvent::from(message);
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
