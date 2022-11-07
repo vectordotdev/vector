@@ -74,7 +74,7 @@ impl UnixConfig {
             host_key: None,
             framing: None,
             decoding: default_decoding(),
-            log_namespace: Some(true),
+            log_namespace: None,
         }
     }
 

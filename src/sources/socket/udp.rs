@@ -106,7 +106,7 @@ impl UdpConfig {
             receive_buffer_bytes: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            log_namespace: Some(true),
+            log_namespace: None,
         }
     }
 

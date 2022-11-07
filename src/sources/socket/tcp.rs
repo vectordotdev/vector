@@ -94,7 +94,7 @@ impl TcpConfig {
             framing: None,
             decoding: default_decoding(),
             connection_limit: None,
-            log_namespace: Some(true),
+            log_namespace: None,
         }
     }
 
