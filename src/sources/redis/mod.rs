@@ -202,12 +202,25 @@ impl SourceConfig for RedisSourceConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        // let legacy_key = self.redis_key.clone().map(|key| key);
+        // let legacy_key = self
+        //     .redis_key
+        //     .as_ref()
+        //     .map(|key| LegacyKey::InsertIfEmpty(key));
 
-        let legacy_key = self
-            .redis_key
-            .as_ref()
-            .map(|key| LegacyKey::InsertIfEmpty(&owned_value_path!(key)));
+        // let legacy_key = self.redis_key.clone().unwrap_or_else(|| "".to_string());
+        // let legacy_key = owned_value_path!(&legacy_key);
+        // let legacy_key = self
+        //     .redis_key
+        //     .as_ref()
+        //     .map(|_| LegacyKey::InsertIfEmpty(&legacy_key));
+
+        // let legacy_key = self.redis_key.clone().unwrap_or_else(|| "".to_string());
+        // let legacy_key = owned_value_path!(&legacy_key);
+        // let legacy_key = self
+        //     .redis_key
+        //     .as_ref()
+        //     .map(|_| LegacyKey::InsertIfEmpty(&legacy_key));
+
         // let legacy_key = legacy_key.map(|key| LegacyKey::InsertIfEmpty(&key));
 
         // let legacy_key = if let Some(key) = legacy_key {
@@ -227,14 +240,24 @@ impl SourceConfig for RedisSourceConfig {
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata()
-            .with_source_metadata(
+            .with_standard_vector_source_metadata();
+
+        let schema_definition = match &self.redis_key {
+            Some(key) => schema_definition.with_source_metadata(
                 Self::NAME,
-                legacy_key,
+                Some(LegacyKey::InsertIfEmpty(&owned_value_path!(key))),
                 &owned_value_path!("key"),
                 Kind::bytes(),
                 None,
-            );
+            ),
+            None => schema_definition.with_source_metadata(
+                Self::NAME,
+                None,
+                &owned_value_path!("key"),
+                Kind::bytes(),
+                None,
+            ),
+        };
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
