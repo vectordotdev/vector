@@ -1,9 +1,12 @@
 use chrono::Utc;
-use lookup::event_path;
+use lookup::{event_path, path};
 use serde_json::Value;
+use value::kind::Collection;
+use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 
+use crate::schema::Definition;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
@@ -14,7 +17,6 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
 };
-use crate::schema::Definition;
 
 /// Configuration for the `metric_to_log` transform.
 #[configurable_component(transform("metric_to_log"))]
@@ -65,9 +67,28 @@ impl TransformConfig for MetricToLogConfig {
     }
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-
         let mut schema_definition = Definition::any()
-            .with_field(&owned_value)
+            .with_event_field(owned_value_path!("name"), Kind::bytes(), None)
+            .with_event_field(
+                owned_value_path!("namespace"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_event_field(
+                owned_value_path!("tags"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_event_field(
+                owned_value_path!("timestamp"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_event_field(owned_value_path!("kind"), Kind::bytes(), None)
+            .with_event_field(
+                owned_value_path!("counter"),
+                Kind::object(Collection::empty().with_known),
+            );
 
         vec![Output::default(DataType::Log)]
     }
@@ -102,7 +123,6 @@ impl MetricToLog {
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
-                    // TODO: Avoid a clone here
                     let (_, _, metadata) = metric.into_parts();
                     let mut log = LogEvent::new_with_metadata(metadata);
 
@@ -112,7 +132,7 @@ impl MetricToLog {
                     }
 
                     let timestamp = log
-                        .remove(self.timestamp_key.as_str())
+                        .remove(event_path!("timestamp"))
                         .and_then(|value| {
                             Conversion::Timestamp(self.timezone)
                                 .convert(value.coerce_to_bytes())
