@@ -38,7 +38,8 @@
 
 <body>
   <h1>[draft] VRL playground wasm</h1>
-  <p>Open up the developer console and try running run_vrl('upcase("hello world")')</p>
+  <p>Open up the developer console and try running</p>
+  <p>run_vrl({"program": ".", "event": {}})')</p>
   
   <button onClick="handleRunCode()">run code</button>
   <button onClick="handleShareCode()">share code</button>
@@ -116,9 +117,9 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
         window.programEditor.setValue(urlState["program"]);
         window.eventEditor.setValue(JSON.stringify(urlState["event"], null, '\t'));
 
-        console.log("stateparams:", JSON.parse(atob(stateParam)));
-
-        console.log("run vrl stateparam:", run_vrl(JSON.parse(atob(stateParam))));
+        console.log("[DEBUG::queryStringLogic] Current Params:", JSON.parse(atob(stateParam)));
+        let res = handleRunCode(JSON.parse(atob(stateParam)));
+        console.log("[DEBUG::queryStringLogic] Running VRL with current Params:", res);
       }
     });
   </script>
@@ -127,38 +128,40 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
     import init, { run_vrl } from "./vrl_web_playground.js";
     init().then(() => {
       window.run_vrl = run_vrl;
-      // console.log(run_vrl("."));
+      // console.log(run_vrl({"program": ".", "event": {}}));
     });
   </script>
 
   <script>
-    function handleRunCode() {
-      const input = {
-        program: window.programEditor.getValue(),
-        event: JSON.parse(window.eventEditor.getValue())
+    function handleRunCode(input) {
+      if (input == null) {
+        input = {
+          program: window.programEditor.getValue(),
+          event: JSON.parse(window.eventEditor.getValue())
+        }
       }
+
       let res = window.run_vrl(input);
 
-      console.log(res);
+      console.log("[DEBUG::handleRunCode()] Printing out res: ", res);
       if (res.output) {
         window.outputEditor.setValue(JSON.stringify(res["result"], null, "\t"));
       } else if (res.msg) {
         window.outputEditor.setValue(res["msg"]);
       }
-      
-
+      return res;
     }
 
   </script>
   <script>
     function handleShareCode() {
       let state = {
-      program: window.programEditor.getValue(),
-      event: JSON.parse(window.eventEditor.getValue())
+        program: window.programEditor.getValue(),
+        event: JSON.parse(window.eventEditor.getValue())
       }
 
-      console.log(state);
-      console.log(btoa(JSON.stringify(state)));
+      console.log("[DEBUG::handleShareCode()] Printing out state", state);
+      console.log("[DEBUG::handleShareCode()] Printing out base64 encoded state\n", btoa(JSON.stringify(state)));
       window.history.pushState(state, "", `?state=${ btoa(JSON.stringify(state)) }`);
     }
   </script>
