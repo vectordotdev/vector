@@ -202,7 +202,7 @@ impl SourceConfig for RedisSourceConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let legacy_key = self.redis_key.clone().unwrap_or("key".to_string());
+        let legacy_key = self.redis_key.clone().unwrap_or_else(|| "key".to_string());
 
         let schema_definition = self
             .decoding
