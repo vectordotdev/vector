@@ -5,7 +5,7 @@ use lookup::path;
 use regex::bytes::{CaptureLocations, Regex};
 use vector_common::conversion;
 use vector_config::NamedComponent;
-use vector_core::config::{log_schema, LogNamespace};
+use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 use crate::{
     event::{self, Event, Value},
@@ -131,20 +131,19 @@ impl FunctionTransform for Cri {
                                     drop(self.log_namespace.insert_source_metadata(
                                         Config::NAME,
                                         log,
-                                        path!(event::PARTIAL),
+                                        Some(LegacyKey::Overwrite(path!(event::PARTIAL))),
                                         path!(event::PARTIAL),
                                         true,
                                     ));
                                 }
                             }
                             TIMESTAMP_TAG => {
-                                dbg!(value.clone());
                                 // Insert additional fields from original message into the event root or source
                                 // metadata, depending on `log_namespace`.
                                 drop(self.log_namespace.insert_source_metadata(
                                     Config::NAME,
                                     log,
-                                    path!(log_schema().timestamp_key()),
+                                    Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
                                     path!(TIMESTAMP_TAG),
                                     value,
                                 ));
@@ -153,7 +152,7 @@ impl FunctionTransform for Cri {
                                 drop(self.log_namespace.insert_source_metadata(
                                     Config::NAME,
                                     log,
-                                    path!(STREAM_TAG),
+                                    Some(LegacyKey::Overwrite(path!(STREAM_TAG))),
                                     path!(STREAM_TAG),
                                     value,
                                 ));

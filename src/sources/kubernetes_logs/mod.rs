@@ -27,7 +27,7 @@ use kube::{
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_common::TimeZone;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{transform::TaskTransform, ByteSizeOf};
+use vector_core::{config::LegacyKey, transform::TaskTransform, ByteSizeOf};
 
 use crate::{
     config::{
@@ -220,29 +220,29 @@ impl SourceConfig for Config {
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("file")),
-                owned_value_path!("file"),
+                Some(LegacyKey::Overwrite(&owned_value_path!("file"))),
+                &owned_value_path!("file"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("kubernetes")),
-                owned_value_path!("kubernetes"),
+                Some(LegacyKey::Overwrite(&owned_value_path!("kubernetes"))),
+                &owned_value_path!("kubernetes"),
                 Kind::object(Collection::any()),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("stream")),
-                owned_value_path!("stream"),
+                Some(LegacyKey::Overwrite(&owned_value_path!("stream"))),
+                &owned_value_path!("stream"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("timestamp")),
-                owned_value_path!("timestamp"),
+                Some(LegacyKey::Overwrite(&owned_value_path!("timestamp"))),
+                &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 // TODO: Should this be considered a `timestamp`, it's currently
                 // the time that the kubernetes logs subsystem processed the log.
@@ -636,7 +636,7 @@ fn create_event(
     log_namespace.insert_source_metadata(
         Config::NAME,
         &mut log,
-        path!("file"),
+        Some(LegacyKey::Overwrite(path!("file"))),
         path!("file"),
         file,
     );
