@@ -75,7 +75,7 @@ pub struct DnstapConfig {
     /// This should not typically needed to be changed.
     pub socket_send_buffer_size: Option<usize>,
 
-    /// The namespace to use for logs. This overrides the global settings
+    /// The namespace to use for logs. This overrides the global settings.
     #[serde(default)]
     log_namespace: Option<bool>,
 }
