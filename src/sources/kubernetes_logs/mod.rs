@@ -247,9 +247,6 @@ impl SourceConfig for Config {
                 ))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
-                // TODO: Should this be considered a `timestamp`, it's currently
-                // the time that the container runtime processed the log.
-                // The log's timestamp is still in the `message` field, unparsed.
                 None,
             )
             .with_standard_vector_source_metadata();
@@ -650,16 +647,17 @@ fn create_event(
         Bytes::from(Config::NAME),
     );
     match (log_namespace, ingestion_timestamp_field) {
-        // When using LogNamespace::Vector always set the ingest_timestamp
+        // When using LogNamespace::Vector always set the ingest_timestamp.
         (LogNamespace::Vector, _) => {
             log.metadata_mut()
                 .value_mut()
                 .insert(path!("vector", "ingest_timestamp"), Utc::now());
         }
-        // When LogNamespace::Legacy, only set when the option is configured
+        // When LogNamespace::Legacy, only set when the `ingestion_timestamp_field` is configured.
         (LogNamespace::Legacy, Some(ingestion_timestamp_field)) => {
             log.try_insert((PathPrefix::Event, ingestion_timestamp_field), Utc::now())
         }
+        // The CRI/Docker parsers handle inserting the `log_schema().timestamp_key()` value.
         (LogNamespace::Legacy, None) => (),
     };
 
