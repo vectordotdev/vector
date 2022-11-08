@@ -3,7 +3,7 @@ package metadata
 remap: functions: parse_cef: {
 	category: "Parse"
 	description: """
-		Parses the `value` in CEF(Common Event Format) format. Ignores everything up to CEF header. Empty values are returned as empty strings. Surrounding quotes are removed from values.
+		Parses the `value` in CEF (Common Event Format) format. Ignores everything up to CEF header. Empty values are returned as empty strings. Surrounding quotes are removed from values.
 		"""
 	notices: [
 		"""
