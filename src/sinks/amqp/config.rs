@@ -27,6 +27,7 @@ pub struct AmqpSinkConfig {
     pub(crate) routing_key: Option<Template>,
 
     /// Connection options for the `amqp` sink.
+    #[serde(flatten)]
     pub(crate) connection: AmqpConfig,
 
     #[configurable(derived)]

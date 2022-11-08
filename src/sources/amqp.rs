@@ -59,6 +59,7 @@ pub struct AmqpSourceConfig {
     pub(crate) consumer: String,
 
     /// Connection options for `AMQP` source.
+    #[serde(flatten)]
     pub(crate) connection: AmqpConfig,
 
     /// The `AMQP` routing key.
