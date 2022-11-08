@@ -102,6 +102,10 @@ impl TcpConfig {
         &self.host_key
     }
 
+    pub const fn port_key(&self) -> &Option<String> {
+        &self.port_key
+    }
+
     pub const fn tls(&self) -> &Option<TlsSourceConfig> {
         &self.tls
     }

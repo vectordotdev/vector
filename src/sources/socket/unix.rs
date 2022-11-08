@@ -81,12 +81,6 @@ impl UnixConfig {
     pub const fn decoding(&self) -> &DeserializerConfig {
         &self.decoding
     }
-
-    pub fn legacy_host_key(&self) -> String {
-        self.clone()
-            .host_key
-            .unwrap_or_else(|| log_schema().host_key().to_string())
-    }
 }
 
 /// Function to pass to `build_unix_*_source`, specific to the basic unix source
