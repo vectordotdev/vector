@@ -22,7 +22,7 @@ use crate::{
         ResourceDirection, ValidatableComponent,
     },
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
         SourceConfig, SourceContext,
     },
     event::{Event, Value},
@@ -126,7 +126,7 @@ pub struct SimpleHttpConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl Default for SimpleHttpConfig {
@@ -144,7 +144,7 @@ impl Default for SimpleHttpConfig {
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
         }
     }
 }

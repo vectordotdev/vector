@@ -348,6 +348,16 @@ components: sinks: elasticsearch: {
 			required: false
 			type: bool: default: false
 		}
+		request_retry_partial: {
+			common: false
+			description: """
+				Whether or not to retry successful requests containing partial failures.
+
+				To avoid duplicates in Elasticsearch, please use option `id_key`.
+				"""
+			required: false
+			type: bool: default: false
+		}
 	}
 
 	input: {
@@ -400,6 +410,9 @@ components: sinks: elasticsearch: {
 				due to Elasticsearch index mapping errors, where data keys aren't consistently
 				typed. To change this behavior, refer to the Elasticsearch [`ignore_malformed`
 				setting](\(urls.elasticsearch_ignore_malformed)).
+
+				By default, partial failures are not retried. To enable retries, set `request_retry_partial`. Once enabled it will
+				retry whole partially failed requests. As such it is advised to use `id_key` to avoid duplicates.
 				"""
 		}
 

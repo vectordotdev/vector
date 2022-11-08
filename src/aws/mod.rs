@@ -113,8 +113,8 @@ pub async fn create_smithy_client<T: ClientBuilder>(
     let mut client_builder = Builder::new()
         .connector(connector)
         .middleware(middleware)
-        .sleep_impl(Some(Arc::new(TokioSleep)));
-    client_builder.set_retry_config(retry_config.into());
+        .sleep_impl(Arc::new(TokioSleep));
+    client_builder.set_retry_config(Some(retry_config.into()));
 
     Ok(client_builder.build())
 }

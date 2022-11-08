@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use lookup::lookup_v2::parse_value_path;
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -35,8 +36,8 @@ impl BytesDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Legacy => schema::Definition::empty_legacy_namespace().with_field(
-                log_schema().message_key(),
+            LogNamespace::Legacy => schema::Definition::empty_legacy_namespace().with_event_field(
+                &parse_value_path(log_schema().message_key()).expect("valid message key"),
                 Kind::bytes(),
                 Some("message"),
             ),
@@ -71,6 +72,18 @@ impl BytesDeserializer {
             log_schema_message_key: log_schema().message_key(),
         }
     }
+
+    /// Deserializes the given bytes, which will always produce a single `LogEvent`.
+    pub fn parse_single(&self, bytes: Bytes, log_namespace: LogNamespace) -> LogEvent {
+        match log_namespace {
+            LogNamespace::Vector => log_namespace.new_log_from_data(bytes),
+            LogNamespace::Legacy => {
+                let mut log = LogEvent::default();
+                log.insert(self.log_schema_message_key, bytes);
+                log
+            }
+        }
+    }
 }
 
 impl Deserializer for BytesDeserializer {
@@ -79,14 +92,7 @@ impl Deserializer for BytesDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let log = match log_namespace {
-            LogNamespace::Vector => log_namespace.new_log_from_data(bytes),
-            LogNamespace::Legacy => {
-                let mut log = LogEvent::default();
-                log.insert(self.log_schema_message_key, bytes);
-                log
-            }
-        };
+        let log = self.parse_single(bytes, log_namespace);
         Ok(smallvec![log.into()])
     }
 }

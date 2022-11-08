@@ -10,6 +10,7 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -60,8 +61,8 @@ pub struct DatadogMetricsRequest {
     pub uri: Uri,
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
-    pub batch_size: usize,
     pub raw_bytes: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl DatadogMetricsRequest {
@@ -107,6 +108,12 @@ impl DatadogMetricsRequest {
 impl Finalizable for DatadogMetricsRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for DatadogMetricsRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -176,8 +183,8 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let byte_size = request.payload.len();
-            let batch_size = request.batch_size;
+            let byte_size = request.get_metadata().events_byte_size();
+            let batch_size = request.get_metadata().event_count();
             let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
             let raw_byte_size = request.raw_bytes;
 

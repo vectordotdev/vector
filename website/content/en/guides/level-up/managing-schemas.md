@@ -180,7 +180,7 @@ Feb 05 16:13:59.241  INFO source{name=application type=stdin}: vector::sources::
 Feb 05 16:15:27.945  INFO vector: Shutting down.
 ```
 
-Don't know where events are coming from? You can use the `geoip` transform an `ipv4` field and get a grip on that!
+Don't know where events are coming from? You can do a geo ip lookup using VRL [enrichment functions][docs.enrichment_functions] to transform an `ipv4` field and get a grip on that!
 
 
 ## Sink field filtering
@@ -331,4 +331,5 @@ Where are you deploying Vector? Let us know, maybe we can help optimize it!
 [docs.transforms.grok_parser]: /docs/reference/vrl/functions/#parse_grok
 [docs.transforms.json_parser]: /docs/reference/vrl/functions/#parse_json
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
+[docs.enrichment_functions]: /docs/reference/vrl/functions/#enrichment-functions
 

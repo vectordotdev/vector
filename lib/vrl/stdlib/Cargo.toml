@@ -31,7 +31,7 @@ indexmap = { version = "~1.9.1", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.2", optional = true }
-once_cell = { version = "1.15", optional = true }
+once_cell = { version = "1.16", optional = true }
 quoted_printable = {version = "0.4.5", optional = true }
 rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
@@ -46,13 +46,13 @@ syslog_loose = { version = "0.18", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "1", features = ["v4"], optional = true }
-roxmltree = { version = "0.15.0", optional = true }
+roxmltree = { version = "0.15.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.6.0", default-features = false, optional = true }
 utf8-width = { version = "0.1.6", optional = true }
 
 # Cryptography
-aes = { version = "0.8.1", optional = true }
+aes = { version = "0.8.2", optional = true }
 
 # Cryptography - Block Modes
 ctr = { version = "0.9.2", optional = true }
@@ -63,7 +63,7 @@ ofb = { version = "0.6.1", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
-chrono-tz = "0.7"
+chrono-tz = "0.8"
 criterion = "0.4"
 tracing-test = "0.1"
 value = { path = "../../value", features = ["test"] }

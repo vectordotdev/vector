@@ -119,7 +119,10 @@ impl Application {
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
-                error!("The `threads` argument must be greater or equal to 1.");
+                #[allow(clippy::print_stderr)]
+                {
+                    eprintln!("The `threads` argument must be greater or equal to 1.");
+                }
                 return Err(exitcode::CONFIG);
             } else {
                 WORKER_THREADS

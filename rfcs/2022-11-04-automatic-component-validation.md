@@ -1,11 +1,11 @@
 # RFC 15103 - 2022-11-04 - Automatic component validation and verification
 
 Over time, the Vector team has undertaken numerous attempts to ensure that the internal telemetry
-emitted from Vector, specifically the internal telemetry related to components, is accurate,
-consistent, and correct. This RFC charts a path for a unit test-based mechanism that will ensure
-that if a component can be used/configured by an end user, it is unit tested thoroughly, and has
-passed all of the relevant qualifications -- Component Specification adherence, correct of actual
-metric values, etc -- that make it suitable for production use.
+emitted from Vector, specifically the internal telemetry related to components, is both accurate and
+consistent. This RFC charts a path for a unit test-based mechanism that will ensure that if a
+component can be used/configured by an end user, it is unit tested thoroughly, and has passed all of
+the relevant qualifications -- Component Specification adherence, correct of actual metric values,
+etc -- that make it suitable for production use.
 
 ## Context
 
