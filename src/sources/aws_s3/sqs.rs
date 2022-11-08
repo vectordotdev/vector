@@ -39,9 +39,9 @@ use crate::{
     tls::TlsConfig,
     SourceSender,
 };
-use lookup::path;
+use lookup::{path, PathPrefix};
 use vector_core::{
-    config::{LegacyKey, LogNamespace},
+    config::{log_schema, LegacyKey, LogNamespace},
     ByteSizeOf,
 };
 
@@ -462,11 +462,10 @@ impl IngestorProcess {
         let object = object_result?;
 
         let metadata = object.metadata;
-        // TODO: Insert last_modified as source metadata?
+
         let timestamp = object
             .last_modified
-            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()))
-            .unwrap_or_else(Utc::now);
+            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()));
 
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(
@@ -559,12 +558,41 @@ impl IngestorProcess {
                 }
             }
 
-            // TODO: This ingest timestamp may be the S3 object's last modified time.
-            log_namespace.insert_standard_vector_source_metadata(
+            log_namespace.insert_vector_metadata(
                 &mut log,
-                AwsS3Config::NAME,
-                timestamp,
+                path!(log_schema().source_type_key()),
+                path!("source_type"),
+                Bytes::from_static(AwsS3Config::NAME.as_bytes()),
             );
+
+            // This handles the transition from the original timestamp logic. Originally the
+            // `timestamp_key` was populated by the `last_modified` time on the object, falling
+            // back to calling `now()`.
+            match (log_namespace, timestamp) {
+                (LogNamespace::Vector, None) => {
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!("vector", "ingest_timestamp"), Utc::now());
+                }
+                (LogNamespace::Vector, Some(timestamp)) => {
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!(AwsS3Config::NAME, "timestamp"), timestamp);
+
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!("vector", "ingest_timestamp"), Utc::now());
+                }
+                (LogNamespace::Legacy, None) => {
+                    log.try_insert(
+                        (PathPrefix::Event, log_schema().timestamp_key()),
+                        Utc::now(),
+                    );
+                }
+                (LogNamespace::Legacy, Some(timestamp)) => {
+                    log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+                }
+            };
 
             emit!(EventsReceived {
                 count: 1,
