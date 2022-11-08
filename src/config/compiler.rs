@@ -189,7 +189,7 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
             t.inner
-                .outputs(&schema::Definition::any())
+                .outputs(&schema::Definition::any(), config.schema.log_namespace())
                 .into_iter()
                 .map(|output| OutputId {
                     component: key.clone(),

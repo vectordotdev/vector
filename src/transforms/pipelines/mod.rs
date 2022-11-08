@@ -111,6 +111,7 @@ use std::{collections::HashSet, fmt::Debug};
 use config::EventTypeConfig;
 use indexmap::IndexMap;
 use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{ComponentKey, DataType, Input, Output},
     transform::Transform,
@@ -252,7 +253,7 @@ impl TransformConfig for PipelinesConfig {
         Input::all()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 

@@ -24,6 +24,7 @@ mod merge_strategy;
 
 use crate::event::Value;
 pub use merge_strategy::*;
+use vector_core::config::LogNamespace;
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
@@ -108,7 +109,7 @@ impl TransformConfig for ReduceConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 }

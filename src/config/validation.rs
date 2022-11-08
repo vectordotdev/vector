@@ -174,7 +174,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
         if transform
             .inner
-            .outputs(&definition)
+            .outputs(&definition, config.schema.log_namespace())
             .iter()
             .map(|output| output.port.as_deref().unwrap_or(""))
             .any(|name| name == DEFAULT_OUTPUT)
@@ -344,7 +344,10 @@ pub fn warnings(config: &Config) -> Vec<String> {
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&merged_definition(&transform.inputs, config, &mut cache))
+            .outputs(
+                &merged_definition(&transform.inputs, config, &mut cache),
+                config.schema.log_namespace(),
+            )
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {

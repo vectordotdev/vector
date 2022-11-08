@@ -5,6 +5,7 @@ use aws_types::region::Region;
 use bytes::Bytes;
 use http::{StatusCode, Uri};
 use snafu::ResultExt;
+use vector_core::config::LogNamespace;
 
 use super::{
     request_builder::ElasticsearchRequestBuilder, ElasticsearchEncoder, InvalidHostSnafu, Request,
@@ -118,6 +119,7 @@ impl ElasticsearchCommon {
         let metric_to_log = MetricToLog::new(
             metric_config.host_tag,
             metric_config.timezone.unwrap_or_default(),
+            LogNamespace::Legacy,
         );
 
         let region = config.aws.as_ref().and_then(|config| config.region());

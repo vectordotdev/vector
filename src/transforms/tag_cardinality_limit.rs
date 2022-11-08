@@ -4,6 +4,7 @@ use bloom::{BloomFilter, ASMS};
 use futures::{Stream, StreamExt};
 use hashbrown::HashMap;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
@@ -118,7 +119,7 @@ impl TransformConfig for TagCardinalityLimitConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 }

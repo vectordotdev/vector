@@ -16,6 +16,7 @@ use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
 use value::Kind;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
@@ -224,7 +225,7 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [

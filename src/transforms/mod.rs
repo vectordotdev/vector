@@ -39,7 +39,7 @@ pub use vector_core::transform::{
     TransformOutputsBuf,
 };
 use vector_core::{
-    config::{Input, Output},
+    config::{Input, LogNamespace, Output},
     schema,
 };
 

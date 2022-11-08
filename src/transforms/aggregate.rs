@@ -7,6 +7,7 @@ use std::{
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext},
@@ -44,7 +45,7 @@ impl TransformConfig for AggregateConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 }
