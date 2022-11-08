@@ -36,15 +36,10 @@ impl Cli {
             return Ok(());
         }
 
-        let test_dir = IntegrationTestConfig::locate_source(
-            app::path(),
-            &self.integration.as_ref().unwrap(),
-        )?;
+        let test_dir =
+            IntegrationTestConfig::locate_source(app::path(), &self.integration.as_ref().unwrap())?;
         let config = IntegrationTestConfig::from_source(&test_dir)?;
-        let envs_dir = state::envs_dir(
-            &platform::data_dir(),
-            &self.integration.as_ref().unwrap(),
-        );
+        let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration.as_ref().unwrap());
         let active_envs = state::active_envs(&envs_dir)?;
 
         app::display(format!(

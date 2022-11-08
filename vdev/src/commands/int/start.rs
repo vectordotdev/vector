@@ -28,10 +28,7 @@ impl Cli {
         let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration);
         let config = IntegrationTestConfig::from_source(&test_dir)?;
         let toolchain_config = RustToolchainConfig::parse(app::path())?;
-        let runner = IntegrationTestRunner::new(
-            &self.integration,
-            &toolchain_config.channel,
-        );
+        let runner = IntegrationTestRunner::new(&self.integration, &toolchain_config.channel);
         runner.ensure_network()?;
 
         let mut command = Command::new("cargo");
@@ -39,14 +36,12 @@ impl Cli {
         command.env(NETWORK_ENV_VAR, runner.network_name());
         command.args(["run", "--quiet", "--", "start"]);
 
-        let mut json = "".to_string();
         let environments = config.environments();
-        if let Some(config) = environments.get(&self.environment) {
-            json = serde_json::to_string(config)?;
-            command.arg(&json);
-        } else {
-            bail!("unknown environment: {}", self.environment);
-        }
+        let json = match environments.get(&self.environment) {
+            Some(config) => serde_json::to_string(config)?,
+            None => bail!("unknown environment: {}", self.environment),
+        };
+        command.arg(&json);
 
         if state::env_exists(&envs_dir, &self.environment) {
             bail!("environment is already up");
@@ -56,10 +51,8 @@ impl Cli {
             command.envs(env_vars);
         }
 
-        let status = command.status()?;
-        if !status.success() {
-            bail!("failed with exit code: {}", status.code().unwrap());
-        }
+        app::display_waiting(format!("Starting environment {}", &self.environment));
+        app::run_command(&mut command)?;
 
         state::save_env(&envs_dir, &self.environment, &json)?;
         Ok(())

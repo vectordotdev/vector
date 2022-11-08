@@ -31,10 +31,7 @@ impl Cli {
         let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration);
         let config = IntegrationTestConfig::from_source(&test_dir)?;
         let toolchain_config = RustToolchainConfig::parse(app::path())?;
-        let runner = IntegrationTestRunner::new(
-            &self.integration,
-            &toolchain_config.channel,
-        );
+        let runner = IntegrationTestRunner::new(&self.integration, &toolchain_config.channel);
 
         let mut command = Command::new("cargo");
         command.current_dir(&test_dir);
@@ -58,12 +55,14 @@ impl Cli {
             command.envs(env_vars);
         }
 
-        let status = command.status()?;
-        if !status.success() {
-            bail!("failed with exit code: {}", status.code().unwrap());
-        }
+        app::display_waiting(format!("Stopping environment {}", &self.environment));
+        app::run_command(&mut command)?;
 
         state::remove_env(&envs_dir, &self.environment)?;
+        if state::active_envs(&envs_dir)?.is_empty() {
+            runner.stop()?;
+        }
+
         Ok(())
     }
 }

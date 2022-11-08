@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use atty::Stream;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -31,10 +31,7 @@ pub struct IntegrationTestRunner<'a> {
 }
 
 impl<'a> IntegrationTestRunner<'a> {
-    pub fn new(
-        integration: &'a String,
-        rust_version: &'a String,
-    ) -> IntegrationTestRunner {
+    pub fn new(integration: &'a String, rust_version: &'a String) -> IntegrationTestRunner {
         IntegrationTestRunner {
             integration,
             rust_version,
@@ -46,7 +43,10 @@ impl<'a> IntegrationTestRunner<'a> {
     }
 
     pub fn container_name(&self) -> String {
-        format!("vector-test-runner-{}-{}", self.integration, self.rust_version)
+        format!(
+            "vector-test-runner-{}-{}",
+            self.integration, self.rust_version
+        )
     }
 
     pub fn image_name(&self) -> String {
@@ -57,7 +57,7 @@ impl<'a> IntegrationTestRunner<'a> {
         let mut command = Command::new("docker");
         command.args(["network", "ls", "--format", "{{.Name}}"]);
 
-        if String::from_utf8(command.output()?.stdout)?
+        if app::capture_output(&mut command)?
             .lines()
             .any(|network| network == &self.network_name())
         {
@@ -67,12 +67,7 @@ impl<'a> IntegrationTestRunner<'a> {
         let mut command = Command::new("docker");
         command.args(["network", "create", &self.network_name()]);
 
-        let status = command.status()?;
-        if status.success() {
-            Ok(())
-        } else {
-            bail!("failed with exit code: {}", status.code().unwrap());
-        }
+        app::wait_for_command(&mut command, "Creating network")
     }
 
     pub fn test(&self, config: &IntegrationTestConfig, args: &Option<Vec<String>>) -> Result<()> {
@@ -121,19 +116,24 @@ impl<'a> IntegrationTestRunner<'a> {
             command.args(args);
         }
 
-        let status = command.status()?;
-        if status.success() {
-            Ok(())
-        } else {
-            bail!("failed with exit code: {}", status.code().unwrap());
-        }
+        app::run_command(&mut command)
+    }
+
+    pub fn stop(&self) -> Result<()> {
+        let mut command = Command::new("docker");
+        command.args(["stop", "--time", "0", &self.container_name()]);
+
+        app::wait_for_command(
+            &mut command,
+            format!("Stopping container {}", self.container_name()),
+        )
     }
 
     fn state(&self) -> Result<RunnerState> {
         let mut command = Command::new("docker");
         command.args(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
 
-        for line in String::from_utf8(command.output()?.stdout)?.lines() {
+        for line in app::capture_output(&mut command)?.lines() {
             if let Some((name, state)) = line.split_once(" ") {
                 if name != self.container_name() {
                     continue;
@@ -166,7 +166,7 @@ impl<'a> IntegrationTestRunner<'a> {
         volumes.insert(VOLUME_TARGET);
         volumes.insert(VOLUME_CARGO_GIT);
         volumes.insert(VOLUME_CARGO_REGISTRY);
-        for volume in String::from_utf8(command.output()?.stdout)?.lines() {
+        for volume in app::capture_output(&mut command)?.lines() {
             volumes.take(volume);
         }
 
@@ -174,10 +174,7 @@ impl<'a> IntegrationTestRunner<'a> {
             let mut command = Command::new("docker");
             command.args(["volume", "create", volume]);
 
-            let status = command.status()?;
-            if !status.success() {
-                bail!("failed with exit code: {}", status.code().unwrap());
-            }
+            app::wait_for_command(&mut command, format!("Creating volume {volume}"))?;
         }
 
         Ok(())
@@ -204,60 +201,38 @@ impl<'a> IntegrationTestRunner<'a> {
             ".",
         ]);
 
-        let status = command.status()?;
-        if status.success() {
-            Ok(())
-        } else {
-            bail!("failed with exit code: {}", status.code().unwrap());
-        }
+        app::display_waiting(format!("Building image {}", self.image_name()));
+        app::run_command(&mut command)
     }
 
     fn start(&self) -> Result<()> {
         let mut command = Command::new("docker");
         command.args(["start", &self.container_name()]);
 
-        let status = command.status()?;
-        if status.success() {
-            Ok(())
-        } else {
-            bail!("failed with exit code: {}", status.code().unwrap());
-        }
-    }
-
-    fn stop(&self) -> Result<()> {
-        let mut command = Command::new("docker");
-        command.args(["stop", "--time", "0", &self.container_name()]);
-
-        let status = command.status()?;
-        if status.success() {
-            Ok(())
-        } else {
-            bail!("failed with exit code: {}", status.code().unwrap());
-        }
+        app::wait_for_command(
+            &mut command,
+            format!("Starting container {}", self.container_name()),
+        )
     }
 
     fn remove(&self) -> Result<()> {
         let mut command = Command::new("docker");
         command.args(["rm", &self.container_name()]);
 
-        let status = command.status()?;
-        if status.success() {
-            Ok(())
-        } else {
-            bail!("failed with exit code: {}", status.code().unwrap());
-        }
+        app::wait_for_command(
+            &mut command,
+            format!("Removing container {}", self.container_name()),
+        )
     }
 
     fn unpause(&self) -> Result<()> {
         let mut command = Command::new("docker");
         command.args(["unpause", &self.container_name()]);
 
-        let status = command.status()?;
-        if status.success() {
-            Ok(())
-        } else {
-            bail!("failed with exit code: {}", status.code().unwrap());
-        }
+        app::wait_for_command(
+            &mut command,
+            format!("Unpausing container {}", self.container_name()),
+        )
     }
 
     fn create(&self) -> Result<()> {
@@ -286,11 +261,9 @@ impl<'a> IntegrationTestRunner<'a> {
             "infinity",
         ]);
 
-        let status = command.status()?;
-        if status.success() {
-            Ok(())
-        } else {
-            bail!("failed with exit code: {}", status.code().unwrap());
-        }
+        app::wait_for_command(
+            &mut command,
+            format!("Creating container {}", self.container_name()),
+        )
     }
 }
