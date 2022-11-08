@@ -27,6 +27,7 @@ tracing-subscriber = { version = "0.3.16", default-features = false, features = 
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.5.0" }
+mimalloc = { version = "0.1.31", default-features = false, optional = true}
 
 [features]
 default = []

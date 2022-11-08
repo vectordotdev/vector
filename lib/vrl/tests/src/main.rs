@@ -21,9 +21,13 @@ use vrl::{
 };
 use vrl_tests::{docs, Test};
 
-#[cfg(not(target_env = "msvc"))]
+#[cfg(all(not(target_env = "msvc"), not(feature = "mimalloc")))]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+#[cfg(all(not(target_env = "msvc"), feature = "mimalloc"))]
+#[global_allocator]
+static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[derive(Parser, Debug)]
 #[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]
