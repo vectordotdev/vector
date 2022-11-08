@@ -65,14 +65,19 @@ jobs:
           echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
           echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
 
+        # github.rest.actions.listWorkflowRunArtifacts only returns first 30
+        # artifacts, and returns a { data, headers, status, url } object. The
+        # "data" part of this object contains the artifact data we care about.
+        # The fields of this data object correspond to the fields in the
+        # "Example Response" JSON object in
+        # https://docs.github.com/en/rest/actions/artifacts#list-workflow-run-artifacts.
+        # To return more than 30 responses, use the github.paginate API in
+        # https://octokit.github.io/rest.js/v19#custom-requests
+        # `github-script` aliases `octokit` to the `github` namespace.
       - name: 'Download metadata'
         uses: actions/github-script@v6.3.3
         with:
           script: |
-            # Please note, listWorkflowRunArtifacts only returns 30
-            # artifacts. The untrusted side of this workflow produces 3 but if
-            # that ever changes github.paginate will need to be used and this
-            # has its own wrapping container: it is not a drop-in solution.
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
@@ -130,14 +135,19 @@ jobs:
       - compute-metadata
       - confirm-valid-credentials
     steps:
+        # github.rest.actions.listWorkflowRunArtifacts only returns first 30
+        # artifacts, and returns a { data, headers, status, url } object. The
+        # "data" part of this object contains the artifact data we care about.
+        # The fields of this data object correspond to the fields in the
+        # "Example Response" JSON object in
+        # https://docs.github.com/en/rest/actions/artifacts#list-workflow-run-artifacts.
+        # To return more than 30 responses, use the github.paginate API in
+        # https://octokit.github.io/rest.js/v19#custom-requests
+        # `github-script` aliases `octokit` to the `github` namespace.
       - name: 'Download baseline image'
         uses: actions/github-script@v6.3.3
         with:
           script: |
-            # Please note, listWorkflowRunArtifacts only returns 30
-            # artifacts. The untrusted side of this workflow produces 3 but if
-            # that ever changes github.paginate will need to be used and this
-            # has its own wrapping container: it is not a drop-in solution.
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
@@ -193,14 +203,19 @@ jobs:
       - compute-metadata
       - confirm-valid-credentials
     steps:
+        # github.rest.actions.listWorkflowRunArtifacts only returns first 30
+        # artifacts, and returns a { data, headers, status, url } object. The
+        # "data" part of this object contains the artifact data we care about.
+        # The fields of this data object correspond to the fields in the
+        # "Example Response" JSON object in
+        # https://docs.github.com/en/rest/actions/artifacts#list-workflow-run-artifacts.
+        # To return more than 30 responses, use the github.paginate API in
+        # https://octokit.github.io/rest.js/v19#custom-requests
+        # `github-script` aliases `octokit` to the `github` namespace.
       - name: 'Download comparison image'
         uses: actions/github-script@v6.3.3
         with:
           script: |
-            # Please note, listWorkflowRunArtifacts only returns 30
-            # artifacts. The untrusted side of this workflow produces 3 but if
-            # that ever changes github.paginate will need to be used and this
-            # has its own wrapping container: it is not a drop-in solution.
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
