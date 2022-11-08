@@ -130,6 +130,7 @@ pub struct RedisSourceConfig {
     decoding: DeserializerConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
 }
