@@ -5,7 +5,7 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
-use lookup::{owned_value_path, path};
+use lookup::{lookup_v2::BorrowedSegment, owned_value_path, path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use value::Kind;
@@ -266,16 +266,12 @@ async fn handle_line(
                             now,
                         );
 
-                        // cannot return reference to temporary value
-                        // (returns a reference to data owned by the
-                        // current function) (rust-cargo)
-                        let redis_key_path =
-                            redis_key.map(|x| path!(x)).map(LegacyKey::InsertIfEmpty);
+                        let redis_key_path = redis_key.map(|x| [BorrowedSegment::from(x)]);
 
                         log_namespace.insert_source_metadata(
                             RedisSourceConfig::NAME,
                             log,
-                            redis_key_path,
+                            redis_key_path.as_ref().map(|x| LegacyKey::InsertIfEmpty(x)),
                             path!("key"),
                             key,
                         );
