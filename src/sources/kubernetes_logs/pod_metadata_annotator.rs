@@ -99,14 +99,20 @@ impl Default for FieldsSpec {
 pub struct PodMetadataAnnotator {
     pods_state_reader: Store<Pod>,
     fields_spec: FieldsSpec,
+    log_namespace: LogNamespace,
 }
 
 impl PodMetadataAnnotator {
     /// Create a new [`PodMetadataAnnotator`].
-    pub const fn new(pods_state_reader: Store<Pod>, fields_spec: FieldsSpec) -> Self {
+    pub const fn new(
+        pods_state_reader: Store<Pod>,
+        fields_spec: FieldsSpec,
+        log_namespace: LogNamespace,
+    ) -> Self {
         Self {
             pods_state_reader,
             fields_spec,
+            log_namespace,
         }
     }
 }
@@ -122,7 +128,7 @@ impl PodMetadataAnnotator {
         let resource = self.pods_state_reader.get(&obj)?;
         let pod: &Pod = resource.as_ref();
 
-        annotate_from_file_info(log, &self.fields_spec, &file_info);
+        annotate_from_file_info(log, &self.fields_spec, &file_info, self.log_namespace);
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
 
         let container;
@@ -154,12 +160,12 @@ impl PodMetadataAnnotator {
 }
 
 fn annotate_from_file_info(
-    log_namespace: LogNamespace,
     log: &mut LogEvent,
     fields_spec: &FieldsSpec,
     file_info: &LogFileInfo<'_>,
+    log_namespace: LogNamespace,
 ) {
-    match fields_spec.container_name.path {
+    match &fields_spec.container_name.path {
         Some(path) => {
             log_namespace.insert_source_metadata(
                 Config::NAME,
@@ -179,9 +185,6 @@ fn annotate_from_file_info(
             );
         }
     }
-    // if let Some(path) = &fields_spec.container_name.path {
-    //     log.insert(path, file_info.container_name.to_owned());
-    // }
 }
 
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
@@ -445,7 +448,7 @@ mod tests {
         for (fields_spec, file, expected) in cases.into_iter() {
             let mut log = LogEvent::default();
             let file_info = parse_log_file_path(file).unwrap();
-            annotate_from_file_info(&mut log, &fields_spec, &file_info);
+            annotate_from_file_info(&mut log, &fields_spec, &file_info, LogNamespace::Legacy);
             assert_event_data_eq!(log, expected);
         }
     }

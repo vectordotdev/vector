@@ -455,7 +455,7 @@ impl Source {
 
         let paths_provider =
             K8sPathsProvider::new(pod_state.clone(), ns_state.clone(), exclude_paths);
-        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec);
+        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace);
         let ns_annotator = NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec);
         let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec);
 
