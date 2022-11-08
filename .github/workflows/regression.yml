@@ -110,7 +110,7 @@ jobs:
           cache-to: type=gha,mode=max
           file: regression/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
-          outputs: type=docker,dest=/tmp/baseline-image.tar
+          outputs: type=docker,dest="${{ runner.temp }}/baseline-image.tar"
           tags: |
             vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
 
@@ -118,7 +118,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: baseline-image
-          path: /tmp/baseline-image.tar
+          path: "${{ runner.temp }}/baseline-image.tar"
 
   build-comparison:
     name: Build comparison Vector container
@@ -147,7 +147,7 @@ jobs:
           cache-to: type=gha,mode=max
           file: regression/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
-          outputs: type=docker,dest=/tmp/comparison-image.tar
+          outputs: type=docker,dest="${{ runner.temp }}/comparison-image.tar"
           tags: |
             vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
 
@@ -155,7 +155,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: comparison-image
-          path: /tmp/comparison-image.tar
+          path: "${{ runner.temp }}/comparison-image.tar"
 
   transmit-metadata:
     name: Transmit metadata to trusted workflow
@@ -165,17 +165,17 @@ jobs:
     steps:
       - name: Write out metadata
         run: |
-          echo "COMPARISON_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > /tmp/meta
-          echo "COMPARISON_SHA=${{ needs.compute-metadata.outputs.comparison }}" >> /tmp/meta
-          echo "BASELINE_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> /tmp/meta
-          echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline }}" >> /tmp/meta
-          echo "CHECKOUT_SHA=${{ github.sha }}" >> /tmp/meta
-          echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> /tmp/meta
-          echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> /tmp/meta
-          echo "GITHUB_EVENT_NUMBER=${{ github.event.number }}" >> /tmp/meta
+          echo "COMPARISON_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > ${{ runner.temp }}/meta
+          echo "COMPARISON_SHA=${{ needs.compute-metadata.outputs.comparison }}" >> ${{ runner.temp }}/meta
+          echo "BASELINE_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
+          echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline }}" >> ${{ runner.temp }}/meta
+          echo "CHECKOUT_SHA=${{ github.sha }}" >> ${{ runner.temp }}/meta
+          echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> ${{ runner.temp }}/meta
+          echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> ${{ runner.temp }}/meta
+          echo "GITHUB_EVENT_NUMBER=${{ github.event.number }}" >> ${{ runner.temp }}/meta
 
       - name: Upload metadata
         uses: actions/upload-artifact@v3
         with:
           name: meta
-          path: /tmp/meta
+          path: "${{ runner.temp }}/meta"
