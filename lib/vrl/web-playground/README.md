@@ -76,6 +76,7 @@ will likely release this automatically upon each version release of Vector,
 probably under a different package name.
 
 Use this dependency in `package.json`
+
 ```json
 "dependencies": {
     "vrl-web-playground": "0.1.0"
@@ -83,6 +84,7 @@ Use this dependency in `package.json`
 ```
 
 Example import and usage in a React component
+
 ```javascript
 import init, { run_vrl } from 'vrl-web-playground';
 
