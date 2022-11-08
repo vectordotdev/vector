@@ -66,10 +66,10 @@ jobs:
           echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
 
       - name: 'Download metadata'
-        uses: actions/github-script@v3.1.0
+        uses: actions/github-script@v6.3.3
         with:
           script: |
-            var artifacts = await github.actions.listWorkflowRunArtifacts({
+            var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
@@ -77,7 +77,7 @@ jobs:
             var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
               return artifact.name == "meta"
             })[0];
-            var download = await github.actions.downloadArtifact({
+            var download = await github.actions.rest.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
                artifact_id: matchArtifact.id,
@@ -123,10 +123,10 @@ jobs:
       - confirm-valid-credentials
     steps:
       - name: 'Download baseline image'
-        uses: actions/github-script@v3.1.0
+        uses: actions/github-script@v6.3.3
         with:
           script: |
-            var artifacts = await github.actions.listWorkflowRunArtifacts({
+            var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
@@ -134,7 +134,7 @@ jobs:
             var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
               return artifact.name == "baseline-image"
             })[0];
-            var download = await github.actions.downloadArtifact({
+            var download = await github.actions.rest.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
                artifact_id: matchArtifact.id,
@@ -178,10 +178,10 @@ jobs:
       - confirm-valid-credentials
     steps:
       - name: 'Download comparison image'
-        uses: actions/github-script@v3.1.0
+        uses: actions/github-script@v6.3.3
         with:
           script: |
-            var artifacts = await github.actions.listWorkflowRunArtifacts({
+            var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
@@ -189,7 +189,7 @@ jobs:
             var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
               return artifact.name == "comparison-image"
             })[0];
-            var download = await github.actions.downloadArtifact({
+            var download = await github.actions.rest.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
                artifact_id: matchArtifact.id,
