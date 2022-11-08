@@ -272,7 +272,7 @@ async fn handle_line(
                         log_namespace.insert_source_metadata(
                             RedisSourceConfig::NAME,
                             log,
-                            redis_key_path.as_ref().map(|x| LegacyKey::InsertIfEmpty(x)),
+                            redis_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
                             path!("key"),
                             key,
                         );
