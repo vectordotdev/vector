@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Args;
 use std::path::PathBuf;
 
@@ -20,7 +20,10 @@ impl Cli {
         if self.integration.is_none() {
             let mut entries = vec![];
             let root_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
-            for entry in root_dir.read_dir()? {
+            for entry in root_dir
+                .read_dir()
+                .with_context(|| format!("failed to read directory {}", root_dir.display()))?
+            {
                 if let Ok(entry) = entry {
                     if entry.path().is_dir() {
                         entries.push(entry.file_name().into_string().unwrap());

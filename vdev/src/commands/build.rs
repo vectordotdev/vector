@@ -46,10 +46,8 @@ impl Cli {
             command.args(["--target", &platform::default_target()]);
         };
 
-        let status = command.status()?;
-        if !status.success() {
-            bail!("failed with exit code: {status}");
-        }
+        app::display_waiting("Building Vector");
+        app::run_command(&mut command)?;
 
         Ok(())
     }

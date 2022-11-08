@@ -22,7 +22,8 @@ pub struct RustToolchainConfig {
 impl RustToolchainConfig {
     pub fn parse(repo_path: &String) -> Result<Self> {
         let config_file: PathBuf = [repo_path, "rust-toolchain.toml"].iter().collect();
-        let contents = fs::read_to_string(&config_file)?;
+        let contents = fs::read_to_string(&config_file)
+            .with_context(|| format!("failed to read {}", config_file.display()))?;
         let config: RustToolchainRootConfig = toml::from_str(&contents)
             .with_context(|| format!("failed to parse {}", config_file.display()))?;
 
@@ -40,7 +41,8 @@ pub struct IntegrationTestConfig {
 
 impl IntegrationTestConfig {
     fn parse_file(config_file: &PathBuf) -> Result<Self> {
-        let contents = fs::read_to_string(config_file)?;
+        let contents = fs::read_to_string(config_file)
+            .with_context(|| format!("failed to read {}", config_file.display()))?;
         let config: IntegrationTestConfig = toml::from_str(&contents).with_context(|| {
             format!(
                 "failed to parse integration test configuration file {}",

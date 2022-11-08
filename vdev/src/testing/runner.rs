@@ -238,9 +238,6 @@ impl<'a> IntegrationTestRunner<'a> {
     fn create(&self) -> Result<()> {
         let mut command = Command::new("docker");
         command.arg("create");
-        if atty::is(Stream::Stdout) {
-            command.arg("--tty");
-        }
         command.args([
             "--name",
             &self.container_name(),

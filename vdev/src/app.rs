@@ -129,7 +129,11 @@ pub fn run_command(command: &mut Command) -> Result<()> {
     if status.success() {
         Ok(())
     } else {
-        bail!("failed with exit code: {}", status.code().unwrap())
+        bail!(
+            "command: {}\nfailed with exit code: {}",
+            render_command(command),
+            status.code().unwrap()
+        )
     }
 }
 
@@ -168,6 +172,14 @@ fn get_progress_bar() -> Result<ProgressBar> {
     );
 
     Ok(progress_bar)
+}
+
+fn render_command(command: &mut Command) -> String {
+    format!(
+        "{} {}",
+        command.get_program().to_str().unwrap(),
+        Vec::from_iter(command.get_args().map(|arg| arg.to_str().unwrap())).join(" ")
+    )
 }
 
 pub fn set_global_verbosity(verbosity: LevelFilter) {
