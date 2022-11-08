@@ -68,8 +68,7 @@ use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use lookup::{owned_value_path, path, PathPrefix};
-use value::kind::Collection;
-use value::Kind;
+use value::{kind::Collection, Kind};
 use vector_core::config::LogNamespace;
 
 /// The key we use for `file` field.
@@ -225,6 +224,7 @@ impl SourceConfig for Config {
                 Kind::bytes(),
                 None,
             )
+            // TODO: Schema for `kubernetes` isn't as precise as it should be.
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(&owned_value_path!("kubernetes"))),
@@ -241,15 +241,16 @@ impl SourceConfig for Config {
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(&owned_value_path!("timestamp"))),
+                Some(LegacyKey::Overwrite(&owned_value_path!(
+                    log_schema().timestamp_key()
+                ))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 // TODO: Should this be considered a `timestamp`, it's currently
-                // the time that the kubernetes logs subsystem processed the log.
+                // the time that the container runtime processed the log.
                 // The log's timestamp is still in the `message` field, unparsed.
                 None,
             )
-            // TODO: This doesn't have the standard metadata.
             .with_standard_vector_source_metadata();
 
         vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]

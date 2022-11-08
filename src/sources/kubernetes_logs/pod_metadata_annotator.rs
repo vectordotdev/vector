@@ -9,9 +9,13 @@ use k8s_openapi::{
 use kube::runtime::reflector::{store::Store, ObjectRef};
 use lookup::lookup_v2::{OptionalTargetPath, ValuePath};
 use lookup::{owned_value_path, path, OwnedTargetPath, PathPrefix};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace, NO_LEGACY_KEY};
 
-use super::path_helpers::{parse_log_file_path, LogFileInfo};
+use super::{
+    path_helpers::{parse_log_file_path, LogFileInfo},
+    Config,
+};
 use crate::event::{Event, LogEvent};
 
 /// Configuration for how the events are annotated with `Pod` metadata.
@@ -150,13 +154,34 @@ impl PodMetadataAnnotator {
 }
 
 fn annotate_from_file_info(
+    log_namespace: LogNamespace,
     log: &mut LogEvent,
     fields_spec: &FieldsSpec,
     file_info: &LogFileInfo<'_>,
 ) {
-    if let Some(path) = &fields_spec.container_name.path {
-        log.insert(path, file_info.container_name.to_owned());
+    match fields_spec.container_name.path {
+        Some(path) => {
+            log_namespace.insert_source_metadata(
+                Config::NAME,
+                log,
+                Some(LegacyKey::Overwrite(&path.path)),
+                path!("container_name"),
+                file_info.container_name.to_owned(),
+            );
+        }
+        None => {
+            log_namespace.insert_source_metadata(
+                Config::NAME,
+                log,
+                NO_LEGACY_KEY,
+                path!("container_name"),
+                file_info.container_name.to_owned(),
+            );
+        }
     }
+    // if let Some(path) = &fields_spec.container_name.path {
+    //     log.insert(path, file_info.container_name.to_owned());
+    // }
 }
 
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {

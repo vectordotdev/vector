@@ -122,6 +122,7 @@ mod tests {
     fn test_parsing_invalid_non_standard_events() {
         trace_init();
 
+        // TODO: Use log_namespace
         let cases = vec![
             // No `message` field.
             Event::from(LogEvent::default()),

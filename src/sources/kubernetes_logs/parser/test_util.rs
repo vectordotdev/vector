@@ -1,4 +1,5 @@
 #![cfg(test)]
+// TODO: Insert with log_namespace
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};

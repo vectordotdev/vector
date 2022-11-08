@@ -17,6 +17,7 @@ pub fn build(enabled: bool) -> PartialEventsMerger {
     let reducer = if enabled {
         // Merge the message field of each event by concatenating it, with a space delimiter.
         let mut merge_strategies = IndexMap::new();
+        // TODO: Use log_namespace
         merge_strategies.insert(
             crate::config::log_schema().message_key().to_string(),
             MergeStrategy::ConcatRaw,
