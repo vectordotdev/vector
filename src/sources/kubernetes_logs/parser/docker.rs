@@ -103,23 +103,36 @@ const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
 fn normalize_event(
     log: &mut LogEvent,
-    _log_namespace: LogNamespace,
+    log_namespace: LogNamespace,
 ) -> Result<(), NormalizationError> {
-    // Parse and rename timestamp.
-    // TODO: Remove with log_namespace
-    let time = log.remove(TIMESTAMP_KEY).context(TimeFieldMissingSnafu)?;
+    // Parse timestamp.
+    let timestamp_key = match log_namespace {
+        LogNamespace::Vector => "%kubernetes_logs.timestamp",
+        LogNamespace::Legacy => log_schema().timestamp_key(),
+    };
+    let time = log.remove(timestamp_key).context(TimeFieldMissingSnafu)?;
+
     let time = match time {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::TimeValueUnexpectedType),
     };
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
         .context(TimeParsingSnafu)?;
-    // TODO: Insert with log_namespace
-    log.insert(log_schema().timestamp_key(), time.with_timezone(&Utc));
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        log,
+        Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+        path!(TIMESTAMP_KEY),
+        time.with_timezone(&Utc),
+    );
 
     // Parse message, remove trailing newline and detect if it's partial.
-    // TODO: Remove with log_namespace
-    let message = log.remove(MESSAGE_KEY).context(LogFieldMissingSnafu)?;
+    let message_key = match log_namespace {
+        LogNamespace::Vector => ".",
+        LogNamespace::Legacy => log_schema().message_key(),
+    };
+    let message = log.remove(message_key).context(LogFieldMissingSnafu)?;
+
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),
@@ -140,13 +153,17 @@ fn normalize_event(
         message.truncate(message.len() - 1);
         is_partial = false;
     };
-    // TODO: Insert with log_namespace
-    log.insert(log_schema().message_key(), message);
+    log.insert(message_key, message);
 
     // For partial messages add a partial event indicator.
     if is_partial {
-        // TODO: Insert with log_namespace
-        log.insert(event::PARTIAL, true);
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            Some(LegacyKey::Overwrite(path!(event::PARTIAL))),
+            path!(event::PARTIAL),
+            true,
+        );
     }
 
     Ok(())
