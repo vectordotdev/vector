@@ -10,7 +10,7 @@ use kube::runtime::reflector::{store::Store, ObjectRef};
 use lookup::lookup_v2::{OptionalTargetPath, ValuePath};
 use lookup::{owned_value_path, path, OwnedTargetPath, PathPrefix};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace, NO_LEGACY_KEY};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::{
     path_helpers::{parse_log_file_path, LogFileInfo},
@@ -165,26 +165,20 @@ fn annotate_from_file_info(
     file_info: &LogFileInfo<'_>,
     log_namespace: LogNamespace,
 ) {
-    match &fields_spec.container_name.path {
-        Some(path) => {
-            log_namespace.insert_source_metadata(
-                Config::NAME,
-                log,
-                Some(LegacyKey::Overwrite(&path.path)),
-                path!("container_name"),
-                file_info.container_name.to_owned(),
-            );
-        }
-        None => {
-            log_namespace.insert_source_metadata(
-                Config::NAME,
-                log,
-                NO_LEGACY_KEY,
-                path!("container_name"),
-                file_info.container_name.to_owned(),
-            );
-        }
-    }
+    let container_name_path = fields_spec
+        .container_name
+        .path
+        .as_ref()
+        .map(|x| &x.path)
+        .map(LegacyKey::Overwrite);
+
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        log,
+        container_name_path,
+        path!("kubernetes", "container_name"),
+        file_info.container_name.to_owned(),
+    );
 }
 
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {

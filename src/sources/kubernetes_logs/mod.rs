@@ -220,7 +220,7 @@ impl SourceConfig for Config {
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(&owned_value_path!("file"))),
+                Some(LegacyKey::Overwrite(owned_value_path!("file"))),
                 &owned_value_path!("file"),
                 Kind::bytes(),
                 None,
@@ -228,21 +228,21 @@ impl SourceConfig for Config {
             // TODO: Schema for `kubernetes` isn't as precise as it should be.
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(&owned_value_path!("kubernetes"))),
+                Some(LegacyKey::Overwrite(owned_value_path!("kubernetes"))),
                 &owned_value_path!("kubernetes"),
                 Kind::object(Collection::any()),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(&owned_value_path!("stream"))),
+                Some(LegacyKey::Overwrite(owned_value_path!("stream"))),
                 &owned_value_path!("stream"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(&owned_value_path!(
+                Some(LegacyKey::Overwrite(owned_value_path!(
                     log_schema().timestamp_key()
                 ))),
                 &owned_value_path!("timestamp"),
