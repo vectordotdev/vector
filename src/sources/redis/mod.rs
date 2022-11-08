@@ -266,7 +266,7 @@ async fn handle_line(
                         log_namespace.insert_vector_metadata(
                             log,
                             path!(log_schema().timestamp_key()),
-                            path!("timestamp"),
+                            path!("ingest_timestamp"),
                             now,
                         );
 
