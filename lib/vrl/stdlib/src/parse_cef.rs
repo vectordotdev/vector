@@ -4,7 +4,7 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, tag, take_till1, take_until},
     character::complete::{char, one_of, satisfy},
-    combinator::{map, opt, peek, value},
+    combinator::{map, opt, peek, success, value},
     error::{ErrorKind, ParseError, VerboseError},
     multi::{count, many1},
     sequence::{delimited, pair, preceded},
@@ -183,6 +183,7 @@ fn parse_value(input: &str) -> IResult<&str, String, VerboseError<&str>> {
                 value('=', char('=')),
                 value('\\', char('\\')),
                 value('\n', one_of("nr")),
+                success('\\'),
             )),
         ),
     ))(input)
@@ -568,6 +569,23 @@ mod test {
                 value: r#"CEF:0|Check Point|VPN-1 & FireWall-1|Check Point|Log|https|"#,
             ],
             want: Err("0: at line 1, in Tag:\nCEF:0|Check Point|VPN-1 & FireWall-1|Check Point|Log|https|\n                                                           ^\n\n1: at line 1, in Alt:\nCEF:0|Check Point|VPN-1 & FireWall-1|Check Point|Log|https|\n                                                           ^\n\n"),
+            tdef: type_def(),
+        }
+
+        utf8_escape {
+            args: func_args! [
+                value: r#"CEF:0|xxx|xxx|123456|xxx|xxx|5|TestField={'blabla': 'blabla\xc3\xaablabla'}"#,
+            ],
+            want: Ok(value!({
+                "cefVersion":"0",
+                "deviceVendor":"xxx",
+                "deviceProduct":"xxx",
+                "deviceVersion":"123456",
+                "deviceEventClassId":"xxx",
+                "name":"xxx",
+                "severity":"5",
+                "TestField": r#"{'blabla': 'blabla\xc3\xaablabla'}"#,
+            })),
             tdef: type_def(),
         }
 

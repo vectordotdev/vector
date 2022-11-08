@@ -113,8 +113,7 @@ pub struct Output {
     ///
     /// For *sources*, a `None` schema is identical to a `Some(Definition::source_default())`.
     ///
-    /// For a *transform*, a `None` schema means the transform inherits the merged [`Definition`]
-    /// of its inputs, without modifying the schema further.
+    /// For a *transform*, a schema [`Definition`] is required if `Datatype` is Log.
     pub log_schema_definition: Option<schema::Definition>,
 }
 
@@ -283,6 +282,9 @@ impl Default for LogNamespace {
         Self::Legacy
     }
 }
+
+/// A shortcut to specify no `LegacyKey` should be used (since otherwise a turbofish would be required)
+pub const NO_LEGACY_KEY: Option<LegacyKey<&'static str>> = None;
 
 pub enum LegacyKey<T> {
     /// Always insert the data, even if the field previously existed

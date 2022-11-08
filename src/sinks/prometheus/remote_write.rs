@@ -142,6 +142,13 @@ impl SinkConfig for RemoteWriteConfig {
                 None,
                 None,
             ),
+            Some(PrometheusRemoteWriteAuth::Bearer { token }) => (
+                Some(Auth::Bearer {
+                    token: token.clone(),
+                }),
+                None,
+                None,
+            ),
             Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
                 let region = self
                     .aws
