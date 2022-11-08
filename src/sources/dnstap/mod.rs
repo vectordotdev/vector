@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use bytes::Bytes;
-use lookup::path;
+use lookup::{owned_value_path, path};
 use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
@@ -22,7 +22,7 @@ pub use parser::{parse_dnstap_data, DnstapParser};
 pub mod schema;
 use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
-use vector_core::config::LogNamespace;
+use vector_core::config::{LegacyKey, LogNamespace};
 
 /// Configuration for the `dnstap` source.
 #[configurable_component(source("dnstap"))]
@@ -117,7 +117,11 @@ impl DnstapConfig {
                 let schema = vector_core::schema::Definition::empty_legacy_namespace();
 
                 if self.raw_data_only.unwrap_or(false) {
-                    schema.with_field(log_schema().message_key(), Kind::bytes(), Some("message"))
+                    schema.with_event_field(
+                        &owned_value_path!(log_schema().message_key()),
+                        Kind::bytes(),
+                        Some("message"),
+                    )
                 } else {
                     event_schema.schema_definition(schema)
                 }
@@ -129,7 +133,11 @@ impl DnstapConfig {
                 );
 
                 if self.raw_data_only.unwrap_or(false) {
-                    schema.with_field("message", Kind::bytes(), Some("message"))
+                    schema.with_event_field(
+                        &owned_value_path!("message"),
+                        Kind::bytes(),
+                        Some("message"),
+                    )
                 } else {
                     event_schema.schema_definition(schema)
                 }
@@ -267,7 +275,7 @@ impl FrameHandler for DnstapFrameHandler {
             self.log_namespace.insert_source_metadata(
                 DnstapConfig::NAME,
                 &mut log_event,
-                path!(self.host_key()),
+                Some(LegacyKey::Overwrite(path!(self.host_key()))),
                 path!("host"),
                 host,
             );

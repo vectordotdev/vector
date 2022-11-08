@@ -1,3 +1,4 @@
+use lookup::owned_value_path;
 use value::{
     kind::{Collection, Field},
     Kind,
@@ -79,35 +80,47 @@ impl DnstapEventSchema {
     ) -> vector_core::schema::Definition {
         let schema = schema
             .optional_field(
-                self.dnstap_root_data_schema().server_identity(),
+                &owned_value_path!(self.dnstap_root_data_schema().server_identity()),
                 Kind::bytes(),
                 None,
             )
             .optional_field(
-                self.dnstap_root_data_schema().server_version(),
+                &owned_value_path!(self.dnstap_root_data_schema().server_version()),
                 Kind::bytes(),
                 None,
             )
-            .optional_field(self.dnstap_root_data_schema().extra(), Kind::bytes(), None)
-            .with_field(
-                self.dnstap_root_data_schema().data_type_id(),
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().extra()),
+                Kind::bytes(),
+                None,
+            )
+            .with_event_field(
+                &owned_value_path!(self.dnstap_root_data_schema().data_type_id()),
                 Kind::integer(),
                 None,
             )
             .optional_field(
-                self.dnstap_root_data_schema().data_type(),
+                &owned_value_path!(self.dnstap_root_data_schema().data_type()),
                 Kind::bytes(),
                 None,
             )
-            .optional_field(self.dnstap_root_data_schema().error(), Kind::bytes(), None)
             .optional_field(
-                self.dnstap_root_data_schema().raw_data(),
+                &owned_value_path!(self.dnstap_root_data_schema().error()),
                 Kind::bytes(),
                 None,
             )
-            .optional_field(self.dnstap_root_data_schema().time(), Kind::integer(), None)
             .optional_field(
-                self.dnstap_root_data_schema().time_precision(),
+                &owned_value_path!(self.dnstap_root_data_schema().raw_data()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().time()),
+                Kind::integer(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().time_precision()),
                 Kind::bytes(),
                 None,
             );
@@ -122,57 +135,57 @@ impl DnstapEventSchema {
     ) -> vector_core::schema::Definition {
         schema
             .optional_field(
-                self.dnstap_message_schema().socket_family(),
+                &owned_value_path!(self.dnstap_message_schema().socket_family()),
                 Kind::bytes(),
                 None,
             )
             .optional_field(
-                self.dnstap_message_schema().socket_protocol(),
+                &owned_value_path!(self.dnstap_message_schema().socket_protocol()),
                 Kind::bytes(),
                 None,
             )
             .optional_field(
-                self.dnstap_message_schema().query_address(),
+                &owned_value_path!(self.dnstap_message_schema().query_address()),
                 Kind::bytes(),
                 None,
             )
             .optional_field(
-                self.dnstap_message_schema().query_port(),
+                &owned_value_path!(self.dnstap_message_schema().query_port()),
                 Kind::bytes(),
                 None,
             )
             .optional_field(
-                self.dnstap_message_schema().response_address(),
+                &owned_value_path!(self.dnstap_message_schema().response_address()),
                 Kind::bytes(),
                 None,
             )
             .optional_field(
-                self.dnstap_message_schema().response_port(),
+                &owned_value_path!(self.dnstap_message_schema().response_port()),
                 Kind::bytes(),
                 None,
             )
             .optional_field(
-                self.dnstap_message_schema().query_zone(),
+                &owned_value_path!(self.dnstap_message_schema().query_zone()),
                 Kind::bytes(),
                 None,
             )
-            .with_field(
-                self.dnstap_message_schema().dnstap_message_type_id(),
+            .with_event_field(
+                &owned_value_path!(self.dnstap_message_schema().dnstap_message_type_id()),
                 Kind::integer(),
                 None,
             )
             .optional_field(
-                self.dnstap_message_schema().dnstap_message_type(),
+                &owned_value_path!(self.dnstap_message_schema().dnstap_message_type()),
                 Kind::bytes(),
                 None,
             )
             .optional_field(
-                self.dnstap_message_schema().request_message(),
+                &owned_value_path!(self.dnstap_message_schema().request_message()),
                 Kind::object(self.request_message_schema_definition()),
                 None,
             )
             .optional_field(
-                self.dnstap_message_schema().response_message(),
+                &owned_value_path!(self.dnstap_message_schema().response_message()),
                 Kind::object(self.request_message_schema_definition()),
                 None,
             )
