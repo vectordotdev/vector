@@ -266,22 +266,19 @@ async fn handle_line(
                             now,
                         );
 
-                        match redis_key {
-                            Some(redis_key) => log_namespace.insert_source_metadata(
-                                RedisSourceConfig::NAME,
-                                log,
-                                Some(LegacyKey::InsertIfEmpty(path!(redis_key))),
-                                path!("key"),
-                                key,
-                            ),
-                            None => log_namespace.insert_source_metadata(
-                                RedisSourceConfig::NAME,
-                                log,
-                                NO_LEGACY_KEY,
-                                path!("key"),
-                                key,
-                            ),
-                        };
+                        // cannot return reference to temporary value
+                        // (returns a reference to data owned by the
+                        // current function) (rust-cargo)
+                        let redis_key_path =
+                            redis_key.map(|x| path!(x)).map(LegacyKey::InsertIfEmpty);
+
+                        log_namespace.insert_source_metadata(
+                            RedisSourceConfig::NAME,
+                            log,
+                            redis_key_path,
+                            path!("key"),
+                            key,
+                        );
                     };
 
                     event
