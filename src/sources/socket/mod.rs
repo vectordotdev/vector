@@ -222,69 +222,86 @@ impl SourceConfig for SocketConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
 
-        let schema_definition = self
-            .decoding()
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+        let schema_definition = self.decoding().schema_definition(log_namespace);
 
         let schema_definition = match &self.mode {
-            Mode::Tcp(config) => schema_definition
-                .with_source_metadata(
-                    Self::NAME,
-                    Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
-                        &config.legacy_host_key()
-                    ))),
-                    &owned_value_path!(log_schema().host_key()),
-                    Kind::bytes(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
-                        &config.legacy_port_key()
-                    ))),
-                    &owned_value_path!("port"),
-                    Kind::bytes(),
-                    None,
-                ),
-            Mode::Udp(config) => schema_definition
-                .with_source_metadata(
-                    Self::NAME,
-                    Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
-                        &config.legacy_host_key()
-                    ))),
-                    &owned_value_path!(log_schema().host_key()),
-                    Kind::bytes(),
-                    None,
-                )
-                .with_source_metadata(
-                    Self::NAME,
-                    Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
-                        &config.legacy_port_key()
-                    ))),
-                    &owned_value_path!("port"),
-                    Kind::bytes(),
-                    None,
-                ),
-            Mode::UnixDatagram(config) => schema_definition.with_source_metadata(
-                Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
-                    &config.legacy_host_key()
-                ))),
-                &owned_value_path!(log_schema().host_key()),
-                Kind::bytes(),
-                None,
-            ),
-            Mode::UnixStream(config) => schema_definition.with_source_metadata(
-                Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
-                    &config.legacy_host_key()
-                ))),
-                &owned_value_path!(log_schema().host_key()),
-                Kind::bytes(),
-                None,
-            ),
+            Mode::Tcp(config) => {
+                // Hacky, but this is fewer lines than a match on each
+                // parameter. You also can't map config.host_key()
+                // onto the Option(key) type since it requires two
+                // borrows: one on the inner String and one on the
+                // OwnedValuePath.
+                let legacy_key = &owned_value_path!(&config.host_key().clone().unwrap_or_default());
+                let legacy_key = config
+                    .host_key()
+                    .as_ref()
+                    .map(|_| LegacyKey::InsertIfEmpty(legacy_key));
+
+                let legacy_port =
+                    &owned_value_path!(&config.port_key().clone().unwrap_or_default());
+                let legacy_port = config
+                    .port_key()
+                    .as_ref()
+                    .map(|_| LegacyKey::InsertIfEmpty(legacy_port));
+
+                schema_definition
+                    .with_source_metadata(
+                        Self::NAME,
+                        legacy_key,
+                        &owned_value_path!(log_schema().host_key()),
+                        Kind::bytes(),
+                        None,
+                    )
+                    .with_source_metadata(
+                        Self::NAME,
+                        legacy_port,
+                        &owned_value_path!("port"),
+                        Kind::bytes(),
+                        None,
+                    )
+            }
+            // TODO
+            _ => schema_definition,
+            // Mode::Udp(config) => schema_definition
+            //     .with_source_metadata(
+            //         Self::NAME,
+            //         Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+            //             &config.legacy_host_key()
+            //         ))),
+            //         &owned_value_path!(log_schema().host_key()),
+            //         Kind::bytes(),
+            //         None,
+            //     )
+            //     .with_source_metadata(
+            //         Self::NAME,
+            //         Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+            //             &config.legacy_port_key()
+            //         ))),
+            //         &owned_value_path!("port"),
+            //         Kind::bytes(),
+            //         None,
+            //     ),
+            // Mode::UnixDatagram(config) => schema_definition.with_source_metadata(
+            //     Self::NAME,
+            //     Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+            //         &config.legacy_host_key()
+            //     ))),
+            //     &owned_value_path!(log_schema().host_key()),
+            //     Kind::bytes(),
+            //     None,
+            // ),
+            // Mode::UnixStream(config) => schema_definition.with_source_metadata(
+            //     Self::NAME,
+            //     Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
+            //         &config.legacy_host_key()
+            //     ))),
+            //     &owned_value_path!(log_schema().host_key()),
+            //     Kind::bytes(),
+            //     None,
+            // ),
         };
+
+        let schema_definition = schema_definition.with_standard_vector_source_metadata();
 
         vec![Output::default(self.decoding().output_type())
             .with_schema_definition(schema_definition)]
