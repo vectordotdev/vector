@@ -13,7 +13,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace, NO_LEGACY_KEY};
+use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -204,22 +204,19 @@ impl SourceConfig for RedisSourceConfig {
 
         let schema_definition = self.decoding.schema_definition(log_namespace);
 
-        let schema_definition = match &self.redis_key {
-            Some(key) => schema_definition.with_source_metadata(
-                Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!(key))),
-                &owned_value_path!("key"),
-                Kind::bytes(),
-                None,
-            ),
-            None => schema_definition.with_source_metadata(
-                Self::NAME,
-                None,
-                &owned_value_path!("key"),
-                Kind::bytes(),
-                None,
-            ),
-        };
+        let redis_key_path = self
+            .redis_key
+            .as_ref()
+            .map(|x| owned_value_path!(x))
+            .map(LegacyKey::InsertIfEmpty);
+
+        let schema_definition = schema_definition.with_source_metadata(
+            Self::NAME,
+            redis_key_path,
+            &owned_value_path!("key"),
+            Kind::bytes(),
+            None,
+        );
 
         let schema_definition = schema_definition.with_standard_vector_source_metadata();
 
