@@ -203,23 +203,23 @@ impl SourceConfig for RedisSourceConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let schema_definition = self.decoding.schema_definition(log_namespace);
-
         let redis_key_path = self
             .redis_key
             .as_ref()
             .map(|x| owned_value_path!(x))
             .map(LegacyKey::InsertIfEmpty);
 
-        let schema_definition = schema_definition.with_source_metadata(
-            Self::NAME,
-            redis_key_path,
-            &owned_value_path!("key"),
-            Kind::bytes(),
-            None,
-        );
-
-        let schema_definition = schema_definition.with_standard_vector_source_metadata();
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_source_metadata(
+                Self::NAME,
+                redis_key_path,
+                &owned_value_path!("key"),
+                Kind::bytes(),
+                None,
+            )
+            .with_standard_vector_source_metadata();
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
