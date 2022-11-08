@@ -271,10 +271,10 @@ async fn handle_line(
                         );
 
                         match redis_key {
-                            Some(key) => log_namespace.insert_source_metadata(
+                            Some(redis_key) => log_namespace.insert_source_metadata(
                                 RedisSourceConfig::NAME,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!(key))),
+                                Some(LegacyKey::InsertIfEmpty(path!(redis_key))),
                                 path!("key"),
                                 key,
                             ),
