@@ -129,7 +129,7 @@ impl PodMetadataAnnotator {
         let pod: &Pod = resource.as_ref();
 
         annotate_from_file_info(log, &self.fields_spec, &file_info, self.log_namespace);
-        annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
+        annotate_from_metadata(log, &self.fields_spec, &pod.metadata, self.log_namespace);
 
         let container;
         if let Some(ref pod_spec) = pod.spec {
@@ -165,7 +165,7 @@ fn annotate_from_file_info(
     file_info: &LogFileInfo<'_>,
     log_namespace: LogNamespace,
 ) {
-    let container_name_path = fields_spec
+    let legacy_key = fields_spec
         .container_name
         .path
         .as_ref()
@@ -175,32 +175,65 @@ fn annotate_from_file_info(
     log_namespace.insert_source_metadata(
         Config::NAME,
         log,
-        container_name_path,
+        legacy_key,
         path!("kubernetes", "container_name"),
         file_info.container_name.to_owned(),
     );
 }
 
-fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
-    for (key, val) in [
-        (&fields_spec.pod_name, &metadata.name),
-        (&fields_spec.pod_namespace, &metadata.namespace),
-        (&fields_spec.pod_uid, &metadata.uid),
+fn annotate_from_metadata(
+    log: &mut LogEvent,
+    fields_spec: &FieldsSpec,
+    metadata: &ObjectMeta,
+    log_namespace: LogNamespace,
+) {
+    for (key, metadata_key, value) in [
+        (
+            &fields_spec.pod_name,
+            path!("kubernetes", "pod_name"),
+            &metadata.name,
+        ),
+        (
+            &fields_spec.pod_namespace,
+            path!("kubernetes", "pod_namespace"),
+            &metadata.namespace,
+        ),
+        (
+            &fields_spec.pod_uid,
+            path!("kubernetes", "pod_uid"),
+            &metadata.uid,
+        ),
     ]
     .iter()
     {
-        if let (Some(key), Some(val)) = (&key.path, val) {
-            log.insert(key, val.to_owned());
+        if let Some(value) = value {
+            let legacy_key = key.path.as_ref().map(|x| &x.path).map(LegacyKey::Overwrite);
+
+            log_namespace.insert_source_metadata(
+                Config::NAME,
+                log,
+                legacy_key,
+                *metadata_key,
+                value.to_owned(),
+            );
         }
     }
 
-    if let (Some(key), Some(owner_references)) =
-        (&fields_spec.pod_owner.path, &metadata.owner_references)
-    {
-        log.insert(
-            key,
+    if let Some(owner_references) = &metadata.owner_references {
+        let legacy_key = fields_spec
+            .pod_owner
+            .path
+            .as_ref()
+            .map(|x| &x.path)
+            .map(LegacyKey::Overwrite);
+
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            legacy_key,
+            path!("kubernetes", "pod_owner"),
             format!("{}/{}", owner_references[0].kind, owner_references[0].name),
-        );
+        )
     }
 
     if let Some(labels) = &metadata.labels {
@@ -411,7 +444,7 @@ mod tests {
 
         for (fields_spec, metadata, expected) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_metadata(&mut log, &fields_spec, &metadata);
+            annotate_from_metadata(&mut log, &fields_spec, &metadata, LogNamespace::Legacy);
             assert_event_data_eq!(log, expected);
         }
     }
