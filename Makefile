@@ -631,6 +631,10 @@ sync-install: ## Sync the install.sh script for access via sh.vector.dev
 test-vrl: ## Run the VRL test suite
 	@scripts/test-vrl.sh
 
+.PHONY: compile-vrl-wasm
+compile-vrl-wasm: ## Compile VRL crates to WASM target
+	@scripts/compile-vrl-wasm.sh
+
 ##@ Utility
 
 .PHONY: build-ci-docker-images
