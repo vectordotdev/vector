@@ -13,7 +13,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::config::{LegacyKey, LogNamespace, NO_LEGACY_KEY};
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -270,27 +270,24 @@ async fn handle_line(
                             now,
                         );
 
-                        log_namespace.insert_source_metadata(
-                            RedisSourceConfig::NAME,
-                            log,
-                            Some(LegacyKey::InsertIfEmpty(path!("key"))),
-                            path!("key"),
-                            key,
-                        );
-
-                        if let (Some(redis_key), LogNamespace::Legacy) = (redis_key, log_namespace)
-                        {
-                            // Optionally store the redis key in the
-                            // event root under a user-provided name.
-                            log_namespace.insert_source_metadata(
+                        match redis_key {
+                            Some(key) => log_namespace.insert_source_metadata(
                                 RedisSourceConfig::NAME,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!(redis_key))),
+                                Some(LegacyKey::InsertIfEmpty(path!(key))),
                                 path!("key"),
                                 key,
-                            )
-                        }
-                    }
+                            ),
+                            None => log_namespace.insert_source_metadata(
+                                RedisSourceConfig::NAME,
+                                log,
+                                NO_LEGACY_KEY,
+                                path!("key"),
+                                key,
+                            ),
+                        };
+                    };
+
                     event
                 });
 
