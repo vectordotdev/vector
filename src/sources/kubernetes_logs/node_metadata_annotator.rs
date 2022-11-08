@@ -5,9 +5,11 @@
 use crate::event::{Event, LogEvent};
 use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::lookup_v2::ValuePath;
-use lookup::{owned_value_path, path, OwnedTargetPath, PathPrefix};
-use vector_config::configurable_component;
+use lookup::{owned_value_path, path, OwnedTargetPath};
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace};
+
+use super::Config;
 
 /// Configuration for how the events are annotated with Node metadata.
 #[configurable_component]
@@ -30,14 +32,20 @@ impl Default for FieldsSpec {
 pub struct NodeMetadataAnnotator {
     node_state_reader: Store<Node>,
     fields_spec: FieldsSpec,
+    log_namespace: LogNamespace,
 }
 
 impl NodeMetadataAnnotator {
     /// Create a new [`NodeMetadataAnnotator`].
-    pub const fn new(node_state_reader: Store<Node>, fields_spec: FieldsSpec) -> Self {
+    pub const fn new(
+        node_state_reader: Store<Node>,
+        fields_spec: FieldsSpec,
+        log_namespace: LogNamespace,
+    ) -> Self {
         Self {
             node_state_reader,
             fields_spec,
+            log_namespace,
         }
     }
 }
@@ -51,21 +59,29 @@ impl NodeMetadataAnnotator {
         let resource = self.node_state_reader.get(&obj)?;
         let node: &Node = resource.as_ref();
 
-        annotate_from_metadata(log, &self.fields_spec, &node.metadata);
+        annotate_from_metadata(log, &self.fields_spec, &node.metadata, self.log_namespace);
         Some(())
     }
 }
 
-fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
-    // Calculate and cache the prefix path.
-    let prefix_path = &fields_spec.node_labels.path;
+fn annotate_from_metadata(
+    log: &mut LogEvent,
+    fields_spec: &FieldsSpec,
+    metadata: &ObjectMeta,
+    log_namespace: LogNamespace,
+) {
     if let Some(labels) = &metadata.labels {
-        for (key, val) in labels.iter() {
-            let key_path = path!(key);
-            log.insert(
-                (PathPrefix::Event, prefix_path.concat(key_path)),
-                val.to_owned(),
-            );
+        let path = &fields_spec.node_labels.path;
+
+        for (key, value) in labels.iter() {
+            log_namespace.insert_source_metadata(
+                Config::NAME,
+                log,
+                // FIXME: This legacy_key is missing the `key` suffix.
+                Some(LegacyKey::Overwrite(path)),
+                path!("kubernetes", "node_labels", key),
+                value.to_owned(),
+            )
         }
     }
 }
@@ -135,7 +151,7 @@ mod tests {
 
         for (fields_spec, metadata, expected) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_metadata(&mut log, &fields_spec, &metadata);
+            annotate_from_metadata(&mut log, &fields_spec, &metadata, LogNamespace::Legacy);
             assert_event_data_eq!(log, expected);
         }
     }
