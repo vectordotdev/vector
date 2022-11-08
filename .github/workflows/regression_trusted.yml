@@ -69,14 +69,22 @@ jobs:
         uses: actions/github-script@v6.3.3
         with:
           script: |
+            # Please note, listWorkflowRunArtifacts only returns 30
+            # artifacts. The untrusted side of this workflow produces 3 but if
+            # that ever changes github.paginate will need to be used and this
+            # has its own wrapping container: it is not a drop-in solution.
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
             });
+
             var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
               return artifact.name == "meta"
             })[0];
+
+            console.log("Downloading artifact %s", matchArtifact.id);
+
             var download = await github.actions.rest.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
@@ -126,14 +134,22 @@ jobs:
         uses: actions/github-script@v6.3.3
         with:
           script: |
+            # Please note, listWorkflowRunArtifacts only returns 30
+            # artifacts. The untrusted side of this workflow produces 3 but if
+            # that ever changes github.paginate will need to be used and this
+            # has its own wrapping container: it is not a drop-in solution.
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
             });
+
             var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
               return artifact.name == "baseline-image"
             })[0];
+
+            console.log("Downloading artifact %s", matchArtifact.id);
+
             var download = await github.actions.rest.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
@@ -181,14 +197,22 @@ jobs:
         uses: actions/github-script@v6.3.3
         with:
           script: |
+            # Please note, listWorkflowRunArtifacts only returns 30
+            # artifacts. The untrusted side of this workflow produces 3 but if
+            # that ever changes github.paginate will need to be used and this
+            # has its own wrapping container: it is not a drop-in solution.
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
             });
+
             var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
               return artifact.name == "comparison-image"
             })[0];
+
+            console.log("Downloading artifact %s", matchArtifact.id);
+
             var download = await github.actions.rest.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
