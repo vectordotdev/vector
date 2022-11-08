@@ -11,7 +11,7 @@ use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::{LegacyKey, LogNamespace},
+    config::{LegacyKey, LogNamespace, NO_LEGACY_KEY},
     ByteSizeOf,
 };
 
@@ -237,31 +237,39 @@ pub(super) fn udp(
 					    now,
 					);
 
-					let legacy_host_key = config
-					    .host_key()
-					    .as_deref()
-					    .unwrap_or_else(|| log_schema().host_key());
+					match config.host_key().as_ref() {
+					    Some(host_key) => log_namespace.insert_source_metadata(
+						SocketConfig::NAME,
+						log,
+						Some(LegacyKey::InsertIfEmpty(path!(host_key))),
+						path!(log_schema().host_key()),
+						address.ip().to_string(),
+					    ),
+					    None => log_namespace.insert_source_metadata(
+						SocketConfig::NAME,
+						log,
+						NO_LEGACY_KEY,
+						path!(log_schema().host_key()),
+						address.ip().to_string(),
+					    ),
+					}
 
-					let legacy_port_key = config
-					    .port_key
-					    .as_deref()
-					    .unwrap_or_else(|| "port");
-
-					log_namespace.insert_source_metadata(
-					    SocketConfig::NAME,
-					    log,
-					    Some(LegacyKey::InsertIfEmpty(path!(legacy_host_key))),
-					    path!(log_schema().host_key()),
-					    address.ip().to_string(),
-					);
-
-					log_namespace.insert_source_metadata(
-					    SocketConfig::NAME,
-					    log,
-					    Some(LegacyKey::InsertIfEmpty(path!(legacy_port_key))),
-					    path!("port"),
-					    address.port(),
-					);
+					match config.port_key.as_ref() {
+					    Some(port_key) => log_namespace.insert_source_metadata(
+						SocketConfig::NAME,
+						log,
+						Some(LegacyKey::InsertIfEmpty(path!(port_key))),
+						path!("port"),
+						address.port(),
+					    ),
+					    None => log_namespace.insert_source_metadata(
+						SocketConfig::NAME,
+						log,
+						NO_LEGACY_KEY,
+						path!("port"),
+						address.port(),
+					    )
+					};
 				    }
                                 }
 

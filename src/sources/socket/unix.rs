@@ -6,7 +6,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::path;
 use vector_common::shutdown::ShutdownSignal;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::config::{LegacyKey, LogNamespace, NO_LEGACY_KEY};
 
 use crate::{
     codecs::Decoder,
@@ -116,13 +116,23 @@ fn handle_events(
         );
 
         if let Some(ref host) = received_from {
-            log_namespace.insert_source_metadata(
-                SocketConfig::NAME,
-                log,
-                Some(LegacyKey::InsertIfEmpty(path!(&config.legacy_host_key()))),
-                path!(log_schema().host_key()),
-                host.clone(),
-            );
+            match config.host_key.as_ref() {
+                Some(key) => log_namespace.insert_source_metadata(
+                    SocketConfig::NAME,
+                    log,
+                    Some(LegacyKey::InsertIfEmpty(path!(key))),
+                    path!(log_schema().host_key()),
+                    host.clone(),
+                ),
+
+                None => log_namespace.insert_source_metadata(
+                    SocketConfig::NAME,
+                    log,
+                    NO_LEGACY_KEY,
+                    path!(log_schema().host_key()),
+                    host.clone(),
+                ),
+            }
         }
     }
 }

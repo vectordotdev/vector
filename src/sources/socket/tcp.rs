@@ -4,7 +4,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::path;
 use smallvec::SmallVec;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::config::{LegacyKey, LogNamespace, NO_LEGACY_KEY};
 
 use crate::{
     codecs::Decoder,
@@ -158,20 +158,6 @@ impl TcpConfig {
         self.decoding = val;
         self
     }
-
-    pub fn legacy_host_key(&self) -> String {
-        self.host_key
-            .as_deref()
-            .unwrap_or_else(|| log_schema().host_key())
-            .to_string()
-    }
-
-    pub fn legacy_port_key(&self) -> String {
-        self.port_key
-            .as_deref()
-            .unwrap_or_else(|| "port")
-            .to_string()
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -219,25 +205,39 @@ impl TcpSource for RawTcpSource {
                     now,
                 );
 
-                self.log_namespace.insert_source_metadata(
-                    SocketConfig::NAME,
-                    log,
-                    Some(LegacyKey::InsertIfEmpty(path!(&self
-                        .config
-                        .legacy_host_key()))),
-                    path!(log_schema().host_key()),
-                    host.ip().to_string(),
-                );
+                match self.config.host_key().as_ref() {
+                    Some(host_key) => self.log_namespace.insert_source_metadata(
+                        SocketConfig::NAME,
+                        log,
+                        Some(LegacyKey::InsertIfEmpty(path!(host_key))),
+                        path!(log_schema().host_key()),
+                        host.ip().to_string(),
+                    ),
+                    None => self.log_namespace.insert_source_metadata(
+                        SocketConfig::NAME,
+                        log,
+                        NO_LEGACY_KEY,
+                        path!(log_schema().host_key()),
+                        host.ip().to_string(),
+                    ),
+                }
 
-                self.log_namespace.insert_source_metadata(
-                    SocketConfig::NAME,
-                    log,
-                    Some(LegacyKey::InsertIfEmpty(path!(&self
-                        .config
-                        .legacy_port_key()))),
-                    path!("port"),
-                    host.port(),
-                );
+                match self.config.port_key.as_ref() {
+                    Some(port_key) => self.log_namespace.insert_source_metadata(
+                        SocketConfig::NAME,
+                        log,
+                        Some(LegacyKey::InsertIfEmpty(path!(port_key))),
+                        path!("port"),
+                        host.port(),
+                    ),
+                    None => self.log_namespace.insert_source_metadata(
+                        SocketConfig::NAME,
+                        log,
+                        NO_LEGACY_KEY,
+                        path!("port"),
+                        host.port(),
+                    ),
+                };
             }
         }
     }
