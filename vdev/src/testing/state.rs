@@ -18,6 +18,10 @@ pub fn env_exists(envs_dir: &PathBuf, environment: &str) -> bool {
 
 pub fn active_envs(envs_dir: &PathBuf) -> Result<HashSet<String>> {
     let mut environments = HashSet::new();
+    if !envs_dir.is_dir() {
+        return Ok(environments);
+    }
+
     for entry in envs_dir
         .read_dir()
         .with_context(|| format!("failed to read directory {}", envs_dir.display()))?
