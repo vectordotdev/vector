@@ -20,13 +20,14 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
+use lookup::{path, PathPrefix};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
 use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
     ByteSizeOf,
 };
@@ -192,7 +193,7 @@ struct Keys<'a> {
 /// Populates the decoded event with extra metadata.
 fn populate_event(
     event: &mut Event,
-    timestamp: chrono::DateTime<Utc>,
+    timestamp: Option<chrono::DateTime<Utc>>,
     keys: &Keys<'_>,
     log_namespace: LogNamespace,
 ) {
@@ -222,8 +223,41 @@ fn populate_event(
         keys.delivery_tag,
     );
 
-    // TODO: This ingest timestamp may be the AMQP message's timestamp.
-    log_namespace.insert_standard_vector_source_metadata(log, AmqpSourceConfig::NAME, timestamp);
+    log_namespace.insert_vector_metadata(
+        log,
+        path!(log_schema().source_type_key()),
+        path!("source_type"),
+        Bytes::from_static(AmqpSourceConfig::NAME.as_bytes()),
+    );
+
+    // This handles the transition from the original timestamp logic. Originally the
+    // `timestamp_key` was populated by the `properties.timestamp()` time on the message, falling
+    // back to calling `now()`.
+    match (log_namespace, timestamp) {
+        (LogNamespace::Vector, None) => {
+            log.metadata_mut()
+                .value_mut()
+                .insert(path!("vector", "ingest_timestamp"), Utc::now());
+        }
+        (LogNamespace::Vector, Some(timestamp)) => {
+            log.metadata_mut()
+                .value_mut()
+                .insert(path!(AmqpSourceConfig::NAME, "timestamp"), timestamp);
+
+            log.metadata_mut()
+                .value_mut()
+                .insert(path!("vector", "ingest_timestamp"), Utc::now());
+        }
+        (LogNamespace::Legacy, None) => {
+            log.try_insert(
+                (PathPrefix::Event, log_schema().timestamp_key()),
+                Utc::now(),
+            );
+        }
+        (LogNamespace::Legacy, Some(timestamp)) => {
+            log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+        }
+    };
 }
 
 /// Receives an event from `AMQP` and pushes it along the pipeline.
@@ -238,12 +272,10 @@ async fn receive_event(
     let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
 
     // Extract timestamp from AMQP message
-    // TODO: Insert timestamp as source metadata?
     let timestamp = msg
         .properties
         .timestamp()
-        .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest())
-        .unwrap_or_else(Utc::now);
+        .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest());
 
     let routing = msg.routing_key.to_string();
     let exchange = msg.exchange.to_string();
