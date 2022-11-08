@@ -1,5 +1,6 @@
 use chrono::Utc;
-use lookup::{event_path, owned_value_path};
+use lookup::lookup_v2::parse_value_path;
+use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use value::kind::Collection;
@@ -7,6 +8,7 @@ use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vrl::prelude::BTreeMap;
 
 use crate::schema::Definition;
 use crate::{
@@ -46,6 +48,7 @@ pub struct MetricToLogConfig {
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
 }
 
@@ -88,11 +91,6 @@ impl TransformConfig for MetricToLogConfig {
                 .with_event_field(
                     &owned_value_path!("tags"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None,
-                )
-                .with_event_field(
-                    &owned_value_path!("timestamp"),
-                    Kind::bytes().or_undefined(),
                     None,
                 )
                 .with_event_field(&owned_value_path!("kind"), Kind::bytes(), None)
@@ -182,13 +180,35 @@ impl TransformConfig for MetricToLogConfig {
                     None,
                 );
 
-        if log_namespace == LogNamespace::Vector {
-            // This is added as a "marker" field to determine which namespace is being used at runtime.
-            // This is normally handled automatically by sources, but this is a special case.
-            schema_definition = schema_definition.with_metadata_field(
-                &owned_value_path!("vector"),
-                Kind::object(Collection::empty()),
-            );
+        match log_namespace {
+            LogNamespace::Vector => {
+                // from serializing the Metric (Legacy moves it to another field
+                schema_definition = schema_definition.with_event_field(
+                    &owned_value_path!("timestamp"),
+                    Kind::bytes().or_undefined(),
+                    None,
+                );
+
+                // This is added as a "marker" field to determine which namespace is being used at runtime.
+                // This is normally handled automatically by sources, but this is a special case.
+                schema_definition = schema_definition.with_metadata_field(
+                    &owned_value_path!("vector"),
+                    Kind::object(Collection::empty()),
+                );
+            }
+            LogNamespace::Legacy => {
+                schema_definition = schema_definition.with_event_field(
+                    &parse_value_path(log_schema().timestamp_key()).expect("valid timestamp key"),
+                    Kind::timestamp(),
+                    None,
+                );
+
+                schema_definition = schema_definition.with_event_field(
+                    &parse_value_path(log_schema().host_key()).expect("valid host key"),
+                    Kind::bytes().or_undefined(),
+                    None,
+                );
+            }
         }
 
         vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
@@ -201,7 +221,6 @@ impl TransformConfig for MetricToLogConfig {
 
 #[derive(Clone, Debug)]
 pub struct MetricToLog {
-    timestamp_key: String,
     host_tag: String,
     timezone: TimeZone,
     log_namespace: LogNamespace,
@@ -210,7 +229,6 @@ pub struct MetricToLog {
 impl MetricToLog {
     pub fn new(host_tag: Option<String>, timezone: TimeZone, log_namespace: LogNamespace) -> Self {
         Self {
-            timestamp_key: "timestamp".into(),
             host_tag: format!(
                 "tags.{}",
                 host_tag.unwrap_or_else(|| log_schema().host_key().to_string())
@@ -250,6 +268,14 @@ impl MetricToLog {
                         if let Some(host) = log.remove_prune(self.host_tag.as_str(), true) {
                             log.insert(log_schema().host_key(), host);
                         }
+                    }
+                    if self.log_namespace == LogNamespace::Vector {
+                        // Create vector metadata since this is used as a marker to see which namespace is used at runtime.
+                        // This can be removed once metrics support namespacing.
+                        log.insert(
+                            (PathPrefix::Metadata, path!("vector")),
+                            Value::Object(BTreeMap::new()),
+                        );
                     }
                     Some(log)
                 }
@@ -293,6 +319,7 @@ mod tests {
             let config = MetricToLogConfig {
                 host_tag: Some("host".into()),
                 timezone: None,
+                log_namespace: Some(false),
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;

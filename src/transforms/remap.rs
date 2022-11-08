@@ -1294,10 +1294,13 @@ mod tests {
         .with_event_field(&owned_value_path!("tags"), Kind::any(), None);
 
         assert_eq!(
-            conf.outputs(&schema::Definition::new_with_default_metadata(
-                Kind::any_object(),
-                [LogNamespace::Legacy]
-            )),
+            conf.outputs(
+                &schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy]
+                ),
+                LogNamespace::Legacy
+            ),
             vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 
