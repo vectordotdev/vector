@@ -311,7 +311,7 @@ validate, the validators to run -- and handles the boilerplate of building the c
 and any external resource, generating the inputs, sending the inputs, collecting the outputs, and
 actually driving the component and external resource until all outputs have been collected.
 
-Here's a simple example of what I expect this to look like:
+Here's a simple example of how the runner would actually be used to bring everything together:
 
 ```rust
 fn get_all_validatable_components() -> Vec<&'static dyn ValidatableComponent> {
@@ -333,9 +333,10 @@ fn compliance() {
             Ok(results) => {
                 for validator_result in results.validator_results() {
                     match validator_result {
-                        // Getting results in the success case will be rare, but perhaps we want to always print
-                        // successful validations so that we can verify that specific components are being validated,
-                        // and verify what things we're validating them against.
+                        // Getting results in the success case will be rare, but perhaps we want
+                        // to always print successful validations so that we can verify that specific
+                        // components are being validated, and verify what things we're validating
+                        // them against.
                         Ok(_success_results) => {}
                         Err(failure_results) => {
                             let formatted_failures = failure_results
@@ -476,9 +477,9 @@ without -- at least as far as I can see -- a meaningful benefit to the isolation
 ## Plan Of Attack
 
 - [ ] Merge the RFC PR, which contains the proof-of-concept approach as described in the RFC itself.
-- [ ] Implement the Component Specification validator: check for expected events/metrics based on
+- [ ] Implement a Component Specification validator: check for expected events/metrics based on
   component type.
-- [ ] Implement the Metrics Correctness validator: check that the metric emitted for bytes received
+- [ ] Implement a Metrics Correctness validator: check that the metric emitted for bytes received
   by a source matches the number of bytes we actually sent to the source, and so on.
 - [ ] Implement more external resources: raw socket, specific services that can be emulated (i.e.
   Elasticsearch is just HTTP with specific routes). This would likely be split into multiple items
