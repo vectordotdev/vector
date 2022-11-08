@@ -41,10 +41,6 @@ etc -- that make it suitable for production use.
 - [#14073](https://github.com/vectordotdev/vector/issues/14073) - verify `route` transform's
   `component_discarded_events_total`
 
-## Cross cutting concerns
-
-- Link to any ongoing or future work relevant to this change.
-
 ## Scope
 
 ### In scope
