@@ -360,6 +360,7 @@ pub async fn build_pieces(
             enrichment_tables: enrichment_tables.clone(),
             schema_definitions,
             merged_schema_definition: merged_definition.clone(),
+            schema: config.schema,
         };
 
         let node = TransformNode::from_parts(key.clone(), transform, &merged_definition);

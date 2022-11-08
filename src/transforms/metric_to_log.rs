@@ -1,10 +1,12 @@
 use chrono::Utc;
-use lookup::{event_path, path};
+use lookup::{event_path, owned_value_path};
 use serde_json::Value;
+use std::collections::BTreeSet;
 use value::kind::Collection;
 use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::schema::Definition;
 use crate::{
@@ -41,6 +43,10 @@ pub struct MetricToLogConfig {
     /// [global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     pub timezone: Option<TimeZone>,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 impl GenerateConfig for MetricToLogConfig {
@@ -48,6 +54,7 @@ impl GenerateConfig for MetricToLogConfig {
         toml::Value::try_from(Self {
             host_tag: Some("host-tag".to_string()),
             timezone: None,
+            log_namespace: None,
         })
         .unwrap()
     }
@@ -56,9 +63,11 @@ impl GenerateConfig for MetricToLogConfig {
 #[async_trait::async_trait]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let log_namespace = context.log_namespace(self.log_namespace);
         Ok(Transform::function(MetricToLog::new(
             self.host_tag.clone(),
             self.timezone.unwrap_or_else(|| context.globals.timezone()),
+            log_namespace,
         )))
     }
 
@@ -66,31 +75,123 @@ impl TransformConfig for MetricToLogConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        let mut schema_definition = Definition::any()
-            .with_event_field(owned_value_path!("name"), Kind::bytes(), None)
-            .with_event_field(
-                owned_value_path!("namespace"),
-                Kind::bytes().or_undefined(),
-                None,
-            )
-            .with_event_field(
-                owned_value_path!("tags"),
-                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                None,
-            )
-            .with_event_field(
-                owned_value_path!("timestamp"),
-                Kind::bytes().or_undefined(),
-                None,
-            )
-            .with_event_field(owned_value_path!("kind"), Kind::bytes(), None)
-            .with_event_field(
-                owned_value_path!("counter"),
-                Kind::object(Collection::empty().with_known),
-            );
+    fn outputs(&self, _: &schema::Definition, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let mut schema_definition =
+            Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
+                .with_event_field(&owned_value_path!("name"), Kind::bytes(), None)
+                .with_event_field(
+                    &owned_value_path!("namespace"),
+                    Kind::bytes().or_undefined(),
+                    None,
+                )
+                .with_event_field(
+                    &owned_value_path!("tags"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
+                )
+                .with_event_field(
+                    &owned_value_path!("timestamp"),
+                    Kind::bytes().or_undefined(),
+                    None,
+                )
+                .with_event_field(&owned_value_path!("kind"), Kind::bytes(), None)
+                .with_event_field(
+                    &owned_value_path!("counter"),
+                    Kind::object(Collection::empty().with_known("value", Kind::float()))
+                        .or_undefined(),
+                    None,
+                )
+                .with_event_field(
+                    &owned_value_path!("gauge"),
+                    Kind::object(Collection::empty().with_known("value", Kind::float()))
+                        .or_undefined(),
+                    None,
+                )
+                .with_event_field(
+                    &owned_value_path!("set"),
+                    Kind::object(Collection::empty().with_known(
+                        "values",
+                        Kind::array(Collection::empty().with_unknown(Kind::bytes())),
+                    ))
+                    .or_undefined(),
+                    None,
+                )
+                .with_event_field(
+                    &owned_value_path!("distribution"),
+                    Kind::object(
+                        Collection::empty()
+                            .with_known(
+                                "samples",
+                                Kind::array(
+                                    Collection::empty().with_unknown(Kind::object(
+                                        Collection::empty()
+                                            .with_known("value", Kind::float())
+                                            .with_known("rate", Kind::integer()),
+                                    )),
+                                ),
+                            )
+                            .with_known("statistic", Kind::bytes()),
+                    )
+                    .or_undefined(),
+                    None,
+                )
+                .with_event_field(
+                    &owned_value_path!("aggregated_histogram"),
+                    Kind::object(
+                        Collection::empty()
+                            .with_known(
+                                "buckets",
+                                Kind::array(
+                                    Collection::empty().with_unknown(Kind::object(
+                                        Collection::empty()
+                                            .with_known("upper_limit", Kind::float())
+                                            .with_known("count", Kind::integer()),
+                                    )),
+                                ),
+                            )
+                            .with_known("count", Kind::integer())
+                            .with_known("sum", Kind::float()),
+                    )
+                    .or_undefined(),
+                    None,
+                )
+                .with_event_field(
+                    &owned_value_path!("aggregated_summary"),
+                    Kind::object(
+                        Collection::empty()
+                            .with_known(
+                                "quantiles",
+                                Kind::array(
+                                    Collection::empty().with_unknown(Kind::object(
+                                        Collection::empty()
+                                            .with_known("quantile", Kind::float())
+                                            .with_known("value", Kind::float()),
+                                    )),
+                                ),
+                            )
+                            .with_known("count", Kind::integer())
+                            .with_known("sum", Kind::float()),
+                    )
+                    .or_undefined(),
+                    None,
+                )
+                .with_event_field(
+                    &owned_value_path!("sketch"),
+                    Kind::any().or_undefined(),
+                    None,
+                );
 
-        vec![Output::default(DataType::Log)]
+        if log_namespace == LogNamespace::Vector {
+            // This is added as a "marker" field to determine which namespace is being used at runtime.
+            // This is normally handled automatically by sources, but this is a special case.
+            schema_definition = schema_definition.with_metadata_field(
+                &owned_value_path!("vector"),
+                Kind::object(Collection::empty()),
+            );
+        }
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -103,10 +204,11 @@ pub struct MetricToLog {
     timestamp_key: String,
     host_tag: String,
     timezone: TimeZone,
+    log_namespace: LogNamespace,
 }
 
 impl MetricToLog {
-    pub fn new(host_tag: Option<String>, timezone: TimeZone) -> Self {
+    pub fn new(host_tag: Option<String>, timezone: TimeZone, log_namespace: LogNamespace) -> Self {
         Self {
             timestamp_key: "timestamp".into(),
             host_tag: format!(
@@ -114,6 +216,7 @@ impl MetricToLog {
                 host_tag.unwrap_or_else(|| log_schema().host_key().to_string())
             ),
             timezone,
+            log_namespace,
         }
     }
 
@@ -131,20 +234,25 @@ impl MetricToLog {
                         log.insert(event_path!(&key), value);
                     }
 
-                    let timestamp = log
-                        .remove(event_path!("timestamp"))
-                        .and_then(|value| {
-                            Conversion::Timestamp(self.timezone)
-                                .convert(value.coerce_to_bytes())
-                                .ok()
-                        })
-                        .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
+                    if self.log_namespace == LogNamespace::Legacy {
+                        // "Vector" namespace just leaves the `timestamp` in place.
 
-                    log.insert(log_schema().timestamp_key(), timestamp);
+                        let timestamp = log
+                            .remove(event_path!("timestamp"))
+                            .and_then(|value| {
+                                Conversion::Timestamp(self.timezone)
+                                    .convert(value.coerce_to_bytes())
+                                    .ok()
+                            })
+                            .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
 
-                    if let Some(host) = log.remove_prune(self.host_tag.as_str(), true) {
-                        log.insert(log_schema().host_key(), host);
+                        log.insert(log_schema().timestamp_key(), timestamp);
                     }
+
+                    //
+                    // if let Some(host) = log.remove_prune(self.host_tag.as_str(), true) {
+                    //     log.insert(log_schema().host_key(), host);
+                    // }
 
                     Some(log)
                 }
