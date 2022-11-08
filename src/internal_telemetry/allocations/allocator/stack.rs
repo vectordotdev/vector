@@ -25,11 +25,11 @@ impl<const N: usize> GroupStack<N> {
     /// Gets the currently active allocation group.
     ///
     /// If the stack is empty, then the root allocation group is the defacto active allocation group, and is returned as such.
-    pub fn current(&self) -> AllocationGroupId {
+    pub const fn current(&self) -> AllocationGroupId {
         if self.current_top == 0 {
             AllocationGroupId::ROOT
         } else {
-            unsafe { *self.slots.get_unchecked(self.current_top - 1) }
+            self.slots[self.current_top - 1]
         }
     }
 
