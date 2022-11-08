@@ -50,6 +50,9 @@ pub struct PulsarSinkConfig {
     /// The Pulsar topic name to write events to.
     topic: String,
 
+    /// The name of the producer. If not specified, the default name will be used.
+    producer_name: Option<String>,
+
     #[configurable(derived)]
     pub encoding: EncodingConfig,
 
@@ -64,7 +67,7 @@ pub struct PulsarSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    /// Log field to use as Pulsar message key
+    /// Log field to use as Pulsar message key.
     partition_key_field: Option<String>,
 }
 
@@ -153,6 +156,7 @@ impl GenerateConfig for PulsarSinkConfig {
             encoding: TextSerializerConfig::new().into(),
             auth: None,
             acknowledgements: Default::default(),
+            producer_name: None,
         })
         .unwrap()
     }
@@ -165,7 +169,7 @@ impl SinkConfig for PulsarSinkConfig {
         _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let producer = self
-            .create_pulsar_producer()
+            .create_pulsar_producer(false)
             .await
             .context(CreatePulsarSinkSnafu)?;
 
@@ -181,7 +185,7 @@ impl SinkConfig for PulsarSinkConfig {
         )?;
 
         let producer = self
-            .create_pulsar_producer()
+            .create_pulsar_producer(true)
             .await
             .context(CreatePulsarSinkSnafu)?;
         let healthcheck = healthcheck(producer).boxed();
@@ -199,7 +203,10 @@ impl SinkConfig for PulsarSinkConfig {
 }
 
 impl PulsarSinkConfig {
-    async fn create_pulsar_producer(&self) -> Result<PulsarProducer, PulsarError> {
+    async fn create_pulsar_producer(
+        &self,
+        is_healthcheck: bool,
+    ) -> Result<PulsarProducer, PulsarError> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
             builder = match (
@@ -227,23 +234,28 @@ impl PulsarSinkConfig {
         }
 
         let pulsar = builder.build().await?;
-        if let SerializerConfig::Avro { avro } = self.encoding.config() {
-            pulsar
-                .producer()
-                .with_options(pulsar::producer::ProducerOptions {
-                    schema: Some(proto::Schema {
-                        schema_data: avro.schema.as_bytes().into(),
-                        r#type: proto::schema::Type::Avro as i32,
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                })
-                .with_topic(&self.topic)
-                .build()
-                .await
-        } else {
-            pulsar.producer().with_topic(&self.topic).build().await
+        let mut pulsar_builder = pulsar.producer().with_topic(&self.topic);
+
+        if let Some(producer_name) = self.producer_name.clone() {
+            if is_healthcheck {
+                pulsar_builder = pulsar_builder.with_name(format!("{}-healthcheck", producer_name));
+            } else {
+                pulsar_builder = pulsar_builder.with_name(producer_name);
+            }
         }
+
+        if let SerializerConfig::Avro { avro } = self.encoding.config() {
+            pulsar_builder = pulsar_builder.with_options(pulsar::producer::ProducerOptions {
+                schema: Some(proto::Schema {
+                    schema_data: avro.schema.as_bytes().into(),
+                    r#type: proto::schema::Type::Avro as i32,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+        }
+
+        pulsar_builder.build().await
     }
 }
 
@@ -436,6 +448,7 @@ mod integration_tests {
         let cnf = PulsarSinkConfig {
             endpoint: pulsar_address(),
             topic: topic.clone(),
+            producer_name: None,
             encoding: TextSerializerConfig::new().into(),
             auth: None,
             acknowledgements: Default::default(),
