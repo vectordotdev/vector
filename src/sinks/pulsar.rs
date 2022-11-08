@@ -91,7 +91,7 @@ struct AuthConfig {
     oauth2: Option<OAuth2Config>,
 }
 
-/// OAuth2-specific authenticatgion configuration.
+/// OAuth2-specific authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct OAuth2Config {

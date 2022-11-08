@@ -42,7 +42,7 @@ base: components: sinks: pulsar: configuration: {
 				type: string: syntax: "literal"
 			}
 			oauth2: {
-				description: "OAuth2-specific authenticatgion configuration."
+				description: "OAuth2-specific authentication configuration."
 				required:    false
 				type: object: options: {
 					audience: {
