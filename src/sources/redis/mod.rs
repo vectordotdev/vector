@@ -202,10 +202,7 @@ impl SourceConfig for RedisSourceConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let schema_definition = self
-            .decoding
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+        let schema_definition = self.decoding.schema_definition(log_namespace);
 
         let schema_definition = match &self.redis_key {
             Some(key) => schema_definition.with_source_metadata(
@@ -223,6 +220,8 @@ impl SourceConfig for RedisSourceConfig {
                 None,
             ),
         };
+
+        let schema_definition = schema_definition.with_standard_vector_source_metadata();
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
