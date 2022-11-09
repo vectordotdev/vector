@@ -452,12 +452,59 @@ impl Definition {
     }
 }
 
+#[cfg(any(test, feature = "test"))]
+mod test_utils {
+    use super::*;
+    use crate::event::{Event, LogEvent};
+
+    impl Definition {
+        /// Asserts that the schema definition is _valid_ for the given event.
+        /// This will panic if the definition is not valid.
+
+        pub fn is_valid_for_event(&self, event: &Event) -> Result<(), String> {
+            if let Some(log) = event.as_log() {
+                let log: &LogEvent = log;
+                let actual_kind = Kind::from(log.value());
+                if !self.event_kind.is_superset(&actual_kind) {
+                    return Result::Err(format!("Event doesn't match"));
+                }
+                Ok(())
+            } else {
+                // schema definitions currently only apply to logs
+                Ok(())
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::event::{Event, LogEvent};
     use lookup::owned_value_path;
     use std::collections::{BTreeMap, HashMap};
 
     use super::*;
+
+    #[test]
+    fn test_definition_validity() {
+        struct TestCase {
+            title: &'static str,
+            definition: Definition,
+            event: Event,
+            valid: bool,
+        }
+
+        for TestCase {
+            title,
+            definition,
+            event,
+            valid,
+        } in [TestCase {
+            title: "",
+            definition: Default::default(),
+            event: Event::Log(LogEvent::from(value!())),
+        }] {}
+    }
 
     #[test]
     fn test_empty_legacy_field() {
