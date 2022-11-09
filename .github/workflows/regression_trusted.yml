@@ -472,7 +472,6 @@ jobs:
 
       - name: Post report to PR
         uses: peter-evans/create-or-update-comment@v2
-        if: ${{ github.actor != 'dependabot[bot]' }}
         with:
           issue-number: ${{ needs.compute-metadata.outputs.github-event-number }}
           edit-mode: append
