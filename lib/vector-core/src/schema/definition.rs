@@ -460,21 +460,32 @@ mod test_utils {
     impl Definition {
         /// Asserts that the schema definition is _valid_ for the given event.
         /// This will panic if the definition is not valid.
-
+        ///
+        /// # Errors
+        /// If the definition is not valid, debug info will be returned.
         pub fn is_valid_for_event(&self, event: &Event) -> Result<(), String> {
             if let Some(log) = event.maybe_as_log() {
                 let log: &LogEvent = log;
 
                 let actual_kind = Kind::from(log.value());
-                if !self.event_kind.is_superset(&actual_kind) {
-                    return Result::Err(format!("Event value doesn't match definition.\n\nDefinition type=\n{:?}\n\nActual event type=\n{:?}\n",
-                                               self.event_kind.debug_info(), actual_kind.debug_info()));
+                if let Err(path) = self.event_kind.is_superset(&actual_kind) {
+                    return Result::Err(format!("Event value doesn't match at path: {:?}.\n\nEvent type at path = {:?}\n\nDefinition at path = {:?}",
+                        path,
+                        actual_kind.get(&path).debug_info(),
+                        self.event_kind.get(&path).debug_info()
+                    ));
                 }
 
                 let actual_metadata_kind = Kind::from(log.metadata().value());
-                if !self.metadata_kind.is_superset(&actual_metadata_kind) {
-                    return Result::Err(format!("Event metadata doesn't match definition.\n\nDefinition type=\n{:?}\n\nActual event metadata type=\n{:?}\n",
-                                               self.metadata_kind.debug_info(), actual_metadata_kind.debug_info()));
+                if let Err(path) = self.metadata_kind.is_superset(&actual_metadata_kind) {
+                    // return Result::Err(format!("Event metadata doesn't match definition.\n\nDefinition type=\n{:?}\n\nActual event metadata type=\n{:?}\n",
+                    //                            self.metadata_kind.debug_info(), actual_metadata_kind.debug_info()));
+                    return Result::Err(format!(
+                        "Event METADATA value doesn't match at path: {:?}.\n\nMetadata type at path = {:?}\n\nDefinition at path = {:?}",
+                        path,
+                        actual_metadata_kind.get(&path).debug_info(),
+                        self.metadata_kind.get(&path).debug_info()
+                    ));
                 }
                 if !self.log_namespaces.contains(&log.namespace()) {
                     return Result::Err(format!(
@@ -491,6 +502,8 @@ mod test_utils {
             }
         }
 
+        /// # Panics
+        /// If the definition is not valid for the event.
         pub fn assert_valid_for_event(&self, event: &Event) {
             if let Err(err) = self.is_valid_for_event(event) {
                 panic!("Schema definition assertion failed: {}", err);
@@ -563,7 +576,11 @@ mod tests {
         ] {
             let result = definition.is_valid_for_event(&event);
             assert_eq!(result.is_ok(), valid, "{}", title);
+            if let Err(err) = result {
+                println!("{}", err);
+            }
         }
+        panic!();
     }
 
     #[test]
