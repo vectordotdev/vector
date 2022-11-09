@@ -25,8 +25,8 @@ impl DnstapEventSchema {
     fn request_message_schema_definition(&self) -> Collection<Field> {
         btreemap! {
             self.dns_query_message_schema().time() => Kind::integer().or_undefined(),
-            self.dns_update_message_schema().time() => Kind::bytes().or_undefined(),
-            self.dns_query_message_schema().time_precision() => Kind::integer().or_undefined(),
+            self.dns_update_message_schema().time() => Kind::integer().or_undefined(),
+            self.dns_query_message_schema().time_precision() => Kind::bytes().or_undefined(),
             self.dns_update_message_schema().time_precision() => Kind::bytes().or_undefined(),
             self.dns_query_message_schema().response_code() => Kind::integer().or_undefined(),
             self.dns_update_message_schema().response_code() => Kind::integer().or_undefined(),
@@ -70,7 +70,7 @@ impl DnstapEventSchema {
                 Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
             ).or_undefined(),
         }
-       .into()
+        .into()
     }
 
     /// Schema definition for fields stored in the root.
@@ -151,7 +151,7 @@ impl DnstapEventSchema {
             )
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().query_port()),
-                Kind::bytes(),
+                Kind::integer(),
                 None,
             )
             .optional_field(
@@ -161,7 +161,7 @@ impl DnstapEventSchema {
             )
             .optional_field(
                 &owned_value_path!(self.dnstap_message_schema().response_port()),
-                Kind::bytes(),
+                Kind::integer(),
                 None,
             )
             .optional_field(
@@ -669,9 +669,19 @@ impl DnsQueryHeaderSchema {
             self.rcode() => Kind::integer(),
             self.qr() => Kind::integer(),
             self.additional_count() => Kind::integer(),
+            self.aa() => Kind::boolean(),
+            self.tc() => Kind::boolean(),
+            self.rd() => Kind::boolean(),
+            self.ra() => Kind::boolean(),
+            self.ad() => Kind::boolean(),
+            self.cd() => Kind::boolean(),
+            self.question_count() => Kind::integer(),
+            self.answer_count() => Kind::integer(),
+            self.authority_count() => Kind::integer(),
         }
         .into()
     }
+
     pub const fn id(&self) -> &'static str {
         self.id
     }
