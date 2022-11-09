@@ -795,6 +795,13 @@ fn prepare_label_selector(selector: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use lookup::{owned_value_path, LookupBuf};
+    use similar_asserts::assert_eq;
+    use value::{kind::Collection, Kind};
+    use vector_core::{config::LogNamespace, schema::Definition};
+
+    use crate::config::SourceConfig;
+
     use super::Config;
 
     #[test]
@@ -929,5 +936,127 @@ mod tests {
             let output = super::prepare_label_selector(&input);
             assert_eq!(expected, output, "expected left, actual right");
         }
+    }
+
+    #[test]
+    fn test_output_schema_definition_vector_namespace() {
+        let definition = toml::from_str::<Config>("")
+            .unwrap()
+            .outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        assert_eq!(
+            definition,
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_metadata_field(&owned_value_path!("kubernetes_logs", "file"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "kubernetes"),
+                    Kind::object(
+                        Collection::empty()
+                            .with_known("container_id", Kind::bytes())
+                            .with_known("container_image", Kind::bytes())
+                            .with_known("container_name", Kind::bytes())
+                            .with_known(
+                                "namespace_labels",
+                                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                            )
+                            .with_known(
+                                "pod_annotations",
+                                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                            )
+                            .with_known("pod_ip", Kind::bytes())
+                            .with_known(
+                                "pod_ips",
+                                Kind::array(Collection::empty().with_unknown(Kind::bytes())),
+                            )
+                            .with_known(
+                                "pod_labels",
+                                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                            )
+                            .with_known("pod_name", Kind::bytes())
+                            .with_known("pod_namespace", Kind::bytes())
+                            .with_known("pod_node_name", Kind::bytes())
+                            .with_known("pod_owner", Kind::bytes())
+                            .with_known("pod_uid", Kind::bytes())
+                    )
+                    .or_undefined()
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "stream"),
+                    Kind::bytes()
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "timestamp"),
+                    Kind::timestamp()
+                )
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp()
+                )
+                .with_meaning(LookupBuf::root(), "message")
+        )
+    }
+
+    #[test]
+    fn test_output_schema_definition_legacy_namespace() {
+        let definition = toml::from_str::<Config>("")
+            .unwrap()
+            .outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        assert_eq!(
+            definition,
+            Definition::new_with_default_metadata(
+                Kind::object(Collection::empty()),
+                [LogNamespace::Legacy]
+            )
+            .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
+            .with_event_field(
+                &owned_value_path!("message"),
+                Kind::bytes(),
+                Some("message")
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes"),
+                Kind::object(
+                    Collection::empty()
+                        .with_known("container_id", Kind::bytes())
+                        .with_known("container_image", Kind::bytes())
+                        .with_known("container_name", Kind::bytes())
+                        .with_known(
+                            "namespace_labels",
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                        )
+                        .with_known(
+                            "pod_annotations",
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                        )
+                        .with_known("pod_ip", Kind::bytes())
+                        .with_known(
+                            "pod_ips",
+                            Kind::array(Collection::empty().with_unknown(Kind::bytes())),
+                        )
+                        .with_known(
+                            "pod_labels",
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                        )
+                        .with_known("pod_name", Kind::bytes())
+                        .with_known("pod_namespace", Kind::bytes())
+                        .with_known("pod_node_name", Kind::bytes())
+                        .with_known("pod_owner", Kind::bytes())
+                        .with_known("pod_uid", Kind::bytes())
+                )
+                .or_undefined(),
+                None
+            )
+            .with_event_field(&owned_value_path!("stream"), Kind::bytes(), None)
+            .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+            .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        )
     }
 }
