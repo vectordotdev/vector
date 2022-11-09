@@ -18,5 +18,5 @@ if [[ -n "${DIRTY_COMPONENT_FILES}" ]]; then
    echo "${DIRTY_COMPONENT_FILES}"
    echo
    echo "Run \`make generate-component-docs\` locally to update your branch and commit/push the changes."
-   exit
+   exit 1
 fi
