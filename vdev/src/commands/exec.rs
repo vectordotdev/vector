@@ -20,7 +20,7 @@ impl Cli {
         if !status.success() {
             bail!(
                 "failed with exit code: {}",
-                status.code().unwrap_or_else(|| 1)
+                status.code().unwrap_or(1)
             );
         }
 
