@@ -20,8 +20,8 @@ use crate::{
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
-            BatchActionTemplateSnafu, ElasticsearchAuth, ElasticsearchCommon,
-            ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
+            BatchActionTemplateSnafu, ElasticsearchApiVersion, ElasticsearchAuth,
+            ElasticsearchCommon, ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
         },
         util::{
             http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
@@ -61,13 +61,19 @@ pub struct ElasticsearchConfig {
     /// set this option since Elasticsearch has removed it.
     pub doc_type: Option<String>,
 
+    /// The API version of Elasticsearch.
+    #[serde(default)]
+    pub api_version: ElasticsearchApiVersion,
+
     /// Whether or not to send the `type` field to Elasticsearch.
     ///
     /// `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
     ///
     /// If enabled, the `doc_type` option will be ignored.
-    #[serde(default)]
-    pub suppress_type_name: bool,
+    ///
+    /// This option has been deprecated, the `api_version` option should be used instead.
+    #[configurable(deprecated)]
+    pub suppress_type_name: Option<bool>,
 
     /// Whether or not to retry successful requests containing partial failures.
     ///
@@ -381,7 +387,7 @@ impl DataStreamConfig {
 #[async_trait::async_trait]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let commons = ElasticsearchCommon::parse_many(self).await?;
+        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
@@ -490,5 +496,29 @@ mod tests {
         "#,
         )
         .unwrap();
+    }
+
+    #[test]
+    fn parse_version() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            api_version = "v7"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.api_version, ElasticsearchApiVersion::V7);
+    }
+
+    #[test]
+    fn parse_version_auto() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            api_version = "auto"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
     }
 }
