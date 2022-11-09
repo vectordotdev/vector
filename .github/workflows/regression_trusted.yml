@@ -90,7 +90,7 @@ jobs:
 
             console.log("Downloading artifact %s", matchArtifact.id);
 
-            var download = await github.actions.rest.downloadArtifact({
+            var download = await github.rest.actions.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
                artifact_id: matchArtifact.id,
@@ -160,7 +160,7 @@ jobs:
 
             console.log("Downloading artifact %s", matchArtifact.id);
 
-            var download = await github.actions.rest.downloadArtifact({
+            var download = await github.rest.actions.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
                artifact_id: matchArtifact.id,
@@ -228,7 +228,7 @@ jobs:
 
             console.log("Downloading artifact %s", matchArtifact.id);
 
-            var download = await github.actions.rest.downloadArtifact({
+            var download = await github.rest.actions.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
                artifact_id: matchArtifact.id,
