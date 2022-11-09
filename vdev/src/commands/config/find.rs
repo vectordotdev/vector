@@ -10,7 +10,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(&self) -> Result<()> {
-        app::display(format!("{}", app::config_file().path().display()));
+        display!("{}", app::config_file().path().display());
 
         Ok(())
     }

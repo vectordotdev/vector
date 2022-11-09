@@ -12,7 +12,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(&self) -> Result<()> {
-        app::display(format!("Branch: {}", git::current_branch()?));
+        display!("Branch: {}", git::current_branch()?);
 
         let configs = IntegrationTestConfig::collect_all(app::path())?;
         let mut changed = vec![];
@@ -22,9 +22,9 @@ impl Cli {
             }
         }
         if !changed.is_empty() {
-            app::display("Changed:");
+            display!("Changed:");
             for integration in changed.iter() {
-                app::display(format!("  {}", integration));
+                display!("  {}", integration);
             }
         }
 

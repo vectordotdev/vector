@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Args;
 
 use crate::app;
@@ -46,7 +46,7 @@ impl Cli {
             command.args(["--target", &platform::default_target()]);
         };
 
-        app::display_waiting("Building Vector");
+        display_waiting!("Building Vector");
         app::run_command(&mut command)?;
 
         Ok(())

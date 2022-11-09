@@ -33,7 +33,7 @@ impl Cli {
             entries.sort();
 
             for integration in entries.iter() {
-                app::display(integration);
+                display!("{integration}");
             }
 
             return Ok(());
@@ -45,18 +45,18 @@ impl Cli {
         let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration.as_ref().unwrap());
         let active_envs = state::active_envs(&envs_dir)?;
 
-        app::display(format!(
+        display!(
             "Tests triggered: {}",
             config.triggered(git::changed_files()?)?
-        ));
-        app::display(format!("Test args: {}", config.args.join(" ")));
+        );
+        display!("Test args: {}", config.args.join(" "));
 
-        app::display("Environments:");
+        display!("Environments:");
         for environment in config.environments().keys() {
             if active_envs.contains(environment) {
-                app::display(format!("  {} (active)", environment));
+                display!("  {} (active)", environment);
             } else {
-                app::display(format!("  {}", environment));
+                display!("  {}", environment);
             }
         }
 

@@ -62,7 +62,7 @@ impl Cli {
                     command.envs(env_vars);
                 }
 
-                app::display_waiting(format!("Starting environment {}", env_name));
+                display_waiting!("Starting environment {}", env_name);
                 app::run_command(&mut command)?;
 
                 state::save_env(&envs_dir, env_name, &json)?;
@@ -86,7 +86,7 @@ impl Cli {
                     command.envs(env_vars);
                 }
 
-                app::display_waiting(format!("Stopping environment {}", env_name));
+                display_waiting!("Stopping environment {}", env_name);
                 app::run_command(&mut command)?;
 
                 state::remove_env(&envs_dir, env_name)?;

@@ -55,7 +55,7 @@ impl Cli {
             command.envs(env_vars);
         }
 
-        app::display_waiting(format!("Stopping environment {}", &self.environment));
+        display_waiting!("Stopping environment {}", &self.environment);
         app::run_command(&mut command)?;
 
         state::remove_env(&envs_dir, &self.environment)?;

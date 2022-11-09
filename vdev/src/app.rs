@@ -1,11 +1,7 @@
 use anyhow::{bail, Result};
 use indicatif::{ProgressBar, ProgressStyle};
-use log::{Level, LevelFilter};
+use log::LevelFilter;
 use once_cell::sync::OnceCell;
-use owo_colors::{
-    OwoColorize,
-    Stream::{Stderr, Stdout},
-};
 use std::time::Duration;
 use std::{borrow::Cow, process::Command};
 
@@ -30,87 +26,6 @@ pub fn config() -> &'static Config {
 
 pub fn path() -> &'static String {
     PATH.get().expect("path is not initialized")
-}
-
-pub fn display<T: AsRef<str>>(text: T) {
-    // Simply bold rather than bright white for terminals with white backgrounds
-    println!(
-        "{}",
-        text.as_ref().if_supports_color(Stdout, |text| text.bold())
-    );
-}
-
-#[allow(dead_code)]
-pub fn display_trace<T: AsRef<str>>(text: T) {
-    if Level::Trace <= *verbosity() {
-        eprintln!(
-            "{}",
-            text.as_ref().if_supports_color(Stderr, |text| text.bold())
-        );
-    }
-}
-
-#[allow(dead_code)]
-pub fn display_debug<T: AsRef<str>>(text: T) {
-    if Level::Debug <= *verbosity() {
-        eprintln!(
-            "{}",
-            text.as_ref().if_supports_color(Stderr, |text| text.bold())
-        );
-    }
-}
-
-#[allow(dead_code)]
-pub fn display_info<T: AsRef<str>>(text: T) {
-    if Level::Info <= *verbosity() {
-        eprintln!(
-            "{}",
-            text.as_ref().if_supports_color(Stderr, |text| text.bold())
-        );
-    }
-}
-
-#[allow(dead_code)]
-pub fn display_success<T: AsRef<str>>(text: T) {
-    if Level::Info <= *verbosity() {
-        eprintln!(
-            "{}",
-            text.as_ref()
-                .if_supports_color(Stderr, |text| text.bright_cyan())
-        );
-    }
-}
-
-#[allow(dead_code)]
-pub fn display_waiting<T: AsRef<str>>(text: T) {
-    if Level::Info <= *verbosity() {
-        eprintln!(
-            "{}",
-            text.as_ref()
-                .if_supports_color(Stderr, |text| text.bright_magenta())
-        );
-    }
-}
-
-#[allow(dead_code)]
-pub fn display_warning<T: AsRef<str>>(text: T) {
-    if Level::Warn <= *verbosity() {
-        eprintln!(
-            "{}",
-            text.as_ref()
-                .if_supports_color(Stderr, |text| text.bright_yellow())
-        );
-    }
-}
-
-pub fn display_error<T: AsRef<str>>(text: T) {
-    if Level::Error <= *verbosity() {
-        eprintln!(
-            "{}",
-            text.as_ref()
-                .if_supports_color(Stderr, |text| text.bright_red())
-        );
-    }
 }
 
 pub fn construct_command(program: &str) -> Command {
