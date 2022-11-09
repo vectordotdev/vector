@@ -42,15 +42,6 @@ jobs:
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
       baseline: ${{ steps.baseline.outputs.BASELINE }}
       baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
-
-      cpus: ${{ steps.system.outputs.CPUS }}
-      memory: ${{ steps.system.outputs.MEMORY }}
-
-      replicas: ${{ steps.experimental-meta.outputs.REPLICAS }}
-      warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
-      total-samples: ${{ steps.experimental-meta.outputs.TOTAL_SAMPLES }}
-      p-value: ${{ steps.experimental-meta.outputs.P_VALUE }}
-      smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -61,27 +52,6 @@ jobs:
         id: pr-metadata
         run: |
           echo "PR_NUMBER=${{ github.event.number }}" >> $GITHUB_OUTPUT
-
-      - name: Setup experimental metadata
-        id: experimental-meta
-        run: |
-          export WARMUP_SECONDS="45"
-          export REPLICAS="10"
-          export TOTAL_SAMPLES="600"
-          export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.5.0"
-
-          echo "warmup seconds: ${WARMUP_SECONDS}"
-          echo "replicas: ${REPLICAS}"
-          echo "total samples: ${TOTAL_SAMPLES}"
-          echo "regression p-value: ${P_VALUE}"
-          echo "smp crate version: ${SMP_CRATE_VERSION}"
-
-          echo "WARMUP_SECONDS=${WARMUP_SECONDS}" >> $GITHUB_OUTPUT
-          echo "REPLICAS=${REPLICAS}" >> $GITHUB_OUTPUT
-          echo "TOTAL_SAMPLES=${TOTAL_SAMPLES}" >> $GITHUB_OUTPUT
-          echo "P_VALUE=${P_VALUE}" >> $GITHUB_OUTPUT
-          echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Setup baseline variables
         id: baseline
@@ -109,35 +79,6 @@ jobs:
           echo "COMPARISON=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
           echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
 
-      - name: Setup system details
-        id: system
-        run: |
-          export CPUS="8"
-          export MEMORY="30g"
-
-          echo "cpus total: ${CPUS}"
-          echo "memory total: ${MEMORY}"
-
-          echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
-          echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
-
-  confirm-valid-credentials:
-    name: Confirm AWS credentials are minimally valid
-    runs-on: ubuntu-22.04
-    needs:
-      - compute-metadata
-    steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
-        with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-
-      - name: Download SMP binary
-        run: |
-          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
-
   ##
   ## BUILD
   ##
@@ -146,7 +87,6 @@ jobs:
     name: Build baseline Vector container
     runs-on: [linux, soak-builder]
     needs:
-      - confirm-valid-credentials
       - compute-metadata
     steps:
       - uses: colpal/actions-clean@v1
@@ -162,22 +102,6 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v2.2.1
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
-        with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Docker Login to ECR
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ steps.login-ecr.outputs.registry }}
-
       - name: Build 'vector' target image
         uses: docker/build-push-action@v3
         with:
@@ -186,15 +110,20 @@ jobs:
           cache-to: type=gha,mode=max
           file: regression/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
+          outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
-          push: true
+            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}
+
+      - name: Upload image as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: baseline-image
+          path: "${{ runner.temp }}/baseline-image.tar"
 
   build-comparison:
     name: Build comparison Vector container
     runs-on: [linux, soak-builder]
     needs:
-      - confirm-valid-credentials
       - compute-metadata
     steps:
       - uses: colpal/actions-clean@v1
@@ -210,22 +139,6 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v2.2.1
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
-        with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Docker Login to ECR
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ steps.login-ecr.outputs.registry }}
-
       - name: Build 'vector' target image
         uses: docker/build-push-action@v3
         with:
@@ -234,144 +147,35 @@ jobs:
           cache-to: type=gha,mode=max
           file: regression/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
+          outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
-          push: true
+            vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}
 
-  ##
-  ## SUBMIT
-  ##
-
-  submit-job:
-    name: Submit regression job
-    runs-on: ubuntu-22.04
-    needs:
-      - compute-metadata
-      - build-baseline
-      - build-comparison
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
-        with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Download SMP binary
-        run: |
-          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
-
-      - name: Submit job
-        env:
-          RUST_LOG: debug
-        run: |
-          chmod +x ${{ runner.temp }}/bin/smp
-
-          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job submit \
-            --total-samples ${{ needs.compute-metadata.outputs.total-samples }} \
-            --warmup-seconds ${{ needs.compute-metadata.outputs.warmup-seconds }} \
-            --replicas ${{ needs.compute-metadata.outputs.replicas }} \
-            --baseline-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }} \
-            --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }} \
-            --baseline-sha ${{ needs.compute-metadata.outputs.baseline }} \
-            --comparison-sha ${{ needs.compute-metadata.outputs.comparison }} \
-            --target-config-dir ${{ github.workspace }}/regression/ \
-            --target-name vector \
-            --submission-metadata ${{ runner.temp }}/submission-metadata
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: vector-submission-metadata
-          path: ${{ runner.temp }}/submission-metadata
-
-      - name: Await job
-        timeout-minutes: 60
-        env:
-          RUST_LOG: info
-        run: |
-          chmod +x ${{ runner.temp }}/bin/smp
-
-          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
-            --wait \
-            --wait-delay-seconds 60 \
-            --submission-metadata ${{ runner.temp }}/submission-metadata
-
-      - name: Handle cancellation if necessary
-        if: ${{ cancelled() }}
-        timeout-minutes: 60
-        env:
-          RUST_LOG: info
-        run: |
-          chmod +x ${{ runner.temp }}/bin/smp
-          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job cancel --submission-metadata ${{ runner.temp }}/submission-metadata
-
-  ##
-  ## ANALYZE
-  ##
-
-  ## NOTE intentionally left as an example. The SMP capture files are quite
-  ## large, 1.5Gb. In the future we won't sync capture files at all, doing
-  ## analysis in the background and shipping the analysis. That said, at this
-  ## stage, it's still useful to know that you can sync if you want.
-
-  download-analysis:
-    name: Download regression analysis & upload report
-    runs-on: ubuntu-22.04
-    needs:
-      - submit-job
-      - compute-metadata
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
-        with:
-          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-
-      - name: Download SMP binary
-        run: |
-          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
-
-      - name: Download submission metadata
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-submission-metadata
-          path: ${{ runner.temp }}/
-
-      - name: Sync regression report to local system
-        env:
-          RUST_LOG: info
-        run: |
-          chmod +x ${{ runner.temp }}/bin/smp
-
-          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
-            --submission-metadata ${{ runner.temp }}/submission-metadata \
-            --output-path "${{ runner.temp }}/outputs"
-
-      - name: Read regression report
-        id: read-analysis
-        uses: juliangruber/read-file-action@v1
-        with:
-          path: ${{ runner.temp }}/outputs/report.html
-
-      - name: Post report to PR
-        uses: peter-evans/create-or-update-comment@v2
-        if: ${{ github.actor != 'dependabot[bot]' }}
-        with:
-          issue-number: ${{ github.event.number }}
-          edit-mode: append
-          body: ${{ steps.read-analysis.outputs.content }}
-
-      - name: Upload regression report to artifacts
+      - name: Upload image as artifact
         uses: actions/upload-artifact@v3
         with:
-          name: capture-artifacts
-          path: ${{ runner.temp }}/outputs/*
+          name: comparison-image
+          path: "${{ runner.temp }}/comparison-image.tar"
+
+  transmit-metadata:
+    name: Transmit metadata to trusted workflow
+    runs-on: ubuntu-22.04
+    needs:
+      - compute-metadata
+    steps:
+      - name: Write out metadata
+        run: |
+          echo "COMPARISON_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > ${{ runner.temp }}/meta
+          echo "COMPARISON_SHA=${{ needs.compute-metadata.outputs.comparison }}" >> ${{ runner.temp }}/meta
+          echo "BASELINE_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
+          echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline }}" >> ${{ runner.temp }}/meta
+          echo "CHECKOUT_SHA=${{ github.sha }}" >> ${{ runner.temp }}/meta
+          echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> ${{ runner.temp }}/meta
+          echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> ${{ runner.temp }}/meta
+          echo "GITHUB_EVENT_NUMBER=${{ github.event.number }}" >> ${{ runner.temp }}/meta
+
+      - name: Upload metadata
+        uses: actions/upload-artifact@v3
+        with:
+          name: meta
+          path: "${{ runner.temp }}/meta"
