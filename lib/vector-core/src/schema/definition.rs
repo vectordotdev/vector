@@ -469,7 +469,7 @@ mod test_utils {
 
                 let actual_kind = Kind::from(log.value());
                 if let Err(path) = self.event_kind.is_superset(&actual_kind) {
-                    return Result::Err(format!("Event value doesn't match at path: {:?}.\n\nEvent type at path = {:?}\n\nDefinition at path = {:?}",
+                    return Result::Err(format!("Event value doesn't match at path: {}\n\nEvent type at path = {:?}\n\nDefinition at path = {:?}",
                         path,
                         actual_kind.get(&path).debug_info(),
                         self.event_kind.get(&path).debug_info()
@@ -481,7 +481,7 @@ mod test_utils {
                     // return Result::Err(format!("Event metadata doesn't match definition.\n\nDefinition type=\n{:?}\n\nActual event metadata type=\n{:?}\n",
                     //                            self.metadata_kind.debug_info(), actual_metadata_kind.debug_info()));
                     return Result::Err(format!(
-                        "Event METADATA value doesn't match at path: {:?}.\n\nMetadata type at path = {:?}\n\nDefinition at path = {:?}",
+                        "Event METADATA value doesn't match at path: {}\n\nMetadata type at path = {:?}\n\nDefinition at path = {:?}",
                         path,
                         actual_metadata_kind.get(&path).debug_info(),
                         self.metadata_kind.get(&path).debug_info()
@@ -576,9 +576,6 @@ mod tests {
         ] {
             let result = definition.is_valid_for_event(&event);
             assert_eq!(result.is_ok(), valid, "{}", title);
-            if let Err(err) = result {
-                println!("{}", err);
-            }
         }
         panic!();
     }
