@@ -143,7 +143,7 @@ do
                    --target-stdout-path /tmp/captures/vector.stdout.log \
                    --experiment-duration-seconds "${TOTAL_SAMPLES}" \
                    --warmup-duration-seconds "${WARMUP_SECONDS}" \
-                   /usr/bin/vector
+                   --target-path /usr/bin/vector
     echo "::group::Vector stdout"
     cat "${SOAK_CAPTURE_DIR}/vector.stdout.log"
     echo "::endgroup::"
