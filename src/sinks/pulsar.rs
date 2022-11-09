@@ -473,7 +473,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let producer = cnf.create_pulsar_producer().await.unwrap();
+        let producer = cnf.create_pulsar_producer(false).await.unwrap();
         let transformer = cnf.encoding.transformer();
         let serializer = cnf.encoding.build().unwrap();
         let encoder = Encoder::<()>::new(serializer);
