@@ -63,7 +63,7 @@ components: sources: kubernetes_logs: {
 						description: "Event field for Container id."
 						required:    false
 						type: string: {
-							default: "kubernetes.container_image"
+							default: "kubernetes.container_id"
 						}
 					}
 					container_image: {
