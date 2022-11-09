@@ -14,7 +14,7 @@ set -euo pipefail
 
 DIRTY_COMPONENT_FILES=$(git ls-files --full-name --modified --others --exclude-standard | grep website/cue/reference/components | sed 's/^/  - /g')
 if [[ -n "${DIRTY_COMPONENT_FILES}" ]]; then
-   echo "[ERROR] Found modified/untracked component Cue files after running component docs generation:"
+   echo "[ERROR] Found out-of-sync component Cue files in this branch:"
    echo "${DIRTY_COMPONENT_FILES}"
    echo
    echo "Run \`make generate-component-docs\` locally to update your branch and commit/push the changes."
