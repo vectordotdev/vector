@@ -114,12 +114,15 @@ fn handle_events(
         );
 
         if let Some(ref host) = received_from {
-            let host_key_path = config.host_key.as_ref().map(|x| [BorrowedSegment::from(x)]);
+            let host_key_path = config.host_key.as_ref().map_or_else(
+                || [BorrowedSegment::from(log_schema().host_key())],
+                |key| [BorrowedSegment::from(key)],
+            );
 
             log_namespace.insert_source_metadata(
                 SocketConfig::NAME,
                 log,
-                host_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                Some(LegacyKey::InsertIfEmpty(&host_key_path)),
                 path!(log_schema().host_key()),
                 host.clone(),
             );

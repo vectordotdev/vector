@@ -209,30 +209,28 @@ impl TcpSource for RawTcpSource {
                     now,
                 );
 
-                let host_key_path = self
-                    .config
-                    .host_key
-                    .as_ref()
-                    .map(|x| [BorrowedSegment::from(x)]);
+                let host_key_path = self.config.host_key.as_ref().map_or_else(
+                    || [BorrowedSegment::from(log_schema().host_key())],
+                    |key| [BorrowedSegment::from(key)],
+                );
 
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,
                     log,
-                    host_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                    Some(LegacyKey::InsertIfEmpty(&host_key_path)),
                     path!(log_schema().host_key()),
                     host.ip().to_string(),
                 );
 
-                let port_key_path = self
-                    .config
-                    .port_key
-                    .as_ref()
-                    .map(|x| [BorrowedSegment::from(x)]);
+                let port_key_path = self.config.port_key.as_ref().map_or_else(
+                    || [BorrowedSegment::from("port")],
+                    |key| [BorrowedSegment::from(key)],
+                );
 
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,
                     log,
-                    port_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                    Some(LegacyKey::InsertIfEmpty(&port_key_path)),
                     path!("port"),
                     host.port(),
                 );

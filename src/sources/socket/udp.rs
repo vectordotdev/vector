@@ -227,28 +227,28 @@ pub(super) fn udp(
                         now,
                     );
 
-                    let host_key_path = config
-                        .host_key
-                        .as_ref()
-                        .map(|x| [BorrowedSegment::from(x)]);
+                    let host_key_path = config.host_key.as_ref().map_or_else(
+                        || [BorrowedSegment::from(log_schema().host_key())],
+                        |key| [BorrowedSegment::from(key)],
+                    );
 
                     log_namespace.insert_source_metadata(
                         SocketConfig::NAME,
                         log,
-                        host_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                        Some(LegacyKey::InsertIfEmpty(&host_key_path)),
                         path!(log_schema().host_key()),
                         address.ip().to_string()
                     );
 
-                    let port_key_path = config
-                        .port_key
-                        .as_ref()
-                        .map(|x| [BorrowedSegment::from(x)]);
+                    let port_key_path = config.port_key.as_ref().map_or_else(
+                        || [BorrowedSegment::from("port")],
+                        |key| [BorrowedSegment::from(key)],
+                    );
 
                     log_namespace.insert_source_metadata(
                         SocketConfig::NAME,
                         log,
-                        port_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                        Some(LegacyKey::InsertIfEmpty(&port_key_path)),
                         path!("port"),
                         address.port()
                     );
