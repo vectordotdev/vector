@@ -162,6 +162,11 @@ impl TcpConfig {
         self.decoding = val;
         self
     }
+
+    pub fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
+        self.log_namespace = val;
+        self
+    }
 }
 
 #[derive(Debug, Clone)]

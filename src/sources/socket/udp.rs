@@ -113,6 +113,11 @@ impl UdpConfig {
             log_namespace: None,
         }
     }
+
+    pub fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
+        self.log_namespace = val;
+        self
+    }
 }
 
 pub(super) fn udp(

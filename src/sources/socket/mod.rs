@@ -355,11 +355,13 @@ mod test {
     #[cfg(unix)]
     use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
     use futures::{stream, StreamExt};
+    use lookup::path;
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
     use vector_common::btreemap;
+    use vector_config::NamedComponent;
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -422,6 +424,46 @@ mod test {
                 addr.ip().to_string().into()
             );
             assert_eq!(event.as_log()["port"], addr.port().into());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn tcp_it_includes_log_namespaced_fields() {
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let (tx, mut rx) = SourceSender::new_test();
+            let addr = next_addr();
+            let mut conf = TcpConfig::from_address(addr.into());
+            conf.set_log_namespace(Some(true));
+
+            let server = SocketConfig::from(conf)
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+
+            wait_for_tcp(addr).await;
+            let addr = send_lines(addr, vec!["test".to_owned()].into_iter())
+                .await
+                .unwrap();
+
+            let event = rx.next().await.unwrap();
+            let event_meta = event.as_log().metadata().value();
+
+            assert_eq!(
+                event_meta.get(path!("vector", "source_type")).unwrap(),
+                &vrl::value!(SocketConfig::NAME)
+            );
+            assert_eq!(
+                event_meta
+                    .get(path!(SocketConfig::NAME, log_schema().host_key()))
+                    .unwrap(),
+                &vrl::value!(addr.ip().to_string())
+            );
+            assert_eq!(
+                event_meta.get(path!(SocketConfig::NAME, "port")).unwrap(),
+                &vrl::value!(addr.port())
+            );
         })
         .await;
     }
@@ -734,15 +776,16 @@ mod test {
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (shutdown_signal, _) = shutdown.register_source(source_id);
-        init_udp_inner(sender, source_id, shutdown_signal, None).await
+        init_udp_inner(sender, source_id, shutdown_signal, None, false).await
     }
 
-    async fn init_udp(sender: SourceSender) -> SocketAddr {
+    async fn init_udp(sender: SourceSender, use_log_namespace: bool) -> SocketAddr {
         let (addr, _handle) = init_udp_inner(
             sender,
             &ComponentKey::from("default"),
             ShutdownSignal::noop(),
             None,
+            use_log_namespace,
         )
         .await;
         addr
@@ -754,6 +797,7 @@ mod test {
             &ComponentKey::from("default"),
             ShutdownSignal::noop(),
             Some(config),
+            false,
         )
         .await;
         addr
@@ -764,8 +808,9 @@ mod test {
         source_key: &ComponentKey,
         shutdown_signal: ShutdownSignal,
         config: Option<UdpConfig>,
+        use_log_namespace: bool,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
-        let (address, config) = match config {
+        let (address, mut config) = match config {
             Some(config) => match config.address() {
                 SocketListenAddr::SocketAddr(addr) => (addr, config),
                 _ => panic!("listen address should not be systemd FD offset in tests"),
@@ -774,6 +819,13 @@ mod test {
                 let address = next_addr();
                 (address, UdpConfig::from_address(address.into()))
             }
+        };
+
+        let config = if use_log_namespace {
+            config.set_log_namespace(Some(true));
+            config
+        } else {
+            config
         };
 
         let server = SocketConfig::from(config)
@@ -801,7 +853,7 @@ mod test {
     async fn udp_message() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
-            let address = init_udp(tx).await;
+            let address = init_udp(tx, false).await;
 
             send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
@@ -818,7 +870,7 @@ mod test {
     async fn udp_message_preserves_newline() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
-            let address = init_udp(tx).await;
+            let address = init_udp(tx, false).await;
 
             send_lines_udp(address, vec!["foo\nbar".to_string()]);
             let events = collect_n(rx, 1).await;
@@ -835,7 +887,7 @@ mod test {
     async fn udp_multiple_packets() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
-            let address = init_udp(tx).await;
+            let address = init_udp(tx, false).await;
 
             send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]);
             let events = collect_n(rx, 2).await;
@@ -923,7 +975,7 @@ mod test {
     async fn udp_it_includes_host() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
-            let address = init_udp(tx).await;
+            let address = init_udp(tx, false).await;
 
             let from = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
@@ -938,10 +990,39 @@ mod test {
     }
 
     #[tokio::test]
+    async fn udp_it_includes_log_namespaced_fields() {
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let address = init_udp(tx, true).await;
+
+            let from = send_lines_udp(address, vec!["test".to_string()]);
+            let events = collect_n(rx, 1).await;
+
+            let event_meta = events[0].as_log().metadata().value();
+
+            assert_eq!(
+                event_meta.get(path!("vector", "source_type")).unwrap(),
+                &vrl::value!(SocketConfig::NAME)
+            );
+            assert_eq!(
+                event_meta
+                    .get(path!(SocketConfig::NAME, log_schema().host_key()))
+                    .unwrap(),
+                &vrl::value!(from.ip().to_string())
+            );
+            assert_eq!(
+                event_meta.get(path!(SocketConfig::NAME, "port")).unwrap(),
+                &vrl::value!(from.port())
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn udp_it_includes_source_type() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
-            let address = init_udp(tx).await;
+            let address = init_udp(tx, false).await;
 
             let _ = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
