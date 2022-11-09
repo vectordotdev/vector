@@ -202,7 +202,7 @@ base: components: sources: aws_s3: configuration: {
 					consumption rate affects the S3 object retrieval rate.
 					"""
 				required: false
-				type: uint: default: 10
+				type: uint: default: 24
 			}
 			delete_message: {
 				description: """
