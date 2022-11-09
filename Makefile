@@ -485,8 +485,15 @@ check-scripts: ## Check that scipts do not have common mistakes
 check-deny: ## Check advisories licenses and sources for crate dependencies
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-deny.sh
 
+.PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
+
+ifeq (${CI}, true)
+.PHONY: check-component-docs
+check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-docs.sh
+endif
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -652,9 +659,10 @@ generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
-	${MAYBE_ENVIRONMENT_EXEC} cargo build
-	target/debug/vector generate-schema > /tmp/vector-config-schema.json
-	scripts/generate-components-docs.rb /tmp/vector-config-schema.json
+	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
+	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
+	${MAYBE_ENVIRONMENT_EXEC} scripts/generate-components-docs.rb /tmp/vector-config-schema.json \
+		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

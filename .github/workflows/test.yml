@@ -346,6 +346,9 @@ jobs:
       - name: Check Markdown
         if: needs.changes.outputs.markdown == 'true'
         run: make check-markdown
+      - name: Check Component Docs
+        if: needs.changes.outputs.source == 'true'
+        run: make check-component-docs
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
