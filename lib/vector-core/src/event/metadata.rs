@@ -43,6 +43,14 @@ fn default_metadata_value() -> Value {
 
 /// Secret access functions
 impl EventMetadata {
+    /// Creates `EventMetadata` with the given `Value`, and the rest of the fields with default values
+    pub fn default_with_value(value: Value) -> Self {
+        Self {
+            value,
+            ..Default::default()
+        }
+    }
+
     /// Returns a reference to the metadata value
     pub fn value(&self) -> &Value {
         &self.value

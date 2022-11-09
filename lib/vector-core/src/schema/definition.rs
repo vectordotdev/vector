@@ -462,16 +462,38 @@ mod test_utils {
         /// This will panic if the definition is not valid.
 
         pub fn is_valid_for_event(&self, event: &Event) -> Result<(), String> {
-            if let Some(log) = event.as_log() {
+            if let Some(log) = event.maybe_as_log() {
                 let log: &LogEvent = log;
+
                 let actual_kind = Kind::from(log.value());
                 if !self.event_kind.is_superset(&actual_kind) {
-                    return Result::Err(format!("Event doesn't match"));
+                    return Result::Err(format!("Event value doesn't match definition.\n\nDefinition type=\n{:?}\n\nActual event type=\n{:?}\n",
+                                               self.event_kind.debug_info(), actual_kind.debug_info()));
                 }
+
+                let actual_metadata_kind = Kind::from(log.metadata().value());
+                if !self.metadata_kind.is_superset(&actual_metadata_kind) {
+                    return Result::Err(format!("Event metadata doesn't match definition.\n\nDefinition type=\n{:?}\n\nActual event metadata type=\n{:?}\n",
+                                               self.metadata_kind.debug_info(), actual_metadata_kind.debug_info()));
+                }
+                if !self.log_namespaces.contains(&log.namespace()) {
+                    return Result::Err(format!(
+                        "Event uses the {:?} LogNamespace, but the definition only contains: {:?}",
+                        log.namespace(),
+                        self.log_namespaces
+                    ));
+                }
+
                 Ok(())
             } else {
                 // schema definitions currently only apply to logs
                 Ok(())
+            }
+        }
+
+        pub fn assert_valid_for_event(&self, event: &Event) {
+            if let Err(err) = self.is_valid_for_event(event) {
+                panic!("Schema definition assertion failed: {}", err);
             }
         }
     }
@@ -479,9 +501,10 @@ mod test_utils {
 
 #[cfg(test)]
 mod tests {
-    use crate::event::{Event, LogEvent};
+    use crate::event::{Event, EventMetadata, LogEvent};
     use lookup::owned_value_path;
     use std::collections::{BTreeMap, HashMap};
+    use value::Value;
 
     use super::*;
 
@@ -499,11 +522,48 @@ mod tests {
             definition,
             event,
             valid,
-        } in [TestCase {
-            title: "",
-            definition: Default::default(),
-            event: Event::Log(LogEvent::from(value!())),
-        }] {}
+        } in [
+            TestCase {
+                title: "match",
+                definition: Definition::new(Kind::any(), Kind::any(), [LogNamespace::Legacy]),
+                event: Event::Log(LogEvent::from(BTreeMap::new())),
+                valid: true,
+            },
+            TestCase {
+                title: "event mismatch",
+                definition: Definition::new(
+                    Kind::object(Collection::empty()),
+                    Kind::any(),
+                    [LogNamespace::Legacy],
+                ),
+                event: Event::Log(LogEvent::from(BTreeMap::from([("foo".into(), 4.into())]))),
+                valid: false,
+            },
+            TestCase {
+                title: "metadata mismatch",
+                definition: Definition::new(
+                    Kind::any(),
+                    Kind::object(Collection::empty()),
+                    [LogNamespace::Legacy],
+                ),
+                event: Event::Log(LogEvent::from_parts(
+                    Value::Object(BTreeMap::new()),
+                    EventMetadata::default_with_value(
+                        BTreeMap::from([("foo".into(), 4.into())]).into(),
+                    ),
+                )),
+                valid: false,
+            },
+            TestCase {
+                title: "wrong log namespace",
+                definition: Definition::new(Kind::any(), Kind::any(), []),
+                event: Event::Log(LogEvent::from(BTreeMap::new())),
+                valid: false,
+            },
+        ] {
+            let result = definition.is_valid_for_event(&event);
+            assert_eq!(result.is_ok(), valid, "{}", title);
+        }
     }
 
     #[test]
