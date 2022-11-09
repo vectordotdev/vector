@@ -46,7 +46,7 @@ impl Cli {
             command.args(["--target", &platform::default_target()]);
         };
 
-        display_waiting!("Building Vector");
+        waiting!("Building Vector");
         app::run_command(&mut command)?;
 
         Ok(())

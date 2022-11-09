@@ -3,18 +3,18 @@ macro_rules! display {
         use owo_colors::OwoColorize;
         println!(
             "{}",
-            <std::string::String as AsRef<str>>::as_ref(&format!($($arg)*))
+            format!($($arg)*)
                 .if_supports_color(owo_colors::Stream::Stdout, |text| text.bold())
         );
     }};
 }
 
-macro_rules! display_critical {
+macro_rules! critical {
     ($($arg:tt)*) => {{
         use owo_colors::OwoColorize;
         eprintln!(
             "{}",
-            <std::string::String as AsRef<str>>::as_ref(&format!($($arg)*))
+            format!($($arg)*)
                 .if_supports_color(owo_colors::Stream::Stderr, |text| text.bright_red())
         );
     }};
@@ -31,7 +31,7 @@ macro_rules! define_display_macro {
                     use owo_colors::OwoColorize;
                     eprintln!(
                         "{}",
-                        <std::string::String as AsRef<str>>::as_ref(&format!($d($d arg)*))
+                        format!($d($d arg)*)
                             .if_supports_color(owo_colors::Stream::Stderr, |text| text.$style())
                     );
                 }
@@ -41,10 +41,10 @@ macro_rules! define_display_macro {
 }
 
 // Simply bold rather than bright white for terminals with white backgrounds
-define_display_macro!(display_trace, Trace, bold, $);
-define_display_macro!(display_debug, Debug, bold, $);
-define_display_macro!(display_info, Info, bold, $);
-define_display_macro!(display_success, Info, bright_cyan, $);
-define_display_macro!(display_waiting, Info, bright_magenta, $);
-define_display_macro!(display_warning, Warn, bright_yellow, $);
-define_display_macro!(display_error, Error, bright_red, $);
+define_display_macro!(trace, Trace, bold, $);
+define_display_macro!(debug, Debug, bold, $);
+define_display_macro!(info, Info, bold, $);
+define_display_macro!(success, Info, bright_cyan, $);
+define_display_macro!(waiting, Info, bright_magenta, $);
+define_display_macro!(warning, Warn, bright_yellow, $);
+define_display_macro!(error, Error, bright_red, $);

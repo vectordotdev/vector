@@ -201,7 +201,7 @@ impl<'a> IntegrationTestRunner<'a> {
             ".",
         ]);
 
-        display_waiting!("Building image {}", self.image_name());
+        waiting!("Building image {}", self.image_name());
         app::run_command(&mut command)
     }
 

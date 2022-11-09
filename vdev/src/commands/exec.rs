@@ -7,7 +7,7 @@ use crate::app;
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
     args: Vec<String>,
 }
 
