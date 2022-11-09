@@ -458,8 +458,7 @@ mod test_utils {
     use crate::event::{Event, LogEvent};
 
     impl Definition {
-        /// Asserts that the schema definition is _valid_ for the given event.
-        /// This will panic if the definition is not valid.
+        /// Checks that the schema definition is _valid_ for the given event.
         ///
         /// # Errors
         /// If the definition is not valid, debug info will be returned.
@@ -502,6 +501,7 @@ mod test_utils {
             }
         }
 
+        /// Asserts that the schema definition is _valid_ for the given event.
         /// # Panics
         /// If the definition is not valid for the event.
         pub fn assert_valid_for_event(&self, event: &Event) {
