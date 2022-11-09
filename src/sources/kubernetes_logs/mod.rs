@@ -231,31 +231,35 @@ impl SourceConfig for Config {
                 &owned_value_path!("kubernetes"),
                 Kind::object(
                     Collection::empty()
-                        .with_known("container_id", Kind::bytes())
-                        .with_known("container_image", Kind::bytes())
-                        .with_known("container_name", Kind::bytes())
+                        .with_known("container_id", Kind::bytes().or_undefined())
+                        .with_known("container_image", Kind::bytes().or_undefined())
+                        .with_known("container_name", Kind::bytes().or_undefined())
                         .with_known(
                             "namespace_labels",
-                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                                .or_undefined(),
                         )
                         .with_known(
                             "pod_annotations",
-                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                                .or_undefined(),
                         )
-                        .with_known("pod_ip", Kind::bytes())
+                        .with_known("pod_ip", Kind::bytes().or_undefined())
                         .with_known(
                             "pod_ips",
-                            Kind::array(Collection::empty().with_unknown(Kind::bytes())), // TODO: Is this right?
+                            Kind::array(Collection::empty().with_unknown(Kind::bytes()))
+                                .or_undefined(),
                         )
                         .with_known(
                             "pod_labels",
-                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                                .or_undefined(),
                         )
-                        .with_known("pod_name", Kind::bytes())
-                        .with_known("pod_namespace", Kind::bytes())
-                        .with_known("pod_node_name", Kind::bytes())
-                        .with_known("pod_owner", Kind::bytes())
-                        .with_known("pod_uid", Kind::bytes()),
+                        .with_known("pod_name", Kind::bytes().or_undefined())
+                        .with_known("pod_namespace", Kind::bytes().or_undefined())
+                        .with_known("pod_node_name", Kind::bytes().or_undefined())
+                        .with_known("pod_owner", Kind::bytes().or_undefined())
+                        .with_known("pod_uid", Kind::bytes().or_undefined()),
                 )
                 .or_undefined(),
                 None,
@@ -955,31 +959,35 @@ mod tests {
                     &owned_value_path!("kubernetes_logs", "kubernetes"),
                     Kind::object(
                         Collection::empty()
-                            .with_known("container_id", Kind::bytes())
-                            .with_known("container_image", Kind::bytes())
-                            .with_known("container_name", Kind::bytes())
+                            .with_known("container_id", Kind::bytes().or_undefined())
+                            .with_known("container_image", Kind::bytes().or_undefined())
+                            .with_known("container_name", Kind::bytes().or_undefined())
                             .with_known(
                                 "namespace_labels",
-                                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                                Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                                    .or_undefined(),
                             )
                             .with_known(
                                 "pod_annotations",
-                                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                                Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                                    .or_undefined(),
                             )
-                            .with_known("pod_ip", Kind::bytes())
+                            .with_known("pod_ip", Kind::bytes().or_undefined())
                             .with_known(
                                 "pod_ips",
-                                Kind::array(Collection::empty().with_unknown(Kind::bytes())),
+                                Kind::array(Collection::empty().with_unknown(Kind::bytes()))
+                                    .or_undefined(),
                             )
                             .with_known(
                                 "pod_labels",
-                                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                                Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                                    .or_undefined(),
                             )
-                            .with_known("pod_name", Kind::bytes())
-                            .with_known("pod_namespace", Kind::bytes())
-                            .with_known("pod_node_name", Kind::bytes())
-                            .with_known("pod_owner", Kind::bytes())
-                            .with_known("pod_uid", Kind::bytes())
+                            .with_known("pod_name", Kind::bytes().or_undefined())
+                            .with_known("pod_namespace", Kind::bytes().or_undefined())
+                            .with_known("pod_node_name", Kind::bytes().or_undefined())
+                            .with_known("pod_owner", Kind::bytes().or_undefined())
+                            .with_known("pod_uid", Kind::bytes().or_undefined())
                     )
                     .or_undefined()
                 )
@@ -1025,31 +1033,35 @@ mod tests {
                 &owned_value_path!("kubernetes"),
                 Kind::object(
                     Collection::empty()
-                        .with_known("container_id", Kind::bytes())
-                        .with_known("container_image", Kind::bytes())
-                        .with_known("container_name", Kind::bytes())
+                        .with_known("container_id", Kind::bytes().or_undefined())
+                        .with_known("container_image", Kind::bytes().or_undefined())
+                        .with_known("container_name", Kind::bytes().or_undefined())
                         .with_known(
                             "namespace_labels",
-                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                                .or_undefined(),
                         )
                         .with_known(
                             "pod_annotations",
-                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                                .or_undefined(),
                         )
-                        .with_known("pod_ip", Kind::bytes())
+                        .with_known("pod_ip", Kind::bytes().or_undefined())
                         .with_known(
                             "pod_ips",
-                            Kind::array(Collection::empty().with_unknown(Kind::bytes())),
+                            Kind::array(Collection::empty().with_unknown(Kind::bytes()))
+                                .or_undefined(),
                         )
                         .with_known(
                             "pod_labels",
-                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                                .or_undefined(),
                         )
-                        .with_known("pod_name", Kind::bytes())
-                        .with_known("pod_namespace", Kind::bytes())
-                        .with_known("pod_node_name", Kind::bytes())
-                        .with_known("pod_owner", Kind::bytes())
-                        .with_known("pod_uid", Kind::bytes())
+                        .with_known("pod_name", Kind::bytes().or_undefined())
+                        .with_known("pod_namespace", Kind::bytes().or_undefined())
+                        .with_known("pod_node_name", Kind::bytes().or_undefined())
+                        .with_known("pod_owner", Kind::bytes().or_undefined())
+                        .with_known("pod_uid", Kind::bytes().or_undefined())
                 )
                 .or_undefined(),
                 None
