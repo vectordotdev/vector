@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::path;
+use lookup::{lookup_v2::BorrowedSegment, path};
 use vector_common::shutdown::ShutdownSignal;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace, NO_LEGACY_KEY};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
     codecs::Decoder,
@@ -81,6 +81,10 @@ impl UnixConfig {
     pub const fn decoding(&self) -> &DeserializerConfig {
         &self.decoding
     }
+
+    pub const fn host_key(&self) -> &Option<String> {
+        &self.host_key
+    }
 }
 
 /// Function to pass to `build_unix_*_source`, specific to the basic unix source
@@ -110,23 +114,15 @@ fn handle_events(
         );
 
         if let Some(ref host) = received_from {
-            match config.host_key.as_ref() {
-                Some(key) => log_namespace.insert_source_metadata(
-                    SocketConfig::NAME,
-                    log,
-                    Some(LegacyKey::InsertIfEmpty(path!(key))),
-                    path!(log_schema().host_key()),
-                    host.clone(),
-                ),
+            let host_key_path = config.host_key.as_ref().map(|x| [BorrowedSegment::from(x)]);
 
-                None => log_namespace.insert_source_metadata(
-                    SocketConfig::NAME,
-                    log,
-                    NO_LEGACY_KEY,
-                    path!(log_schema().host_key()),
-                    host.clone(),
-                ),
-            }
+            log_namespace.insert_source_metadata(
+                SocketConfig::NAME,
+                log,
+                host_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                path!(log_schema().host_key()),
+                host.clone(),
+            );
         }
     }
 }

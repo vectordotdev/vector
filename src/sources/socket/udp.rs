@@ -6,12 +6,12 @@ use codecs::{
 };
 use futures::StreamExt;
 use listenfd::ListenFd;
-use lookup::path;
+use lookup::{lookup_v2::BorrowedSegment, path};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::{LegacyKey, LogNamespace, NO_LEGACY_KEY},
+    config::{LegacyKey, LogNamespace},
     ByteSizeOf,
 };
 
@@ -83,6 +83,10 @@ pub struct UdpConfig {
 impl UdpConfig {
     pub(super) const fn host_key(&self) -> &Option<String> {
         &self.host_key
+    }
+
+    pub const fn port_key(&self) -> &Option<String> {
+        &self.port_key
     }
 
     pub(super) const fn framing(&self) -> &FramingConfig {
@@ -209,54 +213,46 @@ pub(super) fn udp(
 
                                 for event in &mut events {
                                     if let Event::Log(ref mut log) = event {
-					log_namespace.insert_vector_metadata(
-					    log,
-					    path!(log_schema().source_type_key()),
-					    path!("source_type"),
-					    Bytes::from(SocketConfig::NAME),
-					);
+                    log_namespace.insert_vector_metadata(
+                        log,
+                        path!(log_schema().source_type_key()),
+                        path!("source_type"),
+                        Bytes::from(SocketConfig::NAME),
+                    );
 
-					log_namespace.insert_vector_metadata(
-					    log,
-					    path!(log_schema().timestamp_key()),
-					    path!("ingest_timestamp"),
-					    now,
-					);
+                    log_namespace.insert_vector_metadata(
+                        log,
+                        path!(log_schema().timestamp_key()),
+                        path!("ingest_timestamp"),
+                        now,
+                    );
 
-					match config.host_key().as_ref() {
-					    Some(host_key) => log_namespace.insert_source_metadata(
-						SocketConfig::NAME,
-						log,
-						Some(LegacyKey::InsertIfEmpty(path!(host_key))),
-						path!(log_schema().host_key()),
-						address.ip().to_string(),
-					    ),
-					    None => log_namespace.insert_source_metadata(
-						SocketConfig::NAME,
-						log,
-						NO_LEGACY_KEY,
-						path!(log_schema().host_key()),
-						address.ip().to_string(),
-					    ),
-					}
+                    let host_key_path = config
+                        .host_key
+                        .as_ref()
+                        .map(|x| [BorrowedSegment::from(x)]);
 
-					match config.port_key.as_ref() {
-					    Some(port_key) => log_namespace.insert_source_metadata(
-						SocketConfig::NAME,
-						log,
-						Some(LegacyKey::InsertIfEmpty(path!(port_key))),
-						path!("port"),
-						address.port(),
-					    ),
-					    None => log_namespace.insert_source_metadata(
-						SocketConfig::NAME,
-						log,
-						NO_LEGACY_KEY,
-						path!("port"),
-						address.port(),
-					    )
-					};
-				    }
+                    log_namespace.insert_source_metadata(
+                        SocketConfig::NAME,
+                        log,
+                        host_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                        path!(log_schema().host_key()),
+                        address.ip().to_string()
+                    );
+
+                    let port_key_path = config
+                        .port_key
+                        .as_ref()
+                        .map(|x| [BorrowedSegment::from(x)]);
+
+                    log_namespace.insert_source_metadata(
+                        SocketConfig::NAME,
+                        log,
+                        port_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                        path!("port"),
+                        address.port()
+                    );
+                    }
                                 }
 
                                 tokio::select!{

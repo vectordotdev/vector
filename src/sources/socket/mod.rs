@@ -185,7 +185,7 @@ impl SourceConfig for SocketConfig {
 
                 let log_namespace = cx.log_namespace(config.log_namespace);
 
-                unix::unix_datagram(config.clone(), decoder, cx.shutdown, cx.out, log_namespace)
+                unix::unix_datagram(config, decoder, cx.shutdown, cx.out, log_namespace)
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
@@ -214,7 +214,7 @@ impl SourceConfig for SocketConfig {
 
                 let log_namespace = cx.log_namespace(config.log_namespace);
 
-                unix::unix_stream(config.clone(), decoder, cx.shutdown, cx.out, log_namespace)
+                unix::unix_stream(config, decoder, cx.shutdown, cx.out, log_namespace)
             }
         }
     }
@@ -222,86 +222,101 @@ impl SourceConfig for SocketConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
 
-        let schema_definition = self.decoding().schema_definition(log_namespace);
+        let schema_definition = self
+            .decoding()
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
 
         let schema_definition = match &self.mode {
             Mode::Tcp(config) => {
-                // Hacky, but this is fewer lines than a match on each
-                // parameter. You also can't map config.host_key()
-                // onto the Option(key) type since it requires two
-                // borrows: one on the inner String and one on the
-                // OwnedValuePath.
-                let legacy_key = &owned_value_path!(&config.host_key().clone().unwrap_or_default());
-                let legacy_key = config
+                let host_key_path = config
                     .host_key()
                     .as_ref()
-                    .map(|_| LegacyKey::InsertIfEmpty(legacy_key));
+                    .map(|x| owned_value_path!(x))
+                    .map(LegacyKey::InsertIfEmpty);
 
-                let legacy_port =
-                    &owned_value_path!(&config.port_key().clone().unwrap_or_default());
-                let legacy_port = config
+                let port_key_path = config
                     .port_key()
                     .as_ref()
-                    .map(|_| LegacyKey::InsertIfEmpty(legacy_port));
+                    .map(|x| owned_value_path!(x))
+                    .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
                     .with_source_metadata(
                         Self::NAME,
-                        legacy_key,
+                        host_key_path,
                         &owned_value_path!(log_schema().host_key()),
                         Kind::bytes(),
                         None,
                     )
                     .with_source_metadata(
                         Self::NAME,
-                        legacy_port,
+                        port_key_path,
                         &owned_value_path!("port"),
                         Kind::bytes(),
                         None,
                     )
             }
-            // TODO
-            _ => schema_definition,
-            // Mode::Udp(config) => schema_definition
-            //     .with_source_metadata(
-            //         Self::NAME,
-            //         Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
-            //             &config.legacy_host_key()
-            //         ))),
-            //         &owned_value_path!(log_schema().host_key()),
-            //         Kind::bytes(),
-            //         None,
-            //     )
-            //     .with_source_metadata(
-            //         Self::NAME,
-            //         Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
-            //             &config.legacy_port_key()
-            //         ))),
-            //         &owned_value_path!("port"),
-            //         Kind::bytes(),
-            //         None,
-            //     ),
-            // Mode::UnixDatagram(config) => schema_definition.with_source_metadata(
-            //     Self::NAME,
-            //     Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
-            //         &config.legacy_host_key()
-            //     ))),
-            //     &owned_value_path!(log_schema().host_key()),
-            //     Kind::bytes(),
-            //     None,
-            // ),
-            // Mode::UnixStream(config) => schema_definition.with_source_metadata(
-            //     Self::NAME,
-            //     Some(LegacyKey::InsertIfEmpty(&owned_value_path!(
-            //         &config.legacy_host_key()
-            //     ))),
-            //     &owned_value_path!(log_schema().host_key()),
-            //     Kind::bytes(),
-            //     None,
-            // ),
-        };
+            Mode::Udp(config) => {
+                let host_key_path = config
+                    .host_key()
+                    .as_ref()
+                    .map(|x| owned_value_path!(x))
+                    .map(LegacyKey::InsertIfEmpty);
 
-        let schema_definition = schema_definition.with_standard_vector_source_metadata();
+                let port_key_path = config
+                    .port_key()
+                    .as_ref()
+                    .map(|x| owned_value_path!(x))
+                    .map(LegacyKey::InsertIfEmpty);
+
+                schema_definition
+                    .with_source_metadata(
+                        Self::NAME,
+                        host_key_path,
+                        &owned_value_path!(log_schema().host_key()),
+                        Kind::bytes(),
+                        None,
+                    )
+                    .with_source_metadata(
+                        Self::NAME,
+                        port_key_path,
+                        &owned_value_path!("port"),
+                        Kind::bytes(),
+                        None,
+                    )
+            }
+            Mode::UnixDatagram(config) => {
+                let host_key_path = config
+                    .host_key()
+                    .as_ref()
+                    .map(|x| owned_value_path!(x))
+                    .map(LegacyKey::InsertIfEmpty);
+
+                schema_definition.with_source_metadata(
+                    Self::NAME,
+                    host_key_path,
+                    &owned_value_path!(log_schema().host_key()),
+                    Kind::bytes(),
+                    None,
+                )
+            }
+            Mode::UnixStream(config) => {
+                let host_key_path = config
+                    .host_key()
+                    .as_ref()
+                    .map(|x| owned_value_path!(x))
+                    .map(LegacyKey::InsertIfEmpty);
+
+                schema_definition.with_source_metadata(
+                    Self::NAME,
+                    host_key_path,
+                    &owned_value_path!(log_schema().host_key()),
+                    Kind::bytes(),
+                    None,
+                )
+            }
+        };
 
         vec![Output::default(self.decoding().output_type())
             .with_schema_definition(schema_definition)]

@@ -1,10 +1,10 @@
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::path;
+use lookup::{lookup_v2::BorrowedSegment, path};
 use smallvec::SmallVec;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace, NO_LEGACY_KEY};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
     codecs::Decoder,
@@ -209,39 +209,33 @@ impl TcpSource for RawTcpSource {
                     now,
                 );
 
-                match self.config.host_key().as_ref() {
-                    Some(host_key) => self.log_namespace.insert_source_metadata(
-                        SocketConfig::NAME,
-                        log,
-                        Some(LegacyKey::InsertIfEmpty(path!(host_key))),
-                        path!(log_schema().host_key()),
-                        host.ip().to_string(),
-                    ),
-                    None => self.log_namespace.insert_source_metadata(
-                        SocketConfig::NAME,
-                        log,
-                        NO_LEGACY_KEY,
-                        path!(log_schema().host_key()),
-                        host.ip().to_string(),
-                    ),
-                }
+                let host_key_path = self
+                    .config
+                    .host_key
+                    .as_ref()
+                    .map(|x| [BorrowedSegment::from(x)]);
 
-                match self.config.port_key.as_ref() {
-                    Some(port_key) => self.log_namespace.insert_source_metadata(
-                        SocketConfig::NAME,
-                        log,
-                        Some(LegacyKey::InsertIfEmpty(path!(port_key))),
-                        path!("port"),
-                        host.port(),
-                    ),
-                    None => self.log_namespace.insert_source_metadata(
-                        SocketConfig::NAME,
-                        log,
-                        NO_LEGACY_KEY,
-                        path!("port"),
-                        host.port(),
-                    ),
-                };
+                self.log_namespace.insert_source_metadata(
+                    SocketConfig::NAME,
+                    log,
+                    host_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                    path!(log_schema().host_key()),
+                    host.ip().to_string(),
+                );
+
+                let port_key_path = self
+                    .config
+                    .port_key
+                    .as_ref()
+                    .map(|x| [BorrowedSegment::from(x)]);
+
+                self.log_namespace.insert_source_metadata(
+                    SocketConfig::NAME,
+                    log,
+                    port_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                    path!("port"),
+                    host.port(),
+                );
             }
         }
     }
