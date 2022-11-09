@@ -414,6 +414,60 @@ impl Kind {
     }
 }
 
+#[cfg(any(test, feature = "test"))]
+mod test_utils {
+
+    impl Kind {
+        pub fn is_superset_debug(&self, other: &Self) -> Result<(), Owned> {
+            if let (None, Some(_)) = (self.bytes, other.bytes) {
+                return false;
+            };
+
+            if let (None, Some(_)) = (self.integer, other.integer) {
+                return false;
+            };
+
+            if let (None, Some(_)) = (self.float, other.float) {
+                return false;
+            };
+
+            if let (None, Some(_)) = (self.boolean, other.boolean) {
+                return false;
+            };
+
+            if let (None, Some(_)) = (self.timestamp, other.timestamp) {
+                return false;
+            };
+
+            if let (None, Some(_)) = (self.regex, other.regex) {
+                return false;
+            };
+
+            if let (None, Some(_)) = (self.null, other.null) {
+                return false;
+            };
+
+            if let (None, Some(_)) = (self.undefined, other.undefined) {
+                return false;
+            };
+
+            match (self.array.as_ref(), other.array.as_ref()) {
+                (None, Some(_)) => return false,
+                (Some(lhs), Some(rhs)) if !lhs.is_superset(rhs) => return false,
+                _ => {}
+            };
+
+            match (self.object.as_ref(), other.object.as_ref()) {
+                (None, Some(_)) => return false,
+                (Some(lhs), Some(rhs)) if !lhs.is_superset(rhs) => return false,
+                _ => {}
+            };
+
+            true
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, HashMap};
