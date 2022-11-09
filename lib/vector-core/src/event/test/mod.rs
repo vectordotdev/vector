@@ -21,13 +21,10 @@ fn event_iteration() {
     assert_eq!(
         all,
         vec![
+            ("Ke$ha".into(), "It's going down, I'm yelling timber".into()),
             (
-                String::from("Ke$ha"),
-                "It's going down, I'm yelling timber".to_string()
-            ),
-            (
-                String::from("Pitbull"),
-                "The bigger they are, the harder they fall".to_string()
+                "Pitbull".into(),
+                "The bigger they are, the harder they fall".into()
             ),
         ]
         .into_iter()

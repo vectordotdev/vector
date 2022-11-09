@@ -24,9 +24,10 @@ use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
 use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::LegacyKey;
 use vector_core::{
-    config::{AcknowledgementsConfig, LogNamespace},
+    config::{LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
     ByteSizeOf,
 };
@@ -88,7 +89,7 @@ pub struct AmqpSourceConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    pub(crate) acknowledgements: AcknowledgementsConfig,
+    pub(crate) acknowledgements: SourceAcknowledgementsConfig,
 }
 
 fn default_queue() -> String {
@@ -123,7 +124,7 @@ impl AmqpSourceConfig {
 impl SourceConfig for AmqpSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         amqp_source(self, cx.shutdown, cx.out, log_namespace, acknowledgements).await
     }
@@ -213,22 +214,28 @@ fn populate_event(
     );
 
     log_namespace.insert_source_metadata(
-        "amqp",
+        AmqpSourceConfig::NAME,
         log,
-        keys.routing_key_field,
+        Some(LegacyKey::InsertIfEmpty(keys.routing_key_field)),
         "routing",
         keys.routing.to_string(),
     );
 
     log_namespace.insert_source_metadata(
-        "amqp",
+        AmqpSourceConfig::NAME,
         log,
-        keys.exchange_key,
+        Some(LegacyKey::InsertIfEmpty(keys.exchange_key)),
         "exchange",
         keys.exchange.to_string(),
     );
 
-    log_namespace.insert_source_metadata("amqp", log, keys.offset_key, "offset", keys.delivery_tag);
+    log_namespace.insert_source_metadata(
+        AmqpSourceConfig::NAME,
+        log,
+        Some(LegacyKey::InsertIfEmpty(keys.offset_key)),
+        "offset",
+        keys.delivery_tag,
+    );
 }
 
 /// Receives an event from `AMQP` and pushes it along the pipeline.
@@ -359,7 +366,7 @@ async fn run_amqp_source(
         )
         .await
         .map_err(|error| {
-            error!(message = "Failed to consume.", error = ?error, internal_log_rate_secs = 10);
+            error!(message = "Failed to consume.", error = ?error, internal_log_rate_limit = true);
         })?
         .fuse();
     let mut shutdown = shutdown.fuse();

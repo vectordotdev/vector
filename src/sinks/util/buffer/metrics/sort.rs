@@ -13,6 +13,7 @@ mod test {
     use rand::prelude::SliceRandom;
     use rand::thread_rng;
     use vector_core::event::{Metric, MetricKind};
+    use vector_core::metric_tags;
 
     // This just ensures the sorting does not change. `sort_for_compression` relies on
     // the default `PartialOrd` on `MetricSeries`.
@@ -34,31 +35,28 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 0.0 },
             )
-            .with_tags(Some([("z".to_string(), "z".to_string())].into())),
+            .with_tags(Some(metric_tags!("z" => "z"))),
             Metric::new(
                 "metric_4",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 0.0 },
             )
-            .with_tags(Some([("a".to_string(), "a".to_string())].into())),
+            .with_tags(Some(metric_tags!("a" => "a"))),
             Metric::new(
                 "metric_4",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 0.0 },
             )
-            .with_tags(Some(
-                [
-                    ("a".to_string(), "a".to_string()),
-                    ("b".to_string(), "b".to_string()),
-                ]
-                .into(),
-            )),
+            .with_tags(Some(metric_tags!(
+                "a" => "a",
+                "b" => "b",
+            ))),
             Metric::new(
                 "metric_4",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 0.0 },
             )
-            .with_tags(Some([("b".to_string(), "b".to_string())].into())),
+            .with_tags(Some(metric_tags!("b" => "b"))),
         ];
 
         let mut rand_metrics = sorted_metrics.clone();

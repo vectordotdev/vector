@@ -3,7 +3,6 @@ use std::{
     mem,
 };
 
-use float_eq::FloatEq;
 use ordered_float::OrderedFloat;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, DeserializeAs, SerializeAs};
@@ -11,7 +10,10 @@ use snafu::Snafu;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
-use crate::event::{metric::Bucket, Metric, MetricValue};
+use crate::{
+    event::{metric::Bucket, Metric, MetricValue},
+    float_eq,
+};
 
 const AGENT_DEFAULT_BIN_LIMIT: u16 = 4096;
 const AGENT_DEFAULT_EPS: f64 = 1.0 / 128.0;
@@ -817,10 +819,10 @@ impl PartialEq for AgentDDSketch {
         // because they can be minimally different between sketches purely due to floating-point
         // behavior, despite being fed the same exact data in terms of recorded samples.
         self.count == other.count
-            && self.min == other.min
-            && self.max == other.max
-            && self.sum.eq_ulps(&other.sum, &1)
-            && self.avg.eq_ulps(&other.avg, &1)
+            && float_eq(self.min, other.min)
+            && float_eq(self.max, other.max)
+            && float_eq(self.sum, other.sum)
+            && float_eq(self.avg, other.avg)
             && self.bins == other.bins
     }
 }

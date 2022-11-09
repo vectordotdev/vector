@@ -1,3 +1,6 @@
+use crate::kind::collection::CollectionRemove;
+use crate::kind::Collection;
+
 /// A `field` type that can be used in `Collection<Field>`
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Field(lookup::FieldBuf);
@@ -13,6 +16,14 @@ impl Field {
     #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
+    }
+}
+
+impl CollectionRemove for Collection<Field> {
+    type Key = Field;
+
+    fn remove_known(&mut self, key: &Field) {
+        self.known.remove(key);
     }
 }
 

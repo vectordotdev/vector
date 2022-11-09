@@ -48,13 +48,18 @@ mod vrl;
 
 use std::path::PathBuf;
 
+use float_eq::FloatEq;
+
 #[cfg(feature = "vrl")]
 pub use vrl::compile_vrl;
 
 pub use vector_buffers as buffers;
 #[cfg(any(test, feature = "test"))]
 pub use vector_common::event_test_util;
-pub use vector_common::{byte_size_of::ByteSizeOf, internal_event};
+pub use vector_common::{
+    byte_size_of::ByteSizeOf, estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
+    internal_event,
+};
 
 #[macro_use]
 extern crate tracing;
@@ -64,3 +69,7 @@ pub fn default_data_dir() -> Option<PathBuf> {
 }
 
 pub(crate) use vector_common::{Error, Result};
+
+pub(crate) fn float_eq(l_value: f64, r_value: f64) -> bool {
+    (l_value.is_nan() && r_value.is_nan()) || l_value.eq_ulps(&r_value, &1)
+}

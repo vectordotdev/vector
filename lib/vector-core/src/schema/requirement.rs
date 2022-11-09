@@ -225,6 +225,7 @@ impl std::error::Error for ValidationError {}
 
 #[cfg(test)]
 mod tests {
+    use lookup::owned_value_path;
     use std::collections::HashMap;
 
     use super::*;
@@ -297,8 +298,8 @@ mod tests {
                 "invalid required meaning kind",
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty_legacy_namespace().with_field(
-                        "foo",
+                    definition: Definition::empty_legacy_namespace().with_event_field(
+                        &owned_value_path!("foo"),
                         Kind::integer(),
                         Some("foo"),
                     ),
@@ -313,8 +314,8 @@ mod tests {
                 "invalid optional meaning kind",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty_legacy_namespace().with_field(
-                        "foo",
+                    definition: Definition::empty_legacy_namespace().with_event_field(
+                        &owned_value_path!("foo"),
                         Kind::integer(),
                         Some("foo"),
                     ),
@@ -330,9 +331,9 @@ mod tests {
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
                     definition: Definition::empty_legacy_namespace()
-                        .with_field("foo", Kind::integer(), Some("foo"))
-                        .merge(Definition::empty_legacy_namespace().with_field(
-                            "bar",
+                        .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo"))
+                        .merge(Definition::empty_legacy_namespace().with_event_field(
+                            &owned_value_path!("bar"),
                             Kind::boolean(),
                             Some("foo"),
                         )),

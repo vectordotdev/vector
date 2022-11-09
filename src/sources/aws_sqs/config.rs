@@ -8,7 +8,7 @@ use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsConfig;
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
-    config::{AcknowledgementsConfig, Output, SourceConfig, SourceContext},
+    config::{Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
@@ -81,7 +81,7 @@ pub struct AwsSqsConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    pub acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: SourceAcknowledgementsConfig,
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -97,7 +97,7 @@ impl SourceConfig for AwsSqsConfig {
             LogNamespace::Legacy,
         )
         .build();
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(
             SqsSource {

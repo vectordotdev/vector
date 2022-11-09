@@ -20,7 +20,7 @@ use crate::{
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     /// The interval between metric gathering, in seconds.
-    #[derivative(Default(value = "2.0"))]
+    #[derivative(Default(value = "1.0"))]
     pub scrape_interval_secs: f64,
 
     #[configurable(derived)]
@@ -168,6 +168,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use metrics::{counter, gauge, histogram};
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -252,8 +253,7 @@ mod tests {
             _ => panic!("wrong type"),
         }
 
-        let mut labels = BTreeMap::new();
-        labels.insert(String::from("host"), String::from("foo"));
+        let labels = metric_tags!("host" => "foo");
         assert_eq!(Some(&labels), output["quux"].tags());
     }
 

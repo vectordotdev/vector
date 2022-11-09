@@ -74,7 +74,7 @@ features = ["full"]
 criterion = "0.4"
 quickcheck = "1"
 tempfile = "3.3.0"
-pretty_assertions = "1.3.0"
+similar-asserts = "1.4.2"
 
 [[bench]]
 name = "buffer"

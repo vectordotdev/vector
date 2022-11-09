@@ -27,7 +27,7 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
+    config::{DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     internal_events::{
@@ -182,7 +182,7 @@ pub struct PubsubConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    pub acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
 const fn default_ack_deadline() -> i32 {
@@ -277,7 +277,7 @@ impl SourceConfig for PubsubConfig {
                 LogNamespace::Legacy,
             )
             .build(),
-            acknowledgements: cx.do_acknowledgements(&self.acknowledgements),
+            acknowledgements: cx.do_acknowledgements(self.acknowledgements),
             shutdown: cx.shutdown,
             out: cx.out,
             ack_deadline_secs,

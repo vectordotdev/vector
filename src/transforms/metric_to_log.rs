@@ -18,7 +18,7 @@ use crate::{
 /// Configuration for the `metric_to_log` transform.
 #[configurable_component(transform("metric_to_log"))]
 #[derive(Clone, Debug, Default)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct MetricToLogConfig {
     /// Name of the tag in the metric to use for the source host.
     ///
@@ -26,6 +26,7 @@ pub struct MetricToLogConfig {
     /// where the field key will use the [global `host_key` option][global_log_schema_host_key].
     ///
     /// [global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
+    #[configurable(metadata(docs::examples = "host", docs::examples = "hostname"))]
     pub host_tag: Option<String>,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
@@ -54,7 +55,7 @@ impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(MetricToLog::new(
             self.host_tag.clone(),
-            self.timezone.unwrap_or(context.globals.timezone),
+            self.timezone.unwrap_or_else(|| context.globals.timezone()),
         )))
     }
 
@@ -135,16 +136,15 @@ impl FunctionTransform for MetricToLog {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::event::{
-        metric::{MetricKind, MetricValue, StatisticKind},
+        metric::{MetricKind, MetricTags, MetricValue, StatisticKind},
         Metric, Value,
     };
     use crate::test_util::components::assert_transform_compliance;
@@ -182,13 +182,11 @@ mod tests {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn tags() -> BTreeMap<String, String> {
-        vec![
-            ("host".to_owned(), "localhost".to_owned()),
-            ("some_tag".to_owned(), "some_value".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+    fn tags() -> MetricTags {
+        metric_tags! {
+            "host" => "localhost",
+            "some_tag" => "some_value",
+        }
     }
 
     #[tokio::test]

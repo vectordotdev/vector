@@ -159,7 +159,7 @@ impl Conditional for Vrl {
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -220,11 +220,7 @@ mod test {
                         MetricValue::Counter { value: 1.0 },
                     )
                     .with_namespace(Some("zerk"))
-                    .with_tags(Some({
-                        let mut tags = BTreeMap::new();
-                        tags.insert("host".into(), "zoobub".into());
-                        tags
-                    })),
+                    .with_tags(Some(metric_tags!("host" => "zoobub"))),
                 ),
                 r#".name == "zork" && .tags.host == "zoobub" && .kind == "incremental""#,
                 Ok(()),

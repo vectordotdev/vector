@@ -1,4 +1,4 @@
-use std::{borrow::Cow, convert::TryFrom, fmt};
+use std::{borrow::Cow, convert::TryFrom, fmt, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -205,8 +205,8 @@ impl From<bool> for Literal {
 
 // Literal::Regex --------------------------------------------------------------
 
-impl From<Regex> for Literal {
-    fn from(regex: Regex) -> Self {
+impl From<Arc<Regex>> for Literal {
+    fn from(regex: Arc<Regex>) -> Self {
         Literal::Regex(ValueRegex::new(regex))
     }
 }

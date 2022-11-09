@@ -1,13 +1,10 @@
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, INTENTIONAL},
-};
+use crate::emit;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
 
 #[derive(Debug)]
 pub struct DedupeEventsDropped {
-    pub count: u64,
+    pub count: usize,
 }
 
 impl InternalEvent for DedupeEventsDropped {
@@ -16,6 +13,6 @@ impl InternalEvent for DedupeEventsDropped {
             count: self.count,
             reason: "Events have been found in cache for deduplication.",
         });
-        counter!("events_discarded_total", self.count); // Deprecated
+        counter!("events_discarded_total", self.count as u64); // Deprecated
     }
 }

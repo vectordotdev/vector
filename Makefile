@@ -342,6 +342,10 @@ test-integration: test-integration-nginx test-integration-opentelemetry test-int
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
+.PHONY: test-integration-aws-s3
+test-integration-aws-s3: ## Runs AWS S3 integration tests
+	FILTER=::aws_s3 make test-integration-aws
+
 .PHONY: test-integration-aws-sqs
 test-integration-aws-sqs: ## Runs AWS SQS integration tests
 	FILTER=::aws_sqs make test-integration-aws
@@ -645,6 +649,12 @@ fmt: ## Format code
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
 	scripts/generate-manifests.sh
+
+.PHONY: generate-component-docs
+generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
+	${MAYBE_ENVIRONMENT_EXEC} cargo build
+	target/debug/vector generate-schema > /tmp/vector-config-schema.json
+	scripts/generate-components-docs.rb /tmp/vector-config-schema.json
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
