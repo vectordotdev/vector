@@ -145,11 +145,6 @@ base: components: sources: http_client: configuration: {
 			type: array: items: type: string: syntax: "literal"
 		}
 	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global setting"
-		required:    false
-		type: bool: {}
-	}
 	method: {
 		description: "Specifies the action of the HTTP request."
 		required:    false
