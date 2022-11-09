@@ -147,6 +147,13 @@ impl<T: Ord + Clone> Collection<T> {
         self
     }
 
+    /// Returns a new collection that includes the known key.
+    #[must_use]
+    pub fn with_known(mut self, key: impl Into<T>, kind: Kind) -> Self {
+        self.known_mut().insert(key.into(), kind);
+        self
+    }
+
     /// Given a collection of known and unknown types, merge the known types with the unknown type,
     /// and remove a reference to the known types.
     ///

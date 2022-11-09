@@ -225,12 +225,39 @@ impl SourceConfig for Config {
                 Kind::bytes(),
                 None,
             )
-            // TODO: Schema for `kubernetes` isn't as precise as it should be.
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!("kubernetes"))),
                 &owned_value_path!("kubernetes"),
-                Kind::object(Collection::any()),
+                Kind::object(
+                    Collection::empty()
+                        .with_known("container_id", Kind::bytes())
+                        .with_known("container_image", Kind::bytes())
+                        .with_known("container_name", Kind::bytes())
+                        .with_known(
+                            "namespace_labels",
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                        )
+                        .with_known(
+                            "pod_annotations",
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                        )
+                        .with_known("pod_ip", Kind::bytes())
+                        .with_known(
+                            "pod_ips",
+                            Kind::array(Collection::empty().with_unknown(Kind::bytes())), // TODO: Is this right?
+                        )
+                        .with_known(
+                            "pod_labels",
+                            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                        )
+                        .with_known("pod_name", Kind::bytes())
+                        .with_known("pod_namespace", Kind::bytes())
+                        .with_known("pod_node_name", Kind::bytes())
+                        .with_known("pod_owner", Kind::bytes())
+                        .with_known("pod_uid", Kind::bytes()),
+                )
+                .or_undefined(),
                 None,
             )
             .with_source_metadata(
