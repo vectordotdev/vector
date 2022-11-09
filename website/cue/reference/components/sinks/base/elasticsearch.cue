@@ -512,6 +512,15 @@ base: components: sinks: elasticsearch: configuration: {
 			}
 		}
 	}
+	request_retry_partial: {
+		description: """
+			Whether or not to retry successful requests containing partial failures.
+
+			To avoid duplicates in Elasticsearch, please use option `id_key`.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	suppress_type_name: {
 		description: """
 			Whether or not to send the `type` field to Elasticsearch.

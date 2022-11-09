@@ -50,7 +50,7 @@ components: sources: internal_metrics: {
 			common:      true
 			required:    false
 			type: float: {
-				default: 2.0
+				default: 1.0
 				unit:    "seconds"
 			}
 		}

@@ -6,8 +6,8 @@ use std::{
     path::PathBuf,
 };
 
-use lookup::lookup_v2::ValuePath;
-use lookup::{metadata_path, path, PathPrefix};
+use lookup::lookup_v2::{parse_value_path, ValuePath};
+use lookup::{metadata_path, owned_value_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
@@ -253,17 +253,18 @@ impl TransformConfig for RemapConfig {
             .log_namespaces()
             .contains(&LogNamespace::Legacy)
         {
-            dropped_definition = dropped_definition.merge(input_definition.clone().with_field(
-                log_schema().metadata_key(),
-                Kind::object(BTreeMap::from([
-                    ("reason".into(), Kind::bytes()),
-                    ("message".into(), Kind::bytes()),
-                    ("component_id".into(), Kind::bytes()),
-                    ("component_type".into(), Kind::bytes()),
-                    ("component_kind".into(), Kind::bytes()),
-                ])),
-                Some("metadata"),
-            ));
+            dropped_definition =
+                dropped_definition.merge(input_definition.clone().with_event_field(
+                    &parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
+                    Kind::object(BTreeMap::from([
+                        ("reason".into(), Kind::bytes()),
+                        ("message".into(), Kind::bytes()),
+                        ("component_id".into(), Kind::bytes()),
+                        ("component_type".into(), Kind::bytes()),
+                        ("component_kind".into(), Kind::bytes()),
+                    ])),
+                    Some("metadata"),
+                ));
         }
 
         if input_definition
@@ -273,11 +274,11 @@ impl TransformConfig for RemapConfig {
             dropped_definition = dropped_definition.merge(
                 input_definition
                     .clone()
-                    .with_metadata_field("reason", Kind::bytes())
-                    .with_metadata_field("message", Kind::bytes())
-                    .with_metadata_field("component_id", Kind::bytes())
-                    .with_metadata_field("component_type", Kind::bytes())
-                    .with_metadata_field("component_kind", Kind::bytes()),
+                    .with_metadata_field(&owned_value_path!("reason"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("message"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("component_id"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("component_type"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("component_kind"), Kind::bytes()),
             );
         }
 
@@ -608,16 +609,16 @@ mod tests {
     use tokio_stream::wrappers::ReceiverStream;
 
     fn test_default_schema_definition() -> schema::Definition {
-        schema::Definition::empty_legacy_namespace().with_field(
-            "a default field",
+        schema::Definition::empty_legacy_namespace().with_event_field(
+            &owned_value_path!("a default field"),
             Kind::integer().or_bytes(),
             Some("default"),
         )
     }
 
     fn test_dropped_schema_definition() -> schema::Definition {
-        schema::Definition::empty_legacy_namespace().with_field(
-            "a dropped field",
+        schema::Definition::empty_legacy_namespace().with_event_field(
+            &owned_value_path!("a dropped field"),
             Kind::boolean().or_null(),
             Some("dropped"),
         )
@@ -1046,7 +1047,7 @@ mod tests {
                 Kind::any_object(),
                 [LogNamespace::Legacy],
             )
-            .with_field("hello", Kind::bytes(), None),
+            .with_event_field(&owned_value_path!("hello"), Kind::bytes(), None),
             ..Default::default()
         };
         let mut tform = Remap::new_ast(conf, &context).unwrap().0;
@@ -1289,8 +1290,8 @@ mod tests {
             Kind::any_object(),
             [LogNamespace::Legacy],
         )
-        .with_field("foo", Kind::any(), None)
-        .with_field("tags", Kind::any(), None);
+        .with_event_field(&owned_value_path!("foo"), Kind::any(), None)
+        .with_event_field(&owned_value_path!("tags"), Kind::any(), None);
 
         assert_eq!(
             conf.outputs(&schema::Definition::new_with_default_metadata(

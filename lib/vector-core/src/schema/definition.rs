@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::config::{log_schema, LogNamespace};
-use lookup::{LookupBuf, SegmentBuf};
+use crate::config::{log_schema, LegacyKey, LogNamespace};
+use lookup::lookup_v2::parse_value_path;
+use lookup::{owned_value_path, LookupBuf, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use value::{kind::Collection, Kind};
 
 /// The definition of a schema.
@@ -153,17 +154,20 @@ impl Definition {
     }
 
     /// Adds the `source_type` and `ingest_timestamp` metadata fields, which are added to every Vector source.
+    /// This function should be called in the same order as the values are actually inserted into the event.
     #[must_use]
     pub fn with_standard_vector_source_metadata(self) -> Self {
         self.with_vector_metadata(
-            LookupBuf::from_str(log_schema().source_type_key()).ok(),
-            "source_type",
+            parse_value_path(log_schema().source_type_key())
+                .ok()
+                .as_ref(),
+            &owned_value_path!("source_type"),
             Kind::bytes(),
             None,
         )
         .with_vector_metadata(
-            LookupBuf::from_str(log_schema().timestamp_key()).ok(),
-            "ingest_timestamp",
+            parse_value_path(log_schema().timestamp_key()).ok().as_ref(),
+            &owned_value_path!("ingest_timestamp"),
             Kind::timestamp(),
             None,
         )
@@ -172,12 +176,13 @@ impl Definition {
     /// This should be used wherever `LogNamespace::insert_source_metadata` is used to insert metadata.
     /// This automatically detects which log namespaces are used, and also automatically
     /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
+    /// This function should be called in the same order as the values are actually inserted into the event.
     #[must_use]
     pub fn with_source_metadata(
         self,
         source_name: &str,
-        legacy_path: Option<impl Into<LookupBuf>>,
-        vector_path: impl Into<LookupBuf>,
+        legacy_path: Option<LegacyKey<OwnedValuePath>>,
+        vector_path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
@@ -187,42 +192,58 @@ impl Definition {
     /// This should be used wherever `LogNamespace::insert_vector_metadata` is used to insert metadata.
     /// This automatically detects which log namespaces are used, and also automatically
     /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
+    /// This function should be called in the same order as the values are actually inserted into the event.
     #[must_use]
     pub fn with_vector_metadata(
         self,
-        legacy_path: Option<impl Into<LookupBuf>>,
-        vector_path: impl Into<LookupBuf>,
+        legacy_path: Option<&OwnedValuePath>,
+        vector_path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        self.with_namespaced_metadata("vector", legacy_path, vector_path, kind, meaning)
+        self.with_namespaced_metadata(
+            "vector",
+            legacy_path.cloned().map(LegacyKey::InsertIfEmpty),
+            vector_path,
+            kind,
+            meaning,
+        )
     }
 
     /// This generalizes the `LogNamespace::insert_*` methods for type definitions.
+    /// This assumes the legacy key is either guaranteed to not collide or is inserted with `try_insert`.
     fn with_namespaced_metadata(
         self,
         prefix: &str,
-        legacy_path: Option<impl Into<LookupBuf>>,
-        vector_path: impl Into<LookupBuf>,
+        legacy_path: Option<LegacyKey<OwnedValuePath>>,
+        vector_path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
         let legacy_definition = legacy_path.and_then(|legacy_path| {
             if self.log_namespaces.contains(&LogNamespace::Legacy) {
-                Some(
-                    self.clone()
-                        .try_with_field(legacy_path, kind.clone(), meaning),
-                )
+                match legacy_path {
+                    LegacyKey::InsertIfEmpty(legacy_path) => Some(self.clone().try_with_field(
+                        &legacy_path,
+                        kind.clone(),
+                        meaning,
+                    )),
+                    LegacyKey::Overwrite(legacy_path) => Some(self.clone().with_event_field(
+                        &legacy_path,
+                        kind.clone(),
+                        meaning,
+                    )),
+                }
             } else {
                 None
             }
         });
 
         let vector_definition = if self.log_namespaces.contains(&LogNamespace::Vector) {
-            let mut path_with_prefix = vector_path.into();
-            path_with_prefix.push_front(SegmentBuf::from(prefix));
-
-            Some(self.clone().with_metadata_field(path_with_prefix, kind))
+            Some(
+                self.clone()
+                    .with_metadata_field(&vector_path.with_field_prefix(prefix), kind),
+            )
         } else {
             None
         };
@@ -234,6 +255,25 @@ impl Definition {
         }
     }
 
+    /// Add type information for an event or metadata field.
+    /// A non-root required field means the root type must be an object, so the type will be automatically
+    /// restricted to an object.
+    ///
+    /// # Panics
+    /// - If the path is not root, and the definition does not allow the type to be an object.
+    #[must_use]
+    pub fn with_field(
+        self,
+        target_path: &OwnedTargetPath,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        match target_path.prefix {
+            PathPrefix::Event => self.with_event_field(&target_path.path, kind, meaning),
+            PathPrefix::Metadata => self.with_metadata_field(&target_path.path, kind),
+        }
+    }
+
     /// Add type information for an event field.
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
@@ -242,13 +282,12 @@ impl Definition {
     /// - If the path is not root, and the definition does not allow the type to be an object.
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
-    pub fn with_field(
+    pub fn with_event_field(
         mut self,
-        path: impl Into<LookupBuf>,
+        path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        let path = path.into();
         let meaning = meaning.map(ToOwned::to_owned);
 
         if !path.is_root() {
@@ -258,10 +297,11 @@ impl Definition {
             );
         }
 
-        self.event_kind.set_at_path(&path, kind);
+        self.event_kind.set_at_path(path, kind);
 
         if let Some(meaning) = meaning {
-            self.meaning.insert(meaning, MeaningPointer::Valid(path));
+            self.meaning
+                .insert(meaning, MeaningPointer::Valid(path.clone().into()));
         }
 
         self
@@ -272,17 +312,15 @@ impl Definition {
     #[must_use]
     pub fn try_with_field(
         mut self,
-        path: impl Into<LookupBuf>,
+        path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        let path = path.into();
-
-        let existing_type = self.event_kind.at_path(&path);
+        let existing_type = self.event_kind.at_path(path);
 
         if existing_type.is_undefined() {
             // Guaranteed to never be set, so the insertion will always succeed.
-            self.with_field(path.clone(), kind, meaning)
+            self.with_event_field(path, kind, meaning)
         } else if !existing_type.contains_undefined() {
             // Guaranteed to always be set (or is never), so the insertion will always fail.
             self
@@ -290,10 +328,10 @@ impl Definition {
             // Not sure if the insertion will be successful. The type definition should contain both
             // possibilities. The meaning is not set, since it can't be relied on.
 
-            let success_definition = self.clone().with_field(path.clone(), kind, None);
+            let success_definition = self.clone().with_event_field(path, kind, None);
             // If the existing type contains `undefined`, the new type will always be used, so remove it.
             self.event_kind
-                .set_at_path(&path, existing_type.without_undefined());
+                .set_at_path(path, existing_type.without_undefined());
             self.merge(success_definition)
         }
     }
@@ -306,9 +344,7 @@ impl Definition {
     /// - If the path is not root, and the definition does not allow the type to be an object
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
-    pub fn with_metadata_field(mut self, path: impl Into<LookupBuf>, kind: Kind) -> Self {
-        let path = path.into();
-
+    pub fn with_metadata_field(mut self, path: &OwnedValuePath, kind: Kind) -> Self {
         if !path.is_root() {
             assert!(
                 self.metadata_kind.as_object().is_some(),
@@ -316,7 +352,7 @@ impl Definition {
             );
         }
 
-        self.metadata_kind.set_at_path(&path, kind);
+        self.metadata_kind.set_at_path(path, kind);
         self
     }
 
@@ -326,13 +362,8 @@ impl Definition {
     ///
     /// See `Definition::require_field`.
     #[must_use]
-    pub fn optional_field(
-        self,
-        path: impl Into<LookupBuf>,
-        kind: Kind,
-        meaning: Option<&str>,
-    ) -> Self {
-        self.with_field(path, kind.or_undefined(), meaning)
+    pub fn optional_field(self, path: &OwnedValuePath, kind: Kind, meaning: Option<&str>) -> Self {
+        self.with_event_field(path, kind.or_undefined(), meaning)
     }
 
     /// Register a semantic meaning for the definition.
@@ -423,6 +454,7 @@ impl Definition {
 
 #[cfg(test)]
 mod tests {
+    use lookup::owned_value_path;
     use std::collections::{BTreeMap, HashMap};
 
     use super::*;
@@ -430,8 +462,8 @@ mod tests {
     #[test]
     fn test_empty_legacy_field() {
         let definition = Definition::default_legacy_namespace().with_vector_metadata(
-            LookupBuf::from_str("").ok(),
-            "",
+            Some(&owned_value_path!()),
+            &owned_value_path!(),
             Kind::integer(),
             None,
         );
@@ -443,7 +475,7 @@ mod tests {
     #[test]
     fn test_required_field() {
         struct TestCase {
-            path: LookupBuf,
+            path: OwnedValuePath,
             kind: Kind,
             meaning: Option<&'static str>,
             want: Definition,
@@ -461,7 +493,7 @@ mod tests {
             (
                 "simple",
                 TestCase {
-                    path: "foo".into(),
+                    path: owned_value_path!("foo"),
                     kind: Kind::boolean(),
                     meaning: Some("foo_meaning"),
                     want: Definition {
@@ -475,7 +507,7 @@ mod tests {
             (
                 "nested fields",
                 TestCase {
-                    path: LookupBuf::from_str(".foo.bar").unwrap(),
+                    path: owned_value_path!("foo", "bar"),
                     kind: Kind::regex().or_null(),
                     meaning: Some("foobar"),
                     want: Definition {
@@ -496,7 +528,7 @@ mod tests {
             (
                 "no meaning",
                 TestCase {
-                    path: "foo".into(),
+                    path: owned_value_path!("foo"),
                     kind: Kind::boolean(),
                     meaning: None,
                     want: Definition {
@@ -508,7 +540,7 @@ mod tests {
                 },
             ),
         ]) {
-            let got = Definition::empty_legacy_namespace().with_field(path, kind, meaning);
+            let got = Definition::empty_legacy_namespace().with_event_field(&path, kind, meaning);
             assert_eq!(got.event_kind(), want.event_kind(), "{}", title);
         }
     }
@@ -516,7 +548,7 @@ mod tests {
     #[test]
     fn test_optional_field() {
         struct TestCase {
-            path: LookupBuf,
+            path: OwnedValuePath,
             kind: Kind,
             meaning: Option<&'static str>,
             want: Definition,
@@ -534,7 +566,7 @@ mod tests {
             (
                 "simple",
                 TestCase {
-                    path: "foo".into(),
+                    path: owned_value_path!("foo"),
                     kind: Kind::boolean(),
                     meaning: Some("foo_meaning"),
                     want: Definition {
@@ -551,7 +583,7 @@ mod tests {
             (
                 "nested fields",
                 TestCase {
-                    path: LookupBuf::from_str(".foo.bar").unwrap(),
+                    path: owned_value_path!("foo", "bar"),
                     kind: Kind::regex().or_null(),
                     meaning: Some("foobar"),
                     want: Definition {
@@ -575,7 +607,7 @@ mod tests {
             (
                 "no meaning",
                 TestCase {
-                    path: "foo".into(),
+                    path: owned_value_path!("foo"),
                     kind: Kind::boolean(),
                     meaning: None,
                     want: Definition {
@@ -591,7 +623,7 @@ mod tests {
             ),
         ] {
             let mut got = Definition::new_with_default_metadata(Kind::object(BTreeMap::new()), []);
-            got = got.optional_field(path, kind, meaning);
+            got = got.optional_field(&path, kind, meaning);
 
             assert_eq!(got, want, "{}", title);
         }

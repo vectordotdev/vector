@@ -112,8 +112,7 @@ pub struct Output {
     ///
     /// For *sources*, a `None` schema is identical to a `Some(Definition::source_default())`.
     ///
-    /// For a *transform*, a `None` schema means the transform inherits the merged [`Definition`]
-    /// of its inputs, without modifying the schema further.
+    /// For a *transform*, a schema [`Definition`] is required if `Datatype` is Log.
     pub log_schema_definition: Option<schema::Definition>,
 }
 
@@ -283,6 +282,16 @@ impl Default for LogNamespace {
     }
 }
 
+/// A shortcut to specify no `LegacyKey` should be used (since otherwise a turbofish would be required)
+pub const NO_LEGACY_KEY: Option<LegacyKey<&'static str>> = None;
+
+pub enum LegacyKey<T> {
+    /// Always insert the data, even if the field previously existed
+    Overwrite(T),
+    /// Only insert the data if the field is currently empty
+    InsertIfEmpty(T),
+}
+
 impl LogNamespace {
     /// Vector: This is added to "event metadata", nested under the source name.
     ///
@@ -291,7 +300,7 @@ impl LogNamespace {
         &self,
         source_name: &'a str,
         log: &mut LogEvent,
-        legacy_key: impl ValuePath<'a>,
+        legacy_key: Option<LegacyKey<impl ValuePath<'a>>>,
         metadata_key: impl ValuePath<'a>,
         value: impl Into<Value>,
     ) {
@@ -301,9 +310,34 @@ impl LogNamespace {
                     .value_mut()
                     .insert(path!(source_name).concat(metadata_key), value);
             }
-            LogNamespace::Legacy => {
-                log.try_insert((PathPrefix::Event, legacy_key), value);
-            }
+            LogNamespace::Legacy => match legacy_key {
+                None => { /* don't insert */ }
+                Some(LegacyKey::Overwrite(key)) => {
+                    log.insert((PathPrefix::Event, key), value);
+                }
+                Some(LegacyKey::InsertIfEmpty(key)) => {
+                    log.try_insert((PathPrefix::Event, key), value);
+                }
+            },
+        }
+    }
+
+    /// Vector: This is retrieved from the "event metadata", nested under the source name.
+    ///
+    /// Legacy: This is retrieved from the event.
+    pub fn get_source_metadata<'a, 'b>(
+        &self,
+        source_name: &'a str,
+        log: &'b LogEvent,
+        legacy_key: impl ValuePath<'a>,
+        metadata_key: impl ValuePath<'a>,
+    ) -> Option<&'b Value> {
+        match self {
+            LogNamespace::Vector => log
+                .metadata()
+                .value()
+                .get(path!(source_name).concat(metadata_key)),
+            LogNamespace::Legacy => log.get((PathPrefix::Event, legacy_key)),
         }
     }
 
@@ -324,7 +358,27 @@ impl LogNamespace {
                     .value_mut()
                     .insert(path!("vector").concat(metadata_key), value);
             }
-            LogNamespace::Legacy => log.try_insert((PathPrefix::Event, legacy_key), value),
+            LogNamespace::Legacy => {
+                log.try_insert((PathPrefix::Event, legacy_key), value);
+            }
+        }
+    }
+
+    /// Vector: This is retrieved from the "event metadata", nested under the name "vector".
+    ///
+    /// Legacy: This is retrieved from the event.
+    pub fn get_vector_metadata<'a, 'b>(
+        &self,
+        log: &'b LogEvent,
+        legacy_key: impl ValuePath<'a>,
+        metadata_key: impl ValuePath<'a>,
+    ) -> Option<&'b Value> {
+        match self {
+            LogNamespace::Vector => log
+                .metadata()
+                .value()
+                .get(path!("vector").concat(metadata_key)),
+            LogNamespace::Legacy => log.get((PathPrefix::Event, legacy_key)),
         }
     }
 
