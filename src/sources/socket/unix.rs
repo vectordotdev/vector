@@ -97,6 +97,8 @@ fn handle_events(
 ) {
     let now = Utc::now();
 
+    dbg!(&events);
+
     for event in events {
         let log = event.as_mut_log();
 
@@ -112,6 +114,8 @@ fn handle_events(
             path!("ingest_timestamp"),
             now,
         );
+
+        dbg!(&received_from);
 
         if let Some(ref host) = received_from {
             let host_key_path = config.host_key.as_ref().map_or_else(

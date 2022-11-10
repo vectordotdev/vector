@@ -1110,10 +1110,14 @@ mod test {
 
     ////////////// UNIX TEST LIBS //////////////
     #[cfg(unix)]
-    async fn init_unix(sender: SourceSender, stream: bool) -> PathBuf {
+    async fn init_unix(sender: SourceSender, stream: bool, use_log_namespace: bool) -> PathBuf {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
-        let config = UnixConfig::new(in_path.clone());
+        let mut config = UnixConfig::new(in_path.clone());
+        if use_log_namespace {
+            config.log_namespace = Some(true);
+        }
+
         let mode = if stream {
             Mode::UnixStream(config)
         } else {
@@ -1147,19 +1151,24 @@ mod test {
     }
 
     #[cfg(unix)]
-    async fn unix_message(message: &str, stream: bool) -> impl Stream<Item = Event> {
+    async fn unix_message(
+        message: &str,
+        stream: bool,
+        use_log_namespace: bool,
+    ) -> (PathBuf, impl Stream<Item = Event>) {
         let (tx, rx) = SourceSender::new_test();
-        let path = init_unix(tx, stream).await;
+        let path = init_unix(tx, stream, use_log_namespace).await;
+        let path_clone = path.clone();
 
         unix_send_lines(stream, path, &[message]).await;
 
-        rx
+        (path_clone, rx)
     }
 
     #[cfg(unix)]
     async fn unix_multiple_packets(stream: bool) {
         let (tx, rx) = SourceSender::new_test();
-        let path = init_unix(tx, stream).await;
+        let path = init_unix(tx, stream, false).await;
 
         unix_send_lines(stream, path, &["test", "test2"]).await;
         let events = collect_n(rx, 2).await;
@@ -1216,8 +1225,10 @@ mod test {
     #[tokio::test]
     async fn unix_datagram_message() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            let rx = unix_message("test", false).await;
+            let (path, rx) = unix_message("test", false, false).await;
             let events = collect_n(rx, 1).await;
+
+            dbg!((&events[0]).as_log());
 
             assert_eq!(events.len(), 1);
             assert_eq!(
@@ -1228,6 +1239,39 @@ mod test {
                 events[0].as_log()[log_schema().source_type_key()],
                 "socket".into()
             );
+            assert_eq!(
+                events[0].as_log()[log_schema().host_key()],
+                path.into_os_string().to_str().into()
+            );
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_message_with_log_namespaces() {
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let (path, rx) = unix_message("test", false, true).await;
+            let events = collect_n(rx, 1).await;
+            let event_meta = events[0].as_log().metadata().value();
+
+            dbg!(&events);
+
+            assert_eq!(events.len(), 1);
+
+            assert_eq!(
+                event_meta.get(path!("vector", "source_type")).unwrap(),
+                &vrl::value!(SocketConfig::NAME)
+            );
+
+            assert_eq!(
+                events[0].as_log()[log_schema().message_key()],
+                "test".into()
+            );
+            assert_eq!(
+                events[0].as_log()[log_schema().host_key()],
+                path.into_os_string().to_str().into()
+            );
         })
         .await;
     }
@@ -1236,7 +1280,7 @@ mod test {
     #[tokio::test]
     async fn unix_datagram_message_preserves_newline() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            let rx = unix_message("foo\nbar", false).await;
+            let (_, rx) = unix_message("foo\nbar", false, false).await;
             let events = collect_n(rx, 1).await;
 
             assert_eq!(events.len(), 1);
@@ -1323,8 +1367,10 @@ mod test {
     #[tokio::test]
     async fn unix_stream_message() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            let rx = unix_message("test", true).await;
+            let (_, rx) = unix_message("test", true, false).await;
             let events = collect_n(rx, 1).await;
+
+            assert!(false);
 
             assert_eq!(1, events.len());
             assert_eq!(
@@ -1343,7 +1389,7 @@ mod test {
     #[tokio::test]
     async fn unix_stream_message_splits_on_newline() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            let rx = unix_message("foo\nbar", true).await;
+            let (_, rx) = unix_message("foo\nbar", true, false).await;
             let events = collect_n(rx, 2).await;
 
             assert_eq!(events.len(), 2);

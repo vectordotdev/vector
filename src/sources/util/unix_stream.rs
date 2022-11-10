@@ -65,6 +65,7 @@ pub fn build_unix_stream_source(
             let listen_path = listen_path.clone();
 
             let span = info_span!("connection");
+            dbg!(&socket.peer_addr());
             let path = if let Ok(addr) = socket.peer_addr() {
                 if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
                     span.record("peer_path", &field::debug(&path));
