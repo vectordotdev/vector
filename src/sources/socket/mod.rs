@@ -1228,8 +1228,6 @@ mod test {
             let (path, rx) = unix_message("test", false, false).await;
             let events = collect_n(rx, 1).await;
 
-            dbg!((&events[0]).as_log());
-
             assert_eq!(events.len(), 1);
             assert_eq!(
                 events[0].as_log()[log_schema().message_key()],
@@ -1247,9 +1245,10 @@ mod test {
         .await;
     }
 
+    #[ignore]
     #[cfg(unix)]
     #[tokio::test]
-    async fn socket_test() {
+    async fn unix_datagram_socket_test() {
         use tempfile::tempdir;
         use tokio::net::UnixDatagram;
 
@@ -1291,18 +1290,15 @@ mod test {
 
         let dgram = &buf[..size];
         assert_eq!(dgram, bytes);
-        assert!(false);
     }
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn unix_datagram_message_with_log_namespaces() {
+    async fn unix_datagram_message_with_log_namespace() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            let (path, rx) = unix_message("test", false, true).await;
+            let (_, rx) = unix_message("test", false, true).await;
             let events = collect_n(rx, 1).await;
             let event_meta = events[0].as_log().metadata().value();
-
-            dbg!(&events);
 
             assert_eq!(events.len(), 1);
 
@@ -1316,8 +1312,10 @@ mod test {
                 "test".into()
             );
             assert_eq!(
-                events[0].as_log()[log_schema().host_key()],
-                path.into_os_string().to_str().into()
+                event_meta
+                    .get(path!(SocketConfig::NAME, log_schema().host_key()))
+                    .unwrap(),
+                &vrl::value!("(unnamed)")
             );
         })
         .await;
@@ -1418,6 +1416,26 @@ mod test {
             let events = collect_n(rx, 1).await;
 
             assert!(false);
+
+            assert_eq!(1, events.len());
+            assert_eq!(
+                events[0].as_log()[log_schema().message_key()],
+                "test".into()
+            );
+            assert_eq!(
+                events[0].as_log()[log_schema().source_type_key()],
+                "socket".into()
+            );
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_stream_message_with_log_namespace() {
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let (_, rx) = unix_message("test", true, true).await;
+            let events = collect_n(rx, 1).await;
 
             assert_eq!(1, events.len());
             assert_eq!(

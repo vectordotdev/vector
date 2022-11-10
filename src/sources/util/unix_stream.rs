@@ -65,17 +65,23 @@ pub fn build_unix_stream_source(
             let listen_path = listen_path.clone();
 
             let span = info_span!("connection");
-            dbg!(&socket.peer_addr());
+
+            dbg!(socket.peer_addr().unwrap());
+
             let path = if let Ok(addr) = socket.peer_addr() {
+                dbg!(&addr);
+
                 if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
                     span.record("peer_path", &field::debug(&path));
                     Some(path)
                 } else {
-                    None
+                    Some("(unnamed)".into())
                 }
             } else {
                 None
             };
+
+            dbg!(&path);
 
             let handle_events = handle_events.clone();
             let received_from: Option<Bytes> =
