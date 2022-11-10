@@ -1,5 +1,4 @@
 use core::fmt;
-use std::collections::btree_map;
 
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
@@ -65,13 +64,6 @@ impl MetricSeries {
                 result
             }
         }
-    }
-
-    /// Get the tag entry for the named key. *Note:* This will create
-    /// the tags map if it is not present, even if nothing is later
-    /// inserted.
-    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
-        self.tags.get_or_insert_with(Default::default).entry(key)
     }
 }
 
