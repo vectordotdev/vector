@@ -68,6 +68,8 @@ pub mod opentelemetry;
 pub mod postgresql_metrics;
 #[cfg(feature = "sources-prometheus")]
 pub mod prometheus;
+#[cfg(feature = "sources-pulsar")]
+pub mod pulsar;
 #[cfg(feature = "sources-redis")]
 pub mod redis;
 #[cfg(feature = "sources-socket")]
