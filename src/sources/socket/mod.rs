@@ -1428,10 +1428,6 @@ mod test {
                 events[0].as_log()[log_schema().source_type_key()],
                 "socket".into()
             );
-            assert_eq!(
-                events[0].as_log()[log_schema().host_key()],
-                UNNAMED_SOCKET_HOST.into()
-            );
         })
         .await;
     }
