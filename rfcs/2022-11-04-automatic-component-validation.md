@@ -4,8 +4,9 @@ Over time, the Vector team has undertaken numerous attempts to ensure that the i
 emitted from Vector, specifically the internal telemetry related to components, is both accurate and
 consistent. This RFC charts a path for a unit test-based mechanism that will ensure that if a
 component can be used/configured by an end user, it is unit tested thoroughly, and has passed all of
-the relevant qualifications -- Component Specification adherence, correct of actual metric values,
-etc -- that make it suitable for production use.
+the relevant qualifications --
+[Component Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md)
+adherence, correctness of actual metric values, etc -- that make it suitable for production use.
 
 ## Context
 
@@ -38,6 +39,8 @@ etc -- that make it suitable for production use.
   `BytesReceived` event for v2 variant
 - [#12964](https://github.com/vectordotdev/vector/issues/12964) - bug(blackhole sink): does not
   report "network" bytes sent
+- [#13995](https://github.com/vectordotdev/vector/issues/13995) - Verify
+  `component_discarded_events_total` and `component_errors_total` for all sources/sinks
 - [#14073](https://github.com/vectordotdev/vector/issues/14073) - verify `route` transform's
   `component_discarded_events_total`
 
@@ -69,6 +72,11 @@ The current process of validating components is inherently manually: we can writ
 check for compliance, but if we forget to write that unit test, or don't update all unit tests when
 we want to change the behavior for, say, all sources... then our compliance checking can quickly
 become out-of-sync with reality.
+
+This goes double for commuinity contributions: while the Vector authors might have learned over time
+to make sure they're emitting the right metrics, and so on, it's essentially impossible for a
+first-time contributor to know to do so unless there is some mechanism in place to tell them to do
+so.
 
 Humans are also inherently fallible: it is easy to look at data and misread a number, to think
 something is there when it isn't. This has occurred multiple times -- as evidenced by the multiple
@@ -395,9 +403,10 @@ When we ensure that all components are automatically tested as soon as they're f
 codebase, we can better ensure that not only do new components get properly tested, but that
 existing components are still being tested as well.
 
-If we don't do this, or something like this, we're likely to once again introduce regressions to
-components, and miss issues with new components, leading to a permanent trail of subtly-wrong
-internal telemetry.
+If we don't do this, or something like this, we'll continue to avoid detecting some metrics that are
+very likely already incorrect and have evaded our attempts to discover them so far. Additionally,
+we're likely to once again introduce regressions to components, and miss issues with new components,
+leading to a permanent trail of subtly-wrong internal telemetry.
 
 ## Drawbacks
 
@@ -417,9 +426,9 @@ proposed trait from existing data, forcing all implementations to be written man
 
 Vector already has existing mechanisms for validating components in terms of the Component
 Specification, and so on. This comes in the form of familiar helper methods like
-`assert_sink_compliance`. Those helpers operate with a similar approach to this proposal in that we
-run the relevant code in a way that ensures we can observe the state of the system before and after
-the code runs, calculating the validation results at the end.
+`assert_sink_compliance`, `assert_source_error`, etc. Those helpers operate with a similar approach
+to this proposal in that we run the relevant code in a way that ensures we can observe the state of
+the system before and after the code runs, calculating the validation results at the end.
 
 We do not have an existing mechanism for asserting the _correctness_ of internal telemetry, only
 that specific bits of internal telemetry are being emitted as intended. This is not necessarily a
@@ -499,3 +508,5 @@ without -- at least as far as I can see -- a meaningful benefit to the isolation
   process to potentially uncover scenarios where valid inputs should have been processed but
   weren't, or a certain metric's value wasn't updated even though the component acknowledged
   processing an event, and so on.
+- Try and unify the distinct per-component configuration traits (i.e. `SourceConfig`) with
+  `ValidatableComponent` into a more generic base trait.
