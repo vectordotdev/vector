@@ -223,7 +223,7 @@ impl TcpSource for RawTcpSource {
                     SocketConfig::NAME,
                     log,
                     Some(LegacyKey::InsertIfEmpty(&host_key_path)),
-                    path!(log_schema().host_key()),
+                    path!("host"),
                     host.ip().to_string(),
                 );
 
