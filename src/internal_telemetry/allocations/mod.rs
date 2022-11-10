@@ -2,9 +2,8 @@
 
 mod allocator;
 use std::{
-    cell::Cell,
     sync::{
-        atomic::{AtomicI64, AtomicUsize, Ordering},
+        atomic::{AtomicI64, Ordering},
         Mutex,
     },
     thread,
@@ -21,11 +20,9 @@ pub(crate) use self::allocator::{
     without_allocation_tracing, AllocationGroupId, AllocationLayer, GroupedTraceableAllocator,
 };
 
-use crossbeam_utils::CachePadded;
-
 const NUM_GROUPS: usize = 128;
 
-type GroupMemStatsArray = [CachePadded<AtomicI64>; NUM_GROUPS];
+type GroupMemStatsArray = [AtomicI64; NUM_GROUPS];
 
 /// A registry for tracking each thread's group memory statistics.
 static THREAD_LOCAL_REFS: Mutex<Vec<&'static GroupMemStatsArray>> = Mutex::new(Vec::new());
@@ -41,18 +38,15 @@ impl GroupMemStats {
     pub fn new() -> Self {
         let mut mutex = THREAD_LOCAL_REFS.lock().unwrap();
         let stats_ref: &'static GroupMemStatsArray =
-            Box::leak(Box::new(arr![CachePadded::new(AtomicI64::new(0)) ; 128]));
+            Box::leak(Box::new(arr![AtomicI64::new(0) ; 128]));
         let group_mem_stats = GroupMemStats { stats: stats_ref };
         mutex.push(stats_ref);
         group_mem_stats
     }
 }
 
-static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
 thread_local! {
     static GROUP_MEM_STATS: GroupMemStats = GroupMemStats::new();
-    static THREAD_ID: Cell<usize> = const { Cell::new(0) };
 }
 
 // By using the Option type, we can do statics w/o the need of other creates such as lazy_static
@@ -127,11 +121,6 @@ pub fn init_allocation_tracing() {
             })
         })
         .unwrap();
-}
-
-/// Initializes the thread local ID.
-pub fn init_thread_id() {
-    THREAD_ID.with(|t| t.replace(THREAD_COUNTER.fetch_add(1, Ordering::Relaxed)));
 }
 
 /// Acquires an allocation group ID.

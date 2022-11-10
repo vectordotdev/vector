@@ -312,7 +312,6 @@ url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.3", default-features = false }
 arr_macro = { version = "0.1.3" }
-crossbeam-utils = { version = "0.8.12", default-features = false }
 
 # depending on fork for bumped nix dependency
 # https://github.com/heim-rs/heim/pull/360
