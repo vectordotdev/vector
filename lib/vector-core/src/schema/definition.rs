@@ -181,7 +181,7 @@ impl Definition {
     pub fn with_source_metadata(
         self,
         source_name: &str,
-        legacy_path: Option<LegacyKey<&OwnedValuePath>>,
+        legacy_path: Option<LegacyKey<OwnedValuePath>>,
         vector_path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
@@ -203,7 +203,7 @@ impl Definition {
     ) -> Self {
         self.with_namespaced_metadata(
             "vector",
-            legacy_path.map(LegacyKey::InsertIfEmpty),
+            legacy_path.cloned().map(LegacyKey::InsertIfEmpty),
             vector_path,
             kind,
             meaning,
@@ -215,7 +215,7 @@ impl Definition {
     fn with_namespaced_metadata(
         self,
         prefix: &str,
-        legacy_path: Option<LegacyKey<&OwnedValuePath>>,
+        legacy_path: Option<LegacyKey<OwnedValuePath>>,
         vector_path: &OwnedValuePath,
         kind: Kind,
         meaning: Option<&str>,
@@ -224,12 +224,12 @@ impl Definition {
             if self.log_namespaces.contains(&LogNamespace::Legacy) {
                 match legacy_path {
                     LegacyKey::InsertIfEmpty(legacy_path) => Some(self.clone().try_with_field(
-                        legacy_path,
+                        &legacy_path,
                         kind.clone(),
                         meaning,
                     )),
                     LegacyKey::Overwrite(legacy_path) => Some(self.clone().with_event_field(
-                        legacy_path,
+                        &legacy_path,
                         kind.clone(),
                         meaning,
                     )),

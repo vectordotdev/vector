@@ -105,6 +105,7 @@ pub struct AwsS3Config {
     tls_options: Option<TlsConfig>,
 
     /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
 }
@@ -137,21 +138,21 @@ impl SourceConfig for AwsS3Config {
             .schema_definition(log_namespace)
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(&owned_value_path!("bucket"))),
+                Some(LegacyKey::Overwrite(owned_value_path!("bucket"))),
                 &owned_value_path!("bucket"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(&owned_value_path!("object"))),
+                Some(LegacyKey::Overwrite(owned_value_path!("object"))),
                 &owned_value_path!("object"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(&owned_value_path!("region"))),
+                Some(LegacyKey::Overwrite(owned_value_path!("region"))),
                 &owned_value_path!("region"),
                 Kind::bytes(),
                 None,

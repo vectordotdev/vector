@@ -123,6 +123,7 @@ scopes:
   - yandex service # Anything `yandex` service provider related
 
   # sources
+  - amqp source # Anything `amqp` source related
   - apache_metrics source # Anything `apache_metrics` source related
   - aws_ecs_metrics source # Anything `aws_ecs_metrics` source related
   - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
@@ -179,6 +180,7 @@ scopes:
   - throttle transform # Anything `throttle` transform related
 
   # sinks
+  - amqp sink # Anything `amqp` sink related
   - apex sink # Anything `apex` sink related
   - aws_cloudwatch_logs sink # Anything `aws_cloudwatch_logs` sink related
   - aws_cloudwatch_metrics sink # Anything `aws_cloudwatch_metrics` sink related

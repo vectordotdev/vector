@@ -274,7 +274,7 @@ impl MetricToLog {
                         // This can be removed once metrics support namespacing.
                         log.insert(
                             (PathPrefix::Metadata, path!("vector")),
-                            Value::Object(BTreeMap::new()),
+                            value::Value::Object(BTreeMap::new()),
                         );
                     }
                     Some(log)

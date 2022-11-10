@@ -420,10 +420,15 @@ pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
 }
 
 pub fn runtime() -> runtime::Runtime {
-    runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
+    let mut rt_builder = runtime::Builder::new_multi_thread();
+    rt_builder.enable_all();
+    #[cfg(feature = "allocation-tracing")]
+    {
+        rt_builder.on_thread_start(|| {
+            crate::internal_telemetry::allocations::init_thread_id();
+        });
+    }
+    rt_builder.build().unwrap()
 }
 
 // Wait for a Future to resolve, or the duration to elapse (will panic)
