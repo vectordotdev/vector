@@ -67,11 +67,7 @@ pub fn build_unix_stream_source(
 
             let span = info_span!("connection");
 
-            dbg!(socket.peer_addr().unwrap());
-
             let path = if let Ok(addr) = socket.peer_addr() {
-                dbg!(&addr);
-
                 if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
                     span.record("peer_path", &field::debug(&path));
                     Some(path)
@@ -82,13 +78,9 @@ pub fn build_unix_stream_source(
                 None
             };
 
-            dbg!(&path);
-
             let handle_events = handle_events.clone();
             let received_from: Option<Bytes> =
                 path.map(|p| p.to_string_lossy().into_owned().into());
-
-            dbg!(&received_from);
 
             let bytes_received = bytes_received.clone();
             let stream = socket

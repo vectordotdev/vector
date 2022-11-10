@@ -71,8 +71,6 @@ async fn listen(
         buf.resize(max_length, 0);
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
-        dbg!(&recv);
-
                 let (byte_size, address) = recv.map_err(|error| {
                     let error = codecs::decoding::Error::FramingError(error.into());
                     emit!(SocketReceiveError {

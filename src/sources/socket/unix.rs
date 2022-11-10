@@ -97,8 +97,6 @@ fn handle_events(
 ) {
     let now = Utc::now();
 
-    dbg!(&events);
-
     for event in events {
         let log = event.as_mut_log();
 
@@ -115,17 +113,11 @@ fn handle_events(
             now,
         );
 
-        dbg!(&received_from);
-
         if let Some(ref host) = received_from {
-            dbg!(&host);
-
             let host_key_path = config.host_key.as_ref().map_or_else(
                 || [BorrowedSegment::from(log_schema().host_key())],
                 |key| [BorrowedSegment::from(key)],
             );
-
-            dbg!(&host_key_path);
 
             log_namespace.insert_source_metadata(
                 SocketConfig::NAME,
