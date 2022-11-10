@@ -88,7 +88,7 @@ impl DnstapEventSchema {
         result.insert(
             self.dns_query_message_schema().question_section().into(),
             Kind::array(Collection::from_unknown(Kind::object(
-                self.dns_record_schema().schema_definition(),
+                self.dns_query_question_schema().schema_definition(),
             )))
             .or_undefined(),
         );
@@ -853,6 +853,16 @@ impl DnsRecordSchema {
 pub struct DnsQueryQuestionSchema;
 
 impl DnsQueryQuestionSchema {
+    pub fn schema_definition(&self) -> Collection<Field> {
+        btreemap! {
+            self.class() => Kind::bytes(),
+            self.name() => Kind::bytes(),
+            self.question_type() => Kind::bytes(),
+            self.question_type_id() => Kind::integer(),
+        }
+        .into()
+    }
+
     pub const fn name(&self) -> &'static str {
         "domainName"
     }

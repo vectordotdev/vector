@@ -388,14 +388,16 @@ mod tests {
                          "sourcePort":54782,
                          "source_type":"dnstap",
                          "time":1667909880863224758,
-                         "timePrecision":"ns",
-                         "timestamp":"2022-11-08T12:18:00.863224758Z"}"#;
+                         "timePrecision":"ns"
+                         }"#;
 
         let json: serde_json::Value = serde_json::from_str(record).unwrap();
-        let event = Event::from(LogEvent::from(value::Value::from(json)));
+        let mut event = Event::from(LogEvent::from(value::Value::from(json)));
+        event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
         let definition = DnstapConfig::event_schema("timestamp");
-        let schema = vector_core::schema::Definition::empty_legacy_namespace();
+        let schema = vector_core::schema::Definition::empty_legacy_namespace()
+            .with_standard_vector_source_metadata();
 
         assert_eq!(
             Ok(()),
@@ -403,8 +405,6 @@ mod tests {
                 .schema_definition(schema)
                 .is_valid_for_event(&event)
         );
-
-        assert!(false);
     }
 }
 
