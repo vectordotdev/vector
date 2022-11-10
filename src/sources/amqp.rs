@@ -73,7 +73,8 @@ pub struct AmqpSourceConfig {
     #[serde(default = "default_offset_key")]
     pub(crate) offset_key: String,
 
-    /// The namespace to use. This overrides the global setting.
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
