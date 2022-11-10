@@ -68,6 +68,8 @@ pub mod opentelemetry;
 pub mod postgresql_metrics;
 #[cfg(feature = "sources-prometheus")]
 pub mod prometheus;
+#[cfg(feature = "sources-pulsar")]
+pub mod pulsar;
 #[cfg(feature = "sources-redis")]
 pub mod redis;
 #[cfg(feature = "sources-socket")]
@@ -244,6 +246,10 @@ pub enum Sources {
     #[cfg(feature = "sources-prometheus")]
     PrometheusRemoteWrite(#[configurable(derived)] prometheus::PrometheusRemoteWriteConfig),
 
+    /// Pulsar.
+    #[cfg(feature = "sources-pulsar")]
+    Pulsar(#[configurable(derived)] pulsar::PulsarSourceConfig),
+
     /// Redis.
     #[cfg(feature = "sources-redis")]
     Redis(#[configurable(derived)] redis::RedisSourceConfig),
@@ -375,6 +381,8 @@ impl NamedComponent for Sources {
             Self::PrometheusScrape(config) => config.get_component_name(),
             #[cfg(feature = "sources-prometheus")]
             Self::PrometheusRemoteWrite(config) => config.get_component_name(),
+            #[cfg(feature = "sources-pulsar")]
+            Self::Pulsar(config) => config.get_component_name(),
             #[cfg(feature = "sources-redis")]
             Self::Redis(config) => config.get_component_name(),
             #[cfg(test)]
