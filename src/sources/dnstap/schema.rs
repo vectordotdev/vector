@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use lookup::owned_value_path;
 use value::{
     kind::{Collection, Field},
@@ -23,54 +25,139 @@ pub struct DnstapEventSchema {
 impl DnstapEventSchema {
     /// The message schema for the request and response message fields
     fn request_message_schema_definition(&self) -> Collection<Field> {
-        btreemap! {
-            self.dns_query_message_schema().time() => Kind::integer().or_undefined(),
-            self.dns_update_message_schema().time() => Kind::integer().or_undefined(),
-            self.dns_query_message_schema().time_precision() => Kind::bytes().or_undefined(),
-            self.dns_update_message_schema().time_precision() => Kind::bytes().or_undefined(),
-            self.dns_query_message_schema().response_code() => Kind::integer().or_undefined(),
-            self.dns_update_message_schema().response_code() => Kind::integer().or_undefined(),
-            self.dns_query_message_schema().response() => Kind::bytes().or_undefined(),
-            self.dns_update_message_schema().response() => Kind::bytes().or_undefined(),
-            self.dns_query_message_schema().header() =>  Kind::object(self.dns_query_header_schema().schema_definition()).or_undefined(),
-            self.dns_update_message_schema().header() =>  Kind::object(self.dns_update_header_schema().schema_definition()).or_undefined(),
-            self.dns_update_message_schema().zone_section() => Kind::object(self.dns_update_zone_info_schema().schema_definition()).or_undefined(),
+        let mut result = BTreeMap::new();
+        result.insert(
+            self.dns_query_message_schema().time().into(),
+            Kind::integer().or_undefined(),
+        );
 
-            self.dns_query_message_schema().question_section() => Kind::array(
-                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
-            ).or_undefined(),
+        result.insert(
+            self.dns_update_message_schema().time().into(),
+            Kind::integer().or_undefined(),
+        );
+        result.insert(
+            self.dns_query_message_schema().time_precision().into(),
+            Kind::bytes().or_undefined(),
+        );
+        result.insert(
+            self.dns_update_message_schema().time_precision().into(),
+            Kind::bytes().or_undefined(),
+        );
+        result.insert(
+            self.dns_query_message_schema().response_code().into(),
+            Kind::integer().or_undefined(),
+        );
+        result.insert(
+            self.dns_update_message_schema().response_code().into(),
+            Kind::integer().or_undefined(),
+        );
+        result.insert(
+            self.dns_query_message_schema().response().into(),
+            Kind::bytes().or_undefined(),
+        );
+        result.insert(
+            self.dns_update_message_schema().response().into(),
+            Kind::bytes().or_undefined(),
+        );
 
-            self.dns_query_message_schema().answer_section() => Kind::array(
-                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
-            ).or_undefined(),
+        if self.dns_query_message_schema().header() == self.dns_update_message_schema().header() {
+            // This branch will always be hit -
+            // we know that both headers are equal since they both pull the values from the common schema.
+            let mut schema = self.dns_query_header_schema().schema_definition();
+            schema.merge(self.dns_update_header_schema().schema_definition(), true);
 
-            self.dns_query_message_schema().authority_section() => Kind::array(
-                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
-            ).or_undefined(),
-
-            self.dns_query_message_schema().additional_section() => Kind::array(
-                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
-            ).or_undefined(),
-
-            self.dns_query_message_schema().opt_pseudo_section() => Kind::object(
-                self.dns_message_opt_pseudo_section_schema().schema_definition(self.dns_message_option_schema())
-            ).or_undefined(),
-
-            self.dns_query_message_schema().raw_data() => Kind::bytes().or_undefined(),
-
-            self.dns_update_message_schema().prerequisite_section() => Kind::array(
-                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
-            ).or_undefined(),
-
-            self.dns_update_message_schema().update_section() => Kind::array(
-                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
-            ).or_undefined(),
-
-            self.dns_update_message_schema().additional_section() => Kind::array(
-                Collection::from_unknown(Kind::object(self.dns_record_schema().schema_definition()))
-            ).or_undefined(),
+            result.insert(
+                self.dns_query_message_schema().header().into(),
+                Kind::object(schema).or_undefined(),
+            );
+        } else {
+            result.insert(
+                self.dns_query_message_schema().header().into(),
+                Kind::object(self.dns_query_header_schema().schema_definition()).or_undefined(),
+            );
+            result.insert(
+                self.dns_update_message_schema().header().into(),
+                Kind::object(self.dns_update_header_schema().schema_definition()).or_undefined(),
+            );
         }
-        .into()
+        result.insert(
+            self.dns_update_message_schema().zone_section().into(),
+            Kind::object(self.dns_update_zone_info_schema().schema_definition()).or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().question_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().answer_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().authority_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().additional_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().opt_pseudo_section().into(),
+            Kind::object(
+                self.dns_message_opt_pseudo_section_schema()
+                    .schema_definition(self.dns_message_option_schema()),
+            )
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().raw_data().into(),
+            Kind::bytes().or_undefined(),
+        );
+
+        result.insert(
+            self.dns_update_message_schema()
+                .prerequisite_section()
+                .into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_update_message_schema().update_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_update_message_schema().additional_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.into()
     }
 
     /// Schema definition for fields stored in the root.
@@ -527,16 +614,16 @@ impl DnsQueryHeaderSchema {
             self.opcode() => Kind::integer(),
             self.rcode() => Kind::integer(),
             self.qr() => Kind::integer(),
-            self.additional_count() => Kind::integer(),
             self.aa() => Kind::boolean(),
             self.tc() => Kind::boolean(),
             self.rd() => Kind::boolean(),
             self.ra() => Kind::boolean(),
             self.ad() => Kind::boolean(),
             self.cd() => Kind::boolean(),
-            self.question_count() => Kind::integer(),
-            self.answer_count() => Kind::integer(),
-            self.authority_count() => Kind::integer(),
+            self.additional_count() => Kind::integer().or_undefined(),
+            self.question_count() => Kind::integer().or_undefined(),
+            self.answer_count() => Kind::integer().or_undefined(),
+            self.authority_count() => Kind::integer().or_undefined(),
         }
         .into()
     }
@@ -608,10 +695,10 @@ impl DnsUpdateHeaderSchema {
             self.opcode() => Kind::integer(),
             self.rcode() => Kind::integer(),
             self.qr() => Kind::integer(),
-            self.zone_count() => Kind::integer(),
-            self.prerequisite_count() => Kind::integer(),
-            self.update_count() => Kind::integer(),
-            self.additional_count() => Kind::integer(),
+            self.zone_count() => Kind::integer().or_undefined(),
+            self.prerequisite_count() => Kind::integer().or_undefined(),
+            self.update_count() => Kind::integer().or_undefined(),
+            self.additional_count() => Kind::integer().or_undefined(),
         }
         .into()
     }

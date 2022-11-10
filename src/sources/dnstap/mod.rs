@@ -392,9 +392,19 @@ mod tests {
                          "timestamp":"2022-11-08T12:18:00.863224758Z"}"#;
 
         let json: serde_json::Value = serde_json::from_str(record).unwrap();
-        let event = LogEvent::from(value::Value::from(json));
+        let event = Event::from(LogEvent::from(value::Value::from(json)));
 
-        dbg!(event);
+        let definition = DnstapConfig::event_schema("timestamp");
+        let schema = vector_core::schema::Definition::empty_legacy_namespace();
+
+        assert_eq!(
+            Ok(()),
+            definition
+                .schema_definition(schema)
+                .is_valid_for_event(&event)
+        );
+
+        assert!(false);
     }
 }
 
