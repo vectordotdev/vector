@@ -49,19 +49,18 @@ thread_local! {
     static GROUP_MEM_STATS: GroupMemStats = GroupMemStats::new();
 }
 
-// By using the Option type, we can do statics w/o the need of other creates such as lazy_static
 struct GroupInfo {
-    component_kind: Option<String>,
-    component_type: Option<String>,
-    component_id: Option<String>,
+    component_kind: String,
+    component_type: String,
+    component_id: String,
 }
 
 impl GroupInfo {
     const fn new() -> Self {
         Self {
-            component_id: None,
-            component_kind: None,
-            component_type: None,
+            component_id: String::new(),
+            component_kind: String::new(),
+            component_type: String::new(),
         }
     }
 }
@@ -96,6 +95,14 @@ impl Tracer for MainTracer {
 
 /// Initializes allocation tracing.
 pub fn init_allocation_tracing() {
+    for group in &GROUP_INFO {
+        let mut writer = group.lock().unwrap();
+        *writer = GroupInfo {
+            component_id: "root".to_string(),
+            component_kind: "root".to_string(),
+            component_type: "root".to_string(),
+        };
+    }
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
         .spawn(|| {
@@ -113,9 +120,9 @@ pub fn init_allocation_tracing() {
                     gauge!(
                         "component_allocated_bytes",
                         mem_used.to_f64().expect("failed to convert group_id from int to float"),
-                        "component_kind" => group_info.component_kind.clone().unwrap_or_else(|| "root".to_string()),
-                        "component_type" => group_info.component_type.clone().unwrap_or_else(|| "root".to_string()),
-                        "component_id" => group_info.component_id.clone().unwrap_or_else(|| "root".to_string()));
+                        "component_kind" => group_info.component_kind.clone(),
+                        "component_type" => group_info.component_type.clone(),
+                        "component_id" => group_info.component_id.clone());
                 }
                 thread::sleep(Duration::from_millis(5000));
             })
@@ -142,9 +149,9 @@ pub fn acquire_allocation_group_id(
         Some(mutex) => {
             let mut writer = mutex.lock().unwrap();
             *writer = GroupInfo {
-                component_id: Some(component_id),
-                component_kind: Some(component_kind),
-                component_type: Some(component_type),
+                component_id,
+                component_kind,
+                component_type,
             };
             group_id
         }
