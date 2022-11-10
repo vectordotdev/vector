@@ -70,10 +70,6 @@ impl TagValueSet {
         }
     }
 
-    fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
-        self.into_iter()
-    }
-
     fn is_empty(&self) -> bool {
         match self {
             Self::Single(None) => true,
@@ -146,6 +142,20 @@ impl TagValueSet {
                 set.remove(&value);
                 set.insert(value)
             }
+        }
+    }
+
+    fn iter(&self) -> TagValueRefIter<'_> {
+        match self {
+            TagValueSet::Single(tag) => TagValueRefIter::Single(tag.as_ref()),
+            TagValueSet::Set(set) => TagValueRefIter::Set(set.into_iter()),
+        }
+    }
+
+    fn into_iter(self) -> TagValueIter {
+        match self {
+            Self::Single(tag) => TagValueIter::Single(tag),
+            Self::Set(set) => TagValueIter::Set(set.into_iter()),
         }
     }
 }
@@ -245,18 +255,6 @@ impl FromIterator<String> for TagValueSet {
     }
 }
 
-impl IntoIterator for TagValueSet {
-    type IntoIter = TagValueIter;
-    type Item = String;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Self::Single(tag) => TagValueIter::Single(tag),
-            Self::Set(set) => TagValueIter::Set(set.into_iter()),
-        }
-    }
-}
-
 pub enum TagValueIter {
     Single(Option<TagValue>),
     Set(<IndexSet<TagValue> as IntoIterator>::IntoIter),
@@ -275,18 +273,6 @@ impl Iterator for TagValueIter {
                     None => None,
                 };
             },
-        }
-    }
-}
-
-impl<'a> IntoIterator for &'a TagValueSet {
-    type IntoIter = TagValueRefIter<'a>;
-    type Item = &'a str;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            TagValueSet::Single(tag) => TagValueRefIter::Single(tag.as_ref()),
-            TagValueSet::Set(set) => TagValueRefIter::Set(set.into_iter()),
         }
     }
 }
@@ -412,7 +398,7 @@ impl IntoIterator for MetricTags {
 
 pub struct IntoIter {
     base: btree_map::IntoIter<String, TagValueSet>,
-    current: Option<(String, <TagValueSet as IntoIterator>::IntoIter)>,
+    current: Option<(String, TagValueIter)>,
 }
 
 impl Iterator for IntoIter {
@@ -455,7 +441,7 @@ impl<'a> IntoIterator for &'a MetricTags {
 
 pub struct Iter<'a> {
     base: btree_map::Iter<'a, String, TagValueSet>,
-    current: Option<(&'a str, <&'a TagValueSet as IntoIterator>::IntoIter)>,
+    current: Option<(&'a str, TagValueRefIter<'a>)>,
 }
 
 impl<'a> Iterator for Iter<'a> {
