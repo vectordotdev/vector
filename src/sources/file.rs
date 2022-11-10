@@ -8,7 +8,10 @@ use file_source::{
     Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
 };
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
-use lookup::{owned_value_path, path};
+use lookup::{
+    lookup_v2::{parse_value_path, OptionalValuePath},
+    owned_value_path, path, OwnedValuePath,
+};
 use regex::bytes::Regex;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
@@ -86,7 +89,7 @@ pub struct FileConfig {
     ///
     /// By default, `file` is used.
     #[serde(default = "default_file_key")]
-    pub file_key: Option<String>,
+    pub file_key: Option<OptionalValuePath>,
 
     /// Whether or not to start reading from the beginning of a new file.
     ///
@@ -123,7 +126,7 @@ pub struct FileConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default)]
-    pub host_key: Option<String>,
+    pub host_key: Option<OptionalValuePath>,
 
     /// The directory used to persist file checkpoint positions.
     ///
@@ -137,7 +140,7 @@ pub struct FileConfig {
     ///
     /// Off by default, the offset is only added to the event if this is set.
     #[serde(default)]
-    pub offset_key: Option<String>,
+    pub offset_key: Option<OptionalValuePath>,
 
     /// Delay between file discovery calls, in milliseconds.
     ///
@@ -214,8 +217,8 @@ fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
 }
 
-fn default_file_key() -> Option<String> {
-    Some("file".to_string())
+fn default_file_key() -> Option<OptionalValuePath> {
+    Some(OptionalValuePath::from(owned_value_path!("file")))
 }
 
 const fn default_glob_minimum_cooldown_ms() -> u64 {
@@ -410,24 +413,26 @@ impl SourceConfig for FileConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let file_key = self
             .file_key
-            .as_ref()
-            .map(|x| owned_value_path!(x))
+            .clone()
+            .map(|x| x.path)
+            .and_then(|x| x)
             .map(LegacyKey::Overwrite);
 
         // `host_key` defaults to the `log_schema().host_key()` if it's not configured in the source.
-        let host_key = self.host_key.as_ref().map_or_else(
-            || {
-                Some(LegacyKey::Overwrite(owned_value_path!(
-                    log_schema().host_key()
-                )))
-            },
-            |key| Some(LegacyKey::Overwrite(owned_value_path!(key.as_str()))),
-        );
+        let host_key = self
+            .host_key
+            .clone()
+            .map_or_else(
+                || parse_value_path(log_schema().host_key()).ok(),
+                |key| key.path,
+            )
+            .map(LegacyKey::Overwrite);
 
         let offset_key = self
             .offset_key
-            .as_ref()
-            .map(|x| owned_value_path!(x))
+            .clone()
+            .map(|f| f.path)
+            .and_then(|f| f)
             .map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
@@ -530,10 +535,14 @@ pub fn file_source(
         host_key: config
             .host_key
             .clone()
-            .unwrap_or_else(|| log_schema().host_key().to_string()),
+            .map_or_else(
+                || parse_value_path(log_schema().host_key()).ok(),
+                |key| key.path,
+            )
+            .unwrap(), // TODO don't unwrap bro
         hostname: crate::get_hostname().ok(),
-        file_key: config.file_key.clone(),
-        offset_key: config.offset_key.clone(),
+        file_key: config.file_key.clone().and_then(|f| f.path),
+        offset_key: config.offset_key.clone().and_then(|f| f.path),
     };
 
     let include = config.include.clone();
@@ -720,10 +729,10 @@ fn wrap_with_line_agg(
 }
 
 struct EventMetadata {
-    host_key: String,
+    host_key: OwnedValuePath,
     hostname: Option<String>,
-    file_key: Option<String>,
-    offset_key: Option<String>,
+    file_key: Option<OwnedValuePath>,
+    offset_key: Option<OwnedValuePath>,
 }
 
 fn create_event(
@@ -744,13 +753,13 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut event,
-        path!(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from_static(FileConfig::NAME.as_bytes()),
     );
     log_namespace.insert_vector_metadata(
         &mut event,
-        path!(log_schema().timestamp_key()),
+        log_schema().timestamp_key(),
         path!("ingest_timestamp"),
         Utc::now(),
     );
@@ -760,13 +769,13 @@ fn create_event(
         log_namespace.insert_source_metadata(
             FileConfig::NAME,
             &mut event,
-            Some(LegacyKey::Overwrite(meta.host_key.as_str())),
+            Some(LegacyKey::Overwrite(&meta.host_key)),
             path!("host"),
             hostname.clone(),
         );
     }
 
-    let legacy_offset_key = meta.offset_key.as_deref().map(LegacyKey::Overwrite);
+    let legacy_offset_key = meta.offset_key.as_ref().map(LegacyKey::Overwrite);
     log_namespace.insert_source_metadata(
         FileConfig::NAME,
         &mut event,
@@ -775,7 +784,7 @@ fn create_event(
         offset,
     );
 
-    let legacy_file_key = meta.file_key.as_deref().map(LegacyKey::Overwrite);
+    let legacy_file_key = meta.file_key.as_ref().map(LegacyKey::Overwrite);
     log_namespace.insert_source_metadata(
         FileConfig::NAME,
         &mut event,
@@ -1014,10 +1023,10 @@ mod tests {
         let offset: u64 = 0;
 
         let meta = EventMetadata {
-            host_key: "host".to_string(),
+            host_key: owned_value_path!("host"),
             hostname: Some("Some.Machine".to_string()),
-            file_key: Some("file".to_string()),
-            offset_key: Some("offset".to_string()),
+            file_key: Some(owned_value_path!("file")),
+            offset_key: Some(owned_value_path!("offset")),
         };
         let log = create_event(line, offset, file, &meta, LogNamespace::Legacy);
 
@@ -1036,10 +1045,10 @@ mod tests {
         let offset: u64 = 0;
 
         let meta = EventMetadata {
-            host_key: "hostname".to_string(),
+            host_key: owned_value_path!("hostname"),
             hostname: Some("Some.Machine".to_string()),
-            file_key: Some("file_path".to_string()),
-            offset_key: Some("off".to_string()),
+            file_key: Some(owned_value_path!("file_path")),
+            offset_key: Some(owned_value_path!("off")),
         };
         let log = create_event(line, offset, file, &meta, LogNamespace::Legacy);
 
@@ -1058,10 +1067,10 @@ mod tests {
         let offset: u64 = 0;
 
         let meta = EventMetadata {
-            host_key: "ignored".to_string(),
+            host_key: owned_value_path!("ignored"),
             hostname: Some("Some.Machine".to_string()),
-            file_key: Some("ignored".to_string()),
-            offset_key: Some("ignored".to_string()),
+            file_key: Some(owned_value_path!("ignored")),
+            offset_key: Some(owned_value_path!("ignored")),
         };
         let log = create_event(line, offset, file, &meta, LogNamespace::Vector);
 
@@ -1400,7 +1409,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                file_key: Some("source".to_string()),
+                file_key: Some(OptionalValuePath::from(owned_value_path!("source"))),
                 ..test_default_file_config(&dir)
             };
 
