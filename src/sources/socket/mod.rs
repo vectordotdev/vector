@@ -1256,20 +1256,22 @@ mod test {
         let tmp = tempdir().unwrap();
 
         // Ex: 1
-        let tx = UnixDatagram::unbound().unwrap();
+        // let tx = UnixDatagram::unbound().unwrap();
         // Out:
-        // ---- sources::socket::test::unix_datagram_message_with_log_namespaces2 stdout ----
-        // [src/sources/socket/mod.rs:1264] tx.local_addr().unwrap() = (unnamed)
-        // [src/sources/socket/mod.rs:1280] &addr = (unnamed)
+        // [src/sources/socket/mod.rs:1272] tx.local_addr().unwrap() = (unnamed)
+        // [src/sources/socket/mod.rs:1273] std::os::unix::prelude::AsRawFd::as_raw_fd(&tx) = 9
+        // [src/sources/socket/mod.rs:1289] &addr = (unnamed)
 
         // Ex: 2
-        // let tx_path = tmp.path().join("tx");
-        // let tx = UnixDatagram::bind(&tx_path).unwrap();
+        let tx_path = tmp.path().join("tx");
+        let tx = UnixDatagram::bind(&tx_path).unwrap();
         // Out:
-        // [src/sources/socket/mod.rs:1266] tx.local_addr().unwrap() = "/var/folders/ln/mzkzwg093kj9sfw11zr37kdh0000gq/T/.tmpiiaz1t/tx" (pathname)
-        // [src/sources/socket/mod.rs:1282] &addr = "/var/folders/ln/mzkzwg093kj9sfw11zr37kdh0000gq/T/.tmpiiaz1t/tx" (pathname
+        // [src/sources/socket/mod.rs:1272] tx.local_addr().unwrap() = "/var/folders/ln/mzkzwg093kj9sfw11zr37kdh0000gq/T/.tmpLS0mvv/tx" (pathname)
+        // [src/sources/socket/mod.rs:1273] std::os::unix::prelude::AsRawFd::as_raw_fd(&tx) = 9
+        // [src/sources/socket/mod.rs:1289] &addr = "/var/folders/ln/mzkzwg093kj9sfw11zr37kdh0000gq/T/.tmpLS0mvv/tx" (pathname)
 
         dbg!(tx.local_addr().unwrap());
+        dbg!(std::os::unix::prelude::AsRawFd::as_raw_fd(&tx));
 
         // Create another, bound socket
         let rx_path = tmp.path().join("rx");
