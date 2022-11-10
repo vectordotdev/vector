@@ -4,7 +4,7 @@ pub mod udp;
 mod unix;
 
 use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
-use lookup::owned_value_path;
+use lookup::{lookup_v2::parse_value_path, owned_value_path};
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
@@ -261,13 +261,15 @@ impl SourceConfig for SocketConfig {
                 let host_key_path = config
                     .host_key()
                     .as_ref()
-                    .map(|x| owned_value_path!(x))
+                    .map(|x| parse_value_path(x).ok())
+                    .flatten()
                     .map(LegacyKey::InsertIfEmpty);
 
                 let port_key_path = config
                     .port_key()
                     .as_ref()
-                    .map(|x| owned_value_path!(x))
+                    .map(|x| parse_value_path(x).ok())
+                    .flatten()
                     .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
@@ -290,7 +292,8 @@ impl SourceConfig for SocketConfig {
                 let host_key_path = config
                     .host_key()
                     .as_ref()
-                    .map(|x| owned_value_path!(x))
+                    .map(|x| parse_value_path(x).ok())
+                    .flatten()
                     .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
@@ -305,7 +308,8 @@ impl SourceConfig for SocketConfig {
                 let host_key_path = config
                     .host_key()
                     .as_ref()
-                    .map(|x| owned_value_path!(x))
+                    .map(|x| parse_value_path(x).ok())
+                    .flatten()
                     .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
