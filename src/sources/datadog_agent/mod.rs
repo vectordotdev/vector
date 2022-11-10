@@ -90,6 +90,7 @@ pub struct DatadogAgentConfig {
 
     /// The namespace to use for logs. This overrides the global settings
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
 
     #[configurable(derived)]
