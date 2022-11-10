@@ -18,11 +18,10 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::util::change_socket_permissions,
+    sources::util::unix::UNNAMED_SOCKET_HOST,
     sources::Source,
     SourceSender,
 };
-
-const UNNAMED_SOCKET_HOST: &'static str = "(unnamed)";
 
 /// Returns a `Source` object corresponding to a Unix domain datagram socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow
@@ -94,7 +93,7 @@ async fn listen(
 		    // In most cases, we'll connecting to the socket
 		    // from an unnamed socket (a socket not bound to a
 		    // file). Instead of a filename, we'll surface
-		    // this specific string.
+		    // a specific host.
 		    span.record("peer_path", &field::debug(UNNAMED_SOCKET_HOST));
 		    Some(UNNAMED_SOCKET_HOST.into())
 		};
@@ -102,15 +101,6 @@ async fn listen(
                 bytes_received.emit(ByteSize(byte_size));
 
                 let payload = buf.split_to(byte_size);
-
-                // let span = info_span!("datagram");
-                // let path = address.as_pathname().map(|e| e.to_owned()).map(|path| {
-                //     span.record("peer_path", &field::debug(&path));
-                //     path
-                // });
-
-                // let received_from: Option<Bytes> =
-                //     path.map(|p| p.to_string_lossy().into_owned().into());
 
                 let mut stream = FramedRead::new(payload.as_ref(), decoder.clone());
 

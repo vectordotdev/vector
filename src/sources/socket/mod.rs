@@ -386,6 +386,7 @@ mod test {
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
         sources::util::net::SocketListenAddr,
+        sources::util::unix::UNNAMED_SOCKET_HOST,
         test_util::{
             collect_n, collect_n_limited,
             components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
@@ -1225,7 +1226,7 @@ mod test {
     #[tokio::test]
     async fn unix_datagram_message() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            let (path, rx) = unix_message("test", false, false).await;
+            let (_, rx) = unix_message("test", false, false).await;
             let events = collect_n(rx, 1).await;
 
             assert_eq!(events.len(), 1);
@@ -1239,7 +1240,7 @@ mod test {
             );
             assert_eq!(
                 events[0].as_log()[log_schema().host_key()],
-                path.into_os_string().to_str().into()
+                UNNAMED_SOCKET_HOST.into()
             );
         })
         .await;
@@ -1249,6 +1250,9 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_socket_test() {
+        // This test is useful for testing the behavior of datagram
+        // sockets.
+
         use tempfile::tempdir;
         use tokio::net::UnixDatagram;
 
@@ -1315,7 +1319,7 @@ mod test {
                 event_meta
                     .get(path!(SocketConfig::NAME, log_schema().host_key()))
                     .unwrap(),
-                &vrl::value!("(unnamed)")
+                &vrl::value!(UNNAMED_SOCKET_HOST)
             );
         })
         .await;
@@ -1415,8 +1419,6 @@ mod test {
             let (_, rx) = unix_message("test", true, false).await;
             let events = collect_n(rx, 1).await;
 
-            assert!(false);
-
             assert_eq!(1, events.len());
             assert_eq!(
                 events[0].as_log()[log_schema().message_key()],
@@ -1425,6 +1427,10 @@ mod test {
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key()],
                 "socket".into()
+            );
+            assert_eq!(
+                events[0].as_log()[log_schema().host_key()],
+                UNNAMED_SOCKET_HOST.into()
             );
         })
         .await;
@@ -1436,15 +1442,22 @@ mod test {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", true, true).await;
             let events = collect_n(rx, 1).await;
+            let event_meta = events[0].as_log().metadata().value();
 
             assert_eq!(1, events.len());
+            assert_eq!(
+                event_meta.get(path!("vector", "source_type")).unwrap(),
+                &vrl::value!(SocketConfig::NAME)
+            );
             assert_eq!(
                 events[0].as_log()[log_schema().message_key()],
                 "test".into()
             );
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
-                "socket".into()
+                event_meta
+                    .get(path!(SocketConfig::NAME, log_schema().host_key()))
+                    .unwrap(),
+                &vrl::value!(UNNAMED_SOCKET_HOST)
             );
         })
         .await;

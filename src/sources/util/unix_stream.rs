@@ -25,6 +25,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::util::change_socket_permissions,
+    sources::util::unix::UNNAMED_SOCKET_HOST,
     sources::Source,
     SourceSender,
 };
@@ -75,7 +76,7 @@ pub fn build_unix_stream_source(
                     span.record("peer_path", &field::debug(&path));
                     Some(path)
                 } else {
-                    Some("(unnamed)".into())
+                    Some(UNNAMED_SOCKET_HOST.into())
                 }
             } else {
                 None
@@ -86,6 +87,8 @@ pub fn build_unix_stream_source(
             let handle_events = handle_events.clone();
             let received_from: Option<Bytes> =
                 path.map(|p| p.to_string_lossy().into_owned().into());
+
+            dbg!(&received_from);
 
             let bytes_received = bytes_received.clone();
             let stream = socket
