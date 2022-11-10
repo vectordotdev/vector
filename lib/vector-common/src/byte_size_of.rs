@@ -189,3 +189,23 @@ impl ByteSizeOf for DateTime<Utc> {
         0
     }
 }
+
+impl<K, V> ByteSizeOf for indexmap::IndexMap<K, V>
+where
+    K: ByteSizeOf,
+    V: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        self.iter()
+            .fold(0, |acc, (k, v)| acc + k.size_of() + v.size_of())
+    }
+}
+
+impl<T> ByteSizeOf for indexmap::IndexSet<T>
+where
+    T: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}

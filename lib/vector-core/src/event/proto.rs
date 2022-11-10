@@ -222,7 +222,7 @@ impl From<Metric> for event::Metric {
 
         Self::new_with_metadata(name, kind, value, metadata)
             .with_namespace(namespace)
-            .with_tags(tags.map(MetricTags))
+            .with_tags(tags.map(MetricTags::from_iter))
             .with_timestamp(timestamp)
             .with_interval_ms(std::num::NonZeroU32::new(metric.interval_ms))
     }
@@ -393,7 +393,11 @@ impl From<event::Metric> for WithMetadata<Metric> {
             name,
             namespace,
             timestamp,
-            tags: tags.0,
+            tags: tags
+                .0
+                .into_iter()
+                .filter_map(|(name, values)| values.into_single().map(|value| (name, value)))
+                .collect(),
             kind,
             interval_ms,
             value: Some(metric),
