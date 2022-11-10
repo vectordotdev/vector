@@ -3,7 +3,6 @@ use clap::Args;
 use std::path::PathBuf;
 
 use crate::app;
-use crate::git;
 use crate::platform;
 use crate::testing::{config::IntegrationTestConfig, state};
 
@@ -45,10 +44,6 @@ impl Cli {
         let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration.as_ref().unwrap());
         let active_envs = state::active_envs(&envs_dir)?;
 
-        display!(
-            "Tests triggered: {}",
-            config.triggered(git::changed_files()?)?
-        );
         display!("Test args: {}", config.args.join(" "));
 
         display!("Environments:");

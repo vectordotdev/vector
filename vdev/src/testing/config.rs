@@ -1,6 +1,5 @@
 use anyhow::{bail, Context, Result};
 use cached::proc_macro::cached;
-use globset::{Glob, GlobSetBuilder};
 use hashlink::LinkedHashMap;
 use itertools::{self, Itertools};
 use serde::Deserialize;
@@ -8,6 +7,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::iter;
 use std::path::PathBuf;
+
+const FILE_NAME: &str = "test.yaml";
 
 #[derive(Deserialize, Debug)]
 pub struct RustToolchainRootConfig {
@@ -33,7 +34,6 @@ impl RustToolchainConfig {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct IntegrationTestConfig {
-    on: Vec<String>,
     pub(crate) args: Vec<String>,
     pub(crate) env: Option<BTreeMap<String, String>>,
     matrix: Vec<LinkedHashMap<String, Vec<String>>>,
@@ -43,7 +43,7 @@ impl IntegrationTestConfig {
     fn parse_file(config_file: &PathBuf) -> Result<Self> {
         let contents = fs::read_to_string(config_file)
             .with_context(|| format!("failed to read {}", config_file.display()))?;
-        let config: IntegrationTestConfig = toml::from_str(&contents).with_context(|| {
+        let config: IntegrationTestConfig = serde_yaml::from_str(&contents).with_context(|| {
             format!(
                 "failed to parse integration test configuration file {}",
                 config_file.display()
@@ -51,18 +51,6 @@ impl IntegrationTestConfig {
         })?;
 
         Ok(config)
-    }
-
-    pub fn triggered(&self, changed_files: Vec<String>) -> Result<bool> {
-        let mut builder = GlobSetBuilder::new();
-        for glob in self.on.iter() {
-            builder.add(Glob::new(&glob)?);
-        }
-        let set = builder.build()?;
-
-        Ok(changed_files
-            .iter()
-            .any(|changed_file| set.is_match(changed_file)))
     }
 
     pub fn environments(&self) -> LinkedHashMap<String, LinkedHashMap<String, String>> {
@@ -94,9 +82,10 @@ impl IntegrationTestConfig {
     }
 
     pub fn from_source(test_dir: &PathBuf) -> Result<Self> {
-        parse_integration_test_config_file(test_dir.join("test.toml"))
+        parse_integration_test_config_file(test_dir.join(FILE_NAME))
     }
 
+    #[allow(dead_code)]
     pub fn collect_all(root: &String) -> Result<BTreeMap<String, Self>> {
         let mut configs = BTreeMap::new();
         let tests_dir: PathBuf = [&root, "scripts", "integration"].iter().collect();
@@ -106,7 +95,7 @@ impl IntegrationTestConfig {
                     continue;
                 }
 
-                let config_file: PathBuf = [&entry.path().to_str().unwrap(), "test.toml"]
+                let config_file: PathBuf = [&entry.path().to_str().unwrap(), FILE_NAME]
                     .iter()
                     .collect();
                 let config = parse_integration_test_config_file(config_file)?;

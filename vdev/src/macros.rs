@@ -26,16 +26,16 @@ macro_rules! define_display_macro {
     ($name:ident, $level:ident, $style:ident, $d:tt) => (
         #[allow(unused_macros)]
         macro_rules! $name {
-            ($d($d arg:tt)*) => {
+            ($d($d arg:tt)*) => {{
+                use owo_colors::OwoColorize;
                 if log::Level::$level <= *$crate::app::verbosity() {
-                    use owo_colors::OwoColorize;
                     eprintln!(
                         "{}",
                         format!($d($d arg)*)
                             .if_supports_color(owo_colors::Stream::Stderr, |text| text.$style())
                     );
                 }
-            };
+            }};
         }
     );
 }
