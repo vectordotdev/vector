@@ -100,18 +100,7 @@ fn handle_events(
     for event in events {
         let log = event.as_mut_log();
 
-        log_namespace.insert_vector_metadata(
-            log,
-            path!(log_schema().source_type_key()),
-            path!("source_type"),
-            Bytes::from(SocketConfig::NAME),
-        );
-        log_namespace.insert_vector_metadata(
-            log,
-            path!(log_schema().timestamp_key()),
-            path!("ingest_timestamp"),
-            now,
-        );
+        log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME, now);
 
         if let Some(ref host) = received_from {
             let host_key_path = config.host_key.as_ref().map_or_else(

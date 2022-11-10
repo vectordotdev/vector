@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::{lookup_v2::BorrowedSegment, path};
@@ -201,16 +200,9 @@ impl TcpSource for RawTcpSource {
 
         for event in events {
             if let Event::Log(ref mut log) = event {
-                self.log_namespace.insert_vector_metadata(
+                self.log_namespace.insert_standard_vector_source_metadata(
                     log,
-                    path!(log_schema().source_type_key()),
-                    path!("source_type"),
-                    Bytes::from(SocketConfig::NAME),
-                );
-                self.log_namespace.insert_vector_metadata(
-                    log,
-                    path!(log_schema().timestamp_key()),
-                    path!("ingest_timestamp"),
+                    SocketConfig::NAME,
                     now,
                 );
 
