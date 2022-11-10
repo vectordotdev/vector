@@ -1,11 +1,12 @@
 use std::{future::ready, panic, sync::Arc};
 
-use aws_sdk_s3::error::GetObjectError;
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sqs::error::{DeleteMessageBatchError, ReceiveMessageError};
-use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, Message};
-use aws_sdk_sqs::output::DeleteMessageBatchOutput;
-use aws_sdk_sqs::Client as SqsClient;
+use aws_sdk_s3::{error::GetObjectError, Client as S3Client};
+use aws_sdk_sqs::{
+    error::{DeleteMessageBatchError, ReceiveMessageError},
+    model::{DeleteMessageBatchRequestEntry, Message},
+    output::DeleteMessageBatchOutput,
+    Client as SqsClient,
+};
 use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
@@ -24,7 +25,7 @@ use vector_common::internal_event::{
 use vector_config::{configurable_component, NamedComponent};
 
 use crate::{
-    config::{log_schema, SourceAcknowledgementsConfig, SourceContext},
+    config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
@@ -38,9 +39,11 @@ use crate::{
     tls::TlsConfig,
     SourceSender,
 };
-use lookup::path;
-use vector_core::config::LegacyKey;
-use vector_core::{config::LogNamespace, ByteSizeOf};
+use lookup::{path, PathPrefix};
+use vector_core::{
+    config::{log_schema, LegacyKey, LogNamespace},
+    ByteSizeOf,
+};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -459,10 +462,10 @@ impl IngestorProcess {
         let object = object_result?;
 
         let metadata = object.metadata;
+
         let timestamp = object
             .last_modified
-            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()))
-            .unwrap_or_else(Utc::now);
+            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()));
 
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(
@@ -559,14 +562,37 @@ impl IngestorProcess {
                 &mut log,
                 path!(log_schema().source_type_key()),
                 path!("source_type"),
-                Bytes::from(AwsS3Config::NAME),
+                Bytes::from_static(AwsS3Config::NAME.as_bytes()),
             );
-            log_namespace.insert_vector_metadata(
-                &mut log,
-                path!(log_schema().timestamp_key()),
-                path!("ingest_timestamp"),
-                timestamp,
-            );
+
+            // This handles the transition from the original timestamp logic. Originally the
+            // `timestamp_key` was populated by the `last_modified` time on the object, falling
+            // back to calling `now()`.
+            match (log_namespace, timestamp) {
+                (LogNamespace::Vector, None) => {
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!("vector", "ingest_timestamp"), Utc::now());
+                }
+                (LogNamespace::Vector, Some(timestamp)) => {
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!(AwsS3Config::NAME, "timestamp"), timestamp);
+
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!("vector", "ingest_timestamp"), Utc::now());
+                }
+                (LogNamespace::Legacy, None) => {
+                    log.try_insert(
+                        (PathPrefix::Event, log_schema().timestamp_key()),
+                        Utc::now(),
+                    );
+                }
+                (LogNamespace::Legacy, Some(timestamp)) => {
+                    log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+                }
+            };
 
             emit!(EventsReceived {
                 count: 1,
