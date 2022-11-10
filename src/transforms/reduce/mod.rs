@@ -362,11 +362,13 @@ mod test {
     use serde_json::json;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use value::Kind;
 
     use super::*;
     use crate::event::{LogEvent, Value};
     use crate::test_util::components::assert_transform_compliance;
     use crate::transforms::test::create_topology;
+    use lookup::owned_value_path;
 
     #[test]
     fn generate_config() {
@@ -387,6 +389,27 @@ group_by = [ "request_id" ]
         .unwrap();
 
         assert_transform_compliance(async move {
+            let input_definition = schema::Definition::default_legacy_namespace()
+                .with_event_field(&owned_value_path!("counter"), Kind::integer(), None)
+                .with_event_field(&owned_value_path!("request_id"), Kind::bytes(), None)
+                .with_event_field(
+                    &owned_value_path!("test_end"),
+                    Kind::bytes().or_undefined(),
+                    None,
+                )
+                .with_event_field(
+                    &owned_value_path!("extra_field"),
+                    Kind::bytes().or_undefined(),
+                    None,
+                );
+            let schema_definition = reduce_config
+                .outputs(&input_definition)
+                .first()
+                .unwrap()
+                .log_schema_definition
+                .clone()
+                .unwrap();
+
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
@@ -423,12 +446,14 @@ group_by = [ "request_id" ]
             assert_eq!(output_1["message"], "test message 1".into());
             assert_eq!(output_1["counter"], Value::from(8));
             assert_eq!(output_1.metadata(), &metadata_1);
+            schema_definition.assert_valid_for_event(&output_1.into());
 
             let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["message"], "test message 2".into());
             assert_eq!(output_2["extra_field"], "value1".into());
             assert_eq!(output_2["counter"], Value::from(7));
             assert_eq!(output_2.metadata(), &metadata_2);
+            schema_definition.assert_valid_for_event(&output_2.into());
 
             drop(tx);
             topology.stop().await;
