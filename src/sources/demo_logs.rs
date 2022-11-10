@@ -57,6 +57,7 @@ pub struct DemoLogsConfig {
 
     /// The namespace to use for logs. This overrides the global setting
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
 }
 

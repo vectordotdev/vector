@@ -11,7 +11,7 @@ use super::recency::{GenerationalStorage, Recency};
 use super::storage::VectorStorage;
 use crate::event::{Metric, MetricValue};
 
-thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = OnceCell::new());
+thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = const { OnceCell::new() });
 
 #[allow(dead_code)]
 pub(super) struct Registry {
