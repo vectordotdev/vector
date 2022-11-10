@@ -12,7 +12,7 @@ set -euo pipefail
 #   the presence of dirty files in the working directory to detect if the machine-generated files
 #   are out-of-date.
 
-DIRTY_COMPONENT_FILES=$(git ls-files --full-name --modified --others --exclude-standard | grep website/cue/reference/components | sed 's/^/  - /g')
+DIRTY_COMPONENT_FILES=$(git ls-files --full-name --modified --others --exclude-standard | { grep website/cue/reference/components || test $? = 1; } | sed 's/^/  - /g')
 if [[ -n "${DIRTY_COMPONENT_FILES}" ]]; then
    echo "[ERROR] Found out-of-sync component Cue files in this branch:"
    echo "${DIRTY_COMPONENT_FILES}"
