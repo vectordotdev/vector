@@ -84,8 +84,10 @@ pub struct MainTracer;
 impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
-        GROUP_MEM_STATS
-            .with(|t| t.stats[group_id.as_raw()].fetch_add(object_size as i64, Ordering::Relaxed));
+        // Handle the case when thread local destructor is ran.
+        let _ = GROUP_MEM_STATS.try_with(|t| {
+            t.stats[group_id.as_raw()].fetch_add(object_size as i64, Ordering::Relaxed)
+        });
     }
 
     #[inline(always)]
