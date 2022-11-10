@@ -341,6 +341,63 @@ impl FrameHandler for DnstapFrameHandler {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simple_matches_schema() {
+        let record = r#"{"dataType":"Message",
+                         "dataTypeId":1,
+                         "messageType":"ClientQuery",
+                         "messageTypeId":5,
+                         "requestData":{
+                           "fullRcode":0,
+                           "header":{
+                             "aa":false,
+                             "ad":true,
+                             "anCount":0,
+                             "arCount":1,
+                             "cd":false,
+                             "id":38339,
+                             "nsCount":0,
+                             "opcode":0,
+                             "qdCount":1,
+                             "qr":0,
+                             "ra":false,
+                             "rcode":0,
+                             "rd":true,
+                             "tc":false},
+                           "opt":{
+                             "do":false,
+                             "ednsVersion":0,
+                             "extendedRcode":0,
+                             "options":[{"optCode":10,
+                                         "optName":"Cookie",
+                                         "optValue":"5JiWq4VYa7U="}],
+                             "udpPayloadSize":1232},
+                           "question":[{"class":"IN","domainName":"whoami.example.org.","questionType":"A","questionTypeId":1}],
+                           "rcodeName":"NoError",
+                           "time":1667909880863224758,
+                           "timePrecision":"ns"},
+                         "serverId":"stephenwakely-Precision-5570",
+                         "serverVersion":"CoreDNS-1.10.0",
+                         "socketFamily":"INET",
+                         "socketProtocol":"UDP",
+                         "sourceAddress":"0.0.0.0",
+                         "sourcePort":54782,
+                         "source_type":"dnstap",
+                         "time":1667909880863224758,
+                         "timePrecision":"ns",
+                         "timestamp":"2022-11-08T12:18:00.863224758Z"}"#;
+
+        let json: serde_json::Value = serde_json::from_str(record).unwrap();
+        let event = LogEvent::from(value::Value::from(json));
+
+        dbg!(event);
+    }
+}
+
 #[cfg(all(test, feature = "dnstap-integration-tests"))]
 mod integration_tests {
     #![allow(clippy::print_stdout)] // tests
