@@ -2,10 +2,12 @@ use std::{fmt, net::SocketAddr};
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
+use lookup::owned_value_path;
 use tracing::Span;
+use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace};
 use warp::Filter;
 
 use crate::{
@@ -59,6 +61,11 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 /// Compression scheme for records in a Firehose message.
@@ -97,12 +104,10 @@ impl fmt::Display for Compression {
 #[async_trait::async_trait]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            LogNamespace::Legacy,
-        )
-        .build();
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         let svc = filters::firehose(
@@ -111,6 +116,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             decoder,
             acknowledgements,
             cx.out,
+            log_namespace,
         );
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
@@ -129,8 +135,27 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let schema_definition = self
+            .decoding
+            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("request_id"))),
+                &owned_value_path!("request_id"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("source_arn"))),
+                &owned_value_path!("source_arn"),
+                Kind::bytes(),
+                None,
+            );
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -152,6 +177,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: Default::default(),
+            log_namespace: None,
         })
         .unwrap()
     }
@@ -220,6 +246,7 @@ mod tests {
         access_key: Option<SensitiveString>,
         record_compression: Option<Compression>,
         delivered: bool,
+        log_namespace: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         use EventStatus::*;
         let status = if delivered { Delivered } else { Rejected };
@@ -235,6 +262,7 @@ mod tests {
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
                 acknowledgements: true.into(),
+                log_namespace: Some(log_namespace),
             }
             .build(cx)
             .await
@@ -394,7 +422,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, Some(source_record_compression), true).await;
+            let (rx, addr) = source(None, Some(source_record_compression), true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -437,7 +465,7 @@ mod tests {
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr) = source(None, None, true).await;
+            let (rx, addr) = source(None, None, true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -474,7 +502,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
-        let (_rx, addr) = source(Some("an access key".to_string().into()), None, true).await;
+        let (_rx, addr) = source(Some("an access key".to_string().into()), None, true, false).await;
 
         let res = send(
             addr,
@@ -496,7 +524,7 @@ mod tests {
     async fn handles_acknowledgement_failure() {
         let expected = RECORD.as_bytes().to_owned();
 
-        let (rx, addr) = source(None, Some(Compression::None), false).await;
+        let (rx, addr) = source(None, Some(Compression::None), false, false).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 
