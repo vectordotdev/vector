@@ -414,8 +414,7 @@ impl SourceConfig for FileConfig {
         let file_key = self
             .file_key
             .clone()
-            .map(|x| x.path)
-            .and_then(|x| x)
+            .and_then(|f| f.path)
             .map(LegacyKey::Overwrite);
 
         // `host_key` defaults to the `log_schema().host_key()` if it's not configured in the source.
@@ -431,8 +430,7 @@ impl SourceConfig for FileConfig {
         let offset_key = self
             .offset_key
             .clone()
-            .map(|f| f.path)
-            .and_then(|f| f)
+            .and_then(|f| f.path)
             .map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
@@ -532,14 +530,10 @@ pub fn file_source(
     };
 
     let event_metadata = EventMetadata {
-        host_key: config
-            .host_key
-            .clone()
-            .map_or_else(
-                || parse_value_path(log_schema().host_key()).ok(),
-                |key| key.path,
-            )
-            .unwrap(), // TODO don't unwrap bro
+        host_key: config.host_key.clone().map_or_else(
+            || parse_value_path(log_schema().host_key()).ok(),
+            |key| key.path,
+        ),
         hostname: crate::get_hostname().ok(),
         file_key: config.file_key.clone().and_then(|f| f.path),
         offset_key: config.offset_key.clone().and_then(|f| f.path),
@@ -729,7 +723,7 @@ fn wrap_with_line_agg(
 }
 
 struct EventMetadata {
-    host_key: OwnedValuePath,
+    host_key: Option<OwnedValuePath>,
     hostname: Option<String>,
     file_key: Option<OwnedValuePath>,
     offset_key: Option<OwnedValuePath>,
@@ -764,12 +758,13 @@ fn create_event(
         Utc::now(),
     );
 
+    let legacy_host_key = meta.host_key.as_ref().map(LegacyKey::Overwrite);
     // `meta.host_key` is already `unwrap_or_else`ed so we can just pass it in.
     if let Some(hostname) = &meta.hostname {
         log_namespace.insert_source_metadata(
             FileConfig::NAME,
             &mut event,
-            Some(LegacyKey::Overwrite(&meta.host_key)),
+            legacy_host_key,
             path!("host"),
             hostname.clone(),
         );
@@ -985,34 +980,18 @@ mod tests {
             )
             .with_event_field(
                 &owned_value_path!("message"),
-                Kind::bytes().or_undefined(),
+                Kind::bytes(),
                 Some("message")
             )
-            .with_event_field(
-                &owned_value_path!("source_type"),
-                Kind::bytes().or_undefined(),
-                None
-            )
-            .with_event_field(
-                &owned_value_path!("timestamp"),
-                Kind::timestamp().or_undefined(),
-                None
-            )
+            .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+            .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
             .with_event_field(
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host")
             )
-            .with_event_field(
-                &owned_value_path!("offset"),
-                Kind::integer().or_undefined(),
-                None
-            )
-            .with_event_field(
-                &owned_value_path!("file"),
-                Kind::bytes().or_undefined(),
-                None
-            )
+            .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
+            .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
         )
     }
 
@@ -1023,7 +1002,7 @@ mod tests {
         let offset: u64 = 0;
 
         let meta = EventMetadata {
-            host_key: owned_value_path!("host"),
+            host_key: Some(owned_value_path!("host")),
             hostname: Some("Some.Machine".to_string()),
             file_key: Some(owned_value_path!("file")),
             offset_key: Some(owned_value_path!("offset")),
@@ -1045,7 +1024,7 @@ mod tests {
         let offset: u64 = 0;
 
         let meta = EventMetadata {
-            host_key: owned_value_path!("hostname"),
+            host_key: Some(owned_value_path!("hostname")),
             hostname: Some("Some.Machine".to_string()),
             file_key: Some(owned_value_path!("file_path")),
             offset_key: Some(owned_value_path!("off")),
@@ -1067,7 +1046,7 @@ mod tests {
         let offset: u64 = 0;
 
         let meta = EventMetadata {
-            host_key: owned_value_path!("ignored"),
+            host_key: Some(owned_value_path!("ignored")),
             hostname: Some("Some.Machine".to_string()),
             file_key: Some(owned_value_path!("ignored")),
             offset_key: Some(owned_value_path!("ignored")),
