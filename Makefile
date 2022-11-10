@@ -666,7 +666,7 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
 	${MAYBE_ENVIRONMENT_EXEC} scripts/generate-component-docs.rb /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
-	git status
+	git diff
 	echo "Base Cue file checksum after re-generation: "
 	find website/cue/reference/components -type f | grep base | sort | xargs -I {} sha256sum {}
 
