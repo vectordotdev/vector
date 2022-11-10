@@ -105,11 +105,6 @@ base: components: sources: aws_s3: configuration: {
 		required:    false
 		type: string: syntax: "literal"
 	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global setting."
-		required:    false
-		type: bool: {}
-	}
 	multiline: {
 		description: """
 			Multiline aggregation configuration.

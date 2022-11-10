@@ -84,6 +84,7 @@ pub struct HttpClientConfig {
     pub auth: Option<Auth>,
 
     /// The namespace to use for logs. This overrides the global setting
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
 }
