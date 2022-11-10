@@ -289,10 +289,10 @@ impl MetricTags {
     }
 
     /// Iterate over references to all values of each tag.
-    pub fn iter_all(&self) -> impl Iterator<Item = (&str, &str)> {
+    pub fn iter_all(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
         self.0
             .iter()
-            .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_ref(), tag)))
+            .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_ref(), Some(tag))))
     }
 
     /// Iterate over references to a single value of each tag.
@@ -303,10 +303,10 @@ impl MetricTags {
     }
 
     /// Iterate over all values of each tag.
-    pub fn into_iter_all(self) -> impl Iterator<Item = (String, String)> {
+    pub fn into_iter_all(self) -> impl Iterator<Item = (String, Option<String>)> {
         self.0
             .into_iter()
-            .flat_map(|(name, tags)| tags.into_iter().map(move |tag| (name.clone(), tag)))
+            .flat_map(|(name, tags)| tags.into_iter().map(move |tag| (name.clone(), Some(tag))))
     }
 
     /// Iterate over a single value of each tag.
