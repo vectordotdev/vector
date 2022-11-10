@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -xeuo pipefail
+set -euo pipefail
 
 # check-component-docs.sh
 #
@@ -14,7 +14,7 @@ set -xeuo pipefail
 
 DIRTY_COMPONENT_FILES=$(git ls-files --full-name --modified --others --exclude-standard | { grep website/cue/reference/components || test $? = 1; } | sed 's/^/  - /g')
 if [[ -n "${DIRTY_COMPONENT_FILES}" ]]; then
-   echo "[ERROR] Found out-of-sync component Cue files in this branch:"
+   echo "Found out-of-sync component Cue files in this branch:"
    echo "${DIRTY_COMPONENT_FILES}"
    echo
    echo "Run \`make generate-component-docs\` locally to update your branch and commit/push the changes."
