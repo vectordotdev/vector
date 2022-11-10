@@ -118,7 +118,10 @@ impl Unknown {
             (Inner::Infinite(infinite), Inner::Exact(rhs)) => {
                 Kind::from(*infinite).is_superset(rhs)
             }
-            (Inner::Exact(lhs), Inner::Exact(rhs)) => lhs.is_superset(rhs),
+            (Inner::Exact(lhs), Inner::Exact(rhs)) => lhs
+                .clone()
+                .without_undefined()
+                .is_superset(&rhs.clone().without_undefined()),
             (Inner::Exact(lhs), Inner::Infinite(..)) => {
                 if lhs.is_any() {
                     Ok(())

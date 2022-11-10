@@ -153,6 +153,13 @@ impl<T: Ord + Clone> Collection<T> {
         self
     }
 
+    /// Returns a new collection that includes the known key.
+    #[must_use]
+    pub fn with_known(mut self, key: impl Into<T>, kind: Kind) -> Self {
+        self.known_mut().insert(key.into(), kind);
+        self
+    }
+
     /// Given a collection of known and unknown types, merge the known types with the unknown type,
     /// and remove a reference to the known types.
     ///
@@ -263,7 +270,6 @@ impl<T: Ord + Clone + CollectionKey> Collection<T> {
     /// This is mostly useful for debugging.
     pub fn is_superset(&self, other: &Self) -> Result<(), OwnedValuePath> {
         // `self`'s `unknown` needs to be  a superset of `other`'s.
-
         self.unknown
             .is_superset(&other.unknown)
             .map_err(|path| path.with_field_prefix("<unknown>"))?;
@@ -482,6 +488,24 @@ mod tests {
                         Kind::bytes().or_integer(),
                     ),
                     other: Collection::from_unknown(Kind::bytes().or_integer()),
+                    want: false,
+                },
+            ),
+            (
+                "unknown superset of known",
+                TestCase {
+                    this: Collection::from_parts(BTreeMap::new(), Kind::bytes().or_integer()),
+                    other: Collection::empty()
+                        .with_known("foo", Kind::integer())
+                        .with_known("bar", Kind::bytes()),
+                    want: true,
+                },
+            ),
+            (
+                "unknown not superset of known",
+                TestCase {
+                    this: Collection::from_parts(BTreeMap::new(), Kind::bytes().or_integer()),
+                    other: Collection::empty().with_known("foo", Kind::float()),
                     want: false,
                 },
             ),
