@@ -5,7 +5,7 @@ use std::{
     cell::Cell,
     sync::{
         atomic::{AtomicI64, AtomicUsize, Ordering},
-        Arc, Mutex,
+        Mutex,
     },
     thread,
     time::Duration,
@@ -25,14 +25,14 @@ use crossbeam_utils::CachePadded;
 
 const NUM_GROUPS: usize = 128;
 
-type GroupMemStatsArray = Arc<[CachePadded<AtomicI64>; NUM_GROUPS]>;
+type GroupMemStatsArray = [CachePadded<AtomicI64>; NUM_GROUPS];
 
 /// A registry for tracking each thread's group memory statistics.
-static THREAD_LOCAL_REFS: Mutex<Vec<GroupMemStatsArray>> = Mutex::new(Vec::new());
+static THREAD_LOCAL_REFS: Mutex<Vec<&'static GroupMemStatsArray>> = Mutex::new(Vec::new());
 
 /// Group memory statistics per thread.
 struct GroupMemStats {
-    stats: GroupMemStatsArray,
+    stats: &'static GroupMemStatsArray,
 }
 
 impl GroupMemStats {
@@ -40,10 +40,10 @@ impl GroupMemStats {
     /// with a reference to this newly allocated memory.
     pub fn new() -> Self {
         let mut mutex = THREAD_LOCAL_REFS.lock().unwrap();
-        let group_mem_stats = GroupMemStats {
-            stats: Arc::new(arr![CachePadded::new(AtomicI64::new(0)) ; 128]),
-        };
-        mutex.push(Arc::clone(&group_mem_stats.stats));
+        let stats_ref: &'static GroupMemStatsArray =
+            Box::leak(Box::new(arr![CachePadded::new(AtomicI64::new(0)) ; 128]));
+        let group_mem_stats = GroupMemStats { stats: stats_ref };
+        mutex.push(stats_ref);
         group_mem_stats
     }
 }
