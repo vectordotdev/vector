@@ -237,11 +237,11 @@ impl PulsarSinkConfig {
         let mut pulsar_builder = pulsar.producer().with_topic(&self.topic);
 
         if let Some(producer_name) = self.producer_name.clone() {
-            if is_healthcheck {
-                pulsar_builder = pulsar_builder.with_name(format!("{}-healthcheck", producer_name));
+            pulsar_builder = pulsar_builder.with_name(if is_healthcheck {
+                format!("{}-healthcheck", producer_name))
             } else {
-                pulsar_builder = pulsar_builder.with_name(producer_name);
-            }
+                pulsar_builder.with_name(producer_name)
+            });
         }
 
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
