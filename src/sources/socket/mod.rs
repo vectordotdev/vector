@@ -1249,6 +1249,51 @@ mod test {
 
     #[cfg(unix)]
     #[tokio::test]
+    async fn socket_test() {
+        use tempfile::tempdir;
+        use tokio::net::UnixDatagram;
+
+        let tmp = tempdir().unwrap();
+
+        // Ex: 1
+        let tx = UnixDatagram::unbound().unwrap();
+        // Out:
+        // ---- sources::socket::test::unix_datagram_message_with_log_namespaces2 stdout ----
+        // [src/sources/socket/mod.rs:1264] tx.local_addr().unwrap() = (unnamed)
+        // [src/sources/socket/mod.rs:1280] &addr = (unnamed)
+
+        // Ex: 2
+        // let tx_path = tmp.path().join("tx");
+        // let tx = UnixDatagram::bind(&tx_path).unwrap();
+        // Out:
+        // [src/sources/socket/mod.rs:1266] tx.local_addr().unwrap() = "/var/folders/ln/mzkzwg093kj9sfw11zr37kdh0000gq/T/.tmpiiaz1t/tx" (pathname)
+        // [src/sources/socket/mod.rs:1282] &addr = "/var/folders/ln/mzkzwg093kj9sfw11zr37kdh0000gq/T/.tmpiiaz1t/tx" (pathname
+
+        dbg!(tx.local_addr().unwrap());
+
+        // Create another, bound socket
+        let rx_path = tmp.path().join("rx");
+        let rx = UnixDatagram::bind(&rx_path).unwrap();
+
+        // Connect to the bound socket
+        tx.connect(&rx_path).unwrap();
+
+        // Send to the bound socket
+        let bytes = b"hello world";
+        tx.send(bytes).await.unwrap();
+
+        let mut buf = vec![0u8; 24];
+        let (size, addr) = rx.recv_from(&mut buf).await.unwrap();
+
+        dbg!(&addr);
+
+        let dgram = &buf[..size];
+        assert_eq!(dgram, bytes);
+        assert!(false);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
     async fn unix_datagram_message_with_log_namespaces() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (path, rx) = unix_message("test", false, true).await;
