@@ -26,17 +26,18 @@ use crossbeam_utils::CachePadded;
 const NUM_GROUPS: usize = 128;
 
 type GroupMemStatsArray = Arc<[CachePadded<AtomicI64>; NUM_GROUPS]>;
-// These arrays represent the memory usage for each group per thread.
-//
-// Each thread is meant to update it's own group statistics, which significantly reduces atomic contention.
-// We pad each Atomic to reduce false sharing effects.
+
+/// A registry for tracking each thread's group memory statistics.
 static THREAD_LOCAL_REFS: Mutex<Vec<GroupMemStatsArray>> = Mutex::new(Vec::new());
 
+/// Group memory statistics per thread.
 struct GroupMemStats {
     stats: GroupMemStatsArray,
 }
 
 impl GroupMemStats {
+    /// Allocates a [`GroupMemStatsArray`], and updates the global [`THREAD_LOCAL_REFS`] registry
+    /// with a reference to this newly allocated memory.
     pub fn new() -> Self {
         let mut mutex = THREAD_LOCAL_REFS.lock().unwrap();
         let group_mem_stats = GroupMemStats {
