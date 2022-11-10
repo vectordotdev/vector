@@ -659,11 +659,16 @@ generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
+	echo "Base Cue file checksum before generation: "
+	find website/cue/reference/components -type f | grep base | sort | xargs -I {} sha256sum {}
 	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
 	git status
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
 	${MAYBE_ENVIRONMENT_EXEC} scripts/generate-component-docs.rb /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
+	git status
+	echo "Base Cue file checksum after re-generation: "
+	find website/cue/reference/components -type f | grep base | sort | xargs -I {} sha256sum {}
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
