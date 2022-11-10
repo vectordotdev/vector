@@ -393,7 +393,7 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
 
 fn encode_tags(tags: &MetricTags) -> Vec<String> {
     let mut pairs: Vec<_> = tags
-        .iter()
+        .iter_all()
         .map(|(name, value)| format!("{}:{}", name, value))
         .collect();
     pairs.sort();

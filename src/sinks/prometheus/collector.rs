@@ -273,7 +273,7 @@ impl StringCollector {
             (None, Some(tag)) => write!(result, "{{{}}}", Self::format_tag(tag.0, &tag.1)),
             (Some(tags), ref tag) => {
                 let mut parts = tags
-                    .iter()
+                    .iter_single()
                     .map(|(key, value)| Self::format_tag(key, value))
                     .collect::<Vec<_>>();
 
@@ -342,7 +342,7 @@ impl TimeSeries {
         // Extract the labels into a vec and sort to produce a
         // consistent key for the buffer.
         let mut labels = labels
-            .into_iter()
+            .into_iter_single()
             .map(|(name, value)| proto::Label { name, value })
             .collect::<Labels>();
         labels.sort();
