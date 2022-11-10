@@ -5,7 +5,7 @@ use std::{
     cell::Cell,
     sync::{
         atomic::{AtomicI64, AtomicUsize, Ordering},
-        Mutex,
+        Arc, Mutex,
     },
     thread,
     time::Duration,
@@ -24,33 +24,36 @@ pub(crate) use self::allocator::{
 use crossbeam_utils::CachePadded;
 
 const NUM_GROUPS: usize = 128;
-const NUM_BUCKETS: usize = 8;
-/// These arrays represent the memory usage for each group per thread.
-///
-/// Each thread is meant to update it's own group statistics, which significantly reduces atomic contention.
-/// We pad each Atomic to reduce false sharing effects.
-///
-/// TODO:
-///
-/// Currently, we reach atomic contention once the number of threads exceeds 8. One potential solution
-/// involves using thread locals to track memory stats.
-static GROUP_MEM_STATS: [[CachePadded<AtomicI64>; NUM_GROUPS]; NUM_BUCKETS] = [
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-];
 
-// TODO: Replace this with [`std::thread::ThreadId::as_u64`] once it is stabilized.
+type GroupMemStatsArray = Arc<[CachePadded<AtomicI64>; NUM_GROUPS]>;
+// These arrays represent the memory usage for each group per thread.
+//
+// Each thread is meant to update it's own group statistics, which significantly reduces atomic contention.
+// We pad each Atomic to reduce false sharing effects.
+static THREAD_LOCAL_REFS: Mutex<Vec<GroupMemStatsArray>> = Mutex::new(Vec::new());
+
+struct GroupMemStats {
+    stats: GroupMemStatsArray,
+}
+
+impl GroupMemStats {
+    pub fn new() -> Self {
+        let mut mutex = THREAD_LOCAL_REFS.lock().unwrap();
+        let group_mem_stats = GroupMemStats {
+            stats: Arc::new(arr![CachePadded::new(AtomicI64::new(0)) ; 128]),
+        };
+        mutex.push(Arc::clone(&group_mem_stats.stats));
+        group_mem_stats
+    }
+}
+
 static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 thread_local! {
+    static GROUP_MEM_STATS: GroupMemStats = GroupMemStats::new();
     static THREAD_ID: Cell<usize> = const { Cell::new(0) };
 }
+
 // By using the Option type, we can do statics w/o the need of other creates such as lazy_static
 struct GroupInfo {
     component_kind: Option<String>,
@@ -81,14 +84,15 @@ pub struct MainTracer;
 impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
-        GROUP_MEM_STATS[THREAD_ID.with(|t| t.get()) % 8][group_id.as_raw()]
-            .fetch_add(object_size as i64, Ordering::Relaxed);
+        GROUP_MEM_STATS
+            .with(|t| t.stats[group_id.as_raw()].fetch_add(object_size as i64, Ordering::Relaxed));
     }
 
     #[inline(always)]
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
-        GROUP_MEM_STATS[THREAD_ID.with(|t| t.get()) % 8][source_group_id.as_raw()]
-            .fetch_sub(object_size as i64, Ordering::Relaxed);
+        GROUP_MEM_STATS.with(|t| {
+            t.stats[source_group_id.as_raw()].fetch_sub(object_size as i64, Ordering::Relaxed)
+        });
     }
 }
 
@@ -98,15 +102,16 @@ pub fn init_allocation_tracing() {
     alloc_processor
         .spawn(|| {
             without_allocation_tracing(|| loop {
-                for group_idx in 0..NUM_GROUPS {
+                for (group_idx, group) in GROUP_INFO.iter().enumerate() {
                     let mut mem_used = 0;
-                    for bucket in &GROUP_MEM_STATS {
-                        mem_used += bucket[group_idx].load(Ordering::Relaxed);
+                    let mutex = THREAD_LOCAL_REFS.lock().unwrap();
+                    for idx in 0..mutex.len() {
+                        mem_used += mutex[idx][group_idx].load(Ordering::Relaxed);
                     }
                     if mem_used == 0 {
                         continue;
                     }
-                    let group_info = GROUP_INFO[group_idx].lock().unwrap();
+                    let group_info = group.lock().unwrap();
                     gauge!(
                         "component_allocated_bytes",
                         mem_used.to_f64().expect("failed to convert group_id from int to float"),
