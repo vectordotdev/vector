@@ -3,7 +3,7 @@ use std::{fs, fs::remove_file, path::Path};
 
 use crate::internal_events::UnixSocketFileDeleteError;
 
-pub const UNNAMED_SOCKET_HOST: &'static str = "(unnamed)";
+pub const UNNAMED_SOCKET_HOST: &str = "(unnamed)";
 
 pub fn change_socket_permissions(path: &Path, perms: Option<u32>) -> crate::Result<()> {
     if let Some(mode) = perms {

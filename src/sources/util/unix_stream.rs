@@ -70,7 +70,7 @@ pub fn build_unix_stream_source(
             let received_from: Bytes = socket
                 .peer_addr()
                 .ok()
-                .map(|addr| {
+                .and_then(|addr| {
                     addr.as_pathname().map(|e| e.to_owned()).map({
                         |path| {
                             span.record("peer_path", &field::debug(&path));
@@ -78,7 +78,6 @@ pub fn build_unix_stream_source(
                         }
                     })
                 })
-                .flatten()
                 // In most cases, we'll be connecting to this socket from
                 // an unnamed socket (a socket not bound to a
                 // file). Instead of a filename, we'll surface a specific

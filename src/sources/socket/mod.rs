@@ -7,7 +7,7 @@ use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
 use lookup::{lookup_v2::parse_value_path, owned_value_path};
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{log_schema, LegacyKey, LogNamespace};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
@@ -17,6 +17,8 @@ use crate::{
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
+#[cfg(unix)]
+use vector_core::config::log_schema;
 
 /// Configuration for the `socket` source.
 #[configurable_component(source("socket"))]
@@ -232,15 +234,13 @@ impl SourceConfig for SocketConfig {
                 let host_key_path = config
                     .host_key()
                     .as_ref()
-                    .map(|x| parse_value_path(x).ok())
-                    .flatten()
+                    .and_then(|x| parse_value_path(x).ok())
                     .map(LegacyKey::InsertIfEmpty);
 
                 let port_key_path = config
                     .port_key()
                     .as_ref()
-                    .map(|x| parse_value_path(x).ok())
-                    .flatten()
+                    .and_then(|x| parse_value_path(x).ok())
                     .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
@@ -263,15 +263,13 @@ impl SourceConfig for SocketConfig {
                 let host_key_path = config
                     .host_key()
                     .as_ref()
-                    .map(|x| parse_value_path(x).ok())
-                    .flatten()
+                    .and_then(|x| parse_value_path(x).ok())
                     .map(LegacyKey::InsertIfEmpty);
 
                 let port_key_path = config
                     .port_key()
                     .as_ref()
-                    .map(|x| parse_value_path(x).ok())
-                    .flatten()
+                    .and_then(|x| parse_value_path(x).ok())
                     .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
@@ -295,8 +293,7 @@ impl SourceConfig for SocketConfig {
                 let host_key_path = config
                     .host_key()
                     .as_ref()
-                    .map(|x| parse_value_path(x).ok())
-                    .flatten()
+                    .and_then(|x| parse_value_path(x).ok())
                     .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
@@ -312,8 +309,7 @@ impl SourceConfig for SocketConfig {
                 let host_key_path = config
                     .host_key()
                     .as_ref()
-                    .map(|x| parse_value_path(x).ok())
-                    .flatten()
+                    .and_then(|x| parse_value_path(x).ok())
                     .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
@@ -1277,8 +1273,8 @@ mod test {
         // [src/sources/socket/mod.rs:1273] std::os::unix::prelude::AsRawFd::as_raw_fd(&tx) = 9
         // [src/sources/socket/mod.rs:1289] &addr = "/var/folders/ln/mzkzwg093kj9sfw11zr37kdh0000gq/T/.tmpLS0mvv/tx" (pathname)
 
-        dbg!(tx.local_addr().unwrap());
-        dbg!(std::os::unix::prelude::AsRawFd::as_raw_fd(&tx));
+        // dbg!(tx.local_addr().unwrap());
+        // dbg!(std::os::unix::prelude::AsRawFd::as_raw_fd(&tx));
 
         // Create another, bound socket
         let rx_path = tmp.path().join("rx");
@@ -1292,9 +1288,9 @@ mod test {
         tx.send(bytes).await.unwrap();
 
         let mut buf = vec![0u8; 24];
-        let (size, addr) = rx.recv_from(&mut buf).await.unwrap();
+        let (size, _) = rx.recv_from(&mut buf).await.unwrap();
 
-        dbg!(&addr);
+        // dbg!(&addr);
 
         let dgram = &buf[..size];
         assert_eq!(dgram, bytes);
