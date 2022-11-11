@@ -122,11 +122,6 @@ base: components: sources: demo_logs: configuration: {
 		required:      true
 		type: array: items: type: string: syntax: "literal"
 	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global setting"
-		required:    false
-		type: bool: {}
-	}
 	sequence: {
 		description:   "If `true`, each output line starts with an increasing sequence number, beginning with 0."
 		relevant_when: "format = \"shuffle\""

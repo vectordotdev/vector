@@ -74,6 +74,20 @@ components: sinks: elasticsearch: {
 	}
 
 	configuration: {
+		api_version: {
+			common:      false
+			description: "The API version of Elasticsearch."
+			required:    false
+			type: string: {
+				default: "auto"
+				enum: {
+					auto: "Auto-detect the api version. Will fail if version endpoint (`/_cluster/state/version`) isn't reachable."
+					v6:   "Use the Elasticsearch 6.x API."
+					v7:   "Use the Elasticsearch 7.x API."
+					v8:   "Use the Elasticsearch 8.x API."
+				}
+			}
+		}
 		auth: {
 			common:      false
 			description: "Options for the authentication strategy."
@@ -345,6 +359,17 @@ components: sinks: elasticsearch: {
 
 				If enabled the `doc_type` option will be ignored.
 				"""
+			warnings: ["This option has been deprecated, the `api_version` option should be used instead."]
+			required: false
+			type: bool: default: false
+		}
+		request_retry_partial: {
+			common: false
+			description: """
+				Whether or not to retry successful requests containing partial failures.
+
+				To avoid duplicates in Elasticsearch, please use option `id_key`.
+				"""
 			required: false
 			type: bool: default: false
 		}
@@ -400,6 +425,9 @@ components: sinks: elasticsearch: {
 				due to Elasticsearch index mapping errors, where data keys aren't consistently
 				typed. To change this behavior, refer to the Elasticsearch [`ignore_malformed`
 				setting](\(urls.elasticsearch_ignore_malformed)).
+
+				By default, partial failures are not retried. To enable retries, set `request_retry_partial`. Once enabled it will
+				retry whole partially failed requests. As such it is advised to use `id_key` to avoid duplicates.
 				"""
 		}
 

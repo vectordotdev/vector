@@ -342,6 +342,10 @@ test-integration: test-integration-nginx test-integration-opentelemetry test-int
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
+.PHONY: test-integration-aws-s3
+test-integration-aws-s3: ## Runs AWS S3 integration tests
+	FILTER=::aws_s3 make test-integration-aws
+
 .PHONY: test-integration-aws-sqs
 test-integration-aws-sqs: ## Runs AWS SQS integration tests
 	FILTER=::aws_sqs make test-integration-aws

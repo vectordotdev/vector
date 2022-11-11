@@ -43,7 +43,7 @@ mod vrl_target;
 
 pub const PARTIAL: &str = "_partial";
 
-#[derive(PartialEq, PartialOrd, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
 pub enum Event {

@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::{
-    schema::{assert_string_schema_for_map, generate_map_schema},
+    schema::{assert_string_schema_for_map, generate_map_schema, generate_set_schema},
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     str::ConfigurableString,
     Configurable, GenerateError,
@@ -23,5 +23,14 @@ where
         assert_string_schema_for_map::<K, Self>(gen)?;
 
         generate_map_schema::<V>(gen)
+    }
+}
+
+impl<V> Configurable for indexmap::IndexSet<V>
+where
+    V: Configurable + Serialize + std::hash::Hash + Eq,
+{
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        generate_set_schema::<V>(gen)
     }
 }
