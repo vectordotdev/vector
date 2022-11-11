@@ -14,8 +14,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     http::Auth,
-    serde::default_decoding,
-    serde::default_framing_message_based,
+    serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
         http::HttpMethod,
@@ -203,20 +202,15 @@ impl HttpClientContext {
 
     /// Enriches events with source_type, timestamp
     fn enrich_events(&self, events: &mut Vec<Event>) {
+        let now = Utc::now();
+
         for event in events {
             match event {
                 Event::Log(ref mut log) => {
-                    self.log_namespace.insert_vector_metadata(
+                    self.log_namespace.insert_standard_vector_source_metadata(
                         log,
-                        log_schema().source_type_key(),
-                        "source_type",
-                        Bytes::from(HttpClientConfig::NAME),
-                    );
-                    self.log_namespace.insert_vector_metadata(
-                        log,
-                        log_schema().timestamp_key(),
-                        "ingest_timestamp",
-                        Utc::now(),
+                        HttpClientConfig::NAME,
+                        now,
                     );
                 }
                 Event::Metric(ref mut metric) => {

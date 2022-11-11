@@ -1,3 +1,4 @@
+use lookup::OwnedValuePath;
 use std::collections::BTreeMap;
 
 use super::Collection;
@@ -111,16 +112,30 @@ impl Unknown {
     ///
     /// Meaning, if `self` is `Any`, then it's always a superset of `other`, otherwise its
     /// accumulative types need to be a superset of `other`.
-    #[must_use]
-    pub(crate) fn is_superset(&self, other: &Self) -> bool {
+    pub(crate) fn is_superset(&self, other: &Self) -> Result<(), OwnedValuePath> {
         match (&self.0, &other.0) {
-            (Inner::Infinite(infinite), _) if infinite.is_any() => true,
+            (Inner::Infinite(infinite), _) if infinite.is_any() => Ok(()),
             (Inner::Infinite(infinite), Inner::Exact(rhs)) => {
                 Kind::from(*infinite).is_superset(rhs)
             }
-            (Inner::Exact(lhs), Inner::Exact(rhs)) => lhs.is_superset(rhs),
-            (Inner::Exact(lhs), Inner::Infinite(..)) => lhs.is_any(),
-            (Inner::Infinite(lhs), Inner::Infinite(rhs)) => lhs.is_superset(rhs),
+            (Inner::Exact(lhs), Inner::Exact(rhs)) => lhs
+                .clone()
+                .without_undefined()
+                .is_superset(&rhs.clone().without_undefined()),
+            (Inner::Exact(lhs), Inner::Infinite(..)) => {
+                if lhs.is_any() {
+                    Ok(())
+                } else {
+                    Err(OwnedValuePath::root())
+                }
+            }
+            (Inner::Infinite(lhs), Inner::Infinite(rhs)) => {
+                if lhs.is_superset(rhs) {
+                    Ok(())
+                } else {
+                    Err(OwnedValuePath::root())
+                }
+            }
         }
     }
 
@@ -394,7 +409,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.is_superset(&other), want, "{}", title);
+            assert_eq!(this.is_superset(&other).is_ok(), want, "{}", title);
         }
     }
 }
