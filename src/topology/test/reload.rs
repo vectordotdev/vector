@@ -184,7 +184,8 @@ async fn topology_disk_buffer_conflict() {
     });
 
     let mut new_config = old_config.clone();
-    new_config.sinks[&sink_key].inner = prom_exporter_sink(address_1, 1).into();
+    new_config.add_source("in", internal_metrics_source());
+    new_config.add_sink("out", &["in"], prom_exporter_sink(address_1, 1));
     new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV1 {
         max_size: NonZeroU64::new(1024).unwrap(),
         when_full: WhenFull::Block,
