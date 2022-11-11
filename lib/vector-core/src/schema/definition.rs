@@ -452,12 +452,145 @@ impl Definition {
     }
 }
 
+#[cfg(any(test, feature = "test"))]
+mod test_utils {
+    use super::*;
+    use crate::event::{Event, LogEvent};
+
+    impl Definition {
+        /// Checks that the schema definition is _valid_ for the given event.
+        ///
+        /// # Errors
+        /// If the definition is not valid, debug info will be returned.
+        pub fn is_valid_for_event(&self, event: &Event) -> Result<(), String> {
+            if let Some(log) = event.maybe_as_log() {
+                let log: &LogEvent = log;
+
+                let actual_kind = Kind::from(log.value());
+                if let Err(path) = self.event_kind.is_superset(&actual_kind) {
+                    return Result::Err(format!("Event value doesn't match at path: {}\n\nEvent type at path = {:?}\n\nDefinition at path = {:?}",
+                        path,
+                        actual_kind.at_path(&path).debug_info(),
+                        self.event_kind.at_path(&path).debug_info()
+                    ));
+                }
+
+                let actual_metadata_kind = Kind::from(log.metadata().value());
+                if let Err(path) = self.metadata_kind.is_superset(&actual_metadata_kind) {
+                    // return Result::Err(format!("Event metadata doesn't match definition.\n\nDefinition type=\n{:?}\n\nActual event metadata type=\n{:?}\n",
+                    //                            self.metadata_kind.debug_info(), actual_metadata_kind.debug_info()));
+                    return Result::Err(format!(
+                        "Event METADATA value doesn't match at path: {}\n\nMetadata type at path = {:?}\n\nDefinition at path = {:?}",
+                        path,
+                        actual_metadata_kind.at_path(&path).debug_info(),
+                        self.metadata_kind.at_path(&path).debug_info()
+                    ));
+                }
+                if !self.log_namespaces.contains(&log.namespace()) {
+                    return Result::Err(format!(
+                        "Event uses the {:?} LogNamespace, but the definition only contains: {:?}",
+                        log.namespace(),
+                        self.log_namespaces
+                    ));
+                }
+
+                Ok(())
+            } else {
+                // schema definitions currently only apply to logs
+                Ok(())
+            }
+        }
+
+        /// Asserts that the schema definition is _valid_ for the given event.
+        /// # Panics
+        /// If the definition is not valid for the event.
+        pub fn assert_valid_for_event(&self, event: &Event) {
+            if let Err(err) = self.is_valid_for_event(event) {
+                panic!("Schema definition assertion failed: {}", err);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::event::{Event, EventMetadata, LogEvent};
     use lookup::owned_value_path;
     use std::collections::{BTreeMap, HashMap};
+    use value::Value;
 
     use super::*;
+
+    #[test]
+    fn test_definition_validity() {
+        struct TestCase {
+            title: &'static str,
+            definition: Definition,
+            event: Event,
+            valid: bool,
+        }
+
+        for TestCase {
+            title,
+            definition,
+            event,
+            valid,
+        } in [
+            TestCase {
+                title: "match",
+                definition: Definition::new(Kind::any(), Kind::any(), [LogNamespace::Legacy]),
+                event: Event::Log(LogEvent::from(BTreeMap::new())),
+                valid: true,
+            },
+            TestCase {
+                title: "event mismatch",
+                definition: Definition::new(
+                    Kind::object(Collection::empty()),
+                    Kind::any(),
+                    [LogNamespace::Legacy],
+                ),
+                event: Event::Log(LogEvent::from(BTreeMap::from([("foo".into(), 4.into())]))),
+                valid: false,
+            },
+            TestCase {
+                title: "metadata mismatch",
+                definition: Definition::new(
+                    Kind::any(),
+                    Kind::object(Collection::empty()),
+                    [LogNamespace::Legacy],
+                ),
+                event: Event::Log(LogEvent::from_parts(
+                    Value::Object(BTreeMap::new()),
+                    EventMetadata::default_with_value(
+                        BTreeMap::from([("foo".into(), 4.into())]).into(),
+                    ),
+                )),
+                valid: false,
+            },
+            TestCase {
+                title: "wrong log namespace",
+                definition: Definition::new(Kind::any(), Kind::any(), []),
+                event: Event::Log(LogEvent::from(BTreeMap::new())),
+                valid: false,
+            },
+            TestCase {
+                title: "event mismatch - null vs undefined",
+                definition: Definition::new(
+                    Kind::object(Collection::empty()),
+                    Kind::any(),
+                    [LogNamespace::Legacy],
+                ),
+                event: Event::Log(LogEvent::from(BTreeMap::from([(
+                    "foo".into(),
+                    Value::Null,
+                )]))),
+                valid: false,
+            },
+        ] {
+            let result = definition.is_valid_for_event(&event);
+            assert_eq!(result.is_ok(), valid, "{}", title);
+        }
+    }
 
     #[test]
     fn test_empty_legacy_field() {
