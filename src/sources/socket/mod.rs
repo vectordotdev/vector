@@ -232,13 +232,15 @@ impl SourceConfig for SocketConfig {
                 let host_key_path = config
                     .host_key()
                     .as_ref()
-                    .map(|x| owned_value_path!(x))
+                    .map(|x| parse_value_path(x).ok())
+                    .flatten()
                     .map(LegacyKey::InsertIfEmpty);
 
                 let port_key_path = config
                     .port_key()
                     .as_ref()
-                    .map(|x| owned_value_path!(x))
+                    .map(|x| parse_value_path(x).ok())
+                    .flatten()
                     .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
