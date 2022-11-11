@@ -79,6 +79,10 @@ pub fn build_unix_stream_source(
                     })
                 })
                 .flatten()
+                // In most cases, we'll be connecting to this socket from
+                // an unnamed socket (a socket not bound to a
+                // file). Instead of a filename, we'll surface a specific
+                // host value.
                 .unwrap_or_else(|| UNNAMED_SOCKET_HOST.into());
 
             let handle_events = handle_events.clone();

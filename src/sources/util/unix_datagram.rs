@@ -88,10 +88,10 @@ async fn listen(
 
 		    path.map(|p| p.to_string_lossy().into_owned().into())
 		} else {
-		    // In most cases, we'll connecting to the socket
-		    // from an unnamed socket (a socket not bound to a
-		    // file). Instead of a filename, we'll surface
-		    // a specific host.
+		    // In most cases, we'll be connecting to this
+		    // socket from an unnamed socket (a socket not
+		    // bound to a file). Instead of a filename, we'll
+		    // surface a specific host value.
 		    span.record("peer_path", &field::debug(UNNAMED_SOCKET_HOST));
 		    Some(UNNAMED_SOCKET_HOST.into())
 		};
