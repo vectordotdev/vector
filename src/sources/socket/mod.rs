@@ -374,9 +374,9 @@ mod test {
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},
+        crate::sources::util::unix::UNNAMED_SOCKET_HOST,
         crate::test_util::wait_for,
         futures::{SinkExt, Stream},
-        sources::util::unix::UNNAMED_SOCKET_HOST,
         std::future::ready,
         std::os::unix::fs::PermissionsExt,
         std::path::PathBuf,
