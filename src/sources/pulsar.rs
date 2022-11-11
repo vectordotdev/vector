@@ -44,6 +44,9 @@ pub struct PulsarSourceConfig {
     /// The Pulsar subscription name.
     subscription_name: Option<String>,
 
+    /// Max count of messages in a batch.
+    batch_size: Option<u32>,
+
     #[configurable(derived)]
     auth: Option<AuthConfig>,
 
@@ -145,7 +148,11 @@ async fn create_consumer(
     let mut consumer_builder = pulsar
         .consumer()
         .with_topics(&config.topics)
-        .with_subscription_type(SubType::Shared).with_batch_size();
+        .with_subscription_type(SubType::Shared);
+
+    if let Some(batch_size) = config.batch_size {
+        consumer_builder = consumer_builder.with_batch_size(batch_size);
+    }
     if let Some(consumer_name) = &config.consumer_name {
         consumer_builder = consumer_builder.with_consumer_name(consumer_name);
     }
