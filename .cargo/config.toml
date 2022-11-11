@@ -1,3 +1,6 @@
+[alias]
+xtask = "run --package xtask --"
+
 [target.'cfg(all())']
 rustflags = [
   "-Dclippy::print_stdout",
