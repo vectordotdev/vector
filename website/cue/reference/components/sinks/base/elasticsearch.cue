@@ -27,6 +27,19 @@ base: components: sinks: elasticsearch: configuration: {
 			type: bool: {}
 		}
 	}
+	api_version: {
+		description: "The API version of Elasticsearch."
+		required:    false
+		type: string: {
+			default: "auto"
+			enum: {
+				auto: "Auto-detect the api version. Will fail if endpoint isn't reachable."
+				v6:   "Use the Elasticsearch 6.x API."
+				v7:   "Use the Elasticsearch 7.x API."
+				v8:   "Use the Elasticsearch 8.x API."
+			}
+		}
+	}
 	auth: {
 		description: "Authentication strategies."
 		required:    false
@@ -528,9 +541,11 @@ base: components: sinks: elasticsearch: configuration: {
 			`type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
 
 			If enabled, the `doc_type` option will be ignored.
+
+			This option has been deprecated, the `api_version` option should be used instead.
 			"""
 		required: false
-		type: bool: default: false
+		type: bool: {}
 	}
 	tls: {
 		description: "Standard TLS options."
