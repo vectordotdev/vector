@@ -447,6 +447,10 @@ impl Definition {
         &self.event_kind
     }
 
+    pub fn event_kind_mut(&mut self) -> &mut Kind {
+        &mut self.event_kind
+    }
+
     pub fn metadata_kind(&self) -> &Kind {
         &self.metadata_kind
     }

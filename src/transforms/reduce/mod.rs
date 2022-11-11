@@ -8,6 +8,8 @@ use std::{
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use indexmap::IndexMap;
+use lookup::lookup_v2::parse_target_path;
+use lookup::PathPrefix;
 use serde_with::serde_as;
 use vector_config::configurable_component;
 
@@ -24,6 +26,8 @@ mod merge_strategy;
 
 use crate::event::Value;
 pub use merge_strategy::*;
+use value::kind::Collection;
+use value::Kind;
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
@@ -108,8 +112,118 @@ impl TransformConfig for ReduceConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, input: &schema::Definition) -> Vec<Output> {
+        let mut schema_definition = input.clone();
+
+        for (key, merge_strategy) in self.merge_strategies.iter() {
+            let key = if let Ok(key) = parse_target_path(key) {
+                key
+            } else {
+                continue;
+            };
+
+            let input_kind = match key.prefix {
+                PathPrefix::Event => schema_definition.event_kind().at_path(&key.path),
+                PathPrefix::Metadata => schema_definition.metadata_kind().at_path(&key.path),
+            };
+
+            let new_kind = match merge_strategy {
+                MergeStrategy::Discard | MergeStrategy::Retain => {
+                    /* does not change the type */
+                    input_kind.clone()
+                }
+                MergeStrategy::Sum | MergeStrategy::Max | MergeStrategy::Min => {
+                    let contains_undefined = input_kind.contains_undefined();
+                    // only keeps integer / float values
+                    let mut kind =
+                        match (input_kind.contains_integer(), input_kind.contains_float()) {
+                            (true, true) => Kind::float().or_integer(),
+                            (true, false) => Kind::integer(),
+                            (false, true) => Kind::float(),
+                            (false, false) => Kind::undefined(),
+                        };
+                    if contains_undefined {
+                        kind.add_undefined();
+                    }
+                    kind
+                }
+                MergeStrategy::Array => {
+                    let contains_undefined = input_kind.contains_undefined();
+                    let unknown_kind = input_kind.clone();
+                    let mut kind = Kind::array(Collection::empty().with_unknown(unknown_kind));
+                    if contains_undefined {
+                        kind.add_undefined();
+                    }
+                    kind
+                }
+                MergeStrategy::Concat => {
+                    let mut new_kind = Kind::never();
+
+                    if input_kind.contains_bytes() {
+                        new_kind.add_bytes();
+                    }
+                    if let Some(array) = input_kind.as_array() {
+                        // array elements can be either any type that the field can be, or any
+                        // element of the array
+                        let array_elements = array.reduced_kind().union(input_kind.without_array());
+                        new_kind.add_array(Collection::empty().with_unknown(array_elements));
+                    }
+
+                    if input_kind.contains_undefined() {
+                        new_kind.add_undefined();
+                    }
+                    new_kind
+                }
+                MergeStrategy::ConcatNewline | MergeStrategy::ConcatRaw => {
+                    // can only produce bytes (or undefined)
+                    if input_kind.contains_bytes() {
+                        let mut kind = Kind::bytes();
+                        if input_kind.contains_undefined() {
+                            kind.add_undefined();
+                        }
+                        kind
+                    } else {
+                        Kind::undefined()
+                    }
+                }
+                MergeStrategy::ShortestArray | MergeStrategy::LongestArray => {
+                    if let Some(array) = input_kind.as_array() {
+                        let mut kind = Kind::array(array.clone());
+                        if input_kind.contains_undefined() {
+                            kind.add_undefined();
+                        }
+                        kind
+                    } else {
+                        Kind::undefined()
+                    }
+                }
+                MergeStrategy::FlatUnique => {
+                    let mut array_elements = input_kind.without_array().without_object();
+                    if let Some(array) = input_kind.as_array() {
+                        array_elements = array_elements.union(array.reduced_kind());
+                    }
+                    if let Some(object) = input_kind.as_object() {
+                        array_elements = array_elements.union(object.reduced_kind());
+                    }
+                    let mut kind = Kind::array(Collection::empty().with_unknown(array_elements));
+                    if input_kind.contains_undefined() {
+                        kind.add_undefined();
+                    }
+                    kind
+                }
+            };
+
+            // all of the merge strategies are optional. They won't produce a value unless a value actually exists
+            let new_kind = if input_kind.contains_undefined() {
+                new_kind.without_undefined()
+            } else {
+                new_kind
+            };
+
+            schema_definition = schema_definition.with_field(&key, new_kind, None);
+        }
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 }
 
