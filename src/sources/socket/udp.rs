@@ -233,7 +233,7 @@ pub(super) fn udp(
 					    SocketConfig::NAME,
 					    log,
 					    Some(LegacyKey::InsertIfEmpty(&host_key_path)),
-					    path!(log_schema().host_key()),
+					    path!("host"),
 					    address.ip().to_string()
 					);
 
