@@ -1,7 +1,3 @@
-// Compatibility-related imports
-//import "core-js/stable";
-//import "regenerator-runtime/runtime";
-
 // Imports
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
@@ -23,7 +19,6 @@ interface IGlobeProps {
   lat?: number;
   long?: number;
   rotation?: number;
-  onClick?: () => void;
 }
 
 const markers: GeoJSON.Point[] = markerData.map((m) => ({
@@ -40,7 +35,7 @@ const geojson = feature(
 const countries = geojson.features;
 
 export const Globe: React.FC<IGlobeProps> = animated(
-  ({ size = 500, lat = 0, long = 0, rotation = 0, onClick }: IGlobeProps) => {
+  ({ size = 500, lat = 0, long = 0, rotation = 0 }: IGlobeProps) => {
     const svgRef = React.useRef(null);
 
     // create geo projection to render paths
@@ -65,7 +60,7 @@ export const Globe: React.FC<IGlobeProps> = animated(
 
     return (
       <div>
-        <svg width={size} height={size} ref={svgRef} /* onClick={onClick} */>
+        <svg width={size} height={size} ref={svgRef}>
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -133,9 +128,6 @@ export const RotatingGlobe: React.FC<{ size: number; duration?: number }> = ({
     },
   });
 
-  // globe click handler
-  // const onClick = React.useCallback(() => {}, []);
-
   // kick off the initial rotation
   React.useEffect(() => {
     setOrientation({ lat: 0, long: 0, degrees: 360 });
@@ -156,7 +148,6 @@ export const RotatingGlobe: React.FC<{ size: number; duration?: number }> = ({
       lat={lat}
       long={long}
       rotation={rotation}
-      // onClick={onClick}
     />
   );
 };
@@ -164,8 +155,6 @@ export const RotatingGlobe: React.FC<{ size: number; duration?: number }> = ({
 // Main page Vector diagram
 function Diagram({className, height, width}) {
   const [_, updateState] = useState();
-  const defaultXPosition = 7;
-  const defaultTextLength = 60;
 
   useEffect(() => {
     const timeout = setTimeout(() => {
