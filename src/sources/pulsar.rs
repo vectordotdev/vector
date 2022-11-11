@@ -1,5 +1,7 @@
 use crate::codecs::{Decoder, DecodingConfig};
 use crate::config::{SourceConfig, SourceContext};
+use crate::internal_events::PulsarAcknowledgmentError;
+use crate::internal_events::PulsarReadError;
 use crate::internal_events::StreamClosedError;
 use crate::serde::{default_decoding, default_framing_message_based};
 use crate::SourceSender;
@@ -8,13 +10,10 @@ use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use codecs::StreamDecodingError;
 use futures_util::StreamExt;
-use metrics::counter;
-use pulsar::error::ConsumerError;
 use pulsar::SubType;
 use pulsar::{Consumer, Pulsar, TokioExecutor};
 use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{error_stage, error_type};
-use vector_common::internal_event::{ByteSize, InternalEvent};
+use vector_common::internal_event::ByteSize;
 use vector_common::internal_event::{
     BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
 };
@@ -36,8 +35,8 @@ pub struct PulsarSourceConfig {
     #[serde(alias = "address")]
     endpoint: String,
 
-    /// The Pulsar topic name to read events from.
-    topic: String,
+    /// The Pulsar topic names to read events from.
+    topics: Vec<String>,
 
     /// The Pulsar consumer name.
     consumer_name: Option<String>,
@@ -102,7 +101,7 @@ impl GenerateConfig for PulsarSourceConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"
-            topic = "from.vector"
+            topics = ["topic1", "topic2"]
             endpoint = "pulsar://127.0.0.1:6650""#,
         )
         .unwrap()
@@ -145,8 +144,8 @@ async fn create_consumer(
         .await?;
     let mut consumer_builder = pulsar
         .consumer()
-        .with_topic(&config.topic)
-        .with_subscription_type(SubType::Shared);
+        .with_topics(&config.topics)
+        .with_subscription_type(SubType::Shared).with_batch_size();
     if let Some(consumer_name) = &config.consumer_name {
         consumer_builder = consumer_builder.with_consumer_name(consumer_name);
     }
@@ -157,58 +156,6 @@ async fn create_consumer(
     let consumer = consumer_builder.build::<String>().await?;
 
     Ok(consumer)
-}
-
-#[derive(Debug)]
-pub struct PulsarReadError {
-    pub error: pulsar::Error,
-}
-
-impl InternalEvent for PulsarReadError {
-    fn emit(self) {
-        error!(
-            message = "Failed to read message.",
-            error = %self.error,
-            error_code = "reading_message",
-            error_type = error_type::READER_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "reading_message",
-            "error_type" => error_type::READER_FAILED,
-            "stage" => error_stage::RECEIVING,
-        );
-        // deprecated
-        counter!("events_failed_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct PulsarAcknowledgmentError {
-    pub error: ConsumerError,
-}
-
-impl InternalEvent for PulsarAcknowledgmentError {
-    fn emit(self) {
-        error!(
-            message = "Failed to acknowledge message.",
-            error = %self.error,
-            error_code = "acknowledge_message",
-            error_type = error_type::ACKNOWLEDGMENT_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "acknowledge_message",
-            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
-            "stage" => error_stage::RECEIVING,
-        );
-        // deprecated
-        counter!("events_failed_total", 1);
-    }
 }
 
 async fn pulsar_source(

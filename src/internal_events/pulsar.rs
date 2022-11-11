@@ -1,4 +1,5 @@
 use metrics::counter;
+use pulsar::error::ConsumerError;
 use vector_core::internal_event::InternalEvent;
 
 use crate::emit;
@@ -31,5 +32,57 @@ impl InternalEvent for PulsarSendingError {
             count: self.count,
             reason,
         });
+    }
+}
+
+#[derive(Debug)]
+pub struct PulsarReadError {
+    pub error: pulsar::Error,
+}
+
+impl InternalEvent for PulsarReadError {
+    fn emit(self) {
+        error!(
+            message = "Failed to read message.",
+            error = %self.error,
+            error_code = "reading_message",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "reading_message",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
+        counter!("events_failed_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct PulsarAcknowledgmentError {
+    pub error: ConsumerError,
+}
+
+impl InternalEvent for PulsarAcknowledgmentError {
+    fn emit(self) {
+        error!(
+            message = "Failed to acknowledge message.",
+            error = %self.error,
+            error_code = "acknowledge_message",
+            error_type = error_type::ACKNOWLEDGMENT_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "acknowledge_message",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
+        counter!("events_failed_total", 1);
     }
 }
