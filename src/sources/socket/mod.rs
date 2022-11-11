@@ -315,7 +315,7 @@ impl SourceConfig for SocketConfig {
                 schema_definition.with_source_metadata(
                     Self::NAME,
                     host_key_path,
-                    &owned_value_path!(log_schema().host_key()),
+                    &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
                 )
@@ -424,10 +424,7 @@ mod test {
                 .unwrap();
 
             let event = rx.next().await.unwrap();
-            assert_eq!(
-                event.as_log()[log_schema().host_key()],
-                addr.ip().to_string().into()
-            );
+            assert_eq!(event.as_log()["host"], addr.ip().to_string().into());
             assert_eq!(event.as_log()["port"], addr.port().into());
         })
         .await;
@@ -983,10 +980,7 @@ mod test {
             let from = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
-            assert_eq!(
-                events[0].as_log()[log_schema().host_key()],
-                from.ip().to_string().into()
-            );
+            assert_eq!(events[0].as_log()["host"], from.ip().to_string().into());
             assert_eq!(events[0].as_log()["port"], from.port().into());
         })
         .await;
@@ -1238,10 +1232,7 @@ mod test {
                 events[0].as_log()[log_schema().source_type_key()],
                 "socket".into()
             );
-            assert_eq!(
-                events[0].as_log()[log_schema().host_key()],
-                UNNAMED_SOCKET_HOST.into()
-            );
+            assert_eq!(events[0].as_log()["host"], UNNAMED_SOCKET_HOST.into());
         })
         .await;
     }
