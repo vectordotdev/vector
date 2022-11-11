@@ -71,7 +71,7 @@ impl SocketConfig {
     }
 
     fn log_namespace(&self) -> LogNamespace {
-        match self.mode.clone() {
+        match &self.mode {
             Mode::Tcp(config) => config.log_namespace.unwrap_or(false).into(),
             Mode::Udp(config) => config.log_namespace.unwrap_or(false).into(),
             #[cfg(unix)]
