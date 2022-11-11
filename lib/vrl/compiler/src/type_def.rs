@@ -330,7 +330,7 @@ impl TypeDef {
     /// within the provided kind.
     pub fn fallible_unless(mut self, kind: impl Into<Kind>) -> Self {
         let kind = kind.into();
-        if !kind.is_superset(&self.kind) {
+        if kind.is_superset(&self.kind).is_err() {
             self.fallible = true
         }
 
