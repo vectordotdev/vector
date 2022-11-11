@@ -443,7 +443,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
-check-all: check-scripts check-deny
+check-all: check-scripts check-deny check-component-docs
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -489,11 +489,9 @@ check-deny: ## Check advisories licenses and sources for crate dependencies
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
 
-ifeq (${CI}, true)
 .PHONY: check-component-docs
 check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-docs.sh
-endif
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
