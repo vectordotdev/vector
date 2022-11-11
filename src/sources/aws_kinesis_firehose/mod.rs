@@ -196,6 +196,7 @@ mod tests {
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
     use futures::Stream;
+    use lookup::path;
     use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
     use vector_common::assert_event_data_eq;
@@ -363,7 +364,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aws_kinesis_firehose_forwards_events() {
+    async fn aws_kinesis_firehose_forwards_events_legacy_namespace() {
         let gziped_record = {
             let mut buf = Vec::new();
             let mut gz = GzEncoder::new(RECORD.as_bytes(), flate2::Compression::fast());
@@ -452,6 +453,134 @@ mod tests {
                         "source_arn" => SOURCE_ARN,
                     },]
                 );
+
+                let response: models::FirehoseResponse = res.json().await.unwrap();
+                assert_eq!(response.request_id, REQUEST_ID);
+            } else {
+                let res = res.await.unwrap().unwrap();
+                assert_eq!(400, res.status().as_u16());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn aws_kinesis_firehose_forwards_events_vector_namespace() {
+        let gziped_record = {
+            let mut buf = Vec::new();
+            let mut gz = GzEncoder::new(RECORD.as_bytes(), flate2::Compression::fast());
+            gz.read_to_end(&mut buf).unwrap();
+            buf
+        };
+
+        for (source_record_compression, record_compression, success, record, expected) in [
+            (
+                Compression::Auto,
+                Compression::Gzip,
+                true,
+                RECORD.as_bytes(),
+                RECORD.as_bytes().to_owned(),
+            ),
+            (
+                Compression::Auto,
+                Compression::None,
+                true,
+                RECORD.as_bytes(),
+                RECORD.as_bytes().to_owned(),
+            ),
+            (
+                Compression::None,
+                Compression::Gzip,
+                true,
+                RECORD.as_bytes(),
+                gziped_record,
+            ),
+            (
+                Compression::None,
+                Compression::None,
+                true,
+                RECORD.as_bytes(),
+                RECORD.as_bytes().to_owned(),
+            ),
+            (
+                Compression::Gzip,
+                Compression::Gzip,
+                true,
+                RECORD.as_bytes(),
+                RECORD.as_bytes().to_owned(),
+            ),
+            (
+                Compression::Gzip,
+                Compression::None,
+                false,
+                RECORD.as_bytes(),
+                RECORD.as_bytes().to_owned(),
+            ),
+            (
+                Compression::Gzip,
+                Compression::Gzip,
+                true,
+                "".as_bytes(),
+                Vec::new(),
+            ),
+        ] {
+            let (rx, addr) = source(None, Some(source_record_compression), true, true).await;
+
+            let timestamp: DateTime<Utc> = Utc::now();
+
+            let res = spawn_send(
+                addr,
+                timestamp,
+                vec![record],
+                None,
+                false,
+                record_compression,
+            )
+            .await;
+
+            if success {
+                let events = collect_ready(rx).await;
+
+                let res = res.await.unwrap().unwrap();
+                assert_eq!(200, res.status().as_u16());
+
+                for event in events {
+                    let log = event.as_log();
+                    let meta = log.metadata();
+
+                    // event data, currently assumes default bytes deserializer
+                    assert_eq!(log.value(), &vrl::value!(Bytes::from(expected.to_owned())));
+
+                    // vector metadata
+                    assert_eq!(
+                        meta.value().get(path!("vector", "source_type")).unwrap(),
+                        &vrl::value!("aws_kinesis_firehose")
+                    );
+                    assert!(meta
+                        .value()
+                        .get(path!("vector", "ingest_timestamp"))
+                        .unwrap()
+                        .is_timestamp());
+
+                    // source metadata
+                    assert_eq!(
+                        meta.value()
+                            .get(path!("aws_kinesis_firehose", "request_id"))
+                            .unwrap(),
+                        &vrl::value!(REQUEST_ID)
+                    );
+                    assert_eq!(
+                        meta.value()
+                            .get(path!("aws_kinesis_firehose", "source_arn"))
+                            .unwrap(),
+                        &vrl::value!(SOURCE_ARN)
+                    );
+                    assert_eq!(
+                        meta.value()
+                            .get(path!("aws_kinesis_firehose", "timestamp"))
+                            .unwrap(),
+                        &vrl::value!(timestamp.trunc_subsecs(3))
+                    );
+                }
 
                 let response: models::FirehoseResponse = res.json().await.unwrap();
                 assert_eq!(response.request_id, REQUEST_ID);
