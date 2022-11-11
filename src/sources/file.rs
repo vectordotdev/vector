@@ -414,7 +414,7 @@ impl SourceConfig for FileConfig {
         let file_key = self
             .file_key
             .clone()
-            .and_then(|f| f.path)
+            .and_then(|k| k.path)
             .map(LegacyKey::Overwrite);
 
         // `host_key` defaults to the `log_schema().host_key()` if it's not configured in the source.
@@ -423,14 +423,14 @@ impl SourceConfig for FileConfig {
             .clone()
             .map_or_else(
                 || parse_value_path(log_schema().host_key()).ok(),
-                |key| key.path,
+                |k| k.path,
             )
             .map(LegacyKey::Overwrite);
 
         let offset_key = self
             .offset_key
             .clone()
-            .and_then(|f| f.path)
+            .and_then(|k| k.path)
             .map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
@@ -532,11 +532,11 @@ pub fn file_source(
     let event_metadata = EventMetadata {
         host_key: config.host_key.clone().map_or_else(
             || parse_value_path(log_schema().host_key()).ok(),
-            |key| key.path,
+            |k| k.path,
         ),
         hostname: crate::get_hostname().ok(),
-        file_key: config.file_key.clone().and_then(|f| f.path),
-        offset_key: config.offset_key.clone().and_then(|f| f.path),
+        file_key: config.file_key.clone().and_then(|k| k.path),
+        offset_key: config.offset_key.clone().and_then(|k| k.path),
     };
 
     let include = config.include.clone();
