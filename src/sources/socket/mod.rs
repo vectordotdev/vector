@@ -462,9 +462,7 @@ mod test {
                 &vrl::value!(SocketConfig::NAME)
             );
             assert_eq!(
-                event_meta
-                    .get(path!(SocketConfig::NAME, log_schema().host_key()))
-                    .unwrap(),
+                event_meta.get(path!(SocketConfig::NAME, "host")).unwrap(),
                 &vrl::value!(addr.ip().to_string())
             );
             assert_eq!(
@@ -1012,9 +1010,7 @@ mod test {
                 &vrl::value!(SocketConfig::NAME)
             );
             assert_eq!(
-                event_meta
-                    .get(path!(SocketConfig::NAME, log_schema().host_key()))
-                    .unwrap(),
+                event_meta.get(path!(SocketConfig::NAME, "host")).unwrap(),
                 &vrl::value!(from.ip().to_string())
             );
             assert_eq!(
@@ -1317,14 +1313,9 @@ mod test {
                 &vrl::value!(SocketConfig::NAME)
             );
 
+            assert_eq!(events[0].as_log()["message"], "test".into());
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                "test".into()
-            );
-            assert_eq!(
-                event_meta
-                    .get(path!(SocketConfig::NAME, log_schema().host_key()))
-                    .unwrap(),
+                event_meta.get(path!(SocketConfig::NAME, "host")).unwrap(),
                 &vrl::value!(UNNAMED_SOCKET_HOST)
             );
         })
@@ -1451,14 +1442,9 @@ mod test {
                 event_meta.get(path!("vector", "source_type")).unwrap(),
                 &vrl::value!(SocketConfig::NAME)
             );
+            assert_eq!(events[0].as_log()["message"], "test".into());
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                "test".into()
-            );
-            assert_eq!(
-                event_meta
-                    .get(path!(SocketConfig::NAME, "host"))
-                    .unwrap(),
+                event_meta.get(path!(SocketConfig::NAME, "host")).unwrap(),
                 &vrl::value!(UNNAMED_SOCKET_HOST)
             );
         })
