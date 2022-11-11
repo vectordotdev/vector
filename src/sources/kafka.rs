@@ -223,6 +223,7 @@ impl SourceConfig for KafkaSourceConfig {
             cx.shutdown,
             cx.out,
             acknowledgements,
+            false,
         )))
     }
 
@@ -242,6 +243,7 @@ async fn kafka_source(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
+    eof: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let (mut finalizer, mut ack_stream) =
@@ -297,7 +299,20 @@ async fn kafka_source(
             },
             message = stream.next(), if !shutting_down => match message {
                 None => unreachable!("MessageStream never returns Ready(None)"),
-                Some(Err(error)) => emit!(KafkaReadError { error }),
+                Some(Err(error)) => match error {
+                    KafkaError::PartitionEOF(_) if eof => {
+                        // Optionally exit on partition EOF - used in tests to collect events when
+                        // the precise expected number is not known (e.g. after shutdown or rebalance)
+                        // NB this requires the client "enable.partition.eof" option set to true
+                        shutting_down = true;
+                        match finalizer.take() {
+                            Some(finalizer) => drop(finalizer),
+                            _ => break
+                        }
+                    },
+                    KafkaError::PartitionEOF(partition) => { info!(%partition, "Partition EOF") },
+                    _ => emit!(KafkaReadError { error })
+                },
                 Some(Ok(msg)) => {
                     emit!(KafkaBytesReceived {
                         byte_size: msg.payload_len(),
@@ -585,8 +600,13 @@ mod test {
         std::env::var("KAFKA_HOST").unwrap_or_else(|_| "localhost".into())
     }
 
-    pub fn kafka_address(port: u16) -> String {
-        format!("{}:{}", kafka_host(), port)
+    pub fn kafka_port() -> u16 {
+        let port = std::env::var("KAFKA_PORT").unwrap_or_else(|_| "9091".into());
+        port.parse().expect("Invalid port number")
+    }
+
+    pub fn kafka_address() -> String {
+        format!("{}:{}", kafka_host(), kafka_port())
     }
 
     #[test]
@@ -595,14 +615,20 @@ mod test {
     }
 
     pub(super) fn make_config(topic: &str, group: &str) -> KafkaSourceConfig {
+        let mut kafka_options = HashMap::new();
+        kafka_options.insert(
+            "enable.partition.eof".into(),
+            "true".into(),
+        );
         KafkaSourceConfig {
-            bootstrap_servers: kafka_address(9091),
+            bootstrap_servers: kafka_address(),
             topics: vec![topic.into()],
             group_id: group.into(),
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: 6000,
             commit_interval_ms: 1,
             key_field: "message_key".to_string(),
+            librdkafka_options: Some(kafka_options),
             topic_key: "topic".to_string(),
             partition_key: "partition".to_string(),
             offset_key: "offset".to_string(),
@@ -666,7 +692,7 @@ mod integration_test {
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();
-        client.set("bootstrap.servers", kafka_address(9091));
+        client.set("bootstrap.servers", kafka_address());
         client.set("produce.offset.report", "true");
         client.set("message.timeout.ms", "5000");
         client.set("auto.commit.interval.ms", "1");
@@ -680,26 +706,46 @@ mod integration_test {
         let now = Utc::now();
         let timestamp = now.timestamp_millis();
 
-        let producer: FutureProducer = client_config(None);
+        let producer: &FutureProducer = &client_config(None);
+        let topic_name = topic.as_ref();
 
-        for i in 0..count {
-            let text = format!("{} {:03}", TEXT, i);
-            let key = format!("{} {}", KEY, i);
-            let record = FutureRecord::to(&topic)
-                .payload(&text)
-                .key(&key)
-                .timestamp(timestamp)
-                .headers(OwnedHeaders::new().insert(Header {
-                    key: HEADER_KEY,
-                    value: Some(HEADER_VALUE),
-                }));
+        create_topic(topic_name, 1).await;
 
-            if let Err(error) = producer.send(record, Timeout::Never).await {
+        let writes = (0..count)
+            .map(|i| async move {
+                let text = format!("{} {:03}", TEXT, i);
+                let key = format!("{} {}", KEY, i);
+                let record = FutureRecord::to(topic_name)
+                    .payload(&text)
+                    .key(&key)
+                    .timestamp(timestamp)
+                    .headers(OwnedHeaders::new().insert(Header {
+                        key: HEADER_KEY,
+                        value: Some(HEADER_VALUE),
+                    }));
+
+                let status = producer.send(record, Timeout::Never).await;
+
+                status
+            })
+            .collect::<Vec<_>>();
+
+        for res in writes {
+            if let Err(error) = res.await {
                 panic!("Cannot send event to Kafka: {:?}", error);
             }
         }
 
         now
+    }
+
+    async fn send_to_test_topic(count: usize) -> (String, String, DateTime<Utc>) {
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+
+        let sent_at = send_events(topic.clone(), count).await;
+
+        (topic, group_id, sent_at)
     }
 
     #[tokio::test]
@@ -722,6 +768,50 @@ mod integration_test {
         send_receive(true, |n| n >= 2, 2).await;
     }
 
+    #[tokio::test]
+    async fn drains_acknowledgements_at_shutdown() {
+        // 1. Send N events
+        let send_count: usize = std::env::var("SEND_COUNT").unwrap_or_else(|_| "100".into()).parse().expect("Valid positive integer");
+        let batch_delay_ms: u64 = std::env::var("BATCH_DELAY_MS").unwrap_or_else(|_| "3000".into()).parse().expect("Valid positive integer");
+
+        let (topic, group_id, _) = send_to_test_topic(send_count).await;
+
+        // 2. Set up consumer, read events for a while
+        // 3. Send shutdown (semi-randomly while reading)
+        let events1 = {
+            let config = make_config(&topic, &group_id);
+            let (tx, rx) = SourceSender::new_test_errors(|_| false);
+            let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, true, false);
+            let (events, _) = tokio::join!(
+                rx.collect::<Vec<Event>>(),
+                async move {
+                    // this timing is tied to "local" performance factors...it might not _reliably_ trigger anything
+                    sleep(Duration::from_millis(batch_delay_ms)).await;
+                    drop(trigger_shutdown);
+                });
+            shutdown_done.await;
+
+            events
+        };
+        // 4. Set up another consumer, read the rest of events
+        let events2 = {
+            let config = make_config(&topic, &group_id);
+            let (tx, rx) = SourceSender::new_test_errors(|_| false);
+            let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, true, true);
+            // let events = collect_n(rx, 50).await;
+            let events = rx.collect::<Vec<Event>>().await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+
+            events
+        };
+        // 5. Assert total consumed == total sent
+        let offset = fetch_tpl_offset(&group_id, &topic, 0);
+        assert_eq!(offset, Offset::from_raw(send_count as i64));
+        let total = events1.len() + events2.len();
+        assert_eq!(total, send_count);
+    }
+
     async fn send_receive(
         acknowledgements: bool,
         error_at: impl Fn(usize) -> bool,
@@ -729,15 +819,12 @@ mod integration_test {
     ) {
         const SEND_COUNT: usize = 10;
 
-        let topic = format!("test-topic-{}", random_string(10));
-        let group_id = format!("test-group-{}", random_string(10));
+        let (topic, group_id, sent_at) = send_to_test_topic(SEND_COUNT).await;
         let config = make_config(&topic, &group_id);
-
-        let now = send_events(topic.clone(), 10).await;
 
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
             let (tx, rx) = SourceSender::new_test_errors(error_at);
-            let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, acknowledgements);
+            let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, acknowledgements, true);
             let events = collect_n(rx, SEND_COUNT).await;
             // Yield to the finalization task to let it collect the
             // batch status receivers before signalling the shutdown.
@@ -768,7 +855,7 @@ mod integration_test {
             );
             assert_eq!(
                 event.as_log()[log_schema().timestamp_key()],
-                now.trunc_subsecs(3).into()
+                sent_at.trunc_subsecs(3).into()
             );
             assert_eq!(event.as_log()["topic"], topic.clone().into());
             assert!(event.as_log().contains("partition"));
@@ -812,6 +899,7 @@ mod integration_test {
         tx: SourceSender,
         config: KafkaSourceConfig,
         acknowledgements: bool,
+        eof: bool,
     ) -> (Trigger, Tripwire) {
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
         let consumer = create_consumer(&config).unwrap();
@@ -822,6 +910,7 @@ mod integration_test {
             shutdown,
             tx,
             acknowledgements,
+            eof,
         ));
         (trigger_shutdown, shutdown_done)
     }
@@ -832,6 +921,7 @@ mod integration_test {
 
         let mut tpl = TopicPartitionList::new();
         tpl.add_partition(topic, partition);
+
         client
             .committed_offsets(tpl, Duration::from_secs(1))
             .expect("Getting committed offsets failed")
@@ -840,8 +930,8 @@ mod integration_test {
             .offset()
     }
 
-    async fn create_topic(group_id: &str, topic: &str, partitions: i32) {
-        let client: AdminClient<DefaultClientContext> = client_config(Some(group_id));
+    async fn create_topic(topic: &str, partitions: i32) {
+        let client: AdminClient<DefaultClientContext> = client_config(None);
         for result in client
             .create_topics(
                 [&NewTopic {
@@ -888,18 +978,18 @@ mod integration_test {
         const DELAY: u64 = 100;
 
         let (topic, group_id, config) = make_rand_config();
-        create_topic(&group_id, &topic, 2).await;
+        create_topic(&topic, 2).await;
 
         let _send_start = send_events(topic.clone(), NEVENTS).await;
 
         let (tx, rx1) = delay_pipeline(1, Duration::from_millis(200), EventStatus::Delivered);
-        let (trigger_shutdown1, shutdown_done1) = spawn_kafka(tx, config.clone(), true);
+        let (trigger_shutdown1, shutdown_done1) = spawn_kafka(tx, config.clone(), true, false);
         let events1 = tokio::spawn(collect_n(rx1, NEVENTS));
 
         sleep(Duration::from_secs(1)).await;
 
         let (tx, rx2) = delay_pipeline(2, Duration::from_millis(DELAY), EventStatus::Delivered);
-        let (trigger_shutdown2, shutdown_done2) = spawn_kafka(tx, config, true);
+        let (trigger_shutdown2, shutdown_done2) = spawn_kafka(tx, config, true, true);
         let events2 = tokio::spawn(collect_n(rx2, NEVENTS));
 
         sleep(Duration::from_secs(5)).await;
