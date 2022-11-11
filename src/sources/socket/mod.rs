@@ -245,7 +245,7 @@ impl SourceConfig for SocketConfig {
                     .with_source_metadata(
                         Self::NAME,
                         host_key_path,
-                        &owned_value_path!(log_schema().host_key()),
+                        &owned_value_path!("host"),
                         Kind::bytes(),
                         None,
                     )
