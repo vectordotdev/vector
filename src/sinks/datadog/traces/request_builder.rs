@@ -7,17 +7,16 @@ use std::{
 
 use bytes::Bytes;
 use prost::Message;
-use rmp_serde;
 use snafu::Snafu;
 use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{
+    apm_stats::{compute_apm_stats, Aggregator},
     config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
     dd_proto,
     service::TraceApiRequest,
     sink::PartitionKey,
-    stats,
 };
 use crate::{
     event::{Event, TraceEvent, Value},
@@ -28,8 +27,12 @@ use crate::{
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
-    #[snafu(display("Encoding of a request payload failed ({}, {})", message, reason))]
-    FailedToEncode {
+    #[snafu(display(
+        "Building an APM stats request payload failed ({}, {})",
+        message,
+        reason
+    ))]
+    FailedToBuild {
         message: &'static str,
         reason: String,
         dropped_events: u64,
@@ -43,7 +46,7 @@ impl RequestBuilderError {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_parts(self) -> (&'static str, String, u64) {
         match self {
-            Self::FailedToEncode {
+            Self::FailedToBuild {
                 message,
                 reason,
                 dropped_events,
@@ -62,7 +65,7 @@ pub struct DatadogTracesRequestBuilder {
     compression: Compression,
     trace_encoder: DatadogTracesEncoder,
     /// Contains the Aggregated stats across a time window.
-    stats_aggregator: Arc<Mutex<stats::Aggregator>>,
+    stats_aggregator: Arc<Mutex<Aggregator>>,
 }
 
 impl DatadogTracesRequestBuilder {
@@ -71,23 +74,24 @@ impl DatadogTracesRequestBuilder {
         endpoint_configuration: DatadogTracesEndpointConfiguration,
         compression: Compression,
         max_size: usize,
+        stats_aggregator: Arc<Mutex<Aggregator>>,
     ) -> Result<Self, RequestBuilderError> {
         Ok(Self {
             api_key,
             endpoint_configuration,
             compression,
             trace_encoder: DatadogTracesEncoder { max_size },
-            stats_aggregator: Arc::new(Mutex::new(stats::Aggregator::new())),
+            stats_aggregator,
         })
     }
 }
 
 pub struct DDTracesMetadata {
-    api_key: Arc<str>,
-    endpoint: DatadogTracesEndpoint,
-    finalizers: EventFinalizers,
-    uncompressed_size: usize,
-    content_type: String,
+    pub api_key: Arc<str>,
+    pub endpoint: DatadogTracesEndpoint,
+    pub finalizers: EventFinalizers,
+    pub uncompressed_size: usize,
+    pub content_type: String,
 }
 
 impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequestBuilder {
@@ -103,21 +107,17 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
         let (key, events) = input;
         let mut results = Vec::new();
         let n = events.len();
-        let traces_event = events
+        let trace_events = events
             .into_iter()
             .filter_map(|e| e.try_into_trace())
             .collect::<Vec<TraceEvent>>();
 
-        results.push(build_apm_stats_request(
-            &key,
-            &traces_event,
-            self.compression,
-            &self.api_key,
-            &self.stats_aggregator,
-        ));
+        // Compute APM stats from the incoming events. The stats payloads are sent out
+        // separately from the sink framework, by the thread `flush_apm_stats_thread()`
+        compute_apm_stats(&key, Arc::clone(&self.stats_aggregator), &trace_events);
 
         self.trace_encoder
-            .encode_trace(&key, traces_event)
+            .encode_trace(&key, trace_events)
             .into_iter()
             .for_each(|r| match r {
                 Ok((payload, mut processed)) => {
@@ -150,14 +150,14 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
 
                             results.push(Ok(((metadata, request_metadata), bytes)))
                         }
-                        Err(e) => results.push(Err(RequestBuilderError::FailedToEncode {
+                        Err(e) => results.push(Err(RequestBuilderError::FailedToBuild {
                             message: "Payload compression failed.",
                             reason: e.to_string(),
                             dropped_events: n as u64,
                         })),
                     }
                 }
-                Err(err) => results.push(Err(RequestBuilderError::FailedToEncode {
+                Err(err) => results.push(Err(RequestBuilderError::FailedToBuild {
                     message: err.parts().0,
                     reason: err.parts().1.into(),
                     dropped_events: err.parts().2,
@@ -167,26 +167,46 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
     }
 
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (ddtraces_metadata, request_metadata) = metadata;
-        let mut headers = BTreeMap::<String, String>::new();
-        headers.insert("Content-Type".to_string(), ddtraces_metadata.content_type);
-        headers.insert(
-            "DD-API-KEY".to_string(),
-            ddtraces_metadata.api_key.to_string(),
-        );
-        if let Some(ce) = self.compression.content_encoding() {
-            headers.insert("Content-Encoding".to_string(), ce.to_string());
-        }
-        TraceApiRequest {
-            body: payload,
-            headers,
-            finalizers: ddtraces_metadata.finalizers,
-            uri: self
-                .endpoint_configuration
-                .get_uri_for_endpoint(ddtraces_metadata.endpoint),
-            uncompressed_size: ddtraces_metadata.uncompressed_size,
-            metadata: request_metadata,
-        }
+        build_request(
+            metadata,
+            payload,
+            self.compression,
+            &self.endpoint_configuration,
+        )
+    }
+}
+
+/// Builds the `TraceApiRequest` from inputs.
+///
+/// # Arguments
+///
+/// * `metadata`                 - Tuple of Datadog traces specific metadata and the generic `RequestMetadata`.
+/// * `payload`                  - Compressed and encoded bytes to send.
+/// * `compression`              - `Compression` used to reference the Content-Encoding header.
+/// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
+pub fn build_request(
+    metadata: (DDTracesMetadata, RequestMetadata),
+    payload: Bytes,
+    compression: Compression,
+    endpoint_configuration: &DatadogTracesEndpointConfiguration,
+) -> TraceApiRequest {
+    let (ddtraces_metadata, request_metadata) = metadata;
+    let mut headers = BTreeMap::<String, String>::new();
+    headers.insert("Content-Type".to_string(), ddtraces_metadata.content_type);
+    headers.insert(
+        "DD-API-KEY".to_string(),
+        ddtraces_metadata.api_key.to_string(),
+    );
+    if let Some(ce) = compression.content_encoding() {
+        headers.insert("Content-Encoding".to_string(), ce.to_string());
+    }
+    TraceApiRequest {
+        body: payload,
+        headers,
+        finalizers: ddtraces_metadata.finalizers,
+        uri: endpoint_configuration.get_uri_for_endpoint(ddtraces_metadata.endpoint),
+        uncompressed_size: ddtraces_metadata.uncompressed_size,
+        metadata: request_metadata,
     }
 }
 
@@ -431,55 +451,5 @@ impl DatadogTracesEncoder {
             metrics,
             meta_struct,
         }
-    }
-}
-
-fn build_apm_stats_request(
-    key: &PartitionKey,
-    events: &[TraceEvent],
-    compression: Compression,
-    default_api_key: &Arc<str>,
-    aggregator: &Arc<Mutex<stats::Aggregator>>,
-) -> Result<((DDTracesMetadata, RequestMetadata), Bytes), RequestBuilderError> {
-    let aggregator = Arc::clone(aggregator);
-    let mut aggregator = aggregator.lock().unwrap();
-    let payload = stats::compute_apm_stats(key, &mut aggregator, events);
-
-    let encoded_payload =
-        rmp_serde::to_vec_named(&payload).map_err(|e| RequestBuilderError::FailedToEncode {
-            message: "APM stats encoding failed.",
-            reason: e.to_string(),
-            dropped_events: 0,
-        })?;
-    let uncompressed_size = encoded_payload.len();
-    let metadata = DDTracesMetadata {
-        api_key: key
-            .api_key
-            .clone()
-            .unwrap_or_else(|| Arc::clone(default_api_key)),
-        endpoint: DatadogTracesEndpoint::APMStats,
-        finalizers: EventFinalizers::default(),
-        uncompressed_size,
-        content_type: "application/msgpack".to_string(),
-    };
-
-    let mut compressor = Compressor::from(compression);
-    match compressor.write_all(&encoded_payload) {
-        Ok(()) => {
-            let bytes = compressor.into_inner().freeze();
-
-            // build RequestMetadata
-            let builder = RequestMetadataBuilder::new(0, uncompressed_size, uncompressed_size);
-            let bytes_len =
-                NonZeroUsize::new(bytes.len()).expect("payload should never be zero length");
-            let request_metadata = builder.with_request_size(bytes_len);
-
-            Ok(((metadata, request_metadata), bytes))
-        }
-        Err(e) => Err(RequestBuilderError::FailedToEncode {
-            message: "APM stats payload compression failed.",
-            reason: e.to_string(),
-            dropped_events: 0,
-        }),
     }
 }

@@ -17,7 +17,7 @@ use warp::http::{HeaderMap, HeaderValue};
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
         SourceConfig, SourceContext,
     },
     event::{Event, Value},
@@ -121,7 +121,7 @@ pub struct SimpleHttpConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl GenerateConfig for SimpleHttpConfig {
@@ -139,7 +139,7 @@ impl GenerateConfig for SimpleHttpConfig {
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
         })
         .unwrap()
     }

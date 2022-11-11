@@ -1,16 +1,17 @@
 use std::{future::ready, panic, sync::Arc};
 
-use aws_sdk_s3::error::GetObjectError;
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sqs::error::{DeleteMessageBatchError, ReceiveMessageError};
-use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, Message};
-use aws_sdk_sqs::output::DeleteMessageBatchOutput;
-use aws_sdk_sqs::Client as SqsClient;
+use aws_sdk_s3::{error::GetObjectError, Client as S3Client};
+use aws_sdk_sqs::{
+    error::{DeleteMessageBatchError, ReceiveMessageError},
+    model::{DeleteMessageBatchRequestEntry, Message},
+    output::DeleteMessageBatchOutput,
+    Client as SqsClient,
+};
 use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::{decoding::FramingError, CharacterDelimitedDecoder};
+use codecs::{decoding::FramingError, BytesDeserializer, CharacterDelimitedDecoder};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -21,13 +22,11 @@ use tracing::Instrument;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_config::{configurable_component, NamedComponent};
 
-use crate::tls::TlsConfig;
 use crate::{
-    config::{log_schema, AcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, LogEvent},
+    config::{SourceAcknowledgementsConfig, SourceContext},
+    event::{BatchNotifier, BatchStatus},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
@@ -36,9 +35,15 @@ use crate::{
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
+    sources::aws_s3::AwsS3Config,
+    tls::TlsConfig,
     SourceSender,
 };
-use lookup::event_path;
+use lookup::{path, PathPrefix};
+use vector_core::{
+    config::{log_schema, LegacyKey, LogNamespace},
+    ByteSizeOf,
+};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -223,15 +228,17 @@ impl Ingestor {
     pub(super) async fn run(
         self,
         cx: SourceContext,
-        acknowledgements: AcknowledgementsConfig,
+        acknowledgements: SourceAcknowledgementsConfig,
+        log_namespace: LogNamespace,
     ) -> Result<(), ()> {
-        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(acknowledgements);
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {
             let process = IngestorProcess::new(
                 Arc::clone(&self.state),
                 cx.out.clone(),
                 cx.shutdown.clone(),
+                log_namespace,
                 acknowledgements,
             );
             let fut = process.run();
@@ -258,6 +265,7 @@ pub struct IngestorProcess {
     out: SourceSender,
     shutdown: ShutdownSignal,
     acknowledgements: bool,
+    log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
 }
 
@@ -266,6 +274,7 @@ impl IngestorProcess {
         state: Arc<State>,
         out: SourceSender,
         shutdown: ShutdownSignal,
+        log_namespace: LogNamespace,
         acknowledgements: bool,
     ) -> Self {
         Self {
@@ -273,6 +282,7 @@ impl IngestorProcess {
             out,
             shutdown,
             acknowledgements,
+            log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
         }
     }
@@ -398,7 +408,8 @@ impl IngestorProcess {
 
     async fn handle_s3_event(&mut self, s3_event: S3Event) -> Result<(), ProcessingError> {
         for record in s3_event.records {
-            self.handle_s3_event_record(record).await?
+            self.handle_s3_event_record(record, self.log_namespace)
+                .await?
         }
         Ok(())
     }
@@ -406,6 +417,7 @@ impl IngestorProcess {
     async fn handle_s3_event_record(
         &mut self,
         s3_event: S3EventRecord,
+        log_namespace: LogNamespace,
     ) -> Result<(), ProcessingError> {
         let event_version: semver::Version = s3_event.event_version.clone().into();
         if !SUPPORTED_S3_EVENT_VERSION.matches(&event_version) {
@@ -450,10 +462,10 @@ impl IngestorProcess {
         let object = object_result?;
 
         let metadata = object.metadata;
+
         let timestamp = object
             .last_modified
-            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()))
-            .unwrap_or_else(Utc::now);
+            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()));
 
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(
@@ -506,31 +518,88 @@ impl IngestorProcess {
             None => lines,
         };
 
-        let bucket_name = Bytes::from(s3_event.s3.bucket.name.as_str().as_bytes().to_vec());
-        let object_key = Bytes::from(s3_event.s3.object.key.as_str().as_bytes().to_vec());
-        let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
+        let mut stream = lines.map(|line| {
+            let deserializer = BytesDeserializer::new();
+            let mut log = deserializer
+                .parse_single(line, log_namespace)
+                .with_batch_notifier_option(&batch);
 
-        let mut stream = lines.filter_map(move |line| {
-            let mut log = LogEvent::from_bytes_legacy(&line).with_batch_notifier_option(&batch);
-
-            log.insert(event_path!("bucket"), bucket_name.clone());
-            log.insert(event_path!("object"), object_key.clone());
-            log.insert(event_path!("region"), aws_region.clone());
-            log.insert(log_schema().source_type_key(), Bytes::from("aws_s3"));
-            log.insert(log_schema().timestamp_key(), timestamp);
+            log_namespace.insert_source_metadata(
+                AwsS3Config::NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!("bucket"))),
+                path!("bucket"),
+                Bytes::from(s3_event.s3.bucket.name.as_bytes().to_vec()),
+            );
+            log_namespace.insert_source_metadata(
+                AwsS3Config::NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!("object"))),
+                path!("object"),
+                Bytes::from(s3_event.s3.object.key.as_bytes().to_vec()),
+            );
+            log_namespace.insert_source_metadata(
+                AwsS3Config::NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!("region"))),
+                path!("region"),
+                Bytes::from(s3_event.aws_region.as_bytes().to_vec()),
+            );
 
             if let Some(metadata) = &metadata {
                 for (key, value) in metadata {
-                    log.insert(key.as_str(), value.clone());
+                    log_namespace.insert_source_metadata(
+                        AwsS3Config::NAME,
+                        &mut log,
+                        Some(LegacyKey::Overwrite(key.as_str())),
+                        path!("metadata", key.as_str()),
+                        value.clone(),
+                    );
                 }
             }
+
+            log_namespace.insert_vector_metadata(
+                &mut log,
+                path!(log_schema().source_type_key()),
+                path!("source_type"),
+                Bytes::from_static(AwsS3Config::NAME.as_bytes()),
+            );
+
+            // This handles the transition from the original timestamp logic. Originally the
+            // `timestamp_key` was populated by the `last_modified` time on the object, falling
+            // back to calling `now()`.
+            match (log_namespace, timestamp) {
+                (LogNamespace::Vector, None) => {
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!("vector", "ingest_timestamp"), Utc::now());
+                }
+                (LogNamespace::Vector, Some(timestamp)) => {
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!(AwsS3Config::NAME, "timestamp"), timestamp);
+
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!("vector", "ingest_timestamp"), Utc::now());
+                }
+                (LogNamespace::Legacy, None) => {
+                    log.try_insert(
+                        (PathPrefix::Event, log_schema().timestamp_key()),
+                        Utc::now(),
+                    );
+                }
+                (LogNamespace::Legacy, Some(timestamp)) => {
+                    log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+                }
+            };
 
             emit!(EventsReceived {
                 count: 1,
                 byte_size: log.size_of()
             });
 
-            ready(Some(log))
+            log
         });
 
         let send_error = match self.out.send_event_stream(&mut stream).await {

@@ -1,9 +1,11 @@
-use proptest::{collection::btree_set, prelude::*};
+use proptest::collection::{btree_set, hash_map, hash_set};
+use proptest::prelude::*;
 
 use crate::metrics::AgentDDSketch;
 
 use super::{
-    samples_to_buckets, Bucket, MetricSketch, MetricValue, Quantile, Sample, StatisticKind,
+    samples_to_buckets, Bucket, MetricSketch, MetricTags, MetricValue, Quantile, Sample,
+    StatisticKind, TagValueSet,
 };
 
 fn realistic_float() -> proptest::num::f64::Any {
@@ -123,6 +125,28 @@ impl Arbitrary for AgentDDSketch {
                 sketch.insert_many(&samples);
                 sketch
             })
+            .boxed()
+    }
+}
+
+impl Arbitrary for TagValueSet {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<TagValueSet>;
+
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        hash_set("[[:^cntrl:]]{0,16}", 1..16)
+            .prop_map(|values| values.into_iter().collect())
+            .boxed()
+    }
+}
+
+impl Arbitrary for MetricTags {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<MetricTags>;
+
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        hash_map("[[:word:]]{1,32}", "[[:^cntrl:]]{1,32}", 0..16)
+            .prop_map(|values| values.into_iter().collect())
             .boxed()
     }
 }
