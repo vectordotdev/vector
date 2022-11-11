@@ -130,7 +130,8 @@ impl DnstapConfig {
                 let schema = vector_core::schema::Definition::new_with_default_metadata(
                     Kind::object(Collection::empty()),
                     [log_namespace],
-                );
+                )
+                .with_standard_vector_source_metadata();
 
                 if self.raw_data_only.unwrap_or(false) {
                     schema.with_event_field(
@@ -257,12 +258,15 @@ impl FrameHandler for DnstapFrameHandler {
 
         let mut log_event = LogEvent::default();
 
-        self.log_namespace.insert_vector_metadata(
-            &mut log_event,
-            path!(self.timestamp_key()),
-            path!("ingest_timestamp"),
-            chrono::Utc::now(),
-        );
+        if self.log_namespace == LogNamespace::Vector {
+            // The timestamp is inserted by the parser which caters for the Legacy namespace.
+            self.log_namespace.insert_vector_metadata(
+                &mut log_event,
+                path!(self.timestamp_key()),
+                path!("ingest_timestamp"),
+                chrono::Utc::now(),
+            );
+        }
 
         self.log_namespace.insert_vector_metadata(
             &mut log_event,
