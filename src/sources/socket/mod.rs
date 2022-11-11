@@ -1455,7 +1455,7 @@ mod test {
             );
             assert_eq!(
                 event_meta
-                    .get(path!(SocketConfig::NAME, log_schema().host_key()))
+                    .get(path!(SocketConfig::NAME, "host"))
                     .unwrap(),
                 &vrl::value!(UNNAMED_SOCKET_HOST)
             );
