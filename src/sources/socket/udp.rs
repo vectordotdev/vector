@@ -1,4 +1,4 @@
-use bytes::{BytesMut};
+use bytes::BytesMut;
 use chrono::Utc;
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -218,38 +218,38 @@ pub(super) fn udp(
 
                                 for event in &mut events {
                                     if let Event::Log(ref mut log) = event {
-					log_namespace.insert_standard_vector_source_metadata(
-					    log,
-					    SocketConfig::NAME,
-					    now,
-					);
+                    log_namespace.insert_standard_vector_source_metadata(
+                        log,
+                        SocketConfig::NAME,
+                        now,
+                    );
 
-					let host_key_path = config.host_key.as_ref().map_or_else(
-					    || [BorrowedSegment::from(log_schema().host_key())],
-					    |key| [BorrowedSegment::from(key)],
-					);
+                    let host_key_path = config.host_key.as_ref().map_or_else(
+                        || [BorrowedSegment::from(log_schema().host_key())],
+                        |key| [BorrowedSegment::from(key)],
+                    );
 
-					log_namespace.insert_source_metadata(
-					    SocketConfig::NAME,
-					    log,
-					    Some(LegacyKey::InsertIfEmpty(&host_key_path)),
-					    path!("host"),
-					    address.ip().to_string()
-					);
+                    log_namespace.insert_source_metadata(
+                        SocketConfig::NAME,
+                        log,
+                        Some(LegacyKey::InsertIfEmpty(&host_key_path)),
+                        path!("host"),
+                        address.ip().to_string()
+                    );
 
-					let port_key_path = config.port_key.as_ref().map_or_else(
-					    || [BorrowedSegment::from("port")],
-					    |key| [BorrowedSegment::from(key)],
-					);
+                    let port_key_path = config.port_key.as_ref().map_or_else(
+                        || [BorrowedSegment::from("port")],
+                        |key| [BorrowedSegment::from(key)],
+                    );
 
-					log_namespace.insert_source_metadata(
-					    SocketConfig::NAME,
-					    log,
-					    Some(LegacyKey::InsertIfEmpty(&port_key_path)),
-					    path!("port"),
-					    address.port()
-					);
-				    }
+                    log_namespace.insert_source_metadata(
+                        SocketConfig::NAME,
+                        log,
+                        Some(LegacyKey::InsertIfEmpty(&port_key_path)),
+                        path!("port"),
+                        address.port()
+                    );
+                    }
                                 }
 
                                 tokio::select!{
