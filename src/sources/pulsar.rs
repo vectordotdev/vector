@@ -7,10 +7,11 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use codecs::StreamDecodingError;
+use futures_util::StreamExt;
 use metrics::counter;
+use pulsar::error::ConsumerError;
 use pulsar::SubType;
 use pulsar::{Consumer, Pulsar, TokioExecutor};
-use tokio_stream::StreamExt;
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{error_stage, error_type};
 use vector_common::internal_event::{ByteSize, InternalEvent};
@@ -39,10 +40,10 @@ pub struct PulsarSourceConfig {
     topic: String,
 
     /// The Pulsar consumer name.
-    consumer_name: String,
+    consumer_name: Option<String>,
 
     /// The Pulsar subscription name.
-    subscription_name: String,
+    subscription_name: Option<String>,
 
     #[configurable(derived)]
     auth: Option<AuthConfig>,
@@ -120,7 +121,6 @@ impl SourceConfig for PulsarSourceConfig {
         .build();
 
         Ok(Box::pin(pulsar_source(
-            self.clone(),
             consumer,
             decoder,
             cx.shutdown,
@@ -143,14 +143,18 @@ async fn create_consumer(
     let pulsar = Pulsar::<TokioExecutor>::builder(&config.endpoint, TokioExecutor)
         .build()
         .await?;
-    let consumer = pulsar
+    let mut consumer_builder = pulsar
         .consumer()
         .with_topic(&config.topic)
-        .with_consumer_name(&config.consumer_name)
-        .with_subscription_type(SubType::Shared)
-        .with_subscription(&config.subscription_name)
-        .build::<String>()
-        .await?;
+        .with_subscription_type(SubType::Shared);
+    if let Some(consumer_name) = &config.consumer_name {
+        consumer_builder = consumer_builder.with_consumer_name(consumer_name);
+    }
+    if let Some(subscription_name) = &config.subscription_name {
+        consumer_builder = consumer_builder.with_subscription(subscription_name);
+    }
+
+    let consumer = consumer_builder.build::<String>().await?;
 
     Ok(consumer)
 }
@@ -181,59 +185,94 @@ impl InternalEvent for PulsarReadError {
     }
 }
 
+#[derive(Debug)]
+pub struct PulsarAcknowledgmentError {
+    pub error: ConsumerError,
+}
+
+impl InternalEvent for PulsarAcknowledgmentError {
+    fn emit(self) {
+        error!(
+            message = "Failed to acknowledge message.",
+            error = %self.error,
+            error_code = "acknowledge_message",
+            error_type = error_type::ACKNOWLEDGMENT_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "acknowledge_message",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
+        counter!("events_failed_total", 1);
+    }
+}
+
 async fn pulsar_source(
-    _: PulsarSourceConfig,
     mut consumer: Consumer<String, TokioExecutor>,
     decoder: Decoder,
-    _: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
-    while let Some(msg) = consumer.next().await {
-        match msg {
-            Ok(msg) => {
-                bytes_received.emit(ByteSize(msg.payload.data.len()));
-                let mut stream = FramedRead::new(msg.payload.data.as_ref(), decoder.clone());
-                while let Some(next) = stream.next().await {
-                    match next {
-                        Ok((events, _byte_size)) => {
-                            let count = events.len();
-                            emit!(EventsReceived {
-                                count,
-                                byte_size: events.size_of()
-                            });
+    loop {
+        tokio::select! {
+            _ = &mut shutdown => break,
+            Some(maybe_message) = consumer.next() => {
+                match maybe_message {
+                    Ok(msg) => {
+                        bytes_received.emit(ByteSize(msg.payload.data.len()));
+                        let mut stream = FramedRead::new(msg.payload.data.as_ref(), decoder.clone());
+                        while let Some(next) = stream.next().await {
+                            match next {
+                                Ok((events, _byte_size)) => {
+                                    let count = events.len();
+                                    emit!(EventsReceived {
+                                        count,
+                                        byte_size: events.size_of()
+                                    });
 
-                            let now = Utc::now();
+                                    let now = Utc::now();
 
-                            let events = events.into_iter().map(|mut event| {
-                                if let Event::Log(ref mut log) = event {
-                                    log.try_insert(
-                                        log_schema().source_type_key(),
-                                        Bytes::from("pulsar"),
-                                    );
-                                    log.try_insert(log_schema().timestamp_key(), now);
+                                    let events = events.into_iter().map(|mut event| {
+                                        if let Event::Log(ref mut log) = event {
+                                            log.try_insert(
+                                                log_schema().source_type_key(),
+                                                Bytes::from("pulsar"),
+                                            );
+                                            log.try_insert(log_schema().timestamp_key(), now);
+                                        }
+                                        event
+                                    });
+
+                                    out.send_batch(events).await.map_err(|error| {
+                                        emit!(StreamClosedError { error, count });
+                                    })?;
+
+                                    if let Err(error) = consumer.ack(&msg).await {
+                                        emit!(PulsarAcknowledgmentError { error });
+                                    }
                                 }
-                                event
-                            });
-
-                            out.send_batch(events).await.map_err(|error| {
-                                emit!(StreamClosedError { error, count });
-                            })?;
-                        }
-                        Err(error) => {
-                            // Error is logged by `crate::codecs`, no further
-                            // handling is needed here.
-                            if !error.can_continue() {
-                                break;
+                                Err(error) => {
+                                    // Error is logged by `crate::codecs`, no further
+                                    // handling is needed here.
+                                    if !error.can_continue() {
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
+                    Err(error) => {
+                        emit!(PulsarReadError { error })
+                    }
                 }
-            }
-            Err(error) => {
-                emit!(PulsarReadError { error })
-            }
+            },
         }
     }
+
     Ok(())
 }
