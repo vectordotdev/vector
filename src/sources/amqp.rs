@@ -20,7 +20,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{path, PathPrefix};
+use lookup::{metadata_path, path, PathPrefix};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
@@ -236,18 +236,15 @@ fn populate_event(
     // back to calling `now()`.
     match (log_namespace, timestamp) {
         (LogNamespace::Vector, None) => {
-            log.metadata_mut()
-                .value_mut()
-                .insert(path!("vector", "ingest_timestamp"), Utc::now());
+            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         (LogNamespace::Vector, Some(timestamp)) => {
-            log.metadata_mut()
-                .value_mut()
-                .insert(path!(AmqpSourceConfig::NAME, "timestamp"), timestamp);
+            log.insert(
+                metadata_path!(AmqpSourceConfig::NAME, "timestamp"),
+                timestamp,
+            );
 
-            log.metadata_mut()
-                .value_mut()
-                .insert(path!("vector", "ingest_timestamp"), Utc::now());
+            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         (LogNamespace::Legacy, None) => {
             log.try_insert(
