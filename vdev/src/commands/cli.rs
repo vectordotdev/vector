@@ -38,6 +38,8 @@ enum Commands {
     Meta(commands::meta::cli::Cli),
     /// Show information about the current environment
     Status(commands::status::Cli),
+    /// Execute tests
+    Test(commands::test::Cli),
 }
 
 impl Cli {
@@ -49,6 +51,7 @@ impl Cli {
             Commands::Int(cli) => cli.exec(),
             Commands::Meta(cli) => cli.exec(),
             Commands::Status(cli) => cli.exec(),
+            Commands::Test(cli) => cli.exec(),
         }
     }
 }

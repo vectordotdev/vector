@@ -18,10 +18,7 @@ impl Cli {
 
         let status = command.status()?;
         if !status.success() {
-            bail!(
-                "failed with exit code: {}",
-                status.code().unwrap_or(1)
-            );
+            bail!("failed with exit code: {}", status.code().unwrap_or(1));
         }
 
         Ok(())

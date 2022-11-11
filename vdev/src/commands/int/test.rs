@@ -1,16 +1,17 @@
 use anyhow::{bail, Result};
 use clap::Args;
+use std::collections::BTreeMap;
 use std::process::Command;
 
 use crate::app;
 use crate::platform;
 use crate::testing::{
     config::{IntegrationTestConfig, RustToolchainConfig},
-    runner::{IntegrationTestRunner, NETWORK_ENV_VAR},
+    runner::*,
     state,
 };
 
-/// Stop an environment
+/// Execute tests
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {
@@ -28,16 +29,27 @@ impl Cli {
     pub fn exec(&self) -> Result<()> {
         let test_dir = IntegrationTestConfig::locate_source(app::path(), &self.integration)?;
         let toolchain_config = RustToolchainConfig::parse(app::path())?;
-        let runner = IntegrationTestRunner::new(&self.integration, &toolchain_config.channel);
+        let runner =
+            IntegrationTestRunner::new(self.integration.to_string(), toolchain_config.channel);
         let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration);
         let config = IntegrationTestConfig::from_source(&test_dir)?;
+
+        let mut env_vars = BTreeMap::new();
+        if let Some(configured_env_vars) = &config.env {
+            env_vars.extend(configured_env_vars.to_owned());
+        }
+
+        let mut args = Vec::from_iter(config.args.to_owned());
+        if let Some(configured_args) = &self.args {
+            args.extend(configured_args.to_owned());
+        }
 
         if let Some(environment) = &self.environment {
             if !state::env_exists(&envs_dir, environment) {
                 bail!("environment {environment} is not up");
             }
 
-            return runner.test(&config, &self.args);
+            return runner.test(&env_vars, &args);
         }
 
         runner.ensure_network()?;
@@ -68,7 +80,7 @@ impl Cli {
                 state::save_env(&envs_dir, env_name, &json)?;
             }
 
-            runner.test(&config, &self.args)?;
+            runner.test(&env_vars, &args)?;
 
             if !env_active {
                 let mut command = Command::new("cargo");
