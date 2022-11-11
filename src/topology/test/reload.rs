@@ -179,7 +179,7 @@ async fn topology_disk_buffer_conflict() {
 
     let sink_key = ComponentKey::from("out");
     old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV1 {
-        max_size: NonZeroU64::new(1024).unwrap(), 
+        max_size: NonZeroU64::new(1024).unwrap(),
         when_full: WhenFull::Block,
     });
 
