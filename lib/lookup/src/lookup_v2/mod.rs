@@ -11,7 +11,7 @@ use std::fmt::Debug;
 
 pub use borrowed::BorrowedSegment;
 pub use concat::PathConcat;
-pub use optional_path::OptionalTargetPath;
+pub use optional_path::{OptionalTargetPath, OptionalValuePath};
 pub use owned::{OwnedSegment, OwnedTargetPath, OwnedValuePath};
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]

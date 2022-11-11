@@ -90,6 +90,7 @@ pub struct DatadogAgentConfig {
 
     /// The namespace to use for logs. This overrides the global settings
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
 
     #[configurable(derived)]
@@ -279,7 +280,6 @@ pub struct ApiKeyQueryParams {
 pub(crate) struct DatadogAgentSource {
     pub(crate) api_key_extractor: ApiKeyExtractor,
     pub(crate) log_schema_host_key: &'static str,
-    pub(crate) log_schema_timestamp_key: &'static str,
     pub(crate) log_schema_source_type_key: &'static str,
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
@@ -332,7 +332,6 @@ impl DatadogAgentSource {
             },
             log_schema_host_key: log_schema().host_key(),
             log_schema_source_type_key: log_schema().source_type_key(),
-            log_schema_timestamp_key: log_schema().timestamp_key(),
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),

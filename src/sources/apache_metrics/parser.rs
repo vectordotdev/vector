@@ -516,19 +516,7 @@ ConnsAsyncClosing: 0
 Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W__________________.....................................................................................................................................................................................................................................................................................................................................
             "##;
 
-        let now: DateTime<Utc> = Utc::now();
-
-        let (mut metrics, errors) = parse(payload, Some("apache"), now, None).fold(
-            (vec![], vec![]),
-            |(mut metrics, mut errors), v| {
-                match v {
-                    Ok(m) => metrics.push(m),
-                    Err(e) => errors.push(e),
-                }
-                (metrics, errors)
-            },
-        );
-        metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
+        let (now, metrics, errors) = parse_sort(payload);
 
         assert_event_data_eq!(
             metrics,
@@ -725,19 +713,7 @@ ConnsAsyncClosing: 0
 Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W__________________.....................................................................................................................................................................................................................................................................................................................................
             "##;
 
-        let now: DateTime<Utc> = Utc::now();
-
-        let (mut metrics, errors) = parse(payload, Some("apache"), now, None).fold(
-            (vec![], vec![]),
-            |(mut metrics, mut errors), v| {
-                match v {
-                    Ok(m) => metrics.push(m),
-                    Err(e) => errors.push(e),
-                }
-                (metrics, errors)
-            },
-        );
-        metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
+        let (now, metrics, errors) = parse_sort(payload);
 
         assert_event_data_eq!(
             metrics,
@@ -957,19 +933,7 @@ ServerUptimeSeconds: not a number
 ConnsTotal: 1
             "##;
 
-        let now: DateTime<Utc> = Utc::now();
-
-        let (mut metrics, errors) = parse(payload, Some("apache"), now, None).fold(
-            (vec![], vec![]),
-            |(mut metrics, mut errors), v| {
-                match v {
-                    Ok(m) => metrics.push(m),
-                    Err(e) => errors.push(e),
-                }
-                (metrics, errors)
-            },
-        );
-        metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
+        let (now, metrics, errors) = parse_sort(payload);
 
         assert_event_data_eq!(
             metrics,
@@ -983,5 +947,23 @@ ConnsTotal: 1
             .with_timestamp(Some(now)),]
         );
         assert_eq!(errors.len(), 1);
+    }
+
+    fn parse_sort(payload: &str) -> (DateTime<Utc>, Vec<Metric>, Vec<ParseError>) {
+        let now: DateTime<Utc> = Utc::now();
+        let (mut metrics, errors) = parse(payload, Some("apache"), now, None).fold(
+            (vec![], vec![]),
+            |(mut metrics, mut errors), v| {
+                match v {
+                    Ok(m) => metrics.push(m),
+                    Err(e) => errors.push(e),
+                }
+                (metrics, errors)
+            },
+        );
+
+        metrics.sort_by_key(|metric| metric.series().to_string());
+
+        (now, metrics, errors)
     }
 }
