@@ -293,3 +293,73 @@ async fn pulsar_source(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::sources::pulsar::PulsarSourceConfig;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PulsarSourceConfig>();
+    }
+}
+
+#[cfg(feature = "pulsar-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::test_util::components::{assert_source_compliance, SOURCE_TAGS};
+    use crate::test_util::{collect_n, random_string, trace_init};
+
+    fn pulsar_address() -> String {
+        std::env::var("PULSAR_ADDRESS").unwrap_or_else(|_| "pulsar://127.0.0.1:6650".into())
+    }
+
+    #[tokio::test]
+    async fn pulsar_happy() {
+        trace_init();
+
+        let topic = format!("test-{}", random_string(10));
+        let cnf = PulsarSourceConfig {
+            endpoint: pulsar_address(),
+            topics: vec![topic.clone()],
+            consumer_name: None,
+            subscription_name: None,
+            priority_level: None,
+            batch_size: None,
+            auth: None,
+            dead_letter_queue_policy: None,
+            framing: FramingConfig::Bytes,
+            decoding: DeserializerConfig::Bytes,
+        };
+
+        let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)
+            .build()
+            .await
+            .unwrap();
+
+        let consumer = create_consumer(&cnf).await.unwrap();
+        let decoder = DecodingConfig::new(
+            cnf.framing.clone(),
+            cnf.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
+
+        let mut producer = pulsar.producer().with_topic(topic).build().await.unwrap();
+
+        let msg = "test message";
+
+        let events = assert_source_compliance(&SOURCE_TAGS, async move {
+            let (tx, rx) = SourceSender::new_test();
+            tokio::spawn(pulsar_source(consumer, decoder, ShutdownSignal::noop(), tx));
+            producer.send(msg).await.unwrap();
+
+            collect_n(rx, 1).await
+        })
+        .await;
+
+        println!("Received event  {:?}", events[0].as_log());
+        assert_eq!(events[0].as_log()[log_schema().message_key()], msg.into());
+    }
+}
