@@ -238,9 +238,9 @@ impl PulsarSinkConfig {
 
         if let Some(producer_name) = self.producer_name.clone() {
             pulsar_builder = pulsar_builder.with_name(if is_healthcheck {
-                format!("{}-healthcheck", producer_name))
+                format!("{}-healthcheck", producer_name)
             } else {
-                pulsar_builder.with_name(producer_name)
+                producer_name
             });
         }
 
