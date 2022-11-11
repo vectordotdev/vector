@@ -60,7 +60,7 @@ impl SocketConfig {
     }
 
     fn decoding(&self) -> DeserializerConfig {
-        match self.mode.clone() {
+        match &self.mode {
             Mode::Tcp(config) => config.decoding().clone(),
             Mode::Udp(config) => config.decoding().clone(),
             #[cfg(unix)]
