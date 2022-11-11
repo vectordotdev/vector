@@ -290,6 +290,7 @@ impl SourceConfig for SocketConfig {
                         None,
                     )
             }
+            #[cfg(unix)]
             Mode::UnixDatagram(config) => {
                 let host_key_path = config
                     .host_key()
@@ -306,6 +307,7 @@ impl SourceConfig for SocketConfig {
                     None,
                 )
             }
+            #[cfg(unix)]
             Mode::UnixStream(config) => {
                 let host_key_path = config
                     .host_key()
@@ -374,6 +376,7 @@ mod test {
         super::{unix::UnixConfig, Mode},
         crate::test_util::wait_for,
         futures::{SinkExt, Stream},
+        sources::util::unix::UNNAMED_SOCKET_HOST,
         std::future::ready,
         std::os::unix::fs::PermissionsExt,
         std::path::PathBuf,
@@ -392,7 +395,6 @@ mod test {
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
         sources::util::net::SocketListenAddr,
-        sources::util::unix::UNNAMED_SOCKET_HOST,
         test_util::{
             collect_n, collect_n_limited,
             components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
