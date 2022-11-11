@@ -39,7 +39,7 @@ use crate::{
     tls::TlsConfig,
     SourceSender,
 };
-use lookup::{path, PathPrefix};
+use lookup::{metadata_path, path, PathPrefix};
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     ByteSizeOf,
@@ -570,18 +570,12 @@ impl IngestorProcess {
             // back to calling `now()`.
             match (log_namespace, timestamp) {
                 (LogNamespace::Vector, None) => {
-                    log.metadata_mut()
-                        .value_mut()
-                        .insert(path!("vector", "ingest_timestamp"), Utc::now());
+                    log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
                 }
                 (LogNamespace::Vector, Some(timestamp)) => {
-                    log.metadata_mut()
-                        .value_mut()
-                        .insert(path!(AwsS3Config::NAME, "timestamp"), timestamp);
+                    log.insert(metadata_path!(AwsS3Config::NAME, "timestamp"), timestamp);
 
-                    log.metadata_mut()
-                        .value_mut()
-                        .insert(path!("vector", "ingest_timestamp"), Utc::now());
+                    log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
                 }
                 (LogNamespace::Legacy, None) => {
                     log.try_insert(

@@ -5,7 +5,7 @@ use chrono::Utc;
 use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
-use lookup::{path, PathPrefix};
+use lookup::{metadata_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::{
@@ -96,11 +96,9 @@ pub(super) async fn firehose(
                             // `timestamp_key` was always populated by the `request.timestamp` time.
                             match log_namespace {
                                 LogNamespace::Vector => {
-                                    log.metadata_mut()
-                                        .value_mut()
-                                        .insert(path!("vector", "ingest_timestamp"), now);
-                                    log.metadata_mut().value_mut().insert(
-                                        path!(AwsKinesisFirehoseConfig::NAME, "timestamp"),
+                                    log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+                                    log.insert(
+                                        metadata_path!(AwsKinesisFirehoseConfig::NAME, "timestamp"),
                                         request.timestamp,
                                     );
                                 }
