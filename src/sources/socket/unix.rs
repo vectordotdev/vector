@@ -91,7 +91,7 @@ impl UnixConfig {
 /// Takes a single line of a received message and handles an `Event` object.
 fn handle_events(
     events: &mut [Event],
-    config: &UnixConfig,
+    host_key: Option<&String>,
     received_from: Option<Bytes>,
     log_namespace: LogNamespace,
 ) {
@@ -103,7 +103,7 @@ fn handle_events(
         log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME, now);
 
         if let Some(ref host) = received_from {
-            let host_key_path = config.host_key.as_ref().map_or_else(
+            let host_key_path = host_key.map_or_else(
                 || [BorrowedSegment::from(log_schema().host_key())],
                 |key| [BorrowedSegment::from(key)],
             );
@@ -126,8 +126,6 @@ pub(super) fn unix_datagram(
     out: SourceSender,
     log_namespace: LogNamespace,
 ) -> crate::Result<Source> {
-    let config_clone = config.clone();
-
     build_unix_datagram_source(
         config.path,
         config.socket_file_mode,
@@ -136,7 +134,12 @@ pub(super) fn unix_datagram(
             .unwrap_or_else(crate::serde::default_max_length),
         decoder,
         move |events, received_from| {
-            handle_events(events, &config_clone, received_from, log_namespace)
+            handle_events(
+                events,
+                config.host_key.as_ref(),
+                received_from,
+                log_namespace,
+            )
         },
         shutdown,
         out,
@@ -150,14 +153,17 @@ pub(super) fn unix_stream(
     out: SourceSender,
     log_namespace: LogNamespace,
 ) -> crate::Result<Source> {
-    let config_clone = config.clone();
-
     build_unix_stream_source(
         config.path,
         config.socket_file_mode,
         decoder,
         move |events, received_from| {
-            handle_events(events, &config_clone, received_from, log_namespace)
+            handle_events(
+                events,
+                config.host_key.as_ref(),
+                received_from,
+                log_namespace,
+            )
         },
         shutdown,
         out,

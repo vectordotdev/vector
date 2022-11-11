@@ -17,8 +17,6 @@ use crate::{
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
-#[cfg(unix)]
-use vector_core::config::log_schema;
 
 /// Configuration for the `socket` source.
 #[configurable_component(source("socket"))]
@@ -60,7 +58,7 @@ impl SocketConfig {
     }
 
     fn decoding(&self) -> DeserializerConfig {
-        match self.mode.clone() {
+        match &self.mode {
             Mode::Tcp(config) => config.decoding().clone(),
             Mode::Udp(config) => config.decoding().clone(),
             #[cfg(unix)]
@@ -71,7 +69,7 @@ impl SocketConfig {
     }
 
     fn log_namespace(&self) -> LogNamespace {
-        match self.mode.clone() {
+        match &self.mode {
             Mode::Tcp(config) => config.log_namespace.unwrap_or(false).into(),
             Mode::Udp(config) => config.log_namespace.unwrap_or(false).into(),
             #[cfg(unix)]
@@ -1265,6 +1263,7 @@ mod test {
         // [src/sources/socket/mod.rs:1289] &addr = "/var/folders/ln/mzkzwg093kj9sfw11zr37kdh0000gq/T/.tmpLS0mvv/tx" (pathname)
 
         // dbg!(tx.local_addr().unwrap());
+
         // dbg!(std::os::unix::prelude::AsRawFd::as_raw_fd(&tx));
 
         // Create another, bound socket
