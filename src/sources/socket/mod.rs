@@ -175,8 +175,8 @@ impl SourceConfig for SocketConfig {
             Mode::UnixDatagram(config) => {
                 let decoder = DecodingConfig::new(
                     config
-                        .clone()
                         .framing
+                        .clone()
                         .unwrap_or_else(default_framing_message_based),
                     config.decoding.clone(),
                     LogNamespace::Legacy,
@@ -189,7 +189,7 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let (framing, decoding) = match (config.clone().framing, config.max_length) {
+                let (framing, decoding) = match (config.framing.clone(), config.max_length) {
                     (Some(_), Some(_)) => {
                         return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
                     }
