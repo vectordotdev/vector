@@ -1,0 +1,51 @@
+name: Install vdev
+
+inputs:
+  token:
+    required: true
+
+runs:
+  using: composite
+
+  steps:
+  # default 2.x fails
+  - if: runner.os == 'Windows'
+    uses: ruby/setup-ruby@v1
+    with:
+      ruby-version: '3.1'
+
+  - name: Wait for build
+    uses: lewagon/wait-on-check-action@v1.2.0
+    with:
+      repo-token: ${{ inputs.token }}
+      check-name: Build executable for ${{ runner.os }}
+      ref: ${{ github.sha }}
+      wait-interval: 20
+
+  - name: Try downloading current artifact
+    uses: dawidd6/action-download-artifact@v2
+    with:
+      github_token: ${{ inputs.token }}
+      workflow: build-vdev.yml
+      branch: ${{ github.ref_name }}
+      name: vdev-${{ runner.os }}
+      path: vdev/bin
+
+  - if: github.event_name == 'pull_request' && failure()
+    name: Download latest artifact
+    uses: dawidd6/action-download-artifact@v2
+    with:
+      github_token: ${{ inputs.token }}
+      workflow: build-vdev.yml
+      branch: master
+      name: vdev-${{ runner.os }}
+      path: vdev/bin
+
+  - name: Add binary to PATH
+    run: mv vdev/bin/* "$HOME/.cargo/bin"
+    shell: bash
+
+  - if: runner.os != 'Windows'
+    name: Make binary executable
+    run: chmod +x "$HOME/.cargo/bin/vdev"
+    shell: bash
