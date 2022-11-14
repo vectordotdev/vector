@@ -133,22 +133,17 @@ impl TransformConfig for ReduceConfig {
                     input_kind.clone()
                 }
                 MergeStrategy::Sum | MergeStrategy::Max | MergeStrategy::Min => {
-                    let contains_undefined = input_kind.contains_undefined();
                     // only keeps integer / float values
-                    let mut kind =
-                        match (input_kind.contains_integer(), input_kind.contains_float()) {
-                            (true, true) => Kind::float().or_integer(),
-                            (true, false) => Kind::integer(),
-                            (false, true) => Kind::float(),
-                            (false, false) => Kind::undefined(),
-                        };
-                    kind
+                    match (input_kind.contains_integer(), input_kind.contains_float()) {
+                        (true, true) => Kind::float().or_integer(),
+                        (true, false) => Kind::integer(),
+                        (false, true) => Kind::float(),
+                        (false, false) => Kind::undefined(),
+                    }
                 }
                 MergeStrategy::Array => {
-                    let contains_undefined = input_kind.contains_undefined();
                     let unknown_kind = input_kind.clone();
-                    let mut kind = Kind::array(Collection::empty().with_unknown(unknown_kind));
-                    kind
+                    Kind::array(Collection::empty().with_unknown(unknown_kind))
                 }
                 MergeStrategy::Concat => {
                     let mut new_kind = Kind::never();
@@ -167,16 +162,14 @@ impl TransformConfig for ReduceConfig {
                 MergeStrategy::ConcatNewline | MergeStrategy::ConcatRaw => {
                     // can only produce bytes (or undefined)
                     if input_kind.contains_bytes() {
-                        let mut kind = Kind::bytes();
-                        kind
+                        Kind::bytes()
                     } else {
                         Kind::undefined()
                     }
                 }
                 MergeStrategy::ShortestArray | MergeStrategy::LongestArray => {
                     if let Some(array) = input_kind.as_array() {
-                        let mut kind = Kind::array(array.clone());
-                        kind
+                        Kind::array(array.clone())
                     } else {
                         Kind::undefined()
                     }
@@ -189,8 +182,7 @@ impl TransformConfig for ReduceConfig {
                     if let Some(object) = input_kind.as_object() {
                         array_elements = array_elements.union(object.reduced_kind());
                     }
-                    let mut kind = Kind::array(Collection::empty().with_unknown(array_elements));
-                    kind
+                    Kind::array(Collection::empty().with_unknown(array_elements))
                 }
             };
 
