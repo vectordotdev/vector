@@ -403,12 +403,9 @@ mod tests {
         let schema = vector_core::schema::Definition::empty_legacy_namespace()
             .with_standard_vector_source_metadata();
 
-        assert_eq!(
-            Ok(()),
-            definition
-                .schema_definition(schema)
-                .is_valid_for_event(&event)
-        );
+        definition
+            .schema_definition(schema)
+            .assert_valid_for_event(&event)
     }
 }
 
