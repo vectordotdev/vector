@@ -196,7 +196,7 @@ impl TransformConfig for ReduceConfig {
 
             // all of the merge strategies are optional. They won't produce a value unless a value actually exists
             let new_kind = if input_kind.contains_undefined() {
-                new_kind.without_undefined()
+                new_kind.or_undefined()
             } else {
                 new_kind
             };
