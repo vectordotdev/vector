@@ -71,7 +71,7 @@
       });
       require(["vs/editor/editor.main"], () => {
         window.programEditor = monaco.editor.create(document.getElementById("container-program"), {
-          value: `# Parse as JSON or error if malformed
+          value: `# Parse as JSON
 parsed, err = parse_syslog(.message)
 
 
