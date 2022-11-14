@@ -577,9 +577,10 @@ impl IngestorProcess {
                     log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
                 }
                 LogNamespace::Legacy => {
-                    timestamp.unwrap_or_else(Utc::now);
-
-                    log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+                    log.try_insert(
+                        (PathPrefix::Event, log_schema().timestamp_key()),
+                        timestamp.unwrap_or_else(Utc::now),
+                    );
                 }
             };
 
