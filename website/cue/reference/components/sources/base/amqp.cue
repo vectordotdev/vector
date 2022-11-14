@@ -217,11 +217,6 @@ base: components: sources: amqp: configuration: {
 			}
 		}
 	}
-	log_namespace: {
-		description: "The namespace to use. This overrides the global setting."
-		required:    false
-		type: bool: {}
-	}
 	offset_key: {
 		description: "The `AMQP` offset key."
 		required:    false

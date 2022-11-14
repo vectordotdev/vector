@@ -125,11 +125,6 @@ base: components: sources: datadog_agent: configuration: {
 			}
 		}
 	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global settings"
-		required:    false
-		type: bool: {}
-	}
 	multiple_outputs: {
 		description: """
 			If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
