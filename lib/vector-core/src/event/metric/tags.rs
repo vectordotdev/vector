@@ -1,7 +1,7 @@
 #[cfg(test)]
 use std::borrow::Borrow;
 use std::cmp::Ordering;
-use std::collections::{btree_map, hash_map::DefaultHasher, BTreeMap};
+use std::collections::{hash_map::DefaultHasher, BTreeMap};
 use std::hash::{Hash, Hasher};
 
 use indexmap::IndexSet;
@@ -403,37 +403,6 @@ impl MetricTags {
             tags.retain(|tag| tag.map_or(false, |tag| f(key, tag)));
             !tags.is_empty()
         });
-    }
-}
-
-pub struct IntoIter {
-    base: btree_map::IntoIter<String, TagValueSet>,
-    current: Option<(String, TagValueIter)>,
-}
-
-impl Iterator for IntoIter {
-    type Item = (String, String);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match &mut self.current {
-                Some((key, tag_set)) => {
-                    if let Some(value) = tag_set.next() {
-                        break Some((key.clone(), value));
-                    }
-                    self.current = None;
-                }
-                None => {
-                    self.current = self
-                        .base
-                        .next()
-                        .map(|(key, value)| (key, value.into_iter()));
-                    if self.current.is_none() {
-                        break None;
-                    }
-                }
-            }
-        }
     }
 }
 
