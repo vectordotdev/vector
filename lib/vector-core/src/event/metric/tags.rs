@@ -261,18 +261,12 @@ pub enum TagValueIter {
 }
 
 impl Iterator for TagValueIter {
-    type Item = String;
+    type Item = Option<String>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Single(single) => single.take().and_then(|tag| tag),
-            Self::Set(set) => loop {
-                break match set.next() {
-                    Some(None) => continue,
-                    Some(Some(tag)) => Some(tag),
-                    None => None,
-                };
-            },
+            Self::Single(single) => single.take(),
+            Self::Set(set) => set.next(),
         }
     }
 }
@@ -283,18 +277,12 @@ pub enum TagValueRefIter<'a> {
 }
 
 impl<'a> Iterator for TagValueRefIter<'a> {
-    type Item = &'a str;
+    type Item = Option<&'a str>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Single(single) => single.take().and_then(Option::as_deref),
-            Self::Set(set) => loop {
-                break match set.next() {
-                    Some(None) => continue,
-                    Some(Some(tag)) => Some(tag.as_str()),
-                    None => None,
-                };
-            },
+            Self::Single(single) => single.take().map(Option::as_deref),
+            Self::Set(set) => set.next().map(Option::as_deref),
         }
     }
 }
@@ -346,7 +334,7 @@ impl MetricTags {
     pub fn iter_all(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
         self.0
             .iter()
-            .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_ref(), Some(tag))))
+            .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_ref(), tag)))
     }
 
     /// Iterate over references to a single value of each tag.
@@ -360,7 +348,7 @@ impl MetricTags {
     pub fn into_iter_all(self) -> impl Iterator<Item = (String, Option<String>)> {
         self.0
             .into_iter()
-            .flat_map(|(name, tags)| tags.into_iter().map(move |tag| (name.clone(), Some(tag))))
+            .flat_map(|(name, tags)| tags.into_iter().map(move |tag| (name.clone(), tag)))
     }
 
     /// Iterate over a single value of each tag.
@@ -495,13 +483,13 @@ mod tests {
         }
 
         #[test]
-        fn tag_value_set_checks(values: Vec<String>, addition: String) {
+        fn tag_value_nonbare_set_checks(values: Vec<String>, addition: String) {
             let mut set = TagValueSet::from(values.clone());
             assert_eq!(set.is_empty(), values.is_empty());
             // All input values are contained in the set.
             assert!(values.iter().all(|v| set.contains(&Some(v.clone()))));
             // All set values were in the input.
-            assert!(set.iter().all(|v| values.contains(&v.into())));
+            assert!(set.iter().all(|s| s.map_or(true, |s| values.contains(&s.to_string()))));
             // Critical: the "single value" of the set is the last value added.
             assert_eq!(set.as_single(), values.last().map(String::as_str));
 
