@@ -1,3 +1,8 @@
+body {
+    margin-right: 2vw;
+    margin-left: 2vw;
+}
+
 div#App {
     display: grid;
     width: 100%;
@@ -309,5 +314,4 @@ div#App {
       .btn-secondary:hover {
         background-color: #dcdcdc;
       }
-
 }
