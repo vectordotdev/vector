@@ -185,7 +185,7 @@ impl<'a> DnstapParser<'a> {
         }
 
         if let Some(query_zone) = dnstap_message.query_zone.as_ref() {
-            let mut decoder: BinDecoder = BinDecoder::new(&query_zone);
+            let mut decoder: BinDecoder = BinDecoder::new(query_zone);
             match Name::read(&mut decoder) {
                 Ok(raw_data) => {
                     self.insert(

@@ -165,7 +165,7 @@ impl DnstapEventSchema {
         &self,
         schema: vector_core::schema::Definition,
     ) -> vector_core::schema::Definition {
-        let schema = schema
+        schema
             .optional_field(
                 &owned_value_path!(self.dnstap_root_data_schema().server_identity()),
                 Kind::bytes(),
@@ -210,9 +210,7 @@ impl DnstapEventSchema {
                 &owned_value_path!(self.dnstap_root_data_schema().time_precision()),
                 Kind::bytes(),
                 None,
-            );
-
-        schema
+            )
     }
 
     /// Schema definition from the message.

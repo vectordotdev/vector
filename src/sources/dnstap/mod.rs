@@ -211,7 +211,7 @@ impl DnstapFrameHandler {
         let source_type_key = log_schema().source_type_key();
         let timestamp_key = log_schema().timestamp_key();
 
-        let schema = DnstapConfig::event_schema(&timestamp_key);
+        let schema = DnstapConfig::event_schema(timestamp_key);
 
         let host_key = config
             .host_key
