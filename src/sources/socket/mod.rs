@@ -447,7 +447,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn tcp_it_includes_log_namespaced_fields() {
+    async fn tcp_it_includes_vector_namespaced_fields() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, mut rx) = SourceSender::new_test();
             let addr = next_addr();
@@ -824,7 +824,7 @@ mod test {
         source_key: &ComponentKey,
         shutdown_signal: ShutdownSignal,
         config: Option<UdpConfig>,
-        use_log_namespace: bool,
+        use_vector_namespace: bool,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (address, mut config) = match config {
             Some(config) => match config.address() {
@@ -837,7 +837,7 @@ mod test {
             }
         };
 
-        let config = if use_log_namespace {
+        let config = if use_vector_namespace {
             config.set_log_namespace(Some(true));
             config
         } else {
@@ -1003,7 +1003,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn udp_it_includes_log_namespaced_fields() {
+    async fn udp_it_includes_vector_namespaced_fields() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, true).await;
@@ -1121,11 +1121,11 @@ mod test {
 
     ////////////// UNIX TEST LIBS //////////////
     #[cfg(unix)]
-    async fn init_unix(sender: SourceSender, stream: bool, use_log_namespace: bool) -> PathBuf {
+    async fn init_unix(sender: SourceSender, stream: bool, use_vector_namespace: bool) -> PathBuf {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
         let mut config = UnixConfig::new(in_path.clone());
-        if use_log_namespace {
+        if use_vector_namespace {
             config.log_namespace = Some(true);
         }
 
@@ -1165,10 +1165,10 @@ mod test {
     async fn unix_message(
         message: &str,
         stream: bool,
-        use_log_namespace: bool,
+        use_vector_namespace: bool,
     ) -> (PathBuf, impl Stream<Item = Event>) {
         let (tx, rx) = SourceSender::new_test();
-        let path = init_unix(tx, stream, use_log_namespace).await;
+        let path = init_unix(tx, stream, use_vector_namespace).await;
         let path_clone = path.clone();
 
         unix_send_lines(stream, path, &[message]).await;
@@ -1301,7 +1301,7 @@ mod test {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn unix_datagram_message_with_log_namespace() {
+    async fn unix_datagram_message_with_vector_namespace() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", false, true).await;
             let events = collect_n(rx, 1).await;
@@ -1432,7 +1432,7 @@ mod test {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn unix_stream_message_with_log_namespace() {
+    async fn unix_stream_message_with_vector_namespace() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", true, true).await;
             let events = collect_n(rx, 1).await;
