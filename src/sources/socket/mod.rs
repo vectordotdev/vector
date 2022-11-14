@@ -233,25 +233,31 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .as_ref()
                     .and_then(|x| parse_value_path(x).ok())
-                    .map(LegacyKey::InsertIfEmpty);
+                    .map_or_else(
+                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
+                        LegacyKey::InsertIfEmpty,
+                    );
 
                 let port_key_path = config
                     .port_key()
                     .as_ref()
                     .and_then(|x| parse_value_path(x).ok())
-                    .map(LegacyKey::InsertIfEmpty);
+                    .map_or_else(
+                        || LegacyKey::InsertIfEmpty(owned_value_path!("port")),
+                        LegacyKey::InsertIfEmpty,
+                    );
 
                 schema_definition
                     .with_source_metadata(
                         Self::NAME,
-                        host_key_path,
+                        Some(host_key_path),
                         &owned_value_path!("host"),
                         Kind::bytes(),
                         None,
                     )
                     .with_source_metadata(
                         Self::NAME,
-                        port_key_path,
+                        Some(port_key_path),
                         &owned_value_path!("port"),
                         Kind::bytes(),
                         None,
@@ -262,25 +268,31 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .as_ref()
                     .and_then(|x| parse_value_path(x).ok())
-                    .map(LegacyKey::InsertIfEmpty);
+                    .map_or_else(
+                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
+                        LegacyKey::InsertIfEmpty,
+                    );
 
                 let port_key_path = config
                     .port_key()
                     .as_ref()
                     .and_then(|x| parse_value_path(x).ok())
-                    .map(LegacyKey::InsertIfEmpty);
+                    .map_or_else(
+                        || LegacyKey::InsertIfEmpty(owned_value_path!("port")),
+                        LegacyKey::InsertIfEmpty,
+                    );
 
                 schema_definition
                     .with_source_metadata(
                         Self::NAME,
-                        host_key_path,
+                        Some(host_key_path),
                         &owned_value_path!("host"),
                         Kind::bytes(),
                         None,
                     )
                     .with_source_metadata(
                         Self::NAME,
-                        port_key_path,
+                        Some(port_key_path),
                         &owned_value_path!("port"),
                         Kind::bytes(),
                         None,
@@ -292,11 +304,14 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .as_ref()
                     .and_then(|x| parse_value_path(x).ok())
-                    .map(LegacyKey::InsertIfEmpty);
+                    .map_or_else(
+                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
+                        LegacyKey::InsertIfEmpty,
+                    );
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
-                    host_key_path,
+                    Some(host_key_path),
                     &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
@@ -308,11 +323,14 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .as_ref()
                     .and_then(|x| parse_value_path(x).ok())
-                    .map(LegacyKey::InsertIfEmpty);
+                    .map_or_else(
+                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
+                        LegacyKey::InsertIfEmpty,
+                    );
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
-                    host_key_path,
+                    Some(host_key_path),
                     &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
