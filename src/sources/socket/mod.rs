@@ -1247,23 +1247,20 @@ mod test {
 
         let tmp = tempdir().unwrap();
 
-        // Ex: 1
-        // let tx = UnixDatagram::unbound().unwrap();
-        // Out:
-        // [src/sources/socket/mod.rs:1272] tx.local_addr().unwrap() = (unnamed)
-        // [src/sources/socket/mod.rs:1273] std::os::unix::prelude::AsRawFd::as_raw_fd(&tx) = 9
-        // [src/sources/socket/mod.rs:1289] &addr = (unnamed)
-
-        // Ex: 2
         let tx_path = tmp.path().join("tx");
-        let tx = UnixDatagram::bind(&tx_path).unwrap();
-        // Out:
-        // [src/sources/socket/mod.rs:1272] tx.local_addr().unwrap() = "/var/folders/ln/mzkzwg093kj9sfw11zr37kdh0000gq/T/.tmpLS0mvv/tx" (pathname)
-        // [src/sources/socket/mod.rs:1273] std::os::unix::prelude::AsRawFd::as_raw_fd(&tx) = 9
-        // [src/sources/socket/mod.rs:1289] &addr = "/var/folders/ln/mzkzwg093kj9sfw11zr37kdh0000gq/T/.tmpLS0mvv/tx" (pathname)
 
+        // Switch this var between "bound" and "unbound" to test
+        // different types of socket behavior.
+        let tx_type = "bound";
+
+        let tx = if tx_type == "bound" {
+            UnixDatagram::bind(&tx_path).unwrap()
+        } else {
+            UnixDatagram::unbound().unwrap()
+        };
+
+        // The following debug statements showcase some useful info:
         // dbg!(tx.local_addr().unwrap());
-
         // dbg!(std::os::unix::prelude::AsRawFd::as_raw_fd(&tx));
 
         // Create another, bound socket
@@ -1279,8 +1276,6 @@ mod test {
 
         let mut buf = vec![0u8; 24];
         let (size, _) = rx.recv_from(&mut buf).await.unwrap();
-
-        // dbg!(&addr);
 
         let dgram = &buf[..size];
         assert_eq!(dgram, bytes);
