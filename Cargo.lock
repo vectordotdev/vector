@@ -8658,7 +8658,6 @@ dependencies = [
  "colored",
  "console-subscriber",
  "criterion",
- "crossbeam-utils",
  "crossterm",
  "csv",
  "datadog-filter",
