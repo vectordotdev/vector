@@ -109,7 +109,7 @@ impl Metric {
     /// Metric tags
     async fn tags(&self) -> Option<Vec<MetricTag>> {
         self.event.tags().map(|tags| {
-            tags.iter()
+            tags.iter_single()
                 .map(|(key, value)| MetricTag {
                     key: key.to_owned(),
                     value: value.to_owned(),

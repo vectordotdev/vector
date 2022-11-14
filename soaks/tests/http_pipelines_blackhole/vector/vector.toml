@@ -20,7 +20,6 @@ decoding.codec = "bytes"
 type = "remap"
 inputs = ["logs"]
 source = '''
-., err = parse_json(.message)
 if starts_with(strip_whitespace!(.message), "{") {
   custom, err = parse_json(.message)
   if (err == null) {
