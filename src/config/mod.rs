@@ -28,7 +28,7 @@ mod graph;
 mod id;
 mod loading;
 pub mod provider;
-pub mod schema;
+mod schema;
 mod secret;
 mod sink;
 mod source;

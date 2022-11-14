@@ -156,9 +156,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    cx.shutdown.map(|_| {
-                        debug!("HTTP server source shutdown token fired.");
-                    }),
+                    cx.shutdown.map(|_| ()),
                 )
                 .await;
             Ok(())
