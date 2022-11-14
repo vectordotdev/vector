@@ -101,7 +101,7 @@ impl SourceConfig for FluentConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        // `host_key` defaults to the `log_schema().host_key()` if it's not configured in the source.
+        // `host_key` is only inserted if not present already.
         let host_key = parse_value_path(log_schema().host_key())
             .ok()
             .map(LegacyKey::InsertIfEmpty);
