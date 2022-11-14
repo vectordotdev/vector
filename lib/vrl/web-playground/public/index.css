@@ -150,9 +150,9 @@ div#App {
   }
 
 /* Portrait and Landscape */
-@media only screen 
-  and (min-width: 200px) 
-  and (max-width: 1000px) { 
+@media only screen
+  and (min-width: 200px)
+  and (max-width: 1000px) {
     div#App {
         display: grid;
         width: 100%;

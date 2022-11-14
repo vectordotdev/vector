@@ -34,9 +34,7 @@
 
       <div id="toolbar-section">
         <button id="run-code-btn" class="btn-primary" onClick="handleRunCode()">run code</button>
-        <button id="share-code-btn" class="btn-secondary" onClick="handleShareCode()">
-          share code
-        </button>
+        <button id="share-code-btn" class="btn-secondary" onClick="handleShareCode()">share code</button>
       </div>
 
       <div id="input-section">
@@ -116,16 +114,21 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
         const queryString = window.location.search;
         if (queryString.length != 0) {
           const urlParams = new URLSearchParams(queryString);
-          const stateParam = urlParams.get("state");
+          const stateParam = decodeURIComponent(urlParams.get("state"));
 
-          let urlState = JSON.parse(atob(stateParam));
+          try {
+            let urlState = JSON.parse(atob(stateParam));
 
-          window.programEditor.setValue(urlState["program"]);
-          window.eventEditor.setValue(JSON.stringify(urlState["event"], null, "\t"));
+            window.programEditor.setValue(urlState["program"]);
+            window.eventEditor.setValue(JSON.stringify(urlState["event"], null, "\t"));
 
-          console.log("[DEBUG::queryStringLogic] Current Params:", JSON.parse(atob(stateParam)));
-          let res = handleRunCode(JSON.parse(atob(stateParam)));
-          console.log("[DEBUG::queryStringLogic] Running VRL with current Params:", res);
+            console.log("[DEBUG::queryStringLogic] Current Params:", JSON.parse(atob(stateParam)));
+            let res = handleRunCode(JSON.parse(atob(stateParam)));
+            console.log("[DEBUG::queryStringLogic] Running VRL with current Params:", res);
+          } catch (e) {
+            window.outputEditor.setValue(`Error reading the shared URL\n${e}`);
+          }
+          
         }
       });
     </script>
@@ -138,11 +141,71 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
     </script>
 
     <script>
+      function tryJsonParse(str) {
+        try {
+          return JSON.parse(str);
+        } catch (e) {
+          monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+            validate: false
+          });
+          window.outputEditor.setValue(`Error attempting to parse the following string into valid JSON\n
+String: ${str}
+\nEnsure that the Event editor contains valid JSON
+\nCommon mistakes:\n
+  Trailing Commas\n  Last line is a newline or whitespace\n  Unbalanced curly braces`);
+        }
+      }
+
+      function isJsonL() {
+        if (window.eventEditor.getModel().getLineCount() > 1) {
+          let lines = window.eventEditor.getModel().getLinesContent();
+          // if the second line is a json object
+          // we assume the user has passed in valid json on each
+          // line
+          if (lines[1][0] == "{" && lines[1][lines[1].length - 1] == "}") {
+            return true;
+          }
+        }
+        return false;
+      }
       function handleRunCode(input) {
+        if (isJsonL()) {
+          let inputs = [];
+          let program = window.programEditor.getValue();
+          let lines = window.eventEditor.getModel().getLinesContent();
+          lines.forEach((line) => {
+            inputs.push({
+              program: program,
+              event: tryJsonParse(line)
+            })
+          });
+
+          let results = [];
+          inputs.forEach((input) => {
+            results.push(window.run_vrl(input));
+          })
+          
+          let outputs = [];
+          results.forEach((res) => {
+            if (res.output) {
+              outputs.push(JSON.stringify(res["result"], null, "\t"));
+            } else if (res.msg) {
+              outputs.push(res["msg"]);
+            }
+          })
+          // disable output validation for json
+          // since jsonl input won't ouput valid json
+          monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+            validate: false
+          });
+          window.outputEditor.setValue(outputs.join("\n"));
+          return results;
+        }
+
         if (input == null) {
           input = {
             program: window.programEditor.getValue(),
-            event: JSON.parse(window.eventEditor.getValue()),
+            event: tryJsonParse(window.eventEditor.getValue()),
           };
         }
 
@@ -168,8 +231,8 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
         console.log(
           "[DEBUG::handleShareCode()] Printing out base64 encoded state\n",
           btoa(JSON.stringify(state))
-        );
-        window.history.pushState(state, "", `?state=${btoa(JSON.stringify(state))}`);
+        ); 
+        window.history.pushState(state, "", `?state=${encodeURIComponent(btoa(JSON.stringify(state)))}`);
       }
     </script>
   </body>
