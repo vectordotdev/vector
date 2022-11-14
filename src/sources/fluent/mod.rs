@@ -533,6 +533,7 @@ impl From<FluentEvent<'_>> for LogEvent {
 mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
+    use lookup::LookupBuf;
     use rmp_serde::Serializer;
     use serde::Serialize;
     use std::collections::BTreeMap;
@@ -541,8 +542,9 @@ mod tests {
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
+    use value::kind::Collection;
     use vector_common::assert_event_data_eq;
-    use vector_core::event::Value;
+    use vector_core::{event::Value, schema::Definition};
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
@@ -991,6 +993,75 @@ mod tests {
         let mut buf = Vec::new();
         req.serialize(&mut Serializer::new(&mut buf)).unwrap();
         buf
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = FluentConfig {
+            address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
+            tls: None,
+            keepalive: None,
+            receive_buffer_bytes: None,
+            acknowledgements: false.into(),
+            connection_limit: None,
+            log_namespace: None,
+        };
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        assert_eq!(
+            definition,
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp()
+                )
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "host"),
+                    Kind::bytes().or_undefined()
+                )
+        )
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = FluentConfig {
+            address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
+            tls: None,
+            keepalive: None,
+            receive_buffer_bytes: None,
+            acknowledgements: false.into(),
+            connection_limit: None,
+            log_namespace: None,
+        };
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        assert_eq!(
+            definition,
+            Definition::new_with_default_metadata(
+                Kind::object(Collection::empty()),
+                [LogNamespace::Legacy]
+            )
+            .with_event_field(
+                &owned_value_path!("message"),
+                Kind::bytes(),
+                Some("message")
+            )
+            .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+            .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+            .with_event_field(
+                &owned_value_path!("host"),
+                Kind::bytes().or_undefined(),
+                Some("host")
+            )
+        )
     }
 }
 
