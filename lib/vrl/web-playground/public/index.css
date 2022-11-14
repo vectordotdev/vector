@@ -96,7 +96,6 @@ div#App {
     grid-template-rows: 12% 88%;
     grid-row: 2;
     height: 100%;
-    /* overflow: hidden; */
   }
 
   #output-section #output-cell #output-cell-title {
@@ -121,7 +120,6 @@ div#App {
     outline: 0;
     border: none;
     cursor: pointer;
-    /* font-weight: 600; */
     border-radius: 4px;
     font-size: 13px;
     height: 30px;
@@ -139,7 +137,6 @@ div#App {
     outline: 0;
     border: none;
     cursor: pointer;
-    /* font-weight: 600; */
     border-radius: 4px;
     font-size: 13px;
     height: 30px;
@@ -163,10 +160,7 @@ div#App {
         /* the app will have multiple rows
         stacking each section on top of each other */
         grid-template-rows: 20vh 25vh 10vh 50vh;
-        grid-template-columns: 100vw;
-
-        /* padding-left: 10%;
-        padding-right: 10%; */
+        grid-template-columns: 100%;
       }
 
       div#summary-section {
@@ -178,7 +172,7 @@ div#App {
         grid-gap: 2vw;
       }
 
-      div#summary-section p{
+      div#summary-section p {
         grid-row: 2;
         font-size: 2vh;
       }
@@ -240,8 +234,6 @@ div#App {
       /* event pane */
       #output-section #event-cell {
         display: grid;
-        /* this is double of input-cell-title row
-      because we are working with half the space */
         grid-template-rows: 20% 80%;
         grid-row: 1;
         height: 100%;
@@ -254,7 +246,6 @@ div#App {
 
       #output-section #event-cell #container-event {
         display: grid;
-        /* grid-row: 2; */
         height: 100%;
       }
 
@@ -264,7 +255,6 @@ div#App {
         grid-template-rows: 20% 80%;
         grid-row: 2;
         height: 100%;
-        /* overflow: hidden; */
       }
 
       #output-section #output-cell #output-cell-title {
@@ -289,7 +279,6 @@ div#App {
         outline: 0;
         border: none;
         cursor: pointer;
-        /* font-weight: 600; */
         border-radius: 4px;
         font-size: 13px;
         height: 30px;
@@ -308,7 +297,6 @@ div#App {
         outline: 0;
         border: none;
         cursor: pointer;
-        /* font-weight: 600; */
         border-radius: 4px;
         font-size: 13px;
         height: 30px;
