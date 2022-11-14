@@ -39,16 +39,7 @@ impl TagValueSet {
     pub(crate) fn into_single(self) -> Option<String> {
         match self {
             Self::Single(tag) => tag.and_then(|tag| tag),
-            Self::Set(set) => {
-                let mut iter = set.into_iter();
-                loop {
-                    match iter.next_back() {
-                        Some(Some(value)) => break Some(value),
-                        Some(None) => continue,
-                        None => break None,
-                    }
-                }
-            }
+            Self::Set(set) => set.into_iter().rfind(Option::is_some).and_then(|tag| tag),
         }
     }
 
@@ -56,18 +47,10 @@ impl TagValueSet {
     /// single string while still storing all of the values.
     pub(crate) fn as_single(&self) -> Option<&str> {
         match self {
-            Self::Single(tag) => tag.as_ref().and_then(Option::as_deref),
-            Self::Set(set) => {
-                let mut iter = set.iter();
-                loop {
-                    match iter.next_back() {
-                        Some(Some(value)) => break Some(value),
-                        Some(None) => continue,
-                        None => break None,
-                    }
-                }
-            }
+            Self::Single(tag) => tag.as_ref(),
+            Self::Set(set) => set.iter().rfind(|tag| tag.is_some()),
         }
+        .and_then(Option::as_deref)
     }
 
     fn is_empty(&self) -> bool {
@@ -139,7 +122,7 @@ impl TagValueSet {
             Self::Set(set) => {
                 // If the value was previously present, we want to move it to become the last element. The
                 // only way to do this is to remove any existing value.
-                set.remove(&value);
+                set.shift_remove(&value);
                 set.insert(value)
             }
         }
@@ -482,7 +465,6 @@ mod tests {
             }
         }
 
-        #[test]
         fn tag_value_nonbare_set_checks(values: Vec<String>, addition: String) {
             let mut set = TagValueSet::from(values.clone());
             assert_eq!(set.is_empty(), values.is_empty());
@@ -507,7 +489,7 @@ mod tests {
                 // All input values were unique, so the resulting set will have all of them.
                 assert_eq!(start_len, values.len());
 
-                if !values.is_empty() {
+                if let Some(first) = values.first() {
                     // Check that re-adding the last value doesn't change the set.
                     set.insert(values.last().unwrap().clone());
                     assert_eq!(set.len(), start_len);
@@ -516,7 +498,7 @@ mod tests {
                     // But re-adding the first value makes it the last.
                     set.insert(values.first().unwrap().clone());
                     assert_eq!(set.len(), start_len);
-                    assert_eq!(set.as_single(), values.first().map(String::as_str));
+                    assert_eq!(set.as_single(), Some(first.as_str()));
                 }
             }
 
@@ -529,6 +511,65 @@ mod tests {
             assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
             // The "single" value will match the addition.
             assert_eq!(set.as_single(), Some(addition.as_str()));
+        }
+
+        #[test]
+        fn tag_value_set_checks(values: Vec<TagValue>, addition: TagValue) {
+            let mut set = TagValueSet::from(values.clone());
+            assert_eq!(set.is_empty(), values.is_empty());
+            // All input values are contained in the set.
+            assert!(values.iter().all(|v| set.contains(v)));
+            // All set values were in the input.
+            assert!(set.iter().all(|s| values.contains(&s.map(str::to_string))));
+            // Critical: the "single value" of the set is the last value added.
+            let last_value = values.iter().rfind(|v| v.is_some());
+            if let Some(last) = &last_value {
+                assert_eq!(set.as_single(), last.as_deref());
+            }
+
+            let start_len = set.len();
+
+            // Is the input value set unique?
+            if values
+                .iter()
+                .enumerate()
+                .any(|(i, v1)| values[i + 1..].iter().any(|v2| v1 == v2))
+            {
+                // Input values are not unique, so the resulting set will be shorter.
+                assert!(start_len < values.len());
+            } else {
+                // All input values were unique, so the resulting set will have all of them.
+                assert_eq!(start_len, values.len());
+
+                if let Some(first) = values.first() {
+                    // Check that re-adding the last value doesn't change the set.
+                    set.insert(values.last().unwrap().clone());
+                    assert_eq!(set.len(), start_len);
+                    if let Some(last) = &last_value {
+                        assert_eq!(set.as_single(), last.as_deref());
+                    }
+
+                    // But re-adding the first value makes it the last.
+                    set.insert(first.clone());
+                    assert_eq!(set.len(), start_len);
+                    // And it shows up as the single value if it was not bare.
+                    if let Some(first) = first {
+                        assert_eq!(set.as_single(), Some(first.as_str()));
+                    }
+                }
+            }
+
+            let new_addition = !values.iter().any(|v| v == &addition);
+            assert_eq!(new_addition, !set.contains(&addition));
+            set.insert(addition.clone());
+            assert!(set.contains(&addition));
+
+            // If the addition wasn't in the start set, it will increase the length.
+            assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
+            // The "single" value will match the addition.
+            if addition.is_some() {
+                assert_eq!(set.as_single(), addition.as_deref());
+            }
         }
     }
 }
