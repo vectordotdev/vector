@@ -312,7 +312,7 @@ impl vrl_lib::Target for VrlTarget {
                             ["namespace"] => metric.series.name.namespace.take().map(Into::into),
                             ["timestamp"] => metric.data.time.timestamp.take().map(Into::into),
                             ["tags"] => metric.series.tags.take().map(|map| {
-                                map.into_iter()
+                                map.into_iter_single()
                                     .map(|(k, v)| (k, v.into()))
                                     .collect::<::value::Value>()
                             }),
@@ -478,7 +478,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                 if let Some(tags) = metric.tags().cloned() {
                     map.insert(
                         "tags".to_owned(),
-                        tags.into_iter()
+                        tags.into_iter_single()
                             .map(|(tag, value)| (tag, value.into()))
                             .collect::<BTreeMap<_, _>>()
                             .into(),
@@ -524,7 +524,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                             .tags()
                             .cloned()
                             .unwrap()
-                            .into_iter()
+                            .into_iter_single()
                             .map(|(tag, value)| (tag, value.into()))
                             .collect::<BTreeMap<_, _>>()
                             .into(),

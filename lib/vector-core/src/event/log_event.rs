@@ -180,12 +180,11 @@ impl LogEvent {
         &mut self.metadata
     }
 
+    /// This detects the log namespace used at runtime by checking for the existence
+    /// of the read-only "vector" metadata, which only exists (and is required to exist)
+    /// with the `Vector` log namespace.
     pub fn namespace(&self) -> LogNamespace {
-        // The (read-only) vector prefix on metadata is used to determine which namespace
-        // is being used. The user is prevented from modifying data here.
-        // This prefix should always exist for logs with the "Vector" namespace,
-        // and should never exist otherwise.
-        if self.metadata().value().contains(path!("vector")) {
+        if self.contains((PathPrefix::Metadata, path!("vector"))) {
             LogNamespace::Vector
         } else {
             LogNamespace::Legacy

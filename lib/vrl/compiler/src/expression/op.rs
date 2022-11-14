@@ -147,7 +147,9 @@ impl Expression for Op {
             Or if lhs_def.is_null() => rhs_def,
 
             // not null || ...
-            Or if !(lhs_def.is_superset(&K::null()) || lhs_def.is_superset(&K::boolean())) => {
+            Or if !(lhs_def.is_superset(&K::null()).is_ok()
+                || lhs_def.is_superset(&K::boolean()).is_ok()) =>
+            {
                 lhs_def
             }
 

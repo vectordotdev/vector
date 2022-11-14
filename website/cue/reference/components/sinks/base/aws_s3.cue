@@ -602,7 +602,28 @@ base: components: sinks: aws_s3: configuration: {
 		type: object: options: "*": {
 			description: "Tags for a metric series."
 			required:    true
-			type: string: syntax: "literal"
+			type: object: options: {
+				Set: {
+					description: """
+						This holds an actual set of values. This variant will be automatically created when a single
+						value is added to, and reduced down to a single value when the length is reduced to 1.  An
+						index set is used for this set, as it preserves the insertion order of the contained
+						elements. This allows us to retrieve the last element inserted which in turn allows us to
+						emulate the set having a single value.
+						"""
+					required: true
+					type: array: items: type: string: syntax: "literal"
+				}
+				Single: {
+					description: """
+						This represents a set containing a no value or a single value. This is stored separately to
+						avoid the overhead of allocating a hash table for the common case of a single value for a
+						tag.
+						"""
+					required: true
+					type: string: syntax: "literal"
+				}
+			}
 		}
 	}
 	tls: {
