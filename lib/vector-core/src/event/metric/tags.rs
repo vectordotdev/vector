@@ -288,10 +288,32 @@ impl MetricTags {
         (!self.is_empty()).then_some(self)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+    /// Iterate over references to all values of each tag.
+    pub fn iter_all(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
         self.0
             .iter()
-            .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_ref(), tag)))
+            .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_ref(), Some(tag))))
+    }
+
+    /// Iterate over references to a single value of each tag.
+    pub fn iter_single(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.0
+            .iter()
+            .filter_map(|(name, tags)| tags.as_single().map(|tag| (name.as_ref(), tag)))
+    }
+
+    /// Iterate over all values of each tag.
+    pub fn into_iter_all(self) -> impl Iterator<Item = (String, Option<String>)> {
+        self.0
+            .into_iter()
+            .flat_map(|(name, tags)| tags.into_iter().map(move |tag| (name.clone(), Some(tag))))
+    }
+
+    /// Iterate over a single value of each tag.
+    pub fn into_iter_single(self) -> impl Iterator<Item = (String, String)> {
+        self.0
+            .into_iter()
+            .filter_map(|(name, tags)| tags.into_single().map(|tag| (name, tag)))
     }
 
     pub fn contains_key(&self, name: &str) -> bool {
@@ -330,18 +352,6 @@ impl MetricTags {
     }
 }
 
-impl IntoIterator for MetricTags {
-    type Item = (String, TagValue);
-    type IntoIter = IntoIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        IntoIter {
-            base: self.0.into_iter(),
-            current: None,
-        }
-    }
-}
-
 pub struct IntoIter {
     base: btree_map::IntoIter<String, TagValueSet>,
     current: Option<(String, <TagValueSet as IntoIterator>::IntoIter)>,
@@ -364,49 +374,6 @@ impl Iterator for IntoIter {
                         .base
                         .next()
                         .map(|(key, value)| (key, value.into_iter()));
-                    if self.current.is_none() {
-                        break None;
-                    }
-                }
-            }
-        }
-    }
-}
-
-impl<'a> IntoIterator for &'a MetricTags {
-    type Item = (&'a str, &'a str);
-    type IntoIter = Iter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Iter {
-            base: self.0.iter(),
-            current: None,
-        }
-    }
-}
-
-pub struct Iter<'a> {
-    base: btree_map::Iter<'a, String, TagValueSet>,
-    current: Option<(&'a str, <&'a TagValueSet as IntoIterator>::IntoIter)>,
-}
-
-impl<'a> Iterator for Iter<'a> {
-    type Item = (&'a str, &'a str);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match &mut self.current {
-                Some((key, tag_set)) => {
-                    if let Some(value) = tag_set.next() {
-                        break Some((key, value));
-                    }
-                    self.current = None;
-                }
-                None => {
-                    self.current = self
-                        .base
-                        .next()
-                        .map(|(key, value)| (key.as_str(), value.iter()));
                     if self.current.is_none() {
                         break None;
                     }

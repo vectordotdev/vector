@@ -131,8 +131,11 @@ impl fmt::Display for MetricSeries {
         write_word(fmt, &self.name.name)?;
         write!(fmt, "{{")?;
         if let Some(tags) = &self.tags {
-            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
-                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
+            write_list(fmt, ",", tags.iter_all(), |fmt, (tag, value)| {
+                write_word(fmt, tag).and_then(|()| match value {
+                    Some(value) => write!(fmt, "={:?}", value),
+                    None => Ok(()),
+                })
             })?;
         }
         write!(fmt, "}}")
