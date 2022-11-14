@@ -7,7 +7,10 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
+use lookup::{
+    lookup_v2::{OptionalTargetPath, ValuePath},
+    owned_value_path, path, OwnedTargetPath,
+};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
 
@@ -173,7 +176,7 @@ fn annotate_from_file_info(
         .container_name
         .path
         .as_ref()
-        .map(|x| &x.path)
+        .map(|k| &k.path)
         .map(LegacyKey::Overwrite);
 
     log_namespace.insert_source_metadata(
@@ -214,7 +217,7 @@ fn annotate_from_metadata(
             let legacy_key = legacy_key
                 .path
                 .as_ref()
-                .map(|x| &x.path)
+                .map(|k| &k.path)
                 .map(LegacyKey::Overwrite);
 
             log_namespace.insert_source_metadata(
@@ -232,7 +235,7 @@ fn annotate_from_metadata(
             .pod_owner
             .path
             .as_ref()
-            .map(|x| &x.path)
+            .map(|k| &k.path)
             .map(LegacyKey::Overwrite);
 
         log_namespace.insert_source_metadata(
@@ -246,18 +249,17 @@ fn annotate_from_metadata(
 
     if let Some(labels) = &metadata.labels {
         for (key, value) in labels.iter() {
-            // TODO: Seems more efficient to move this outside of the `for` but it doesn't impl Copy.
             let legacy_key = fields_spec
                 .pod_labels
                 .path
                 .as_ref()
-                .map(|x| &x.path)
+                .map(|k| &k.path)
+                .map(|k| k.concat(key.as_str()))
                 .map(LegacyKey::Overwrite);
 
             log_namespace.insert_source_metadata(
                 Config::NAME,
                 log,
-                // FIXME: This legacy_key is missing the `key` suffix.
                 legacy_key,
                 path!("kubernetes", "pod_labels", key),
                 value.to_owned(),
@@ -267,18 +269,17 @@ fn annotate_from_metadata(
 
     if let Some(annotations) = &metadata.annotations {
         for (key, value) in annotations.iter() {
-            // TODO: Seems more efficient to move this outside of the `for` but it doesn't impl Copy.
             let legacy_key = fields_spec
                 .pod_annotations
                 .path
                 .as_ref()
-                .map(|x| &x.path)
+                .map(|k| &k.path)
+                .map(|k| k.concat(key.as_str()))
                 .map(LegacyKey::Overwrite);
 
             log_namespace.insert_source_metadata(
                 Config::NAME,
                 log,
-                // FIXME: This legacy_key is missing the `key` suffix.
                 legacy_key,
                 path!("kubernetes", "pod_annotations", key),
                 value.to_owned(),
@@ -298,7 +299,7 @@ fn annotate_from_pod_spec(
             .pod_node_name
             .path
             .as_ref()
-            .map(|x| &x.path)
+            .map(|k| &k.path)
             .map(LegacyKey::Overwrite);
 
         log_namespace.insert_source_metadata(
@@ -322,7 +323,7 @@ fn annotate_from_pod_status(
             .pod_ip
             .path
             .as_ref()
-            .map(|x| &x.path)
+            .map(|k| &k.path)
             .map(LegacyKey::Overwrite);
 
         log_namespace.insert_source_metadata(
@@ -339,12 +340,12 @@ fn annotate_from_pod_status(
             .pod_ips
             .path
             .as_ref()
-            .map(|x| &x.path)
+            .map(|k| &k.path)
             .map(LegacyKey::Overwrite);
 
         let value = value
             .iter()
-            .filter_map(|x| x.ip.clone())
+            .filter_map(|k| k.ip.clone())
             .collect::<Vec<String>>();
 
         log_namespace.insert_source_metadata(
@@ -368,7 +369,7 @@ fn annotate_from_container_status(
             .container_id
             .path
             .as_ref()
-            .map(|x| &x.path)
+            .map(|k| &k.path)
             .map(LegacyKey::Overwrite);
 
         log_namespace.insert_source_metadata(
@@ -392,7 +393,7 @@ fn annotate_from_container(
             .container_image
             .path
             .as_ref()
-            .map(|x| &x.path)
+            .map(|k| &k.path)
             .map(LegacyKey::Overwrite);
 
         log_namespace.insert_source_metadata(

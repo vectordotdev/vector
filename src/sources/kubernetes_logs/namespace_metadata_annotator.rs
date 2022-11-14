@@ -4,7 +4,7 @@
 
 use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::{owned_value_path, path, OwnedTargetPath};
+use lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
 
@@ -86,8 +86,7 @@ fn annotate_from_metadata(
             log_namespace.insert_source_metadata(
                 Config::NAME,
                 log,
-                // FIXME: This legacy_key is missing the `key` suffix.
-                Some(LegacyKey::Overwrite(path)),
+                Some(LegacyKey::Overwrite(path.concat(key.as_str()))),
                 path!("kubernetes", "namespace_labels", key),
                 value.to_owned(),
             )
