@@ -142,18 +142,12 @@ impl TransformConfig for ReduceConfig {
                             (false, true) => Kind::float(),
                             (false, false) => Kind::undefined(),
                         };
-                    if contains_undefined {
-                        kind.add_undefined();
-                    }
                     kind
                 }
                 MergeStrategy::Array => {
                     let contains_undefined = input_kind.contains_undefined();
                     let unknown_kind = input_kind.clone();
                     let mut kind = Kind::array(Collection::empty().with_unknown(unknown_kind));
-                    if contains_undefined {
-                        kind.add_undefined();
-                    }
                     kind
                 }
                 MergeStrategy::Concat => {
@@ -168,19 +162,12 @@ impl TransformConfig for ReduceConfig {
                         let array_elements = array.reduced_kind().union(input_kind.without_array());
                         new_kind.add_array(Collection::empty().with_unknown(array_elements));
                     }
-
-                    if input_kind.contains_undefined() {
-                        new_kind.add_undefined();
-                    }
                     new_kind
                 }
                 MergeStrategy::ConcatNewline | MergeStrategy::ConcatRaw => {
                     // can only produce bytes (or undefined)
                     if input_kind.contains_bytes() {
                         let mut kind = Kind::bytes();
-                        if input_kind.contains_undefined() {
-                            kind.add_undefined();
-                        }
                         kind
                     } else {
                         Kind::undefined()
@@ -189,9 +176,6 @@ impl TransformConfig for ReduceConfig {
                 MergeStrategy::ShortestArray | MergeStrategy::LongestArray => {
                     if let Some(array) = input_kind.as_array() {
                         let mut kind = Kind::array(array.clone());
-                        if input_kind.contains_undefined() {
-                            kind.add_undefined();
-                        }
                         kind
                     } else {
                         Kind::undefined()
@@ -206,9 +190,6 @@ impl TransformConfig for ReduceConfig {
                         array_elements = array_elements.union(object.reduced_kind());
                     }
                     let mut kind = Kind::array(Collection::empty().with_unknown(array_elements));
-                    if input_kind.contains_undefined() {
-                        kind.add_undefined();
-                    }
                     kind
                 }
             };
