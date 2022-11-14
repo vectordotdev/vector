@@ -17,7 +17,6 @@
     />
 
     <style type="text/css">
-      
     </style>
   </head>
 
@@ -128,7 +127,6 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
           } catch (e) {
             window.outputEditor.setValue(`Error reading the shared URL\n${e}`);
           }
-          
         }
       });
     </script>
@@ -184,7 +182,6 @@ String: ${str}
           inputs.forEach((input) => {
             results.push(window.run_vrl(input));
           })
-          
           let outputs = [];
           results.forEach((res) => {
             if (res.output) {
@@ -231,7 +228,7 @@ String: ${str}
         console.log(
           "[DEBUG::handleShareCode()] Printing out base64 encoded state\n",
           btoa(JSON.stringify(state))
-        ); 
+        );
         window.history.pushState(state, "", `?state=${encodeURIComponent(btoa(JSON.stringify(state)))}`);
       }
     </script>
