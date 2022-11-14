@@ -120,10 +120,12 @@ impl TagValueSet {
                 }
             },
             Self::Set(set) => {
-                // If the value was previously present, we want to move it to become the last element. The
-                // only way to do this is to remove any existing value.
-                set.shift_remove(&value);
-                set.insert(value)
+                let (index, result) = set.insert_full(value);
+                if !result {
+                    // The value was already in the set, so move it to the last position.
+                    set.move_index(index, set.len() - 1);
+                }
+                result
             }
         }
     }
