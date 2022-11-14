@@ -1,5 +1,5 @@
-use bytes::Bytes;
 use chrono::Utc;
+use codecs::BytesDeserializerConfig;
 use futures::{stream, StreamExt};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
@@ -34,6 +34,11 @@ pub struct InternalLogsConfig {
     ///
     /// By default, `"pid"` is used.
     pub pid_key: Option<String>,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 impl_generate_config_from_default!(InternalLogsConfig);
@@ -50,17 +55,26 @@ impl SourceConfig for InternalLogsConfig {
 
         let subscription = TraceSubscription::subscribe();
 
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         Ok(Box::pin(run(
             host_key,
             pid_key,
             subscription,
             cx.out,
             cx.shutdown,
+            log_namespace,
         )))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // There is a global and per-source `log_namespace` config.
+        // The source config overrides the global setting and is merged here.
+        let schema_definition = BytesDeserializerConfig
+            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .with_standard_vector_source_metadata();
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -74,6 +88,7 @@ async fn run(
     mut subscription: TraceSubscription,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
@@ -100,8 +115,20 @@ async fn run(
             log.insert(host_key.as_str(), hostname.to_owned());
         }
         log.insert(pid_key.as_str(), pid);
-        log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
-        log.try_insert(log_schema().timestamp_key(), Utc::now());
+
+        log_namespace.insert_vector_metadata(
+            &mut log,
+            log_schema().source_type_key(),
+            "source_type",
+            "internal_logs",
+        );
+        log_namespace.insert_vector_metadata(
+            &mut log,
+            log_schema().timestamp_key(),
+            "ingest_timestamp",
+            Utc::now(),
+        );
+
         if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
             emit!(StreamClosedError { error, count: 1 });
