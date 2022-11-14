@@ -9105,6 +9105,7 @@ dependencies = [
  "chrono",
  "criterion",
  "dyn-clone",
+ "getrandom 0.2.8",
  "indoc",
  "lalrpop-util",
  "lookup",
