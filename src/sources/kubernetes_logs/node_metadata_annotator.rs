@@ -74,10 +74,12 @@ fn annotate_from_metadata(
         let path = &fields_spec.node_labels.path;
 
         for (key, value) in labels.iter() {
+            let key_path = path!(key);
+
             log_namespace.insert_source_metadata(
                 Config::NAME,
                 log,
-                Some(LegacyKey::Overwrite(path.concat(key.as_str()))),
+                Some(LegacyKey::Overwrite(path.concat(key_path))),
                 path!("kubernetes", "node_labels", key),
                 value.to_owned(),
             )
@@ -87,7 +89,7 @@ fn annotate_from_metadata(
 
 #[cfg(test)]
 mod tests {
-    use lookup::lookup_v2::parse_target_path;
+    use lookup::{event_path, lookup_v2::parse_target_path};
     use vector_common::assert_event_data_eq;
 
     use super::*;
@@ -99,6 +101,7 @@ mod tests {
                 FieldsSpec::default(),
                 ObjectMeta::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -117,10 +120,17 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.node_labels.\"sandbox0-label0\"", "val0");
-                    log.insert("kubernetes.node_labels.\"sandbox0-label1\"", "val1");
+                    log.insert(
+                        event_path!("kubernetes", "node_labels", "sandbox0-label0"),
+                        "val0",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "node_labels", "sandbox0-label1"),
+                        "val1",
+                    );
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -141,16 +151,17 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("node_labels.\"sandbox0-label0\"", "val0");
-                    log.insert("node_labels.\"sandbox0-label1\"", "val1");
+                    log.insert(event_path!("node_labels", "sandbox0-label0"), "val0");
+                    log.insert(event_path!("node_labels", "sandbox0-label1"), "val1");
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
 
-        for (fields_spec, metadata, expected) in cases.into_iter() {
+        for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_metadata(&mut log, &fields_spec, &metadata, LogNamespace::Legacy);
+            annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace);
             assert_event_data_eq!(log, expected);
         }
     }

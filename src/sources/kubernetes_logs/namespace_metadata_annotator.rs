@@ -80,13 +80,15 @@ fn annotate_from_metadata(
     log_namespace: LogNamespace,
 ) {
     if let Some(labels) = &metadata.labels {
-        let path = &fields_spec.namespace_labels.path;
+        let prefix_path = &fields_spec.namespace_labels.path;
 
         for (key, value) in labels.iter() {
+            let key_path = path!(key);
+
             log_namespace.insert_source_metadata(
                 Config::NAME,
                 log,
-                Some(LegacyKey::Overwrite(path.concat(key.as_str()))),
+                Some(LegacyKey::Overwrite(prefix_path.concat(key_path))),
                 path!("kubernetes", "namespace_labels", key),
                 value.to_owned(),
             )
@@ -96,6 +98,7 @@ fn annotate_from_metadata(
 
 #[cfg(test)]
 mod tests {
+    use lookup::{event_path, metadata_path};
     use vector_common::assert_event_data_eq;
 
     use super::*;
@@ -107,6 +110,7 @@ mod tests {
                 FieldsSpec::default(),
                 ObjectMeta::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -125,10 +129,46 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.namespace_labels.\"sandbox0-label0\"", "val0");
-                    log.insert("kubernetes.namespace_labels.\"sandbox0-label1\"", "val1");
+                    log.insert(
+                        metadata_path!("kubernetes", "namespace_labels", "sandbox0-label0"),
+                        "val0",
+                    );
+                    log.insert(
+                        metadata_path!("kubernetes", "namespace_labels", "sandbox0-label1"),
+                        "val1",
+                    );
                     log
                 },
+                LogNamespace::Vector,
+            ),
+            (
+                FieldsSpec::default(),
+                ObjectMeta {
+                    name: Some("sandbox0-name".to_owned()),
+                    uid: Some("sandbox0-uid".to_owned()),
+                    labels: Some(
+                        vec![
+                            ("sandbox0-label0".to_owned(), "val0".to_owned()),
+                            ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
+                    ..ObjectMeta::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(
+                        event_path!("kubernetes", "namespace_labels", "sandbox0-label0"),
+                        "val0",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "namespace_labels", "sandbox0-label1"),
+                        "val1",
+                    );
+                    log
+                },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -149,10 +189,11 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("ns_labels.\"sandbox0-label0\"", "val0");
-                    log.insert("ns_labels.\"sandbox0-label1\"", "val1");
+                    log.insert(event_path!("ns_labels", "sandbox0-label0"), "val0");
+                    log.insert(event_path!("ns_labels", "sandbox0-label1"), "val1");
                     log
                 },
+                LogNamespace::Legacy,
             ),
             // Ensure we properly handle labels with `.` as flat fields.
             (
@@ -175,21 +216,31 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert(r#"kubernetes.namespace_labels."nested0.label0""#, "val0");
-                    log.insert(r#"kubernetes.namespace_labels."nested0.label1""#, "val1");
-                    log.insert(r#"kubernetes.namespace_labels."nested1.label0""#, "val2");
                     log.insert(
-                        r#"kubernetes.namespace_labels."nested2.label0.deep0""#,
+                        event_path!("kubernetes", "namespace_labels", "nested0.label0"),
+                        "val0",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "namespace_labels", "nested0.label1"),
+                        "val1",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "namespace_labels", "nested1.label0"),
+                        "val2",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "namespace_labels", "nested2.label0.deep0"),
                         "val3",
                     );
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
 
-        for (fields_spec, metadata, expected) in cases.into_iter() {
+        for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_metadata(&mut log, &fields_spec, &metadata, LogNamespace::Legacy);
+            annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace);
             assert_event_data_eq!(log, expected);
         }
     }

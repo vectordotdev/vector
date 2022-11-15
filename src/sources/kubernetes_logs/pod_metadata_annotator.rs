@@ -249,12 +249,13 @@ fn annotate_from_metadata(
 
     if let Some(labels) = &metadata.labels {
         for (key, value) in labels.iter() {
+            let key_path = path!(key);
             let legacy_key = fields_spec
                 .pod_labels
                 .path
                 .as_ref()
                 .map(|k| &k.path)
-                .map(|k| k.concat(key.as_str()))
+                .map(|k| k.concat(key_path))
                 .map(LegacyKey::Overwrite);
 
             log_namespace.insert_source_metadata(
@@ -269,12 +270,13 @@ fn annotate_from_metadata(
 
     if let Some(annotations) = &metadata.annotations {
         for (key, value) in annotations.iter() {
+            let key_path = path!(key);
             let legacy_key = fields_spec
                 .pod_annotations
                 .path
                 .as_ref()
                 .map(|k| &k.path)
-                .map(|k| k.concat(key.as_str()))
+                .map(|k| k.concat(key_path))
                 .map(LegacyKey::Overwrite);
 
             log_namespace.insert_source_metadata(
@@ -409,6 +411,7 @@ fn annotate_from_container(
 #[cfg(test)]
 mod tests {
     use k8s_openapi::api::core::v1::PodIP;
+    use lookup::event_path;
     use vector_common::assert_event_data_eq;
 
     use super::*;
@@ -420,6 +423,7 @@ mod tests {
                 FieldsSpec::default(),
                 ObjectMeta::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -447,21 +451,28 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_name", "sandbox0-name");
-                    log.insert("kubernetes.pod_namespace", "sandbox0-ns");
-                    log.insert("kubernetes.pod_uid", "sandbox0-uid");
-                    log.insert("kubernetes.pod_labels.\"sandbox0-label0\"", "val0");
-                    log.insert("kubernetes.pod_labels.\"sandbox0-label1\"", "val1");
+                    log.insert(event_path!("kubernetes", "pod_name"), "sandbox0-name");
+                    log.insert(event_path!("kubernetes", "pod_namespace"), "sandbox0-ns");
+                    log.insert(event_path!("kubernetes", "pod_uid"), "sandbox0-uid");
                     log.insert(
-                        "kubernetes.pod_annotations.\"sandbox0-annotation0\"",
+                        event_path!("kubernetes", "pod_labels", "sandbox0-label0"),
                         "val0",
                     );
                     log.insert(
-                        "kubernetes.pod_annotations.\"sandbox0-annotation1\"",
+                        event_path!("kubernetes", "pod_labels", "sandbox0-label1"),
+                        "val1",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_annotations", "sandbox0-annotation0"),
+                        "val0",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_annotations", "sandbox0-annotation1"),
                         "val1",
                     );
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -497,13 +508,14 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("name", "sandbox0-name");
-                    log.insert("ns", "sandbox0-ns");
-                    log.insert("uid", "sandbox0-uid");
-                    log.insert("labels.\"sandbox0-label0\"", "val0");
-                    log.insert("labels.\"sandbox0-label1\"", "val1");
+                    log.insert(event_path!("name"), "sandbox0-name");
+                    log.insert(event_path!("ns"), "sandbox0-ns");
+                    log.insert(event_path!("uid"), "sandbox0-uid");
+                    log.insert(event_path!("labels", "sandbox0-label0"), "val0");
+                    log.insert(event_path!("labels", "sandbox0-label1"), "val1");
                     log
                 },
+                LogNamespace::Legacy,
             ),
             // Ensure we properly handle labels with `.` as flat fields.
             (
@@ -526,21 +538,34 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_name", "sandbox0-name");
-                    log.insert("kubernetes.pod_namespace", "sandbox0-ns");
-                    log.insert("kubernetes.pod_uid", "sandbox0-uid");
-                    log.insert(r#"kubernetes.pod_labels."nested0.label0""#, "val0");
-                    log.insert(r#"kubernetes.pod_labels."nested0.label1""#, "val1");
-                    log.insert(r#"kubernetes.pod_labels."nested1.label0""#, "val2");
-                    log.insert(r#"kubernetes.pod_labels."nested2.label0.deep0""#, "val3");
+                    log.insert(event_path!("kubernetes", "pod_name"), "sandbox0-name");
+                    log.insert(event_path!("kubernetes", "pod_namespace"), "sandbox0-ns");
+                    log.insert(event_path!("kubernetes", "pod_uid"), "sandbox0-uid");
+                    log.insert(
+                        event_path!("kubernetes", "pod_labels", "nested0.label0"),
+                        "val0",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_labels", "nested0.label1"),
+                        "val1",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_labels", "nested1.label0"),
+                        "val2",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_labels", "nested2.label0.deep0"),
+                        "val3",
+                    );
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
 
-        for (fields_spec, metadata, expected) in cases.into_iter() {
+        for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_metadata(&mut log, &fields_spec, &metadata, LogNamespace::Legacy);
+            annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace);
             assert_event_data_eq!(log, expected);
         }
     }
@@ -552,9 +577,10 @@ mod tests {
             "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
             {
                 let mut log = LogEvent::default();
-                log.insert("kubernetes.container_name", "sandbox0-container0-name");
+                log.insert(event_path!("kubernetes", "container_name"), "sandbox0-container0-name");
                 log
             },
+            LogNamespace::Legacy,
         ),(
             FieldsSpec{
                 container_name: OwnedTargetPath::event(owned_value_path!("container_name")).into(),
@@ -563,15 +589,16 @@ mod tests {
             "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
             {
                 let mut log = LogEvent::default();
-                log.insert("container_name", "sandbox0-container0-name");
+                log.insert(event_path!("container_name"), "sandbox0-container0-name");
                 log
             },
+            LogNamespace::Legacy,
         )];
 
-        for (fields_spec, file, expected) in cases.into_iter() {
+        for (fields_spec, file, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
             let file_info = parse_log_file_path(file).unwrap();
-            annotate_from_file_info(&mut log, &fields_spec, &file_info, LogNamespace::Legacy);
+            annotate_from_file_info(&mut log, &fields_spec, &file_info, log_namespace);
             assert_event_data_eq!(log, expected);
         }
     }
@@ -583,6 +610,7 @@ mod tests {
                 FieldsSpec::default(),
                 PodSpec::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -592,9 +620,13 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_node_name", "sandbox0-node-name");
+                    log.insert(
+                        event_path!("kubernetes", "pod_node_name"),
+                        "sandbox0-node-name",
+                    );
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -607,15 +639,16 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("node_name", "sandbox0-node-name");
+                    log.insert(event_path!("node_name"), "sandbox0-node-name");
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
 
-        for (fields_spec, pod_spec, expected) in cases.into_iter() {
+        for (fields_spec, pod_spec, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_pod_spec(&mut log, &fields_spec, &pod_spec, LogNamespace::Legacy);
+            annotate_from_pod_spec(&mut log, &fields_spec, &pod_spec, log_namespace);
             assert_event_data_eq!(log, expected);
         }
     }
@@ -627,6 +660,7 @@ mod tests {
                 FieldsSpec::default(),
                 PodStatus::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -636,9 +670,10 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_ip", "192.168.1.2");
+                    log.insert(event_path!("kubernetes", "pod_ip"), "192.168.1.2");
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -651,9 +686,10 @@ mod tests {
                 {
                     let mut log = LogEvent::default();
                     let ips_vec = vec!["192.168.1.2"];
-                    log.insert("kubernetes.pod_ips", ips_vec);
+                    log.insert(event_path!("kubernetes", "pod_ips"), ips_vec);
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -683,11 +719,12 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.custom_pod_ip", "192.168.1.2");
+                    log.insert(event_path!("kubernetes", "custom_pod_ip"), "192.168.1.2");
                     let ips_vec = vec!["192.168.1.2", "192.168.1.3"];
-                    log.insert("kubernetes.custom_pod_ips", ips_vec);
+                    log.insert(event_path!("kubernetes", "custom_pod_ips"), ips_vec);
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -708,17 +745,18 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_ip", "192.168.1.2");
+                    log.insert(event_path!("kubernetes", "pod_ip"), "192.168.1.2");
                     let ips_vec = vec!["192.168.1.2", "192.168.1.3"];
-                    log.insert("kubernetes.pod_ips", ips_vec);
+                    log.insert(event_path!("kubernetes", "pod_ips"), ips_vec);
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
 
-        for (fields_spec, pod_status, expected) in cases.into_iter() {
+        for (fields_spec, pod_status, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_pod_status(&mut log, &fields_spec, &pod_status, LogNamespace::Legacy);
+            annotate_from_pod_status(&mut log, &fields_spec, &pod_status, log_namespace);
             assert_event_data_eq!(log, expected);
         }
     }
@@ -730,6 +768,7 @@ mod tests {
                 FieldsSpec::default(),
                 ContainerStatus::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -741,18 +780,22 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.container_id", "container_id_foo");
+                    log.insert(
+                        event_path!("kubernetes", "container_id"),
+                        "container_id_foo",
+                    );
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
-        for (fields_spec, container_status, expected) in cases.into_iter() {
+        for (fields_spec, container_status, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
             annotate_from_container_status(
                 &mut log,
                 &fields_spec,
                 &container_status,
-                LogNamespace::Legacy,
+                log_namespace,
             );
             assert_event_data_eq!(log, expected);
         }
@@ -765,6 +808,7 @@ mod tests {
                 FieldsSpec::default(),
                 Container::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -774,9 +818,13 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.container_image", "sandbox0-container-image");
+                    log.insert(
+                        event_path!("kubernetes", "container_image"),
+                        "sandbox0-container-image",
+                    );
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -790,15 +838,16 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("container_image", "sandbox0-container-image");
+                    log.insert(event_path!("container_image"), "sandbox0-container-image");
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
 
-        for (fields_spec, container, expected) in cases.into_iter() {
+        for (fields_spec, container, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_container(&mut log, &fields_spec, &container, LogNamespace::Legacy);
+            annotate_from_container(&mut log, &fields_spec, &container, log_namespace);
             assert_event_data_eq!(log, expected);
         }
     }
