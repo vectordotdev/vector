@@ -1151,7 +1151,7 @@ if @cue_binary_path.nil?
 end
 
 schema_path = ARGV[0]
-root_schema = JSON.load_file schema_path
+root_schema = JSON.parse(File.read(schema_path))
 
 component_types = %w[source transform sink]
 

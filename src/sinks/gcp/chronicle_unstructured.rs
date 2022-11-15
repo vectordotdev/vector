@@ -458,6 +458,7 @@ impl Service<ChronicleRequest> for ChronicleService {
         );
 
         let metadata = request.get_metadata();
+
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
         self.creds.apply(&mut http_request);
 

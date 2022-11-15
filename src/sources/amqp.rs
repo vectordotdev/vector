@@ -234,26 +234,22 @@ fn populate_event(
     // This handles the transition from the original timestamp logic. Originally the
     // `timestamp_key` was populated by the `properties.timestamp()` time on the message, falling
     // back to calling `now()`.
-    match (log_namespace, timestamp) {
-        (LogNamespace::Vector, None) => {
-            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
-        }
-        (LogNamespace::Vector, Some(timestamp)) => {
-            log.insert(
-                metadata_path!(AmqpSourceConfig::NAME, "timestamp"),
-                timestamp,
-            );
+    match log_namespace {
+        LogNamespace::Vector => {
+            if let Some(timestamp) = timestamp {
+                log.insert(
+                    metadata_path!(AmqpSourceConfig::NAME, "timestamp"),
+                    timestamp,
+                );
+            };
 
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
-        (LogNamespace::Legacy, None) => {
+        LogNamespace::Legacy => {
             log.try_insert(
                 (PathPrefix::Event, log_schema().timestamp_key()),
-                Utc::now(),
+                timestamp.unwrap_or_else(Utc::now),
             );
-        }
-        (LogNamespace::Legacy, Some(timestamp)) => {
-            log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
         }
     };
 }
