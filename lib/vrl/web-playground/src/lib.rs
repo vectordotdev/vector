@@ -5,7 +5,7 @@ use value::Secrets;
 use vrl::diagnostic::DiagnosticList;
 use vrl::state::TypeState;
 use vrl::{diagnostic::Formatter, prelude::BTreeMap, CompileConfig, Runtime};
-use vrl::{TargetValue, TimeZone};
+use vrl::{TargetValue, TimeZone, Terminate};
 use wasm_bindgen::prelude::*;
 
 #[derive(Serialize, Deserialize)]
@@ -41,7 +41,7 @@ impl VrlCompileResult {
 pub struct VrlDiagnosticResult {
     pub list: Vec<String>,
     pub msg: String,
-    pub msg_colorized: String,
+    pub msg_colorized: String
 }
 
 impl VrlDiagnosticResult {
@@ -58,6 +58,14 @@ impl VrlDiagnosticResult {
                 .to_string(),
         }
     }
+
+    fn new_runtime_error(terminate: Terminate) -> Self {
+        Self {
+            list: Vec::with_capacity(1),
+            msg: format!("Runtime Error:\n{terminate}"),
+            msg_colorized: String::from(" "),
+        }
+    }
 }
 
 // TODO: return diagnostic if fails upon compilation, currently being ignored
@@ -69,7 +77,6 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
     let config = CompileConfig::default();
     let timezone = TimeZone::default();
 
-    let mut diagnostics_res: VrlDiagnosticResult = VrlDiagnosticResult::default();
     let mut target_value = TargetValue {
         value: event.clone(),
         metadata: Value::Object(BTreeMap::new()),
@@ -78,15 +85,12 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
 
     let program = match vrl::compile_with_state(&input.program, &functions, &state, config) {
         Ok(program) => program,
-        Err(diagnostics) => {
-            diagnostics_res = VrlDiagnosticResult::new(&input.program, diagnostics);
-            return Err(diagnostics_res);
-        }
+        Err(diagnostics) => return Err(VrlDiagnosticResult::new(&input.program, diagnostics))
     };
 
     match runtime.resolve(&mut target_value, &program.program, &timezone) {
         Ok(result) => Ok(VrlCompileResult::new(result, target_value.value)),
-        Err(_err) => Err(diagnostics_res),
+        Err(err) => return Err(VrlDiagnosticResult::new_runtime_error(err))
     }
 }
 

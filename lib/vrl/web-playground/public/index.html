@@ -25,9 +25,9 @@
       <div id="summary-section">
         <h1>VRL Playground</h1>
         <p>
-          We compiled the <a href="https://vrl.dev">Vector Remap Language</a> crate into a web
-          assembly binary so you could see how a VRL program changes an event. You can write a
-          program, change the input event, run the program, share it, and see the output.
+          Vector Remap Language (VRL) is an expression-oriented language designed for transforming
+          observability data. This playground lets you write a program, run it against an event or
+          events, share it, and see how the events are transformed.
         </p>
       </div>
 
@@ -64,6 +64,15 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
+
+    <!-- moving the below script above any calls to handleRunCode()
+    should help prevent "window.run_vrl is not a function" error -->
+    <script type="module">
+      import init, { run_vrl } from "./vrl_web_playground.js";
+      init().then(() => {
+        window.run_vrl = run_vrl;
+      });
+    </script>
     <script>
       // require is provided by loader.min.js.
       require.config({
@@ -128,13 +137,6 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
             window.outputEditor.setValue(`Error reading the shared URL\n${e}`);
           }
         }
-      });
-    </script>
-
-    <script type="module">
-      import init, { run_vrl } from "./vrl_web_playground.js";
-      init().then(() => {
-        window.run_vrl = run_vrl;
       });
     </script>
 
