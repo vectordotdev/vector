@@ -5,7 +5,7 @@ use value::Secrets;
 use vrl::diagnostic::DiagnosticList;
 use vrl::state::TypeState;
 use vrl::{diagnostic::Formatter, prelude::BTreeMap, CompileConfig, Runtime};
-use vrl::{TargetValue, TimeZone, Terminate};
+use vrl::{TargetValue, Terminate, TimeZone};
 use wasm_bindgen::prelude::*;
 
 #[derive(Serialize, Deserialize)]
@@ -41,7 +41,7 @@ impl VrlCompileResult {
 pub struct VrlDiagnosticResult {
     pub list: Vec<String>,
     pub msg: String,
-    pub msg_colorized: String
+    pub msg_colorized: String,
 }
 
 impl VrlDiagnosticResult {
@@ -59,11 +59,13 @@ impl VrlDiagnosticResult {
         }
     }
 
-    fn new_runtime_error(terminate: Terminate) -> Self {
+    fn new_runtime_error(program: &str, terminate: Terminate) -> Self {
         Self {
             list: Vec::with_capacity(1),
-            msg: format!("Runtime Error:\n{terminate}"),
-            msg_colorized: String::from(" "),
+            msg: Formatter::new(program, terminate.clone().get_expression_error()).to_string(),
+            msg_colorized: Formatter::new(program, terminate.get_expression_error())
+                .colored()
+                .to_string(),
         }
     }
 }
@@ -85,12 +87,12 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
 
     let program = match vrl::compile_with_state(&input.program, &functions, &state, config) {
         Ok(program) => program,
-        Err(diagnostics) => return Err(VrlDiagnosticResult::new(&input.program, diagnostics))
+        Err(diagnostics) => return Err(VrlDiagnosticResult::new(&input.program, diagnostics)),
     };
 
     match runtime.resolve(&mut target_value, &program.program, &timezone) {
         Ok(result) => Ok(VrlCompileResult::new(result, target_value.value)),
-        Err(err) => return Err(VrlDiagnosticResult::new_runtime_error(err))
+        Err(err) => return Err(VrlDiagnosticResult::new_runtime_error(&input.program, err)),
     }
 }
 

@@ -6,11 +6,11 @@ use crate::{DiagnosticMessage, Label, Note, Severity, Span};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
-    severity: Severity,
-    code: usize,
-    message: String,
-    labels: Vec<Label>,
-    notes: Vec<Note>,
+    pub severity: Severity,
+    pub code: usize,
+    pub message: String,
+    pub labels: Vec<Label>,
+    pub notes: Vec<Note>,
 }
 
 impl Diagnostic {
