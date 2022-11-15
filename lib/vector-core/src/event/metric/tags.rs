@@ -1,15 +1,69 @@
 #[cfg(test)]
 use std::borrow::Borrow;
-use std::cmp::Ordering;
 use std::collections::{hash_map::DefaultHasher, BTreeMap};
 use std::hash::{Hash, Hasher};
+use std::{cmp::Ordering, mem};
 
 use indexmap::IndexSet;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::{configurable_component, Configurable};
 
-type TagValue = Option<String>;
+/// A single tag value, either a bare tag or a value.
+#[derive(Clone, Configurable, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum TagValue {
+    /// Bare tag value.
+    Bare,
+    /// Tag value containing a string.
+    Value(#[configurable(transparent)] String),
+}
+
+impl From<Option<String>> for TagValue {
+    fn from(value: Option<String>) -> Self {
+        match value {
+            None => Self::Bare,
+            Some(value) => Self::Value(value),
+        }
+    }
+}
+
+impl ByteSizeOf for TagValue {
+    fn allocated_bytes(&self) -> usize {
+        match self {
+            Self::Bare => 0,
+            Self::Value(value) => value.allocated_bytes(),
+        }
+    }
+}
+
+impl TagValue {
+    pub fn as_option(&self) -> Option<&str> {
+        match self {
+            Self::Bare => None,
+            Self::Value(value) => Some(value.as_str()),
+        }
+    }
+
+    pub fn into_option(self) -> Option<String> {
+        match self {
+            Self::Bare => None,
+            Self::Value(value) => Some(value),
+        }
+    }
+
+    pub fn is_bare(&self) -> bool {
+        matches!(self, Self::Bare)
+    }
+
+    pub fn is_value(&self) -> bool {
+        matches!(self, Self::Value(_))
+    }
+
+    #[must_use]
+    pub fn take(&mut self) -> Self {
+        mem::replace(self, Self::Bare)
+    }
+}
 
 type TagValueRef<'a> = Option<&'a str>;
 
@@ -44,8 +98,11 @@ impl TagValueSet {
     pub(crate) fn into_single(self) -> Option<String> {
         match self {
             Self::Empty => None,
-            Self::Single(tag) => tag,
-            Self::Set(set) => set.into_iter().rfind(Option::is_some).flatten(),
+            Self::Single(tag) => tag.into_option(),
+            Self::Set(set) => set
+                .into_iter()
+                .rfind(TagValue::is_value)
+                .and_then(TagValue::into_option),
         }
     }
 
@@ -54,11 +111,11 @@ impl TagValueSet {
     pub(crate) fn as_single(&self) -> Option<&str> {
         match self {
             Self::Empty => None,
-            Self::Single(tag) => tag.as_deref(),
+            Self::Single(tag) => tag.as_option(),
             Self::Set(set) => set
                 .iter()
-                .rfind(|tag| tag.is_some())
-                .and_then(Option::as_deref),
+                .rfind(|tag| tag.is_value())
+                .and_then(TagValue::as_option),
         }
     }
 
@@ -95,12 +152,12 @@ impl TagValueSet {
         match self {
             Self::Empty => (),
             Self::Single(tag) => {
-                if !f(tag.as_deref()) {
+                if !f(tag.as_option()) {
                     *self = Self::Empty;
                 }
             }
             Self::Set(set) => {
-                set.retain(|value| f(value.as_deref()));
+                set.retain(|value| f(value.as_option()));
                 match set.len() {
                     0 => *self = Self::Empty,
                     1 => *self = Self::Single(set.pop().unwrap()),
@@ -117,8 +174,8 @@ impl TagValueSet {
                 *self = Self::Single(value);
                 false
             }
-            // Need to take ownership of the single value to optionally move it into a set.
             Self::Single(single) => {
+                // Need to take ownership of the single value to optionally move it into a set.
                 let tag = single.take();
                 if tag == value {
                     *self = Self::Single(value);
@@ -216,7 +273,7 @@ impl<const N: usize> From<[String; N]> for TagValueSet {
         // See logic in `TagValueSet::insert` to why we can't just use `Self(values.into())`
         let mut result = Self::default();
         for value in values {
-            result.insert(value);
+            result.insert(TagValue::Value(value));
         }
         result
     }
@@ -232,7 +289,7 @@ impl From<Vec<String>> for TagValueSet {
     fn from(values: Vec<String>) -> Self {
         let mut result = Self::default();
         for value in values {
-            result.insert(value);
+            result.insert(TagValue::Value(value));
         }
         result
     }
@@ -273,7 +330,7 @@ pub enum TagValueIntoIter {
 }
 
 impl Iterator for TagValueIntoIter {
-    type Item = Option<String>;
+    type Item = TagValue;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
@@ -301,11 +358,11 @@ impl<'a> Iterator for TagValueRefIter<'a> {
         match self {
             Self::Empty => None,
             Self::Single(single) => {
-                let result = single.as_deref();
+                let result = single.as_option();
                 *self = Self::Empty;
                 Some(result)
             }
-            Self::Set(set) => set.next().map(Option::as_deref),
+            Self::Set(set) => set.next().map(TagValue::as_option),
         }
     }
 }
@@ -406,7 +463,10 @@ impl MetricTags {
 
     pub fn extend(&mut self, tags: impl IntoIterator<Item = (String, String)>) {
         for (key, value) in tags {
-            self.0.entry(key).or_default().insert(value);
+            self.0
+                .entry(key)
+                .or_default()
+                .insert(TagValue::Value(value));
         }
     }
 
@@ -440,7 +500,11 @@ impl FromIterator<(String, String)> for MetricTags {
     fn from_iter<T: IntoIterator<Item = (String, String)>>(tags: T) -> Self {
         let mut result = Self::default();
         for (key, value) in tags {
-            result.0.entry(key).or_default().insert(value);
+            result
+                .0
+                .entry(key)
+                .or_default()
+                .insert(TagValue::Value(value));
         }
         result
     }
@@ -469,6 +533,12 @@ mod test_support {
     use quickcheck::{Arbitrary, Gen};
 
     use super::*;
+
+    impl Arbitrary for TagValue {
+        fn arbitrary(g: &mut Gen) -> Self {
+            Self::from(Option::<String>::arbitrary(g))
+        }
+    }
 
     impl Arbitrary for TagValueSet {
         fn arbitrary(g: &mut Gen) -> Self {
@@ -510,7 +580,7 @@ mod tests {
             let mut set = TagValueSet::from(values.clone());
             assert_eq!(set.is_empty(), values.is_empty());
             // All input values are contained in the set.
-            assert!(values.iter().all(|v| set.contains(&Some(v.clone()))));
+            assert!(values.iter().all(|v| set.contains(&TagValue::Value(v.clone()))));
             // All set values were in the input.
             assert!(set.iter().all(|s| s.map_or(false, |s| values.contains(&s.to_string()))));
             // Critical: the "single value" of the set is the last value added.
@@ -532,26 +602,27 @@ mod tests {
 
                 if let Some(first) = values.first() {
                     // Check that re-adding the last value doesn't change the set.
-                    set.insert(values.last().unwrap().clone());
+                    set.insert(TagValue::Value(values.last().unwrap().clone()));
                     assert_eq!(set.len(), start_len);
                     assert_eq!(set.as_single(), values.last().map(String::as_str));
 
                     // But re-adding the first value makes it the last.
-                    set.insert(values.first().unwrap().clone());
+                    set.insert(TagValue::Value(first.clone()));
                     assert_eq!(set.len(), start_len);
                     assert_eq!(set.as_single(), Some(first.as_str()));
                 }
             }
 
             let new_addition = !values.iter().any(|v| v == &addition);
-            assert_eq!(new_addition, !set.contains(&Some(addition.clone())));
+            let addition=TagValue::Value(addition);
+            assert_eq!(new_addition, !set.contains(&addition));
             set.insert(addition.clone());
-            assert!(set.contains(&Some(addition.clone())));
+            assert!(set.contains(&addition));
 
             // If the addition wasn't in the start set, it will increase the length.
             assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
             // The "single" value will match the addition.
-            assert_eq!(set.as_single(), Some(addition.as_str()));
+            assert_eq!(set.as_single(), addition.as_option());
         }
 
         #[test]
@@ -561,11 +632,11 @@ mod tests {
             // All input values are contained in the set.
             assert!(values.iter().all(|v| set.contains(v)));
             // All set values were in the input.
-            assert!(set.iter().all(|s| values.contains(&s.map(str::to_string))));
+            assert!(set.iter().all(|s| values.contains(&TagValue::from(s.map(str::to_string)))));
             // Critical: the "single value" of the set is the last value added.
-            let last_value = values.iter().rfind(|v| v.is_some());
+            let last_value = values.iter().rfind(|v| v.is_value());
             if let Some(last) = &last_value {
-                assert_eq!(set.as_single(), last.as_deref());
+                assert_eq!(set.as_single(), last.as_option());
             }
 
             let start_len = set.len();
@@ -587,14 +658,14 @@ mod tests {
                     set.insert(values.last().unwrap().clone());
                     assert_eq!(set.len(), start_len);
                     if let Some(last) = &last_value {
-                        assert_eq!(set.as_single(), last.as_deref());
+                        assert_eq!(set.as_single(), last.as_option());
                     }
 
                     // But re-adding the first value makes it the last.
                     set.insert(first.clone());
                     assert_eq!(set.len(), start_len);
                     // And it shows up as the single value if it was not bare.
-                    if let Some(first) = first {
+                    if let TagValue::Value(first) = first {
                         assert_eq!(set.as_single(), Some(first.as_str()));
                     }
                 }
@@ -608,8 +679,8 @@ mod tests {
             // If the addition wasn't in the start set, it will increase the length.
             assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
             // The "single" value will match the addition.
-            if addition.is_some() {
-                assert_eq!(set.as_single(), addition.as_deref());
+            if addition.is_value() {
+                assert_eq!(set.as_single(), addition.as_option());
             }
         }
     }
