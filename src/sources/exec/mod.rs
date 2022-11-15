@@ -37,7 +37,7 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use lookup::{event_path, path};
+use lookup::path;
 use vector_core::config::LogNamespace;
 
 pub mod sized_bytes_codec;
@@ -697,7 +697,14 @@ mod tests {
         let pid = Some(8888_u32);
 
         let mut event = LogEvent::from("hello world").into();
-        handle_event(&config, &hostname, &data_stream, pid, &mut event);
+        handle_event(
+            &config,
+            &hostname,
+            &data_stream,
+            pid,
+            &mut event,
+            LogNamespace::Legacy,
+        );
         let log = event.as_log();
 
         assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
@@ -717,7 +724,14 @@ mod tests {
         let pid = Some(8888_u32);
 
         let mut event = LogEvent::from("hello world").into();
-        handle_event(&config, &hostname, &data_stream, pid, &mut event);
+        handle_event(
+            &config,
+            &hostname,
+            &data_stream,
+            pid,
+            &mut event,
+            LogNamespace::Legacy,
+        );
         let log = event.as_log();
 
         assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
@@ -744,6 +758,7 @@ mod tests {
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
             framing: None,
             decoding: default_decoding(),
+            log_namespace: None,
         };
 
         let command = build_command(&config);
@@ -810,7 +825,14 @@ mod tests {
         // Wait for our task to finish, wrapping it in a timeout
         let timeout = tokio::time::timeout(
             time::Duration::from_secs(5),
-            run_command(config.clone(), hostname, decoder, shutdown, tx),
+            run_command(
+                config.clone(),
+                hostname,
+                decoder,
+                shutdown,
+                tx,
+                LogNamespace::Legacy,
+            ),
         );
 
         drop(rx);
@@ -834,7 +856,14 @@ mod tests {
         // Wait for our task to finish, wrapping it in a timeout
         let timeout = tokio::time::timeout(
             time::Duration::from_secs(5),
-            run_command(config.clone(), hostname, decoder, shutdown, tx),
+            run_command(
+                config.clone(),
+                hostname,
+                decoder,
+                shutdown,
+                tx,
+                LogNamespace::Legacy,
+            ),
         );
 
         let timeout_result = crate::test_util::components::assert_source_compliance(
@@ -881,7 +910,14 @@ mod tests {
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let (tx, mut rx) = SourceSender::new_test();
 
-        let task = tokio::spawn(run_command(config.clone(), hostname, decoder, shutdown, tx));
+        let task = tokio::spawn(run_command(
+            config.clone(),
+            hostname,
+            decoder,
+            shutdown,
+            tx,
+            LogNamespace::Legacy,
+        ));
 
         tokio::time::sleep(Duration::from_secs(1)).await; // let the source start the command
 
@@ -931,6 +967,7 @@ mod tests {
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
             framing: None,
             decoding: default_decoding(),
+            log_namespace: None,
         }
     }
 }
