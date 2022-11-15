@@ -36,7 +36,7 @@ impl From<ExpressionError> for Diagnostic {
             code: error.code(),
             message: error.message(),
             labels: error.labels(),
-            notes: error.notes()
+            notes: error.notes(),
         }
     }
 }
