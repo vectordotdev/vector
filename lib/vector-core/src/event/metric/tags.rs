@@ -582,7 +582,9 @@ mod tests {
             // All input values are contained in the set.
             assert!(values.iter().all(|v| set.contains(&TagValue::Value(v.clone()))));
             // All set values were in the input.
-            assert!(set.iter().all(|s| s.map_or(false, |s| values.contains(&s.to_string()))));
+            assert!(set.iter().all(
+                |s| values.contains(&s.expect("must not contain bare tags").into())
+            ));
             // Critical: the "single value" of the set is the last value added.
             assert_eq!(set.as_single(), values.last().map(String::as_str));
 
