@@ -15,10 +15,13 @@ type TagValue = Option<String>;
 /// used to provide the storage for `TagValueSet`.
 #[derive(Clone, Configurable, Debug, Eq, PartialEq)]
 pub enum TagValueSet {
-    /// This represents a set containing a no value or a single value. This is stored separately to
+    /// This represents a set containing no value.
     /// avoid the overhead of allocating a hash table for the common case of a single value for a
     /// tag.
-    Single(#[configurable(transparent)] Option<TagValue>),
+    Empty,
+    /// This represents a set containing a single value. This is stored separately to avoid the
+    /// overhead of allocating a hash table for the common case of a single value for a tag.
+    Single(#[configurable(transparent)] TagValue),
     /// This holds an actual set of values. This variant will be automatically created when a single
     /// value is added to, and reduced down to a single value when the length is reduced to 1.  An
     /// index set is used for this set, as it preserves the insertion order of the contained
@@ -29,7 +32,7 @@ pub enum TagValueSet {
 
 impl Default for TagValueSet {
     fn default() -> Self {
-        Self::Single(None)
+        Self::Empty
     }
 }
 
@@ -38,7 +41,8 @@ impl TagValueSet {
     /// single string while still storing all of the values.
     pub(crate) fn into_single(self) -> Option<String> {
         match self {
-            Self::Single(tag) => tag.and_then(|tag| tag),
+            Self::Empty => None,
+            Self::Single(tag) => tag,
             Self::Set(set) => set.into_iter().rfind(Option::is_some).and_then(|tag| tag),
         }
     }
@@ -47,24 +51,27 @@ impl TagValueSet {
     /// single string while still storing all of the values.
     pub(crate) fn as_single(&self) -> Option<&str> {
         match self {
-            Self::Single(tag) => tag.as_ref(),
-            Self::Set(set) => set.iter().rfind(|tag| tag.is_some()),
+            Self::Empty => None,
+            Self::Single(tag) => tag.as_deref(),
+            Self::Set(set) => set
+                .iter()
+                .rfind(|tag| tag.is_some())
+                .and_then(Option::as_deref),
         }
-        .and_then(Option::as_deref)
     }
 
     fn is_empty(&self) -> bool {
         match self {
-            Self::Single(None) => true,
-            Self::Single(Some(_)) | Self::Set(_) => false, // the `Set` variant will never be empty
+            Self::Empty => true,
+            Self::Single(_) | Self::Set(_) => false, // the `Set` variant will never be empty
         }
     }
 
     #[cfg(test)]
     fn len(&self) -> usize {
         match self {
-            Self::Single(None) => 0,
-            Self::Single(Some(_)) => 1,
+            Self::Empty => 0,
+            Self::Single(_) => 1,
             Self::Set(set) => set.len(),
         }
     }
@@ -72,28 +79,29 @@ impl TagValueSet {
     #[cfg(test)]
     fn contains<T>(&self, value: &T) -> bool
     where
-        T: Eq + Hash + PartialEq<Option<String>>,
+        T: Eq + Hash + PartialEq<TagValue>,
         TagValue: Borrow<T>,
     {
         match self {
-            Self::Single(None) => false,
-            Self::Single(Some(tag)) => value == tag,
+            Self::Empty => false,
+            Self::Single(tag) => value == tag,
             Self::Set(set) => set.contains(value),
         }
     }
 
     fn retain(&mut self, mut f: impl FnMut(Option<&str>) -> bool) {
         match self {
-            Self::Single(None) => (),
-            Self::Single(Some(tag)) => {
+            Self::Empty => (),
+            Self::Single(tag) => {
                 if !f(tag.as_deref()) {
-                    *self = Self::Single(None);
+                    *self = Self::Empty;
                 }
             }
             Self::Set(set) => {
                 set.retain(|value| f(value.as_deref()));
                 match set.len() {
-                    0 | 1 => *self = Self::Single(set.pop()),
+                    0 => *self = Self::Empty,
+                    1 => *self = Self::Single(set.pop().unwrap()),
                     _ => {}
                 }
             }
@@ -103,22 +111,21 @@ impl TagValueSet {
     fn insert(&mut self, value: impl Into<TagValue>) -> bool {
         let value = value.into();
         match self {
+            Self::Empty => {
+                *self = Self::Single(value);
+                false
+            }
             // Need to take ownership of the single value to optionally move it into a set.
-            Self::Single(single) => match single.take() {
-                None => {
-                    *self = Self::Single(Some(value));
+            Self::Single(single) => {
+                let tag = single.take();
+                if tag == value {
+                    *self = Self::Single(value);
+                    true
+                } else {
+                    *self = Self::Set(IndexSet::from([tag, value]));
                     false
                 }
-                Some(tag) => {
-                    if tag == value {
-                        *self = Self::Single(Some(value));
-                        true
-                    } else {
-                        *self = Self::Set(IndexSet::from([tag, value]));
-                        false
-                    }
-                }
-            },
+            }
             Self::Set(set) => {
                 let (index, result) = set.insert_full(value);
                 if !result {
@@ -132,13 +139,15 @@ impl TagValueSet {
 
     fn iter(&self) -> TagValueRefIter<'_> {
         match self {
-            TagValueSet::Single(tag) => TagValueRefIter::Single(tag.as_ref()),
+            TagValueSet::Empty => TagValueRefIter::Empty,
+            TagValueSet::Single(tag) => TagValueRefIter::Single(tag),
             TagValueSet::Set(set) => TagValueRefIter::Set(set.into_iter()),
         }
     }
 
     fn into_iter(self) -> TagValueIter {
         match self {
+            Self::Empty => TagValueIter::Empty,
             Self::Single(tag) => TagValueIter::Single(tag),
             Self::Set(set) => TagValueIter::Set(set.into_iter()),
         }
@@ -151,6 +160,7 @@ impl TagValueSet {
 impl Hash for TagValueSet {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         match self {
+            Self::Empty => 0_u8.hash(hasher),
             Self::Single(tag) => tag.hash(hasher),
             Self::Set(set) => {
                 // Hash each contained value individually and then combine the hash values using
@@ -241,7 +251,8 @@ impl FromIterator<String> for TagValueSet {
 }
 
 pub enum TagValueIter {
-    Single(Option<TagValue>),
+    Empty,
+    Single(TagValue),
     Set(<IndexSet<TagValue> as IntoIterator>::IntoIter),
 }
 
@@ -250,14 +261,20 @@ impl Iterator for TagValueIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Single(single) => single.take(),
+            Self::Empty => None,
+            Self::Single(single) => {
+                let value = single.take();
+                *self = Self::Empty;
+                Some(value)
+            }
             Self::Set(set) => set.next(),
         }
     }
 }
 
 pub enum TagValueRefIter<'a> {
-    Single(Option<&'a TagValue>),
+    Empty,
+    Single(&'a TagValue),
     Set(<&'a IndexSet<TagValue> as IntoIterator>::IntoIter),
 }
 
@@ -266,7 +283,12 @@ impl<'a> Iterator for TagValueRefIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Single(single) => single.take().map(Option::as_deref),
+            Self::Empty => None,
+            Self::Single(single) => {
+                let result = single.as_deref();
+                *self = Self::Empty;
+                Some(result)
+            }
             Self::Set(set) => set.next().map(Option::as_deref),
         }
     }
@@ -275,6 +297,7 @@ impl<'a> Iterator for TagValueRefIter<'a> {
 impl ByteSizeOf for TagValueSet {
     fn allocated_bytes(&self) -> usize {
         match self {
+            Self::Empty => 0,
             Self::Single(tag) => tag.allocated_bytes(),
             Self::Set(set) => set.allocated_bytes(),
         }
