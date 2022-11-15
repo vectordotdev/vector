@@ -364,6 +364,7 @@ async fn run_scheduled(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_streaming(
     config: ExecConfig,
     hostname: Option<String>,
