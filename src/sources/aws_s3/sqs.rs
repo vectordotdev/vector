@@ -1,4 +1,4 @@
-use std::{future::ready, panic, sync::Arc};
+use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
 
 use aws_sdk_s3::{error::GetObjectError, Client as S3Client};
 use aws_sdk_sqs::{
@@ -95,9 +95,7 @@ pub(super) struct Config {
     /// high rate of messages being pushed into the queue and the objects being fetched are small. In these cases,
     /// Vector may not fully utilize system resources without fetching more messages per second, as the SQS message
     /// consumption rate affects the S3 object retrieval rate.
-    #[serde(default = "default_client_concurrency")]
-    #[derivative(Default(value = "default_client_concurrency()"))]
-    pub(super) client_concurrency: u32,
+    pub(super) client_concurrency: Option<NonZeroUsize>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -115,10 +113,6 @@ const fn default_visibility_timeout_secs() -> u32 {
 
 const fn default_true() -> bool {
     true
-}
-
-fn default_client_concurrency() -> u32 {
-    crate::num_threads() as u32
 }
 
 #[derive(Debug, Snafu)]
@@ -188,7 +182,7 @@ pub struct State {
 
     queue_url: String,
     poll_secs: i32,
-    client_concurrency: u32,
+    client_concurrency: usize,
     visibility_timeout_secs: i32,
     delete_message: bool,
 }
@@ -217,7 +211,10 @@ impl Ingestor {
 
             queue_url: config.queue_url,
             poll_secs: config.poll_secs as i32,
-            client_concurrency: config.client_concurrency,
+            client_concurrency: config
+                .client_concurrency
+                .map(|n| n.get())
+                .unwrap_or_else(crate::num_threads),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
         });

@@ -12,8 +12,7 @@ use std::{
 use futures::StreamExt;
 use tokio_util::time::{delay_queue, DelayQueue};
 
-/// An expired item, holding the value and the key with an expiration
-/// information.
+/// An expired item, holding the value and the key with an expiration information.
 pub type ExpiredItem<K, V> = (V, delay_queue::Expired<K>);
 
 /// A [`HashMap`] that maintains deadlines for the keys via a [`DelayQueue`].

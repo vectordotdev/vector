@@ -39,6 +39,7 @@ jobs:
         dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         cue: ${{ steps.filter.outputs.cue }}
+        component_docs: ${{ steps.filter.outputs.component_docs }}
         markdown: ${{ steps.filter.outputs.markdown }}
       steps:
       - uses: actions/checkout@v3
@@ -73,6 +74,8 @@ jobs:
               - 'scripts/cross/**'
             cue:
               - 'website/cue/**'
+            component_docs:
+              - 'scripts/generate-component-docs.rb'
             markdown:
               - '**/**.md'
             internal_events:
@@ -359,6 +362,9 @@ jobs:
       - name: Check Markdown
         if: needs.changes.outputs.markdown == 'true'
         run: make check-markdown
+      - name: Check Component Docs
+        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
+        run: make check-component-docs
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
