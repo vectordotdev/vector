@@ -99,7 +99,7 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
 .timestamp = to_unix_timestamp(ts)`,
           language: "coffeescript",
           theme: "vs-light",
-          // minimap: { enabled: false },
+          minimap: { enabled: false },
           automaticLayout: true,
         });
 
@@ -109,14 +109,14 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
 }`,
           language: "json",
           theme: "vs-light",
-          // minimap: { enabled: false },
+          minimap: { enabled: false },
           automaticLayout: true,
         });
 
         window.outputEditor = monaco.editor.create(document.getElementById("container-output"), {
           language: "json",
           theme: "vs-light",
-          // minimap: { enabled: false },
+          minimap: { enabled: false },
           automaticLayout: true,
         });
         const queryString = window.location.search;
@@ -215,6 +215,11 @@ String: ${str}
         if (res.output) {
           window.outputEditor.setValue(JSON.stringify(res["result"], null, "\t"));
         } else if (res.msg) {
+          // disable output validation for json
+          // since vrl error msgs won't ouput json
+          monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+            validate: false
+          });
           window.outputEditor.setValue(res["msg"]);
         }
         return res;
