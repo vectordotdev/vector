@@ -459,8 +459,25 @@ impl Kind {
 impl Kind {
     /// Remove the `undefined` state from the type, and return it.
     #[must_use]
-    pub fn without_undefined(mut self) -> Self {
-        self.remove_undefined();
-        self
+    pub fn without_undefined(&self) -> Self {
+        let mut kind = self.clone();
+        kind.remove_undefined();
+        kind
+    }
+
+    /// Remove the `array` state from the type, and return it.
+    #[must_use]
+    pub fn without_array(&self) -> Self {
+        let mut kind = self.clone();
+        kind.remove_array();
+        kind
+    }
+
+    /// Remove the `object` state from the type, and return it.
+    #[must_use]
+    pub fn without_object(&self) -> Self {
+        let mut kind = self.clone();
+        kind.remove_object();
+        kind
     }
 }
