@@ -1,4 +1,4 @@
-use diagnostic::{DiagnosticMessage, Label, Note};
+use diagnostic::{Diagnostic, DiagnosticMessage, Label, Note};
 use value::Value;
 
 pub type Resolved = Result<Value, ExpressionError>;
@@ -26,6 +26,19 @@ impl std::fmt::Display for ExpressionError {
 impl std::error::Error for ExpressionError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         None
+    }
+}
+
+impl From<ExpressionError> for Diagnostic {
+    fn from(_error: ExpressionError) -> Self {
+        unimplemented!()
+        // Self {
+        //     severity: ,
+        //     code: error.code(),
+        //     message: "".to_string(),
+        //     labels: vec![],
+        //     notes: vec![]
+        // }
     }
 }
 
