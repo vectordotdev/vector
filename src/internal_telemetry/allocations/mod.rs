@@ -21,7 +21,7 @@ pub(crate) use self::allocator::{
 };
 
 const NUM_GROUPS: usize = 128;
-static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
+pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
 
 type GroupMemStatsArray = [AtomicI64; NUM_GROUPS];
 
@@ -109,22 +109,24 @@ pub fn init_allocation_tracing() {
     alloc_processor
         .spawn(|| {
             without_allocation_tracing(|| loop {
-                for (group_idx, group) in GROUP_INFO.iter().enumerate() {
-                    let mut mem_used = 0;
-                    let mutex = THREAD_LOCAL_REFS.lock().unwrap();
-                    for idx in 0..mutex.len() {
-                        mem_used += mutex[idx][group_idx].load(Ordering::Relaxed);
-                    }
-                    if mem_used == 0 {
-                        continue;
-                    }
-                    let group_info = group.lock().unwrap();
-                    gauge!(
+                if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+                    for (group_idx, group) in GROUP_INFO.iter().enumerate() {
+                        let mut mem_used = 0;
+                        let mutex = THREAD_LOCAL_REFS.lock().unwrap();
+                        for idx in 0..mutex.len() {
+                            mem_used += mutex[idx][group_idx].load(Ordering::Relaxed);
+                        }
+                        if mem_used == 0 {
+                            continue;
+                        }
+                        let group_info = group.lock().unwrap();
+                        gauge!(
                         "component_allocated_bytes",
                         mem_used.to_f64().expect("failed to convert group_id from int to float"),
                         "component_kind" => group_info.component_kind.clone(),
                         "component_type" => group_info.component_type.clone(),
                         "component_id" => group_info.component_id.clone());
+                    }
                 }
                 thread::sleep(Duration::from_millis(5000));
             })
