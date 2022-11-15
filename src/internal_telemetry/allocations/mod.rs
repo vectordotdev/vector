@@ -107,9 +107,9 @@ pub fn init_allocation_tracing() {
     }
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
-        .spawn(|| {
-            without_allocation_tracing(|| loop {
-                if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+        .spawn(|| loop {
+            if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+                without_allocation_tracing(|| {
                     for (group_idx, group) in GROUP_INFO.iter().enumerate() {
                         let mut mem_used = 0;
                         let mutex = THREAD_LOCAL_REFS.lock().unwrap();
@@ -127,9 +127,9 @@ pub fn init_allocation_tracing() {
                         "component_type" => group_info.component_type.clone(),
                         "component_id" => group_info.component_id.clone());
                     }
-                }
-                thread::sleep(Duration::from_millis(5000));
-            })
+                });
+            }
+            thread::sleep(Duration::from_millis(5000));
         })
         .unwrap();
 }
