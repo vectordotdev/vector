@@ -600,34 +600,9 @@ base: components: sinks: aws_s3: configuration: {
 		description: "The tag-set for the object."
 		required:    false
 		type: object: options: "*": {
-			description: "Tags for a metric series."
+			description: "The tag-set for the object."
 			required:    true
-			type: {
-				object: options: {
-					Set: {
-						required: true
-						type: array: items: type: {
-							object: options: Value: {
-								required: true
-								type: string: syntax: "literal"
-							}
-							string: const: "Bare"
-						}
-					}
-					Single: {
-						description: "A single tag value, either a bare tag or a value."
-						required:    true
-						type: {
-							object: options: Value: {
-								required: true
-								type: string: syntax: "literal"
-							}
-							string: const: "Bare"
-						}
-					}
-				}
-				string: const: "Empty"
-			}
+			type: string: syntax: "literal"
 		}
 	}
 	tls: {
