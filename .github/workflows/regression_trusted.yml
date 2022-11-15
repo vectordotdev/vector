@@ -16,6 +16,7 @@ jobs:
     outputs:
       cpus: ${{ steps.system.outputs.CPUS }}
       memory: ${{ steps.system.outputs.MEMORY }}
+      vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
 
       comparison-sha: ${{ steps.metadata.outputs.COMPARISON_SHA }}
       comparison-tag: ${{ steps.metadata.outputs.COMPARISON_TAG }}
@@ -39,7 +40,7 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.5.0"
+          export SMP_CRATE_VERSION="0.5.1"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"
@@ -56,14 +57,17 @@ jobs:
       - name: Setup system details
         id: system
         run: |
-          export CPUS="8"
+          export CPUS="7"
           export MEMORY="30g"
+          export VECTOR_CPUS="4"
 
           echo "cpus total: ${CPUS}"
           echo "memory total: ${MEMORY}"
+          echo "vector cpus: ${VECTOR_CPUS}"
 
           echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
           echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
+          echo "VECTOR_CPUS=${VECTOR_CPUS}" >> $GITHUB_OUTPUT
 
         # github.rest.actions.listWorkflowRunArtifacts only returns first 30
         # artifacts, and returns a { data, headers, status, url } object. The
@@ -322,6 +326,9 @@ jobs:
             --baseline-sha ${{ needs.compute-metadata.outputs.baseline-sha }} \
             --comparison-sha ${{ needs.compute-metadata.outputs.comparison-sha }} \
             --target-config-dir ${{ github.workspace }}/regression/ \
+            --target-cpu-allotment "${{ needs.compute-metadata.outputs.cpus }}" \
+            --target-memory-allotment "${{ needs.compute-metadata.outputs.memory }}" \
+            --target-environment-variables "VECTOR_THREADS=${{ needs.compute-metadata.outputs.vector-cpus }},VECTOR_REQUIRE_HEALTHY=true" \
             --target-name vector \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
