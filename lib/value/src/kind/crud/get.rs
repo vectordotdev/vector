@@ -133,7 +133,6 @@ impl Kind {
 
                 // This is the resulting type, assuming the match succeeded.
                 let match_type = field_kind
-                    .clone()
                     // This type is only valid if the match succeeded, which means this type wasn't undefined.
                     .without_undefined()
                     .get_recursive(match_iter.into_iter());

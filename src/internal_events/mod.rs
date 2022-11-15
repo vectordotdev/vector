@@ -16,10 +16,13 @@ mod aws_cloudwatch_logs;
 mod aws_ec2_metadata;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 mod aws_ecs_metrics;
+#[cfg(any(
+    feature = "sinks-aws_kinesis_streams",
+    feature = "sinks-aws_kinesis_firehose"
+))]
+mod aws_kinesis;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-mod aws_kinesis_streams;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
 mod batch;
@@ -146,10 +149,13 @@ pub(crate) use self::aws_cloudwatch_logs::*;
 pub(crate) use self::aws_ec2_metadata::*;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 pub(crate) use self::aws_ecs_metrics::*;
+#[cfg(any(
+    feature = "sinks-aws_kinesis_streams",
+    feature = "sinks-aws_kinesis_firehose"
+))]
+pub(crate) use self::aws_kinesis::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub(crate) use self::aws_kinesis_firehose::*;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-pub(crate) use self::aws_kinesis_streams::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
 pub(crate) use self::codecs::*;
