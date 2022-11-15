@@ -1,8 +1,11 @@
 use chrono::Utc;
 use codecs::BytesDeserializerConfig;
 use futures::{stream, StreamExt};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
+use lookup::owned_value_path;
+use value::Kind;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -26,7 +29,8 @@ pub struct InternalLogsConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    pub host_key: Option<String>,
+    #[serde(default)]
+    pub host_key: Option<OptionalValuePath>,
 
     /// Overrides the name of the log field used to add the current process ID to each event.
     ///
@@ -68,11 +72,28 @@ impl SourceConfig for InternalLogsConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // `host_key` defaults to the `log_schema().host_key()` if it's not configured in the source.
+        let host_key = self
+            .host_key
+            .clone()
+            .map_or_else(
+                || parse_value_path(log_schema().host_key()).ok(),
+                |k| k.path,
+            )
+            .map(LegacyKey::Overwrite);
+
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_definition = BytesDeserializerConfig
             .schema_definition(global_log_namespace.merge(self.log_namespace))
-            .with_standard_vector_source_metadata();
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                InternalLogsConfig::NAME,
+                host_key,
+                &owned_value_path!("host"),
+                Kind::bytes().or_undefined(),
+                Some("host"),
+            );
 
         vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
@@ -112,20 +133,20 @@ async fn run(
             byte_size,
         });
         if let Ok(hostname) = &hostname {
-            log.insert(host_key.as_str(), hostname.to_owned());
+            log_namespace.insert_source_metadata(
+                InternalLogsConfig::NAME,
+                &mut log,
+                legacy_host_key,
+                path!("host"),
+                hostname.clone(),
+            );
+            //log.insert(host_key.as_str(), hostname.to_owned());
         }
         log.insert(pid_key.as_str(), pid);
 
-        log_namespace.insert_vector_metadata(
+        log_namespace.insert_standard_vector_source_metadata(
             &mut log,
-            log_schema().source_type_key(),
-            "source_type",
-            "internal_logs",
-        );
-        log_namespace.insert_vector_metadata(
-            &mut log,
-            log_schema().timestamp_key(),
-            "ingest_timestamp",
+            InternalLogsConfig::NAME,
             Utc::now(),
         );
 
