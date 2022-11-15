@@ -4,7 +4,6 @@ use std::{
     process::ExitStatus,
 };
 
-use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -27,7 +26,7 @@ use vector_core::{config::LegacyKey, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext},
+    config::{Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::{
         ExecChannelClosedError, ExecCommandExecuted, ExecEventsReceived, ExecFailedError,
@@ -676,12 +675,15 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 
 #[cfg(test)]
 mod tests {
+    use bytes::Bytes;
     use std::io::Cursor;
 
     #[cfg(unix)]
     use futures::task::Poll;
 
     use super::*;
+    use crate::config::log_schema;
+
     use crate::{event::LogEvent, test_util::trace_init};
 
     #[test]
