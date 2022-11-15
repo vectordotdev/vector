@@ -23,12 +23,15 @@ end
 @default_schema_type_values = {
   "array" => [],
   "uint" => 0,
+  "int" => 0,
   "float" => 0,
   "string" => "",
   "boolean" => false,
 }
 
-@numeric_schema_types = %w[uint int float]
+@integer_schema_types = %w[uint int]
+@number_schema_types = %w[float]
+@numeric_schema_types = @integer_schema_types + @number_schema_types
 
 # Cross-platform friendly method of finding if command exists on the current path.
 #
@@ -120,7 +123,9 @@ end
 def json_type_str(value)
   if value.is_a?(String)
     'string'
-  elsif value.is_a?(Numeric)
+  elsif value.is_a?(Integer)
+    'integer'
+  elsif value.is_a?(Float)
     'number'
   elsif [true, false].include?(value)
     'boolean'
@@ -149,7 +154,6 @@ end
 def resolved_schema_type?(resolved_schema)
   if resolved_schema['type'].length == 1
     resolved_schema['type'].keys.first
-  else
   end
 end
 
@@ -160,6 +164,65 @@ end
 def numeric_schema_type(resolved_schema)
   schema_type = resolved_schema_type?(resolved_schema)
   schema_type if @numeric_schema_types.include?(schema_type)
+end
+
+# Gets the docs type for the given value's type.
+#
+# When dealing with a source schema, and trying to get the "docs"-compatible schema type, we need to
+# cross-reference the original schema with the type of the value we have on the Ruby side. While
+# some types like a string will always have a type of "string", numbers represent an area where we
+# need to do some digging.
+#
+# For example, we encode the specific class of number on the source schema -- unsigned, signed, or
+# floating-point -- and we can discern nearly as much from the Ruby value itself (integer vs float),
+# but we need to be able to discern the precise type i.e. the unsigned vs signed vs floating-point
+# bit.
+#
+# This function cross-references the Ruby value given with the source schema it is associated with
+# and returns the appropriate "docs" schema type for that value. If the value is not recognized, or
+# if the source schema does not match the given value, `nil` is returned.
+#
+# Otherwise, the most precise "docs" schema type for the given value is returned.
+def get_docs_type_for_value(schema, value)
+  @logger.debug "Getting docs type for value '#{value}' based on schema: #{schema}"
+
+  schema_type = schema['type']
+  value_type = json_type_str(value)
+
+  # If the schema defines a type, see if it matches the value type. If it doesn't, that's a bad sign
+  # and we abort. Otherwise, we fallthrough below to make sure we're handling special cases i.e.
+  # numeric types.
+  if !schema_type.nil? && value_type != schema_type
+    @logger.error "Schema type and value type are a mismatch, which should not happen."
+    @logger.error "Schema type: #{schema_type}"
+    @logger.error "Value: #{value} (type: #{value_type})"
+    exit
+  end
+
+  case value_type
+  # For any numeric type, extract the value of `docs::numeric_type`, which must always be present in
+  # the schema for numeric fields.
+  when 'number', 'integer'
+    numeric_type = get_schema_metadata(schema, 'docs::numeric_type')
+    if numeric_type.nil?
+      @logger.error "All fields with numeric types should have 'docs::numeric_type' metadata included."
+      exit
+    end
+
+    numeric_type
+  else
+    # Just use the type we detected from the value itself. We may arrive here because the value type
+    # matches the schema type, or we might get here for something like a const schema, where there's
+    # no type field because it's dictated by the type of the value set for the `const` property,
+    # etc.
+    #
+    # We actually re-grab the type via `docs_type_str` which is the JSON Schema type, but slightly
+    # tweaked to match with the documentation stuff expects.
+    #
+    # TODO: The documentation should really just use `boolean` to match JSON Schema, which would let
+    # us simply this type of handling in quite a few places.
+    docs_type_str(value)
+  end
 end
 
 # Gets the schema type field for the given value's type.
@@ -178,17 +241,9 @@ end
 # Ruby side) if a value is the `number` type. To handle this, for any value of the type `number`, we
 # iteratively try and find a matching type definition in the resolved schema for any of the possible
 # numeric types.
-def get_schema_type_field_for_value(schema, value)
-  value_type = docs_type_str(value)
-  case value_type
-  when 'number'
-    @numeric_schema_types.each do |numeric_type|
-      type_field = schema.dig('type', numeric_type)
-      return type_field unless type_field.nil?
-    end
-  else
-    schema.dig('type', value_type)
-  end
+def get_schema_type_field_for_value(source_schema, resolved_schema, value)
+  value_type = get_docs_type_for_value(source_schema, value)
+  resolved_schema.dig('type', value_type)
 end
 
 def get_schema_metadata(schema, key)
@@ -214,6 +269,51 @@ def get_schema_type(schema)
   end
 end
 
+# Fixes grouped enums by adjusting the schema type where necessary.
+#
+# For "grouped enums", these represent the sum of all possible enum values in an `enum` schema being
+# grouped by their JSON type. For example, a set of enums such as `[0, 1, 2, true, false]` would be
+# grouped as:
+#
+# { "bool": [true, false], "number": [0, 1, 2] }
+#
+# This is technically correct, but in the documentation output, that `number` key needs to be `uint`
+# or `int` or what have you. Since `enum` schemas don't carry the "numeric type" information, we try
+# and figure that out here.
+#
+# If we find a `number` group, we check all of its values to see if they fit neatly within the
+# bounds of any of the possible numeric types `int`, `uint`, or `float`. We try and coalesce
+# towards `uint` as it's by far the most common numeric type in Vector configuration, but after
+# that, we aim for `int`, unless the values are too large, in which case we'll shift up to `float`.
+def fix_grouped_enums_if_numeric!(grouped_enums)
+  number_group = grouped_enums.delete('number')
+  if !number_group.nil?
+    is_integer = number_group.all? { |n| n.is_a?(Integer) }
+    within_uint = number_group.all? { |n| n >= 0 && n <= 2 ** 64 }
+    within_int = number_group.all? { |n| n >= -(2 ** 63) && n <= (2 ** 63) - 1 }
+
+    # If the values themselves are not all integers, or they are but not all of them can fit within
+    # a normal 64-bit signed/unsigned integer, then we use `float` as it's the only other type that
+    # could reasonably satisfy the constraints.
+    numeric_type = if !is_integer || (!within_int && !within_uint)
+      'float'
+    else
+      if within_uint
+        'uint'
+      elsif within_int
+        'int'
+      else
+        # This should never actually happen, _but_, technically Ruby integers could be a "BigNum"
+        # aka arbitrary-precision integer, so this protects us if somehow we get a value that is an
+        # integer but doesn't actually fit neatly into 64 bits.
+        'float'
+      end
+    end
+
+    grouped_enums[numeric_type] = number_group
+  end
+end
+
 # Gets a schema definition from the root schema, by name.
 def get_schema_by_name(root_schema, schema_name)
   schema_name = schema_name.gsub(%r{#/definitions/}, '')
@@ -224,6 +324,16 @@ def get_schema_by_name(root_schema, schema_name)
   end
 
   schema_def
+end
+
+# Gets the dereferenced version of this schema.
+#
+# If the schema has no schema reference, `nil` is returned.
+def dereferenced_schema(schema)
+  schema_name = get_schema_ref(schema)
+  if !schema_ref.nil?
+    get_schema_by_name(root_schema, schema_name)
+  end
 end
 
 # Applies various fields to an object property.
@@ -528,7 +638,7 @@ def resolve_bare_schema(root_schema, schema)
       string_def['default'] = schema['default'] unless schema['default'].nil?
 
       { 'string' => string_def }
-    when 'number'
+    when 'number', 'integer'
       @logger.debug 'Resolving number schema.'
 
       numeric_type = get_schema_metadata(schema, 'docs::numeric_type') || 'number'
@@ -551,7 +661,7 @@ def resolve_bare_schema(root_schema, schema)
       # For `const` schemas, just figure out the type of the constant value so we can generate the
       # resolved output.
       const_value = schema['const']
-      const_type = docs_type_str(const_value)
+      const_type = get_docs_type_for_value(schema, const_value)
       { const_type => { 'const' => const_value } }
     when 'enum'
       @logger.debug 'Resolving enum const schema.'
@@ -561,6 +671,7 @@ def resolve_bare_schema(root_schema, schema)
       # type to get the resolved output.
       enum_values = schema['enum']
       grouped = enum_values.group_by { |value| docs_type_str(value) }
+      fix_grouped_enums_if_numeric!(grouped)
       grouped.transform_values! { |values| { 'enum' => values } }
       grouped
     else
@@ -661,6 +772,7 @@ def resolve_enum_schema(root_schema, schema)
       unique_tag_values = {}
 
       resolved_subschemas.each do |resolved_subschema|
+        @logger.debug "Resolved subschema: #{JSON.dump(resolved_subschema)}"
         resolved_subschema_properties = resolved_subschema.dig('type', 'object', 'options')
 
         # Extract the tag property and figure out any necessary intersections, etc.
@@ -678,7 +790,7 @@ def resolve_enum_schema(root_schema, schema)
         tag_subschema['description'] = resolved_subschema['description'] if !resolved_subschema['description'].nil?
         tag_value = nil
 
-        %w[string number boolean].each do |allowed_type|
+        %w[string number integer boolean].each do |allowed_type|
           maybe_tag_value = tag_subschema.dig('type', allowed_type, 'const')
           unless maybe_tag_value.nil?
             tag_value = maybe_tag_value
@@ -934,7 +1046,7 @@ def apply_schema_default_value!(source_schema, resolved_schema)
     # given default value, since anything else would be indicative of a nasty bug in schema
     # generation.
     default_value_type = docs_type_str(default_value)
-    resolved_schema_type_field = get_schema_type_field_for_value(resolved_schema, default_value)
+    resolved_schema_type_field = get_schema_type_field_for_value(source_schema, resolved_schema, default_value)
     if resolved_schema_type_field.nil?
       @logger.error "Schema has default value declared that does not match type of resolved schema: \
       \
@@ -980,8 +1092,11 @@ def apply_schema_default_value!(source_schema, resolved_schema)
       #
       resolved_properties = resolved_schema_type_field['options']
       resolved_properties.each do |property_name, resolved_property|
+        @logger.debug "Source schema: #{source_schema}"
+        @logger.debug "Property name: #{property_name}"
+        source_property = source_schema['properties'][property_name]
         property_default_value = default_value[property_name]
-        property_type_field = get_schema_type_field_for_value(resolved_property, property_default_value)
+        property_type_field = get_schema_type_field_for_value(source_property, resolved_property, property_default_value)
         property_type_field['default'] = property_default_value unless property_type_field.nil?
         resolved_property['required'] = false unless property_type_field.nil?
       end
