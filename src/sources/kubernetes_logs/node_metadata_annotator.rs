@@ -80,7 +80,7 @@ fn annotate_from_metadata(
                 Config::NAME,
                 log,
                 Some(LegacyKey::Overwrite(path.concat(key_path))),
-                path!("kubernetes", "node_labels", key),
+                path!("node_labels", key),
                 value.to_owned(),
             )
         }
@@ -89,8 +89,8 @@ fn annotate_from_metadata(
 
 #[cfg(test)]
 mod tests {
-    use lookup::{event_path, lookup_v2::parse_target_path};
-    use vector_common::assert_event_data_eq;
+    use lookup::{event_path, lookup_v2::parse_target_path, metadata_path};
+    use similar_asserts::assert_eq;
 
     use super::*;
 
@@ -102,6 +102,35 @@ mod tests {
                 ObjectMeta::default(),
                 LogEvent::default(),
                 LogNamespace::Legacy,
+            ),
+            (
+                FieldsSpec::default(),
+                ObjectMeta {
+                    name: Some("sandbox0-name".to_owned()),
+                    uid: Some("sandbox0-uid".to_owned()),
+                    labels: Some(
+                        vec![
+                            ("sandbox0-label0".to_owned(), "val0".to_owned()),
+                            ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
+                    ..ObjectMeta::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "node_labels", "sandbox0-label0"),
+                        "val0",
+                    );
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "node_labels", "sandbox0-label1"),
+                        "val1",
+                    );
+                    log
+                },
+                LogNamespace::Vector,
             ),
             (
                 FieldsSpec::default(),
@@ -162,7 +191,7 @@ mod tests {
         for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
             annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace);
-            assert_event_data_eq!(log, expected);
+            assert_eq!(log, expected);
         }
     }
 }
