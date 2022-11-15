@@ -1,4 +1,4 @@
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, sync::atomic::Ordering};
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use futures::StreamExt;
 #[cfg(feature = "enterprise")]
@@ -142,6 +142,7 @@ impl Application {
             rt.block_on(async move {
                 #[cfg(feature = "allocation-tracing")]
                 if root_opts.allocation_tracing {
+                    use std::sync::atomic::Ordering;
                     crate::internal_telemetry::allocations::TRACK_ALLOCATIONS
                         .store(true, Ordering::Relaxed);
                 }
