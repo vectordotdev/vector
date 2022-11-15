@@ -6,6 +6,7 @@ use lookup::{owned_value_path, path, OwnedValuePath};
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::schema::Definition;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -48,6 +49,47 @@ pub struct InternalLogsConfig {
 
 impl_generate_config_from_default!(InternalLogsConfig);
 
+impl InternalLogsConfig {
+    /// Generates the `schema::Definition` for this component.
+    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+        // `host_key` defaults to the `log_schema().host_key()` if it's not configured in the source.
+        let host_key = self
+            .host_key
+            .clone()
+            .map_or_else(
+                || parse_value_path(log_schema().host_key()).ok(),
+                |k| k.path,
+            )
+            .map(LegacyKey::Overwrite);
+
+        let pid_key = self
+            .pid_key
+            .clone()
+            .and_then(|k| k.path)
+            .map(LegacyKey::Overwrite);
+
+        // There is a global and per-source `log_namespace` config.
+        // The source config overrides the global setting and is merged here.
+        BytesDeserializerConfig
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                InternalLogsConfig::NAME,
+                host_key,
+                &owned_value_path!("host"),
+                Kind::bytes().or_undefined(),
+                Some("host"),
+            )
+            .with_source_metadata(
+                InternalLogsConfig::NAME,
+                pid_key,
+                &owned_value_path!("pid"),
+                Kind::bytes().or_undefined(),
+                Some("pid"),
+            )
+    }
+}
+
 #[async_trait::async_trait]
 impl SourceConfig for InternalLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
@@ -73,41 +115,8 @@ impl SourceConfig for InternalLogsConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        // `host_key` defaults to the `log_schema().host_key()` if it's not configured in the source.
-        let host_key = self
-            .host_key
-            .clone()
-            .map_or_else(
-                || parse_value_path(log_schema().host_key()).ok(),
-                |k| k.path,
-            )
-            .map(LegacyKey::Overwrite);
-
-        let pid_key = self
-            .pid_key
-            .clone()
-            .and_then(|k| k.path)
-            .map(LegacyKey::Overwrite);
-
-        // There is a global and per-source `log_namespace` config.
-        // The source config overrides the global setting and is merged here.
-        let schema_definition = BytesDeserializerConfig
-            .schema_definition(global_log_namespace.merge(self.log_namespace))
-            .with_standard_vector_source_metadata()
-            .with_source_metadata(
-                InternalLogsConfig::NAME,
-                host_key,
-                &owned_value_path!("host"),
-                Kind::bytes().or_undefined(),
-                Some("host"),
-            )
-            .with_source_metadata(
-                InternalLogsConfig::NAME,
-                pid_key,
-                &owned_value_path!("pid"),
-                Kind::bytes().or_undefined(),
-                Some("pid"),
-            );
+        let schema_definition =
+            self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
         vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
@@ -186,7 +195,9 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use futures::Stream;
+    use lookup::LookupBuf;
     use tokio::time::{sleep, Duration};
+    use value::kind::Collection;
     use vector_core::event::Value;
 
     use super::*;
@@ -314,5 +325,72 @@ mod tests {
         sleep(Duration::from_millis(1)).await;
         trace::stop_early_buffering();
         rx
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = InternalLogsConfig::default();
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!(InternalLogsConfig::NAME, "pid"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(InternalLogsConfig::NAME, "host"),
+                    Kind::bytes().or_undefined(),
+                );
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let mut config = InternalLogsConfig::default();
+
+        let pid_key = "pid_a_pid_a_pid_pid_pid";
+
+        config.pid_key = Some(OptionalValuePath::from(owned_value_path!(pid_key)));
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!(pid_key),
+            Kind::bytes().or_undefined(),
+            Some("pid"),
+        )
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(
+            &owned_value_path!("host"),
+            Kind::bytes().or_undefined(),
+            Some("host"),
+        );
+
+        assert_eq!(definition, expected_definition)
     }
 }
