@@ -5,12 +5,13 @@ use bytes::{Buf, Bytes, BytesMut};
 use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::MultiGzDecoder;
 use lookup::lookup_v2::parse_value_path;
-use lookup::{event_path, owned_value_path, path, OwnedValuePath};
+use lookup::{metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix};
 use rmp_serde::{decode, Deserializer};
 use serde::Deserialize;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
-use value::Kind;
+use value::kind::Collection;
+use value::{Kind, Value};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
 
@@ -106,10 +107,14 @@ impl SourceConfig for FluentConfig {
             .ok()
             .map(LegacyKey::InsertIfEmpty);
 
+        let tag_key = parse_value_path("tag").ok().map(LegacyKey::Overwrite);
+
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
-        let schema_definition = BytesDeserializerConfig
-            .schema_definition(global_log_namespace.merge(self.log_namespace))
+        let mut schema_definition = BytesDeserializerConfig
+            .schema_definition(log_namespace)
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 FluentConfig::NAME,
@@ -117,7 +122,27 @@ impl SourceConfig for FluentConfig {
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
+            )
+            .with_source_metadata(
+                FluentConfig::NAME,
+                tag_key,
+                &owned_value_path!("tag"),
+                Kind::bytes().or_undefined(),
+                Some("tag"),
+            )
+            // for metadata that is added to the events dynamically from the FluentRecord
+            .with_source_metadata(
+                FluentConfig::NAME,
+                None,
+                &owned_value_path!("record"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                None,
             );
+
+        // for metadata that is added to the events dynamically
+        if log_namespace == LogNamespace::Legacy {
+            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+        }
 
         vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
@@ -514,16 +539,26 @@ impl From<FluentEvent<'_>> for LogEvent {
 
         let mut log = LogEvent::default();
 
-        log_namespace.insert_vector_metadata(
-            &mut log,
-            log_schema().timestamp_key(),
-            "ingest_timestamp",
-            timestamp,
-        );
+        match log_namespace {
+            LogNamespace::Vector => {
+                log.insert(metadata_path!(FluentConfig::NAME, "timestamp"), timestamp);
+            }
+            LogNamespace::Legacy => {
+                log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+            }
+        }
 
-        log.insert("tag", tag);
+        log_namespace.insert_vector_metadata(&mut log, path!("tag"), path!("tag"), tag);
+
         for (key, value) in record.into_iter() {
-            log.insert(event_path!(&key), value);
+            let value: Value = value.into();
+            log_namespace.insert_source_metadata(
+                FluentConfig::NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(key.as_str()))),
+                path!("record", key.as_str()),
+                value,
+            );
         }
         log
     }
@@ -1006,25 +1041,34 @@ mod tests {
             connection_limit: None,
             log_namespace: None,
         };
+
         let definition = config.outputs(LogNamespace::Vector)[0]
             .clone()
             .log_schema_definition
             .unwrap();
 
-        assert_eq!(
-            definition,
+        let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                 .with_meaning(LookupBuf::root(), "message")
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(
+                    &owned_value_path!("fluent", "tag"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "record"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                )
+                .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp()
+                    Kind::timestamp(),
                 )
                 .with_metadata_field(
                     &owned_value_path!("fluent", "host"),
-                    Kind::bytes().or_undefined()
-                )
-        )
+                    Kind::bytes().or_undefined(),
+                );
+
+        assert_eq!(definition, expected_definition)
     }
 
     #[test]
@@ -1038,30 +1082,36 @@ mod tests {
             connection_limit: None,
             log_namespace: None,
         };
+
         let definition = config.outputs(LogNamespace::Legacy)[0]
             .clone()
             .log_schema_definition
             .unwrap();
 
-        assert_eq!(
-            definition,
-            Definition::new_with_default_metadata(
-                Kind::object(Collection::empty()),
-                [LogNamespace::Legacy]
-            )
-            .with_event_field(
-                &owned_value_path!("message"),
-                Kind::bytes(),
-                Some("message")
-            )
-            .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-            .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
-            .with_event_field(
-                &owned_value_path!("host"),
-                Kind::bytes().or_undefined(),
-                Some("host")
-            )
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
         )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("tag"),
+            Kind::bytes().or_undefined(),
+            Some("tag"),
+        )
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(
+            &owned_value_path!("host"),
+            Kind::bytes().or_undefined(),
+            Some("host"),
+        )
+        .unknown_fields(Kind::bytes());
+
+        assert_eq!(definition, expected_definition)
     }
 }
 
