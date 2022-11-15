@@ -279,21 +279,21 @@ impl SourceConfig for ExecConfig {
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("host"))),
                 &owned_value_path!("host"),
-                Kind::bytes(),
+                Kind::bytes().or_undefined(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!(STREAM_KEY))),
                 &owned_value_path!(STREAM_KEY),
-                Kind::bytes(),
+                Kind::bytes().or_undefined(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!(PID_KEY))),
                 &owned_value_path!(PID_KEY),
-                Kind::integer(),
+                Kind::integer().or_undefined(),
                 None,
             )
             .with_source_metadata(
