@@ -72,8 +72,6 @@ type TagValueRef<'a> = Option<&'a str>;
 #[derive(Clone, Configurable, Debug, Eq, PartialEq)]
 pub enum TagValueSet {
     /// This represents a set containing no value.
-    /// avoid the overhead of allocating a hash table for the common case of a single value for a
-    /// tag.
     Empty,
     /// This represents a set containing a single value. This is stored separately to avoid the
     /// overhead of allocating a hash table for the common case of a single value for a tag.
