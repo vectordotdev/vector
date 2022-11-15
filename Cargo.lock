@@ -9437,9 +9437,9 @@ dependencies = [
 
 [[package]]
 name = "webbrowser"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f7aa8c655ad0b020787afb0b8f0656b2cfbef3452d619ea930e6b1aa1c5c1e9"
+checksum = "2a0cc7962b5aaa0dfcebaeef0161eec6edf5f4606c12e6777fd7d392f52033a5"
 dependencies = [
  "jni",
  "ndk-context",
