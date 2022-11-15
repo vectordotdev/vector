@@ -11,6 +11,8 @@ use vector_config::{configurable_component, Configurable};
 
 type TagValue = Option<String>;
 
+type TagValueRef<'a> = Option<&'a str>;
+
 /// Tag values for a metric series.  This may be empty, a single value, or a set of values. This is
 /// used to provide the storage for `TagValueSet`.
 #[derive(Clone, Configurable, Debug, Eq, PartialEq)]
@@ -43,7 +45,7 @@ impl TagValueSet {
         match self {
             Self::Empty => None,
             Self::Single(tag) => tag,
-            Self::Set(set) => set.into_iter().rfind(Option::is_some).and_then(|tag| tag),
+            Self::Set(set) => set.into_iter().rfind(Option::is_some).flatten(),
         }
     }
 
@@ -89,7 +91,7 @@ impl TagValueSet {
         }
     }
 
-    fn retain(&mut self, mut f: impl FnMut(Option<&str>) -> bool) {
+    fn retain(&mut self, mut f: impl FnMut(TagValueRef<'_>) -> bool) {
         match self {
             Self::Empty => (),
             Self::Single(tag) => {
@@ -157,7 +159,7 @@ impl IntoIterator for TagValueSet {
 
 impl<'a> IntoIterator for &'a TagValueSet {
     type IntoIter = TagValueRefIter<'a>;
-    type Item = Option<&'a str>;
+    type Item = TagValueRef<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
@@ -293,7 +295,7 @@ pub enum TagValueRefIter<'a> {
 }
 
 impl<'a> Iterator for TagValueRefIter<'a> {
-    type Item = Option<&'a str>;
+    type Item = TagValueRef<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
@@ -353,7 +355,7 @@ impl MetricTags {
     }
 
     /// Iterate over references to all values of each tag.
-    pub fn iter_all(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
+    pub fn iter_all(&self) -> impl Iterator<Item = (&str, TagValueRef<'_>)> {
         self.0
             .iter()
             .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_ref(), tag)))
@@ -367,7 +369,7 @@ impl MetricTags {
     }
 
     /// Iterate over all values of each tag.
-    pub fn into_iter_all(self) -> impl Iterator<Item = (String, Option<String>)> {
+    pub fn into_iter_all(self) -> impl Iterator<Item = (String, TagValue)> {
         self.0
             .into_iter()
             .flat_map(|(name, tags)| tags.into_iter().map(move |tag| (name.clone(), tag)))
@@ -510,7 +512,7 @@ mod tests {
             // All input values are contained in the set.
             assert!(values.iter().all(|v| set.contains(&Some(v.clone()))));
             // All set values were in the input.
-            assert!(set.iter().all(|s| s.map_or(true, |s| values.contains(&s.to_string()))));
+            assert!(set.iter().all(|s| s.map_or(false, |s| values.contains(&s.to_string()))));
             // Critical: the "single value" of the set is the last value added.
             assert_eq!(set.as_single(), values.last().map(String::as_str));
 
