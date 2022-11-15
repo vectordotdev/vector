@@ -83,8 +83,8 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
         // pointer can be safely subtracted by `offset_to_object` to get back to the group ID field in our wrapper.
         let actual_ptr = object_ptr.wrapping_sub(offset_to_object);
 
-        // SAFETY: We know that `actual_ptr` is at least aligned enough for casting it to `*mut usize` as the layout for
-        // the allocation backing this pointer ensures the first field in the layout is `usize.
+        // SAFETY: We know that `actual_ptr` is at least aligned enough for casting it to `*mut u16` as the layout for
+        // the allocation backing this pointer ensures the first field in the layout is `u16.
         #[allow(clippy::cast_ptr_alignment)]
         let raw_group_id = actual_ptr.cast::<u16>().read();
 
