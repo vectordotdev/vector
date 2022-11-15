@@ -277,20 +277,17 @@ jobs:
       - upload-comparison-image-to-ecr
     steps:
       - name: Check status, in-progress
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Submit Experiment",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "in_progress",
-               output: {
-                  title: "Submit Experiment",
-                  summary: "Submit experiments to Regression Detector cluster.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='pending' \
+            -f description='Experiments submitted to the Regression Detector cluster.' \
+            -f context='Regression Detector / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - uses: actions/checkout@v3
         with:
@@ -360,58 +357,43 @@ jobs:
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Check status, cancelled
-        if: ${{ cancelled() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Submit Experiment",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "cancelled",
-               output: {
-                  title: "Submit Experiment",
-                  summary: "Submit experiments to Regression Detector cluster.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='failure' \
+            -f description='Experiments submitted to the Regression Detector cluster cancelled.' \
+            -f context='Regression Detector / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, success
-        if: ${{ success() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Submit Experiment",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "success",
-               output: {
-                  title: "Submit Experiment",
-                  summary: "Submit experiments to Regression Detector cluster.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Experiments submitted to the Regression Detector cluster successfully.' \
+            -f context='Regression Detector / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, failure
-        if: ${{ failure() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Submit Experiment",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "failure",
-               output: {
-                  title: "Submit Experiment",
-                  summary: "Submit experiments to Regression Detector cluster.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Experiments submitted to the Regression Detector cluster failed.' \
+            -f context='Regression Detector / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   ##
   ## ANALYZE
@@ -425,20 +407,17 @@ jobs:
       - compute-metadata
     steps:
       - name: Check status, in-progress
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Analyze Experimental Results",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "in_progress",
-               output: {
-                  title: "Analyze Experiment",
-                  summary: "Analyze experimental results from Regression Detector.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='pending' \
+            -f description='Analyze experimental results from Regression Detector.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - uses: actions/checkout@v3
         with:
@@ -491,55 +470,40 @@ jobs:
           path: ${{ runner.temp }}/outputs/*
 
       - name: Check status, cancelled
-        if: ${{ cancelled() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Analyze Experimental Results",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "cancelled",
-               output: {
-                  title: "Analyze Experiment",
-                  summary: "Analyze experimental results from Regression Detector.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='failure' \
+            -f description='Analyze experimental results from Regression Detector cancelled.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, success
-        if: ${{ success() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Analyze Experimental Results",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "success",
-               output: {
-                  title: "Analyze Experiment",
-                  summary: "Analyze experimental results from Regression Detector.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Analyze experimental results from Regression Detector succeeded.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, failure
-        if: ${{ failure() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Analyze Experiment",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "failure",
-               output: {
-                  title: "Analyze Experimental Results",
-                  summary: "Analyze experimental results from Regression Detector.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Analyze experimental results from Regression Detector failed.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
