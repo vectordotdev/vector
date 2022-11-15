@@ -82,6 +82,9 @@ impl FunctionTransform for Parser {
 
 #[cfg(test)]
 mod tests {
+    use codecs::BytesDeserializer;
+    use lookup::event_path;
+
     use super::*;
     use crate::{event::Event, event::LogEvent, test_util::trace_init, transforms::Transform};
 
@@ -107,13 +110,22 @@ mod tests {
     fn test_parsing_invalid() {
         trace_init();
 
-        let cases = vec!["", "qwe", "{"];
+        let cases = vec![
+            ("", LogNamespace::Vector),
+            ("", LogNamespace::Legacy),
+            ("qwe", LogNamespace::Vector),
+            ("qwe", LogNamespace::Legacy),
+            ("{", LogNamespace::Vector),
+            ("{", LogNamespace::Legacy),
+        ];
 
-        for message in cases {
-            let input = LogEvent::from(message);
-            let mut parser = Parser::new(LogNamespace::Legacy);
+        for (message, log_namespace) in cases {
+            let deserializer = BytesDeserializer::new();
+            let input = deserializer.parse_single(message.into(), log_namespace);
+            let mut parser = Parser::new(log_namespace);
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
+
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
     }
@@ -122,20 +134,22 @@ mod tests {
     fn test_parsing_invalid_non_standard_events() {
         trace_init();
 
-        // TODO: Use log_namespace
         let cases = vec![
             // No `message` field.
-            Event::from(LogEvent::default()),
+            (Event::from(LogEvent::default()), LogNamespace::Legacy),
             // Non-bytes `message` field.
-            {
-                let mut input = LogEvent::default();
-                input.insert("message", 123);
-                input.into()
-            },
+            (
+                {
+                    let mut input = LogEvent::default();
+                    input.insert(event_path!("message"), 123);
+                    input.into()
+                },
+                LogNamespace::Legacy,
+            ),
         ];
 
-        for input in cases {
-            let mut parser = Parser::new(LogNamespace::Legacy);
+        for (input, log_namespace) in cases {
+            let mut parser = Parser::new(log_namespace);
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input);
             assert!(output.is_empty(), "Expected no events: {:?}", output);

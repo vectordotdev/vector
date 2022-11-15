@@ -14,6 +14,11 @@ base: components: sources: dnstap: configuration: {
 		required: false
 		type: string: syntax: "literal"
 	}
+	log_namespace: {
+		description: "The namespace to use for logs. This overrides the global settings."
+		required:    false
+		type: bool: {}
+	}
 	max_frame_handling_tasks: {
 		description: "Maximum number of frames that can be processed concurrently."
 		required:    false
