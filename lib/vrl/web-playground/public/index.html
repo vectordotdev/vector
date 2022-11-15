@@ -80,23 +80,22 @@
       });
       require(["vs/editor/editor.main"], () => {
         window.programEditor = monaco.editor.create(document.getElementById("container-program"), {
-          value: `# Parse as JSON
-parsed, err = parse_syslog(.message)
+          value: `# Remove some fields
+del(.foo)
 
+# Add a timestamp
+.timestamp = now()
 
+# Parse HTTP status code into local variable
+http_status_code = parse_int!(.http_status)
+del(.http_status)
 
-# Set the event to the parsed JSON value
-. = parsed
-
-# Remove some fields
-del(.msgid)
-
-
-# Reformat the timestamp
-ts, err = parse_timestamp(.timestamp, format: "%s")
-
-
-.timestamp = to_unix_timestamp(ts)`,
+# Add status
+if http_status_code >= 200 && http_status_code <= 299 {
+    .status = "success"
+} else {
+    .status = "error"
+}`,
           language: "coffeescript",
           theme: "vs-light",
           minimap: { enabled: false },
@@ -105,7 +104,9 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
 
         window.eventEditor = monaco.editor.create(document.getElementById("container-event"), {
           value: `{
-  "message": "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
+	"message": "Hello VRL",
+	"foo": "delete me",
+	"http_status": "200"
 }`,
           language: "json",
           theme: "vs-light",
