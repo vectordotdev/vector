@@ -759,6 +759,50 @@ mod tests {
     }
 
     #[test]
+    fn test_scheduled_handle_event_vector_namespace() {
+        let config = standard_scheduled_test_config();
+        let hostname = Some("Some.Machine".to_string());
+        let data_stream = Some(STDOUT.to_string());
+        let pid = Some(8888_u32);
+
+        let mut event = LogEvent::from("hello world").into();
+        handle_event(
+            &config,
+            &hostname,
+            &data_stream,
+            pid,
+            &mut event,
+            LogNamespace::Vector,
+        );
+
+        let log = event.as_log();
+        let meta = log.metadata().value();
+
+        assert_eq!(
+            meta.get(path!(ExecConfig::NAME, "host")).unwrap(),
+            &vrl::value!("Some.Machine")
+        );
+        assert_eq!(
+            meta.get(path!(ExecConfig::NAME, STREAM_KEY)).unwrap(),
+            &vrl::value!(STDOUT)
+        );
+        assert_eq!(
+            meta.get(path!(ExecConfig::NAME, PID_KEY)).unwrap(),
+            &vrl::value!(8888_i64)
+        );
+        assert_eq!(
+            meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
+            &vrl::value!(config.command)
+        );
+        assert_eq!(log["message"], "hello world".into());
+        assert_eq!(
+            meta.get(path!("vector", "source_type")).unwrap(),
+            &vrl::value!("exec")
+        );
+        assert!(meta.get(path!("vector", "ingest_timestamp")).is_some());
+    }
+
+    #[test]
     fn test_streaming_create_event() {
         let config = standard_streaming_test_config();
         let hostname = Some("Some.Machine".to_string());
@@ -783,6 +827,50 @@ mod tests {
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
         assert!(log.get(log_schema().timestamp_key()).is_some());
+    }
+
+    #[test]
+    fn test_streaming_create_event_vector_namespace() {
+        let config = standard_streaming_test_config();
+        let hostname = Some("Some.Machine".to_string());
+        let data_stream = Some(STDOUT.to_string());
+        let pid = Some(8888_u32);
+
+        let mut event = LogEvent::from("hello world").into();
+        handle_event(
+            &config,
+            &hostname,
+            &data_stream,
+            pid,
+            &mut event,
+            LogNamespace::Vector,
+        );
+
+        let log = event.as_log();
+        let meta = log.metadata().value();
+
+        assert_eq!(
+            meta.get(path!(ExecConfig::NAME, "host")).unwrap(),
+            &vrl::value!("Some.Machine")
+        );
+        assert_eq!(
+            meta.get(path!(ExecConfig::NAME, STREAM_KEY)).unwrap(),
+            &vrl::value!(STDOUT)
+        );
+        assert_eq!(
+            meta.get(path!(ExecConfig::NAME, PID_KEY)).unwrap(),
+            &vrl::value!(8888_i64)
+        );
+        assert_eq!(
+            meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
+            &vrl::value!(config.command)
+        );
+        assert_eq!(log["message"], "hello world".into());
+        assert_eq!(
+            meta.get(path!("vector", "source_type")).unwrap(),
+            &vrl::value!("exec")
+        );
+        assert!(meta.get(path!("vector", "ingest_timestamp")).is_some());
     }
 
     #[test]
