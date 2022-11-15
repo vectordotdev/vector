@@ -137,19 +137,33 @@ impl TagValueSet {
         }
     }
 
-    fn iter(&self) -> TagValueRefIter<'_> {
+    pub fn iter(&self) -> TagValueRefIter<'_> {
+        self.into_iter()
+    }
+}
+
+impl IntoIterator for TagValueSet {
+    type IntoIter = TagValueIntoIter;
+    type Item = TagValue;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            Self::Empty => TagValueIntoIter::Empty,
+            Self::Single(tag) => TagValueIntoIter::Single(tag),
+            Self::Set(set) => TagValueIntoIter::Set(set.into_iter()),
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a TagValueSet {
+    type IntoIter = TagValueRefIter<'a>;
+    type Item = Option<&'a str>;
+
+    fn into_iter(self) -> Self::IntoIter {
         match self {
             TagValueSet::Empty => TagValueRefIter::Empty,
             TagValueSet::Single(tag) => TagValueRefIter::Single(tag),
             TagValueSet::Set(set) => TagValueRefIter::Set(set.into_iter()),
-        }
-    }
-
-    fn into_iter(self) -> TagValueIter {
-        match self {
-            Self::Empty => TagValueIter::Empty,
-            Self::Single(tag) => TagValueIter::Single(tag),
-            Self::Set(set) => TagValueIter::Set(set.into_iter()),
         }
     }
 }
@@ -250,13 +264,13 @@ impl FromIterator<String> for TagValueSet {
     }
 }
 
-pub enum TagValueIter {
+pub enum TagValueIntoIter {
     Empty,
     Single(TagValue),
     Set(<IndexSet<TagValue> as IntoIterator>::IntoIter),
 }
 
-impl Iterator for TagValueIter {
+impl Iterator for TagValueIntoIter {
     type Item = Option<String>;
 
     fn next(&mut self) -> Option<Self::Item> {
