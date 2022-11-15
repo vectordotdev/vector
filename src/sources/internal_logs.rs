@@ -2,7 +2,7 @@ use chrono::Utc;
 use codecs::BytesDeserializerConfig;
 use futures::{stream, StreamExt};
 use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
-use lookup::owned_value_path;
+use lookup::{owned_value_path, path, OwnedValuePath};
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
@@ -37,7 +37,8 @@ pub struct InternalLogsConfig {
     /// The value will be the current process ID for Vector itself.
     ///
     /// By default, `"pid"` is used.
-    pub pid_key: Option<String>,
+    #[serde(default)]
+    pub pid_key: Option<OptionalValuePath>,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -50,12 +51,12 @@ impl_generate_config_from_default!(InternalLogsConfig);
 #[async_trait::async_trait]
 impl SourceConfig for InternalLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let host_key = self
-            .host_key
-            .as_deref()
-            .unwrap_or_else(|| log_schema().host_key())
-            .to_owned();
-        let pid_key = self.pid_key.as_deref().unwrap_or("pid").to_owned();
+        let host_key = self.host_key.clone().map_or_else(
+            || parse_value_path(log_schema().host_key()).ok(),
+            |k| k.path,
+        );
+
+        let pid_key = self.pid_key.clone().and_then(|k| k.path);
 
         let subscription = TraceSubscription::subscribe();
 
@@ -82,6 +83,12 @@ impl SourceConfig for InternalLogsConfig {
             )
             .map(LegacyKey::Overwrite);
 
+        let pid_key = self
+            .pid_key
+            .clone()
+            .and_then(|k| k.path)
+            .map(LegacyKey::Overwrite);
+
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_definition = BytesDeserializerConfig
@@ -93,6 +100,13 @@ impl SourceConfig for InternalLogsConfig {
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
+            )
+            .with_source_metadata(
+                InternalLogsConfig::NAME,
+                pid_key,
+                &owned_value_path!("pid"),
+                Kind::bytes().or_undefined(),
+                Some("pid"),
             );
 
         vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
@@ -104,8 +118,8 @@ impl SourceConfig for InternalLogsConfig {
 }
 
 async fn run(
-    host_key: String,
-    pid_key: String,
+    host_key: Option<OwnedValuePath>,
+    pid_key: Option<OwnedValuePath>,
     mut subscription: TraceSubscription,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
@@ -132,17 +146,26 @@ async fn run(
             count: 1,
             byte_size,
         });
+
         if let Ok(hostname) = &hostname {
+            let legacy_host_key = host_key.as_ref().map(LegacyKey::Overwrite);
             log_namespace.insert_source_metadata(
                 InternalLogsConfig::NAME,
                 &mut log,
                 legacy_host_key,
                 path!("host"),
-                hostname.clone(),
+                hostname.to_owned(),
             );
-            //log.insert(host_key.as_str(), hostname.to_owned());
         }
-        log.insert(pid_key.as_str(), pid);
+
+        let legacy_pid_key = pid_key.as_ref().map(LegacyKey::Overwrite);
+        log_namespace.insert_source_metadata(
+            InternalLogsConfig::NAME,
+            &mut log,
+            legacy_pid_key,
+            path!("pid"),
+            pid,
+        );
 
         log_namespace.insert_standard_vector_source_metadata(
             &mut log,
