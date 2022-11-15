@@ -3,7 +3,7 @@
 mod allocator;
 use std::{
     sync::{
-        atomic::{AtomicI64, Ordering},
+        atomic::{AtomicBool, AtomicI64, Ordering},
         Mutex,
     },
     thread,
@@ -21,6 +21,7 @@ pub(crate) use self::allocator::{
 };
 
 const NUM_GROUPS: usize = 128;
+static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
 
 type GroupMemStatsArray = [AtomicI64; NUM_GROUPS];
 
@@ -80,7 +81,7 @@ impl Tracer for MainTracer {
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
         let _ = GROUP_MEM_STATS.try_with(|t| {
-            t.stats[group_id.as_raw()].fetch_add(object_size as i64, Ordering::Relaxed)
+            t.stats[group_id.as_raw() as usize].fetch_add(object_size as i64, Ordering::Relaxed)
         });
     }
 
@@ -88,7 +89,8 @@ impl Tracer for MainTracer {
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
         let _ = GROUP_MEM_STATS.try_with(|t| {
-            t.stats[source_group_id.as_raw()].fetch_sub(object_size as i64, Ordering::Relaxed)
+            t.stats[source_group_id.as_raw() as usize]
+                .fetch_sub(object_size as i64, Ordering::Relaxed)
         });
     }
 }
@@ -145,7 +147,7 @@ pub fn acquire_allocation_group_id(
     let group_id =
         AllocationGroupId::register().expect("failed to register allocation group token");
     let idx = group_id.as_raw();
-    match GROUP_INFO.get(idx) {
+    match GROUP_INFO.get(idx as usize) {
         Some(mutex) => {
             let mut writer = mutex.lock().unwrap();
             *writer = GroupInfo {

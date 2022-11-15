@@ -1,7 +1,6 @@
 use std::{
     cell::RefCell,
-    num::NonZeroUsize,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicU16, Ordering},
 };
 
 use tracing::Span;
@@ -20,20 +19,21 @@ thread_local! {
 
 /// The identifier that uniquely identifiers an allocation group.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct AllocationGroupId(NonZeroUsize);
+pub struct AllocationGroupId(u16);
 
 impl AllocationGroupId {
     /// The group ID used for allocations which are not made within a registered allocation group.
-    pub const ROOT: Self = Self(unsafe { NonZeroUsize::new_unchecked(1) });
+    // Group IDs start at 1. The value 0 is reserved for handling runtime allocation edge cases.
+    pub const ROOT: Self = Self(1);
 
-    pub(super) const fn from_raw_unchecked(raw_group_id: usize) -> Self {
-        unsafe { Self(NonZeroUsize::new_unchecked(raw_group_id)) }
+    pub(super) const fn from_raw(raw_group_id: u16) -> Self {
+        Self(raw_group_id)
     }
 
     /// Gets the integer representation of this group ID.
     #[must_use]
-    pub const fn as_raw(self) -> usize {
-        self.0.get()
+    pub const fn as_raw(self) -> u16 {
+        self.0
     }
 
     /// Registers an allocation group ID.
@@ -45,12 +45,11 @@ impl AllocationGroupId {
     /// associating allocations and deallocations within an active span as being attached to the
     /// given allocation group.
     pub fn register() -> Option<AllocationGroupId> {
-        static GROUP_ID: AtomicUsize = AtomicUsize::new(AllocationGroupId::ROOT.0.get() + 1);
+        static GROUP_ID: AtomicU16 = AtomicU16::new(AllocationGroupId::ROOT.0 + 1);
 
         let group_id = GROUP_ID.fetch_add(1, Ordering::Relaxed);
 
-        if group_id != usize::MAX {
-            let group_id = NonZeroUsize::new(group_id).expect("bug: GROUP_ID overflowed");
+        if group_id != u16::MAX {
             Some(AllocationGroupId(group_id))
         } else {
             None
