@@ -141,21 +141,30 @@ impl From<Metric> for event::Metric {
 
         let name = metric.name;
 
-        let namespace = if metric.namespace.is_empty() {
-            None
-        } else {
-            Some(metric.namespace)
-        };
+        let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
 
         let timestamp = metric
             .timestamp
             .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
-        let tags = if metric.tags.is_empty() {
-            None
-        } else {
-            Some(metric.tags)
-        };
+        let mut tags = MetricTags(
+            metric
+                .tags_v2
+                .into_iter()
+                .map(|(tag, values)| {
+                    (
+                        tag,
+                        values
+                            .values
+                            .into_iter()
+                            .map(|value| event::metric::TagValue::from(value.value))
+                            .collect(),
+                    )
+                })
+                .collect(),
+        );
+        tags.extend(metric.tags_v1.into_iter());
+        let tags = (!tags.is_empty()).then_some(tags);
 
         let value = match metric.value.unwrap() {
             MetricValue::Counter(counter) => event::MetricValue::Counter {
@@ -222,7 +231,7 @@ impl From<Metric> for event::Metric {
 
         Self::new_with_metadata(name, kind, value, metadata)
             .with_namespace(namespace)
-            .with_tags(tags.map(MetricTags::from_iter))
+            .with_tags(tags)
             .with_timestamp(timestamp)
             .with_interval_ms(std::num::NonZeroU32::new(metric.interval_ms))
     }
@@ -393,10 +402,19 @@ impl From<event::Metric> for WithMetadata<Metric> {
             name,
             namespace,
             timestamp,
-            tags: tags
+            tags_v1: Default::default(),
+            tags_v2: tags
                 .0
                 .into_iter()
-                .filter_map(|(name, values)| values.into_single().map(|value| (name, value)))
+                .map(|(tag, values)| {
+                    let values = values
+                        .into_iter()
+                        .map(|value| TagValue {
+                            value: value.into_option(),
+                        })
+                        .collect();
+                    (tag, TagValues { values })
+                })
                 .collect(),
             kind,
             interval_ms,
@@ -509,12 +527,7 @@ fn decode_value(input: Value) -> Option<event::Value> {
 fn decode_map(fields: BTreeMap<String, Value>) -> Option<event::Value> {
     let mut accum: BTreeMap<String, event::Value> = BTreeMap::new();
     for (key, value) in fields {
-        match decode_value(value) {
-            Some(value) => {
-                accum.insert(key, value);
-            }
-            None => return None,
-        }
+        accum.insert(key, decode_value(value)?);
     }
     Some(event::Value::Object(accum))
 }
@@ -522,10 +535,7 @@ fn decode_map(fields: BTreeMap<String, Value>) -> Option<event::Value> {
 fn decode_array(items: Vec<Value>) -> Option<event::Value> {
     let mut accum = Vec::with_capacity(items.len());
     for value in items {
-        match decode_value(value) {
-            Some(value) => accum.push(value),
-            None => return None,
-        }
+        accum.push(decode_value(value)?);
     }
     Some(event::Value::Array(accum))
 }
