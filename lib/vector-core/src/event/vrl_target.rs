@@ -26,7 +26,11 @@ pub enum VrlTarget {
     // `LogEvent` is essentially just a destructured `event::LogEvent`, but without the semantics
     // that `fields` must always be a `Map` variant.
     LogEvent(Value, EventMetadata),
-    Metric { metric: Metric, value: Value },
+    Metric {
+        metric: Metric,
+        value: Value,
+        multi_value_tags: bool,
+    },
     Trace(Value, EventMetadata),
 }
 
@@ -81,7 +85,7 @@ impl Iterator for TargetIter<TraceEvent> {
 }
 
 impl VrlTarget {
-    pub fn new(event: Event, info: &ProgramInfo) -> Self {
+    pub fn new(event: Event, info: &ProgramInfo, multi_value_metric_tags: bool) -> Self {
         match event {
             Event::Log(event) => {
                 let (value, metadata) = event.into_parts();
@@ -93,7 +97,11 @@ impl VrlTarget {
                 // values, even if the field is accessed more than once.
                 let value = precompute_metric_value(&metric, info);
 
-                VrlTarget::Metric { metric, value }
+                VrlTarget::Metric {
+                    metric,
+                    value,
+                    multi_value_tags: multi_value_metric_tags,
+                }
             }
             Event::Trace(event) => {
                 let (fields, metadata) = event.into_parts();
@@ -604,7 +612,7 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info);
+            let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info, false);
             let path = OwnedTargetPath::event(path);
 
             assert_eq!(
@@ -710,7 +718,7 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
+            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
             let expect = LogEvent::from(expect);
             let value: ::value::Value = value;
             let path = OwnedTargetPath::event(path);
@@ -809,7 +817,7 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
+            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
             let path = OwnedTargetPath::event(path);
             let removed = vrl_lib::Target::target_get(&target, &path)
                 .unwrap()
@@ -872,6 +880,7 @@ mod test {
             let mut target = VrlTarget::new(
                 Event::Log(LogEvent::new_with_metadata(metadata.clone())),
                 &info,
+                false,
             );
 
             ::vrl_lib::Target::target_insert(&mut target, &OwnedTargetPath::event_root(), value)
@@ -915,7 +924,7 @@ mod test {
             ],
             target_assignments: vec![],
         };
-        let target = VrlTarget::new(Event::Metric(metric), &info);
+        let target = VrlTarget::new(Event::Metric(metric), &info, false);
 
         assert_eq!(
             Ok(Some(
@@ -988,7 +997,7 @@ mod test {
             ],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
 
         for (path, current, new, delete) in cases {
             let path = OwnedTargetPath::event(path);
@@ -1035,7 +1044,11 @@ mod test {
         );
 
         match target {
-            VrlTarget::Metric { metric, value: _ } => {
+            VrlTarget::Metric {
+                metric,
+                value: _,
+                multi_value_tags: _,
+            } => {
                 assert!(metric.tags().is_some());
                 assert_eq!(metric.tags().unwrap(), &crate::metric_tags!("a" => "b"));
             }

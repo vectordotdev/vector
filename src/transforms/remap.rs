@@ -24,6 +24,7 @@ use vrl::{
     CompileConfig, Program, Runtime, Terminate, VrlRuntime,
 };
 
+use crate::transforms::MetricTagsValues;
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
@@ -63,6 +64,9 @@ pub struct RemapConfig {
     /// [vrl]: https://vector.dev/docs/reference/vrl
     #[configurable(metadata(docs::examples = "./my/program.vrl",))]
     pub file: Option<PathBuf>,
+
+    #[serde(default)]
+    pub metric_tags_values: MetricTagsValues,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
     /// time zone.
@@ -161,6 +165,10 @@ impl RemapConfig {
 
         config.set_custom(enrichment_tables);
         config.set_custom(MeaningList::default());
+        config.multiple_metric_tag_values = match self.metric_tags_values {
+            MetricTagsValues::Single => false,
+            MetricTagsValues::Full => true,
+        };
 
         compile_vrl(&source, &functions, &state, config)
             .map_err(|diagnostics| {

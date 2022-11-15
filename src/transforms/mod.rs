@@ -54,6 +54,20 @@ enum BuildError {
     InvalidSubstring { name: String },
 }
 
+#[configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MetricTagsValues {
+    Single,
+    Full,
+}
+
+impl Default for MetricTagsValues {
+    fn default() -> Self {
+        Self::Single
+    }
+}
+
 /// Configurable transforms in Vector.
 #[configurable_component]
 #[derive(Clone, Debug)]
