@@ -92,7 +92,8 @@ where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
     let cfg = T::generate_config().to_string();
-    toml::from_str::<T>(&cfg).expect("Invalid config generated");
+    toml::from_str::<T>(&cfg)
+        .unwrap_or_else(|_| panic!("Invalid config generated from string:\n'{}'\n", cfg));
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
@@ -420,15 +421,10 @@ pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
 }
 
 pub fn runtime() -> runtime::Runtime {
-    let mut rt_builder = runtime::Builder::new_multi_thread();
-    rt_builder.enable_all();
-    #[cfg(feature = "allocation-tracing")]
-    {
-        rt_builder.on_thread_start(|| {
-            crate::internal_telemetry::allocations::init_thread_id();
-        });
-    }
-    rt_builder.build().unwrap()
+    runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
 }
 
 // Wait for a Future to resolve, or the duration to elapse (will panic)

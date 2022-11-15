@@ -354,8 +354,9 @@ pub trait FrameHandler {
     fn socket_file_mode(&self) -> Option<u32>;
     fn socket_receive_buffer_size(&self) -> Option<usize>;
     fn socket_send_buffer_size(&self) -> Option<usize>;
-    fn host_key(&self) -> String;
-    fn timestamp_key(&self) -> String;
+    fn host_key(&self) -> &str;
+    fn timestamp_key(&self) -> &str;
+    fn source_type_key(&self) -> &str;
 }
 
 /**
@@ -633,6 +634,7 @@ mod test {
         extra_task_handling_routine: F,
         host_key: String,
         timestamp_key: String,
+        source_type_key: String,
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockFrameHandler<F> {
@@ -649,6 +651,7 @@ mod test {
                 extra_task_handling_routine: extra_routine,
                 host_key: "test_framestream".to_string(),
                 timestamp_key: "my_timestamp".to_string(),
+                source_type_key: "source_type".to_string(),
             }
         }
     }
@@ -665,7 +668,7 @@ mod test {
             let mut event = LogEvent::from(frame);
             event.insert(log_schema().source_type_key(), "framestream");
             if let Some(host) = received_from {
-                event.insert(self.host_key().as_str(), host);
+                event.insert(self.host_key(), host);
             }
 
             (self.extra_task_handling_routine.clone())();
@@ -695,12 +698,16 @@ mod test {
             self.socket_send_buffer_size
         }
 
-        fn host_key(&self) -> String {
-            self.host_key.clone()
+        fn host_key(&self) -> &str {
+            self.host_key.as_str()
         }
 
-        fn timestamp_key(&self) -> String {
-            self.timestamp_key.clone()
+        fn timestamp_key(&self) -> &str {
+            self.timestamp_key.as_str()
+        }
+
+        fn source_type_key(&self) -> &str {
+            self.source_type_key.as_str()
         }
     }
 
