@@ -92,7 +92,7 @@ remap: functions: parse_cef: {
 					translate_custom_fields: true
 				)
 				"""#
-			return: {				
+			return: {
 				"cefVersion":          "0"
 				"deviceVendor":        "Dev"
 				"deviceProduct":       "firewall"
