@@ -20,6 +20,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
+use value::Kind;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{config::LegacyKey, ByteSizeOf};
@@ -36,7 +37,7 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use lookup::path;
+use lookup::{owned_value_path, path};
 use vector_core::config::LogNamespace;
 
 pub mod sized_bytes_codec;
@@ -215,6 +216,10 @@ impl ExecConfig {
             Some(config) => config.respawn_interval_secs,
         }
     }
+
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace.unwrap_or(false).into()
+    }
 }
 
 #[async_trait::async_trait]
@@ -263,8 +268,43 @@ impl SourceConfig for ExecConfig {
         }
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
+
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("host"))),
+                &owned_value_path!("host"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(STREAM_KEY))),
+                &owned_value_path!(STREAM_KEY),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(PID_KEY))),
+                &owned_value_path!(PID_KEY),
+                Kind::integer(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(PID_KEY))),
+                &owned_value_path!(COMMAND_KEY),
+                Kind::bytes(),
+                None,
+            );
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
