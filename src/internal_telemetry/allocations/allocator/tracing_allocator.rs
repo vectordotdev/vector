@@ -28,7 +28,7 @@ impl<A, T> GroupedTraceableAllocator<A, T> {
 
 impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
     #[inline(always)]
-    unsafe fn get_wrapped_allocation(&self, object_layout: Layout) -> (*mut u16, *mut u8, Layout) {
+    unsafe fn get_wrapped_allocation(&self, object_layout: Layout) -> (*mut u8, *mut u8, Layout) {
         // Allocate our wrapped layout and make sure the allocation succeeded.
         let (actual_layout, offset_to_object) = get_wrapped_layout(object_layout);
         let actual_ptr = self.allocator.alloc(actual_layout);
@@ -36,10 +36,10 @@ impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
             handle_alloc_error(actual_layout);
         }
 
-        // SAFETY: We know that `actual_ptr` is at least aligned enough for casting it to `*mut u16` as the layout for
-        // the allocation backing this pointer ensures the first field in the layout is `u16.
+        // SAFETY: We know that `actual_ptr` is at least aligned enough for casting it to `*mut u8` as the layout for
+        // the allocation backing this pointer ensures the first field in the layout is `u8.
         #[allow(clippy::cast_ptr_alignment)]
-        let group_id_ptr = actual_ptr.cast::<u16>();
+        let group_id_ptr = actual_ptr.cast::<u8>();
 
         // SAFETY: If the allocation succeeded and `actual_ptr` is valid, then it must be valid to advance by
         // `offset_to_object` as it would land within the allocation.
@@ -83,10 +83,10 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
         // pointer can be safely subtracted by `offset_to_object` to get back to the group ID field in our wrapper.
         let actual_ptr = object_ptr.wrapping_sub(offset_to_object);
 
-        // SAFETY: We know that `actual_ptr` is at least aligned enough for casting it to `*mut u16` as the layout for
-        // the allocation backing this pointer ensures the first field in the layout is `u16.
+        // SAFETY: We know that `actual_ptr` is at least aligned enough for casting it to `*mut u8` as the layout for
+        // the allocation backing this pointer ensures the first field in the layout is `u8.
         #[allow(clippy::cast_ptr_alignment)]
-        let raw_group_id = actual_ptr.cast::<u16>().read();
+        let raw_group_id = actual_ptr.cast::<u8>().read();
 
         // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
         self.allocator.dealloc(actual_ptr, wrapped_layout);
@@ -110,7 +110,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
 #[inline(always)]
 fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
-    static HEADER_LAYOUT: Layout = Layout::new::<u16>();
+    static HEADER_LAYOUT: Layout = Layout::new::<u8>();
 
     // We generate a new allocation layout that gives us a location to store the active allocation group ID ahead
     // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path.
@@ -118,5 +118,5 @@ fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
         .extend(object_layout)
         .expect("wrapping requested layout resulted in overflow");
 
-    (actual_layout, offset_to_object)
+    (actual_layout.pad_to_align(), offset_to_object)
 }
