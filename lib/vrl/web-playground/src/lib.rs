@@ -70,7 +70,6 @@ impl VrlDiagnosticResult {
     }
 }
 
-// TODO: return diagnostic if fails upon compilation, currently being ignored
 fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
     let event = &mut input.event;
     let functions = stdlib::all();
