@@ -1,0 +1,16 @@
+[package]
+name = "vector-elasticsearch-env-manager"
+version = "0.1.0"
+edition = "2021"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+license = "MPL-2.0"
+readme = "README.md"
+publish = false
+
+[dependencies]
+anyhow = "1.0.66"
+clap = { version = "4.0.18", features = ["derive"] }
+dunce = "1.0.3"
+serde_json = "1.0.87"
+
+[workspace]
