@@ -45,7 +45,7 @@ pub struct OrgConfig {
     pub(crate) api_key: String,
 }
 
-impl ::std::default::Default for Config {
+impl Default for Config {
     fn default() -> Self {
         let default_org = "default".to_string();
         let mut orgs = BTreeMap::new();
