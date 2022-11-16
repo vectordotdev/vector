@@ -8,10 +8,14 @@ use codecs::{
     NewlineDelimitedDecoderConfig,
 };
 use http::StatusCode;
-use lookup::event_path;
+use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
+use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{DataType, LogNamespace};
+use vector_core::{
+    config::{DataType, LegacyKey, LogNamespace},
+    schema::Definition,
+};
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
@@ -21,10 +25,7 @@ use crate::{
     },
     event::{Event, Value},
     serde::{bool_or_struct, default_decoding},
-    sources::util::{
-        add_query_parameters, http::HttpMethod, Encoding, ErrorMessage, HttpSource,
-        HttpSourceAuthConfig,
-    },
+    sources::util::{http::HttpMethod, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsEnableableConfig,
 };
 
@@ -128,6 +129,50 @@ pub struct SimpleHttpConfig {
     pub log_namespace: Option<bool>,
 }
 
+impl SimpleHttpConfig {
+    /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
+    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+        let mut schema_definition = self
+            .decoding
+            .as_ref()
+            .unwrap_or(&default_decoding())
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                SimpleHttpConfig::NAME,
+                parse_value_path(&self.path_key)
+                    .ok()
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("path"),
+                Kind::bytes(),
+                None,
+            )
+            // for metadata that is added to the events dynamically from the self.headers
+            .with_source_metadata(
+                SimpleHttpConfig::NAME,
+                None,
+                &owned_value_path!("headers"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            // for metadata that is added to the events dynamically from the self.query_parameters
+            .with_source_metadata(
+                SimpleHttpConfig::NAME,
+                None,
+                &owned_value_path!("query_parameters"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            );
+
+        // for metadata that is added to the events dynamically from config options
+        if log_namespace == LogNamespace::Legacy {
+            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+        }
+
+        schema_definition
+    }
+}
+
 impl GenerateConfig for SimpleHttpConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -160,90 +205,6 @@ fn default_path() -> String {
 
 fn default_path_key() -> String {
     "path".to_string()
-}
-
-#[derive(Clone)]
-struct SimpleHttpSource {
-    headers: Vec<String>,
-    query_parameters: Vec<String>,
-    path_key: String,
-    decoder: Decoder,
-    log_namespace: LogNamespace,
-}
-
-impl SimpleHttpSource {
-    fn add_path(&self, events: &mut [Event], key: &str) {
-        for event in events.iter_mut() {
-            event
-                .as_mut_log()
-                .try_insert(key, Value::from(self.path_key.to_string()));
-        }
-    }
-
-    fn add_headers(&self, events: &mut [Event], headers: HeaderMap) {
-        for header_name in &self.headers {
-            let value = headers.get(header_name).map(HeaderValue::as_bytes);
-
-            for event in events.iter_mut() {
-                event.as_mut_log().try_insert(
-                    event_path!(header_name),
-                    Value::from(value.map(Bytes::copy_from_slice)),
-                );
-            }
-        }
-    }
-}
-
-impl HttpSource for SimpleHttpSource {
-    fn build_events(
-        &self,
-        body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
-        request_path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
-        let mut decoder = self.decoder.clone();
-        let mut events = Vec::new();
-        let mut bytes = BytesMut::new();
-        bytes.extend_from_slice(&body);
-
-        loop {
-            match decoder.decode_eof(&mut bytes) {
-                Ok(Some((next, _))) => {
-                    events.extend(next.into_iter());
-                }
-                Ok(None) => break,
-                Err(error) => {
-                    // Error is logged / emitted by `crate::codecs::Decoder`, no further
-                    // handling is needed here
-                    return Err(ErrorMessage::new(
-                        StatusCode::BAD_REQUEST,
-                        format!("Failed decoding body: {}", error),
-                    ));
-                }
-            }
-        }
-
-        self.add_headers(&mut events, header_map);
-
-        // TODO need to handle the shared util function
-        add_query_parameters(&mut events, &self.query_parameters, query_parameters);
-
-        self.add_path(&mut events, request_path);
-
-        let now = Utc::now();
-        for event in &mut events {
-            let log = event.as_mut_log();
-
-            self.log_namespace.insert_standard_vector_source_metadata(
-                log,
-                SimpleHttpConfig::NAME,
-                now,
-            );
-        }
-
-        Ok(events)
-    }
 }
 
 #[async_trait::async_trait]
@@ -308,12 +269,7 @@ impl SourceConfig for SimpleHttpConfig {
         // The source config overrides the global setting and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let schema_definition = self
-            .decoding
-            .as_ref()
-            .unwrap_or(&default_decoding())
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+        let schema_definition = self.schema_definition(log_namespace);
 
         vec![Output::default(
             self.decoding
@@ -330,6 +286,124 @@ impl SourceConfig for SimpleHttpConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
+    }
+}
+
+#[derive(Clone)]
+struct SimpleHttpSource {
+    headers: Vec<String>,
+    query_parameters: Vec<String>,
+    path_key: String,
+    decoder: Decoder,
+    log_namespace: LogNamespace,
+}
+
+impl SimpleHttpSource {
+    /// Enriches the passed in events with metadata for the `request_path` and for each of the headers.
+    fn enrich_events(&self, events: &mut [Event], request_path: &str, headers: HeaderMap) {
+        for event in events.iter_mut() {
+            let log = event.as_mut_log();
+
+            // add request_path to each event
+            self.log_namespace.insert_source_metadata(
+                SimpleHttpConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(path!(self.path_key.as_str()))),
+                path!("path"),
+                request_path.to_owned(),
+            );
+
+            // add each header to each event
+            for header_name in &self.headers {
+                let value = headers.get(header_name).map(HeaderValue::as_bytes);
+
+                self.log_namespace.insert_source_metadata(
+                    SimpleHttpConfig::NAME,
+                    log,
+                    Some(LegacyKey::Overwrite(path!(header_name))),
+                    path!("headers"),
+                    Value::from(value.map(Bytes::copy_from_slice)),
+                );
+            }
+        }
+    }
+}
+
+// TODO when the `heroku` log namespacing work is undertaken, move this function out of this file and replace the
+// sources::util::http::query::add_query_parameters() function body with it.
+fn add_query_parameters(
+    events: &mut [Event],
+    query_parameters_config: &[String],
+    query_parameters: HashMap<String, String>,
+    log_namespace: LogNamespace,
+    source_name: &'static str,
+) {
+    for query_parameter_name in query_parameters_config {
+        let value = query_parameters.get(query_parameter_name);
+        for event in events.iter_mut() {
+            log_namespace.insert_source_metadata(
+                source_name,
+                event.as_mut_log(),
+                Some(LegacyKey::Overwrite(path!(query_parameter_name))),
+                path!("query_parameters"),
+                crate::event::Value::from(value.map(String::to_owned)),
+            );
+        }
+    }
+}
+
+impl HttpSource for SimpleHttpSource {
+    fn build_events(
+        &self,
+        body: Bytes,
+        header_map: HeaderMap,
+        query_parameters: HashMap<String, String>,
+        request_path: &str,
+    ) -> Result<Vec<Event>, ErrorMessage> {
+        let mut decoder = self.decoder.clone();
+        let mut events = Vec::new();
+        let mut bytes = BytesMut::new();
+        bytes.extend_from_slice(&body);
+
+        loop {
+            match decoder.decode_eof(&mut bytes) {
+                Ok(Some((next, _))) => {
+                    events.extend(next.into_iter());
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    // Error is logged / emitted by `crate::codecs::Decoder`, no further
+                    // handling is needed here
+                    return Err(ErrorMessage::new(
+                        StatusCode::BAD_REQUEST,
+                        format!("Failed decoding body: {}", error),
+                    ));
+                }
+            }
+        }
+
+        self.enrich_events(&mut events, request_path, header_map);
+
+        add_query_parameters(
+            &mut events,
+            &self.query_parameters,
+            query_parameters,
+            self.log_namespace,
+            SimpleHttpConfig::NAME,
+        );
+
+        let now = Utc::now();
+        for event in &mut events {
+            let log = event.as_mut_log();
+
+            self.log_namespace.insert_standard_vector_source_metadata(
+                log,
+                SimpleHttpConfig::NAME,
+                now,
+            );
+        }
+
+        Ok(events)
     }
 }
 
