@@ -471,7 +471,7 @@ end
 # For any overlapping fields in the given schema and the referenced schema, the fields from the
 # given schema will win.
 def expand_schema_references(root_schema, unexpanded_schema)
-  # Break any cycles during expansion, to same as we do during resolution.
+  # Break any cycles during expansion, the same as we do during resolution.
   if get_schema_metadata(unexpanded_schema, 'docs::cycle_entrypoint')
     return unexpanded_schema
   end
