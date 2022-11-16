@@ -13,8 +13,8 @@ use similar_asserts::assert_eq;
 use vector_core::{config::LogNamespace, event::Event};
 
 #[test]
-fn v23_fixtures_match() {
-    fixtures_match("v23");
+fn pre_v23_fixtures_match() {
+    fixtures_match("pre-v23");
 }
 
 #[test]
@@ -23,7 +23,7 @@ fn current_fixtures_match() {
 }
 
 #[test]
-fn roundtrip_native_json_fixtures() {
+fn roundtrip_current_native_json_fixtures() {
     roundtrip_fixtures(
         "json",
         "",
@@ -34,7 +34,7 @@ fn roundtrip_native_json_fixtures() {
 }
 
 #[test]
-fn roundtrip_native_proto_fixtures() {
+fn roundtrip_current_native_proto_fixtures() {
     roundtrip_fixtures(
         "proto",
         "",
@@ -47,10 +47,10 @@ fn roundtrip_native_proto_fixtures() {
 /// The event proto file was changed in v23. This test ensures we can still load the old version
 /// binary and that when serialized and deserialized in the new format we still get the same event.
 #[test]
-fn updated_native_json_fixtures() {
+fn reserialize_pre_v23_native_json_fixtures() {
     roundtrip_fixtures(
         "json",
-        "v23",
+        "pre-v23",
         &NativeJsonDeserializerConfig.build(),
         &mut NativeJsonSerializerConfig.build(),
         true,
@@ -58,10 +58,10 @@ fn updated_native_json_fixtures() {
 }
 
 #[test]
-fn updated_native_proto_fixtures() {
+fn reserialize_pre_v23_native_proto_fixtures() {
     roundtrip_fixtures(
         "proto",
-        "v23",
+        "pre-v23",
         &NativeDeserializerConfig.build(),
         &mut NativeSerializerConfig.build(),
         true,
@@ -69,13 +69,13 @@ fn updated_native_proto_fixtures() {
 }
 
 #[test]
-fn native_decoding_matches() {
+fn current_native_decoding_matches() {
     decoding_matches("");
 }
 
 #[test]
-fn updated_native_decoding_matches() {
-    decoding_matches("v23");
+fn pre_v23_native_decoding_matches() {
+    decoding_matches("pre-v23");
 }
 
 /// This test ensures that the different sets of protocol fixture names match.
