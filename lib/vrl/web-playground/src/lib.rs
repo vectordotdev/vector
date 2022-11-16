@@ -92,7 +92,7 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
 
     match runtime.resolve(&mut target_value, &program.program, &timezone) {
         Ok(result) => Ok(VrlCompileResult::new(result, target_value.value)),
-        Err(err) => return Err(VrlDiagnosticResult::new_runtime_error(&input.program, err)),
+        Err(err) => Err(VrlDiagnosticResult::new_runtime_error(&input.program, err)),
     }
 }
 
