@@ -649,7 +649,7 @@ end
 
 # Fully resolves a schema definition, if it exists.
 #
-# This looks up a schema definition by the given `name` within `root_schema` and resolves i
+# This looks up a schema definition by the given `name` within `root_schema` and resolves it.
 # If no schema definition exists for the given name, `nil` is returned. Otherwise, the schema
 # definition is preprocessed (collapsing schema references, etc), and then resolved. Both the
 # "source" schema (preprocessed value) and the resolved schema are returned.
