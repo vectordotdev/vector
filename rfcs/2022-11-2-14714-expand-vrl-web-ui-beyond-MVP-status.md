@@ -57,32 +57,54 @@ concerns have to do with.
 
 ### User Experience
 
-- The expansion of the MVP UI is necessary to create more robust features that tightly integrates with VRL and Vector so users can get a clear
+- The expansion of the MVP UI is necessary to create more robust features that tightly integrates with VRL and Vector so users can get a clear picture of what VRL can do.
 
 ### Implementation
 
 The new UI will set up the building blocks for a robust
 playground experience. Live deploy, auto completion, in line docs,
-and more desired features will be quicker to implement in a
+and more desired features will be possible to implement after
+the building blocks of the site are made. We should be able
+to have components for tabs, editors, toolbars, and more.
+Each with the possibility to expand with features that will
+accomplish the stretch goals.
 
-- When possible, demonstrate with pseudo code not text.
-- Be specific. Be opinionated. Avoid ambiguity.
+- Live deploy => we would likely require a robust component for the editors, one that handles state and context so we can add additional logic to expand to live deployment to vector instances.
+- Auto completion => we can investigate adding the AST onto the monaco editors and keeping that logic in a seperate module similar to how graphiql created codemirror-graphql we can create monaco-vrl.
+- UI building blocks => will allow us to implement tabs, docs, editor buttons (sharing, copy code, etc), toolbars
 
 ## Rationale
 
 - Why is this change worth it?
+This change will allow us to expand the current playground to a more long-term maintainable project.
+
 - What is the impact of not doing this?
+The impact will be a less organized code-base (if using graphiql) or a more complex project for what we need
+the playground to accomplish (going the rust web-framework route).
+
 - How does this position us for success in the future?
+This will allow us to develop a nice onboarding experience for users who want to see what VRL has to offer,
+making it an easier sell for users, or at the very least an easier demo to potential customers.
 
 ## Drawbacks
 
 - Why should we not do this?
+We should not do this if the MVP playground is already enough and no longer needs more iteration,
+if we do not forsee making the playground more complex than it already is in the MVP, then the
+effort will not be useful.
+
 - What kind on ongoing burden does this place on the team?
+The burden will take place in requiring more front end developers or building up context for
+current Vector developers.
 
 ## Prior Art
 
 - List prior art, the good and bad.
+- MVP Playground - great demonstration of what can be done, but limited in features we would like
+- Graphiql-Vector Playground - has more features we want but the codebase is too tightly coupled with graphql
+
 - Why can't we simply use or copy them?
+- The above prior art is not sufficient for what we would like to develop in the future, and can be too difficult to maintain long term.
 
 ## Alternatives
 
@@ -126,9 +148,8 @@ in a rust web framework.
 
 ## Outstanding Questions
 
-- List any remaining questions.
-- Use this to resolve ambiguity and collaborate with your team during the RFC process.
-- *These must be resolved before the RFC can be merged.*
+- What would obersvablity pipelines team like to see in a VRL playground effort, npm modules?, more vrl-js docs?
+- What would customers like to see for the VRL playground?
 
 ## Plan Of Attack
 
