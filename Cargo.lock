@@ -1744,7 +1744,7 @@ dependencies = [
  "memchr",
  "once_cell",
  "ordered-float 3.4.0",
- "prost 0.11.0",
+ "prost 0.11.2",
  "regex",
  "serde",
  "serde_json",
@@ -1839,7 +1839,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e57ff02e8ad8e06ab9731d5dc72dc23bef9200778eae1a89d555d8c42e5d4a86"
 dependencies = [
- "prost 0.11.0",
+ "prost 0.11.2",
  "prost-types 0.11.1",
  "tonic",
  "tracing-core 0.1.30",
@@ -4276,7 +4276,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.2.1",
  "chrono",
- "prost 0.10.4",
+ "prost 0.11.2",
  "prost-build 0.10.4",
  "prost-types 0.10.1",
  "snap",
@@ -5180,7 +5180,7 @@ dependencies = [
  "chrono",
  "hex",
  "ordered-float 3.4.0",
- "prost 0.11.0",
+ "prost 0.11.2",
  "prost-build 0.11.1",
  "tonic",
  "tonic-build",
@@ -5745,7 +5745,7 @@ dependencies = [
  "indexmap",
  "nom",
  "num_enum",
- "prost 0.11.0",
+ "prost 0.11.2",
  "prost-build 0.11.1",
  "prost-types 0.11.1",
  "snafu",
@@ -5797,9 +5797,9 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.11.0"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "399c3c31cdec40583bb68f0b18403400d01ec4289c383aa047560439952c4dd7"
+checksum = "a0841812012b2d4a6145fae9a6af1534873c32aa67fff26bd09f8fa42c83f95a"
 dependencies = [
  "bytes 1.2.1",
  "prost-derive 0.11.0",
@@ -5840,7 +5840,7 @@ dependencies = [
  "log",
  "multimap",
  "petgraph",
- "prost 0.11.0",
+ "prost 0.11.2",
  "prost-types 0.11.1",
  "regex",
  "tempfile",
@@ -5890,7 +5890,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4dfaa718ad76a44b3415e6c4d53b17c8f99160dcb3a99b10470fce8ad43f6e3e"
 dependencies = [
  "bytes 1.2.1",
- "prost 0.11.0",
+ "prost 0.11.2",
 ]
 
 [[package]]
@@ -7929,7 +7929,7 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost 0.11.0",
+ "prost 0.11.2",
  "prost-derive 0.11.0",
  "rustls-native-certs 0.6.2",
  "rustls-pemfile 1.0.0",
@@ -8734,7 +8734,7 @@ dependencies = [
  "postgres-openssl",
  "prometheus-parser",
  "proptest",
- "prost 0.11.0",
+ "prost 0.11.2",
  "prost-build 0.11.1",
  "prost-types 0.11.1",
  "pulsar",
@@ -8996,7 +8996,7 @@ dependencies = [
  "parking_lot",
  "pin-project",
  "proptest",
- "prost 0.11.0",
+ "prost 0.11.2",
  "prost-build 0.11.1",
  "prost-types 0.11.1",
  "quanta",
