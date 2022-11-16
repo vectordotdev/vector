@@ -294,7 +294,7 @@ impl SourceConfig for ExecConfig {
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(PID_KEY))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(COMMAND_KEY))),
                 &owned_value_path!(COMMAND_KEY),
                 Kind::bytes(),
                 None,
