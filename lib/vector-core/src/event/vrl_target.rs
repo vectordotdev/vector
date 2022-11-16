@@ -170,6 +170,28 @@ impl VrlTarget {
     }
 }
 
+fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi_value_tags: bool) {
+    if multi_value_tags {
+        let tag_values = value
+            .as_array()
+            .unwrap_or(&[])
+            .iter()
+            .filter_map(|value| match value {
+                Value::Bytes(bytes) => Some(Some(String::from_utf8_lossy(bytes).to_string())),
+                Value::Null => Some(None),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        metric.set_multi_value_tag(name, tag_values);
+    } else {
+        // set a single tag value
+        if let Ok(tag_value) = value.try_bytes_utf8_lossy().map(|x| x.into_owned()) {
+            metric.insert_tag(name, tag_value);
+        }
+    }
+}
+
 impl vrl_lib::Target for VrlTarget {
     fn target_insert(
         &mut self,
@@ -186,6 +208,7 @@ impl vrl_lib::Target for VrlTarget {
                 VrlTarget::Metric {
                     ref mut metric,
                     value: metric_value,
+                    multi_value_tags,
                 } => {
                     if path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -201,20 +224,20 @@ impl vrl_lib::Target for VrlTarget {
 
                                 metric.remove_tags();
                                 for (field, value) in &value {
-                                    metric.insert_tag(
+                                    set_metric_tag_values(
                                         field.as_str().to_owned(),
-                                        value
-                                            .try_bytes_utf8_lossy()
-                                            .map_err(|e| e.to_string())?
-                                            .into_owned(),
+                                        value,
+                                        metric,
+                                        *multi_value_tags,
                                     );
                                 }
                             }
                             ["tags", field] => {
-                                let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
-                                metric.insert_tag(
+                                set_metric_tag_values(
                                     (*field).to_owned(),
-                                    String::from_utf8_lossy(&value).into_owned(),
+                                    &value,
+                                    metric,
+                                    *multi_value_tags,
                                 );
                             }
                             ["name"] => {
@@ -306,6 +329,7 @@ impl vrl_lib::Target for VrlTarget {
                 VrlTarget::Metric {
                     ref mut metric,
                     value,
+                    multi_value_tags: _,
                 } => {
                     if target_path.path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
