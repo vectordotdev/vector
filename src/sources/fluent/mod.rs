@@ -1116,7 +1116,7 @@ mod tests {
             Some("message"),
         )
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("tag"), Kind::bytes(), Some("tag"))
+        .with_event_field(&owned_value_path!("tag"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
         .unknown_fields(Kind::bytes());
