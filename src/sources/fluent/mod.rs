@@ -2,6 +2,7 @@ use std::io::{self, Read};
 use std::net::SocketAddr;
 
 use bytes::{Buf, Bytes, BytesMut};
+use chrono::Utc;
 use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::MultiGzDecoder;
 use lookup::lookup_v2::parse_value_path;
@@ -120,14 +121,14 @@ impl SourceConfig for FluentConfig {
                 FluentConfig::NAME,
                 host_key,
                 &owned_value_path!("host"),
-                Kind::bytes().or_undefined(),
+                Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
                 FluentConfig::NAME,
                 tag_key,
                 &owned_value_path!("tag"),
-                Kind::bytes().or_undefined(),
+                Kind::bytes(),
                 Some("tag"),
             )
             // for metadata that is added to the events dynamically from the FluentRecord
@@ -135,7 +136,7 @@ impl SourceConfig for FluentConfig {
                 FluentConfig::NAME,
                 None,
                 &owned_value_path!("record"),
-                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             );
 
@@ -542,13 +543,20 @@ impl From<FluentEvent<'_>> for LogEvent {
         match log_namespace {
             LogNamespace::Vector => {
                 log.insert(metadata_path!(FluentConfig::NAME, "timestamp"), timestamp);
+                log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
             LogNamespace::Legacy => {
                 log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
             }
         }
 
-        log_namespace.insert_vector_metadata(&mut log, path!("tag"), path!("tag"), tag);
+        log_namespace.insert_source_metadata(
+            FluentConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!("tag"))),
+            path!("tag"),
+            tag,
+        );
 
         for (key, value) in record.into_iter() {
             let value: Value = value.into();
@@ -1039,7 +1047,7 @@ mod tests {
             receive_buffer_bytes: None,
             acknowledgements: false.into(),
             connection_limit: None,
-            log_namespace: None,
+            log_namespace: Some(true),
         };
 
         let definition = config.outputs(LogNamespace::Vector)[0]
@@ -1051,22 +1059,16 @@ mod tests {
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                 .with_meaning(LookupBuf::root(), "message")
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
-                .with_metadata_field(
-                    &owned_value_path!("fluent", "tag"),
-                    Kind::bytes().or_undefined(),
-                )
+                .with_metadata_field(&owned_value_path!("fluent", "tag"), Kind::bytes())
                 .with_metadata_field(
                     &owned_value_path!("fluent", "record"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                 )
-                .with_metadata_field(
-                    &owned_value_path!("fluent", "host"),
-                    Kind::bytes().or_undefined(),
-                );
+                .with_metadata_field(&owned_value_path!("fluent", "host"), Kind::bytes());
 
         assert_eq!(definition, expected_definition)
     }
@@ -1098,17 +1100,9 @@ mod tests {
             Some("message"),
         )
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-        .with_event_field(
-            &owned_value_path!("tag"),
-            Kind::bytes().or_undefined(),
-            Some("tag"),
-        )
+        .with_event_field(&owned_value_path!("tag"), Kind::bytes(), Some("tag"))
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
-        .with_event_field(
-            &owned_value_path!("host"),
-            Kind::bytes().or_undefined(),
-            Some("host"),
-        )
+        .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
         .unknown_fields(Kind::bytes());
 
         assert_eq!(definition, expected_definition)
