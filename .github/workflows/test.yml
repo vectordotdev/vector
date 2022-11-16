@@ -228,7 +228,7 @@ jobs:
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
-    runs-on: macos-12
+    runs-on: macos-11
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
