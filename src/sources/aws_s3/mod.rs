@@ -157,6 +157,13 @@ impl SourceConfig for AwsS3Config {
                 Kind::bytes(),
                 None,
             )
+            .with_source_metadata(
+                Self::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
             .with_standard_vector_source_metadata()
             // for metadata that is added to the events dynamically from the metadata
             .with_source_metadata(

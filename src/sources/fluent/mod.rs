@@ -131,6 +131,13 @@ impl SourceConfig for FluentConfig {
                 Kind::bytes(),
                 Some("tag"),
             )
+            .with_source_metadata(
+                FluentConfig::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
             // for metadata that is added to the events dynamically from the FluentRecord
             .with_source_metadata(
                 FluentConfig::NAME,
@@ -1060,6 +1067,7 @@ mod tests {
                 .with_meaning(LookupBuf::root(), "message")
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("fluent", "tag"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("fluent", "timestamp"), Kind::timestamp())
                 .with_metadata_field(
                     &owned_value_path!("fluent", "record"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
