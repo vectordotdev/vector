@@ -404,6 +404,7 @@ where
 
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
+
             Ok(hyper::Response::from_parts(
                 parts,
                 body.copy_to_bytes(body.remaining()),
