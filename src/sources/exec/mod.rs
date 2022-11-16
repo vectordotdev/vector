@@ -276,7 +276,7 @@ impl SourceConfig for ExecConfig {
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("host"))),
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
-                None,
+                Some("host"),
             )
             .with_source_metadata(
                 Self::NAME,
