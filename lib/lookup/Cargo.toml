@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 serde = { version = "1.0.147", default-features = false, features = ["derive", "alloc"] }
 snafu = { version = "0.7", default-features = false }
-regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.7.0", default-features = false, features = ["std", "perf"] }
 inherent = "1.0"
 lalrpop-util = { version = "0.19.8", features = ["lexer"] }
 once_cell = { version = "1.16" }
