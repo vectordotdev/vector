@@ -87,7 +87,7 @@ impl InternalLogsConfig {
                 pid_key,
                 &owned_value_path!("pid"),
                 Kind::integer(),
-                Some("pid"),
+                None,
             )
     }
 }
@@ -381,7 +381,7 @@ mod tests {
             Some("message"),
         )
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!(pid_key), Kind::integer(), Some("pid"))
+        .with_event_field(&owned_value_path!(pid_key), Kind::integer(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(
             &owned_value_path!("host"),
