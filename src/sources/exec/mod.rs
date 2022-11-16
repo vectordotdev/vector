@@ -269,7 +269,7 @@ impl SourceConfig for ExecConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
+        let log_namespace = global_log_namespace.merge(log_namespace());
 
         let schema_definition = self
             .decoding
