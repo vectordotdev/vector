@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
@@ -65,9 +67,7 @@ pub struct AwsSqsConfig {
     /// high rate of messages being pushed into the queue and the messages being fetched are small. In these cases,
     /// Vector may not fully utilize system resources without fetching more messages per second, as it spends more time
     /// fetching the messages than processing them.
-    #[serde(default = "default_client_concurrency")]
-    #[derivative(Default(value = "default_client_concurrency()"))]
-    pub client_concurrency: u32,
+    pub client_concurrency: Option<NonZeroUsize>,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -105,7 +105,10 @@ impl SourceConfig for AwsSqsConfig {
                 queue_url: self.queue_url.clone(),
                 decoder,
                 poll_secs: self.poll_secs,
-                concurrency: self.client_concurrency,
+                concurrency: self
+                    .client_concurrency
+                    .map(|n| n.get())
+                    .unwrap_or_else(crate::num_threads),
                 visibility_timeout_secs: self.visibility_timeout_secs,
                 delete_message: self.delete_message,
                 acknowledgements,
@@ -139,10 +142,6 @@ impl AwsSqsConfig {
 
 const fn default_poll_secs() -> u32 {
     15
-}
-
-fn default_client_concurrency() -> u32 {
-    crate::num_threads() as u32
 }
 
 const fn default_visibility_timeout_secs() -> u32 {
