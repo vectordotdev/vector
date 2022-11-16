@@ -26,28 +26,23 @@ impl<const N: usize> GroupStack<N> {
     ///
     /// If the stack is empty, then the root allocation group is the defacto active allocation group, and is returned as such.
     pub const fn current(&self) -> AllocationGroupId {
-        if self.current_top == 0 {
-            AllocationGroupId::ROOT
-        } else {
-            self.slots[self.current_top - 1]
-        }
+        self.slots[self.current_top]
     }
 
     /// Pushes an allocation group on to the stack, marking it as the active allocation group.
     pub fn push(&mut self, group: AllocationGroupId) {
+        self.current_top += 1;
         if self.current_top >= self.slots.len() {
             panic!("tried to push new allocation group to the current stack, but hit the limit of {} entries", N);
         }
         self.slots[self.current_top] = group;
-        self.current_top += 1;
     }
 
-    /// Pops and returns the previous allocation group that was on the stack.
-    pub fn pop(&mut self) -> AllocationGroupId {
+    /// Pops the previous allocation group that was on the stack.
+    pub fn pop(&mut self) {
         if self.current_top == 0 {
             panic!("tried to pop current allocation group from the stack but the stack is empty");
         }
         self.current_top -= 1;
-        self.slots[self.current_top]
     }
 }

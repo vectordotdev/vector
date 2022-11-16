@@ -326,7 +326,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 	}
 	stream_name: {
 		description: """
-			The [stream name][stream_name] of the target Kinesis Logs stream.
+			The [stream name][stream_name] of the target Kinesis Firehose delivery stream.
 
 			[stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""

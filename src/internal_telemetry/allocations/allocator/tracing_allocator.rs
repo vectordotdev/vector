@@ -22,6 +22,7 @@ impl<A, T> GroupedTraceableAllocator<A, T> {
 }
 
 impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
+    #[inline(always)]
     unsafe fn get_wrapped_allocation(
         &self,
         object_layout: Layout,
@@ -33,13 +34,10 @@ impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
             handle_alloc_error(actual_layout);
         }
 
-        // Zero out the group ID field to make sure it's in the `None` state.
-        //
         // SAFETY: We know that `actual_ptr` is at least aligned enough for casting it to `*mut usize` as the layout for
         // the allocation backing this pointer ensures the first field in the layout is `usize.
         #[allow(clippy::cast_ptr_alignment)]
         let group_id_ptr = actual_ptr.cast::<usize>();
-        group_id_ptr.write(0);
 
         // SAFETY: If the allocation succeeded and `actual_ptr` is valid, then it must be valid to advance by
         // `offset_to_object` as it would land within the allocation.
@@ -59,13 +57,6 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
         try_with_suspended_allocation_group(
             #[inline(always)]
             |group_id| {
-                // We only set the group ID in the wrapper header if we're tracing an allocation, because when it
-                // comes back to us during deallocation, we want to skip doing any checks at all if it's already
-                // zero.
-                //
-                // If we never trace the allocation, tracing the deallocation will only produce incorrect numbers,
-                // and that includes even if we just used the rule of "always attribute allocations to the root
-                // allocation group by default".
                 group_id_ptr.write(group_id.as_raw());
                 self.tracer.trace_allocation(object_size, group_id);
             },
@@ -99,21 +90,22 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
         try_with_suspended_allocation_group(
             #[inline(always)]
-            |_| self.tracer.trace_deallocation(object_size, source_group_id),
+            |_| {
+                self.tracer.trace_deallocation(object_size, source_group_id);
+            },
         );
     }
 }
 
+#[inline(always)]
 fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
     static HEADER_LAYOUT: Layout = Layout::new::<usize>();
 
     // We generate a new allocation layout that gives us a location to store the active allocation group ID ahead
-    // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path. We'll
-    // always set this to zero, and conditionally update it to the actual allocation group ID if tracking is enabled.
+    // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path.
     let (actual_layout, offset_to_object) = HEADER_LAYOUT
         .extend(object_layout)
         .expect("wrapping requested layout resulted in overflow");
-    let actual_layout = actual_layout.pad_to_align();
 
     (actual_layout, offset_to_object)
 }

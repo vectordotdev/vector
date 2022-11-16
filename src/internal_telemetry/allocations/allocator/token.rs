@@ -15,7 +15,7 @@ thread_local! {
     /// Any allocations which occur on this thread will be associated with whichever token is
     /// present at the time of the allocation.
     pub(crate) static LOCAL_ALLOCATION_GROUP_STACK: RefCell<GroupStack<256>> =
-        RefCell::new(GroupStack::new());
+        const { RefCell::new(GroupStack::new()) };
 }
 
 /// The identifier that uniquely identifiers an allocation group.

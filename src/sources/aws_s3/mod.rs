@@ -105,6 +105,7 @@ pub struct AwsS3Config {
     tls_options: Option<TlsConfig>,
 
     /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
 }
@@ -680,7 +681,7 @@ mod integration_tests {
                 queue_url: queue_url.to_string(),
                 poll_secs: 1,
                 visibility_timeout_secs: 0,
-                client_concurrency: 1,
+                client_concurrency: None,
                 ..Default::default()
             }),
             acknowledgements: true.into(),

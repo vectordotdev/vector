@@ -30,6 +30,10 @@ impl OwnedValuePath {
         self.segments.insert(0, OwnedSegment::field(field));
     }
 
+    pub fn push_front_segment(&mut self, segment: OwnedSegment) {
+        self.segments.insert(0, segment);
+    }
+
     pub fn with_field_appended(&self, field: &str) -> Self {
         let mut new_path = self.clone();
         new_path.push_field(field);
@@ -37,8 +41,12 @@ impl OwnedValuePath {
     }
 
     pub fn with_field_prefix(&self, field: &str) -> Self {
+        self.with_segment_prefix(OwnedSegment::field(field))
+    }
+
+    pub fn with_segment_prefix(&self, segment: OwnedSegment) -> Self {
         let mut new_path = self.clone();
-        new_path.push_front_field(field);
+        new_path.push_front_segment(segment);
         new_path
     }
 
