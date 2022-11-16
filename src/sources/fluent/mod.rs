@@ -15,6 +15,7 @@ use value::kind::Collection;
 use value::{Kind, Value};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::schema::Definition;
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -103,14 +104,29 @@ impl SourceConfig for FluentConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = self.schema_definition(log_namespace);
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.as_tcp_resource()]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
+}
+
+impl FluentConfig {
+    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         // `host_key` is only inserted if not present already.
         let host_key = parse_value_path(log_schema().host_key())
             .ok()
             .map(LegacyKey::InsertIfEmpty);
 
         let tag_key = parse_value_path("tag").ok().map(LegacyKey::Overwrite);
-
-        let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
@@ -152,15 +168,7 @@ impl SourceConfig for FluentConfig {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        vec![self.address.as_tcp_resource()]
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        true
+        schema_definition
     }
 }
 
