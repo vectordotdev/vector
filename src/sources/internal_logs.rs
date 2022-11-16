@@ -5,9 +5,11 @@ use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
 use lookup::{owned_value_path, path, OwnedValuePath};
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::schema::Definition;
-use vector_core::ByteSizeOf;
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    schema::Definition,
+    ByteSizeOf,
+};
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
@@ -84,7 +86,7 @@ impl InternalLogsConfig {
                 InternalLogsConfig::NAME,
                 pid_key,
                 &owned_value_path!("pid"),
-                Kind::bytes().or_undefined(),
+                Kind::integer(),
                 Some("pid"),
             )
     }
@@ -342,7 +344,7 @@ mod tests {
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(
                     &owned_value_path!(InternalLogsConfig::NAME, "pid"),
-                    Kind::bytes().or_undefined(),
+                    Kind::integer(),
                 )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
@@ -379,11 +381,7 @@ mod tests {
             Some("message"),
         )
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-        .with_event_field(
-            &owned_value_path!(pid_key),
-            Kind::bytes().or_undefined(),
-            Some("pid"),
-        )
+        .with_event_field(&owned_value_path!(pid_key), Kind::integer(), Some("pid"))
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(
             &owned_value_path!("host"),
