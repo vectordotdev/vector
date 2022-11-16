@@ -231,7 +231,7 @@ jobs:
 
   build-x86_64-apple-darwin-packages:
     name: Build Vector for x86_64-apple-darwin (.tar.gz)
-    runs-on: macos-11
+    runs-on: macos-12
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -400,7 +400,7 @@ jobs:
 
   macos-verify:
     name: Verify macOS Package
-    runs-on: macos-11
+    runs-on: macos-12
     needs:
       - generate-publish-metadata
       - build-x86_64-apple-darwin-packages
