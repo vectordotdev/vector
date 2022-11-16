@@ -10,15 +10,14 @@ use codecs::{
 use http::StatusCode;
 use lookup::event_path;
 use tokio_util::codec::Decoder as _;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{DataType, LogNamespace};
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
     },
     event::{Event, Value},
     serde::{bool_or_struct, default_decoding},
@@ -122,6 +121,11 @@ pub struct SimpleHttpConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 impl GenerateConfig for SimpleHttpConfig {
@@ -140,6 +144,7 @@ impl GenerateConfig for SimpleHttpConfig {
             framing: None,
             decoding: Some(default_decoding()),
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            log_namespace: None,
         })
         .unwrap()
     }
@@ -163,6 +168,30 @@ struct SimpleHttpSource {
     query_parameters: Vec<String>,
     path_key: String,
     decoder: Decoder,
+    log_namespace: LogNamespace,
+}
+
+impl SimpleHttpSource {
+    fn add_path(&self, events: &mut [Event], key: &str) {
+        for event in events.iter_mut() {
+            event
+                .as_mut_log()
+                .try_insert(key, Value::from(self.path_key.to_string()));
+        }
+    }
+
+    fn add_headers(&self, events: &mut [Event], headers: HeaderMap) {
+        for header_name in &self.headers {
+            let value = headers.get(header_name).map(HeaderValue::as_bytes);
+
+            for event in events.iter_mut() {
+                event.as_mut_log().try_insert(
+                    event_path!(header_name),
+                    Value::from(value.map(Bytes::copy_from_slice)),
+                );
+            }
+        }
+    }
 }
 
 impl HttpSource for SimpleHttpSource {
@@ -195,16 +224,22 @@ impl HttpSource for SimpleHttpSource {
             }
         }
 
-        add_headers(&mut events, &self.headers, header_map);
+        self.add_headers(&mut events, header_map);
+
+        // TODO need to handle the shared util function
         add_query_parameters(&mut events, &self.query_parameters, query_parameters);
-        add_path(&mut events, self.path_key.as_str(), request_path);
+
+        self.add_path(&mut events, request_path);
 
         let now = Utc::now();
         for event in &mut events {
             let log = event.as_mut_log();
 
-            log.try_insert(log_schema().source_type_key(), Bytes::from("http"));
-            log.try_insert(log_schema().timestamp_key(), now);
+            self.log_namespace.insert_standard_vector_source_metadata(
+                log,
+                SimpleHttpConfig::NAME,
+                now,
+            );
         }
 
         Ok(events)
@@ -247,11 +282,14 @@ impl SourceConfig for SimpleHttpConfig {
         };
 
         let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let source = SimpleHttpSource {
             headers: self.headers.clone(),
             query_parameters: self.query_parameters.clone(),
             path_key: self.path_key.clone(),
             decoder,
+            log_namespace,
         };
         source.run(
             self.address,
@@ -265,13 +303,25 @@ impl SourceConfig for SimpleHttpConfig {
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // There is a global and per-source `log_namespace` config.
+        // The source config overrides the global setting and is merged here.
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        let schema_definition = self
+            .decoding
+            .as_ref()
+            .unwrap_or(&default_decoding())
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
+
         vec![Output::default(
             self.decoding
                 .as_ref()
                 .map(|d| d.output_type())
                 .unwrap_or(DataType::Log),
-        )]
+        )
+        .with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -280,27 +330,6 @@ impl SourceConfig for SimpleHttpConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
-    }
-}
-
-fn add_path(events: &mut [Event], key: &str, path: &str) {
-    for event in events.iter_mut() {
-        event
-            .as_mut_log()
-            .try_insert(key, Value::from(path.to_string()));
-    }
-}
-
-fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderMap) {
-    for header_name in headers_config {
-        let value = headers.get(header_name).map(HeaderValue::as_bytes);
-
-        for event in events.iter_mut() {
-            event.as_mut_log().try_insert(
-                event_path!(header_name),
-                Value::from(value.map(Bytes::copy_from_slice)),
-            );
-        }
     }
 }
 
@@ -379,6 +408,7 @@ mod tests {
                 framing,
                 decoding,
                 acknowledgements: acknowledgements.into(),
+                log_namespace: None,
             }
             .build(context)
             .await
