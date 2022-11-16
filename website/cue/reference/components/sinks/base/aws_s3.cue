@@ -195,8 +195,8 @@ base: components: sinks: aws_s3: configuration: {
 					description: "Compression level."
 					required:    false
 					type: {
-						number: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 						string: enum: ["none", "fast", "best", "default"]
+						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 					}
 				}
 			}
@@ -600,30 +600,9 @@ base: components: sinks: aws_s3: configuration: {
 		description: "The tag-set for the object."
 		required:    false
 		type: object: options: "*": {
-			description: "Tags for a metric series."
+			description: "The tag-set for the object."
 			required:    true
-			type: object: options: {
-				Set: {
-					description: """
-						This holds an actual set of values. This variant will be automatically created when a single
-						value is added to, and reduced down to a single value when the length is reduced to 1.  An
-						index set is used for this set, as it preserves the insertion order of the contained
-						elements. This allows us to retrieve the last element inserted which in turn allows us to
-						emulate the set having a single value.
-						"""
-					required: true
-					type: array: items: type: string: syntax: "literal"
-				}
-				Single: {
-					description: """
-						This represents a set containing a no value or a single value. This is stored separately to
-						avoid the overhead of allocating a hash table for the common case of a single value for a
-						tag.
-						"""
-					required: true
-					type: string: syntax: "literal"
-				}
-			}
+			type: string: syntax: "literal"
 		}
 	}
 	tls: {

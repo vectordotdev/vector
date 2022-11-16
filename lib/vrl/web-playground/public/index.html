@@ -1,170 +1,245 @@
 <!DOCTYPE html>
 <html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <!-- the below line lets monaco editor to appear nicely in mobile view -->
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <title>VRL playground</title>
+    <link rel="icon" type="image/x-icon" href="https://vector.dev/favicon.ico">
+    <link
+      rel="stylesheet"
+      data-name="vs/editor/editor.main"
+      href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.20.0/min/vs/editor/editor.main.min.css"
+    />
 
-<head>
-  <meta charset="utf-8" />
-  <title>VRL playground</title>
-  <link rel="stylesheet" data-name="vs/editor/editor.main"
-    href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.20.0/min/vs/editor/editor.main.min.css">
+    <link
+      rel="stylesheet"
+      href="index.css"
+    />
 
-  <style type="text/css">
-    div#input-section {
-      display: grid;
-      grid-template-columns: 50% 50%;
-      margin-bottom: 5rem;
-    }
-
-    div#container-program {
-      border-radius: 25px;
-      overflow: hidden;
-    }
-
-    div#container-event { 
-      border-radius: 25px;
-      overflow: hidden;
-    }
-
-    div#container-output {
-      border-radius: 25px;
-      overflow: hidden;
-    }
-
-    body {
-      font-family: ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;
-    }
-
-  </style>
+    <style type="text/css">
+    </style>
   </head>
 
-<body>
-  <h1>[draft] VRL playground wasm</h1>
-  <p>Open up the developer console and try running</p>
-  <p>run_vrl({"program": ".", "event": {}})')</p>
-  
-  <button onClick="handleRunCode()">run code</button>
-  <button onClick="handleShareCode()">share code</button>
-  <div id="input-section">
-    <div id="cell">
-      <p class="cell-title">Program</p>
-      <div id="container-program" style="height:400px;border:1px solid black;width:800px"></div>
+  <body>
+    <div id="App">
+      <div id="summary-section">
+        <h1>VRL Playground</h1>
+        <p>
+          <a href="https://vector.dev/docs/reference/vrl/functions/">Vector Remap Language (VRL)</a> is an expression-oriented language designed for transforming
+          observability data. This playground lets you write a program, run it against an event or
+          events, share it, and see how the events are transformed.
+        </p>
+      </div>
+
+      <div id="toolbar-section">
+        <button id="run-code-btn" class="btn-primary" onClick="handleRunCode()">run code</button>
+        <button id="share-code-btn" class="btn-secondary" onClick="handleShareCode()">share code</button>
+      </div>
+
+      <div id="input-section">
+        <div id="cell">
+          <div id="input-cell-title">
+            <p class="cell-title">Program</p>
+          </div>
+
+          <div id="container-program"></div>
+        </div>
+      </div>
+
+      <div id="output-section">
+        <div id="event-cell">
+          <div id="event-cell-title">
+            <p class="cell-title">Event</p>
+          </div>
+          <div id="container-event"></div>
+        </div>
+
+        <div id="output-cell">
+          <div id="output-cell-title">
+            <p class="cell-title">Output</p>
+          </div>
+          <div id="container-output"></div>
+        </div>
+      </div>
     </div>
-    
-    <div id="cell">
-      <p class="cell-title">Event</p>
-      <div id="container-event" style="height:400px;border:1px solid black;width:800px"></div>
-    </div>
-    
-  </div>
-  
-  <div id="output-section">
-    <div id="cell">
-      <p class="cell-title">Output</p>
-      <div id="container-output" style="height:400px;border:1px solid black;width:800px"></div>
-    </div>
-    
-  </div>
 
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
-  <script>
-    // require is provided by loader.min.js.
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs' } });
-    require(["vs/editor/editor.main"], () => {
-      window.programEditor = monaco.editor.create(document.getElementById('container-program'), {
-        value: `# Parse as JSON or error if malformed
-parsed, err = parse_syslog(.message)
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
 
-
-
-# Set the event to the parsed JSON value
-. = parsed
-
-# Remove some fields
-del(.msgid)
-
-
-# Reformat the timestamp
-ts, err = parse_timestamp(.timestamp, format: "%s")
-
-
-.timestamp = to_unix_timestamp(ts)`,
-        language: 'python',
-        theme: 'vs-light',
-        minimap: { enabled: false }
+    <!-- moving the below script above any calls to handleRunCode()
+    should help prevent "window.run_vrl is not a function" error -->
+    <script type="module">
+      import init, { run_vrl } from "./vrl_web_playground.js";
+      init().then(() => {
+        window.run_vrl = run_vrl;
       });
+    </script>
+    <script>
+      // require is provided by loader.min.js.
+      require.config({
+        paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs" },
+      });
+      require(["vs/editor/editor.main"], () => {
+        window.programEditor = monaco.editor.create(document.getElementById("container-program"), {
+          value: `# Remove some fields
+del(.foo)
 
-      window.eventEditor = monaco.editor.create(document.getElementById('container-event'), {
-        value: `{
-  "message": "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
+# Add a timestamp
+.timestamp = now()
+
+# Parse HTTP status code into local variable
+http_status_code = parse_int!(.http_status)
+del(.http_status)
+
+# Add status
+if http_status_code >= 200 && http_status_code <= 299 {
+    .status = "success"
+} else {
+    .status = "error"
 }`,
-        language: 'json',
-        theme: 'vs-light',
-        minimap: { enabled: false }
+          language: "coffeescript",
+          theme: "vs-light",
+          minimap: { enabled: false },
+          automaticLayout: true,
+        });
+
+        window.eventEditor = monaco.editor.create(document.getElementById("container-event"), {
+          value: `{
+	"message": "Hello VRL",
+	"foo": "delete me",
+	"http_status": "200"
+}`,
+          language: "json",
+          theme: "vs-light",
+          minimap: { enabled: false },
+          automaticLayout: true,
+        });
+
+        window.outputEditor = monaco.editor.create(document.getElementById("container-output"), {
+          language: "json",
+          theme: "vs-light",
+          minimap: { enabled: false },
+          automaticLayout: true,
+        });
+        const queryString = window.location.search;
+        if (queryString.length != 0) {
+          const urlParams = new URLSearchParams(queryString);
+          const stateParam = decodeURIComponent(urlParams.get("state"));
+
+          try {
+            let urlState = JSON.parse(atob(stateParam));
+
+            window.programEditor.setValue(urlState["program"]);
+            window.eventEditor.setValue(JSON.stringify(urlState["event"], null, "\t"));
+
+            console.log("[DEBUG::queryStringLogic] Current Params:", JSON.parse(atob(stateParam)));
+            let res = handleRunCode(JSON.parse(atob(stateParam)));
+            console.log("[DEBUG::queryStringLogic] Running VRL with current Params:", res);
+          } catch (e) {
+            window.outputEditor.setValue(`Error reading the shared URL\n${e}`);
+          }
+        }
       });
+    </script>
 
-      window.outputEditor = monaco.editor.create(document.getElementById('container-output'), {
-        language: 'json',
-        theme: 'vs-light',
-        minimap: { enabled: false }
-      });
-      const queryString = window.location.search;
-      if (queryString.length != 0) {
-        const urlParams = new URLSearchParams(queryString);
-        const stateParam = urlParams.get('state');
-
-        let urlState = JSON.parse(atob(stateParam));
-
-        window.programEditor.setValue(urlState["program"]);
-        window.eventEditor.setValue(JSON.stringify(urlState["event"], null, '\t'));
-
-        console.log("[DEBUG::queryStringLogic] Current Params:", JSON.parse(atob(stateParam)));
-        let res = handleRunCode(JSON.parse(atob(stateParam)));
-        console.log("[DEBUG::queryStringLogic] Running VRL with current Params:", res);
-      }
-    });
-  </script>
-
-  <script type="module">
-    import init, { run_vrl } from "./vrl_web_playground.js";
-    init().then(() => {
-      window.run_vrl = run_vrl;
-      // console.log(run_vrl({"program": ".", "event": {}}));
-    });
-  </script>
-
-  <script>
-    function handleRunCode(input) {
-      if (input == null) {
-        input = {
-          program: window.programEditor.getValue(),
-          event: JSON.parse(window.eventEditor.getValue())
+    <script>
+      function tryJsonParse(str) {
+        try {
+          return JSON.parse(str);
+        } catch (e) {
+          monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+            validate: false
+          });
+          window.outputEditor.setValue(`Error attempting to parse the following string into valid JSON\n
+String: ${str}
+\nEnsure that the Event editor contains valid JSON
+\nCommon mistakes:\n
+  Trailing Commas\n  Last line is a newline or whitespace\n  Unbalanced curly braces
+  If using JSONL, ensure each line is valid JSON`);
         }
       }
 
-      let res = window.run_vrl(input);
-
-      console.log("[DEBUG::handleRunCode()] Printing out res: ", res);
-      if (res.output) {
-        window.outputEditor.setValue(JSON.stringify(res["result"], null, "\t"));
-      } else if (res.msg) {
-        window.outputEditor.setValue(res["msg"]);
+      function isJsonL() {
+        if (window.eventEditor.getModel().getLineCount() > 1) {
+          let lines = window.eventEditor.getModel().getLinesContent();
+          // if the second line is a json object
+          // we assume the user has passed in valid json on each
+          // line
+          if (lines[1][0] == "{" && lines[1][lines[1].length - 1] == "}") {
+            return true;
+          }
+        }
+        return false;
       }
-      return res;
-    }
+      function handleRunCode(input) {
+        if (isJsonL()) {
+          let inputs = [];
+          let program = window.programEditor.getValue();
+          let lines = window.eventEditor.getModel().getLinesContent();
+          lines.forEach((line) => {
+            inputs.push({
+              program: program,
+              event: tryJsonParse(line)
+            })
+          });
 
-  </script>
-  <script>
-    function handleShareCode() {
-      let state = {
-        program: window.programEditor.getValue(),
-        event: JSON.parse(window.eventEditor.getValue())
+          let results = [];
+          inputs.forEach((input) => {
+            results.push(window.run_vrl(input));
+          })
+          let outputs = [];
+          results.forEach((res) => {
+            if (res.output) {
+              outputs.push(JSON.stringify(res["result"], null, "\t"));
+            } else if (res.msg) {
+              outputs.push(res["msg"]);
+            }
+          })
+          // disable output validation for json since jsonl input won't ouput valid json
+          monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+            validate: false
+          });
+          window.outputEditor.setValue(outputs.join("\n"));
+          return results;
+        }
+
+        if (input == null) {
+          input = {
+            program: window.programEditor.getValue(),
+            event: tryJsonParse(window.eventEditor.getValue()),
+          };
+        }
+
+        let res = window.run_vrl(input);
+
+        console.log("[DEBUG::handleRunCode()] Printing out res: ", res);
+        if (res.output) {
+          window.outputEditor.setValue(JSON.stringify(res["result"], null, "\t"));
+        } else if (res.msg) {
+          // disable output validation for json
+          // since vrl error msgs won't ouput json
+          monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+            validate: false
+          });
+          window.outputEditor.setValue(res["msg"]);
+        }
+        return res;
       }
+    </script>
+    <script>
+      function handleShareCode() {
+        let state = {
+          program: window.programEditor.getValue(),
+          event: JSON.parse(window.eventEditor.getValue()),
+        };
 
-      console.log("[DEBUG::handleShareCode()] Printing out state", state);
-      console.log("[DEBUG::handleShareCode()] Printing out base64 encoded state\n", btoa(JSON.stringify(state)));
-      window.history.pushState(state, "", `?state=${ btoa(JSON.stringify(state)) }`);
-    }
-  </script>
-</body>
-
+        console.log("[DEBUG::handleShareCode()] Printing out state", state);
+        console.log(
+          "[DEBUG::handleShareCode()] Printing out base64 encoded state\n",
+          btoa(JSON.stringify(state))
+        );
+        window.history.pushState(state, "", `?state=${encodeURIComponent(btoa(JSON.stringify(state)))}`);
+      }
+    </script>
+  </body>
 </html>

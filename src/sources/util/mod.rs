@@ -24,7 +24,7 @@ pub mod net;
     unix,
     any(feature = "sources-socket", feature = "sources-utils-net-unix",)
 ))]
-mod unix;
+pub mod unix;
 #[cfg(all(unix, feature = "sources-socket"))]
 mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-net-unix"))]
