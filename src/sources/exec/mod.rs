@@ -799,7 +799,10 @@ mod tests {
             meta.get(path!("vector", "source_type")).unwrap(),
             &vrl::value!("exec")
         );
-        assert!(meta.get(path!("vector", "ingest_timestamp")).is_some());
+        assert!(meta
+            .get(path!("vector", "ingest_timestamp"))
+            .unwrap()
+            .is_timestamp());
     }
 
     #[test]
@@ -872,7 +875,10 @@ mod tests {
             meta.get(path!("vector", "source_type")).unwrap(),
             &vrl::value!("exec")
         );
-        assert!(meta.get(path!("vector", "ingest_timestamp")).is_some());
+        assert!(meta
+            .get(path!("vector", "ingest_timestamp"))
+            .unwrap()
+            .is_timestamp());
     }
 
     #[test]
