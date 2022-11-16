@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::lookup_v2::OwnedSegment;
@@ -7,6 +8,7 @@ use vrl_lib::{prelude::VrlValueConvert, ProgramInfo, SecretTarget};
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
 use crate::config::log_schema;
+use crate::event::metric::TagValue;
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
@@ -177,8 +179,10 @@ fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi
             .unwrap_or(&[])
             .iter()
             .filter_map(|value| match value {
-                Value::Bytes(bytes) => Some(Some(String::from_utf8_lossy(bytes).to_string())),
-                Value::Null => Some(None),
+                Value::Bytes(bytes) => {
+                    Some(TagValue::Value(String::from_utf8_lossy(bytes).to_string()))
+                }
+                Value::Null => Some(TagValue::Bare),
                 _ => None,
             })
             .collect::<Vec<_>>();
@@ -186,7 +190,7 @@ fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi
         metric.set_multi_value_tag(name, tag_values);
     } else {
         // set a single tag value
-        if let Ok(tag_value) = value.try_bytes_utf8_lossy().map(|x| x.into_owned()) {
+        if let Ok(tag_value) = value.try_bytes_utf8_lossy().map(Cow::into_owned) {
             metric.insert_tag(name, tag_value);
         }
     }
@@ -1061,7 +1065,7 @@ mod test {
             target_queries: vec![],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
         let _result = target.target_insert(
             &OwnedTargetPath::event(owned_value_path!("tags")),
             Value::Object(BTreeMap::from([("a".into(), "b".into())])),
@@ -1105,7 +1109,7 @@ mod test {
             target_queries: vec![],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
 
         assert_eq!(
             Err(format!(
@@ -1143,5 +1147,51 @@ mod test {
                 "tags", "foo", "flork"
             )))
         );
+    }
+
+    #[test]
+    fn test_metric_insert_get_multi_value_tag() {
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.23 },
+        );
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, true);
+
+        let value = Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()]);
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "foo")),
+                value,
+            )
+            .unwrap();
+
+        let vrl_tags_value = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            vrl_tags_value,
+            &Value::Object(BTreeMap::from([(
+                "foo".into(),
+                Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()])
+            )]))
+        );
+
+        let metric = match target {
+            VrlTarget::Metric { metric, .. } => metric,
+            _ => unreachable!(),
+        };
+
+        // get single value (should be the last one)
+        assert_eq!(metric.tag_value("foo"), Some("b".into()));
     }
 }

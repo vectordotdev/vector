@@ -348,6 +348,7 @@ async fn handle_stream<T>(
                             }
                         }
 
+
                         source.handle_events(&mut events, peer_addr);
                         match out.send_batch(events).await {
                             Ok(_) => {

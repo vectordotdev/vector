@@ -1,5 +1,6 @@
 use core::fmt;
 
+use crate::event::metric::TagValue;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
@@ -45,8 +46,8 @@ impl MetricSeries {
         (self.tags.get_or_insert_with(Default::default)).insert(key, value)
     }
 
-    pub fn set_multi_value_tag(&mut self, key: String, values: Vec<Option<String>>) {
-        (self.tags.get_or_insert_with(Default::default)).set_multi_value_tag(key, values)
+    pub fn set_multi_value_tag(&mut self, key: String, values: Vec<TagValue>) {
+        (self.tags.get_or_insert_with(Default::default)).set_multi_value_tag(key, values);
     }
 
     /// Removes all the tags.

@@ -6,14 +6,6 @@ pub struct CompileConfig {
     /// Custom context injected by the external environment
     custom: AnyMap,
     read_only_paths: BTreeSet<ReadOnlyPath>,
-
-    /// When set to `false`, tag values will be exposed as single strings, the
-    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
-    /// will be ignored.
-    ///
-    /// When set to `true`, all tags will be exposed as arrays of either string or null
-    /// values.
-    pub multiple_metric_tag_values: bool,
 }
 
 impl CompileConfig {
@@ -76,7 +68,6 @@ impl Default for CompileConfig {
         Self {
             custom: AnyMap::new(),
             read_only_paths: BTreeSet::new(),
-            multiple_metric_tag_values: false,
         }
     }
 }

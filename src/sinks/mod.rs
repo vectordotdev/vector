@@ -12,10 +12,11 @@ pub mod apex;
 pub mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
 pub mod aws_cloudwatch_metrics;
-#[cfg(feature = "sinks-aws_kinesis_firehose")]
-pub mod aws_kinesis_firehose;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-pub mod aws_kinesis_streams;
+#[cfg(any(
+    feature = "sinks-aws_kinesis_streams",
+    feature = "sinks-aws_kinesis_firehose",
+))]
+pub mod aws_kinesis;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
 #[cfg(feature = "sinks-aws_sqs")]
@@ -152,11 +153,10 @@ pub enum Sinks {
 
     /// AWS Kinesis Firehose.
     #[cfg(feature = "sinks-aws_kinesis_firehose")]
-    AwsKinesisFirehose(#[configurable(derived)] aws_kinesis_firehose::KinesisFirehoseSinkConfig),
-
+    AwsKinesisFirehose(#[configurable(derived)] aws_kinesis::firehose::KinesisFirehoseSinkConfig),
     /// AWS Kinesis Streams.
     #[cfg(feature = "sinks-aws_kinesis_streams")]
-    AwsKinesisStreams(#[configurable(derived)] aws_kinesis_streams::KinesisSinkConfig),
+    AwsKinesisStreams(#[configurable(derived)] aws_kinesis::streams::KinesisStreamsSinkConfig),
 
     /// AWS S3.
     #[cfg(feature = "sinks-aws_s3")]

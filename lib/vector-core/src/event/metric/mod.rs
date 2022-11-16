@@ -346,8 +346,8 @@ impl Metric {
         self.series.insert_tag(name, value)
     }
 
-    pub fn set_multi_value_tag(&mut self, name: String, values: Vec<Option<String>>) {
-        self.series.set_multi_value_tag(name, values)
+    pub fn set_multi_value_tag(&mut self, name: String, values: Vec<TagValue>) {
+        self.series.set_multi_value_tag(name, values);
     }
 
     /// Zeroes out the data in this metric.

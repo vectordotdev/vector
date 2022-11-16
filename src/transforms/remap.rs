@@ -65,6 +65,12 @@ pub struct RemapConfig {
     #[configurable(metadata(docs::examples = "./my/program.vrl",))]
     pub file: Option<PathBuf>,
 
+    /// When set to `single`, tag values will be exposed as single strings, the
+    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+    /// will be ignored.
+    ///
+    /// When set to `full`, all tags will be exposed as arrays of either string or null
+    /// values.
     #[serde(default)]
     pub metric_tags_values: MetricTagsValues,
 
@@ -165,10 +171,6 @@ impl RemapConfig {
 
         config.set_custom(enrichment_tables);
         config.set_custom(MeaningList::default());
-        config.multiple_metric_tag_values = match self.metric_tags_values {
-            MetricTagsValues::Single => false,
-            MetricTagsValues::Full => true,
-        };
 
         compile_vrl(&source, &functions, &state, config)
             .map_err(|diagnostics| {
@@ -324,6 +326,7 @@ where
     default_schema_definition: Arc<schema::Definition>,
     dropped_schema_definition: Arc<schema::Definition>,
     runner: Runner,
+    metric_tags_values: MetricTagsValues,
 }
 
 pub trait VrlRunner {
@@ -411,6 +414,7 @@ where
             default_schema_definition: Arc::new(default_schema_definition),
             dropped_schema_definition: Arc::new(dropped_schema_definition),
             runner,
+            metric_tags_values: config.metric_tags_values,
         })
     }
 
@@ -507,7 +511,14 @@ where
             None
         };
 
-        let mut target = VrlTarget::new(event, self.program.info());
+        let mut target = VrlTarget::new(
+            event,
+            self.program.info(),
+            match self.metric_tags_values {
+                MetricTagsValues::Single => false,
+                MetricTagsValues::Full => true,
+            },
+        );
         let result = self.run_vrl(&mut target);
 
         match result {
