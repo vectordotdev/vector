@@ -30,22 +30,18 @@ impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
     #[inline(always)]
     unsafe fn get_wrapped_allocation(&self, object_layout: Layout) -> (*mut u8, *mut u8, Layout) {
         // Allocate our wrapped layout and make sure the allocation succeeded.
-        let (actual_layout, offset_to_object) = get_wrapped_layout(object_layout);
+        let (actual_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
         let actual_ptr = self.allocator.alloc(actual_layout);
         if actual_ptr.is_null() {
             handle_alloc_error(actual_layout);
         }
 
-        // SAFETY: We know that `actual_ptr` is at least aligned enough for casting it to `*mut u8` as the layout for
-        // the allocation backing this pointer ensures the first field in the layout is `u8.
+        // SAFETY: We know that `actual_ptr` with offset is at least aligned enough for casting it to `*mut u8` as the layout for
+        // the allocation backing this pointer ensures the last field in the layout is `u8.
         #[allow(clippy::cast_ptr_alignment)]
-        let group_id_ptr = actual_ptr.cast::<u8>();
+        let group_id_ptr = actual_ptr.add(offset_to_group_id).cast::<u8>();
 
-        // SAFETY: If the allocation succeeded and `actual_ptr` is valid, then it must be valid to advance by
-        // `offset_to_object` as it would land within the allocation.
-        let object_ptr = actual_ptr.wrapping_add(offset_to_object);
-
-        (group_id_ptr, object_ptr, actual_layout)
+        (group_id_ptr, actual_ptr, actual_layout)
     }
 }
 
@@ -75,21 +71,15 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
         // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
         // requested layout, not the wrapped layout that was actually allocated.
-        let (wrapped_layout, offset_to_object) = get_wrapped_layout(object_layout);
+        let (wrapped_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
 
-        // SAFETY: We only ever return pointers to the actual requested object layout, not our wrapped layout. Since
-        // global allocators cannot be changed at runtime, we know that if we're here, then the given pointer, and the
-        // allocation it refers to, was allocated by us. Thus, since we wrap _all_ allocations, we know that this object
-        // pointer can be safely subtracted by `offset_to_object` to get back to the group ID field in our wrapper.
-        let actual_ptr = object_ptr.wrapping_sub(offset_to_object);
-
-        // SAFETY: We know that `actual_ptr` is at least aligned enough for casting it to `*mut u8` as the layout for
-        // the allocation backing this pointer ensures the first field in the layout is `u8.
+        // SAFETY: We know that `object_ptr` with offset is at least aligned enough for casting it to `*mut u8` as the layout for
+        // the allocation backing this pointer ensures the last field in the layout is `u8.
         #[allow(clippy::cast_ptr_alignment)]
-        let raw_group_id = actual_ptr.cast::<u8>().read();
+        let raw_group_id = object_ptr.add(offset_to_group_id).cast::<u8>().read();
 
         // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
-        self.allocator.dealloc(actual_ptr, wrapped_layout);
+        self.allocator.dealloc(object_ptr, wrapped_layout);
 
         // Do not track deallocations when allocations weren't tracked.
         if raw_group_id == 0 {
@@ -114,9 +104,9 @@ fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
 
     // We generate a new allocation layout that gives us a location to store the active allocation group ID ahead
     // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path.
-    let (actual_layout, offset_to_object) = HEADER_LAYOUT
-        .extend(object_layout)
+    let (actual_layout, offset_to_group_id) = object_layout
+        .extend(HEADER_LAYOUT)
         .expect("wrapping requested layout resulted in overflow");
 
-    (actual_layout.pad_to_align(), offset_to_object)
+    (actual_layout.pad_to_align(), offset_to_group_id)
 }
