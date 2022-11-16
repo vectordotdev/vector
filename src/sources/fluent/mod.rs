@@ -145,7 +145,7 @@ impl FluentConfig {
                 tag_key,
                 &owned_value_path!("tag"),
                 Kind::bytes(),
-                Some("tag"),
+                None,
             )
             .with_source_metadata(
                 FluentConfig::NAME,
