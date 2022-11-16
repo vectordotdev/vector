@@ -190,37 +190,41 @@ pub mod tests {
             (
                 "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1".into(),
                 vec![test_util::make_log_event(
-                    "The content of the log entry 1",
+                    vrl::value!("The content of the log entry 1"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     false,
+                    LogNamespace::Legacy,
                 )],
             ),
             (
                 "2016-10-06T00:17:09.669794202Z stdout P First line of log entry 2".into(),
                 vec![test_util::make_log_event(
-                    "First line of log entry 2",
+                    vrl::value!("First line of log entry 2"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     true,
+                    LogNamespace::Legacy,
                 )],
             ),
             (
                 "2016-10-06T00:17:09.669794202Z stdout P Second line of the log entry 2".into(),
                 vec![test_util::make_log_event(
-                    "Second line of the log entry 2",
+                    vrl::value!("Second line of the log entry 2"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     true,
+                    LogNamespace::Legacy,
                 )],
             ),
             (
                 "2016-10-06T00:17:10.113242941Z stderr F Last line of the log entry 2".into(),
                 vec![test_util::make_log_event(
-                    "Last line of the log entry 2",
+                    vrl::value!("Last line of the log entry 2"),
                     "2016-10-06T00:17:10.113242941Z",
                     "stderr",
                     false,
+                    LogNamespace::Legacy,
                 )],
             ),
             // A part of the partial message with a realistic length.
@@ -231,10 +235,11 @@ pub mod tests {
                 ]
                 .join(""),
                 vec![test_util::make_log_event(
-                    make_long_string("very long message ", 16 * 1024).as_str(),
+                    vrl::value!(make_long_string("very long message ", 16 * 1024)),
                     "2016-10-06T00:17:10.113242941Z",
                     "stdout",
                     true,
+                    LogNamespace::Legacy,
                 )],
             ),
         ]

@@ -212,19 +212,20 @@ pub mod tests {
             (
                 r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
                 vec![test_util::make_log_event(
-                    "The actual log line",
+                    vrl::value!("The actual log line"),
                     "2016-10-05T00:00:30.082640485Z",
                     "stderr",
                     false,
+                    LogNamespace::Legacy,
                 )],
             ),
             (
                 r#"{"log": "A line without newline chan at the end", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
                 vec![test_util::make_log_event(
-                    "A line without newline chan at the end",
+                    vrl::value!("A line without newline chan at the end"),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
-                    false,
+                    false,LogNamespace::Legacy,
                 )],
             ),
             // Partial message due to message length.
@@ -236,10 +237,10 @@ pub mod tests {
                 ]
                 .join(""),
                 vec![test_util::make_log_event(
-                    make_long_string("partial ",16 * 1024).as_str(),
+                    vrl::value!(make_long_string("partial ",16 * 1024)),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
-                    true,
+                    true,LogNamespace::Legacy,
                 )],
             ),
             // Non-partial message, because message length matches but
@@ -253,10 +254,10 @@ pub mod tests {
                 ]
                 .join(""),
                 vec![test_util::make_log_event(
-                    make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
+                    vrl::value!(make_long_string("non-partial ", 16 * 1024 - 1)),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
-                    false,
+                    false,LogNamespace::Legacy,
                 )],
             ),
         ]
@@ -283,31 +284,49 @@ pub mod tests {
 
         let cases = vec![
             // Empty string.
-            r#""#,
+            (r#""#, LogNamespace::Legacy),
             // Incomplete.
-            r#"{"#,
+            (r#"{"#, LogNamespace::Legacy),
             // Random non-JSON text.
-            r#"hello world"#,
+            (r#"hello world"#, LogNamespace::Legacy),
             // Random JSON non-object.
-            r#"123"#,
+            (r#"123"#, LogNamespace::Legacy),
             // Empty JSON object.
-            r#"{}"#,
+            (r#"{}"#, LogNamespace::Legacy),
             // No timestamp.
-            r#"{"log": "Hello world", "stream": "stdout"}"#,
+            (
+                r#"{"log": "Hello world", "stream": "stdout"}"#,
+                LogNamespace::Legacy,
+            ),
             // Timestamp not a string.
-            r#"{"log": "Hello world", "stream": "stdout", "time": 123}"#,
+            (
+                r#"{"log": "Hello world", "stream": "stdout", "time": 123}"#,
+                LogNamespace::Legacy,
+            ),
             // Empty timestamp.
-            r#"{"log": "Hello world", "stream": "stdout", "time": ""}"#,
+            (
+                r#"{"log": "Hello world", "stream": "stdout", "time": ""}"#,
+                LogNamespace::Legacy,
+            ),
             // Invalid timestamp.
-            r#"{"log": "Hello world", "stream": "stdout", "time": "qwerty"}"#,
+            (
+                r#"{"log": "Hello world", "stream": "stdout", "time": "qwerty"}"#,
+                LogNamespace::Legacy,
+            ),
             // No log field.
-            r#"{"stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+            (
+                r#"{"stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                LogNamespace::Legacy,
+            ),
             // Log is not a string.
-            r#"{"log": 123, "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+            (
+                r#"{"log": 123, "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                LogNamespace::Legacy,
+            ),
         ];
 
-        for message in cases {
-            let mut parser = Docker::new(LogNamespace::Legacy);
+        for (message, log_namespace) in cases {
+            let mut parser = Docker::new(log_namespace);
             let input = LogEvent::from(message);
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());

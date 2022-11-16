@@ -3,6 +3,9 @@
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use lookup::event_path;
+use value::Value;
+use vector_core::{config::LogNamespace, event};
 
 use crate::{
     event::{Event, LogEvent},
@@ -13,21 +16,31 @@ use crate::{
 ///
 /// The implementation is shared, and therefore consistent across all
 /// the parsers.
-pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: bool) -> Event {
-    let mut log = LogEvent::default();
+pub fn make_log_event(
+    message: Value,
+    timestamp: &str,
+    stream: &str,
+    is_partial: bool,
+    log_namespce: LogNamespace,
+) -> Event {
+    let log = match log_namespce {
+        LogNamespace::Vector => LogEvent::from(vrl::value!("hello world")),
+        LogNamespace::Legacy => {
+            let mut log = LogEvent::default();
+            let timestamp = DateTime::parse_from_rfc3339(timestamp)
+                .expect("invalid test case")
+                .with_timezone(&Utc);
 
-    log.insert("message", message);
+            log.insert(event_path!("message"), message);
+            log.insert(event_path!("timestamp"), timestamp);
+            log.insert(event_path!("stream"), stream);
+            if is_partial {
+                log.insert(event_path!(event::PARTIAL), true);
+            }
 
-    let timestamp = DateTime::parse_from_rfc3339(timestamp)
-        .expect("invalid test case")
-        .with_timezone(&Utc);
-    log.insert("timestamp", timestamp);
-
-    log.insert("stream", stream);
-
-    if is_partial {
-        log.insert("_partial", true);
-    }
+            log
+        }
+    };
 
     Event::Log(log)
 }
