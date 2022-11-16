@@ -115,7 +115,7 @@ impl Service<S3Request> for S3Service {
 
         let tagging = options.tags.map(|tags| {
             let mut tagging = url::form_urlencoded::Serializer::new(String::new());
-            for (p, v) in tags.iter_single() {
+            for (p, v) in &tags {
                 tagging.append_pair(p, v);
             }
             tagging.finish()

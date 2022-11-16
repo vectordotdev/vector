@@ -4558,9 +4558,9 @@ dependencies = [
 
 [[package]]
 name = "mlua"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53b6ea067a456d841f7fdd9510368715ee8da5608ddaa43d36c58414add37abf"
+checksum = "4351dbcc863fb6249c81b3bd0c8001214e9d4d44d22cabda17026353a77fe612"
 dependencies = [
  "bstr 0.2.17",
  "cc",
@@ -4668,9 +4668,9 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.23.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d61e51453596562c82656b4fb004071b5b0c214183be3d02fbb7b16ba2370df"
+checksum = "b3d877cd2e71146efa7065300fc5f5da967f938694b4d65e8bc64cc4a409092c"
 dependencies = [
  "base64",
  "base64-url",
@@ -4688,6 +4688,7 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "regex",
+ "ring",
  "rustls 0.19.1",
  "rustls-native-certs 0.5.0",
  "rustls-pemfile 0.2.1",
@@ -6267,9 +6268,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.6.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c4eb3267174b8c6c2f654116623910a0fef09c4753f8dd83db29c48a0df988b"
+checksum = "e076559ef8e241f2ae3479e36f97bd5741c0330689e217ad51ce2c76808b868a"
 dependencies = [
  "aho-corasick",
  "memchr",
