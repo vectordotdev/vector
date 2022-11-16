@@ -216,7 +216,7 @@ impl SourceConfig for RedisSourceConfig {
                 Self::NAME,
                 redis_key_path,
                 &owned_value_path!("key"),
-                Kind::bytes(),
+                Kind::bytes().or_undefined(),
                 None,
             )
             .with_standard_vector_source_metadata();
