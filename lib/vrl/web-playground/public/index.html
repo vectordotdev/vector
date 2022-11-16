@@ -195,8 +195,7 @@ String: ${str}
               outputs.push(res["msg"]);
             }
           })
-          // disable output validation for json
-          // since jsonl input won't ouput valid json
+          // disable output validation for json since jsonl input won't ouput valid json
           monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
             validate: false
           });
