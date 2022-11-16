@@ -3,22 +3,67 @@
 
 begin
   require 'json'
-  require 'logging'
   require 'tempfile'
 rescue LoadError => e
   puts "Load error: #{e.message}"
   exit
 end
 
-@logger = Logging.logger['default']
-@logger.add_appenders(Logging.appenders.stdout(
-  'stdout',
-  layout: Logging.layouts.pattern(
-    pattern: '[%d] %l %m\n',
-    color_scheme: 'default'
-  )
-))
-@logger.level = ENV['LOG_LEVEL'] || 'info'
+DEBUG_LEVEL = 1
+INFO_LEVEL = 2
+ERROR_LEVEL = 3
+
+LEVEL_MAPPINGS = {
+  'debug' => { 'numeric' => DEBUG_LEVEL, 'colored' => "\033[34mDEBUG\033[0m" },
+  'info' => { 'numeric' => INFO_LEVEL, 'colored' => "\033[32mINFO\033[0m" },
+  'error' => { 'numeric' => ERROR_LEVEL, 'colored' => "\033[31mERROR\033[0m" },
+}
+
+def numerical_level(level_str)
+  LEVEL_MAPPINGS.dig(level_str.downcase, 'numeric') if !level_str.nil?
+end
+
+def colored_level(level_str)
+  LEVEL_MAPPINGS.dig(level_str.downcase, 'colored') if !level_str.nil?
+end
+
+class Logger
+  def initialize
+    @level = numerical_level(ENV['LOG_LEVEL'] || '') || INFO_LEVEL
+    @is_tty = STDOUT.isatty
+  end
+
+  def formatted_level(level)
+    if @is_tty
+      colored_level(level)
+    else
+      level.upcase
+    end
+  end
+
+  def log(level, msg)
+    numeric_level = numerical_level(level)
+    if numeric_level >= @level
+      formatted_level = self.formatted_level(level)
+      dt = Time.now.strftime('%Y-%m-%dT%H:%M:%S')
+      puts "[#{dt}] #{formatted_level} #{msg}"
+    end
+  end
+
+  def debug(msg)
+    self.log('debug', msg)
+  end
+
+  def info(msg)
+    self.log('info', msg)
+  end
+
+  def error(msg)
+    self.log('error', msg)
+  end
+end
+
+@logger = Logger.new
 
 @default_schema_type_values = {
   "array" => [],
