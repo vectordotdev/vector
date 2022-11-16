@@ -216,10 +216,6 @@ impl ExecConfig {
             Some(config) => config.respawn_interval_secs,
         }
     }
-
-    fn log_namespace(&self) -> LogNamespace {
-        self.log_namespace.unwrap_or(false).into()
-    }
 }
 
 #[async_trait::async_trait]
@@ -269,7 +265,7 @@ impl SourceConfig for ExecConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
+        let log_namespace = global_log_namespace.merge(Some(self.log_namespace.unwrap_or(false)));
 
         let schema_definition = self
             .decoding
@@ -718,6 +714,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 mod tests {
     use bytes::Bytes;
     use std::io::Cursor;
+    use vector_core::event::EventMetadata;
 
     #[cfg(unix)]
     use futures::task::Poll;
@@ -766,7 +763,9 @@ mod tests {
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
 
-        let mut event = LogEvent::from("hello world").into();
+        let mut event: Event =
+            LogEvent::from_parts(vrl::value!("hello world"), EventMetadata::default()).into();
+
         handle_event(
             &config,
             &hostname,
@@ -795,7 +794,7 @@ mod tests {
             meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
             &vrl::value!(config.command)
         );
-        assert_eq!(log["message"], "hello world".into());
+        assert_eq!(log.value(), &vrl::value!("hello world"));
         assert_eq!(
             meta.get(path!("vector", "source_type")).unwrap(),
             &vrl::value!("exec")
@@ -837,7 +836,9 @@ mod tests {
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
 
-        let mut event = LogEvent::from("hello world").into();
+        let mut event: Event =
+            LogEvent::from_parts(vrl::value!("hello world"), EventMetadata::default()).into();
+
         handle_event(
             &config,
             &hostname,
@@ -848,7 +849,7 @@ mod tests {
         );
 
         let log = event.as_log();
-        let meta = log.metadata().value();
+        let meta = event.metadata().value();
 
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, "host")).unwrap(),
@@ -866,7 +867,7 @@ mod tests {
             meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
             &vrl::value!(config.command)
         );
-        assert_eq!(log["message"], "hello world".into());
+        assert_eq!(log.value(), &vrl::value!("hello world"));
         assert_eq!(
             meta.get(path!("vector", "source_type")).unwrap(),
             &vrl::value!("exec")
