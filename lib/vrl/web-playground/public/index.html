@@ -70,103 +70,11 @@
     <script type="module" src="./index.js"></script>
 
     <script>
-      function tryJsonParse(str) {
-        try {
-          return JSON.parse(str);
-        } catch (e) {
-          monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-            validate: false
-          });
-          window.outputEditor.setValue(`Error attempting to parse the following string into valid JSON\n
-String: ${str}
-\nEnsure that the Event editor contains valid JSON
-\nCommon mistakes:\n
-  Trailing Commas\n  Last line is a newline or whitespace\n  Unbalanced curly braces
-  If using JSONL, ensure each line is valid JSON`);
-        }
-      }
-
-      function isJsonL() {
-        if (window.eventEditor.getModel().getLineCount() > 1) {
-          let lines = window.eventEditor.getModel().getLinesContent();
-          // if the second line is a json object
-          // we assume the user has passed in valid json on each
-          // line
-          if (lines[1][0] == "{" && lines[1][lines[1].length - 1] == "}") {
-            return true;
-          }
-        }
-        return false;
-      }
-      function handleRunCode(input) {
-        if (isJsonL()) {
-          let inputs = [];
-          let program = window.programEditor.getValue();
-          let lines = window.eventEditor.getModel().getLinesContent();
-          lines.forEach((line) => {
-            inputs.push({
-              program: program,
-              event: tryJsonParse(line)
-            })
-          });
-
-          let results = [];
-          inputs.forEach((input) => {
-            results.push(window.run_vrl(input));
-          })
-          let outputs = [];
-          results.forEach((res) => {
-            if (res.output) {
-              outputs.push(JSON.stringify(res["result"], null, "\t"));
-            } else if (res.msg) {
-              outputs.push(res["msg"]);
-            }
-          })
-          // disable output validation for json since jsonl input won't ouput valid json
-          monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-            validate: false
-          });
-          window.outputEditor.setValue(outputs.join("\n"));
-          return results;
-        }
-
-        if (input == null) {
-          input = {
-            program: window.programEditor.getValue(),
-            event: tryJsonParse(window.eventEditor.getValue()),
-          };
-        }
-
-        let res = window.run_vrl(input);
-
-        console.log("[DEBUG::handleRunCode()] Printing out res: ", res);
-        if (res.output) {
-          window.outputEditor.setValue(JSON.stringify(res["result"], null, "\t"));
-        } else if (res.msg) {
-          // disable output validation for json
-          // since vrl error msgs won't ouput json
-          monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-            validate: false
-          });
-          window.outputEditor.setValue(res["msg"]);
-        }
-        return res;
-      }
+      
     </script>
     <script>
-      function handleShareCode() {
-        let state = {
-          program: window.programEditor.getValue(),
-          event: JSON.parse(window.eventEditor.getValue()),
-        };
-
-        console.log("[DEBUG::handleShareCode()] Printing out state", state);
-        console.log(
-          "[DEBUG::handleShareCode()] Printing out base64 encoded state\n",
-          btoa(JSON.stringify(state))
-        );
-        window.history.pushState(state, "", `?state=${encodeURIComponent(btoa(JSON.stringify(state)))}`);
-      }
+      // handleRunCode() = window.handleRunCode;
+      // handleShareCode() = window.handleShareCode;
     </script>
   </body>
 </html>
