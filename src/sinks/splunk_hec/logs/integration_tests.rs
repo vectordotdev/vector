@@ -392,6 +392,8 @@ async fn splunk_indexer_acknowledgements_disabled_on_server() {
     assert!(find_entries(messages.as_slice()).await);
 }
 
+// Ignoring these tests since they don't work with Splunk version 7.
+#[ignore]
 #[tokio::test]
 async fn splunk_auto_extracted_timestamp() {
     let cx = SinkContext::new_test();
@@ -405,7 +407,7 @@ async fn splunk_auto_extracted_timestamp() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     // With auto_extract_timestamp switched the timestamp comes from the message.
-    let message = "this message is on 2017-10-01 00:00:00";
+    let message = "this message is on 2017-10-01 03:00:00";
     let mut event = LogEvent::from(message);
 
     event.insert(
@@ -422,11 +424,13 @@ async fn splunk_auto_extracted_timestamp() {
         entry["_raw"].as_str().unwrap()
     );
     assert_eq!(
-        "2017-10-01T00:00:00.000+00:00",
+        "2017-10-01T03:00:00.000+00:00",
         entry["_time"].as_str().unwrap()
     );
 }
 
+// Ignoring these tests since they don't work with Splunk version 7.
+#[ignore]
 #[tokio::test]
 async fn splunk_non_auto_extracted_timestamp() {
     let cx = SinkContext::new_test();
