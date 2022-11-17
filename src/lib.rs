@@ -43,8 +43,10 @@ static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator
     target_os = "macos"
 ))]
 #[global_allocator]
-static ALLOC: self::internal_telemetry::allocations::Allocator<std::alloc::System> =
-    self::internal_telemetry::allocations::get_grouped_tracing_allocator(std::alloc::System);
+static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
+    self::internal_telemetry::allocations::get_grouped_tracing_allocator(
+        tikv_jemallocator::Jemalloc,
+    );
 
 #[allow(unreachable_pub)]
 pub mod internal_telemetry;
