@@ -405,7 +405,7 @@ async fn splunk_auto_extracted_timestamp() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     // With auto_extract_timestamp switched the timestamp comes from the message.
-    let message = "this message is on 2017-10-01 00:00:00";
+    let message = "this message is on 2017-10-01 03:00:00";
     let mut event = LogEvent::from(message);
 
     event.insert(
@@ -422,7 +422,7 @@ async fn splunk_auto_extracted_timestamp() {
         entry["_raw"].as_str().unwrap()
     );
     assert_eq!(
-        "2017-10-01T00:00:00.000+00:00",
+        "2017-10-01T03:00:00.000+00:00",
         entry["_time"].as_str().unwrap()
     );
 }
