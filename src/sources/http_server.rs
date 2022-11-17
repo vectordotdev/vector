@@ -137,7 +137,6 @@ impl SimpleHttpConfig {
             .as_ref()
             .unwrap_or(&default_decoding())
             .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata()
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
                 parse_value_path(&self.path_key)
@@ -162,7 +161,8 @@ impl SimpleHttpConfig {
                 &owned_value_path!("query_parameters"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
-            );
+            )
+            .with_standard_vector_source_metadata();
 
         // for metadata that is added to the events dynamically from config options
         if log_namespace == LogNamespace::Legacy {
@@ -313,7 +313,7 @@ impl SimpleHttpSource {
             self.log_namespace.insert_source_metadata(
                 SimpleHttpConfig::NAME,
                 log,
-                Some(LegacyKey::Overwrite(path!(self.path_key.as_str()))),
+                Some(LegacyKey::InsertIfEmpty(path!(self.path_key.as_str()))),
                 path!("path"),
                 request_path.to_owned(),
             );
@@ -325,7 +325,7 @@ impl SimpleHttpSource {
                 self.log_namespace.insert_source_metadata(
                     SimpleHttpConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite(path!(header_name))),
+                    Some(LegacyKey::InsertIfEmpty(path!(header_name))),
                     path!("headers"),
                     Value::from(value.map(Bytes::copy_from_slice)),
                 );
