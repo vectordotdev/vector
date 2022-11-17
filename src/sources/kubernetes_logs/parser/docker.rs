@@ -273,6 +273,50 @@ pub mod tests {
         ]
     }
 
+    pub fn invalid_cases() -> Vec<Bytes> {
+        vec![
+            // Empty string.
+            Bytes::from(""),
+            // Incomplete.
+            Bytes::from("{"),
+            // Random non-JSON text.
+            Bytes::from("hello world"),
+            // Random JSON non-object.
+            Bytes::from("123"),
+            // Empty JSON object.
+            Bytes::from("{}"),
+            // No timestamp.
+            Bytes::from(r#"{"log": "Hello world", "stream": "stdout"}"#),
+            // Timestamp not a string.
+            Bytes::from(r#"{"log": "Hello world", "stream": "stdout", "time": 123}"#),
+            // Empty timestamp.
+            Bytes::from(r#"{"log": "Hello world", "stream": "stdout", "time": ""}"#),
+            // Invalid timestamp.
+            Bytes::from(r#"{"log": "Hello world", "stream": "stdout", "time": "qwerty"}"#),
+            // No log field.
+            Bytes::from(r#"{"stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#),
+            // Log is not a string.
+            Bytes::from(
+                r#"{"log": 123, "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+            ),
+        ]
+    }
+
+    #[test]
+    fn test_parsing_valid_vector_namespace() {
+        trace_init();
+
+        test_util::test_parser(
+            || {
+                Transform::function(Docker {
+                    log_namespace: LogNamespace::Vector,
+                })
+            },
+            |bytes| Event::Log(LogEvent::from(vrl::value!(bytes))),
+            valid_cases(LogNamespace::Vector),
+        );
+    }
+
     #[test]
     fn test_parsing_valid_legacy_namespace() {
         trace_init();
@@ -289,55 +333,30 @@ pub mod tests {
     }
 
     #[test]
-    fn test_parsing_invalid() {
+    fn test_parsing_invalid_vector_namespace() {
         trace_init();
 
-        let cases = vec![
-            // Empty string.
-            (r#""#, LogNamespace::Legacy),
-            // Incomplete.
-            (r#"{"#, LogNamespace::Legacy),
-            // Random non-JSON text.
-            (r#"hello world"#, LogNamespace::Legacy),
-            // Random JSON non-object.
-            (r#"123"#, LogNamespace::Legacy),
-            // Empty JSON object.
-            (r#"{}"#, LogNamespace::Legacy),
-            // No timestamp.
-            (
-                r#"{"log": "Hello world", "stream": "stdout"}"#,
-                LogNamespace::Legacy,
-            ),
-            // Timestamp not a string.
-            (
-                r#"{"log": "Hello world", "stream": "stdout", "time": 123}"#,
-                LogNamespace::Legacy,
-            ),
-            // Empty timestamp.
-            (
-                r#"{"log": "Hello world", "stream": "stdout", "time": ""}"#,
-                LogNamespace::Legacy,
-            ),
-            // Invalid timestamp.
-            (
-                r#"{"log": "Hello world", "stream": "stdout", "time": "qwerty"}"#,
-                LogNamespace::Legacy,
-            ),
-            // No log field.
-            (
-                r#"{"stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
-                LogNamespace::Legacy,
-            ),
-            // Log is not a string.
-            (
-                r#"{"log": 123, "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
-                LogNamespace::Legacy,
-            ),
-        ];
+        let cases = invalid_cases();
 
-        for (message, log_namespace) in cases {
-            let mut parser = Docker::new(log_namespace);
-            let input = LogEvent::from(message);
+        for bytes in cases {
+            let mut parser = Docker::new(LogNamespace::Vector);
+            let input = LogEvent::from(vrl::value!(bytes));
+            let mut output = OutputBuffer::default();
+            parser.transform(&mut output, input.into());
+
+            assert!(output.is_empty(), "Expected no events: {:?}", output);
+        }
+    }
+
+    #[test]
+    fn test_parsing_invalid_legacy_namespace() {
+        trace_init();
+
+        let cases = invalid_cases();
+
+        for bytes in cases {
+            let mut parser = Docker::new(LogNamespace::Legacy);
+            let input = LogEvent::from(bytes);
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 

@@ -1,5 +1,4 @@
 #![cfg(test)]
-// TODO: Insert with log_namespace
 use similar_asserts::assert_eq;
 
 use chrono::{DateTime, Utc};
@@ -69,7 +68,6 @@ where
         let input = loader(message);
         let mut parser = (builder)();
         let parser = parser.as_function();
-
         let mut output = OutputBuffer::default();
         parser.transform(&mut output, input);
 

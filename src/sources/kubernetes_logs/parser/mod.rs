@@ -96,6 +96,12 @@ mod tests {
         valid_cases
     }
 
+    fn invalid_cases() -> Vec<Bytes> {
+        let mut invalid_cases = vec![];
+        invalid_cases.extend(docker::tests::invalid_cases());
+        invalid_cases
+    }
+
     #[test]
     fn test_parsing_valid_vector_namespace() {
         trace_init();
@@ -117,20 +123,14 @@ mod tests {
     }
 
     #[test]
-    fn test_parsing_invalid() {
+    fn test_parsing_invalid_legacy_namespace() {
         trace_init();
 
-        let cases = vec![
-            (LogEvent::from(vrl::value!("")), LogNamespace::Vector),
-            (LogEvent::from(""), LogNamespace::Legacy),
-            (LogEvent::from(vrl::value!("qwe")), LogNamespace::Vector),
-            (LogEvent::from("qwe"), LogNamespace::Legacy),
-            (LogEvent::from(vrl::value!("{")), LogNamespace::Vector),
-            (LogEvent::from("{"), LogNamespace::Legacy),
-        ];
+        let cases = invalid_cases();
 
-        for (input, log_namespace) in cases {
-            let mut parser = Parser::new(log_namespace);
+        for bytes in cases {
+            let mut parser = Parser::new(LogNamespace::Legacy);
+            let input = LogEvent::from(bytes);
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 
