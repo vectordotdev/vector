@@ -173,9 +173,9 @@ impl SimpleHttpConfig {
     }
 }
 
-impl GenerateConfig for SimpleHttpConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+impl Default for SimpleHttpConfig {
+    fn default() -> Self {
+        Self {
             address: "0.0.0.0:8080".parse().unwrap(),
             encoding: None,
             headers: Vec::new(),
@@ -190,8 +190,13 @@ impl GenerateConfig for SimpleHttpConfig {
             decoding: Some(default_decoding()),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
-        })
-        .unwrap()
+        }
+    }
+}
+
+impl GenerateConfig for SimpleHttpConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(SimpleHttpConfig::default()).unwrap()
     }
 }
 
@@ -409,9 +414,15 @@ impl HttpSource for SimpleHttpSource {
 
 #[cfg(test)]
 mod tests {
-    use lookup::event_path;
+    use lookup::{event_path, owned_value_path, LookupBuf};
     use std::str::FromStr;
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
+    use value::kind::Collection;
+    use value::Kind;
+    use vector_config::NamedComponent;
+    use vector_core::config::LogNamespace;
+    use vector_core::event::LogEvent;
+    use vector_core::schema::Definition;
 
     use codecs::{
         decoding::{DeserializerConfig, FramingConfig},
@@ -600,16 +611,18 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[log_schema().source_type_key()],
+                SimpleHttpConfig::NAME.into()
+            );
             assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body 2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
     }
 
@@ -638,17 +651,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body 2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
     }
 
@@ -680,9 +689,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "foo\nbar".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
     }
 
@@ -763,17 +770,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key"], "value".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
     }
 
@@ -866,34 +869,35 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
+    }
+
+    async fn assert_event_metadata(log: &LogEvent) {
+        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            log[log_schema().source_type_key()],
+            SimpleHttpConfig::NAME.into()
+        );
+        assert_eq!(log["http_path"], "/".into());
     }
 
     #[tokio::test]
@@ -937,9 +941,7 @@ mod tests {
             assert_eq!(log["\"User-Agent\""], "test_client".into());
             assert_eq!(log["\"Upgrade-Insecure-Requests\""], "false".into());
             assert_eq!(log["AbsentHeader"], Value::Null);
-            assert_eq!(log["http_path"], "/".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_event_metadata(&log).await;
         }
     }
 
@@ -980,9 +982,7 @@ mod tests {
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_eq!(log["absent"], Value::Null);
-            assert_eq!(log["http_path"], "/".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_event_metadata(&log).await;
         }
     }
 
@@ -1024,9 +1024,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(&log).await;
         }
     }
 
@@ -1062,7 +1060,10 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[log_schema().source_type_key()],
+                SimpleHttpConfig::NAME.into()
+            );
         }
     }
 
@@ -1107,7 +1108,10 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path1".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[log_schema().source_type_key()],
+                SimpleHttpConfig::NAME.into()
+            );
         }
         {
             let event = events.remove(0);
@@ -1115,7 +1119,10 @@ mod tests {
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["vector_http_path"], "/event/path2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[log_schema().source_type_key()],
+                SimpleHttpConfig::NAME.into()
+            );
         }
     }
 
@@ -1218,5 +1225,65 @@ mod tests {
         .await;
 
         assert_eq!(200, send_request(addr, "GET", "", "/").await);
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let mut config = SimpleHttpConfig::default();
+        config.log_namespace = Some(true);
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!(SimpleHttpConfig::NAME, "path"),
+                    Kind::bytes(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(SimpleHttpConfig::NAME, "headers"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(SimpleHttpConfig::NAME, "query_parameters"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                );
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = SimpleHttpConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("path"), Kind::bytes(), None)
+        .unknown_fields(Kind::bytes());
+
+        assert_eq!(definition, expected_definition)
     }
 }
