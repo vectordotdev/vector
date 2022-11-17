@@ -68,13 +68,14 @@ fn reserialize_pre_v23_native_proto_fixtures() {
     );
 }
 
-/// The event proto file was changed in v23. This test ensures we can still load the old version
-/// binary and that when serialized and deserialized in the new format we still get the same event.
+/// The event proto file was changed in v26 to include support for enhanced metric tags. This test
+/// ensures we can still load the old version binary and that when serialized and deserialized in
+/// the new format we still get the same event.
 #[test]
 fn reserialize_pre_v26_native_proto_fixtures() {
     roundtrip_fixtures(
         "proto",
-        "pre-v23",
+        "pre-v26",
         &NativeDeserializerConfig.build(),
         &mut NativeSerializerConfig.build(),
         true,
