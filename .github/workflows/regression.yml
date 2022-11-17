@@ -166,9 +166,9 @@ jobs:
       - name: Write out metadata
         run: |
           echo "COMPARISON_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > ${{ runner.temp }}/meta
-          echo "COMPARISON_SHA=${{ needs.compute-metadata.outputs.comparison }}" >> ${{ runner.temp }}/meta
+          echo "COMPARISON_SHA=${{ needs.compute-metadata.outputs.comparison-sha }}" >> ${{ runner.temp }}/meta
           echo "BASELINE_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
-          echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline }}" >> ${{ runner.temp }}/meta
+          echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline-sha }}" >> ${{ runner.temp }}/meta
           echo "CHECKOUT_SHA=${{ github.sha }}" >> ${{ runner.temp }}/meta
           echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> ${{ runner.temp }}/meta
           echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> ${{ runner.temp }}/meta
