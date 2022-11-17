@@ -185,105 +185,99 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn cases() -> Vec<(String, Vec<Event>)> {
+    pub fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
         vec![
             (
-                "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1".into(),
+                Bytes::from(
+                    "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1",
+                ),
                 vec![test_util::make_log_event(
                     vrl::value!("The content of the log entry 1"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     false,
-                    LogNamespace::Legacy,
+                    log_namespace,
                 )],
             ),
             (
-                "2016-10-06T00:17:09.669794202Z stdout P First line of log entry 2".into(),
+                Bytes::from("2016-10-06T00:17:09.669794202Z stdout P First line of log entry 2"),
                 vec![test_util::make_log_event(
                     vrl::value!("First line of log entry 2"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     true,
-                    LogNamespace::Legacy,
+                    log_namespace,
                 )],
             ),
             (
-                "2016-10-06T00:17:09.669794202Z stdout P Second line of the log entry 2".into(),
+                Bytes::from(
+                    "2016-10-06T00:17:09.669794202Z stdout P Second line of the log entry 2",
+                ),
                 vec![test_util::make_log_event(
                     vrl::value!("Second line of the log entry 2"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     true,
-                    LogNamespace::Legacy,
+                    log_namespace,
                 )],
             ),
             (
-                "2016-10-06T00:17:10.113242941Z stderr F Last line of the log entry 2".into(),
+                Bytes::from("2016-10-06T00:17:10.113242941Z stderr F Last line of the log entry 2"),
                 vec![test_util::make_log_event(
                     vrl::value!("Last line of the log entry 2"),
                     "2016-10-06T00:17:10.113242941Z",
                     "stderr",
                     false,
-                    LogNamespace::Legacy,
+                    log_namespace,
                 )],
             ),
             // A part of the partial message with a realistic length.
             (
-                [
-                    r#"2016-10-06T00:17:10.113242941Z stdout P "#,
-                    make_long_string("very long message ", 16 * 1024).as_str(),
-                ]
-                .join(""),
+                Bytes::from(
+                    [
+                        r#"2016-10-06T00:17:10.113242941Z stdout P "#,
+                        make_long_string("very long message ", 16 * 1024).as_str(),
+                    ]
+                    .join(""),
+                ),
                 vec![test_util::make_log_event(
                     vrl::value!(make_long_string("very long message ", 16 * 1024)),
                     "2016-10-06T00:17:10.113242941Z",
                     "stdout",
                     true,
-                    LogNamespace::Legacy,
+                    log_namespace,
+                )],
+            ),
+            (
+                // This is not valid UTF-8 string, ends with \n
+                // 2021-08-05T17:35:26.640507539Z stdout P Hello World Привет Ми\xd1\n
+                Bytes::from(vec![
+                    50, 48, 50, 49, 45, 48, 56, 45, 48, 53, 84, 49, 55, 58, 51, 53, 58, 50, 54, 46,
+                    54, 52, 48, 53, 48, 55, 53, 51, 57, 90, 32, 115, 116, 100, 111, 117, 116, 32,
+                    80, 32, 72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209,
+                    128, 208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209, 10,
+                ]),
+                vec![test_util::make_log_event(
+                    vrl::value!(Bytes::from(vec![
+                        72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128,
+                        208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209,
+                    ])),
+                    "2021-08-05T17:35:26.640507539Z",
+                    "stdout",
+                    true,
+                    log_namespace,
                 )],
             ),
         ]
     }
 
-    pub fn byte_cases() -> Vec<(Bytes, Vec<Event>)> {
-        vec![(
-            // This is not valid UTF-8 string, ends with \n
-            // 2021-08-05T17:35:26.640507539Z stdout P Hello World Привет Ми\xd1\n
-            Bytes::from(vec![
-                50, 48, 50, 49, 45, 48, 56, 45, 48, 53, 84, 49, 55, 58, 51, 53, 58, 50, 54, 46, 54,
-                52, 48, 53, 48, 55, 53, 51, 57, 90, 32, 115, 116, 100, 111, 117, 116, 32, 80, 32,
-                72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128, 208,
-                184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209, 10,
-            ]),
-            vec![test_util::make_log_event_with_byte_message(
-                Bytes::from(vec![
-                    72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128,
-                    208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209,
-                ]),
-                "2021-08-05T17:35:26.640507539Z",
-                "stdout",
-                true,
-            )],
-        )]
-    }
-
     #[test]
-    fn test_parsing() {
+    fn test_parsing_valid() {
         trace_init();
         test_util::test_parser(
             || Transform::function(Cri::new(LogNamespace::Legacy)),
             |s| Event::Log(LogEvent::from(s)),
-            cases(),
-        );
-    }
-
-    #[test]
-    fn test_parsing_bytes() {
-        trace_init();
-        test_util::test_parser(
-            || Transform::function(Cri::new(LogNamespace::Legacy)),
-            |bytes| LogEvent::from(bytes).into(),
-            byte_cases(),
+            valid_cases(LogNamespace::Legacy),
         );
     }
 }

@@ -207,64 +207,75 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn cases() -> Vec<(String, Vec<Event>)> {
+    pub fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
         vec![
             (
-                r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
+                Bytes::from(
+                    r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                ),
                 vec![test_util::make_log_event(
                     vrl::value!("The actual log line"),
                     "2016-10-05T00:00:30.082640485Z",
                     "stderr",
                     false,
-                    LogNamespace::Legacy,
+                    log_namespace,
                 )],
             ),
             (
-                r#"{"log": "A line without newline chan at the end", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
+                Bytes::from(
+                    r#"{"log": "A line without newline char at the end", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                ),
                 vec![test_util::make_log_event(
-                    vrl::value!("A line without newline chan at the end"),
+                    vrl::value!("A line without newline char at the end"),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
-                    false,LogNamespace::Legacy,
+                    false,
+                    log_namespace,
                 )],
             ),
             // Partial message due to message length.
             (
-                [
-                    r#"{"log": ""#,
-                    make_long_string("partial ", 16 * 1024).as_str(),
-                    r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
-                ]
-                .join(""),
+                Bytes::from(
+                    [
+                        r#"{"log": ""#,
+                        make_long_string("partial ", 16 * 1024).as_str(),
+                        r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                    ]
+                    .join(""),
+                ),
                 vec![test_util::make_log_event(
-                    vrl::value!(make_long_string("partial ",16 * 1024)),
+                    vrl::value!(make_long_string("partial ", 16 * 1024)),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
-                    true,LogNamespace::Legacy,
+                    true,
+                    log_namespace,
                 )],
             ),
             // Non-partial message, because message length matches but
             // the message also ends with newline.
             (
-                [
-                    r#"{"log": ""#,
-                    make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
-                    r"\n",
-                    r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
-                ]
-                .join(""),
+                Bytes::from(
+                    [
+                        r#"{"log": ""#,
+                        make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
+                        r"\n",
+                        r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                    ]
+                    .join(""),
+                ),
                 vec![test_util::make_log_event(
                     vrl::value!(make_long_string("non-partial ", 16 * 1024 - 1)),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
-                    false,LogNamespace::Legacy,
+                    false,
+                    log_namespace,
                 )],
             ),
         ]
     }
 
     #[test]
-    fn test_parsing() {
+    fn test_parsing_valid() {
         trace_init();
 
         test_util::test_parser(
@@ -274,7 +285,7 @@ pub mod tests {
                 })
             },
             |s| Event::Log(LogEvent::from(s)),
-            cases(),
+            valid_cases(LogNamespace::Legacy),
         );
     }
 
@@ -330,6 +341,7 @@ pub mod tests {
             let input = LogEvent::from(message);
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
+
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
     }

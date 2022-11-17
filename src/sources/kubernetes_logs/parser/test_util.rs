@@ -1,7 +1,7 @@
 #![cfg(test)]
 // TODO: Insert with log_namespace
+use similar_asserts::assert_eq;
 
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use lookup::event_path;
 use value::Value;
@@ -21,9 +21,9 @@ pub fn make_log_event(
     timestamp: &str,
     stream: &str,
     is_partial: bool,
-    log_namespce: LogNamespace,
+    log_namespace: LogNamespace,
 ) -> Event {
-    let log = match log_namespce {
+    let log = match log_namespace {
         LogNamespace::Vector => LogEvent::from(vrl::value!("hello world")),
         LogNamespace::Legacy => {
             let mut log = LogEvent::default();
@@ -41,35 +41,6 @@ pub fn make_log_event(
             log
         }
     };
-
-    Event::Log(log)
-}
-
-/// Build a log event for test purposes.
-/// Message can be a not valid UTF-8 string
-///
-/// The implementation is shared, and therefore consistent across all
-/// the parsers.
-pub(crate) fn make_log_event_with_byte_message(
-    message: Bytes,
-    timestamp: &str,
-    stream: &str,
-    is_partial: bool,
-) -> Event {
-    let mut log = LogEvent::default();
-
-    log.insert("message", message);
-
-    let timestamp = DateTime::parse_from_rfc3339(timestamp)
-        .expect("invalid test case")
-        .with_timezone(&Utc);
-    log.insert("timestamp", timestamp);
-
-    log.insert("stream", stream);
-
-    if is_partial {
-        log.insert("_partial", true);
-    }
 
     Event::Log(log)
 }
@@ -92,6 +63,6 @@ where
 
         let actual = output.into_events().collect::<Vec<_>>();
 
-        vector_common::assert_event_data_eq!(expected, actual, "expected left, actual right");
+        assert_eq!(expected, actual, "expected left, actual right");
     }
 }

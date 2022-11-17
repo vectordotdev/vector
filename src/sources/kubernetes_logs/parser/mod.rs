@@ -82,26 +82,27 @@ impl FunctionTransform for Parser {
 
 #[cfg(test)]
 mod tests {
+    use bytes::Bytes;
     use lookup::event_path;
 
     use super::*;
     use crate::{event::Event, event::LogEvent, test_util::trace_init, transforms::Transform};
 
     /// Picker has to work for all test cases for underlying parsers.
-    fn cases() -> Vec<(String, Vec<Event>)> {
-        let mut cases = vec![];
-        cases.extend(docker::tests::cases());
-        cases.extend(cri::tests::cases());
-        cases
+    fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
+        let mut valid_cases = vec![];
+        valid_cases.extend(docker::tests::valid_cases(log_namespace));
+        valid_cases.extend(cri::tests::valid_cases(log_namespace));
+        valid_cases
     }
 
     #[test]
-    fn test_parsing() {
+    fn test_parsing_valid() {
         trace_init();
         test_util::test_parser(
             || Transform::function(Parser::new(LogNamespace::Legacy)),
             |s| Event::Log(LogEvent::from(s)),
-            cases(),
+            valid_cases(LogNamespace::Legacy),
         );
     }
 
