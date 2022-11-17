@@ -70,8 +70,6 @@ impl LogstashConfig {
             .ok()
             .map(LegacyKey::InsertIfEmpty);
 
-        // There is a global and per-source `log_namespace` config.
-        // The source config overrides the global setting and is merged here.
         BytesDeserializerConfig
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata()
@@ -92,9 +90,9 @@ impl LogstashConfig {
     }
 }
 
-impl GenerateConfig for LogstashConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+impl Default for LogstashConfig {
+    fn default() -> Self {
+        Self {
             address: SocketListenAddr::SocketAddr("0.0.0.0:5044".parse().unwrap()),
             keepalive: None,
             tls: None,
@@ -102,8 +100,13 @@ impl GenerateConfig for LogstashConfig {
             acknowledgements: Default::default(),
             connection_limit: None,
             log_namespace: None,
-        })
-        .unwrap()
+        }
+    }
+}
+
+impl GenerateConfig for LogstashConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(LogstashConfig::default()).unwrap()
     }
 }
 
@@ -136,6 +139,8 @@ impl SourceConfig for LogstashConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // There is a global and per-source `log_namespace` config.
+        // The source config overrides the global setting and is merged here.
         vec![Output::default(DataType::Log).with_schema_definition(
             self.schema_definition(global_log_namespace.merge(self.log_namespace)),
         )]
@@ -642,8 +647,10 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 #[cfg(test)]
 mod test {
     use bytes::BufMut;
+    use lookup::LookupBuf;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use value::kind::Collection;
 
     use super::*;
     use crate::{
@@ -743,6 +750,63 @@ mod test {
             assert_eq!(output.get_u32(), seq);
         }
         assert_eq!(output.len(), 0);
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = LogstashConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!(LogstashConfig::NAME, "timestamp"),
+                    Kind::timestamp().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogstashConfig::NAME, "host"),
+                    Kind::bytes(),
+                );
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = LogstashConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"));
+
+        assert_eq!(definition, expected_definition)
     }
 }
 
