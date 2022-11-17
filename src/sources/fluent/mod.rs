@@ -555,6 +555,13 @@ impl From<FluentEvent<'_>> for LogEvent {
 
         let mut log = LogEvent::default();
 
+        log_namespace.insert_vector_metadata(
+            &mut log,
+            log_schema().source_type_key(),
+            path!("source_type"),
+            Bytes::from_static(FluentConfig::NAME.as_bytes()),
+        );
+
         match log_namespace {
             LogNamespace::Vector => {
                 log.insert(metadata_path!(FluentConfig::NAME, "timestamp"), timestamp);
