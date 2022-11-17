@@ -38,9 +38,9 @@ jobs:
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
 
-      comparison: ${{ steps.comparison.outputs.COMPARISON }}
+      comparison-sha: ${{ steps.comparison.outputs.COMPARISON }}
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
-      baseline: ${{ steps.baseline.outputs.BASELINE }}
+      baseline-sha: ${{ steps.baseline.outputs.BASELINE }}
       baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
     steps:
       - uses: actions/checkout@v3
