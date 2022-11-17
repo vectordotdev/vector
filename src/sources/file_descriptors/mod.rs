@@ -8,10 +8,11 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
+use lookup::path;
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::NamedComponent;
-use vector_core::config::LogNamespace;
+use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::event::Event;
 use vector_core::ByteSizeOf;
 
@@ -39,6 +40,7 @@ pub trait FileDescriptorConfig: NamedComponent {
         reader: R,
         shutdown: ShutdownSignal,
         out: SourceSender,
+        log_namespace: LogNamespace,
     ) -> crate::Result<crate::sources::Source>
     where
         R: Send + io::BufRead + 'static,
@@ -48,14 +50,13 @@ pub trait FileDescriptorConfig: NamedComponent {
             .unwrap_or_else(|| log_schema().host_key().to_string());
         let hostname = crate::get_hostname().ok();
 
-        let source_type = Bytes::from_static(Self::NAME.as_bytes());
         let description = self.description();
 
         let decoding = self.decoding();
         let framing = self
             .framing()
             .unwrap_or_else(|| decoding.default_stream_framing());
-        let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
+        let decoder = DecodingConfig::new(framing, decoding, log_namespace).build();
 
         let (sender, receiver) = mpsc::channel(1024);
 
@@ -75,8 +76,9 @@ pub trait FileDescriptorConfig: NamedComponent {
             out,
             shutdown,
             host_key,
-            source_type,
+            Self::NAME,
             hostname,
+            log_namespace,
         )))
     }
 }
@@ -112,8 +114,9 @@ async fn process_stream(
     mut out: SourceSender,
     shutdown: ShutdownSignal,
     host_key: String,
-    source_type: Bytes,
+    source_type: &'static str,
     hostname: Option<String>,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
     let stream = receiver.inspect(|result| {
@@ -138,16 +141,25 @@ async fn process_stream(
                     for mut event in events {
                         match event{
                             Event::Log(_) => {
-                              let log = event.as_mut_log();
+                                let log = event.as_mut_log();
 
-                              log.try_insert(log_schema().source_type_key(), source_type.clone());
-                              log.try_insert(log_schema().timestamp_key(), now);
+                                log_namespace.insert_standard_vector_source_metadata(
+                                    log,
+                                    source_type,
+                                    now
+                                );
 
-                              if let Some(hostname) = &hostname {
-                                  log.try_insert(host_key.as_str(), hostname.clone());
-                              }
+                                if let Some(hostname) = &hostname {
+                                    log_namespace.insert_source_metadata(
+                                        source_type,
+                                        log,
+                                        Some(LegacyKey::InsertIfEmpty(host_key.as_str())),
+                                        path!("host"),
+                                        hostname.clone()
+                                    );
+                                }
 
-                              yield event;
+                                yield event;
                             },
                             _ => {
                                 yield event;

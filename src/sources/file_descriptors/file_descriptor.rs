@@ -39,6 +39,11 @@ pub struct FileDescriptorSourceConfig {
 
     /// The file descriptor number to read from.
     pub fd: u32,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl FileDescriptorConfig for FileDescriptorSourceConfig {
@@ -72,7 +77,9 @@ impl GenerateConfig for FileDescriptorSourceConfig {
 impl SourceConfig for FileDescriptorSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let pipe = io::BufReader::new(unsafe { File::from_raw_fd(self.fd as i32) });
-        self.source(pipe, cx.shutdown, cx.out)
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
+        self.source(pipe, cx.shutdown, cx.out, log_namespace)
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -118,6 +125,7 @@ mod tests {
                 framing: None,
                 decoding: default_decoding(),
                 fd: read_fd as u32,
+                log_namespace: None,
             };
 
             let mut stream = rx;
@@ -161,6 +169,7 @@ mod tests {
                 framing: None,
                 decoding: default_decoding(),
                 fd: write_fd as u32, // intentionally giving the source a write-only fd
+                log_namespace: None,
             };
 
             let mut stream = rx;

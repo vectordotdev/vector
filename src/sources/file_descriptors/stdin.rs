@@ -37,6 +37,11 @@ pub struct StdinConfig {
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl FileDescriptorConfig for StdinConfig {
@@ -64,6 +69,7 @@ impl Default for StdinConfig {
             host_key: Default::default(),
             framing: None,
             decoding: default_decoding(),
+            log_namespace: None,
         }
     }
 }
@@ -73,7 +79,13 @@ impl_generate_config_from_default!(StdinConfig);
 #[async_trait::async_trait]
 impl SourceConfig for StdinConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
-        self.source(io::BufReader::new(io::stdin()), cx.shutdown, cx.out)
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        self.source(
+            io::BufReader::new(io::stdin()),
+            cx.shutdown,
+            cx.out,
+            log_namespace,
+        )
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -114,7 +126,7 @@ mod tests {
             let buf = Cursor::new("hello world\nhello world again");
 
             config
-                .source(buf, ShutdownSignal::noop(), tx)
+                .source(buf, ShutdownSignal::noop(), tx, LogNamespace::Legacy)
                 .unwrap()
                 .await
                 .unwrap();
