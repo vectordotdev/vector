@@ -416,6 +416,7 @@ async fn splunk_auto_extracted_timestamp() {
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message).await;
+    dbg!(&entry);
 
     assert_eq!(
         format!("{{\"message\":\"{}\"}}", message),

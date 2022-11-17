@@ -111,6 +111,8 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                         hec_data.source = metadata.source;
                         hec_data.sourcetype = metadata.sourcetype;
 
+                        dbg!(&hec_data);
+
                         match serde_json::to_vec(&hec_data) {
                             Ok(value) => Some(value),
                             Err(error) => {

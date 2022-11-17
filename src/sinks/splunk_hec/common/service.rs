@@ -246,6 +246,8 @@ impl HttpRequestBuilder {
             .context(UriParseSnafu)?,
         };
 
+        dbg!(&uri);
+
         let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")
             .header(
