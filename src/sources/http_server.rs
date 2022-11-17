@@ -336,6 +336,7 @@ impl SimpleHttpSource {
 
 // TODO when the `heroku` log namespacing work is undertaken, move this function out of this file and replace the
 // sources::util::http::query::add_query_parameters() function body with it.
+// (https://github.com/vectordotdev/vector/issues/15022)
 fn add_query_parameters(
     events: &mut [Event],
     query_parameters_config: &[String],
@@ -616,13 +617,13 @@ mod tests {
                 SimpleHttpConfig::NAME.into()
             );
             assert_eq!(log["http_path"], "/".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body 2".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
     }
 
@@ -651,13 +652,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body 2".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
     }
 
@@ -689,7 +690,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "foo\nbar".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
     }
 
@@ -770,13 +771,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key"], "value".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
     }
 
@@ -869,25 +870,25 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
     }
 
@@ -941,7 +942,7 @@ mod tests {
             assert_eq!(log["\"User-Agent\""], "test_client".into());
             assert_eq!(log["\"Upgrade-Insecure-Requests\""], "false".into());
             assert_eq!(log["AbsentHeader"], Value::Null);
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
     }
 
@@ -982,7 +983,7 @@ mod tests {
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_eq!(log["absent"], Value::Null);
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
     }
 
@@ -1024,7 +1025,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
-            assert_event_metadata(&log).await;
+            assert_event_metadata(log).await;
         }
     }
 
@@ -1229,8 +1230,10 @@ mod tests {
 
     #[test]
     fn output_schema_definition_vector_namespace() {
-        let mut config = SimpleHttpConfig::default();
-        config.log_namespace = Some(true);
+        let config = SimpleHttpConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
 
         let definition = config.outputs(LogNamespace::Vector)[0]
             .clone()

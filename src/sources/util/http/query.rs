@@ -4,6 +4,7 @@ use vector_core::event::Event;
 
 // TODO when the `heroku` log namespacing work is undertaken, replace this function with the one from
 // sources::http_server::add_query_parameters() and remove that function from http_server.
+// (https://github.com/vectordotdev/vector/issues/15022)
 pub fn add_query_parameters(
     events: &mut [Event],
     query_parameters_config: &[String],
