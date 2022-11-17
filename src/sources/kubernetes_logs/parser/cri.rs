@@ -272,11 +272,11 @@ pub mod tests {
     }
 
     #[test]
-    fn test_parsing_valid() {
+    fn test_parsing_valid_legacy_namespace() {
         trace_init();
         test_util::test_parser(
             || Transform::function(Cri::new(LogNamespace::Legacy)),
-            |s| Event::Log(LogEvent::from(s)),
+            |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );
     }

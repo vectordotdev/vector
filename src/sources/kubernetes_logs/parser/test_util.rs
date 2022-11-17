@@ -3,12 +3,14 @@
 use similar_asserts::assert_eq;
 
 use chrono::{DateTime, Utc};
-use lookup::event_path;
+use lookup::{event_path, metadata_path};
 use value::Value;
+use vector_config::NamedComponent;
 use vector_core::{config::LogNamespace, event};
 
 use crate::{
     event::{Event, LogEvent},
+    sources::kubernetes_logs::Config,
     transforms::{OutputBuffer, Transform},
 };
 
@@ -23,13 +25,23 @@ pub fn make_log_event(
     is_partial: bool,
     log_namespace: LogNamespace,
 ) -> Event {
+    let timestamp = DateTime::parse_from_rfc3339(timestamp)
+        .expect("invalid timestamp in test case")
+        .with_timezone(&Utc);
+
     let log = match log_namespace {
-        LogNamespace::Vector => LogEvent::from(vrl::value!("hello world")),
+        LogNamespace::Vector => {
+            let mut log = LogEvent::from(vrl::value!(message));
+            log.insert(metadata_path!(Config::NAME, "timestamp"), timestamp);
+            log.insert(metadata_path!(Config::NAME, "stream"), stream);
+            if is_partial {
+                log.insert(metadata_path!(Config::NAME, event::PARTIAL), true);
+            }
+
+            log
+        }
         LogNamespace::Legacy => {
             let mut log = LogEvent::default();
-            let timestamp = DateTime::parse_from_rfc3339(timestamp)
-                .expect("invalid test case")
-                .with_timezone(&Utc);
 
             log.insert(event_path!("message"), message);
             log.insert(event_path!("timestamp"), timestamp);

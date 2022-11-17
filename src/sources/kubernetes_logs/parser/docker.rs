@@ -78,11 +78,10 @@ fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), Par
                         path!(STREAM_KEY),
                         value,
                     ),
-                    // TODO: Should this insert under the json-file key of "time"?
                     TIMESTAMP_KEY => log_namespace.insert_source_metadata(
                         Config::NAME,
                         log,
-                        Some(LegacyKey::Overwrite(path!("timestamp"))),
+                        Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
                         path!("timestamp"),
                         value,
                     ),
@@ -122,7 +121,7 @@ fn normalize_event(
         Config::NAME,
         log,
         Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
-        path!(TIMESTAMP_KEY),
+        path!("timestamp"),
         time.with_timezone(&Utc),
     );
 
@@ -275,7 +274,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_parsing_valid() {
+    fn test_parsing_valid_legacy_namespace() {
         trace_init();
 
         test_util::test_parser(
@@ -284,7 +283,7 @@ pub mod tests {
                     log_namespace: LogNamespace::Legacy,
                 })
             },
-            |s| Event::Log(LogEvent::from(s)),
+            |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );
     }

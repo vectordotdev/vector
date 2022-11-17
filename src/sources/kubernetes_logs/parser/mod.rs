@@ -97,11 +97,21 @@ mod tests {
     }
 
     #[test]
-    fn test_parsing_valid() {
+    fn test_parsing_valid_vector_namespace() {
+        trace_init();
+        test_util::test_parser(
+            || Transform::function(Parser::new(LogNamespace::Vector)),
+            |bytes| Event::Log(LogEvent::from(vrl::value!(bytes))),
+            valid_cases(LogNamespace::Vector),
+        );
+    }
+
+    #[test]
+    fn test_parsing_valid_legacy_namespace() {
         trace_init();
         test_util::test_parser(
             || Transform::function(Parser::new(LogNamespace::Legacy)),
-            |s| Event::Log(LogEvent::from(s)),
+            |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );
     }
