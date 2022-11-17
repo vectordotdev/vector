@@ -115,8 +115,8 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					description: "Compression level."
 					required:    false
 					type: {
-						number: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 						string: enum: ["none", "fast", "best", "default"]
+						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 					}
 				}
 			}
@@ -326,7 +326,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 	}
 	stream_name: {
 		description: """
-			The [stream name][stream_name] of the target Kinesis Logs stream.
+			The [stream name][stream_name] of the target Kinesis Firehose delivery stream.
 
 			[stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""

@@ -28,7 +28,7 @@ use vector_common::request_metadata::RequestMetadata;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{log_schema, AcknowledgementsConfig, LogSchema},
-    event::{Event, EventFinalizers, Finalizable, MetricTags},
+    event::{Event, EventFinalizers, Finalizable},
     ByteSizeOf,
 };
 
@@ -216,7 +216,7 @@ pub struct S3Options {
     pub storage_class: Option<S3StorageClass>,
 
     /// The tag-set for the object.
-    pub tags: Option<MetricTags>,
+    pub tags: Option<BTreeMap<String, String>>,
 }
 
 /// ABS-specific configuration options.
@@ -669,7 +669,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for DatadogS3RequestBuilder {
                 server_side_encryption: s3_options.server_side_encryption,
                 ssekms_key_id: s3_options.ssekms_key_id,
                 storage_class: s3_options.storage_class,
-                tags: s3_options.tags,
+                tags: s3_options.tags.map(|tags| tags.into_iter().collect()),
                 content_encoding: None,
                 content_type: None,
             },
