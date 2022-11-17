@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio_util::codec::Encoder;
 use vector_core::event::Event;
 
-use crate::components::compliance::sync::{Configured, ExternalResourceCoordinator, WaitHandle};
+use crate::components::validation::sync::{Configured, ExternalResourceCoordinator, WaitHandle};
 
 use super::{ResourceCodec, ResourceDirection};
 

@@ -17,7 +17,7 @@ use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    components::compliance::{
+    components::validation::{
         self, BuiltComponent, ComponentBuilderParts, ComponentType, ExternalResource,
         ResourceDirection, ValidatableComponent,
     },

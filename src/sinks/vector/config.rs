@@ -69,6 +69,14 @@ pub struct VectorConfig {
     pub(in crate::sinks::vector) acknowledgements: AcknowledgementsConfig,
 }
 
+impl VectorConfig {
+    /// Creates a `VectorConfig` with the given address.
+    pub fn from_address(addr: Uri) -> Self {
+        let addr = addr.to_string();
+        default_config(addr.as_str())
+    }
+}
+
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(default_config("127.0.0.1:6000")).unwrap()

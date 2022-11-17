@@ -1,7 +1,7 @@
 mod resources;
 mod runner;
 mod sync;
-mod validation;
+mod validators;
 
 use async_trait::async_trait;
 use vector_core::{sink::VectorSink, source::Source, transform::Transform};
@@ -11,7 +11,7 @@ use crate::config::{SinkContext, SourceContext, TransformContext};
 pub use self::resources::*;
 pub use self::runner::*;
 use self::sync::*;
-pub use self::validation::*;
+pub use self::validators::*;
 
 /// Component types that can be validated.
 pub enum ComponentType {
@@ -148,7 +148,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        components::compliance::{Runner, StandardValidators},
+        components::validation::{Runner, StandardValidators},
         sources::http_server::SimpleHttpConfig,
     };
 

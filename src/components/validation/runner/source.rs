@@ -8,7 +8,7 @@ use vector_core::{
 };
 
 use crate::{
-    components::compliance::{
+    components::validation::{
         sync::{Configured, ExternalResourceCoordinator, WaitHandle},
         ComponentBuilderParts, ComponentType, ValidatableComponent,
     },

@@ -17,6 +17,7 @@ use std::{
 
 use flate2::read::MultiGzDecoder;
 use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
+use ::http::Uri;
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
 use rand::{thread_rng, Rng};
@@ -112,6 +113,16 @@ pub fn next_addr_for_ip(ip: IpAddr) -> SocketAddr {
 
 pub fn next_addr() -> SocketAddr {
     next_addr_for_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
+}
+
+pub fn next_http_addr() -> Uri {
+    let addr = next_addr();
+    let addr_str = addr.to_string();
+    Uri::builder()
+        .scheme("http")
+        .host(addr_str)
+        .build()
+        .expect("should not fail to build uri")
 }
 
 pub fn next_addr_v6() -> SocketAddr {

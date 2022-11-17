@@ -9,7 +9,7 @@ use vector_core::{
 };
 
 use crate::{
-    components::compliance::{
+    components::validation::{
         sync::{Configured, ExternalResourceCoordinator},
         ComponentBuilderParts, ComponentType, ValidatableComponent,
     },

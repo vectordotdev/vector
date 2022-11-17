@@ -1,3 +1,5 @@
+mod config;
+mod edges;
 mod sink;
 mod source;
 mod transform;
@@ -14,7 +16,7 @@ use tokio::{pin, runtime::Builder, select, sync::mpsc};
 use vector_common::finalization::{EventStatus, Finalizable};
 use vector_core::event::{Event, LogEvent};
 
-use crate::components::compliance::sync::ExternalResourceCoordinator;
+use crate::components::validation::sync::ExternalResourceCoordinator;
 
 use super::{
     sync::Configured, ComponentType, ValidatableComponent, Validator, WaitHandle, WaitTrigger,
@@ -28,6 +30,7 @@ use self::transform::build_transform_component_future;
 ///
 /// This is the mechanism by which the Runner task pushes input to the component being validated.
 pub type RunnerInput = mpsc::Sender<Event>;
+
 /// Runner output mechanism.
 ///
 /// This is the mechanism by which the Runner task captures output from the component being
@@ -320,7 +323,7 @@ mod tests {
         transform::{FunctionTransform, OutputBuffer, Transform},
     };
 
-    use crate::components::compliance::{BuiltComponent, ComponentBuilderParts, ExternalResource};
+    use crate::components::validation::{BuiltComponent, ComponentBuilderParts, ExternalResource};
 
     use super::*;
 
