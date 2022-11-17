@@ -629,6 +629,21 @@ mod tests {
     // Encode to array of bytes: https://kawanet.github.io/msgpack-lite/
     // Decode base64: https://toolslick.com/conversion/data/messagepack-to-json
 
+    fn mock_event(name: &str, timestamp: &str) -> Event {
+        Event::Log(LogEvent::from(BTreeMap::from([
+            (String::from("message"), Value::from(name)),
+            (
+                String::from(log_schema().source_type_key()),
+                Value::from(FluentConfig::NAME),
+            ),
+            (String::from("tag"), Value::from("tag.name")),
+            (
+                String::from("timestamp"),
+                Value::Timestamp(DateTime::parse_from_rfc3339(timestamp).unwrap().into()),
+            ),
+        ])))
+    }
+
     #[test]
     fn decode_message_mode() {
         //[
@@ -641,18 +656,7 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114,
         ];
 
-        let expected = Event::Log(LogEvent::from(BTreeMap::from([
-            (String::from("message"), Value::from("bar")),
-            (String::from("tag"), Value::from("tag.name")),
-            (
-                String::from("timestamp"),
-                Value::Timestamp(
-                    DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                        .unwrap()
-                        .into(),
-                ),
-            ),
-        ])));
+        let expected = mock_event("bar", "2015-09-07T01:23:04Z");
         let got = decode_all(message.clone()).unwrap();
         assert_event_data_eq!(got.0[0], expected);
         assert_eq!(got.1, message.len());
@@ -671,18 +675,7 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114, 129, 164, 115, 105, 122, 101, 1,
         ];
 
-        let expected = Event::Log(LogEvent::from(BTreeMap::from([
-            (String::from("message"), Value::from("bar")),
-            (String::from("tag"), Value::from("tag.name")),
-            (
-                String::from("timestamp"),
-                Value::Timestamp(
-                    DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                        .unwrap()
-                        .into(),
-                ),
-            ),
-        ])));
+        let expected = mock_event("bar", "2015-09-07T01:23:04Z");
         let got = decode_all(message.clone()).unwrap();
         assert_eq!(got.1, message.len());
         assert_event_data_eq!(got.0[0], expected);
@@ -706,44 +699,10 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("foo")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("bar")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("baz")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
+            mock_event("foo", "2015-09-07T01:23:04Z"),
+            mock_event("bar", "2015-09-07T01:23:05Z"),
+            mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
-
         let got = decode_all(message.clone()).unwrap();
 
         assert_eq!(got.1, message.len());
@@ -772,42 +731,9 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("foo")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("bar")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("baz")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
+            mock_event("foo", "2015-09-07T01:23:04Z"),
+            mock_event("bar", "2015-09-07T01:23:05Z"),
+            mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -839,42 +765,9 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("foo")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("bar")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("baz")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
+            mock_event("foo", "2015-09-07T01:23:04Z"),
+            mock_event("bar", "2015-09-07T01:23:05Z"),
+            mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -907,42 +800,9 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("foo")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("bar")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("baz")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
+            mock_event("foo", "2015-09-07T01:23:04Z"),
+            mock_event("bar", "2015-09-07T01:23:05Z"),
+            mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
 
         let got = decode_all(message.clone()).unwrap();
