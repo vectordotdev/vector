@@ -13,7 +13,7 @@ use codecs::{
 };
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use warp::http::{HeaderMap, StatusCode};
 
 use crate::{
@@ -30,8 +30,11 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
-use lookup::event_path;
-use vector_core::config::LogNamespace;
+use lookup::{lookup_v2::parse_value_path, path};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    schema::Definition,
+};
 
 /// Configuration for `heroku_logs` source.
 #[configurable_component(source("heroku_logs"))]
@@ -63,11 +66,23 @@ pub struct LogplexConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
-impl GenerateConfig for LogplexConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+impl LogplexConfig {
+    /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
+    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+        self.decoding.schema_definition(log_namespace)
+    }
+}
+
+impl Default for LogplexConfig {
+    fn default() -> Self {
+        Self {
             address: "0.0.0.0:80".parse().unwrap(),
             query_parameters: Vec::new(),
             tls: None,
@@ -75,28 +90,14 @@ impl GenerateConfig for LogplexConfig {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
-        })
-        .unwrap()
+            log_namespace: None,
+        }
     }
 }
 
-#[derive(Clone, Default)]
-struct LogplexSource {
-    query_parameters: Vec<String>,
-    decoder: Decoder,
-}
-
-impl HttpSource for LogplexSource {
-    fn build_events(
-        &self,
-        body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
-        _full_path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
-        let mut events = decode_message(self.decoder.clone(), body, header_map)?;
-        add_query_parameters(&mut events, &self.query_parameters, query_parameters);
-        Ok(events)
+impl GenerateConfig for LogplexConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(LogplexConfig::default()).unwrap()
     }
 }
 
@@ -109,10 +110,15 @@ impl SourceConfig for LogplexConfig {
             LogNamespace::Legacy,
         )
         .build();
+
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
             decoder,
+            log_namespace,
         };
+
         source.run(
             self.address,
             "events",
@@ -125,8 +131,11 @@ impl SourceConfig for LogplexConfig {
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // There is a global and per-source `log_namespace` config.
+        // The source config overrides the global setting and is merged here.
+        let schema_def = self.schema_definition(global_log_namespace.merge(self.log_namespace));
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_def)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -138,42 +147,77 @@ impl SourceConfig for LogplexConfig {
     }
 }
 
-fn decode_message(
+#[derive(Clone, Default)]
+struct LogplexSource {
+    query_parameters: Vec<String>,
     decoder: Decoder,
-    body: Bytes,
-    header_map: HeaderMap,
-) -> Result<Vec<Event>, ErrorMessage> {
-    // Deal with headers
-    let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
-        Ok(v) => v,
-        Err(e) => return Err(header_error_message("Logplex-Msg-Count", &e.to_string())),
-    };
-    let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
-    let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
+    log_namespace: LogNamespace,
+}
 
-    emit!(HerokuLogplexRequestReceived {
-        msg_count,
-        frame_id,
-        drain_token
-    });
+impl LogplexSource {
+    fn decode_message(
+        &self,
+        body: Bytes,
+        header_map: HeaderMap,
+    ) -> Result<Vec<Event>, ErrorMessage> {
+        // Deal with headers
+        let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
+            Ok(v) => v,
+            Err(e) => return Err(header_error_message("Logplex-Msg-Count", &e.to_string())),
+        };
+        let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
+        let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
 
-    // Deal with body
-    let events = body_to_events(decoder, body);
+        emit!(HerokuLogplexRequestReceived {
+            msg_count,
+            frame_id,
+            drain_token
+        });
 
-    if events.len() != msg_count {
-        let error_msg = format!(
-            "Parsed event count does not match message count header: {} vs {}",
-            events.len(),
-            msg_count
-        );
+        // Deal with body
+        let events = self.body_to_events(body);
 
-        if cfg!(test) {
-            panic!("{}", error_msg);
+        if events.len() != msg_count {
+            let error_msg = format!(
+                "Parsed event count does not match message count header: {} vs {}",
+                events.len(),
+                msg_count
+            );
+
+            if cfg!(test) {
+                panic!("{}", error_msg);
+            }
+            return Err(header_error_message("Logplex-Msg-Count", &error_msg));
         }
-        return Err(header_error_message("Logplex-Msg-Count", &error_msg));
+
+        Ok(events)
     }
 
-    Ok(events)
+    fn body_to_events(&self, body: Bytes) -> Vec<Event> {
+        let rdr = BufReader::new(body.reader());
+        rdr.lines()
+            .filter_map(|res| {
+                res.map_err(|error| emit!(HerokuLogplexRequestReadError { error }))
+                    .ok()
+            })
+            .filter(|s| !s.is_empty())
+            .flat_map(|line| line_to_events(self.decoder.clone(), self.log_namespace, line))
+            .collect()
+    }
+}
+
+impl HttpSource for LogplexSource {
+    fn build_events(
+        &self,
+        body: Bytes,
+        header_map: HeaderMap,
+        query_parameters: HashMap<String, String>,
+        _full_path: &str,
+    ) -> Result<Vec<Event>, ErrorMessage> {
+        let mut events = self.decode_message(body, header_map)?;
+        add_query_parameters(&mut events, &self.query_parameters, query_parameters);
+        Ok(events)
+    }
 }
 
 fn get_header<'a>(header_map: &'a HeaderMap, name: &str) -> Result<&'a str, ErrorMessage> {
@@ -193,19 +237,11 @@ fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
     )
 }
 
-fn body_to_events(decoder: Decoder, body: Bytes) -> Vec<Event> {
-    let rdr = BufReader::new(body.reader());
-    rdr.lines()
-        .filter_map(|res| {
-            res.map_err(|error| emit!(HerokuLogplexRequestReadError { error }))
-                .ok()
-        })
-        .filter(|s| !s.is_empty())
-        .flat_map(|line| line_to_events(decoder.clone(), line))
-        .collect()
-}
-
-fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
+fn line_to_events(
+    mut decoder: Decoder,
+    log_namespace: LogNamespace,
+    line: String,
+) -> SmallVec<[Event; 1]> {
     let parts = line.splitn(8, ' ').collect::<Vec<&str>>();
 
     let mut events = SmallVec::<[Event; 1]>::new();
@@ -223,16 +259,44 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
         loop {
             match decoder.decode_eof(&mut buffer) {
                 Ok(Some((decoded, _byte_size))) => {
+                    let legacy_host_key = parse_value_path(log_schema().host_key()).ok();
+                    let legacy_app_key = parse_value_path("app_name").ok();
+                    let legacy_proc_key = parse_value_path("proc_id").ok();
+
                     for mut event in decoded {
                         if let Event::Log(ref mut log) = event {
                             if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-                                log.try_insert(log_schema().timestamp_key(), ts);
+                                log_namespace.insert_vector_metadata(
+                                    log,
+                                    log_schema().timestamp_key(),
+                                    path!("timestamp"),
+                                    ts,
+                                );
                             }
 
-                            log.try_insert(log_schema().host_key(), hostname.to_owned());
+                            log_namespace.insert_source_metadata(
+                                LogplexConfig::NAME,
+                                log,
+                                legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                path!("host"),
+                                hostname.to_owned(),
+                            );
 
-                            log.try_insert(event_path!("app_name"), app_name.to_owned());
-                            log.try_insert(event_path!("proc_id"), proc_id.to_owned());
+                            log_namespace.insert_source_metadata(
+                                LogplexConfig::NAME,
+                                log,
+                                legacy_app_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                path!("app_name"),
+                                app_name.to_owned(),
+                            );
+
+                            log_namespace.insert_source_metadata(
+                                LogplexConfig::NAME,
+                                log,
+                                legacy_proc_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                path!("proc_id"),
+                                proc_id.to_owned(),
+                            );
                         }
 
                         events.push(event);
@@ -260,8 +324,7 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
 
     for event in &mut events {
         if let Event::Log(log) = event {
-            log.try_insert(log_schema().source_type_key(), Bytes::from("heroku_logs"));
-            log.try_insert(log_schema().timestamp_key(), now);
+            log_namespace.insert_standard_vector_source_metadata(log, LogplexConfig::NAME, now);
         }
     }
 
@@ -275,7 +338,10 @@ mod tests {
     use chrono::{DateTime, Utc};
     use futures::Stream;
     use similar_asserts::assert_eq;
-    use vector_core::event::{Event, EventStatus, Value};
+    use vector_core::{
+        config::LogNamespace,
+        event::{Event, EventStatus, Value},
+    };
 
     use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::{
@@ -311,6 +377,7 @@ mod tests {
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
                 acknowledgements: acknowledgements.into(),
+                log_namespace: None,
             }
             .build(context)
             .await
@@ -462,8 +529,9 @@ mod tests {
 
     #[test]
     fn logplex_handles_normal_lines() {
+        let log_namespace = LogNamespace::Legacy;
         let body = "267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - foo bar baz";
-        let events = super::line_to_events(Default::default(), body.into());
+        let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
         assert_eq!(log[log_schema().message_key()], "foo bar baz".into());
@@ -480,8 +548,9 @@ mod tests {
 
     #[test]
     fn logplex_handles_malformed_lines() {
+        let log_namespace = LogNamespace::Legacy;
         let body = "what am i doing here";
-        let events = super::line_to_events(Default::default(), body.into());
+        let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
         assert_eq!(
@@ -494,8 +563,9 @@ mod tests {
 
     #[test]
     fn logplex_doesnt_blow_up_on_bad_framing() {
+        let log_namespace = LogNamespace::Legacy;
         let body = "1000000 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - i'm not that long";
-        let events = super::line_to_events(Default::default(), body.into());
+        let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
         assert_eq!(log[log_schema().message_key()], "i'm not that long".into());
