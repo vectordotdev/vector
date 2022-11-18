@@ -1664,9 +1664,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.23"
+version = "4.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0eb41c13df48950b20eb4cd0eefa618819469df1bffc49d11e8487c4ba0037e5"
+checksum = "2148adefda54e14492fb9bddcc600b4344c5d1a3123bd666dcb939c6f0e0e57e"
 dependencies = [
  "atty",
  "bitflags",
@@ -4438,9 +4438,9 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "memmap2"
-version = "0.5.7"
+version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95af15f345b17af2efc8ead6080fb8bc376f8cec1b35277b935637595fe77498"
+checksum = "4b182332558b18d807c4ce1ca8ca983b34c3ee32765e47b3f0f69b90355cc1dc"
 dependencies = [
  "libc",
 ]
@@ -5342,9 +5342,9 @@ dependencies = [
 
 [[package]]
 name = "pest_derive"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60b75706b9642ebcb34dab3bc7750f811609a0eb1dd8b88c2d15bf628c1c65b2"
+checksum = "d5fd9bc6500181952d34bd0b2b0163a54d794227b498be0b7afa7698d0a7b18f"
 dependencies = [
  "pest",
  "pest_generator",
@@ -5352,9 +5352,9 @@ dependencies = [
 
 [[package]]
 name = "pest_generator"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f9272122f5979a6511a749af9db9bfc810393f63119970d7085fed1c4ea0db"
+checksum = "d2610d5ac5156217b4ff8e46ddcef7cdf44b273da2ac5bca2ecbfa86a330e7c4"
 dependencies = [
  "pest",
  "pest_meta",
@@ -5365,9 +5365,9 @@ dependencies = [
 
 [[package]]
 name = "pest_meta"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c8717927f9b79515e565a64fe46c38b8cd0427e64c40680b14a7365ab09ac8d"
+checksum = "824749bf7e21dd66b36fbe26b3f45c713879cccd4a009a917ab8e045ca8246fe"
 dependencies = [
  "once_cell",
  "pest",
@@ -6312,9 +6312,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.12"
+version = "0.11.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "431949c384f4e2ae07605ccaa56d1d9d2ecdb5cadd4f9577ccfab29f2e5149fc"
+checksum = "68cc60575865c7831548863cc02356512e3f1dc2f3f82cb837d7fc4cc8f3c97c"
 dependencies = [
  "base64",
  "bytes 1.2.1",
@@ -7004,9 +7004,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "2.0.1"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "368f2d60d049ea019a84dcd6687b0d1e0030fe663ae105039bdf967ed5e6a9a7"
+checksum = "25bf4a5a814902cd1014dbccfa4d4560fb8432c779471e96e035602519f82eef"
 dependencies = [
  "base64",
  "chrono",
@@ -7014,7 +7014,7 @@ dependencies = [
  "indexmap",
  "serde",
  "serde_json",
- "serde_with_macros 2.0.1",
+ "serde_with_macros 2.1.0",
  "time",
 ]
 
@@ -7032,9 +7032,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "2.0.1"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ccadfacf6cf10faad22bbadf55986bdd0856edfb5d9210aa1dcf1f516e84e93"
+checksum = "e3452b4c0f6c1e357f73fdb87cd1efabaa12acf328c7a528e252893baeb3f4aa"
 dependencies = [
  "darling 0.14.1",
  "proc-macro2",
@@ -8657,7 +8657,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 4.0.23",
+ "clap 4.0.26",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8754,7 +8754,7 @@ dependencies = [
  "serde-toml-merge",
  "serde_bytes",
  "serde_json",
- "serde_with 2.0.1",
+ "serde_with 2.1.0",
  "serde_yaml 0.9.14",
  "sha2 0.10.6",
  "similar-asserts",
@@ -8816,7 +8816,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "clap 4.0.23",
+ "clap 4.0.26",
  "futures 0.3.25",
  "graphql_client",
  "indoc",
@@ -8839,7 +8839,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.2.1",
- "clap 4.0.23",
+ "clap 4.0.26",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -8923,7 +8923,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "serde_with 2.0.1",
+ "serde_with 2.1.0",
  "snafu",
  "toml",
  "url",
@@ -9009,7 +9009,7 @@ dependencies = [
  "security-framework",
  "serde",
  "serde_json",
- "serde_with 2.0.1",
+ "serde_with 2.1.0",
  "similar-asserts",
  "snafu",
  "socket2",
@@ -9081,7 +9081,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.23",
+ "clap 4.0.26",
  "exitcode",
  "indoc",
  "lookup",
@@ -9224,7 +9224,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 4.0.23",
+ "clap 4.0.26",
  "enrichment",
  "glob",
  "lookup",

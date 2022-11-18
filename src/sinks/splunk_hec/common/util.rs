@@ -53,6 +53,7 @@ pub fn build_http_batch_service(
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
     endpoint_target: EndpointTarget,
+    auto_extract_timestamp: bool,
 ) -> HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HecRequest> {
     HttpBatchService::new(client, move |req: HecRequest| {
         let request_builder = Arc::clone(&http_request_builder);
@@ -71,6 +72,7 @@ pub fn build_http_batch_service(
                         index: req.index,
                         host: req.host,
                     },
+                    auto_extract_timestamp,
                 )
             });
         future
@@ -269,6 +271,7 @@ mod tests {
                 "/services/collector/event",
                 None,
                 MetadataFields::default(),
+                false,
             )
             .unwrap();
 
@@ -311,6 +314,7 @@ mod tests {
                 "/services/collector/event",
                 None,
                 MetadataFields::default(),
+                false,
             )
             .unwrap();
 
@@ -356,6 +360,7 @@ mod tests {
                 "/services/collector/event",
                 None,
                 MetadataFields::default(),
+                false,
             )
             .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")
