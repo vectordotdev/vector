@@ -15,8 +15,10 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::schema::Definition;
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    schema::Definition,
+};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -769,12 +771,12 @@ mod test {
                 .with_meaning(LookupBuf::root(), "message")
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(
-                    &owned_value_path!(LogstashConfig::NAME, "timestamp"),
-                    Kind::timestamp().or_undefined(),
-                )
-                .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogstashConfig::NAME, "timestamp"),
+                    Kind::timestamp().or_undefined(),
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "host"),
