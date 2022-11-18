@@ -75,6 +75,7 @@ depends = ""
 members = [
   ".",
   "lib/codecs",
+  "lib/config-schema",
   "lib/datadog/filter",
   "lib/datadog/grok",
   "lib/datadog/search-syntax",

@@ -1821,6 +1821,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "config-schema"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "once_cell",
+ "schemars",
+ "serde",
+ "serde_json",
+ "snafu",
+ "tracing 0.1.37",
+ "tracing-subscriber 0.3.16",
+ "vector-config",
+ "vector-config-common",
+]
+
+[[package]]
 name = "console"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -285,48 +285,6 @@ pub fn generate_struct_schema(
     }
 }
 
-#[allow(dead_code)]
-pub fn generate_optional_schema<T>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<T>,
-) -> Result<SchemaObject, GenerateError>
-where
-    T: Configurable + Serialize,
-{
-    // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
-    let mut schema = get_or_generate_schema::<T>(gen, metadata)?;
-
-    // We do a little dance here to add an additional instance type of "null" to the schema to
-    // signal it can be "X or null", achieving the functional behavior of "this is optional".
-    match schema.instance_type.as_mut() {
-        // If this schema has no instance type, see if it's a reference schema.  If so, then we'd simply switch to
-        // generating a composite schema with this schema reference and a generic null schema.
-        None => match schema.is_ref() {
-            false => panic!("tried to generate optional schema, but `T` had no instance type and was not a referenceable schema"),
-            true => {
-                let null = generate_null_schema();
-
-                // Drop the description from our generated schema if we're here, because it's going to exist on the
-                // outer field wrapping this schema, and it looks wonky to have it nested within the composite schema.
-                schema.metadata().description = None;
-
-                return Ok(generate_one_of_schema(&[null, schema]))
-            }
-        },
-        Some(sov) => match sov {
-            SingleOrVec::Single(ty) if **ty != InstanceType::Null => {
-                *sov = vec![**ty, InstanceType::Null].into()
-            }
-            SingleOrVec::Vec(ty) if !ty.contains(&InstanceType::Null) => {
-                ty.push(InstanceType::Null)
-            }
-            _ => {}
-        },
-    }
-
-    Ok(schema)
-}
-
 pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()

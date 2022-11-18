@@ -42,4 +42,12 @@ impl CustomAttribute {
             value: value.to_string(),
         }
     }
+
+    pub const fn is_flag(&self) -> bool {
+        matches!(self, Self::Flag(_))
+    }
+
+    pub const fn is_kv(&self) -> bool {
+        matches!(self, Self::Flag(_))
+    }
 }
