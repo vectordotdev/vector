@@ -404,10 +404,14 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use futures::Stream;
+    use lookup::{owned_value_path, LookupBuf};
     use similar_asserts::assert_eq;
+    use value::{kind::Collection, Kind};
+    use vector_config::NamedComponent;
     use vector_core::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
+        schema::Definition,
     };
 
     use super::{HttpSourceAuthConfig, LogplexConfig};
@@ -645,5 +649,49 @@ mod tests {
         );
         assert_eq!(log[log_schema().host_key()], "host".into());
         assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = LogplexConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogplexConfig::NAME, "timestamp"),
+                    Kind::timestamp().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogplexConfig::NAME, "host"),
+                    Kind::bytes(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogplexConfig::NAME, "app_name"),
+                    Kind::bytes(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogplexConfig::NAME, "proc_id"),
+                    Kind::bytes(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogplexConfig::NAME, "query_parameters"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                );
+
+        assert_eq!(definition, expected_definition)
     }
 }
