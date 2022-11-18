@@ -126,7 +126,7 @@ pub struct SimpleHttpConfig {
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
-    pub log_namespace: Option<bool>,
+    log_namespace: Option<bool>,
 }
 
 impl SimpleHttpConfig {
