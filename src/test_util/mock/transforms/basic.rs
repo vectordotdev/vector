@@ -65,7 +65,8 @@ impl FunctionTransform for BasicTransform {
                 let mut v = log
                     .get(crate::config::log_schema().message_key())
                     .unwrap()
-                    .to_string_lossy();
+                    .to_string_lossy()
+                    .into_owned();
                 v.push_str(&self.suffix);
                 log.insert(crate::config::log_schema().message_key(), Value::from(v));
             }
@@ -107,7 +108,8 @@ impl FunctionTransform for BasicTransform {
                 let mut v = trace
                     .get(crate::config::log_schema().message_key())
                     .unwrap()
-                    .to_string_lossy();
+                    .to_string_lossy()
+                    .into_owned();
                 v.push_str(&self.suffix);
                 trace.insert(crate::config::log_schema().message_key(), Value::from(v));
             }

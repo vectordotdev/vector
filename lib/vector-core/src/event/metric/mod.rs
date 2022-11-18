@@ -1,7 +1,6 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
-    collections::{btree_map, BTreeMap},
     convert::AsRef,
     fmt::{self, Display, Formatter},
     num::NonZeroU32,
@@ -27,14 +26,28 @@ pub use self::data::*;
 mod series;
 pub use self::series::*;
 
+mod tags;
+pub use self::tags::*;
+
 mod value;
 pub use self::value::*;
 
-pub type MetricTags = BTreeMap<String, String>;
+#[macro_export]
+macro_rules! metric_tags {
+    () => { $crate::event::MetricTags::default() };
+
+    ($($key:expr => $value:expr,)+) => { $crate::metric_tags!($($key => $value),+) };
+
+    ($($key:expr => $value:expr),*) => {
+        $crate::event::MetricTags::from([
+            $( ($key.into(), $value.into()), )*
+        ])
+    };
+}
 
 /// A metric.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Metric {
     #[serde(flatten)]
     pub(super) series: MetricSeries,
@@ -201,6 +214,12 @@ impl Metric {
         self.series.tags.as_ref()
     }
 
+    /// Gets a mutable reference to the tags of this metric, if they exist.
+    #[inline]
+    pub fn tags_mut(&mut self) -> Option<&mut MetricTags> {
+        self.series.tags.as_mut()
+    }
+
     /// Gets a reference to the timestamp of this metric, if it exists.
     #[inline]
     pub fn timestamp(&self) -> Option<DateTime<Utc>> {
@@ -292,12 +311,17 @@ impl Metric {
         Self::new(key.name().to_string(), MetricKind::Absolute, value)
             .with_namespace(Some("vector"))
             .with_timestamp(Some(timestamp))
-            .with_tags((!labels.is_empty()).then(|| labels))
+            .with_tags((!labels.is_empty()).then_some(labels))
     }
 
     /// Removes a tag from this metric, returning the value of the tag if the tag was previously in the metric.
     pub fn remove_tag(&mut self, key: &str) -> Option<String> {
         self.series.remove_tag(key)
+    }
+
+    /// Removes all the tags.
+    pub fn remove_tags(&mut self) {
+        self.series.remove_tags();
     }
 
     /// Returns `true` if `name` tag is present, and matches the provided `value`
@@ -309,7 +333,7 @@ impl Metric {
 
     /// Returns the string value of a tag, if it exists
     pub fn tag_value(&self, name: &str) -> Option<String> {
-        self.tags().and_then(|t| t.get(name).cloned())
+        self.tags().and_then(|t| t.get(name)).map(ToOwned::to_owned)
     }
 
     /// Inserts a tag into this metric.
@@ -320,13 +344,6 @@ impl Metric {
     /// *Note:* This will create the tags map if it is not present.
     pub fn insert_tag(&mut self, name: String, value: String) -> Option<String> {
         self.series.insert_tag(name, value)
-    }
-
-    /// Gets the given tag's corresponding entry in this metric.
-    ///
-    /// *Note:* This will create the tags map if it is not present, even if nothing is later inserted.
-    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
-        self.series.tag_entry(key)
     }
 
     /// Zeroes out the data in this metric.
@@ -594,7 +611,7 @@ mod test {
     use std::collections::BTreeSet;
 
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::*;
 
@@ -603,13 +620,11 @@ mod test {
     }
 
     fn tags() -> MetricTags {
-        vec![
-            ("normal_tag".to_owned(), "value".to_owned()),
-            ("true_tag".to_owned(), "true".to_owned()),
-            ("empty_tag".to_owned(), "".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+        metric_tags!(
+            "normal_tag" => "value",
+            "true_tag" => "true",
+            "empty_tag" => "",
+        )
     }
 
     #[test]

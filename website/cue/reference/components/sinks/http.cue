@@ -88,6 +88,18 @@ components: sinks: http: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
 			}
 		}
+		method: {
+			description: "The HTTP method to use."
+			required:    false
+			common:      false
+			type: string: {
+				default: "POST"
+				enum: {
+					PUT:  "PUT"
+					POST: "POST"
+				}
+			}
+		}
 		healthcheck: type: object: options: uri: {
 			common: false
 			description: """

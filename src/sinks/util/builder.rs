@@ -100,13 +100,21 @@ pub trait SinkBuilderExt: Stream {
 
             Box::pin(async move {
                 // Split the input into metadata and events.
-                let (metadata, events) = builder.split_input(input);
+                let (metadata, request_metadata_builder, events) = builder.split_input(input);
 
                 // Encode the events.
                 let payload = builder.encode_events(events)?;
 
+                // Note: it would be nice for the RequestMetadataBuilder to build be created from the
+                // events here, and not need to be requred by split_input(). But this then requires
+                // each Event type to implement Serialize, and that causes conflicts with the Serialize
+                // implementation for EstimatedJsonEncodedSizeOf.
+
+                // Build the request metadata.
+                let request_metadata = request_metadata_builder.build(&payload);
+
                 // Now build the actual request.
-                Ok(builder.build_request(metadata, payload))
+                Ok(builder.build_request(metadata, request_metadata, payload))
             })
         })
     }
@@ -121,7 +129,7 @@ pub trait SinkBuilderExt: Stream {
     ///
     /// As an example, the normal `request_builder` doesn't allow for a batch of input events to be
     /// split up: all events must be split at the beginning, encoded separately (and all together),
-    /// and the nreassembled into the request.  If the encoding of these events caused a payload to
+    /// and then reassembled into the request.  If the encoding of these events caused a payload to
     /// be generated that was, say, too large, you would have to back out the operation entirely by
     /// failing the batch.
     ///

@@ -11,8 +11,8 @@ use vector_core::{
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        ComponentKey, DataType, InnerTopology, InnerTopologyTransform, Output, TransformConfig,
-        TransformContext,
+        ComponentKey, DataType, InnerTopology, InnerTopologyTransform, Inputs, Output,
+        TransformConfig, TransformContext,
     },
     transforms::Transforms,
 };
@@ -33,6 +33,7 @@ pub struct PipelineConfig {
 
     /// A list of sequential transforms that will process any event that is passed to the pipeline.
     #[serde(default)]
+    #[configurable(metadata(docs::cycle_entrypoint))]
     transforms: Vec<Transforms>,
 }
 
@@ -144,7 +145,7 @@ impl PipelineConfig {
         result.inner.insert(
             name.clone(),
             InnerTopologyTransform {
-                inputs: inputs.to_vec(),
+                inputs: Inputs::from_iter(inputs.iter().cloned()),
                 inner: self.clone().into(),
             },
         );

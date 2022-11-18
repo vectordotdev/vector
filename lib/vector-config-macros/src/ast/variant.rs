@@ -1,4 +1,5 @@
 use darling::{error::Accumulator, util::Flag, FromAttributes};
+use proc_macro2::Ident;
 use serde_derive_internals::ast as serde_ast;
 use syn::spanned::Spanned;
 use vector_config_common::attributes::CustomAttribute;
@@ -48,6 +49,11 @@ impl<'a> Variant<'a> {
             tagging,
         };
         accumulator.finish_with(variant)
+    }
+
+    /// Ident of the variant.
+    pub fn ident(&self) -> &Ident {
+        &self.original.ident
     }
 
     /// Style of the variant.

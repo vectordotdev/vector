@@ -13,7 +13,10 @@ use tokio::{
     sync::watch,
     time::{interval, sleep_until},
 };
-use vector_core::{internal_event::EventsSent, ByteSizeOf};
+use vector_core::{
+    internal_event::{BytesSent, EventsSent},
+    ByteSizeOf,
+};
 
 use crate::{
     event::{EventArray, EventContainer},
@@ -55,19 +58,21 @@ impl StreamSink<EventArray> for BlackholeSink {
                 loop {
                     select! {
                         _ = print_interval.tick() => {
-                            info!({
+                            info!(
                                 events = total_events.load(Ordering::Relaxed),
                                 raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
-                            }, "Total events collected");
+                                "Collected events."
+                            );
                         },
                         _ = tripwire.changed() => break,
                     }
                 }
 
-                info!({
+                info!(
                     events = total_events.load(Ordering::Relaxed),
-                    raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed)
-                }, "Total events collected");
+                    raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
+                    "Collected events."
+                );
             });
         }
 
@@ -91,6 +96,11 @@ impl StreamSink<EventArray> for BlackholeSink {
                 count: events.len(),
                 byte_size: message_len,
                 output: None,
+            });
+
+            emit!(BytesSent {
+                byte_size: message_len,
+                protocol: "blackhole".to_string().into(),
             });
         }
 

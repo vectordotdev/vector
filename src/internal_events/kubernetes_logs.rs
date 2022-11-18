@@ -1,8 +1,11 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use crate::emit;
 use crate::event::Event;
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
 pub struct KubernetesLogsEventsReceived<'a> {
@@ -61,6 +64,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -85,7 +89,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -110,7 +114,7 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -149,7 +153,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -166,6 +170,7 @@ const KUBERNETES_LIFECYCLE: &str = "kubernetes_lifecycle";
 pub struct KubernetesLifecycleError<E> {
     pub message: &'static str,
     pub error: E,
+    pub count: usize,
 }
 
 impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
@@ -176,7 +181,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             error_code = KUBERNETES_LIFECYCLE,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -184,5 +189,9 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: self.count,
+            reason: self.message,
+        });
     }
 }

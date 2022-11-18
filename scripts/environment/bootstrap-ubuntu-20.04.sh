@@ -50,6 +50,7 @@ apt install --yes \
     ruby-bundler \
     shellcheck \
     sudo \
+    unzip \
     wget \
     yarn
 
@@ -86,15 +87,12 @@ fi
 
 # Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 20.04 images _and_
 # by our own Ubuntu 20.04 images, so this is really just make sure the path is configured.
-# Also, force the proto-build crate to avoid building the vendored protoc.
 if [ -n "${CI-}" ] ; then
     echo "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
     # we often run into OOM issues in CI due to the low memory vs. CPU ratio on c5 instances
     echo "CARGO_BUILD_JOBS=$(($(nproc) /2))" >> "${GITHUB_ENV}"
-    echo PROTOC_NO_VENDOR=1 >> "${GITHUB_ENV}"
 else
     echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> "${HOME}/.bash_profile"
-    echo "export PROTOC_NO_VENDOR=1" >> "${HOME}/.bash_profile"
 fi
 
 # Docker.
@@ -112,15 +110,7 @@ if ! [ -x "$(command -v docker)" ]; then
     usermod --append --groups docker ubuntu || true
 fi
 
-# Protoc. No guard because we want to override Ubuntu's old version in
-# case it is already installed by a dependency.
-PROTOC_VERSION=3.19.4 # also update soaks/Dockerfile
-PROTOC_ZIP=protoc-${PROTOC_VERSION}-linux-x86_64.zip
-curl -fsSL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_ZIP \
-     --output "$TEMP/$PROTOC_ZIP"
-unzip "$TEMP/$PROTOC_ZIP" bin/protoc -d "$TEMP"
-chmod +x "$TEMP"/bin/protoc
-mv --force --verbose "$TEMP"/bin/protoc /usr/bin/protoc
+bash scripts/environment/install-protoc.sh
 
 # Apt cleanup
 apt clean

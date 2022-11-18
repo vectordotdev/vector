@@ -1,9 +1,4 @@
-use std::{
-    fmt::Debug,
-    io::{self, Write},
-    num::NonZeroUsize,
-    sync::Arc,
-};
+use std::{fmt::Debug, io, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -12,21 +7,24 @@ use futures::{stream::BoxStream, StreamExt};
 use lookup::event_path;
 use snafu::Snafu;
 use tower::Service;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
     config::{log_schema, LogSchema},
     event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
 };
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
     codecs::{Encoder, Transformer},
+    internal_events::SinkRequestBuildError,
     sinks::util::{
-        encoding::Encoder as _, request_builder::EncodeResult, Compression, Compressor,
-        RequestBuilder, SinkBuilderExt,
+        encoding::{write_all, Encoder as _},
+        metadata::RequestMetadataBuilder,
+        request_builder::EncodeResult,
+        Compression, Compressor, RequestBuilder, SinkBuilderExt,
     },
 };
 #[derive(Default)]
@@ -201,7 +199,7 @@ struct LogRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
-    type Metadata = (Arc<str>, usize, EventFinalizers, usize);
+    type Metadata = (Arc<str>, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = JsonEncoding;
     type Payload = Bytes;
@@ -216,14 +214,16 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: (Option<Arc<str>>, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (Option<Arc<str>>, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (api_key, mut events) = input;
-        let events_len = events.len();
         let finalizers = events.take_finalizers();
-        let events_byte_size = events.size_of();
-
         let api_key = api_key.unwrap_or_else(|| Arc::clone(&self.default_api_key));
-        ((api_key, events_len, finalizers, events_byte_size), events)
+        let builder = RequestMetadataBuilder::from_events(&events);
+
+        ((api_key, finalizers), builder, events)
     }
 
     fn encode_events(
@@ -242,6 +242,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         // sink to incremental encoding and simply put up with suboptimal batch sizes if we need to end up splitting due
         // to (un)compressed size limitations.
         let mut buf = Vec::new();
+        let n_events = events.len();
         let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
         if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
@@ -249,7 +250,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        compressor.write_all(&buf)?;
+        write_all(&mut compressor, n_events, &buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
@@ -261,19 +262,20 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        dd_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (api_key, batch_size, finalizers, events_byte_size) = metadata;
+        let (api_key, finalizers) = dd_metadata;
         let uncompressed_size = payload.uncompressed_byte_size;
+
         LogApiRequest {
-            batch_size,
             api_key,
             compression: self.compression,
             body: payload.into_payload(),
             finalizers,
-            events_byte_size,
             uncompressed_size,
+            metadata,
         }
     }
 }
@@ -285,7 +287,7 @@ struct SemanticLogRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilder {
-    type Metadata = (Arc<str>, usize, EventFinalizers, usize);
+    type Metadata = (Arc<str>, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = SemanticJsonEncoding;
     type Payload = Bytes;
@@ -300,14 +302,19 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
         &self.encoding
     }
 
-    fn split_input(&self, input: (Option<Arc<str>>, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (Option<Arc<str>>, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (api_key, mut events) = input;
-        let events_len = events.len();
+
+        let builder = RequestMetadataBuilder::from_events(&events);
+
         let finalizers = events.take_finalizers();
-        let events_byte_size = events.size_of();
 
         let api_key = api_key.unwrap_or_else(|| Arc::clone(&self.default_api_key));
-        ((api_key, events_len, finalizers, events_byte_size), events)
+
+        ((api_key, finalizers), builder, events)
     }
 
     fn encode_events(
@@ -326,6 +333,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
         // sink to incremental encoding and simply put up with suboptimal batch sizes if we need to end up splitting due
         // to (un)compressed size limitations.
         let mut buf = Vec::new();
+        let n_events = events.len();
         let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
         if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
@@ -333,7 +341,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        compressor.write_all(&buf)?;
+        write_all(&mut compressor, n_events, &buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
@@ -345,19 +353,20 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        dd_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (api_key, batch_size, finalizers, events_byte_size) = metadata;
+        let (api_key, finalizers) = dd_metadata;
         let uncompressed_size = payload.uncompressed_byte_size;
+
         LogApiRequest {
-            batch_size,
             api_key,
             compression: self.compression,
             body: payload.into_payload(),
             finalizers,
-            events_byte_size,
             uncompressed_size,
+            metadata,
         }
     }
 }
@@ -391,8 +400,8 @@ where
                 )
                 .filter_map(|request| async move {
                     match request {
-                        Err(e) => {
-                            error!("Failed to build Datadog Logs request: {:?}.", e);
+                        Err(error) => {
+                            emit!(SinkRequestBuildError { error });
                             None
                         }
                         Ok(req) => Some(req),
@@ -414,8 +423,8 @@ where
                 )
                 .filter_map(|request| async move {
                     match request {
-                        Err(e) => {
-                            error!("Failed to build Datadog Logs request: {:?}.", e);
+                        Err(error) => {
+                            emit!(SinkRequestBuildError { error });
                             None
                         }
                         Ok(req) => Some(req),

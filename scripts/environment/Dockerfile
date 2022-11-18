@@ -11,14 +11,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN echo $TZ > /etc/timezone
 
 # Setup the env
-COPY scripts/environment/bootstrap-ubuntu-20.04.sh /git/vectordotdev/vector/scripts/environment/
-RUN ./git/vectordotdev/vector/scripts/environment/bootstrap-ubuntu-20.04.sh
+COPY scripts/environment/*.sh /git/vectordotdev/vector/scripts/environment/
+RUN cd git/vectordotdev/vector && ./scripts/environment/bootstrap-ubuntu-20.04.sh
 
 # Setup the toolchain
 WORKDIR /git/vectordotdev/vector
-COPY scripts/environment/prepare.sh /git/vectordotdev/vector/scripts/environment/
-COPY scripts/environment/setup-helm.sh /git/vectordotdev/vector/scripts/environment/
-COPY scripts/environment/release-flags.sh /git/vectordotdev/vector/scripts/environment/
 COPY scripts/Gemfile scripts/Gemfile.lock \
     /git/vectordotdev/vector/scripts/
 COPY rust-toolchain.toml \
@@ -29,6 +26,7 @@ RUN ./scripts/environment/prepare.sh && ./scripts/environment/setup-helm.sh
 VOLUME /vector
 VOLUME /vector/target
 VOLUME /root/.cargo
+VOLUME /root/.rustup
 
 # Prepare for use
 COPY ./scripts/environment/entrypoint.sh /

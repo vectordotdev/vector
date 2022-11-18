@@ -192,7 +192,10 @@ pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
     get_controller()
         .capture_metrics()
         .into_iter()
-        .filter_map(|m| m.tag_matches("component_id", component_key.id()).then(|| m))
+        .filter_map(|m| {
+            m.tag_matches("component_id", component_key.id())
+                .then_some(m)
+        })
         .collect()
 }
 

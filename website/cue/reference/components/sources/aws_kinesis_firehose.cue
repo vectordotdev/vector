@@ -226,7 +226,7 @@ components: sources: aws_kinesis_firehose: {
 					encoding.codec = "json"
 				   ```
 
-				2. Create a Kinesis Firewatch delivery stream in the region
+				2. Create a Kinesis Firehose delivery stream in the region
 				   where the CloudWatch Logs groups exist that you want to
 				   ingest.
 				3. Set the stream to forward to your Vector instance via its

@@ -130,11 +130,30 @@ impl Fanout {
         }
     }
 
-    pub async fn send_stream(&mut self, events: impl Stream<Item = EventArray>) {
+    /// Send a stream of events to all connected sinks.
+    ///
+    /// This function will send events until the provided stream finishes. It will also block on the
+    /// resolution of any pending reload before proceeding with a send operation, similar to `send`.
+    ///
+    /// # Panics
+    ///
+    /// This method can panic if the fanout receives a control message that violates some invariant
+    /// about its current state (e.g. remove a non-existent sink, etc.). This would imply a bug in
+    /// Vector's config reloading logic.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs while sending events to any of the connected sinks, an error variant will be
+    /// returned detailing the cause.
+    pub async fn send_stream(
+        &mut self,
+        events: impl Stream<Item = EventArray>,
+    ) -> crate::Result<()> {
         tokio::pin!(events);
         while let Some(event_array) = events.next().await {
-            self.send(event_array).await;
+            self.send(event_array).await?;
         }
+        Ok(())
     }
 
     /// Send a batch of events to all connected sinks.
@@ -147,7 +166,12 @@ impl Fanout {
     /// This method can panic if the fanout receives a control message that violates some invariant
     /// about its current state (e.g. remove a non-existent sink, etc). This would imply a bug in
     /// Vector's config reloading logic.
-    pub async fn send(&mut self, events: EventArray) {
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs while sending events to any of the connected sinks, an error variant will be
+    /// returned detailing the cause.
+    pub async fn send(&mut self, events: EventArray) -> crate::Result<()> {
         // First, process any available control messages in a non-blocking fashion.  If any of our
         // senders were replaced, we additionally wait until they're replaced.
         while let Ok(message) = self.control_channel.try_recv() {
@@ -159,7 +183,7 @@ impl Fanout {
         // Nothing to send if we have no sender.
         if self.senders.is_empty() {
             trace!("No senders present.");
-            return;
+            return Ok(());
         }
 
         // Keep track of whether the control channel has returned `Ready(None)`, and stop polling
@@ -200,27 +224,29 @@ impl Fanout {
                             send_group.pause(&id);
                         },
                         None => {
-                            // Control channel is closed, process must be shutting down
+                            // Control channel is closed, which means Vector is shutting down.
                             control_channel_open = false;
                         }
                     }
                 }
 
-                () = send_group.send() => {
-                    // All in-flight sends have completed, so return sinks to the base collection.
-                    // We extend instead of assign here because other sinks could have been added
-                    // while the send was in-flight.
-                    trace!("Sent item to fanout.");
-                    break;
+                result = send_group.send() => match result {
+                    Ok(()) => {
+                        trace!("Sent item to fanout.");
+                        break;
+                    },
+                    Err(e) => return Err(e),
                 }
             }
         }
+
+        Ok(())
     }
 }
 
 struct SendGroup<'a> {
     senders: &'a mut IndexMap<ComponentKey, Option<Sender>>,
-    sends: HashMap<ComponentKey, ReusableBoxFuture<'static, Sender>>,
+    sends: HashMap<ComponentKey, ReusableBoxFuture<'static, crate::Result<Sender>>>,
 }
 
 impl<'a> SendGroup<'a> {
@@ -249,8 +275,8 @@ impl<'a> SendGroup<'a> {
 
             // Now generate a send for that sender which we'll drive to completion.
             let send = async move {
-                sender.flush().await;
-                sender
+                sender.flush().await?;
+                Ok(sender)
             };
 
             sends.insert(key.clone(), ReusableBoxFuture::new(send));
@@ -262,7 +288,12 @@ impl<'a> SendGroup<'a> {
     fn try_detach_send(&mut self, id: &ComponentKey) {
         if let Some(send) = self.sends.remove(id) {
             tokio::spawn(async move {
-                send.await;
+                if let Err(e) = send.await {
+                    warn!(
+                        cause = %e,
+                        message = "Encountered error writing to component after detaching from topology.",
+                    );
+                }
             });
         }
     }
@@ -321,7 +352,7 @@ impl<'a> SendGroup<'a> {
         }
     }
 
-    async fn send(&mut self) {
+    async fn send(&mut self) -> crate::Result<()> {
         // Right now, we do a linear scan of all sends, polling each send once in order to avoid
         // waiting forever, such that we can let our control messages get picked up while sends are
         // waiting.
@@ -332,7 +363,9 @@ impl<'a> SendGroup<'a> {
 
             let mut done = Vec::new();
             for (key, send) in &mut self.sends {
-                if let Poll::Ready(sender) = poll!(send.get_pin()) {
+                if let Poll::Ready(result) = poll!(send.get_pin()) {
+                    let sender = result?;
+
                     // The send completed, so we restore the sender and mark ourselves so that this
                     // future gets dropped.
                     done.push((key.clone(), sender));
@@ -351,6 +384,8 @@ impl<'a> SendGroup<'a> {
                 pending!();
             }
         }
+
+        Ok(())
     }
 }
 
@@ -364,11 +399,13 @@ impl Sender {
         Self { inner, input: None }
     }
 
-    async fn flush(&mut self) {
+    async fn flush(&mut self) -> crate::Result<()> {
         if let Some(input) = self.input.take() {
-            self.inner.send(input).await.expect("unit error");
-            self.inner.flush().await.expect("unit error");
+            self.inner.send(input).await?;
+            self.inner.flush().await?;
         }
+
+        Ok(())
     }
 }
 
@@ -533,7 +570,7 @@ mod tests {
         let events = make_event_array(2);
 
         let clones = events.clone();
-        fanout.send(clones).await;
+        fanout.send(clones).await.expect("should not fail");
 
         for receiver in receivers {
             assert_eq!(collect_ready(receiver.into_stream()), &[events.clone()]);
@@ -547,7 +584,7 @@ mod tests {
 
         // First send should immediately complete because all senders have capacity:
         let mut first_send = spawn(fanout.send(events[0].clone().into()));
-        assert_ready!(first_send.poll());
+        assert_ready!(first_send.poll()).expect("should not fail");
         drop(first_send);
 
         // Second send should return pending because sender B is now full:
@@ -560,7 +597,7 @@ mod tests {
         }
 
         // Now our second send should actually be able to complete:
-        assert_ready!(second_send.poll());
+        assert_ready!(second_send.poll()).expect("should not fail");
         drop(second_send);
 
         // And make sure the second item comes through:
@@ -575,14 +612,23 @@ mod tests {
         let events = make_events(3);
 
         // Send in the first two events to our initial two senders:
-        fanout.send(events[0].clone().into()).await;
-        fanout.send(events[1].clone().into()).await;
+        fanout
+            .send(events[0].clone().into())
+            .await
+            .expect("should not fail");
+        fanout
+            .send(events[1].clone().into())
+            .await
+            .expect("should not fail");
 
         // Now add a third sender:
         add_sender_to_fanout(&mut fanout, &mut receivers, 2, 4).await;
 
         // Send in the last event which all three senders will now get:
-        fanout.send(events[2].clone().into()).await;
+        fanout
+            .send(events[2].clone().into())
+            .await
+            .expect("should not fail");
 
         // Make sure the first two senders got all three events, but the third sender only got the
         // last event:
@@ -601,14 +647,23 @@ mod tests {
         let events = make_events(3);
 
         // Send in the first two events to our initial two senders:
-        fanout.send(events[0].clone().into()).await;
-        fanout.send(events[1].clone().into()).await;
+        fanout
+            .send(events[0].clone().into())
+            .await
+            .expect("should not fail");
+        fanout
+            .send(events[1].clone().into())
+            .await
+            .expect("should not fail");
 
         // Now remove the second sender:
         remove_sender_from_fanout(&control, 1);
 
         // Send in the last event which only the first sender will get:
-        fanout.send(events[2].clone().into()).await;
+        fanout
+            .send(events[2].clone().into())
+            .await
+            .expect("should not fail");
 
         // Make sure the first sender got all three events, but the second sender only got the first two:
         let expected_events = [&events, &events[..2]];
@@ -668,7 +723,7 @@ mod tests {
 
             // First send should immediately complete because all senders have capacity:
             let mut first_send = spawn(fanout.send(events[0].clone().into()));
-            assert_ready!(first_send.poll());
+            assert_ready!(first_send.poll()).expect("should not fail");
             drop(first_send);
 
             // Second send should return pending because sender B is now full:
@@ -679,7 +734,7 @@ mod tests {
             remove_sender_from_fanout(&control, sender_id);
 
             if should_complete {
-                assert_ready!(second_send.poll());
+                assert_ready!(second_send.poll()).expect("should not fail");
             } else {
                 assert_pending!(second_send.poll());
             }
@@ -707,8 +762,14 @@ mod tests {
         let (mut fanout, _) = Fanout::new();
         let events = make_events(2);
 
-        fanout.send(events[0].clone().into()).await;
-        fanout.send(events[1].clone().into()).await;
+        fanout
+            .send(events[0].clone().into())
+            .await
+            .expect("should not fail");
+        fanout
+            .send(events[1].clone().into())
+            .await
+            .expect("should not fail");
     }
 
     #[tokio::test]
@@ -717,14 +778,23 @@ mod tests {
         let events = make_events(3);
 
         // First two sends should immediately complete because all senders have capacity:
-        fanout.send(events[0].clone().into()).await;
-        fanout.send(events[1].clone().into()).await;
+        fanout
+            .send(events[0].clone().into())
+            .await
+            .expect("should not fail");
+        fanout
+            .send(events[1].clone().into())
+            .await
+            .expect("should not fail");
 
         // Replace the first sender with a brand new one before polling again:
         let old_first_receiver = replace_sender_in_fanout(&control, &mut receivers, 0, 4).await;
 
         // And do the third send which should also complete since all senders still have capacity:
-        fanout.send(events[2].clone().into()).await;
+        fanout
+            .send(events[2].clone().into())
+            .await
+            .expect("should not fail");
 
         // Now make sure that the new "first" sender only got the third event, but that the second and
         // third sender got all three events:
@@ -750,9 +820,9 @@ mod tests {
 
         // First two sends should immediately complete because all senders have capacity:
         let send1 = Box::pin(fanout.send(events[0].clone().into()));
-        assert_ready!(poll!(send1));
+        assert_ready!(poll!(send1)).expect("should not fail");
         let send2 = Box::pin(fanout.send(events[1].clone().into()));
-        assert_ready!(poll!(send2));
+        assert_ready!(poll!(send2)).expect("should not fail");
 
         // Now do an empty replace on the second sender, which we'll test to make sure that `Fanout`
         // doesn't let any writes through until we replace it properly.  We get back the receiver
@@ -768,7 +838,7 @@ mod tests {
         // actually complete:
         finish_sender_replace(&control, 0, new_first_sender);
         assert!(third_send.is_woken());
-        assert_ready!(third_send.poll());
+        assert_ready!(third_send.poll()).expect("should not fail");
 
         // Make sure the original first sender got the first two events, the new first sender got
         // the last event, and the second sender got all three:

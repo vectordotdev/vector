@@ -68,6 +68,7 @@ FORMATTING_END = \033[0m
 # "One weird trick!" https://www.gnu.org/software/make/manual/make.html#Syntax-of-Functions
 EMPTY:=
 SPACE:= ${EMPTY} ${EMPTY}
+COMMA:= ,
 
 help:
 	@printf -- "${FORMATTING_BEGIN_BLUE}                                      __   __  __${FORMATTING_END}\n"
@@ -119,9 +120,10 @@ define ENVIRONMENT_EXEC
 			--env INSIDE_ENVIRONMENT=true \
 			--network host \
 			--mount type=bind,source=${CURRENT_DIR},target=/git/vectordotdev/vector \
-			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=/var/run/docker.sock$(COMMA)target=/var/run/docker.sock,) \
 			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
+			--mount type=volume,source=vector-rustup-cache,target=/root/.rustup \
 			$(ENVIRONMENT_UPSTREAM)
 endef
 
@@ -157,7 +159,7 @@ environment-prepare: ## Prepare the Vector dev shell using $CONTAINER_TOOL.
 
 .PHONY: environment-clean
 environment-clean: ## Clean the Vector dev shell using $CONTAINER_TOOL.
-	@$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache
+	@$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache vector-rustup-cache
 	@$(CONTAINER_TOOL) rmi $(ENVIRONMENT_UPSTREAM) || true
 
 .PHONY: environment-push
@@ -226,7 +228,7 @@ cross-image-%:
 	$(CONTAINER_TOOL) build \
 		--tag vector-cross-env:${TRIPLE} \
 		--file scripts/cross/${TRIPLE}.dockerfile \
-		scripts/cross
+		.
 
 # This is basically a shorthand for folks.
 # `cross-anything-triple` will call `cross anything --target triple` with the right features.
@@ -303,7 +305,7 @@ test-docs: ## Run the docs test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-all
-test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behaviorial, and integration.
+test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behavioral, and integration.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
@@ -314,16 +316,16 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 	${EMPTY}
 
 .PHONY: test-behavior-config
-test-behavior-config: ## Runs configuration related behaviorial tests
+test-behavior-config: ## Runs configuration related behavioral tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --bin secret-backend-example
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/config/*
 
 .PHONY: test-behavior-%
-test-behavior-%: ## Runs behaviorial test for a given category
+test-behavior-%: ## Runs behavioral test for a given category
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/$*/*
 
 .PHONY: test-behavior
-test-behavior: ## Runs all behaviorial tests
+test-behavior: ## Runs all behavioral tests
 test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
 
 .PHONY: test-enterprise
@@ -332,13 +334,17 @@ test-enterprise: ## Runs enterprise related behavioral tests
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-scrape test-integration-influxdb
+test-integration: test-integration-amqp test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
+test-integration: test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
+
+.PHONY: test-integration-aws-s3
+test-integration-aws-s3: ## Runs AWS S3 integration tests
+	FILTER=::aws_s3 make test-integration-aws
 
 .PHONY: test-integration-aws-sqs
 test-integration-aws-sqs: ## Runs AWS SQS integration tests
@@ -347,6 +353,14 @@ test-integration-aws-sqs: ## Runs AWS SQS integration tests
 .PHONY: test-integration-aws-cloudwatch-logs
 test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
 	FILTER=::aws_cloudwatch_logs make test-integration-aws
+
+.PHONY: test-integration-aws-cloudwatch-metrics
+test-integration-aws-cloudwatch-metrics: ## Runs AWS Cloudwatch Metrics integration tests
+	FILTER=::aws_cloudwatch_metrics make test-integration-aws
+
+.PHONY: test-integration-aws-kinesis
+test-integration-aws-kinesis: ## Runs AWS Kinesis integration tests
+	FILTER=::aws_kinesis make test-integration-aws
 
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
@@ -433,7 +447,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
-check-all: check-scripts check-deny
+check-all: check-scripts check-deny check-component-docs
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -475,8 +489,13 @@ check-scripts: ## Check that scipts do not have common mistakes
 check-deny: ## Check advisories licenses and sources for crate dependencies
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-deny.sh
 
+.PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
+
+.PHONY: check-component-docs
+check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-docs.sh
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -621,6 +640,10 @@ sync-install: ## Sync the install.sh script for access via sh.vector.dev
 test-vrl: ## Run the VRL test suite
 	@scripts/test-vrl.sh
 
+.PHONY: compile-vrl-wasm
+compile-vrl-wasm: ## Compile VRL crates to WASM target
+	@scripts/compile-vrl-wasm.sh
+
 ##@ Utility
 
 .PHONY: build-ci-docker-images
@@ -639,6 +662,13 @@ fmt: ## Format code
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
 	scripts/generate-manifests.sh
+
+.PHONY: generate-component-docs
+generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
+	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
+	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
+	${MAYBE_ENVIRONMENT_EXEC} scripts/generate-component-docs.rb /tmp/vector-config-schema.json \
+		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

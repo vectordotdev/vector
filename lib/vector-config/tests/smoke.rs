@@ -21,7 +21,7 @@ use vector_config::{
 
 /// A templated string.
 #[configurable_component]
-#[configurable(metadata(templateable))]
+#[configurable(metadata(docs::templateable))]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
@@ -221,7 +221,6 @@ pub struct SimpleSinkConfig {
     encoding: Encoding,
 
     /// The filepath to write the events to.
-    #[configurable(metadata(templateable))]
     output_path: Template,
 
     /// The tags to apply to each event.
@@ -291,7 +290,7 @@ pub struct AdvancedSinkConfig {
     tls: Option<TlsEnablableConfig>,
 
     /// The partition key to use for each event.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::templateable))]
     #[serde(default = "default_partition_key")]
     partition_key: String,
 

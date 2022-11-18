@@ -1,6 +1,7 @@
 mod common;
 mod config;
 mod encoder;
+mod health;
 mod request_builder;
 mod retry;
 mod service;
@@ -20,6 +21,7 @@ pub use config::*;
 pub use encoder::ElasticsearchEncoder;
 use http::{uri::InvalidUri, Request};
 use snafu::Snafu;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::aws::AwsAuthentication;
@@ -40,7 +42,7 @@ pub enum ElasticsearchAuth {
         user: String,
 
         /// Basic authentication password.
-        password: String,
+        password: SensitiveString,
     },
 
     /// Amazon OpenSearch Service-specific authentication.
@@ -169,6 +171,27 @@ impl ElasticsearchCommonMode {
     }
 }
 
+/// Configuration for api version.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum ElasticsearchApiVersion {
+    /// Auto-detect the api version. Will fail if endpoint isn't reachable.
+    Auto,
+    /// Use the Elasticsearch 6.x API.
+    V6,
+    /// Use the Elasticsearch 7.x API.
+    V7,
+    /// Use the Elasticsearch 8.x API.
+    V8,
+}
+
+impl Default for ElasticsearchApiVersion {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum ParseError {
@@ -182,4 +205,10 @@ pub enum ParseError {
     BatchActionTemplate { source: TemplateParseError },
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     RegionRequired,
+    #[snafu(display("Endpoints option must be specified"))]
+    EndpointRequired,
+    #[snafu(display(
+        "`endpoint` and `endpoints` options are mutually exclusive. Please use `endpoints` option."
+    ))]
+    EndpointsExclusive,
 }

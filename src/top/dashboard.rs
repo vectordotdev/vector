@@ -181,7 +181,7 @@ impl<'a> Widgets<'a> {
             let mut data = vec![
                 r.key.id().to_string(),
                 (!r.has_displayable_outputs())
-                    .then(|| "--")
+                    .then_some("--")
                     .unwrap_or_default()
                     .to_string(),
                 r.kind.clone(),

@@ -3,6 +3,6 @@ fn main() {
     prost_build::Config::new()
         .btree_map(&["."])
         .bytes(&["raw_bytes"])
-        .compile_protos(&["proto/event.proto"], &["proto/"])
+        .compile_protos(&["proto/event.proto"], &["proto", "../../proto"])
         .unwrap();
 }

@@ -220,8 +220,8 @@ mod integration_test {
             kafka_address(9093),
             Some(KafkaSaslConfig {
                 enabled: Some(true),
-                username: Some("admin".to_owned()),
-                password: Some("admin".to_owned()),
+                username: Some("admin".to_string()),
+                password: Some("admin".to_string().into()),
                 mechanism: Some("PLAIN".to_owned()),
             }),
             None,
@@ -324,9 +324,9 @@ mod integration_test {
                 Some(Ok(msg)) => {
                     let s: &str = msg.payload_view().unwrap().unwrap();
                     out.push(s.to_owned());
-                    let (header_key, header_val) = msg.headers().unwrap().get(0).unwrap();
-                    assert_eq!(header_key, header_1_key);
-                    assert_eq!(header_val, header_1_value.as_bytes());
+                    let header = msg.headers().unwrap().get(0);
+                    assert_eq!(header.key, header_1_key);
+                    assert_eq!(header.value.unwrap(), header_1_value.as_bytes());
                 }
                 None if out.len() >= input.len() => break,
                 _ => {

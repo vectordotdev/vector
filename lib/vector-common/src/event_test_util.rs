@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::{cell::RefCell, collections::HashSet};
 
 thread_local! {
@@ -5,9 +6,36 @@ thread_local! {
     static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
 }
 
-#[must_use]
-pub fn contains_name(name: &str) -> bool {
-    EVENTS_RECORDED.with(|events| events.borrow().iter().any(|event| event.ends_with(name)))
+/// Returns Ok(()) if the event name pattern is matched only once.
+///
+/// # Errors
+///
+/// Will return `Err` if `pattern` is not found in the event record, or is found multiple times.
+pub fn contains_name_once(pattern: &str) -> Result<(), String> {
+    EVENTS_RECORDED.with(|events| {
+        let mut n_events = 0;
+        let mut names: String = "".to_string();
+        for event in events.borrow().iter() {
+            if event.ends_with(pattern) {
+                if n_events > 0 {
+                    names.push_str(", ");
+                }
+                n_events += 1;
+                let _ = write!(names, "`{}`", event);
+            }
+        }
+        if n_events == 0 {
+            Err(format!("Missing event `{}`", pattern))
+        } else if n_events > 1 {
+            Err(format!(
+                "Multiple ({}) events matching `{}`: ({}). Hint! Don't use the `assert_x_` \
+                 test helpers on round-trip tests (tests that run more than a single component).",
+                n_events, pattern, names
+            ))
+        } else {
+            Ok(())
+        }
+    })
 }
 
 pub fn clear_recorded_events() {

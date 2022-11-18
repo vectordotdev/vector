@@ -255,7 +255,7 @@ Each condition in the `conditions` array has two fields:
 
 Parameter | Type | Description
 :---------|:-----|:-----------
-`type` | string | The type of condition you're providing. As the original `check_fields` syntax is now deprecated, [`vrl`][vrl] is currently the only valid value.
+`type` | string | The type of condition you're providing. [`vrl`][vrl] is currently the only valid value.
 `source` | string (VRL Boolean expression) | Explained in detail [above](#verifying).
 
 Here's an example `outputs` declaration:
@@ -271,12 +271,6 @@ assert!(is_string(.id))
 assert!(exists(.tags))
 '''
 ```
-
-{{< danger title="`check_fields` conditions now deprecated" >}}
-Vector initially provided a `check_fields` condition type that enabled you to specify Boolean
-test conditions using a special configuration-based system. `check_fields` is now deprecated. We
-strongly recommend converting any existing `check_fields` tests to `vrl` conditions.
-{{< /danger >}}
 
 #### Asserting no output
 

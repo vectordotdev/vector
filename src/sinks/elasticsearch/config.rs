@@ -3,9 +3,8 @@ use std::{
     convert::TryFrom,
 };
 
-use futures::FutureExt;
+use futures::{FutureExt, TryFutureExt};
 use snafu::ResultExt;
-use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
 use crate::{
@@ -17,15 +16,16 @@ use crate::{
     internal_events::TemplateRenderingError,
     sinks::{
         elasticsearch::{
+            health::ElasticsearchHealthLogic,
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
-            BatchActionTemplateSnafu, ElasticsearchAuth, ElasticsearchCommon,
-            ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
+            BatchActionTemplateSnafu, ElasticsearchApiVersion, ElasticsearchAuth,
+            ElasticsearchCommon, ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
         },
         util::{
-            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
-            ServiceBuilderExt, TowerRequestConfig,
+            http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
+            RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -46,7 +46,14 @@ pub struct ElasticsearchConfig {
     /// The Elasticsearch endpoint to send logs to.
     ///
     /// This should be the full URL as shown in the example.
-    pub endpoint: String,
+    #[configurable(deprecated)]
+    pub endpoint: Option<String>,
+
+    /// The Elasticsearch endpoints to send logs to.
+    ///
+    /// Each endpoint should be the full URL as shown in the example.
+    #[serde(default)]
+    pub endpoints: Vec<String>,
 
     /// The `doc_type` for your index data.
     ///
@@ -54,13 +61,25 @@ pub struct ElasticsearchConfig {
     /// set this option since Elasticsearch has removed it.
     pub doc_type: Option<String>,
 
+    /// The API version of Elasticsearch.
+    #[serde(default)]
+    pub api_version: ElasticsearchApiVersion,
+
     /// Whether or not to send the `type` field to Elasticsearch.
     ///
     /// `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
     ///
     /// If enabled, the `doc_type` option will be ignored.
+    ///
+    /// This option has been deprecated, the `api_version` option should be used instead.
+    #[configurable(deprecated)]
+    pub suppress_type_name: Option<bool>,
+
+    /// Whether or not to retry successful requests containing partial failures.
+    ///
+    /// To avoid duplicates in Elasticsearch, please use option `id_key`.
     #[serde(default)]
-    pub suppress_type_name: bool,
+    pub request_retry_partial: bool,
 
     /// The name of the event key that should map to Elasticsearch’s [`_id` field][es_id].
     ///
@@ -109,6 +128,9 @@ pub struct ElasticsearchConfig {
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
+    pub distribution: Option<HealthConfig>,
 
     #[configurable(derived)]
     #[serde(alias = "normal")]
@@ -190,17 +212,14 @@ impl BulkConfig {
 #[serde(rename_all = "snake_case")]
 pub struct DataStreamConfig {
     /// The data stream type used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
     pub dtype: Template,
 
     /// The data stream dataset used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(default = "DataStreamConfig::default_dataset")]
     pub dataset: Template,
 
     /// The data stream namespace used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(default = "DataStreamConfig::default_namespace")]
     pub namespace: Template,
 
@@ -349,15 +368,15 @@ impl DataStreamConfig {
             let data_stream = log.get("data_stream").and_then(|ds| ds.as_object());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.dtype(log))?;
             let dataset = data_stream
                 .and_then(|ds| ds.get("dataset"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.dataset(log))?;
             let namespace = data_stream
                 .and_then(|ds| ds.get("namespace"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.namespace(log))?;
             (dtype, dataset, namespace)
         };
@@ -368,44 +387,51 @@ impl DataStreamConfig {
 #[async_trait::async_trait]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let common = ElasticsearchCommon::parse_config(self).await?;
+        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
+        let common = commons[0].clone();
 
-        let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
         let request_limits = self
             .request
             .tower
             .unwrap_with(&TowerRequestConfig::default());
 
-        let http_request_builder = HttpRequestBuilder {
-            bulk_uri: common.bulk_uri.clone(),
-            http_request_config: self.request.clone(),
-            http_auth: common.http_auth.clone(),
-            query_params: common.query_params.clone(),
-            region: common.region.clone(),
-            compression: self.compression,
-            credentials_provider: common.aws_auth.clone(),
-        };
+        let health_config = self.distribution.clone().unwrap_or_default();
 
-        let service = ServiceBuilder::new()
-            .settings(request_limits, ElasticsearchRetryLogic)
-            .service(ElasticsearchService::new(http_client, http_request_builder));
+        let services = commons
+            .iter()
+            .cloned()
+            .map(|common| {
+                let endpoint = common.base_url.clone();
 
-        let sink = ElasticsearchSink {
-            batch_settings,
-            request_builder: common.request_builder.clone(),
-            transformer: self.encoding.clone(),
-            service,
+                let http_request_builder = HttpRequestBuilder::new(&common, self);
+                let service = ElasticsearchService::new(client.clone(), http_request_builder);
 
-            metric_to_log: common.metric_to_log.clone(),
-            mode: common.mode.clone(),
-            id_key_field: self.id_key.clone(),
-        };
+                (endpoint, service)
+            })
+            .collect::<Vec<_>>();
 
-        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
-        let healthcheck = common.healthcheck(client).boxed();
+        let service = request_limits.distributed_service(
+            ElasticsearchRetryLogic {
+                retry_partial: self.request_retry_partial,
+            },
+            services,
+            health_config,
+            ElasticsearchHealthLogic,
+        );
+
+        let sink = ElasticsearchSink::new(&common, self, service)?;
+
         let stream = VectorSink::from_event_streamsink(sink);
+
+        let healthcheck = futures::future::select_ok(
+            commons
+                .into_iter()
+                .map(move |common| common.healthcheck(client.clone()).boxed()),
+        )
+        .map_ok(|((), _)| ())
+        .boxed();
         Ok((stream, healthcheck))
     }
 
@@ -431,7 +457,7 @@ mod tests {
     fn parse_aws_auth() {
         toml::from_str::<ElasticsearchConfig>(
             r#"
-            endpoint = ""
+            endpoints = [""]
             auth.strategy = "aws"
             auth.assume_role = "role"
         "#,
@@ -440,7 +466,7 @@ mod tests {
 
         toml::from_str::<ElasticsearchConfig>(
             r#"
-            endpoint = ""
+            endpoints = [""]
             auth.strategy = "aws"
         "#,
         )
@@ -451,7 +477,7 @@ mod tests {
     fn parse_mode() {
         let config = toml::from_str::<ElasticsearchConfig>(
             r#"
-            endpoint = ""
+            endpoints = [""]
             mode = "data_stream"
             data_stream.type = "synthetics"
         "#,
@@ -459,5 +485,40 @@ mod tests {
         .unwrap();
         assert!(matches!(config.mode, ElasticsearchMode::DataStream));
         assert!(config.data_stream.is_some());
+    }
+
+    #[test]
+    fn parse_distribution() {
+        toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = ["", ""]
+            distribution.retry_initial_backoff_secs = 10
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn parse_version() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            api_version = "v7"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.api_version, ElasticsearchApiVersion::V7);
+    }
+
+    #[test]
+    fn parse_version_auto() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            api_version = "auto"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
     }
 }

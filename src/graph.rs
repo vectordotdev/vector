@@ -6,43 +6,43 @@ use clap::Parser;
 use crate::config;
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
     /// If zero files are specified the default config path
     /// `/etc/vector/vector.toml` will be targeted.
-    #[clap(
-        name = "config",
+    #[arg(
+        id = "config",
         short,
         long,
         env = "VECTOR_CONFIG",
-        use_value_delimiter(true)
+        value_delimiter(',')
     )]
     paths: Vec<PathBuf>,
 
     /// Vector config files in TOML format.
-    #[clap(name = "config-toml", long, use_value_delimiter(true))]
+    #[arg(id = "config-toml", long, value_delimiter(','))]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format.
-    #[clap(name = "config-json", long, use_value_delimiter(true))]
+    #[arg(id = "config-json", long, value_delimiter(','))]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format.
-    #[clap(name = "config-yaml", long, use_value_delimiter(true))]
+    #[arg(id = "config-yaml", long, value_delimiter(','))]
     paths_yaml: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[clap(
-        name = "config-dir",
+    #[arg(
+        id = "config-dir",
         short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_value_delimiter(true)
+        value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
 }

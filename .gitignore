@@ -2,10 +2,12 @@ cargo-timing*.html
 *.pyc
 *.iml
 *.tmp
+*~
 **/*.rs.bk
 .DS_Store
 .idea/
 .vscode/
+.dir-locals.el
 checkpoints/*
 miniodat
 bench_output.txt

@@ -20,6 +20,7 @@ In order to run a soak locally you will need:
 * python-pandas
 * python-numpy
 * python-tabulate
+* python-scipy
 
 ## Approach
 

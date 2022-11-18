@@ -255,11 +255,11 @@ components: sources: syslog: {
 				Syslog style). It's unfortunate that the Syslog specification isn't more
 				accurately followed, but we hope that Vector insulates you from these deviations.
 
-				If parsing fails, Vector includes the entire Syslog line in the `message`
-				key. If you find this happening often, we recommend using the
-				[`socket` source](\(urls.vector_socket_source)) combined with
+				If parsing fails, Vector will raise an error. If you find this happening often,
+				we recommend using the [`socket` source](\(urls.vector_socket_source)) combined with
 				[regex parsing](\(urls.vrl_functions)/#parse_regex) to implement your own custom
-				ingestion and parsing scheme. Alternatively, you can [open an
+				ingestion and parsing scheme, or [syslog parsing](\(urls.vrl_functions)/#parse_syslog) and
+				manually handle any errors. Alternatively, you can [open an
 				issue](\(urls.new_feature_request)) to request support for your specific format.
 				"""
 		}

@@ -18,16 +18,15 @@ pub struct Variable {
 
 impl Variable {
     pub(crate) fn new(span: Span, ident: Ident, local: &LocalEnv) -> Result<Self, Error> {
-        let value = match local.variable(&ident) {
-            Some(variable) => variable.value.as_ref().cloned(),
-            None => {
-                let idents = local
-                    .variable_idents()
-                    .map(std::clone::Clone::clone)
-                    .collect::<Vec<_>>();
+        let value = if let Some(variable) = local.variable(&ident) {
+            variable.value.as_ref().cloned()
+        } else {
+            let idents = local
+                .variable_idents()
+                .map(std::clone::Clone::clone)
+                .collect::<Vec<_>>();
 
-                return Err(Error::undefined(ident, span, idents));
-            }
+            return Err(Error::undefined(ident, span, idents));
         };
 
         Ok(Self { ident, value })

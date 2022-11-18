@@ -4,6 +4,7 @@ use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, sts::AssumeRoleProviderBuilder,
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
@@ -17,12 +18,12 @@ const DEFAULT_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 #[serde(deny_unknown_fields, untagged)]
 pub enum AwsAuthentication {
     /// Authenticate using a fixed access key and secret pair.
-    Static {
+    AccessKey {
         /// The AWS access key ID.
-        access_key_id: String,
+        access_key_id: SensitiveString,
 
         /// The AWS secret access key.
-        secret_access_key: String,
+        secret_access_key: SensitiveString,
     },
 
     /// Authenticate using credentials stored in a file.
@@ -65,12 +66,12 @@ impl AwsAuthentication {
         service_region: Region,
     ) -> crate::Result<SharedCredentialsProvider> {
         match self {
-            Self::Static {
+            Self::AccessKey {
                 access_key_id,
                 secret_access_key,
             } => Ok(SharedCredentialsProvider::new(Credentials::from_keys(
-                access_key_id,
-                secret_access_key,
+                access_key_id.inner(),
+                secret_access_key.inner(),
                 None,
             ))),
             AwsAuthentication::File { .. } => {
@@ -96,9 +97,9 @@ impl AwsAuthentication {
 
     #[cfg(test)]
     pub fn test_auth() -> AwsAuthentication {
-        AwsAuthentication::Static {
-            access_key_id: "dummy".to_string(),
-            secret_access_key: "dummy".to_string(),
+        AwsAuthentication::AccessKey {
+            access_key_id: "dummy".to_string().into(),
+            secret_access_key: "dummy".to_string().into(),
         }
     }
 }
@@ -219,7 +220,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AwsAuthentication::Static { .. }));
+        assert!(matches!(config.auth, AwsAuthentication::AccessKey { .. }));
     }
 
     #[test]

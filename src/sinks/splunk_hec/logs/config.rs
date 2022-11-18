@@ -3,6 +3,7 @@ use std::sync::Arc;
 use codecs::TextSerializerConfig;
 use futures_util::FutureExt;
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
@@ -36,7 +37,7 @@ pub struct HecLogsSinkConfig {
     ///
     /// If an event has a token set in its metadata, it will prevail over the one set here.
     #[serde(alias = "token")]
-    pub default_token: String,
+    pub default_token: SensitiveString,
 
     /// The base URL of the Splunk instance.
     pub endpoint: String,
@@ -58,13 +59,11 @@ pub struct HecLogsSinkConfig {
     /// The name of the index where to send the events to.
     ///
     /// If not specified, the default index is used.
-    #[configurable(metadata(templateable))]
     pub index: Option<Template>,
 
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk will default to `httpevent`.
-    #[configurable(metadata(templateable))]
     pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
@@ -72,7 +71,6 @@ pub struct HecLogsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector will set it.
-    #[configurable(metadata(templateable))]
     pub source: Option<Template>,
 
     #[configurable(derived)]
@@ -110,6 +108,13 @@ pub struct HecLogsSinkConfig {
     #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
     pub timestamp_key: String,
 
+    /// Passes the auto_extract_timestamp option to Splunk.
+    /// This will cause Splunk to extract the timestamp from the message text rather than use
+    /// the timestamp embedded in the event. The timestamp must be in the format yyyy-mm-dd hh:mm:ss.
+    /// This option only applies for the `Event` endpoint target.
+    #[serde(default)]
+    pub auto_extract_timestamp: Option<bool>,
+
     #[configurable(derived)]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
@@ -122,7 +127,7 @@ const fn default_endpoint_target() -> EndpointTarget {
 impl GenerateConfig for HecLogsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
             host_key: host_key(),
             indexed_fields: vec![],
@@ -137,6 +142,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
             timestamp_key: timestamp_key(),
+            auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
         })
         .unwrap()
@@ -146,10 +152,14 @@ impl GenerateConfig for HecLogsSinkConfig {
 #[async_trait::async_trait]
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        if self.auto_extract_timestamp.is_some() && self.endpoint_target == EndpointTarget::Raw {
+            return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
+        }
+
         let client = create_client(&self.tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             client.clone(),
         )
         .boxed();
@@ -185,6 +195,7 @@ impl HecLogsSinkConfig {
         let encoder = HecLogsEncoder {
             transformer,
             encoder,
+            auto_extract_timestamp: self.auto_extract_timestamp.unwrap_or_default(),
         };
         let request_builder = HecLogsRequestBuilder {
             encoder,
@@ -195,7 +206,7 @@ impl HecLogsSinkConfig {
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
             self.endpoint_target,
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             self.compression,
         ));
         let http_service = ServiceBuilder::new()
@@ -204,6 +215,7 @@ impl HecLogsSinkConfig {
                 client,
                 Arc::clone(&http_request_builder),
                 self.endpoint_target,
+                self.auto_extract_timestamp.unwrap_or_default(),
             ));
 
         let service = HecService::new(

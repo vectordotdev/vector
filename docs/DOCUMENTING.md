@@ -8,16 +8,16 @@ documentation in tandem with code changes.
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
 1. [Responsibilities](#responsibilities)
-1. [Reference documentation](#reference-documentation)
+2. [Reference documentation](#reference-documentation)
    1. [Formatting](#formatting)
-   1. [Validating](#validating)
+   2. [Validating](#validating)
       1. [Tips & tricks](#tips--tricks)
          1. [Make small incremental changes](#make-small-incremental-changes)
-   1. [Changelog](#changelog)
-   1. [Release highlights](#release-highlights)
+   3. [Changelog](#changelog)
+   4. [Release highlights](#release-highlights)
       1. [FAQ](#faq)
          1. [What makes a release highlight noteworthy?](#what-makes-a-release-highlight-noteworthy)
-         1. [How is a release highlight different from a blog post?](#how-is-a-release-highlight-different-from-a-blog-post)
+         2. [How is a release highlight different from a blog post?](#how-is-a-release-highlight-different-from-a-blog-post)
 
 <!-- /MarkdownTOC -->
 
@@ -77,7 +77,7 @@ A good practice for writing CUE is to make small, incremental changes and to
 frequently check to ensure that those changes are valid. If you introduce larger
 changes that introduce multiple errors, you may have difficulty interpreting
 CUE's verbose (and not always super helpful) log output. In fact, we recommend
-using a tool like [watchexec] to validate the sources every time you save a
+using a tool like [watchexec](https://github.com/watchexec/watchexec) to validate the sources every time you save a
 change:
 
 ```bash
@@ -89,13 +89,13 @@ watchexec "make check-docs"
 
 Contributors do not need to maintain a changelog. This is automatically generated
 via the `make release` command, made possible by the use of
-[conventional commit](#title) titles.
+[conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) titles.
 
 ### Release highlights
 
 Because Vector releases often contain many different changes, we use highlights
 to surface high-value, meaningful changes. Highlights are markdown files located
-in the [`docs/content/en/highlights` folder](docs/content/en/highlights) that
+in the [`docs/content/en/highlights` folder](../website/content/en/highlights) that
 thoughtfully describe a feature. Each highlight is prominently displayed in the
 relevant [release notes](https://vector.dev/releases/).
 
@@ -103,7 +103,7 @@ relevant [release notes](https://vector.dev/releases/).
 
 ##### What makes a release highlight noteworthy?
 
-It should offer meaningful value to users. This is inherently subjective and
+It should offer meaningful value to users. This is inherently subjective, and
 it is impossible to define exact rules for this distinction. But we should be
 cautious not to dilute the meaning of a highlight by producing low values
 highlights. Typically, a release contains no more than 6 highlights.

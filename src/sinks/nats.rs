@@ -6,11 +6,11 @@ use codecs::JsonSerializerConfig;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol,
+use vector_common::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
+    internal_event::{ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol},
 };
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
@@ -62,7 +62,7 @@ pub struct NatsSinkConfig {
     connection_name: String,
 
     /// The NATS subject to publish messages to.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::templateable))]
     subject: String,
 
     /// The NATS URL to connect to.
@@ -182,7 +182,7 @@ impl StreamSink<Event> for NatsSink {
 
             self.transformer.transform(&mut event);
 
-            let event_byte_size = event.size_of();
+            let event_byte_size = event.estimated_json_encoded_size_of();
 
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {
@@ -325,8 +325,8 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".into(),
-                    password: "natspass".into(),
+                    user: "natsuser".to_string(),
+                    password: "natspass".to_string().into(),
                 },
             }),
         };
@@ -353,8 +353,8 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".into(),
-                    password: "wrongpass".into(),
+                    user: "natsuser".to_string(),
+                    password: "wrongpass".to_string().into(),
                 },
             }),
         };
@@ -384,7 +384,7 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
-                    value: "secret".into(),
+                    value: "secret".to_string().into(),
                 },
             }),
         };
@@ -414,7 +414,7 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
-                    value: "wrongsecret".into(),
+                    value: "wrongsecret".to_string().into(),
                 },
             }),
         };

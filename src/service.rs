@@ -7,50 +7,50 @@ use crate::{cli::handle_config_errors, config};
 const DEFAULT_SERVICE_NAME: &str = crate::built_info::PKG_NAME;
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub struct Opts {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     sub_command: Option<SubCommand>,
 }
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 struct InstallOpts {
     /// The name of the service to install.
-    #[clap(long)]
+    #[arg(long)]
     name: Option<String>,
 
     /// The display name to be used by interface programs to identify the service like Windows Services App
-    #[clap(long)]
+    #[arg(long)]
     display_name: Option<String>,
 
     /// Vector config files in TOML format to be used by the service.
-    #[clap(name = "config-toml", long, use_value_delimiter(true))]
+    #[arg(name = "config-toml", long, value_delimiter(','))]
     config_paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to be used by the service.
-    #[clap(name = "config-json", long, use_value_delimiter(true))]
+    #[arg(name = "config-json", long, value_delimiter(','))]
     config_paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to be used by the service.
-    #[clap(name = "config-yaml", long, use_value_delimiter(true))]
+    #[arg(name = "config-yaml", long, value_delimiter(','))]
     config_paths_yaml: Vec<PathBuf>,
 
     /// The configuration files that will be used by the service.
     /// If no configuration file is specified, will target default configuration file.
-    #[clap(name = "config", short, long, use_value_delimiter(true))]
+    #[arg(name = "config", short, long, value_delimiter(','))]
     config_paths: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[clap(
-        name = "config-dir",
+    #[arg(
+        id = "config-dir",
         short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_value_delimiter(true)
+        value_delimiter(',')
     )]
     config_dirs: Vec<PathBuf>,
 }
@@ -92,14 +92,14 @@ impl InstallOpts {
 }
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 struct RestartOpts {
     /// The name of the service.
-    #[clap(long)]
+    #[arg(long)]
     name: Option<String>,
 
     /// How long to wait for the service to stop before starting it back, in seconds.
-    #[clap(default_value = "60", long)]
+    #[arg(default_value = "60", long)]
     stop_timeout: u32,
 }
 
@@ -114,10 +114,10 @@ impl RestartOpts {
 }
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 struct StandardOpts {
     /// The name of the service.
-    #[clap(long)]
+    #[arg(long)]
     name: Option<String>,
 }
 
@@ -132,7 +132,7 @@ impl StandardOpts {
 }
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 enum SubCommand {
     /// Install the service.
     Install(InstallOpts),

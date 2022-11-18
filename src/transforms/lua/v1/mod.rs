@@ -5,6 +5,7 @@ use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 
+use crate::schema::Definition;
 use crate::{
     config::{DataType, Input, Output},
     event::{Event, Value},
@@ -36,6 +37,9 @@ pub struct LuaConfig {
 
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
+        warn!(
+            "DEPRECATED The `lua` transform API version 1 is deprecated. Please convert your script to version 2."
+        );
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
 
@@ -43,8 +47,11 @@ impl LuaConfig {
         Input::log()
     }
 
-    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        // Lua causes the type definition to be reset
+        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
+
+        vec![Output::default(DataType::Log).with_schema_definition(definition)]
     }
 }
 
@@ -220,7 +227,7 @@ impl mlua::UserData for LuaEvent {
                             message =
                                 "Could not set field to Lua value of invalid type, dropping field.",
                             field = key.as_str(),
-                            internal_log_rate_secs = 30
+                            internal_log_rate_limit = true
                         );
                         this.inner.as_mut_log().remove(key.as_str());
                     }

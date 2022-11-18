@@ -9,15 +9,16 @@ use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, event::Event};
 
 use super::parser;
+use crate::sources::util::http::HttpMethod;
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
     http::Auth,
     internal_events::PrometheusParseError,
     sources::{
         self,
-        util::http_scrape::{
-            build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs,
-            HttpScraperBuilder, HttpScraperContext,
+        util::http_client::{
+            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
+            HttpClientBuilder, HttpClientContext,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -121,7 +122,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             endpoint_tag: self.endpoint_tag.clone(),
         };
 
-        let inputs = GenericHttpScrapeInputs {
+        let inputs = GenericHttpClientInputs {
             urls,
             interval_secs: self.scrape_interval_secs,
             headers: HashMap::new(),
@@ -132,7 +133,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(http_scrape(inputs, builder, cx.out).boxed())
+        Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -172,7 +173,7 @@ struct PrometheusScrapeBuilder {
     endpoint_tag: Option<String>,
 }
 
-impl HttpScraperBuilder for PrometheusScrapeBuilder {
+impl HttpClientBuilder for PrometheusScrapeBuilder {
     type Context = PrometheusScrapeContext;
 
     /// Expands the context with the instance info and endpoint info for the current request.
@@ -211,7 +212,7 @@ struct PrometheusScrapeContext {
     endpoint_info: Option<EndpointInfo>,
 }
 
-impl HttpScraperContext for PrometheusScrapeContext {
+impl HttpClientContext for PrometheusScrapeContext {
     /// Parses the Prometheus HTTP response into metric events
     fn on_response(&mut self, url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         let body = String::from_utf8_lossy(body);
@@ -292,7 +293,7 @@ mod test {
         service::{make_service_fn, service_fn},
         Body, Client, Response, Server,
     };
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
     use warp::Filter;
 
@@ -301,10 +302,8 @@ mod test {
         config,
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
-            components::{
-                assert_source_compliance, run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS,
-            },
-            next_addr, start_topology, wait_for_tcp,
+            components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+            next_addr, start_topology, trace_init, wait_for_tcp,
         },
         Error,
     };
@@ -531,8 +530,11 @@ mod test {
         }
     }
 
+    // Intentially not using assert_source_compliance here because this is a round-trip test which
+    // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
     async fn test_prometheus_routing() {
+        trace_init();
         let in_addr = next_addr();
         let out_addr = next_addr();
 
@@ -597,6 +599,7 @@ mod test {
             &["in"],
             PrometheusExporterConfig {
                 address: out_addr,
+                auth: None,
                 tls: None,
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
@@ -608,23 +611,22 @@ mod test {
             },
         );
 
-        assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async move {
-            let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-            sleep(Duration::from_secs(1)).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        sleep(Duration::from_secs(1)).await;
 
-            let response = Client::new()
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .await
-                .unwrap();
+        let response = Client::new()
+            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+            .await
+            .unwrap();
 
-            assert!(response.status().is_success());
-            let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-            let lines = std::str::from_utf8(&body)
-                .unwrap()
-                .lines()
-                .collect::<Vec<_>>();
+        assert!(response.status().is_success());
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        let lines = std::str::from_utf8(&body)
+            .unwrap()
+            .lines()
+            .collect::<Vec<_>>();
 
-            assert_eq!(lines, vec![
+        assert_eq!(lines, vec![
                 "# HELP vector_http_request_duration_seconds http_request_duration_seconds",
                 "# TYPE vector_http_request_duration_seconds histogram",
                 "vector_http_request_duration_seconds_bucket{le=\"0.05\"} 24054 1612411516789",
@@ -654,8 +656,7 @@ mod test {
                 ],
             );
 
-            topology.stop().await;
-        }).await;
+        topology.stop().await;
     }
 }
 

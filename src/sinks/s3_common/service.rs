@@ -1,26 +1,31 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_s3::error::PutObjectError;
-use aws_sdk_s3::types::{ByteStream, SdkError};
-use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::{
+    error::PutObjectError,
+    types::{ByteStream, SdkError},
+    Client as S3Client,
+};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
 use super::config::S3Options;
+use super::partitioner::S3PartitionKey;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
     pub body: Bytes,
     pub bucket: String,
     pub metadata: S3Metadata,
+    pub request_metadata: RequestMetadata,
     pub content_encoding: Option<&'static str>,
     pub options: S3Options,
 }
@@ -31,11 +36,16 @@ impl Finalizable for S3Request {
     }
 }
 
+impl MetaDescriptive for S3Request {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct S3Metadata {
-    pub partition_key: String,
-    pub count: usize,
-    pub byte_size: usize,
+    pub partition_key: S3PartitionKey,
+    pub s3_key: String,
     pub finalizers: EventFinalizers,
 }
 
@@ -50,12 +60,8 @@ impl DriverResponse for S3Response {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.count, self.events_byte_size)
     }
 }
 
@@ -85,11 +91,16 @@ impl Service<S3Request> for S3Service {
     type Error = SdkError<PutObjectError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: S3Request) -> Self::Future {
+        let count = request.get_metadata().event_count();
+        let events_byte_size = request.get_metadata().events_byte_size();
+
         let options = request.options;
 
         let content_encoding = request.content_encoding;
@@ -104,13 +115,11 @@ impl Service<S3Request> for S3Service {
 
         let tagging = options.tags.map(|tags| {
             let mut tagging = url::form_urlencoded::Serializer::new(String::new());
-            for (p, v) in tags {
-                tagging.append_pair(&p, &v);
+            for (p, v) in &tags {
+                tagging.append_pair(p, v);
             }
             tagging.finish()
         });
-        let count = request.metadata.count;
-        let events_byte_size = request.metadata.byte_size;
 
         let client = self.client.clone();
 
@@ -119,7 +128,7 @@ impl Service<S3Request> for S3Service {
                 .put_object()
                 .body(bytes_to_bytestream(request.body))
                 .bucket(request.bucket)
-                .key(request.metadata.partition_key)
+                .key(request.metadata.s3_key)
                 .set_content_encoding(content_encoding)
                 .set_content_type(content_type)
                 .set_acl(options.acl.map(Into::into))

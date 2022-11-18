@@ -41,15 +41,32 @@ configuration: {
 			common: false
 			description: """
 				If set, Vector will configure the internal metrics system to automatically
-				remove all metrics that have not been updated in the given number of seconds.
+				remove all metrics that have not been updated in the given time.
 				This value must be positive.
 				"""
-			warnings: ["Deprecated, please use `expire_metrics_secs` instead."]
 			required: false
-			type: float: {
-				default: null
-				examples: [60.0]
-				unit: "seconds"
+			warnings: ["Deprecated, please use `expire_metrics_secs` instead."]
+			type: object: options: {
+				secs: {
+					common:      true
+					required:    false
+					description: "The whole number of seconds after which to expire metrics."
+					type: uint: {
+						default: null
+						examples: [60]
+						unit: "seconds"
+					}
+				}
+				nsecs: {
+					common:      true
+					required:    false
+					description: "The fractional number of seconds after which to expire metrics."
+					type: uint: {
+						default: null
+						examples: [0]
+						unit: "nanoseconds"
+					}
+				}
 			}
 		}
 
@@ -59,6 +76,11 @@ configuration: {
 				If set, Vector will configure the internal metrics system to automatically
 				remove all metrics that have not been updated in the given number of seconds.
 				This value must be positive.
+
+				Note that internal counters that are expired but are later updated will have
+				their values reset to zero.
+				Be careful to set this value high enough to avoid
+				expiring critical but infrequently updated internal counters.
 				"""
 			required: false
 			type: float: {
@@ -86,6 +108,18 @@ configuration: {
 				"""
 			required:    false
 			type: object: options: {
+				type: {
+					description: """
+						Determines the type of enrichment data that is to be loaded.
+						"""
+					required: true
+					type: string: {
+						enum: {
+							"file":  "Enrich data from a CSV file."
+							"geoip": "Enrich data from a [MaxMind](\(urls.maxmind)) database."
+						}
+					}
+				}
 				file: {
 					required:    true
 					description: "Configuration options for the file that provides the enrichment table."

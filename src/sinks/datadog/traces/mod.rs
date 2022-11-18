@@ -11,13 +11,13 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
+pub(crate) mod apm_stats;
 mod config;
 mod request_builder;
 mod service;
 mod sink;
-mod stats;
 
-#[allow(warnings)]
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }

@@ -38,7 +38,7 @@ pub enum Error {
     /// byte messages.
     FramingError(BoxedFramingError),
     /// The error occurred while parsing structured events from a byte frame.
-    ParsingError(vector_core::Error),
+    ParsingError(vector_common::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -383,7 +383,7 @@ impl format::Deserializer for Deserializer {
         &self,
         bytes: Bytes,
         log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         match self {
             Deserializer::Bytes(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Json(deserializer) => deserializer.parse(bytes, log_namespace),

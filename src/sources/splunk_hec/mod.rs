@@ -14,6 +14,7 @@ use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
@@ -65,7 +66,7 @@ pub struct SplunkConfig {
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
     #[configurable(deprecated)]
-    token: Option<String>,
+    token: Option<SensitiveString>,
 
     /// Optional list of valid authorization tokens.
     ///
@@ -73,7 +74,7 @@ pub struct SplunkConfig {
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
-    valid_tokens: Option<Vec<String>>,
+    valid_tokens: Option<Vec<SensitiveString>>,
 
     /// Whether or not to forward the Splunk HEC authentication token with events.
     ///
@@ -183,7 +184,7 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
-        let acknowledgements = cx.do_acknowledgements(&config.acknowledgements.inner);
+        let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
         let shutdown = cx.shutdown;
         let valid_tokens = config
             .valid_tokens
@@ -200,7 +201,7 @@ impl SplunkSource {
 
         SplunkSource {
             valid_credentials: valid_tokens
-                .map(|token| format!("Splunk {}", token))
+                .map(|token| format!("Splunk {}", token.inner()))
                 .collect(),
             protocol,
             idx_ack,
@@ -992,6 +993,7 @@ mod tests {
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
+    use vector_common::sensitive_string::SensitiveString;
     use vector_core::event::EventStatus;
 
     use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
@@ -1008,7 +1010,10 @@ mod tests {
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
             collect_n,
-            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            components::{
+                assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
+                HTTP_PUSH_SOURCE_TAGS,
+            },
             next_addr, wait_for_tcp,
         },
         SourceSender,
@@ -1026,11 +1031,11 @@ mod tests {
     async fn source(
         acknowledgements: Option<HecAcknowledgementsConfig>,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
-        source_with(Some(TOKEN.to_owned()), None, acknowledgements, false).await
+        source_with(Some(TOKEN.to_owned().into()), None, acknowledgements, false).await
     }
 
     async fn source_with(
-        token: Option<String>,
+        token: Option<SensitiveString>,
         valid_tokens: Option<&[&str]>,
         acknowledgements: Option<HecAcknowledgementsConfig>,
         store_hec_token: bool,
@@ -1038,7 +1043,7 @@ mod tests {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =
-            valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
+            valid_tokens.map(|tokens| tokens.iter().map(|v| v.to_string().into()).collect());
         let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             SplunkConfig {
@@ -1065,7 +1070,7 @@ mod tests {
         compression: Compression,
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
-            default_token: TOKEN.to_owned(),
+            default_token: TOKEN.to_owned().into(),
             endpoint: format!("http://{}", address),
             host_key: "host".to_owned(),
             indexed_fields: vec![],
@@ -1080,6 +1085,7 @@ mod tests {
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
             timestamp_key: timestamp_key(),
+            auto_extract_timestamp: None,
             endpoint_target: Default::default(),
         }
         .build(SinkContext::new_test())
@@ -1501,16 +1507,19 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_token() {
-        let (_source, address) = source(None).await;
-        let opts = SendWithOpts {
-            channel: Some(Channel::Header("channel")),
-            forwarded_for: None,
-        };
+        assert_source_error(&COMPONENT_ERROR_TAGS, async {
+            let (_source, address) = source(None).await;
+            let opts = SendWithOpts {
+                channel: Some(Channel::Header("channel")),
+                forwarded_for: None,
+            };
 
-        assert_eq!(
-            401,
-            send_with(address, "services/collector/event", "", "nope", &opts).await
-        );
+            assert_eq!(
+                401,
+                send_with(address, "services/collector/event", "", "nope", &opts).await
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -1854,7 +1863,7 @@ mod tests {
     #[tokio::test]
     async fn ack_json_event() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (source, address) = source(Some(ack_config)).await;
@@ -1899,7 +1908,7 @@ mod tests {
     #[tokio::test]
     async fn ack_raw_event() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (source, address) = source(Some(ack_config)).await;
@@ -1944,7 +1953,7 @@ mod tests {
     #[tokio::test]
     async fn ack_repeat_ack_query() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (source, address) = source(Some(ack_config)).await;
@@ -2000,7 +2009,7 @@ mod tests {
     #[tokio::test]
     async fn ack_exceed_max_number_of_ack_channels() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -2036,7 +2045,7 @@ mod tests {
     #[tokio::test]
     async fn ack_exceed_max_pending_acks_per_channel() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_pending_acks_per_channel: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -2111,7 +2120,7 @@ mod tests {
     async fn event_service_acknowledgements_enabled_channel_required() {
         let message = r#"{"event":"first", "color": "blue"}"#;
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (_, address) = source(Some(ack_config)).await;

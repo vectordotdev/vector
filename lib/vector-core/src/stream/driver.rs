@@ -1,11 +1,11 @@
-use std::{collections::VecDeque, fmt, task::Poll};
+use std::{collections::VecDeque, fmt, future::poll_fn, task::Poll};
 
 use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::BytesSent;
+use vector_common::internal_event::{BytesSent, CallError, CountByteSize, PollReadyError};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 
 use super::FuturesUnorderedCount;
 use crate::{
@@ -15,8 +15,11 @@ use crate::{
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
-    fn events_sent(&self) -> EventsSent;
+    fn events_sent(&self) -> CountByteSize;
 
+    /// Return a tuple containing the number of bytes that were sent in the
+    /// request that returned this response together with the protocol the
+    /// bytes were sent over.
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
     fn bytes_sent(&self) -> Option<(usize, &str)> {
@@ -51,7 +54,7 @@ impl<St, Svc> Driver<St, Svc> {
 impl<St, Svc> Driver<St, Svc>
 where
     St: Stream,
-    St::Item: Finalizable,
+    St::Item: Finalizable + MetaDescriptive,
     Svc: Service<St::Item>,
     Svc::Error: fmt::Debug + 'static,
     Svc::Future: Send + 'static,
@@ -119,8 +122,8 @@ where
 
                         let svc = match maybe_ready {
                             Poll::Ready(Ok(())) => &mut service,
-                            Poll::Ready(Err(err)) => {
-                                error!(message = "Service return error from `poll_ready()`.", ?err);
+                            Poll::Ready(Err(error)) => {
+                                emit(PollReadyError{ error });
                                 return Err(())
                             }
                             Poll::Pending => {
@@ -140,9 +143,11 @@ where
                         );
                         let finalizers = req.take_finalizers();
 
+                        let metadata = req.get_metadata();
+
                         let fut = svc.call(req)
                             .err_into()
-                            .map(move |result| Self::handle_response(result, request_id, finalizers))
+                            .map(move |result| Self::handle_response(result, request_id, finalizers, &metadata))
                             .instrument(info_span!("request", request_id).or_current());
 
                         in_flight.push(fut);
@@ -165,10 +170,11 @@ where
         result: Result<Svc::Response, Svc::Error>,
         request_id: usize,
         finalizers: EventFinalizers,
+        metadata: &RequestMetadata,
     ) {
         match result {
             Err(error) => {
-                error!(message = "Service call failed.", ?error, request_id);
+                Self::emit_call_error(Some(error), request_id, metadata.event_count());
                 finalizers.update_status(EventStatus::Rejected);
             }
             Ok(response) => {
@@ -181,11 +187,31 @@ where
                             protocol: protocol.to_string().into(),
                         });
                     }
-                    emit(response.events_sent());
+                    let cbs = response.events_sent();
+                    emit(EventsSent {
+                        count: cbs.0,
+                        byte_size: cbs.1,
+                        output: None,
+                    });
+
+                // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
+                } else if response.event_status() == EventStatus::Rejected {
+                    Self::emit_call_error(None, request_id, metadata.event_count());
+                    finalizers.update_status(EventStatus::Rejected);
                 }
             }
         };
         drop(finalizers); // suppress "argument not consumed" warning
+    }
+
+    /// Emit the `Error` and `EventsDropped` internal events.
+    /// This scenario occurs after retries have been attempted.
+    fn emit_call_error(error: Option<Svc::Error>, request_id: usize, count: usize) {
+        emit(CallError {
+            error,
+            request_id,
+            count,
+        });
     }
 }
 
@@ -195,11 +221,11 @@ mod tests {
         future::Future,
         pin::Pin,
         sync::{atomic::AtomicUsize, atomic::Ordering, Arc},
-        task::{Context, Poll},
+        task::{ready, Context, Poll},
         time::Duration,
     };
 
-    use futures_util::{ready, stream};
+    use futures_util::stream;
     use rand::{prelude::StdRng, SeedableRng};
     use rand_distr::{Distribution, Pareto};
     use tokio::{
@@ -208,17 +234,18 @@ mod tests {
     };
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
-    use vector_common::finalization::{
-        BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+    use vector_common::{
+        finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
+        request_metadata::RequestMetadata,
     };
-    use vector_common::internal_event::EventsSent;
+    use vector_common::{internal_event::CountByteSize, request_metadata::MetaDescriptive};
 
     use super::{Driver, DriverResponse};
 
     type Counter = Arc<AtomicUsize>;
 
     #[derive(Debug)]
-    struct DelayRequest(usize, EventFinalizers);
+    struct DelayRequest(usize, EventFinalizers, RequestMetadata);
 
     impl DelayRequest {
         fn new(value: usize, counter: &Counter) -> Self {
@@ -228,13 +255,23 @@ mod tests {
                 receiver.await;
                 counter.fetch_add(value, Ordering::Relaxed);
             });
-            Self(value, EventFinalizers::new(EventFinalizer::new(batch)))
+            Self(
+                value,
+                EventFinalizers::new(EventFinalizer::new(batch)),
+                RequestMetadata::default(),
+            )
         }
     }
 
     impl Finalizable for DelayRequest {
         fn take_finalizers(&mut self) -> crate::event::EventFinalizers {
             std::mem::take(&mut self.1)
+        }
+    }
+
+    impl MetaDescriptive for DelayRequest {
+        fn get_metadata(&self) -> RequestMetadata {
+            self.2
         }
     }
 
@@ -245,12 +282,8 @@ mod tests {
             EventStatus::Delivered
         }
 
-        fn events_sent(&self) -> EventsSent {
-            EventsSent {
-                count: 1,
-                byte_size: 1,
-                output: None,
-            }
+        fn events_sent(&self) -> CountByteSize {
+            CountByteSize(1, 1)
         }
     }
 

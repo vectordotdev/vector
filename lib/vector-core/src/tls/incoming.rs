@@ -267,7 +267,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
         loop {
             return match &mut this.state {
                 StreamState::Accepted(stream) => poll_fn(Pin::new(stream), cx),
-                StreamState::Accepting(fut) => match futures::ready!(fut.as_mut().poll(cx)) {
+                StreamState::Accepting(fut) => match std::task::ready!(fut.as_mut().poll(cx)) {
                     Ok(stream) => {
                         this.state = StreamState::Accepted(MaybeTlsStream::Tls(stream));
                         continue;
@@ -316,7 +316,7 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
                 }
                 poll_result => poll_result,
             },
-            StreamState::Accepting(fut) => match futures::ready!(fut.as_mut().poll(cx)) {
+            StreamState::Accepting(fut) => match std::task::ready!(fut.as_mut().poll(cx)) {
                 Ok(stream) => {
                     this.state = StreamState::Accepted(MaybeTlsStream::Tls(stream));
                     Poll::Pending

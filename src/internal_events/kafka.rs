@@ -1,7 +1,7 @@
 use metrics::{counter, gauge};
 use vector_core::{internal_event::InternalEvent, update_counter};
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct KafkaBytesReceived<'a> {
@@ -72,6 +72,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
             error_code = "kafka_offset_update",
             error_type = error_type::READER_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -97,6 +98,7 @@ impl InternalEvent for KafkaReadError {
             error_code = "reading_message",
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -162,6 +164,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
             header_field = self.header_field,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

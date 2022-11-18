@@ -9,7 +9,7 @@ use crate::{
         metrics::{self, IntoSinkMetrics},
         sort,
     },
-    config::{ComponentKey, OutputId},
+    config::{ComponentKey, Inputs, OutputId},
     filter_check,
 };
 
@@ -17,7 +17,7 @@ use crate::{
 pub struct Data {
     pub component_key: ComponentKey,
     pub component_type: String,
-    pub inputs: Vec<OutputId>,
+    pub inputs: Inputs<OutputId>,
 }
 
 #[derive(Debug, Clone)]
@@ -129,17 +129,17 @@ mod tests {
             Sink(Data {
                 component_key: ComponentKey::from("webserver"),
                 component_type: "http".to_string(),
-                inputs: vec![],
+                inputs: Inputs::default(),
             }),
             Sink(Data {
                 component_key: ComponentKey::from("db"),
                 component_type: "clickhouse".to_string(),
-                inputs: vec![],
+                inputs: Inputs::default(),
             }),
             Sink(Data {
                 component_key: ComponentKey::from("zip_drive"),
                 component_type: "file".to_string(),
-                inputs: vec![],
+                inputs: Inputs::default(),
             }),
         ]
     }

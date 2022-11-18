@@ -1,8 +1,11 @@
-use std::{collections::HashMap, pin::Pin};
+use std::{collections::HashMap, error, pin::Pin};
 
 use futures::{Stream, StreamExt};
-use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
-use vector_common::EventDataEq;
+use vector_common::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
+    internal_event::{emit, EventsSent, DEFAULT_OUTPUT},
+    EventDataEq,
+};
 
 use crate::{
     config::Output,
@@ -252,32 +255,47 @@ impl TransformOutputs {
         TransformOutputsBuf::new_with_capacity(self.outputs_spec.clone(), capacity)
     }
 
-    pub async fn send(&mut self, buf: &mut TransformOutputsBuf) {
+    /// Sends the events in the buffer to their respective outputs.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs while sending events to their respective output, an error variant will be
+    /// returned detailing the cause.
+    pub async fn send(
+        &mut self,
+        buf: &mut TransformOutputsBuf,
+    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         if let Some(primary) = self.primary_output.as_mut() {
             let count = buf.primary_buffer.as_ref().map_or(0, OutputBuffer::len);
-            let byte_size = buf.primary_buffer.as_ref().map_or(0, ByteSizeOf::size_of);
+            let byte_size = buf.primary_buffer.as_ref().map_or(
+                0,
+                EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of,
+            );
             buf.primary_buffer
                 .as_mut()
                 .expect("mismatched outputs")
                 .send(primary)
-                .await;
+                .await?;
             emit(EventsSent {
                 count,
                 byte_size,
                 output: Some(DEFAULT_OUTPUT),
             });
         }
+
         for (key, buf) in &mut buf.named_buffers {
             let count = buf.len();
-            let byte_size = buf.size_of();
+            let byte_size = buf.estimated_json_encoded_size_of();
             buf.send(self.named_outputs.get_mut(key).expect("unknown output"))
-                .await;
+                .await?;
             emit(EventsSent {
                 count,
                 byte_size,
                 output: Some(key.as_ref()),
             });
         }
+
+        Ok(())
     }
 }
 
@@ -453,10 +471,15 @@ impl OutputBuffer {
         self.0.drain(..).flat_map(EventArray::into_events)
     }
 
-    async fn send(&mut self, output: &mut Fanout) {
+    async fn send(
+        &mut self,
+        output: &mut Fanout,
+    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         for array in std::mem::take(&mut self.0) {
-            output.send(array).await;
+            output.send(array).await?;
         }
+
+        Ok(())
     }
 
     fn iter_events(&self) -> impl Iterator<Item = EventRef> {
@@ -485,6 +508,15 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
         }
 
         self.iter_events().map(Comparator).eq(other.iter())
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for OutputBuffer {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0
+            .iter()
+            .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
+            .sum()
     }
 }
 

@@ -34,8 +34,10 @@ parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
 vector-common = { path = "../../vector-common", default-features = false, features = ["conversion", "serde"] }
 vector-config = { path = "../../vector-config" }
+vector-config-common = { path = "../../vector-config-common" }
 vector-config-macros = { path = "../../vector-config-macros" }
 value = { path = "../../value" }
+getrandom = { version = "0.2", features = ["js"] }
 
 bytes = { version = "1.2.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
@@ -49,7 +51,7 @@ thiserror ={ version =  "1", default-features = false }
 anymap = { version = "0.12.1", default-features = false }
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.4"
 indoc = "1"
 vector-common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 

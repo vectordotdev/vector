@@ -48,9 +48,9 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub(crate) async fn send(&mut self, item: T) -> Result<(), ()> {
+    pub(crate) async fn send(&mut self, item: T) -> crate::Result<()> {
         match self {
-            Self::InMemory(tx) => tx.send(item).await.map_err(|_| ()),
+            Self::InMemory(tx) => tx.send(item).await.map_err(Into::into),
             Self::DiskV1(writer) => {
                 writer.send(item).await;
                 Ok(())
@@ -58,17 +58,21 @@ where
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
-                if let Err(e) = writer.write_record(item).await {
-                    // Can't really do much except panic here. :sweat:
-                    panic!("writer hit unrecoverable error during write: {}", e);
-                }
+                writer.write_record(item).await.map(|_| ()).map_err(|e| {
+                    // TODO: Could some errors be handled and not be unrecoverable? Right now,
+                    // encoding should theoretically be recoverable -- encoded value was too big, or
+                    // error during encoding -- but the traits don't allow for recovering the
+                    // original event value because we have to consume it to do the encoding... but
+                    // that might not always be the case.
+                    error!("Disk buffer writer has encountered an unrecoverable error.");
 
-                Ok(())
+                    e.into()
+                })
             }
         }
     }
 
-    pub(crate) async fn try_send(&mut self, item: T) -> Result<Option<T>, ()> {
+    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<Option<T>> {
         match self {
             Self::InMemory(tx) => tx
                 .try_send(item)
@@ -78,27 +82,21 @@ where
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
-                match writer.try_write_record(item).await {
-                    Ok(item) => match item {
-                        None => {
-                            if let Err(e) = writer.flush().await {
-                                // Can't really do much except panic here. :sweat:
-                                panic!("writer hit unrecoverable error during flush: {}", e);
-                            }
-                            Ok(None)
-                        }
-                        Some(item) => Ok(Some(item)),
-                    },
-                    Err(e) => {
-                        // Can't really do much except panic here. :sweat:
-                        panic!("writer hit unrecoverable error during write: {}", e);
-                    }
-                }
+                writer.try_write_record(item).await.map_err(|e| {
+                    // TODO: Could some errors be handled and not be unrecoverable? Right now,
+                    // encoding should theoretically be recoverable -- encoded value was too big, or
+                    // error during encoding -- but the traits don't allow for recovering the
+                    // original event value because we have to consume it to do the encoding... but
+                    // that might not always be the case.
+                    error!("Disk buffer writer has encountered an unrecoverable error.");
+
+                    e.into()
+                })
             }
         }
     }
 
-    pub(crate) async fn flush(&mut self) -> Result<(), ()> {
+    pub(crate) async fn flush(&mut self) -> crate::Result<()> {
         match self {
             Self::InMemory(_) => Ok(()),
             Self::DiskV1(writer) => {
@@ -107,13 +105,12 @@ where
             }
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
+                writer.flush().await.map_err(|e| {
+                    // Errors on the I/O path, which is all that flushing touches, are never recoverable.
+                    error!("Disk buffer writer has encountered an unrecoverable error.");
 
-                if let Err(e) = writer.flush().await {
-                    // Can't really do much except panic here. :sweat:
-                    panic!("writer hit unrecoverable error during flush: {}", e);
-                }
-
-                Ok(())
+                    e.into()
+                })
             }
         }
     }
@@ -205,7 +202,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn send(&mut self, item: T) -> Result<(), ()> {
+    pub async fn send(&mut self, item: T) -> crate::Result<()> {
         let item_sizing = self
             .instrumentation
             .as_ref()
@@ -255,7 +252,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn flush(&mut self) -> Result<(), ()> {
+    pub async fn flush(&mut self) -> crate::Result<()> {
         self.base.flush().await?;
         if let Some(overflow) = self.overflow.as_mut() {
             overflow.flush().await?;

@@ -1,16 +1,17 @@
 use std::collections::HashMap;
-use std::time::SystemTime;
 
-use aws_sigv4::http_request::{SignableRequest, SigningSettings};
-use aws_sigv4::SigningParams;
-use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
+use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
-use bytes::Bytes;
-use http::{StatusCode, Uri};
+use bytes::{Buf, Bytes};
+use http::{Response, StatusCode, Uri};
+use hyper::{body, Body};
+use serde::Deserialize;
 use snafu::ResultExt;
+use vector_core::config::proxy::ProxyConfig;
 
 use super::{
-    request_builder::ElasticsearchRequestBuilder, ElasticsearchEncoder, InvalidHostSnafu, Request,
+    request_builder::ElasticsearchRequestBuilder, ElasticsearchApiVersion, ElasticsearchEncoder,
+    InvalidHostSnafu, Request,
 };
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
@@ -25,7 +26,7 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ElasticsearchCommon {
     pub base_url: String,
     pub bulk_uri: Uri,
@@ -41,15 +42,20 @@ pub struct ElasticsearchCommon {
 }
 
 impl ElasticsearchCommon {
-    pub async fn parse_config(config: &ElasticsearchConfig) -> crate::Result<Self> {
+    pub async fn parse_config(
+        config: &ElasticsearchConfig,
+        endpoint: &str,
+        proxy_config: &ProxyConfig,
+        version: &mut Option<usize>,
+    ) -> crate::Result<Self> {
         // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", &config.endpoint);
-        let uri = uri.parse::<Uri>().with_context(|_| InvalidHostSnafu {
-            host: &config.endpoint,
-        })?;
+        let uri = format!("{}/_test", endpoint);
+        let uri = uri
+            .parse::<Uri>()
+            .with_context(|_| InvalidHostSnafu { host: endpoint })?;
         if uri.host().is_none() {
             return Err(ParseError::HostMustIncludeHostname {
-                host: config.endpoint.clone(),
+                host: endpoint.to_string(),
             }
             .into());
         }
@@ -61,7 +67,7 @@ impl ElasticsearchCommon {
             }),
             _ => None,
         };
-        let uri = config.endpoint.parse::<UriSerde>()?;
+        let uri = endpoint.parse::<UriSerde>()?;
         let http_auth = authorization.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
@@ -81,16 +87,6 @@ impl ElasticsearchCommon {
 
         let mode = config.common_mode()?;
 
-        let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
-        let request_builder = ElasticsearchRequestBuilder {
-            compression: config.compression,
-            encoder: ElasticsearchEncoder {
-                transformer: config.encoding.clone(),
-                doc_type,
-                suppress_type_name: config.suppress_type_name,
-            },
-        };
-
         let tower_request = config
             .request
             .tower
@@ -106,11 +102,13 @@ impl ElasticsearchCommon {
             query_params.insert("pipeline".into(), pipeline.into());
         }
 
-        let mut query = url::form_urlencoded::Serializer::new(String::new());
-        for (p, v) in &query_params {
-            query.append_pair(&p[..], &v[..]);
-        }
-        let bulk_url = format!("{}/_bulk?{}", base_url, query.finish());
+        let bulk_url = {
+            let mut query = url::form_urlencoded::Serializer::new(String::new());
+            for (p, v) in &query_params {
+                query.append_pair(&p[..], &v[..]);
+            }
+            format!("{}/_bulk?{}", base_url, query.finish())
+        };
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
@@ -124,6 +122,60 @@ impl ElasticsearchCommon {
         );
 
         let region = config.aws.as_ref().and_then(|config| config.region());
+
+        let version = if let Some(version) = *version {
+            version
+        } else {
+            let ver = match config.api_version {
+                ElasticsearchApiVersion::V6 => 6,
+                ElasticsearchApiVersion::V7 => 7,
+                ElasticsearchApiVersion::V8 => 8,
+                ElasticsearchApiVersion::Auto => {
+                    match get_version(
+                        &base_url,
+                        &http_auth,
+                        &aws_auth,
+                        &region,
+                        &request,
+                        &tls_settings,
+                        proxy_config,
+                    )
+                    .await
+                    {
+                        Ok(version) => version,
+                        // This error should be fatal, but for now we only emit it as a warning
+                        // to make the transition smoother.
+                        Err(error) => {
+                            // For now, estimate version.
+                            let assumed_version = match config.suppress_type_name {
+                                Some(true) => 8,
+                                _ => 6,
+                            };
+                            warn!(message = "Failed to determine Elasticsearch version from `/_cluster/state/version`. Please fix the reported error or set an API version explicitly via `api_version`.",%assumed_version, %error);
+                            assumed_version
+                        }
+                    }
+                }
+            };
+            *version = Some(ver);
+            ver
+        };
+
+        let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
+        let suppress_type_name = if let Some(suppress_type_name) = config.suppress_type_name {
+            warn!(message = "DEPRECATION, use of deprecated option `suppress_type_name`. Please use `api_version` option instead.");
+            suppress_type_name
+        } else {
+            version >= 7
+        };
+        let request_builder = ElasticsearchRequestBuilder {
+            compression: config.compression,
+            encoder: ElasticsearchEncoder {
+                transformer: config.encoding.clone(),
+                doc_type,
+                suppress_type_name,
+            },
+        };
 
         Ok(Self {
             http_auth,
@@ -140,25 +192,55 @@ impl ElasticsearchCommon {
         })
     }
 
+    /// Parses endpoints into a vector of ElasticsearchCommons. The resulting vector is guaranteed to not be empty.
+    pub async fn parse_many(
+        config: &ElasticsearchConfig,
+        proxy_config: &ProxyConfig,
+    ) -> crate::Result<Vec<Self>> {
+        let mut version = None;
+        if let Some(endpoint) = config.endpoint.as_ref() {
+            warn!(message = "DEPRECATION, use of deprecated option `endpoint`. Please use `endpoints` option instead.");
+            if config.endpoints.is_empty() {
+                Ok(vec![
+                    Self::parse_config(config, endpoint, proxy_config, &mut version).await?,
+                ])
+            } else {
+                Err(ParseError::EndpointsExclusive.into())
+            }
+        } else if config.endpoints.is_empty() {
+            Err(ParseError::EndpointRequired.into())
+        } else {
+            let mut commons = Vec::new();
+            for endpoint in config.endpoints.iter() {
+                commons
+                    .push(Self::parse_config(config, endpoint, proxy_config, &mut version).await?);
+            }
+            Ok(commons)
+        }
+    }
+
+    /// Parses a single endpoint, else panics.
+    #[cfg(test)]
+    pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
+        let mut commons =
+            Self::parse_many(config, crate::config::SinkContext::new_test().proxy()).await?;
+        assert_eq!(commons.len(), 1);
+        Ok(commons.remove(0))
+    }
+
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
-        let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
-
-        if let Some(authorization) = &self.http_auth {
-            builder = authorization.apply_builder(builder);
-        }
-
-        for (header, value) in &self.request.headers {
-            builder = builder.header(&header[..], &value[..]);
-        }
-
-        let mut request = builder.body(Bytes::new())?;
-
-        if let Some(credentials_provider) = &self.aws_auth {
-            sign_request(&mut request, credentials_provider, &self.region).await?;
-        }
-        let response = client.send(request.map(hyper::Body::from)).await?;
-
-        match response.status() {
+        match get(
+            &self.base_url,
+            &self.http_auth,
+            &self.aws_auth,
+            &self.region,
+            &self.request,
+            client,
+            "/_cluster/health",
+        )
+        .await?
+        .status()
+        {
             StatusCode::OK => Ok(()),
             status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
         }
@@ -170,22 +252,69 @@ pub async fn sign_request(
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
-    let signable_request = SignableRequest::from(&*request);
-    let credentials = credentials_provider.provide_credentials().await?;
-    let mut signing_params_builder = SigningParams::builder()
-        .access_key(credentials.access_key_id())
-        .secret_key(credentials.secret_access_key())
-        .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
-        .service_name("es")
-        .time(SystemTime::now())
-        .settings(SigningSettings::default());
+    crate::aws::sign_request("es", request, credentials_provider, region).await
+}
 
-    signing_params_builder.set_security_token(credentials.session_token());
+async fn get_version(
+    base_url: &str,
+    http_auth: &Option<Auth>,
+    aws_auth: &Option<SharedCredentialsProvider>,
+    region: &Option<Region>,
+    request: &RequestConfig,
+    tls_settings: &TlsSettings,
+    proxy_config: &ProxyConfig,
+) -> crate::Result<usize> {
+    #[derive(Deserialize)]
+    struct ClusterState {
+        version: Option<usize>,
+    }
 
-    let (signing_instructions, _signature) =
-        aws_sigv4::http_request::sign(signable_request, &signing_params_builder.build()?)?
-            .into_parts();
-    signing_instructions.apply_to_request(request);
+    let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
+    let response = get(
+        base_url,
+        http_auth,
+        aws_auth,
+        region,
+        request,
+        client,
+        "/_cluster/state/version",
+    )
+    .await
+    .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;
 
-    Ok(())
+    let (_, body) = response.into_parts();
+    let mut body = body::aggregate(body).await?;
+    let body = body.copy_to_bytes(body.remaining());
+    let ClusterState { version } = serde_json::from_slice(&body)?;
+    version.ok_or_else(||"Unexpected response from Elasticsearch endpoint `/_cluster/state/version`. Missing `version`. Consider setting `api_version` option.".into())
+}
+
+async fn get(
+    base_url: &str,
+    http_auth: &Option<Auth>,
+    aws_auth: &Option<SharedCredentialsProvider>,
+    region: &Option<Region>,
+    request: &RequestConfig,
+    client: HttpClient,
+    path: &str,
+) -> crate::Result<Response<Body>> {
+    let mut builder = Request::get(format!("{}{}", base_url, path));
+
+    if let Some(authorization) = &http_auth {
+        builder = authorization.apply_builder(builder);
+    }
+
+    for (header, value) in &request.headers {
+        builder = builder.header(&header[..], &value[..]);
+    }
+
+    let mut request = builder.body(Bytes::new())?;
+
+    if let Some(credentials_provider) = aws_auth {
+        sign_request(&mut request, credentials_provider, region).await?;
+    }
+    client
+        .send(request.map(hyper::Body::from))
+        .await
+        .map_err(Into::into)
 }

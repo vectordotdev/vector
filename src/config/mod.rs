@@ -9,7 +9,9 @@ use std::{
 use indexmap::IndexMap;
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 use vector_config::configurable_component;
-pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
+pub use vector_core::config::{
+    AcknowledgementsConfig, DataType, GlobalOptions, Input, Output, SourceAcknowledgementsConfig,
+};
 
 use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 
@@ -41,7 +43,7 @@ pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, OutputId};
+pub use id::{ComponentKey, Inputs, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
     load_from_str, load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
@@ -100,7 +102,7 @@ pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub schema: schema::Options,
-    pub version: Option<String>,
+    pub hash: Option<String>,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,
@@ -146,8 +148,8 @@ impl Config {
     pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
         self.transforms
             .get(id)
-            .map(|t| t.inputs.as_slice())
-            .or_else(|| self.sinks.get(id).map(|s| s.inputs.as_slice()))
+            .map(|t| &t.inputs[..])
+            .or_else(|| self.sinks.get(id).map(|s| &s.inputs[..]))
     }
 
     /// Expand a logical component id (i.e. from the config file) into the ids of the
@@ -933,8 +935,8 @@ mod tests {
                           [[tests.outputs]]
                             extract_from = "foo"
                             [[tests.outputs.conditions]]
-                              type = "check_fields"
-                              "message.equals" = "Sorry, I'm busy this week Cecil"
+                              type = "vrl"
+                              source = ".message == \"Sorry, I'm busy this week Cecil\""
                     "#},
                     Format::Toml,
                 )
@@ -1232,10 +1234,13 @@ mod acknowledgements_tests {
                 data_dir = "/tmp"
                 [sources.in1]
                     type = "file"
+                    include = ["/var/log/**/*.log"]
                 [sources.in2]
                     type = "file"
+                    include = ["/var/log/**/*.log"]
                 [sources.in3]
                     type = "file"
+                    include = ["/var/log/**/*.log"]
                 [transforms.parse3]
                     type = "test_basic"
                     inputs = ["in3"]

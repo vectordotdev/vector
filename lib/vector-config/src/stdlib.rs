@@ -6,17 +6,20 @@ use std::{
         NonZeroU8, NonZeroUsize,
     },
     path::PathBuf,
+    time::Duration,
 };
 
+use indexmap::IndexMap;
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 use serde::Serialize;
-use vector_config_common::validation::Validation;
+use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::{
+    num::ConfigurableNumber,
     schema::{
         assert_string_schema_for_map, generate_array_schema, generate_bool_schema,
-        generate_map_schema, generate_number_schema, generate_optional_schema, generate_set_schema,
-        generate_string_schema,
+        generate_map_schema, generate_number_schema, generate_set_schema, generate_string_schema,
+        get_or_generate_schema,
     },
     str::ConfigurableString,
     Configurable, GenerateError, Metadata,
@@ -47,14 +50,14 @@ where
         // Said another way, this allows callers to use `#[configurable(derived)]` on a field of `Option<T>` so long as
         // `T` has a description, and both the optional field and the schema for `T` will get the description... but the
         // description for the optional field can still be overridden independently, etc.
-        T::metadata().convert()
+        T::metadata().convert().as_subschema()
     }
 
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         let mut inner_metadata = T::metadata();
         inner_metadata.set_transparent();
 
-        generate_optional_schema(gen, inner_metadata)
+        get_or_generate_schema(gen, inner_metadata)
     }
 }
 
@@ -74,9 +77,6 @@ impl Configurable for String {
 impl Configurable for char {
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
         metadata.add_validation(Validation::Length {
             minimum: Some(1),
             maximum: Some(1),
@@ -94,6 +94,14 @@ macro_rules! impl_configuable_numeric {
 	($($ty:ty),+) => {
 		$(
 			impl Configurable for $ty {
+                fn metadata() -> Metadata<Self> {
+                    let mut metadata = Metadata::default();
+                    let numeric_type = <Self as ConfigurableNumber>::class();
+                    metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", numeric_type));
+
+                    metadata
+                }
+
                 fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
                     $crate::__ensure_numeric_validation_bounds::<Self>(metadata)
                 }
@@ -202,8 +210,10 @@ impl Configurable for SocketAddr {
         Some("stdlib::SocketAddr")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("An internet socket address, either IPv4 or IPv6.")
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description("An internet socket address, either IPv4 or IPv6.");
+        metadata
     }
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
@@ -219,15 +229,9 @@ impl Configurable for PathBuf {
         Some("stdlib::PathBuf")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("A file path.")
-    }
-
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
+        metadata.set_description("A file path.");
 
         // Taken from
         // https://stackoverflow.com/questions/44289075/regular-expression-to-validate-windows-and-linux-path-with-extension
@@ -241,5 +245,32 @@ impl Configurable for PathBuf {
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
+    }
+}
+
+// The use of `Duration` is deprecated and will be removed in a future version
+impl Configurable for Duration {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("stdlib::Duration")
+    }
+
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description("An duration of time.");
+        metadata
+    }
+
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        let mut properties = IndexMap::default();
+        properties.insert("secs".into(), generate_number_schema::<u64>());
+        properties.insert("nsecs".into(), generate_number_schema::<u32>());
+
+        let mut required = BTreeSet::default();
+        required.insert("secs".into());
+        required.insert("nsecs".into());
+
+        Ok(crate::schema::generate_struct_schema(
+            properties, required, None,
+        ))
     }
 }

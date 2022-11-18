@@ -55,7 +55,7 @@ Examples of Orchestration Platform targets include, but are not limited to:
 
 ## 3. Deployment Architectures
 
-When supporting a target, Vector must support them through the the paradigm of
+When supporting a target, Vector must support them through the paradigm of
 architectures:
 
 - Targets MUST support the [agent architecture][agent_architecture] by

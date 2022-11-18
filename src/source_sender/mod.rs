@@ -11,7 +11,7 @@ use vector_core::{
     config::{log_schema, Output},
     event::{array, Event, EventArray, EventContainer, EventRef},
     internal_event::{EventsSent, DEFAULT_OUTPUT},
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 mod errors;
@@ -257,7 +257,7 @@ impl Inner {
         events
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
-        let byte_size = events.size_of();
+        let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
         self.inner.send(events).await.map_err(|_| ClosedError)?;
         emit!(EventsSent {
@@ -299,7 +299,7 @@ impl Inner {
                 .iter_events()
                 .for_each(|event| self.emit_lag_time(event, reference));
             let this_count = events.len();
-            let this_size = events.size_of();
+            let this_size = events.estimated_json_encoded_size_of();
             match self.inner.send(events).await {
                 Ok(()) => {
                     count += this_count;
@@ -403,7 +403,7 @@ mod tests {
     }
 
     async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
-        let _ = metrics::init_test();
+        metrics::init_test();
         let (mut sender, _stream) = SourceSender::new_test();
         let millis = thread_rng().gen_range(10..10000);
         let timestamp = Utc::now() - Duration::milliseconds(millis);

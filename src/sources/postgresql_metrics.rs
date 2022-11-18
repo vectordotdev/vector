@@ -1,10 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    fmt::Write as _,
-    iter,
-    path::PathBuf,
-    time::Instant,
-};
+use std::{collections::HashSet, fmt::Write as _, iter, path::PathBuf, time::Instant};
 
 use chrono::{DateTime, Utc};
 use futures::{
@@ -26,11 +20,11 @@ use tokio_postgres::{
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{metric_tags, ByteSizeOf};
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectError,
         StreamClosedError,
@@ -459,7 +453,7 @@ struct PostgresqlMetrics {
     client: PostgresqlClient,
     endpoint: String,
     namespace: Option<String>,
-    tags: BTreeMap<String, String>,
+    tags: MetricTags,
     datname_filter: DatnameFilter,
 }
 
@@ -490,9 +484,10 @@ impl PostgresqlMetrics {
             }
         };
 
-        let mut tags = BTreeMap::new();
-        tags.insert("endpoint".into(), endpoint.clone());
-        tags.insert("host".into(), host);
+        let tags = metric_tags!(
+            "endpoint" => endpoint.clone(),
+            "host" => host,
+        );
 
         Ok(Self {
             client: PostgresqlClient::new(config, tls_config),
@@ -812,12 +807,7 @@ impl PostgresqlMetrics {
         ))
     }
 
-    fn create_metric(
-        &self,
-        name: &str,
-        value: MetricValue,
-        tags: BTreeMap<String, String>,
-    ) -> Metric {
+    fn create_metric(&self, name: &str, value: MetricValue, tags: MetricTags) -> Metric {
         Metric::new(name, MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(tags))
@@ -872,7 +862,7 @@ fn config_to_endpoint(config: &Config) -> String {
         SslMode::Require => params.push(("sslmode", "require".to_string())),
         // non_exhaustive enum
         _ => {
-            warn!(r#"Unknown variant of "SslMode.""#);
+            warn!("Unknown variant of \"SslMode\".");
         }
     };
 
@@ -914,7 +904,7 @@ fn config_to_endpoint(config: &Config) -> String {
         }
         // non_exhaustive enum
         _ => {
-            warn!(r#"Unknown variant of "TargetSessionAttrs.""#);
+            warn!("Unknown variant of \"TargetSessionAttr\".");
         }
     }
 
@@ -925,7 +915,7 @@ fn config_to_endpoint(config: &Config) -> String {
         ChannelBinding::Require => params.push(("channel_binding", "require".to_owned())),
         // non_exhaustive enum
         _ => {
-            warn!(r#"Unknown variant of "ChannelBinding"."#);
+            warn!("Unknown variant of \"ChannelBinding\".");
         }
     }
 

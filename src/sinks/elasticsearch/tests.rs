@@ -5,13 +5,14 @@ use crate::{
     event::{LogEvent, Metric, MetricKind, MetricValue, Value},
     sinks::{
         elasticsearch::{
-            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchCommon,
-            ElasticsearchConfig, ElasticsearchMode,
+            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
+            ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
         },
         util::encoding::Encoder,
     },
     template::Template,
 };
+use lookup::owned_value_path;
 
 #[tokio::test]
 async fn sets_create_action_when_configured() {
@@ -24,10 +25,11 @@ async fn sets_create_action_when_configured() {
             action: Some(String::from("{{ action }}te")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert(
@@ -71,11 +73,12 @@ async fn encode_datastream_mode() {
             action: None,
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert(
@@ -112,16 +115,17 @@ async fn encode_datastream_mode_no_routing() {
             action: None,
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             auto_routing: false,
             namespace: Template::try_from("something").unwrap(),
             ..Default::default()
         }),
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
@@ -153,10 +157,11 @@ async fn handle_metrics() {
             action: Some(String::from("create")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let metric = Metric::new(
         "cpu",
@@ -194,10 +199,11 @@ async fn decode_bulk_action_error() {
             action: Some(String::from("{{ action }}")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello world");
     log.insert("foo", "bar");
@@ -213,10 +219,11 @@ async fn decode_bulk_action() {
             action: Some(String::from("create")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let log = LogEvent::from("hello there");
     let action = es.mode.bulk_action(&log).unwrap();
@@ -234,17 +241,18 @@ async fn encode_datastream_mode_no_sync() {
             action: None,
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             namespace: Template::try_from("something").unwrap(),
             sync_fields: false,
             ..Default::default()
         }),
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
 
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
@@ -283,10 +291,11 @@ async fn allows_using_except_fields() {
             None,
         )
         .unwrap(),
-        endpoint: String::from("https://example.com"),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("foo", "bar");
@@ -316,11 +325,12 @@ async fn allows_using_only_fields() {
             action: None,
             index: Some(String::from("{{ idx }}")),
         }),
-        encoding: Transformer::new(Some(vec!["foo".to_string().into()]), None, None).unwrap(),
-        endpoint: String::from("https://example.com"),
+        encoding: Transformer::new(Some(vec![owned_value_path!("foo")]), None, None).unwrap(),
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("foo", "bar");

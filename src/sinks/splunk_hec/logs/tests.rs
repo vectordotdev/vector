@@ -124,6 +124,7 @@ fn hec_encoder(encoding: EncodingConfig) -> HecLogsEncoder {
     HecLogsEncoder {
         transformer,
         encoder,
+        auto_extract_timestamp: false,
     }
 }
 
@@ -188,7 +189,7 @@ fn splunk_encode_log_event_text() {
 async fn splunk_passthrough_token() {
     let addr = next_addr();
     let config = HecLogsSinkConfig {
-        default_token: "token".into(),
+        default_token: "token".to_string().into(),
         endpoint: format!("http://{}", addr),
         host_key: "host".into(),
         indexed_fields: Vec::new(),
@@ -203,6 +204,7 @@ async fn splunk_passthrough_token() {
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
         timestamp_key: log_schema().timestamp_key().into(),
+        auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
     };
     let cx = SinkContext::new_test();

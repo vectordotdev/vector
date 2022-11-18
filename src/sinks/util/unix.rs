@@ -13,8 +13,8 @@ use crate::{
     codecs::Transformer,
     event::{Event, Finalizable},
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionError,
-        UnixSocketConnectionEstablished, UnixSocketError,
+        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
+        UnixSocketOutgoingConnectionError, UnixSocketSendError,
     },
     sink::VecSinkExt,
     sinks::{
@@ -29,8 +29,11 @@ use crate::{
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
-    #[snafu(display("Connect error: {}", source))]
-    ConnectError { source: tokio::io::Error },
+    #[snafu(display("Failed connecting to socket at path {}: {}", path.display(), source))]
+    ConnectionError {
+        source: tokio::io::Error,
+        path: PathBuf,
+    },
 }
 
 /// A Unix Domain Socket sink.
@@ -80,7 +83,11 @@ impl UnixConnector {
     }
 
     async fn connect(&self) -> Result<UnixStream, UnixError> {
-        UnixStream::connect(&self.path).await.context(ConnectSnafu)
+        UnixStream::connect(&self.path)
+            .await
+            .context(ConnectionSnafu {
+                path: self.path.clone(),
+            })
     }
 
     async fn connect_backoff(&self) -> UnixStream {
@@ -92,10 +99,7 @@ impl UnixConnector {
                     return stream;
                 }
                 Err(error) => {
-                    emit!(UnixSocketConnectionError {
-                        error,
-                        path: &self.path
-                    });
+                    emit!(UnixSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -151,6 +155,8 @@ where
 
                 let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
+
+                // Errors are handled by `Encoder`.
                 if encoder.encode(event, &mut bytes).is_ok() {
                     let item = bytes.freeze();
                     EncodedEvent {
@@ -174,7 +180,7 @@ where
             };
 
             if let Err(error) = result {
-                emit!(UnixSocketError {
+                emit!(UnixSocketSendError {
                     error: &error,
                     path: &self.connector.path
                 });
@@ -193,7 +199,10 @@ mod tests {
     use super::*;
     use crate::{
         codecs::Encoder,
-        test_util::{random_lines_with_stream, CountReceiver},
+        test_util::{
+            components::{assert_sink_compliance, SINK_TAGS},
+            random_lines_with_stream, CountReceiver,
+        },
     };
 
     fn temp_uds_path(name: &str) -> PathBuf {
@@ -248,7 +257,10 @@ mod tests {
 
         // Send the test data
         let (input_lines, events) = random_lines_with_stream(100, num_lines, None);
-        sink.run(events).await.unwrap();
+
+        assert_sink_compliance(&SINK_TAGS, async move { sink.run(events).await })
+            .await
+            .expect("Running sink failed");
 
         // Wait for output to connect
         receiver.connected().await;

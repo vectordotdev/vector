@@ -20,6 +20,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
+    filter::LevelFilter,
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
     util::SubscriberInitExt,
@@ -55,16 +56,17 @@ fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
-pub fn init(color: bool, json: bool, levels: &str) {
+pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64) {
     let fmt_filter = tracing_subscriber::filter::Targets::from_str(levels).expect(
         "logging filter targets were not formatted correctly or did not specify a valid level",
     );
 
-    let metrics_layer = metrics_layer_enabled()
-        .then(|| MetricsLayer::new().with_filter(tracing_subscriber::filter::LevelFilter::INFO));
+    let metrics_layer =
+        metrics_layer_enabled().then(|| MetricsLayer::new().with_filter(LevelFilter::INFO));
 
-    let broadcast_layer =
-        RateLimitedLayer::new(BroadcastLayer::new()).with_filter(fmt_filter.clone());
+    let broadcast_layer = RateLimitedLayer::new(BroadcastLayer::new())
+        .with_default_limit(internal_log_rate_limit)
+        .with_filter(fmt_filter.clone());
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)
@@ -79,13 +81,22 @@ pub fn init(color: bool, json: bool, levels: &str) {
         subscriber.with(console_layer)
     };
 
+    #[cfg(feature = "allocation-tracing")]
+    let subscriber = {
+        let allocation_layer = crate::internal_telemetry::allocations::AllocationLayer::new()
+            .with_filter(LevelFilter::ERROR);
+
+        subscriber.with(allocation_layer)
+    };
+
     if json {
         let formatter = tracing_subscriber::fmt::layer().json().flatten_event(true);
 
         #[cfg(test)]
         let formatter = formatter.with_test_writer();
 
-        let rate_limited = RateLimitedLayer::new(formatter);
+        let rate_limited =
+            RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let _ = subscriber.try_init();
@@ -97,7 +108,8 @@ pub fn init(color: bool, json: bool, levels: &str) {
         #[cfg(test)]
         let formatter = formatter.with_test_writer();
 
-        let rate_limited = RateLimitedLayer::new(formatter);
+        let rate_limited =
+            RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let _ = subscriber.try_init();

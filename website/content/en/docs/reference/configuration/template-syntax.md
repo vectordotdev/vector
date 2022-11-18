@@ -4,11 +4,13 @@ weight: 6
 aliases: ["/docs/reference/templates", "/docs/reference/configuration/templates"]
 ---
 
-Vector supports a template syntax for some configuration options. This allows for dynamic values derived from event data. Options that support this syntax will be clearly documented as such in the option description.
+Vector supports a template syntax for some configuration options. This allows for dynamic values derived from event
+data. Any option that supports this syntax will be clearly documented as such in the description.
 
 ## Example
 
-For example, let's partition data on AWS S3 by application_id and date. We can accomplish this with the key_prefix option in the aws_s3 sink:
+Let's partition data on AWS S3 by "application_id" and "date". We can accomplish this with the `key_prefix` option in
+the `aws_s3` sink:
 
 ```toml
 [sinks.backup]
@@ -17,7 +19,8 @@ For example, let's partition data on AWS S3 by application_id and date. We can a
   key_prefix = "application_id={{ application_id }}/date=%F/"
 ```
 
-Notice that Vector allows direct field references as well as strftime specifiers. If we were to run the following log event through Vector:
+Notice that Vector allows direct field references as well as "strftime" specifiers. If we were to run the following log
+event through Vector:
 
 ```json
 {
@@ -27,39 +30,42 @@ Notice that Vector allows direct field references as well as strftime specifiers
 }
 ```
 
-The value of the `key_prefix` option would equal:
+The value of the above `key_prefix` option would equal:
 
 ```raw
 application_id=1/date=2020-02-14
 ```
 
-Because the [`aws_s3`][aws_s3] sink batches data, each event would be grouped by its produced value. This effectively enables dynamic partitioning, something fundamental to storing log data in filesystems.
+Because the [`aws_s3`][aws_s3] sink batches data, each event would be grouped by its produced value. This effectively
+enables dynamic partitioning, something fundamental to storing log data in filesystems.
 
 ## Syntax
 
 ### Event fields
 
-Individual [log event][log] fields can be accessed using `{{ <field-path-notation> }}` syntax:
+Individual [log event][log] fields can be accessed using `{{ ... }}` to wrap a VRL [path expression][path_expression]:
 
 ```toml
-option = "{{ field_path_notation }}"
+option = "{{ .parent.child }}"
 ```
 
-Vector's [field notation][fields] uses `.` to target nested fields and `[<index>]` to target array values.
-
-### strftime specifiers
+### Strftime specifiers
 
 In addition to directly accessing fields, Vector offers a shortcut for injecting [strftime specifiers][strftime]:
 
 ```toml
-options = "year=%Y/month=%m/day=%d/"
+option = "year=%Y/month=%m/day=%d/"
 ```
 
-The value is derived from the [`timestamp` field][timestamp] and the name of this field can be changed via the [global `timestamp_key` option][timestamp_key].
+{{< info >}}
+The value is derived from the [`timestamp` field](/docs/about/under-the-hood/architecture/data-model/log/#timestamps)
+and the name of this field can be changed via the [global `timestamp_key` option](/docs/reference/configuration/global-options/#log_schema.timestamp_key).
+{{< /info >}}
 
 ### Escaping
 
-You can escape this syntax by prefixing the character with a `\`. For example, you can escape the event field syntax like this:
+You can escape this syntax by prefixing the character with a `\`. For example, you can escape the event field syntax
+like this:
 
 ```toml
 option = "\{{ field_name }}"
@@ -68,28 +74,25 @@ option = "\{{ field_name }}"
 And [strftime] specified like so:
 
 ```toml
-options = "year=\%Y/month=\%m/day=\%d/"
+option = "year=\%Y/month=\%m/day=\%d/"
 ```
 
 Each of the values above would be treated literally.
 
 ## How it works
 
-### Array Values
+### Accessing fields
 
-Array values can be accessed using Vector's [field notation syntax][paths]:
-
-```toml
-option = "{{ parent.child[0] }}"
-```
+You can find additional examples for accessing fields in the
+[path expression reference][path_expression_examples] documentation.
 
 ### Fallback values
 
-Vector doesn't currently support fallback values. [Issue 1692][1692] is open to add this functionality. In the interim, you can use the [`remap` transform][remap] to set a default value:
+Vector doesn't currently support fallback values, [issue 1692][1692] is open to add this functionality. In the interim,
+you can use the [`remap` transform][remap] to set a default value:
 
 ```toml
 [transforms.set_defaults]
-  # REQUIRED
   type = "remap"
   inputs = ["my-source-id"]
   source = '''
@@ -102,23 +105,12 @@ Vector doesn't currently support fallback values. [Issue 1692][1692] is open to 
 ### Missing fields
 
 If a field is missing, an error is logged and Vector drops the event. The `component_errors_total` internal
-metric is incremented with `error_type` = `template_failed`.
-
-### Nested fields
-
-Nested values can be accessed using Vector's [field notation syntax][paths]:
-
-```toml
-option = "{{ parent.child[0] }}"
-```
-
+metric is incremented with an `error_type` tag of `template_failed`.
 
 [1692]: https://github.com/vectordotdev/vector/issues/1692
 [aws_s3]: /docs/reference/configuration/sinks/aws_s3
-[fields]: /docs/reference/configuration/field-path-notation
 [log]: /docs/about/under-the-hood/architecture/data-model/log
-[paths]: /docs/reference/configuration/field-path-notation
+[path_expression]: /docs/reference/vrl/expressions/#path
+[path_expression_examples]: /docs/reference/vrl/expressions/#path-examples
 [remap]: /docs/reference/configuration/transforms/remap
 [strftime]: https://docs.rs/chrono/0.4.19/chrono/format/strftime/index.html#specifiers
-[timestamp]: /docs/about/under-the-hood/architecture/data-model/log/#timestamps
-[timestamp_key]: /docs/reference/configuration/global-options/#log_schema.timestamp_key

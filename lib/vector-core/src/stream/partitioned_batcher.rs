@@ -5,14 +5,11 @@ use std::{
     mem,
     num::NonZeroUsize,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Duration,
 };
 
-use futures::{
-    ready,
-    stream::{Fuse, Stream, StreamExt},
-};
+use futures::stream::{Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use twox_hash::XxHash64;

@@ -11,13 +11,12 @@ use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext},
+    config::{Output, SourceConfig, SourceContext},
     internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -57,6 +56,7 @@ pub struct DemoLogsConfig {
 
     /// The namespace to use for logs. This overrides the global setting
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
 }
 
@@ -182,7 +182,7 @@ async fn demo_logs_source(
     mut out: SourceSender,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = (interval != 0.0).then(|| interval);
+    let maybe_interval: Option<f64> = (interval != 0.0).then_some(interval);
 
     let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
 
@@ -213,16 +213,9 @@ async fn demo_logs_source(
 
                     let events = events.into_iter().map(|mut event| {
                         let log = event.as_mut_log();
-                        log_namespace.insert_vector_metadata(
+                        log_namespace.insert_standard_vector_source_metadata(
                             log,
-                            log_schema().source_type_key(),
-                            "source_type",
-                            "demo_logs",
-                        );
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            log_schema().timestamp_key(),
-                            "ingest_timestamp",
+                            DemoLogsConfig::NAME,
                             now,
                         );
 
@@ -292,7 +285,13 @@ mod tests {
     use futures::{poll, Stream, StreamExt};
 
     use super::*;
-    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, SourceSender};
+    use crate::{
+        config::log_schema,
+        event::Event,
+        shutdown::ShutdownSignal,
+        test_util::components::{assert_source_compliance, SOURCE_TAGS},
+        SourceSender,
+    };
 
     #[test]
     fn generate_config() {
@@ -308,17 +307,21 @@ mod tests {
             LogNamespace::Legacy,
         )
         .build();
-        demo_logs_source(
-            config.interval,
-            config.count,
-            config.format,
-            decoder,
-            ShutdownSignal::noop(),
-            tx,
-            LogNamespace::Legacy,
-        )
-        .await
-        .unwrap();
+
+        assert_source_compliance(&SOURCE_TAGS, async {
+            demo_logs_source(
+                config.interval,
+                config.count,
+                config.format,
+                decoder,
+                ShutdownSignal::noop(),
+                tx,
+                LogNamespace::Legacy,
+            )
+            .await
+            .unwrap();
+        })
+        .await;
         rx
     }
 

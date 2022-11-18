@@ -34,7 +34,7 @@ impl NativeSerializerConfig {
 pub struct NativeSerializer;
 
 impl Encoder<Event> for NativeSerializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let array = EventArray::from(event);

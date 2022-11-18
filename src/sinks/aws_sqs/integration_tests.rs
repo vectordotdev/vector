@@ -1,23 +1,23 @@
+#![cfg(all(test, feature = "aws-sqs-integration-tests"))]
+
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use aws_sdk_sqs::model::QueueAttributeName;
-use aws_sdk_sqs::Client as SqsClient;
-use aws_sdk_sqs::{Endpoint, Region};
+use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Endpoint, Region};
 use codecs::TextSerializerConfig;
 use http::Uri;
 use tokio::time::{sleep, Duration};
 
-use super::config::SqsSinkConfig;
-use super::sink::SqsSink;
-use crate::aws::create_client;
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::common::sqs::SqsClientBuilder;
-use crate::config::ProxyConfig;
-use crate::sinks::VectorSink;
-use crate::test_util::{
-    components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
-    random_lines_with_stream, random_string,
+use super::{config::SqsSinkConfig, sink::SqsSink};
+use crate::{
+    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+    common::sqs::SqsClientBuilder,
+    config::ProxyConfig,
+    sinks::VectorSink,
+    test_util::{
+        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        random_lines_with_stream, random_string,
+    },
 };
 
 fn sqs_address() -> String {

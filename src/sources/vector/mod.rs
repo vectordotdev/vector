@@ -11,7 +11,7 @@ use vector_core::{
 
 use crate::{
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
+        DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext,
     },
     internal_events::{EventsReceived, StreamClosedError},
@@ -110,21 +110,13 @@ pub struct VectorConfig {
     /// It _must_ include a port.
     pub address: SocketAddr,
 
-    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
-    #[serde(default = "default_shutdown_timeout_secs")]
-    pub shutdown_timeout_secs: u64,
-
     #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
-}
-
-const fn default_shutdown_timeout_secs() -> u64 {
-    30
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl GenerateConfig for VectorConfig {
@@ -132,7 +124,6 @@ impl GenerateConfig for VectorConfig {
         toml::Value::try_from(Self {
             version: None,
             address: "0.0.0.0:6000".parse().unwrap(),
-            shutdown_timeout_secs: default_shutdown_timeout_secs(),
             tls: None,
             acknowledgements: Default::default(),
         })
@@ -144,12 +135,12 @@ impl GenerateConfig for VectorConfig {
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let service = proto::Server::new(Service {
             pipeline: cx.out,
             acknowledgements,
         })
-        .accept_gzip();
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
         let source =
             run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {

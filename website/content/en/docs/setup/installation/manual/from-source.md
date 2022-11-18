@@ -66,6 +66,10 @@ target/<target>/release/vector --config config/vector.toml
 
 Install Rust using [`rustup`][rustup]. If you don't have VC++ build tools, the install will prompt you to install them.
 
+Install and add [CMake][cmake] to `PATH`.
+
+Install and add [Protoc][protoc] to `PATH`.
+
 Install [Perl for Windows][perl].
 
 Add Perl to your `PATH`. In a Rust/MSVC environment (for example using `x64 Native Tools Command Prompt`) add the binary directory of Perl installed on the previous step to `PATH`. For example, for default installation of Strawberry Perl it is
@@ -198,6 +202,7 @@ all sources, transforms, and sinks are enabled. To view a complete list of featu
 under "[features]" [here](https://github.com/vectordotdev/vector/blob/master/Cargo.toml).
 
 [buffer]: /docs/reference/glossary/#buffer
+[cmake]: https://cmake.org/
 [configuration]: /docs/reference/configuration
 [cross]: https://github.com/rust-embedded/cross
 [data_dir]: /docs/reference/configuration/global-options/#data_dir
@@ -209,5 +214,6 @@ under "[features]" [here](https://github.com/vectordotdev/vector/blob/master/Car
 [librdkafka]: https://github.com/edenhill/librdkafka
 [openssl]: https://www.openssl.org
 [perl]: https://www.perl.org/get.html#win32
+[protoc]: https://github.com/protocolbuffers/protobuf
 [rustup]: https://rustup.rs
 [zlib]: https://www.zlib.net

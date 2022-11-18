@@ -47,5 +47,5 @@ To have Vector parse each comma-delimited element as a new message. This can be
 used with `decoding` option specified above. See the [docs][http_source_framing]
 for other framing options.
 
-[http_source_framing]: /docs/reference/configuration/sources/http/#framing
+[http_source_framing]: /docs/reference/configuration/sources/http_server/#framing
 [9404]: https://github.com/vectordotdev/vector/issues/9404

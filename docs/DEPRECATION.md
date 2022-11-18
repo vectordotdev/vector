@@ -69,7 +69,7 @@ When introducing a deprecation into Vector, the pull request introducing the dep
 
 - Add a note to the Deprecations section of the upgrade guide for the next release with a description and
   directions for transitioning if applicable.
-- Add a deprecation note to the docs. Typically this means adding `deprecation: "description of the deprecation"`
+- Add a deprecation note to the docs. Typically, this means adding `deprecation: "description of the deprecation"`
   to the `cue` data for the option or feature. If the `cue` schema does not support `deprecation` for whatever you
   are deprecating yet, add it to the schema and open an issue to have it rendered on the website.
 - Add a log message to Vector that is logged at the `WARN` level starting with the word `DEPRECATION` if Vector detects

@@ -35,13 +35,13 @@ impl NativeJsonSerializer {
     }
 
     /// Encode event and represent it as native JSON value.
-    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_core::Error> {
+    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         serde_json::to_value(&event).map_err(|e| e.to_string().into())
     }
 }
 
 impl Encoder<Event> for NativeJsonSerializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();

@@ -1,6 +1,5 @@
 use std::{
     cmp,
-    collections::BTreeMap,
     io::{self, Write},
     mem,
     sync::Arc,
@@ -12,7 +11,7 @@ use prost::Message;
 use snafu::{ResultExt, Snafu};
 use vector_core::{
     config::{log_schema, LogSchema},
-    event::{metric::MetricSketch, Metric, MetricValue},
+    event::{metric::MetricSketch, Metric, MetricTags, MetricValue},
 };
 
 use super::config::{
@@ -27,7 +26,7 @@ const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
-#[allow(warnings)]
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
 mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
@@ -392,10 +391,13 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
     )
 }
 
-fn encode_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
+fn encode_tags(tags: &MetricTags) -> Vec<String> {
     let mut pairs: Vec<_> = tags
-        .iter()
-        .map(|(name, value)| format!("{}:{}", name, value))
+        .iter_all()
+        .map(|(name, value)| match value {
+            Some(value) => format!("{}:{}", name, value),
+            None => name.into(),
+        })
         .collect();
     pairs.sort();
     pairs
@@ -425,20 +427,21 @@ fn generate_series_metrics(
 
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, maybe_interval_ms) => {
-            let (value, interval) = match maybe_interval_ms {
-                None => (*value, None),
+            let (value, interval, metric_type) = match maybe_interval_ms {
+                None => (*value, None, DatadogMetricType::Count),
                 // When an interval is defined, it implies the value should be in a per-second form,
                 // so we need to get back to seconds from our milliseconds-based interval, and then
                 // divide our value by that amount as well.
                 Some(interval_ms) => (
                     (*value) * 1000.0 / (interval_ms.get() as f64),
                     Some(interval_ms.get() / 1000),
+                    DatadogMetricType::Rate,
                 ),
             };
 
             vec![DatadogSeriesMetric {
                 metric: name,
-                r#type: DatadogMetricType::Count,
+                r#type: metric_type,
                 interval,
                 points: vec![DatadogPoint(ts, value)],
                 tags,
@@ -654,8 +657,8 @@ fn write_payload_footer(
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::BTreeMap,
         io::{self, copy},
+        num::NonZeroU32,
     };
 
     use bytes::{BufMut, Bytes, BytesMut};
@@ -666,20 +669,31 @@ mod tests {
         proptest, strategy::Strategy, string::string_regex,
     };
     use vector_core::{
-        event::{Metric, MetricKind, MetricValue},
+        config::log_schema,
+        event::{Metric, MetricKind, MetricTags, MetricValue},
+        metric_tags,
         metrics::AgentDDSketch,
     };
 
     use super::{
-        encode_tags, encode_timestamp, get_compressor, max_compression_overhead_len,
-        max_uncompressed_header_len, validate_payload_size_limits, write_payload_footer,
-        write_payload_header, DatadogMetricsEncoder,
+        encode_tags, encode_timestamp, generate_series_metrics, get_compressor,
+        max_compression_overhead_len, max_uncompressed_header_len, validate_payload_size_limits,
+        write_payload_footer, write_payload_header, DatadogMetricsEncoder, EncoderError,
     };
-    use crate::sinks::datadog::metrics::{config::DatadogMetricsEndpoint, encoder::EncoderError};
+    use crate::{
+        common::datadog::DatadogMetricType, sinks::datadog::metrics::config::DatadogMetricsEndpoint,
+    };
 
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };
         Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
+    }
+
+    fn get_simple_rate_counter(value: f64, interval_ms: u32) -> Metric {
+        let value = MetricValue::Counter { value };
+        Metric::new("basic_counter", MetricKind::Incremental, value)
+            .with_timestamp(Some(ts()))
+            .with_interval_ms(NonZeroU32::new(interval_ms))
     }
 
     fn get_simple_sketch() -> Metric {
@@ -711,14 +725,12 @@ mod tests {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn tags() -> BTreeMap<String, String> {
-        vec![
-            ("normal_tag".to_owned(), "value".to_owned()),
-            ("true_tag".to_owned(), "true".to_owned()),
-            ("empty_tag".to_owned(), "".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+    fn tags() -> MetricTags {
+        metric_tags! {
+            "normal_tag" => "value",
+            "true_tag" => "true",
+            "empty_tag" => "",
+        }
     }
 
     #[test]
@@ -755,6 +767,33 @@ mod tests {
             sketch_result.err(),
             Some(EncoderError::InvalidMetric { .. })
         ));
+    }
+
+    #[test]
+    fn encode_counter_with_interval_as_rate() {
+        // When a counter explicitly has an interval, we need to encode it as a rate. This means
+        // dividing the value by the interval (in seconds) and setting the metric type so that when
+        // it lands on the DD side, they can multiply the value by the interval (in seconds) and get
+        // back the correct total value for that time period.
+
+        let value = 423.1331;
+        let interval_ms = 10000;
+        let rate_counter = get_simple_rate_counter(value, interval_ms);
+        let expected_value = value / (interval_ms / 1000) as f64;
+        let expected_interval = interval_ms / 1000;
+
+        // Encode the metric and make sure we did the rate conversion correctly.
+        let result = generate_series_metrics(&rate_counter, &None, log_schema());
+        assert!(result.is_ok());
+
+        let metrics = result.unwrap();
+        assert_eq!(metrics.len(), 1);
+
+        let actual = &metrics[0];
+        assert_eq!(actual.r#type, DatadogMetricType::Rate);
+        assert_eq!(actual.interval, Some(expected_interval));
+        assert_eq!(actual.points.len(), 1);
+        assert_eq!(actual.points[0].1, expected_value);
     }
 
     #[test]
@@ -921,7 +960,7 @@ mod tests {
             any::<u64>().prop_map(|v| v.to_string()),
             0..64,
         )
-        .prop_map(|tags| if tags.is_empty() { None } else { Some(tags) });
+        .prop_map(|tags| (!tags.is_empty()).then(|| MetricTags::from(tags)));
 
         (name, value, tags).prop_map(|(metric_name, metric_value, metric_tags)| {
             let metric_value = MetricValue::Counter {

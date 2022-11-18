@@ -9,6 +9,9 @@ fn main() {
     prost_build.type_attribute("Label", "#[derive(Eq, Hash, Ord, PartialOrd)]");
     prost_build.type_attribute("MetricType", "#[derive(num_enum::TryFromPrimitive)]");
     prost_build
-        .compile_protos(&["proto/prometheus-remote.proto"], &["proto/"])
+        .compile_protos(
+            &["proto/prometheus-remote.proto"],
+            &["proto", "../../proto"],
+        )
         .unwrap();
 }

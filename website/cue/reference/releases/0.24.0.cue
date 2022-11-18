@@ -17,6 +17,33 @@ releases: "0.24.0": {
 	]
 
 	known_issues: [
+		"""
+			The new `host_metrics` metrics for physical and logical CPU counts were incorrectly
+			implemented as new modes for the `cpu_seconds_total` when they were meant to be new gauges.
+			Fixed in 0.24.1.
+			""",
+		"""
+			`vector top` and some sinks like `file` incorrectly report metrics from the
+			`internal_metrics` source as they show the incremental metrics rather than absolute.
+			Fixed in 0.24.1.
+			""",
+		"""
+			The `expire_metrics_secs` option added in this release was not correctly applied. Fixed
+			in 0.24.2.
+			""",
+		"""
+			Supplying an empty string (`""`) for options that take a field name started panicking in
+			0.24.0 rather than disabling the option as it previously did. Fixed in 0.24.2.
+			""",
+		"""
+			This release was intended to add support for sending rate metrics to the
+			`datadog_metrics` sink, but there was a regression in it prior to release. Fixed in
+			0.24.2.
+			""",
+		"""
+			VRL code using closures sometimes returned an incorrect type error ("block returns
+			invalid value type"). Fixed in 0.24.2.
+			""",
 	]
 
 	description: """
@@ -33,6 +60,10 @@ releases: "0.24.0": {
 		- A new `opentelemetry` source to receive input from OpenTelemetry collectors and SDKs. Only
 		  logs are supported in this release, but support for metrics and traces are in-flight.
 		  An `opentelemetry` sink will follow.
+		- Support for expiring high cardinality internal metrics through the global `expire_metrics`
+		  (will be replaced by `expire_metrics_secs` in 0.24.1). This can alleviate issues with
+		  Vector using increased memory over time. For now it is opt-in, but we may make this the
+		  default in the future.
 
 		Note that this release has a backwards incompatible data model change that users of the
 		`vector` sink and disk buffers should be aware of while upgrading. See the [note in the
@@ -132,9 +163,7 @@ releases: "0.24.0": {
 				Additionally the `geoip` enrichment table has support for `Connection-Type`
 				databases.
 
-				This takes the place of the [`geoip`
-				transform](/docs/reference/configuration/transforms/geoip/), which has been
-				deprecated.
+				This takes the place of the `geoip`, which has been deprecated.
 				"""
 			contributors: ["ktff", "w4"]
 			pr_numbers: [13338, 13707]

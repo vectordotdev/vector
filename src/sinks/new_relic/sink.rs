@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::{BoxStream, StreamExt};
 use tower::Service;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     stream::{BatcherSettings, DriverResponse},
@@ -16,10 +17,9 @@ use super::{
 use crate::{
     codecs::Transformer,
     event::Event,
+    internal_events::SinkRequestBuildError,
     sinks::util::{
-        builder::SinkBuilderExt,
-        metadata::{RequestMetadata, RequestMetadataBuilder},
-        request_builder::EncodeResult,
+        builder::SinkBuilderExt, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
         Compression, RequestBuilder, StreamSink,
     },
 };
@@ -75,7 +75,7 @@ struct NewRelicRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
-    type Metadata = (EventFinalizers, RequestMetadataBuilder);
+    type Metadata = EventFinalizers;
     type Events = Result<NewRelicApiModel, Self::Error>;
     type Encoder = NewRelicEncoder;
     type Payload = Bytes;
@@ -90,12 +90,15 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, mut input: Vec<Event>) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        mut input: Vec<Event>,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         for event in input.iter_mut() {
             self.transformer.transform(event);
         }
 
-        let metadata_builder = RequestMetadata::builder(&input);
+        let builder = RequestMetadataBuilder::from_events(&input);
 
         let finalizers = input.take_finalizers();
         let api_model = || -> Result<NewRelicApiModel, Self::Error> {
@@ -110,17 +113,15 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
             }
         }();
 
-        ((finalizers, metadata_builder), api_model)
+        (finalizers, builder, api_model)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        finalizers: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (finalizers, metadata_builder) = metadata;
-        let metadata = metadata_builder.build(&payload);
-
         NewRelicApiRequest {
             metadata,
             finalizers,
@@ -162,8 +163,8 @@ where
             .filter_map(
                 |request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
                     match request {
-                        Err(e) => {
-                            error!("Failed to build New Relic request: {:?}.", e);
+                        Err(error) => {
+                            emit!(SinkRequestBuildError { error });
                             None
                         }
                         Ok(req) => Some(req),

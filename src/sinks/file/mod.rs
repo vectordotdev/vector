@@ -40,7 +40,6 @@ use bytes_path::BytesPath;
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
     /// File name to write events to.
-    #[configurable(metadata(templateable))]
     pub path: Template,
 
     /// The amount of time, in seconds, that a file can be idle and stay open.
@@ -408,7 +407,7 @@ mod tests {
     use std::convert::TryInto;
 
     use futures::{stream, SinkExt};
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_core::{event::LogEvent, sink::VectorSink};
 
     use super::*;

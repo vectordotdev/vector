@@ -1,9 +1,10 @@
-use std::{fs::DirBuilder, path::PathBuf};
+use std::{fs::DirBuilder, path::PathBuf, time::Duration};
 
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 
+use super::super::default_data_dir;
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
 use crate::serde::bool_or_struct;
 
@@ -59,13 +60,18 @@ pub struct GlobalOptions {
     ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
-    pub timezone: TimeZone,
+    pub timezone: Option<TimeZone>,
 
     #[configurable(derived)]
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub proxy: ProxyConfig,
 
-    #[configurable(derived)]
+    /// Controls how acknowledgements are handled for all sinks by default.
+    ///
+    /// See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event
+    /// acknowledgement.
+    ///
+    /// [e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
     #[serde(
         default,
         deserialize_with = "bool_or_struct",
@@ -83,7 +89,7 @@ pub struct GlobalOptions {
     /// a small amount of memory for each metric.
     #[configurable(deprecated)]
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
-    pub expire_metrics: Option<f64>,
+    pub expire_metrics: Option<Duration>,
 
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
@@ -146,5 +152,110 @@ impl GlobalOptions {
             .create(&data_subdir)
             .with_context(|_| CouldNotCreateSnafu { subdir, data_dir })?;
         Ok(data_subdir)
+    }
+
+    /// Merge a second global configuration into self, and return the new merged data.
+    ///
+    /// # Errors
+    ///
+    /// Returns a list of textual errors if there is a merge conflict between the two global
+    /// configs.
+    pub fn merge(&self, with: Self) -> Result<Self, Vec<String>> {
+        let mut errors = Vec::new();
+
+        if conflicts(&self.proxy.http, &with.proxy.http) {
+            errors.push("conflicting values for 'proxy.http' found".to_owned());
+        }
+
+        if conflicts(&self.proxy.https, &with.proxy.https) {
+            errors.push("conflicting values for 'proxy.https' found".to_owned());
+        }
+
+        if !self.proxy.no_proxy.is_empty() && !with.proxy.no_proxy.is_empty() {
+            errors.push("conflicting values for 'proxy.no_proxy' found".to_owned());
+        }
+
+        if conflicts(&self.timezone, &with.timezone) {
+            errors.push("conflicting values for 'timezone' found".to_owned());
+        }
+
+        let data_dir = if self.data_dir.is_none() || self.data_dir == default_data_dir() {
+            with.data_dir
+        } else if with.data_dir != default_data_dir() && self.data_dir != with.data_dir {
+            // If two configs both set 'data_dir' and have conflicting values
+            // we consider this an error.
+            errors.push("conflicting values for 'data_dir' found".to_owned());
+            None
+        } else {
+            self.data_dir.clone()
+        };
+
+        // If the user has multiple config files, we must *merge* log schemas
+        // until we meet a conflict, then we are allowed to error.
+        let mut log_schema = self.log_schema.clone();
+        if let Err(merge_errors) = log_schema.merge(&with.log_schema) {
+            errors.extend(merge_errors);
+        }
+
+        if errors.is_empty() {
+            Ok(Self {
+                data_dir,
+                log_schema,
+                acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),
+                timezone: self.timezone.or(with.timezone),
+                proxy: self.proxy.merge(&with.proxy),
+                expire_metrics: self.expire_metrics.or(with.expire_metrics),
+                expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
+            })
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Get the configured time zone, using "local" time if none is set.
+    pub fn timezone(&self) -> TimeZone {
+        self.timezone.unwrap_or(TimeZone::Local)
+    }
+}
+
+fn conflicts<T: PartialEq>(this: &Option<T>, that: &Option<T>) -> bool {
+    matches!((this, that), (Some(this), Some(that)) if this != that)
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono_tz::Tz;
+
+    use super::*;
+
+    #[test]
+    fn merges_timezones() {
+        fn merge(tz1: Option<&str>, tz2: Option<&str>) -> Result<TimeZone, Vec<String>> {
+            // Use TOML parsing to match the behavior of what a user would actually configure.
+            let tz1 = tz1.map_or(String::new(), |tz| format!(r#"timezone = "{tz}""#));
+            let tz2 = tz2.map_or(String::new(), |tz| format!(r#"timezone = "{tz}""#));
+            toml::from_str::<GlobalOptions>(&tz1)
+                .unwrap()
+                .merge(toml::from_str::<GlobalOptions>(&tz2).unwrap())
+                .map(|go| go.timezone())
+        }
+
+        assert_eq!(merge(None, None), Ok(TimeZone::Local));
+        assert_eq!(merge(Some("local"), None), Ok(TimeZone::Local));
+        assert_eq!(merge(None, Some("local")), Ok(TimeZone::Local));
+        assert_eq!(merge(Some("local"), Some("local")), Ok(TimeZone::Local),);
+        assert_eq!(merge(Some("UTC"), None), Ok(TimeZone::Named(Tz::UTC)));
+        assert_eq!(
+            merge(None, Some("EST5EDT")),
+            Ok(TimeZone::Named(Tz::EST5EDT))
+        );
+        assert_eq!(
+            merge(Some("UTC"), Some("UTC")),
+            Ok(TimeZone::Named(Tz::UTC))
+        );
+        assert_eq!(
+            merge(Some("CST6CDT"), Some("GMT")),
+            Err(vec!["conflicting values for 'timezone' found".into()])
+        );
     }
 }

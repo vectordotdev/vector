@@ -6,12 +6,14 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
+use vector_buffers::EventCount;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
-    event::{self, Event, EventFinalizers, Finalizable, Value},
+    event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
     stream::BatcherSettings,
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use super::{
@@ -19,17 +21,21 @@ use super::{
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
+use crate::sinks::loki::event::LokiBatchEncoding;
+use crate::sinks::{
+    loki::config::{CompressionConfigAdapter, ExtendedCompression},
+    util::metadata::RequestMetadataBuilder,
+};
 use crate::{
     codecs::{Encoder, Transformer},
     config::log_schema,
     http::HttpClient,
     internal_events::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
-        TemplateRenderingError,
+        SinkRequestBuildError, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
-        metadata::{RequestMetadata, RequestMetadataBuilder},
         request_builder::EncodeResult,
         service::{ServiceBuilderExt, Svc},
         Compression, RequestBuilder,
@@ -79,7 +85,7 @@ impl Partitioner for RecordPartitioner {
 
 #[derive(Clone)]
 pub struct LokiRequestBuilder {
-    compression: Compression,
+    compression: CompressionConfigAdapter,
     encoder: LokiBatchEncoder,
 }
 
@@ -97,16 +103,51 @@ impl From<std::io::Error> for RequestBuildError {
     }
 }
 
-impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
-    type Metadata = (Option<String>, EventFinalizers, RequestMetadataBuilder);
-    type Events = Vec<LokiRecord>;
+pub(super) struct LokiRecords(pub Vec<LokiRecord>);
+
+impl ByteSizeOf for LokiRecords {
+    fn allocated_bytes(&self) -> usize {
+        self.0
+            .iter()
+            .fold(0, |res, item| res + item.allocated_bytes())
+    }
+}
+
+impl EventCount for LokiRecords {
+    fn event_count(&self) -> usize {
+        self.0.iter().fold(0, |res, item| res + item.event_count())
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for LokiRecords {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0
+            .iter()
+            .fold(0, |res, item| res + item.estimated_json_encoded_size_of())
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for &LokiRecords {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0
+            .iter()
+            .fold(0, |res, item| res + item.estimated_json_encoded_size_of())
+    }
+}
+
+impl RequestBuilder<(PartitionKey, LokiRecords)> for LokiRequestBuilder {
+    type Metadata = (Option<String>, EventFinalizers);
+    type Events = LokiRecords;
     type Encoder = LokiBatchEncoder;
     type Payload = Bytes;
     type Request = LokiRequest;
     type Error = RequestBuildError;
 
     fn compression(&self) -> Compression {
-        self.compression
+        match self.compression {
+            CompressionConfigAdapter::Original(compression) => compression,
+            CompressionConfigAdapter::Extended(_) => Compression::None,
+        }
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -115,23 +156,24 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
 
     fn split_input(
         &self,
-        input: (PartitionKey, Vec<LokiRecord>),
-    ) -> (Self::Metadata, Self::Events) {
+        input: (PartitionKey, LokiRecords),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (key, mut events) = input;
-        let metadata_builder = RequestMetadata::builder(&events);
-        let finalizers = events.take_finalizers();
 
-        ((key.tenant_id, finalizers, metadata_builder), events)
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
+        let finalizers = events.0.take_finalizers();
+
+        ((key.tenant_id, finalizers), metadata_builder, events)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        loki_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (tenant_id, finalizers, metadata_builder) = metadata;
-        let metadata = metadata_builder.build(&payload);
-        let compression = self.compression();
+        let (tenant_id, finalizers) = loki_metadata;
+        let compression = self.compression;
 
         LokiRequest {
             compression,
@@ -171,7 +213,7 @@ impl EventEncoder {
                         for (k, v) in output {
                             vec.push((
                                 slugify_text(format!("{}{}", opening_prefix, k)),
-                                Value::from(v).to_string_lossy(),
+                                Value::from(v).to_string_lossy().into_owned(),
                             ))
                         }
                     }
@@ -204,7 +246,7 @@ impl EventEncoder {
         let schema = log_schema();
         let timestamp_key = schema.timestamp_key();
         let timestamp = match event.as_log().get(timestamp_key) {
-            Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
+            Some(Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
 
@@ -264,12 +306,12 @@ impl FilteredRecord {
 }
 
 impl ByteSizeOf for FilteredRecord {
-    fn allocated_bytes(&self) -> usize {
-        self.inner.allocated_bytes()
-    }
-
     fn size_of(&self) -> usize {
         self.inner.size_of()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.inner.allocated_bytes()
     }
 }
 
@@ -348,11 +390,17 @@ impl LokiSink {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
+        let batch_encoder = match config.compression {
+            CompressionConfigAdapter::Original(_) => LokiBatchEncoder(LokiBatchEncoding::Json),
+            CompressionConfigAdapter::Extended(ExtendedCompression::Snappy) => {
+                LokiBatchEncoder(LokiBatchEncoding::Protobuf)
+            }
+        };
 
         Ok(Self {
             request_builder: LokiRequestBuilder {
                 compression,
-                encoder: Default::default(),
+                encoder: batch_encoder,
             },
             encoder: EventEncoder {
                 key_partitioner: KeyPartitioner::new(config.tenant_id),
@@ -408,11 +456,12 @@ impl LokiSink {
                     None
                 }
             })
+            .map(|(key, records)| (key, LokiRecords(records)))
             .request_builder(Some(request_builder_concurrency), self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Loki request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

@@ -46,7 +46,7 @@ components: sources: aws_sqs: components._aws & {
 		}
 		requirements: [
 			"""
-					The AWS SQS source requires an SQS queue.
+				The AWS SQS source requires an SQS queue.
 				""",
 		]
 		warnings: []

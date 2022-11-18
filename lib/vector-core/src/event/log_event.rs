@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use chrono::Utc;
 use std::{
-    cmp,
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::Debug,
@@ -15,7 +14,10 @@ use crossbeam_utils::atomic::AtomicCell;
 use lookup::lookup_v2::TargetPath;
 use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
-use vector_common::EventDataEq;
+use vector_common::{
+    estimated_json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
+    EventDataEq,
+};
 
 use super::{
     finalization::{BatchNotifier, EventFinalizer},
@@ -34,11 +36,15 @@ struct Inner {
 
     #[serde(skip)]
     size_cache: AtomicCell<Option<NonZeroUsize>>,
+
+    #[serde(skip)]
+    json_encoded_size_cache: AtomicCell<Option<NonZeroUsize>>,
 }
 
 impl Inner {
     fn invalidate(&self) {
         self.size_cache.store(None);
+        self.json_encoded_size_cache.store(None);
     }
 
     fn as_value(&self) -> &Value {
@@ -68,6 +74,23 @@ impl ByteSizeOf for Inner {
     }
 }
 
+impl EstimatedJsonEncodedSizeOf for Inner {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.json_encoded_size_cache
+            .load()
+            .unwrap_or_else(|| {
+                let value = JsonEncodedByteCountingValue(&self.fields);
+
+                let size = value.estimated_json_encoded_size_of();
+                let size = NonZeroUsize::new(size).expect("Size cannot be zero");
+
+                self.json_encoded_size_cache.store(Some(size));
+                size
+            })
+            .into()
+    }
+}
+
 impl Clone for Inner {
     fn clone(&self) -> Self {
         Self {
@@ -76,6 +99,11 @@ impl Clone for Inner {
             // `Arc::make_mut`, so don't bother fetching the size
             // cache to copy it since it will be invalidated anyways.
             size_cache: None.into(),
+
+            // This clone is only ever used in combination with
+            // `Arc::make_mut`, so don't bother fetching the size
+            // cache to copy it since it will be invalidated anyways.
+            json_encoded_size_cache: None.into(),
         }
     }
 }
@@ -86,6 +114,7 @@ impl Default for Inner {
             // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
             fields: Value::Object(Default::default()),
             size_cache: Default::default(),
+            json_encoded_size_cache: Default::default(),
         }
     }
 }
@@ -95,6 +124,7 @@ impl From<Value> for Inner {
         Self {
             fields,
             size_cache: Default::default(),
+            json_encoded_size_cache: Default::default(),
         }
     }
 }
@@ -105,13 +135,7 @@ impl PartialEq for Inner {
     }
 }
 
-impl PartialOrd for Inner {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.fields.partial_cmp(&other.fields)
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct LogEvent {
     #[serde(flatten)]
     inner: Arc<Inner>,
@@ -156,16 +180,19 @@ impl LogEvent {
         &mut self.metadata
     }
 
+    /// This detects the log namespace used at runtime by checking for the existence
+    /// of the read-only "vector" metadata, which only exists (and is required to exist)
+    /// with the `Vector` log namespace.
     pub fn namespace(&self) -> LogNamespace {
-        // The (read-only) vector prefix on metadata is used to determine which namespace
-        // is being used. The user is prevented from modifying data here.
-        // This prefix should always exist for logs with the "Vector" namespace,
-        // and should never exist otherwise.
-        if self.metadata().value().contains(path!("vector")) {
+        if self.contains((PathPrefix::Metadata, path!("vector"))) {
             LogNamespace::Vector
         } else {
             LogNamespace::Legacy
         }
+    }
+
+    pub fn estimated_json_encoded_size_of(&self) -> usize {
+        self.inner.estimated_json_encoded_size_of()
     }
 }
 

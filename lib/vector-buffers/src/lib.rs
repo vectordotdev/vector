@@ -20,6 +20,8 @@ pub use config::{BufferConfig, BufferType};
 use encoding::Encodable;
 use vector_config::configurable_component;
 
+pub(crate) use vector_common::Result;
+
 pub mod encoding;
 
 mod internal_events;
@@ -63,7 +65,7 @@ pub enum WhenFull {
     /// potentially be able to buffer the event, but it may also block or drop the event.
     ///
     /// This mode can only be used when two or more buffer stages are configured.
-    #[configurable(metadata(hidden))]
+    #[configurable(metadata(docs::hidden))]
     Overflow,
 }
 

@@ -19,14 +19,15 @@ use warp::http::{HeaderMap, StatusCode};
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig,
+        log_schema, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext,
     },
     event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::http::HttpMethod,
-    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{
+        add_query_parameters, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    },
     tls::TlsEnableableConfig,
 };
 use lookup::event_path;
@@ -61,7 +62,7 @@ pub struct LogplexConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl GenerateConfig for LogplexConfig {
@@ -73,7 +74,7 @@ impl GenerateConfig for LogplexConfig {
             auth: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -249,7 +250,7 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
 
         events.push(LogEvent::from_str_legacy(line).into())
@@ -273,7 +274,7 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use futures::Stream;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_core::event::{Event, EventStatus, Value};
 
     use super::{HttpSourceAuthConfig, LogplexConfig};
@@ -330,7 +331,7 @@ mod tests {
         let len = body.lines().count();
         let mut req = reqwest::Client::new().post(&format!("http://{}/events?{}", address, query));
         if let Some(auth) = auth {
-            req = req.basic_auth(auth.username, Some(auth.password));
+            req = req.basic_auth(auth.username, Some(auth.password.inner()));
         }
         req.header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
@@ -346,7 +347,7 @@ mod tests {
     fn make_auth() -> HttpSourceAuthConfig {
         HttpSourceAuthConfig {
             username: random_string(16),
-            password: random_string(16),
+            password: random_string(16).into(),
         }
     }
 

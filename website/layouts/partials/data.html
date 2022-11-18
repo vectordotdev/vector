@@ -1747,9 +1747,7 @@
           </span>
 
           <span>
-            {{ if $v.required }}
-            {{ partial "badge.html" (dict "word" "required" "color" "red") }}
-            {{ else }}
+            {{ if not $v.required }}
             {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
             {{ end }}
           </span>

@@ -1,9 +1,9 @@
 use std::{
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
-use futures_util::{ready, stream::Fuse, Stream, StreamExt};
+use futures_util::{stream::Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use vector_core::event::Metric;
 

@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
 use tower::Service;
+use vector_common::request_metadata::MetaDescriptive;
 use vector_core::{
     event::Finalizable,
     sink::StreamSink,
@@ -12,6 +13,7 @@ use vector_core::{
 
 use crate::{
     event::Event,
+    internal_events::SinkRequestBuildError,
     sinks::util::{partitioner::KeyPartitioner, RequestBuilder, SinkBuilderExt},
 };
 
@@ -45,8 +47,8 @@ where
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Error: fmt::Debug + Send,
-    RB::Request: Finalizable + Send,
+    RB::Error: fmt::Display + Send,
+    RB::Request: Finalizable + MetaDescriptive + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let partitioner = self.partitioner;
@@ -57,12 +59,16 @@ where
 
         let sink = input
             .batched_partitioned(partitioner, settings)
-            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(|(key, batch)| async move {
+                // A `TemplateRenderingError` will have been emitted by `KeyPartitioner` if the key here is `None`,
+                // thus no further `EventsDropped` event needs emitting at this stage.
+                key.map(move |k| (k, batch))
+            })
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build GCS request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -82,8 +88,8 @@ where
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Error: fmt::Debug + Send,
-    RB::Request: Finalizable + Send,
+    RB::Error: fmt::Display + Send,
+    RB::Request: Finalizable + MetaDescriptive + Send,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await

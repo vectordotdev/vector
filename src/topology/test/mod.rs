@@ -31,7 +31,7 @@ mod compliance;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
 mod doesnt_reload;
-#[cfg(all(feature = "sources-http", feature = "sinks-http"))]
+#[cfg(all(feature = "sources-http_server", feature = "sinks-http"))]
 mod end_to_end;
 #[cfg(all(
     feature = "sources-prometheus",
@@ -68,6 +68,7 @@ fn into_message(event: Event) -> String {
         .get(crate::config::log_schema().message_key())
         .unwrap()
         .to_string_lossy()
+        .into_owned()
 }
 
 fn into_message_stream(array: EventArray) -> impl futures::Stream<Item = String> {

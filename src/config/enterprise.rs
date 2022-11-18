@@ -341,7 +341,7 @@ impl TryFrom<&Config> for EnterpriseMetadata {
         );
 
         // Get the configuration version hash. In DD Pipelines, this is referred to as the 'config hash'.
-        let configuration_version_hash = value.version.clone().expect("Config should be versioned");
+        let configuration_version_hash = value.hash.clone().expect("Config should be versioned");
 
         Ok(Self {
             opts,
@@ -478,7 +478,7 @@ fn setup_logs_reporting(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        default_api_key: api_key,
+        default_api_key: api_key.into(),
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
@@ -577,7 +577,7 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        default_api_key: api_key,
+        default_api_key: api_key.into(),
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,

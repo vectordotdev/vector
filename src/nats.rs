@@ -1,5 +1,6 @@
 use nkeys::error::Error as NKeysError;
 use snafu::{ResultExt, Snafu};
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::tls::TlsEnableableConfig;
@@ -70,7 +71,7 @@ pub(crate) struct NatsAuthUserPassword {
     pub(crate) user: String,
 
     /// Password.
-    pub(crate) password: String,
+    pub(crate) password: SensitiveString,
 }
 
 /// Token configuration.
@@ -79,7 +80,7 @@ pub(crate) struct NatsAuthUserPassword {
 #[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthToken {
     /// Token.
-    pub(crate) value: String,
+    pub(crate) value: SensitiveString,
 }
 
 /// Credentials file configuration.
@@ -110,9 +111,12 @@ pub(crate) struct NatsAuthNKey {
 impl NatsAuthConfig {
     pub(crate) fn to_nats_options(&self) -> Result<nats::asynk::Options, NatsConfigError> {
         match self {
-            NatsAuthConfig::UserPassword { user_password } => Ok(
-                nats::asynk::Options::with_user_pass(&user_password.user, &user_password.password),
-            ),
+            NatsAuthConfig::UserPassword { user_password } => {
+                Ok(nats::asynk::Options::with_user_pass(
+                    user_password.user.as_str(),
+                    user_password.password.inner(),
+                ))
+            }
             NatsAuthConfig::CredentialsFile { credentials_file } => Ok(
                 nats::asynk::Options::with_credentials(&credentials_file.path),
             ),
@@ -126,7 +130,9 @@ impl NatsAuthConfig {
                         kp.sign(nonce).unwrap()
                     })
                 }),
-            NatsAuthConfig::Token { token } => Ok(nats::asynk::Options::with_token(&token.value)),
+            NatsAuthConfig::Token { token } => {
+                Ok(nats::asynk::Options::with_token(token.value.inner()))
+            }
         }
     }
 }

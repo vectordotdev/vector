@@ -10,7 +10,7 @@ use super::{
 use crate::ByteSizeOf;
 
 /// Traces are a newtype of `LogEvent`
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct TraceEvent(LogEvent);
 
 impl TraceEvent {
@@ -84,6 +84,10 @@ impl TraceEvent {
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
         self.0.insert(key.as_ref(), value.into())
+    }
+
+    pub fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0.estimated_json_encoded_size_of()
     }
 }
 

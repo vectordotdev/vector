@@ -379,7 +379,7 @@ Vector then needs to be started using the `--config-dir` argument to specify the
 vector --config-dir /etc/vector
 ```
 
-#### Wilcards in component IDs
+#### Wildcards in component IDs
 
 Vector supports wildcards (`*`) in component IDs when building your topology.
 For example:

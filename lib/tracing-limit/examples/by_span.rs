@@ -28,7 +28,7 @@ fn main() {
                         message =
                             "This message is rate limited by its component and vrl_line_number",
                         count = &i,
-                        internal_log_rate_secs = 5,
+                        internal_log_rate_limit = true,
                     );
                 }
             }

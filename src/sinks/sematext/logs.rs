@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::Region;
@@ -9,7 +10,7 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::EventArray,
     sinks::{
-        elasticsearch::{BulkConfig, ElasticsearchConfig},
+        elasticsearch::{BulkConfig, ElasticsearchApiVersion, ElasticsearchConfig},
         util::{
             http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
             StreamSink, TowerRequestConfig,
@@ -30,7 +31,7 @@ pub struct SematextLogsConfig {
     endpoint: Option<String>,
 
     /// The token that will be used to write to Sematext.
-    token: String,
+    token: SensitiveString,
 
     #[configurable(derived)]
     #[serde(
@@ -80,7 +81,7 @@ impl SinkConfig for SematextLogsConfig {
         };
 
         let (sink, healthcheck) = ElasticsearchConfig {
-            endpoint,
+            endpoints: vec![endpoint],
             compression: Compression::None,
             doc_type: Some(
                 "\
@@ -89,7 +90,7 @@ impl SinkConfig for SematextLogsConfig {
             ),
             bulk: Some(BulkConfig {
                 action: None,
-                index: Some(self.token.clone()),
+                index: Some(self.token.inner().to_owned()),
             }),
             batch: self.batch,
             request: RequestConfig {
@@ -97,6 +98,7 @@ impl SinkConfig for SematextLogsConfig {
                 ..Default::default()
             },
             encoding: self.encoding.clone(),
+            api_version: ElasticsearchApiVersion::V6,
             ..Default::default()
         }
         .build(cx)
