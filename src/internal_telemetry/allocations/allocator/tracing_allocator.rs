@@ -68,41 +68,6 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
     }
 
     #[track_caller]
-    unsafe fn alloc_zeroed(&self, object_layout: Layout) -> *mut u8 {
-        // Allocate our wrapped layout and make sure the allocation succeeded.
-        let (actual_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
-        let actual_ptr = self.allocator.alloc_zeroed(actual_layout);
-        if actual_ptr.is_null() {
-            handle_alloc_error(actual_layout);
-        }
-
-        // SAFETY: We know that `actual_ptr` with offset is at least aligned enough for casting it to `*mut u8` as the layout for
-        // the allocation backing this pointer ensures the last field in the layout is `u8.
-        #[allow(clippy::cast_ptr_alignment)]
-        let group_id_ptr = actual_ptr.add(offset_to_group_id).cast::<u8>();
-        let object_size = object_layout.size();
-        if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-            try_with_suspended_allocation_group(
-                #[inline(always)]
-                |group_id| {
-                    group_id_ptr.write(group_id.as_raw());
-                    self.tracer.trace_allocation(object_size, group_id);
-                },
-            );
-        }
-
-        actual_ptr
-    }
-
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        let new_layout = Layout::from_size_align_unchecked(new_size, layout.align());
-        let new_ptr = self.alloc(new_layout);
-        std::ptr::copy_nonoverlapping(ptr, new_ptr, std::cmp::min(layout.size(), new_size));
-        self.dealloc(ptr, layout);
-        new_ptr
-    }
-
-    #[track_caller]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
         // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
         // requested layout, not the wrapped layout that was actually allocated.
