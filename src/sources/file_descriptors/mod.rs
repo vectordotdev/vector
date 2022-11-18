@@ -108,6 +108,7 @@ where
 
 type Receiver = mpsc::Receiver<std::result::Result<bytes::Bytes, std::io::Error>>;
 
+#[allow(clippy::too_many_arguments)]
 async fn process_stream(
     receiver: Receiver,
     decoder: Decoder,

@@ -5,8 +5,10 @@ use std::os::unix::io::FromRawFd;
 use super::FileDescriptorConfig;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use lookup::owned_value_path;
+use value::Kind;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 use crate::{
     config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
@@ -82,8 +84,27 @@ impl SourceConfig for FileDescriptorSourceConfig {
         self.source(pipe, cx.shutdown, cx.out, log_namespace)
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        let host_key_path = self.host_key.as_ref().map_or_else(
+            || owned_value_path!(log_schema().host_key()),
+            |x| owned_value_path!(x),
+        );
+
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(host_key_path)),
+                &owned_value_path!("host"),
+                Kind::bytes(),
+                None,
+            )
+            .with_standard_vector_source_metadata();
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
