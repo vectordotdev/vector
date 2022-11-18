@@ -76,7 +76,8 @@ pub struct LogplexConfig {
 impl LogplexConfig {
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
-        self.decoding
+        let mut schema_definition = self
+            .decoding
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata()
             .with_source_metadata(
@@ -107,13 +108,21 @@ impl LogplexConfig {
                 Kind::bytes(),
                 None,
             )
+            // for metadata that is added to the events dynamically from the self.query_parameters
             .with_source_metadata(
                 LogplexConfig::NAME,
                 None,
                 &owned_value_path!("query_parameters"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
-            )
+            );
+
+        // for metadata that is added to the events dynamically from config options
+        if log_namespace == LogNamespace::Legacy {
+            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+        }
+
+        schema_definition
     }
 }
 
@@ -691,6 +700,34 @@ mod tests {
                     &owned_value_path!(LogplexConfig::NAME, "query_parameters"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 );
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = LogplexConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
+        .with_event_field(&owned_value_path!("app_name"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("proc_id"), Kind::bytes(), None)
+        .unknown_fields(Kind::bytes());
 
         assert_eq!(definition, expected_definition)
     }
