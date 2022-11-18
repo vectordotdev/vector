@@ -16,6 +16,7 @@ use pulsar::{
 use snafu::ResultExt;
 use vector_config::configurable_component;
 use vector_core::config::DataType;
+use crate::sinks::util::TowerRequestConfig;
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
@@ -63,6 +64,7 @@ pub struct PulsarSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
     #[configurable(derived)]
     #[serde(
         default,
@@ -173,6 +175,7 @@ impl PulsarSinkConfig {
     pub(crate) fn build_producer_options(&self) -> ProducerOptions {
         let mut opts = ProducerOptions {
             encrypted: None,
+            access_mode: Some(0),
             metadata: Default::default(),
             schema: None,
             batch_size: None,
@@ -205,6 +208,7 @@ impl GenerateConfig for PulsarSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
+            request: TowerRequestConfig::default(),
             topic: "topic-1234".to_string(),
             key_field: None,
             properties_key: None,
@@ -220,7 +224,7 @@ impl GenerateConfig for PulsarSinkConfig {
 
 #[async_trait::async_trait]
 impl SinkConfig for PulsarSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> vector_core::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self
             .create_pulsar_client()
             .await
@@ -239,15 +243,5 @@ impl SinkConfig for PulsarSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn generate_config() {
-        PulsarSinkConfig::generate_config();
     }
 }

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
@@ -8,28 +7,26 @@ use lru::LruCache;
 use pulsar::{Error as PulsarError, Executor, Producer, ProducerOptions, Pulsar};
 use tokio::sync::Mutex;
 use tower::Service;
+use vector_common::internal_event::{CountByteSize};
 use vector_core::{
     internal_event::{
-        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+        BytesSent, Protocol, Registered,
     },
     stream::DriverResponse,
 };
 
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::internal_events::PulsarSendingError;
+use std::num::NonZeroUsize;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use crate::sinks::pulsar::request_builder::PulsarMetadata;
+use crate::sinks::util::retries::RetryLogic;
 
+#[derive(Clone)]
 pub struct PulsarRequest {
     pub body: Bytes,
-    pub metadata: PulsarRequestMetadata,
-    pub event_byte_size: usize,
-}
-
-pub struct PulsarRequestMetadata {
-    pub finalizers: EventFinalizers,
-    pub key: Option<Bytes>,
-    pub properties: Option<HashMap<String, Bytes>>,
-    pub timestamp_millis: Option<i64>,
-    pub topic: String,
+    pub metadata: PulsarMetadata,
+    pub request_metadata: RequestMetadata
 }
 
 pub struct PulsarResponse {
@@ -41,18 +38,34 @@ impl DriverResponse for PulsarResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.event_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.event_byte_size)
     }
 }
 
 impl Finalizable for PulsarRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.metadata.finalizers)
+    }
+}
+
+impl MetaDescriptive for PulsarRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
+    }
+}
+
+/// Pulsar retry logic.
+#[derive(Debug, Default, Clone)]
+pub struct PulsarRetryLogic;
+
+impl RetryLogic for PulsarRetryLogic {
+    type Error = PulsarError;
+    type Response = PulsarResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        // TODO improve retry logic
+        true
     }
 }
 
@@ -68,12 +81,12 @@ impl<Exe: Executor> PulsarService<Exe> {
     pub(crate) fn new(
         pulsar_client: Pulsar<Exe>,
         producer_options: ProducerOptions,
-        producer_cache_size: Option<usize>,
+        producer_cache_size: Option<NonZeroUsize>,
     ) -> PulsarService<Exe> {
         // Use a LRUCache to store a limited set of producers
         // Producers in Pulsar use a send buffer, so we want to limit the number of these
         let producer_cache = Arc::new(Mutex::new(LruCache::new(
-            producer_cache_size.unwrap_or(100),
+            producer_cache_size.unwrap_or(NonZeroUsize::new(100).unwrap()),
         )));
         PulsarService {
             pulsar_client,
@@ -144,7 +157,6 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             self.producer_options.clone(),
             request.metadata.topic.clone(),
         );
-        let bytes_sent = self.bytes_sent.clone();
         let ts = request.metadata.timestamp_millis.to_owned();
         Box::pin(async move {
             let p = prod_future.await;
@@ -167,10 +179,8 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             match msg_builder.send().await {
                 Ok(resp) => match resp.await {
                     Ok(_) => {
-                        //TODO: not totally accurate, doesn't include metadata or key
-                        bytes_sent.emit(ByteSize(request.body.len()));
                         Ok(PulsarResponse {
-                            event_byte_size: request.event_byte_size,
+                            event_byte_size: request.request_metadata.events_byte_size(),
                         })
                     }
                     Err(e) => {

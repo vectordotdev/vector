@@ -1,3 +1,13 @@
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        PulsarSinkConfig::generate_config();
+    }
+}
+
 #[cfg(feature = "pulsar-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
