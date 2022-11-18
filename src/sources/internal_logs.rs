@@ -33,7 +33,7 @@ pub struct InternalLogsConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default)]
-    pub host_key: Option<OptionalValuePath>,
+    host_key: Option<OptionalValuePath>,
 
     /// Overrides the name of the log field used to add the current process ID to each event.
     ///
@@ -41,12 +41,12 @@ pub struct InternalLogsConfig {
     ///
     /// By default, `"pid"` is used.
     #[serde(default)]
-    pub pid_key: Option<OptionalValuePath>,
+    pid_key: Option<OptionalValuePath>,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
-    pub log_namespace: Option<bool>,
+    log_namespace: Option<bool>,
 }
 
 impl_generate_config_from_default!(InternalLogsConfig);
