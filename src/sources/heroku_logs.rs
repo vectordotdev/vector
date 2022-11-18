@@ -11,10 +11,17 @@ use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
+use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use vector_config::{configurable_component, NamedComponent};
+use value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
+
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    schema::Definition,
+};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -25,15 +32,8 @@ use crate::{
     event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::util::{
-        add_query_parameters, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig,
-    },
+    sources::util::{http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsEnableableConfig,
-};
-use lookup::{lookup_v2::parse_value_path, path};
-use vector_core::{
-    config::{LegacyKey, LogNamespace},
-    schema::Definition,
 };
 
 /// Configuration for `heroku_logs` source.
@@ -76,7 +76,44 @@ pub struct LogplexConfig {
 impl LogplexConfig {
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
-        self.decoding.schema_definition(log_namespace)
+        self.decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                LogplexConfig::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp().or_undefined(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                LogplexConfig::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("host"))),
+                &owned_value_path!("host"),
+                Kind::bytes(),
+                Some("host"),
+            )
+            .with_source_metadata(
+                LogplexConfig::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("app_name"))),
+                &owned_value_path!("app_name"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                LogplexConfig::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("proc_id"))),
+                &owned_value_path!("proc_id"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                LogplexConfig::NAME,
+                None,
+                &owned_value_path!("query_parameters"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
     }
 }
 
@@ -215,8 +252,38 @@ impl HttpSource for LogplexSource {
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         let mut events = self.decode_message(body, header_map)?;
-        add_query_parameters(&mut events, &self.query_parameters, query_parameters);
+
+        add_query_parameters(
+            &mut events,
+            &self.query_parameters,
+            query_parameters,
+            self.log_namespace,
+            LogplexConfig::NAME,
+        );
+
         Ok(events)
+    }
+}
+
+// TODO move to util/http/query.rs after merging in the http_server commit from master
+fn add_query_parameters(
+    events: &mut [Event],
+    query_parameters_config: &[String],
+    query_parameters: HashMap<String, String>,
+    log_namespace: LogNamespace,
+    source_name: &'static str,
+) {
+    for query_parameter_name in query_parameters_config {
+        let value = query_parameters.get(query_parameter_name);
+        for event in events.iter_mut() {
+            log_namespace.insert_source_metadata(
+                source_name,
+                event.as_mut_log(),
+                Some(LegacyKey::Overwrite(path!(query_parameter_name))),
+                path!("query_parameters"),
+                crate::event::Value::from(value.map(String::to_owned)),
+            );
+        }
     }
 }
 
@@ -256,13 +323,13 @@ fn line_to_events(
         let mut buffer = BytesMut::new();
         buffer.put(message.as_bytes());
 
+        let legacy_host_key = parse_value_path(log_schema().host_key()).ok();
+        let legacy_app_key = parse_value_path("app_name").ok();
+        let legacy_proc_key = parse_value_path("proc_id").ok();
+
         loop {
             match decoder.decode_eof(&mut buffer) {
                 Ok(Some((decoded, _byte_size))) => {
-                    let legacy_host_key = parse_value_path(log_schema().host_key()).ok();
-                    let legacy_app_key = parse_value_path("app_name").ok();
-                    let legacy_proc_key = parse_value_path("proc_id").ok();
-
                     for mut event in decoded {
                         if let Event::Log(ref mut log) = event {
                             if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
