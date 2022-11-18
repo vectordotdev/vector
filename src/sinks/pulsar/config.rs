@@ -61,6 +61,9 @@ pub struct PulsarSinkConfig {
     pub auth: Option<AuthConfig>,
 
     #[configurable(derived)]
+    #[serde(default)]
+    pub request: TowerRequestConfig,
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
