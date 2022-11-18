@@ -394,12 +394,11 @@ async fn splunk_indexer_acknowledgements_disabled_on_server() {
 
 #[tokio::test]
 async fn splunk_auto_extracted_timestamp() {
-    // The auto_extract_timestamp setting only works on version 8 of splunk.
+    // The auto_extract_timestamp setting only works on version 8 and above of splunk.
     // If the splunk version is set to 7, we ignore this test.
-    // This environment variable is set by the integration test
-    // docker-compose  file.
+    // This environment variable is set by the integration test docker-compose file.
     if std::env::var("SPLUNK_VERSION")
-        .map(|version| !version.starts_with('7'))
+        .map(|version| !version.starts_with("7."))
         .unwrap_or(true)
     {
         let cx = SinkContext::new_test();
@@ -438,12 +437,11 @@ async fn splunk_auto_extracted_timestamp() {
 
 #[tokio::test]
 async fn splunk_non_auto_extracted_timestamp() {
-    // The auto_extract_timestamp setting only works on version 8 of splunk.
+    // The auto_extract_timestamp setting only works on version 8 and above of splunk.
     // If the splunk version is set to 7, we ignore this test.
-    // This environment variable is set by the integration test
-    // docker-compose  file.
+    // This environment variable is set by the integration test docker-compose file.
     if std::env::var("SPLUNK_VERSION")
-        .map(|version| !version.starts_with('7'))
+        .map(|version| !version.starts_with("7."))
         .unwrap_or(true)
     {
         let cx = SinkContext::new_test();
