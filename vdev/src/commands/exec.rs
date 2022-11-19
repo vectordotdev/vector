@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Args;
 
 use crate::app;
@@ -14,13 +14,11 @@ pub struct Cli {
 impl Cli {
     pub fn exec(&self) -> Result<()> {
         let mut command = app::construct_command(&self.args[0]);
-        command.args(&self.args[1..]);
-
-        let status = command.status()?;
-        if !status.success() {
-            bail!("failed with exit code: {}", status.code().unwrap_or(1));
+        if self.args.len() > 1 {
+            command.args(&self.args[1..]);
         }
 
-        Ok(())
+        let status = command.status()?;
+        std::process::exit(status.code().unwrap_or(1));
     }
 }

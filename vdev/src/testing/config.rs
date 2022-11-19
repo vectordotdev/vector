@@ -12,12 +12,12 @@ const FILE_NAME: &str = "test.yaml";
 
 #[derive(Deserialize, Debug)]
 pub struct RustToolchainRootConfig {
-    pub(crate) toolchain: RustToolchainConfig,
+    pub toolchain: RustToolchainConfig,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct RustToolchainConfig {
-    pub(crate) channel: String,
+    pub channel: String,
 }
 
 impl RustToolchainConfig {
@@ -34,8 +34,8 @@ impl RustToolchainConfig {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct IntegrationTestConfig {
-    pub(crate) args: Vec<String>,
-    pub(crate) env: Option<BTreeMap<String, String>>,
+    pub args: Vec<String>,
+    pub env: Option<BTreeMap<String, String>>,
     matrix: Vec<LinkedHashMap<String, Vec<String>>>,
 }
 

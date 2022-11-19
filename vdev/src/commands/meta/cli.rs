@@ -1,8 +1,6 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
-use crate::commands;
-
 /// Collection of useful utilities
 #[derive(Args, Debug)]
 #[command()]
@@ -13,8 +11,7 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Custom Starship prompt plugin
-    Starship(commands::meta::starship::Cli),
+    Starship(super::starship::Cli),
 }
 
 impl Cli {

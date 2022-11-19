@@ -5,19 +5,14 @@ use once_cell::sync::OnceCell;
 use std::time::Duration;
 use std::{borrow::Cow, process::Command};
 
-use crate::config::{Config, ConfigFile};
+use crate::config::Config;
 
 static VERBOSITY: OnceCell<LevelFilter> = OnceCell::new();
-static CONFIG_FILE: OnceCell<ConfigFile> = OnceCell::new();
 static CONFIG: OnceCell<Config> = OnceCell::new();
 static PATH: OnceCell<String> = OnceCell::new();
 
 pub fn verbosity() -> &'static LevelFilter {
     VERBOSITY.get().expect("verbosity is not initialized")
-}
-
-pub fn config_file() -> &'static ConfigFile {
-    CONFIG_FILE.get().expect("config file is not initialized")
 }
 
 pub fn config() -> &'static Config {
@@ -98,17 +93,13 @@ fn render_command(command: &mut Command) -> String {
 }
 
 pub fn set_global_verbosity(verbosity: LevelFilter) {
-    VERBOSITY.set(verbosity).unwrap()
-}
-
-pub fn set_global_config_file(config_file: ConfigFile) {
-    CONFIG_FILE.set(config_file).unwrap()
+    VERBOSITY.set(verbosity).expect("could not set verbosity")
 }
 
 pub fn set_global_config(config: Config) {
-    CONFIG.set(config).unwrap()
+    CONFIG.set(config).expect("could not set config")
 }
 
 pub fn set_global_path(path: String) {
-    PATH.set(path).unwrap()
+    PATH.set(path).expect("could not set path")
 }

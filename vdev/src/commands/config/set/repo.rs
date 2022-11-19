@@ -1,8 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::app;
-use crate::platform;
+use crate::{app, config, platform};
 
 /// Set the path to the Vector repository
 #[derive(Args, Debug)]
@@ -17,7 +16,7 @@ impl Cli {
 
         let mut config = app::config().clone();
         config.repo = path;
-        app::config_file().save(config);
+        config::save(config)?;
 
         Ok(())
     }

@@ -1,8 +1,6 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
-use crate::commands;
-
 /// Manage integrations
 #[derive(Args, Debug)]
 #[command()]
@@ -13,14 +11,10 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Show information about integrations
-    Show(commands::int::show::Cli),
-    /// Start an environment
-    Start(commands::int::start::Cli),
-    /// Stop an environment
-    Stop(commands::int::stop::Cli),
-    /// Execute tests
-    Test(commands::int::test::Cli),
+    Show(super::show::Cli),
+    Start(super::start::Cli),
+    Stop(super::stop::Cli),
+    Test(super::test::Cli),
 }
 
 impl Cli {
