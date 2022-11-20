@@ -1,6 +1,7 @@
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod config {
+    use crate::sinks::pulsar::config::PulsarSinkConfig;
+    use vector_config::component::GenerateConfig;
 
     #[test]
     fn generate_config() {
@@ -13,6 +14,7 @@ mod tests {
 mod integration_tests {
     use crate::sinks::pulsar::config::PulsarSinkConfig;
     use crate::sinks::pulsar::sink::PulsarSink;
+    use crate::sinks::util::TowerRequestConfig;
     use codecs::TextSerializerConfig;
     use futures::StreamExt;
     use pulsar::SubType;
@@ -106,6 +108,7 @@ mod integration_tests {
             encoding: TextSerializerConfig::new().into(),
             auth: None,
             acknowledgements: Default::default(),
+            request: TowerRequestConfig::default(),
         };
 
         pulsar_happy_reuse(cnf).await

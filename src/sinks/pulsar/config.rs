@@ -1,3 +1,4 @@
+use crate::sinks::util::TowerRequestConfig;
 use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -16,9 +17,6 @@ use pulsar::{
 use snafu::ResultExt;
 use vector_config::configurable_component;
 use vector_core::config::DataType;
-use crate::sinks::util::TowerRequestConfig;
-
-pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 /// Configuration for the `pulsar` sink.
 #[configurable_component(sink("pulsar"))]

@@ -1,18 +1,18 @@
-use bytes::{Bytes};
+use bytes::Bytes;
 use std::collections::HashMap;
 use std::io;
 use vector_common::finalization::EventFinalizers;
 use vector_common::request_metadata::RequestMetadata;
 
-use crate::{
-    event::{Event, Finalizable},
-    sinks::pulsar::service::{PulsarRequest},
-};
 use crate::sinks::pulsar::encoder::PulsarEncoder;
 use crate::sinks::pulsar::sink::PulsarEvent;
 use crate::sinks::util::metadata::RequestMetadataBuilder;
-use crate::sinks::util::{Compression, RequestBuilder};
 use crate::sinks::util::request_builder::EncodeResult;
+use crate::sinks::util::{Compression, RequestBuilder};
+use crate::{
+    event::{Event, Finalizable},
+    sinks::pulsar::service::PulsarRequest,
+};
 
 #[derive(Clone)]
 pub(super) struct PulsarMetadata {
@@ -45,19 +45,27 @@ impl RequestBuilder<PulsarEvent> for PulsarRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, mut input: PulsarEvent) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(
+        &self,
+        mut input: PulsarEvent,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let builder = RequestMetadataBuilder::from_events(&input);
         let metadata = PulsarMetadata {
             finalizers: input.event.take_finalizers(),
             key: input.key,
             timestamp_millis: input.timestamp_millis,
             properties: input.properties,
-            topic: input.topic
+            topic: input.topic,
         };
         (metadata, builder, input.event)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, request_metadata: RequestMetadata, payload: EncodeResult<Self::Payload>) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let body = payload.into_payload();
         PulsarRequest {
             body,
@@ -66,4 +74,3 @@ impl RequestBuilder<PulsarEvent> for PulsarRequestBuilder {
         }
     }
 }
-

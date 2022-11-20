@@ -7,26 +7,21 @@ use lru::LruCache;
 use pulsar::{Error as PulsarError, Executor, Producer, ProducerOptions, Pulsar};
 use tokio::sync::Mutex;
 use tower::Service;
-use vector_common::internal_event::{CountByteSize};
-use vector_core::{
-    internal_event::{
-        BytesSent, Protocol, Registered,
-    },
-    stream::DriverResponse,
-};
+use vector_common::internal_event::CountByteSize;
+use vector_core::stream::DriverResponse;
 
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::internal_events::PulsarSendingError;
-use std::num::NonZeroUsize;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use crate::sinks::pulsar::request_builder::PulsarMetadata;
 use crate::sinks::util::retries::RetryLogic;
+use std::num::NonZeroUsize;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 
 #[derive(Clone)]
-pub struct PulsarRequest {
+pub(super) struct PulsarRequest {
     pub body: Bytes,
     pub metadata: PulsarMetadata,
-    pub request_metadata: RequestMetadata
+    pub request_metadata: RequestMetadata,
 }
 
 pub struct PulsarResponse {
@@ -40,6 +35,10 @@ impl DriverResponse for PulsarResponse {
 
     fn events_sent(&self) -> CountByteSize {
         CountByteSize(1, self.event_byte_size)
+    }
+
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
+        Some((self.event_byte_size, "pulsar"))
     }
 }
 
@@ -63,18 +62,19 @@ impl RetryLogic for PulsarRetryLogic {
     type Error = PulsarError;
     type Response = PulsarResponse;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         // TODO improve retry logic
         true
     }
 }
 
 type SafeLru<Exe> = Arc<Mutex<LruCache<String, Result<Arc<Mutex<Producer<Exe>>>, PulsarError>>>>;
+
+#[derive(Clone)]
 pub struct PulsarService<Exe: Executor> {
     pulsar_client: Pulsar<Exe>,
     producer_cache: SafeLru<Exe>,
     producer_options: ProducerOptions,
-    bytes_sent: Registered<BytesSent>,
 }
 
 impl<Exe: Executor> PulsarService<Exe> {
@@ -92,7 +92,6 @@ impl<Exe: Executor> PulsarService<Exe> {
             pulsar_client,
             producer_cache,
             producer_options,
-            bytes_sent: register!(BytesSent::from(Protocol("pulsar".into()))),
         }
     }
 
@@ -178,11 +177,9 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
 
             match msg_builder.send().await {
                 Ok(resp) => match resp.await {
-                    Ok(_) => {
-                        Ok(PulsarResponse {
-                            event_byte_size: request.request_metadata.events_byte_size(),
-                        })
-                    }
+                    Ok(_) => Ok(PulsarResponse {
+                        event_byte_size: request.request_metadata.events_byte_size(),
+                    }),
                     Err(e) => {
                         emit!(PulsarSendingError {
                             error: Box::new(PulsarError::Custom("failed to send".to_string())),
