@@ -1,8 +1,11 @@
 use std::net::SocketAddr;
 
+use chrono::Utc;
+use codecs::BytesDeserializerConfig;
 use futures::TryFutureExt;
+use lookup::path;
 use tonic::{Request, Response, Status};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
@@ -35,6 +38,7 @@ enum VectorConfigVersion {
 pub struct Service {
     pipeline: SourceSender,
     acknowledgements: bool,
+    log_namespace: LogNamespace,
 }
 
 #[tonic::async_trait]
@@ -49,6 +53,21 @@ impl proto::Service for Service {
             .into_iter()
             .map(Event::from)
             .collect();
+
+        if self.log_namespace == LogNamespace::Vector {
+            let now = Utc::now();
+            for event in &mut events {
+                if let Event::Log(ref mut log) = event {
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!("vector", "source_type"), VectorConfig::NAME);
+
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!("vector", "ingest_timestamp"), now);
+                }
+            }
+        }
 
         let count = events.len();
         let byte_size = events.size_of();
@@ -117,6 +136,11 @@ pub struct VectorConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
+    log_namespace: Option<bool>,
 }
 
 impl GenerateConfig for VectorConfig {
@@ -126,6 +150,7 @@ impl GenerateConfig for VectorConfig {
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
             acknowledgements: Default::default(),
+            log_namespace: None,
         })
         .unwrap()
     }
@@ -136,9 +161,12 @@ impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let service = proto::Server::new(Service {
             pipeline: cx.out,
             acknowledgements,
+            log_namespace,
         })
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
@@ -150,8 +178,14 @@ impl SourceConfig for VectorConfig {
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        let schema_definition = BytesDeserializerConfig
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
+
+        vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
