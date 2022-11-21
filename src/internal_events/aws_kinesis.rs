@@ -1,3 +1,4 @@
+/// Used in both `aws_kinesis_streams` and `aws_kinesis_firehose` sinks
 use crate::emit;
 use metrics::counter;
 use vector_common::internal_event::{

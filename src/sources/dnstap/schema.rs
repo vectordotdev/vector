@@ -1,4 +1,13 @@
-#[derive(Default, Debug, Clone)]
+use std::collections::BTreeMap;
+
+use lookup::owned_value_path;
+use value::{
+    kind::{Collection, Field},
+    Kind,
+};
+use vector_common::btreemap;
+
+#[derive(Debug, Default, Clone)]
 pub struct DnstapEventSchema {
     dnstap_root_data_schema: DnstapRootDataSchema,
     dnstap_message_schema: DnstapMessageSchema,
@@ -14,6 +23,267 @@ pub struct DnstapEventSchema {
 }
 
 impl DnstapEventSchema {
+    /// The message schema for the request and response message fields
+    fn request_message_schema_definition(&self) -> Collection<Field> {
+        let mut result = BTreeMap::new();
+        result.insert(
+            self.dns_query_message_schema().time().into(),
+            Kind::integer().or_undefined(),
+        );
+
+        result.insert(
+            self.dns_update_message_schema().time().into(),
+            Kind::integer().or_undefined(),
+        );
+        result.insert(
+            self.dns_query_message_schema().time_precision().into(),
+            Kind::bytes().or_undefined(),
+        );
+        result.insert(
+            self.dns_update_message_schema().time_precision().into(),
+            Kind::bytes().or_undefined(),
+        );
+        result.insert(
+            self.dns_query_message_schema().response_code().into(),
+            Kind::integer().or_undefined(),
+        );
+        result.insert(
+            self.dns_update_message_schema().response_code().into(),
+            Kind::integer().or_undefined(),
+        );
+        result.insert(
+            self.dns_query_message_schema().response().into(),
+            Kind::bytes().or_undefined(),
+        );
+        result.insert(
+            self.dns_update_message_schema().response().into(),
+            Kind::bytes().or_undefined(),
+        );
+
+        if self.dns_query_message_schema().header() == self.dns_update_message_schema().header() {
+            // This branch will always be hit -
+            // we know that both headers are equal since they both pull the values from the common schema.
+            let mut schema = self.dns_query_header_schema().schema_definition();
+            schema.merge(self.dns_update_header_schema().schema_definition(), true);
+
+            result.insert(
+                self.dns_query_message_schema().header().into(),
+                Kind::object(schema).or_undefined(),
+            );
+        } else {
+            result.insert(
+                self.dns_query_message_schema().header().into(),
+                Kind::object(self.dns_query_header_schema().schema_definition()).or_undefined(),
+            );
+            result.insert(
+                self.dns_update_message_schema().header().into(),
+                Kind::object(self.dns_update_header_schema().schema_definition()).or_undefined(),
+            );
+        }
+        result.insert(
+            self.dns_update_message_schema().zone_section().into(),
+            Kind::object(self.dns_update_zone_info_schema().schema_definition()).or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().question_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_query_question_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().answer_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().authority_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().additional_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().opt_pseudo_section().into(),
+            Kind::object(
+                self.dns_message_opt_pseudo_section_schema()
+                    .schema_definition(self.dns_message_option_schema()),
+            )
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_query_message_schema().raw_data().into(),
+            Kind::bytes().or_undefined(),
+        );
+
+        result.insert(
+            self.dns_update_message_schema()
+                .prerequisite_section()
+                .into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_update_message_schema().update_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.insert(
+            self.dns_update_message_schema().additional_section().into(),
+            Kind::array(Collection::from_unknown(Kind::object(
+                self.dns_record_schema().schema_definition(),
+            )))
+            .or_undefined(),
+        );
+
+        result.into()
+    }
+
+    /// Schema definition for fields stored in the root.
+    fn root_schema_definition(
+        &self,
+        schema: vector_core::schema::Definition,
+    ) -> vector_core::schema::Definition {
+        schema
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().server_identity()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().server_version()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().extra()),
+                Kind::bytes(),
+                None,
+            )
+            .with_event_field(
+                &owned_value_path!(self.dnstap_root_data_schema().data_type_id()),
+                Kind::integer(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().data_type()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().error()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().raw_data()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().time()),
+                Kind::integer(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_root_data_schema().time_precision()),
+                Kind::bytes(),
+                None,
+            )
+    }
+
+    /// Schema definition from the message.
+    pub fn message_schema_definition(
+        &self,
+        schema: vector_core::schema::Definition,
+    ) -> vector_core::schema::Definition {
+        schema
+            .optional_field(
+                &owned_value_path!(self.dnstap_message_schema().socket_family()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_message_schema().socket_protocol()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_message_schema().query_address()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_message_schema().query_port()),
+                Kind::integer(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_message_schema().response_address()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_message_schema().response_port()),
+                Kind::integer(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_message_schema().query_zone()),
+                Kind::bytes(),
+                None,
+            )
+            .with_event_field(
+                &owned_value_path!(self.dnstap_message_schema().dnstap_message_type_id()),
+                Kind::integer(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_message_schema().dnstap_message_type()),
+                Kind::bytes(),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_message_schema().request_message()),
+                Kind::object(self.request_message_schema_definition()),
+                None,
+            )
+            .optional_field(
+                &owned_value_path!(self.dnstap_message_schema().response_message()),
+                Kind::object(self.request_message_schema_definition()),
+                None,
+            )
+    }
+
+    /// The schema definition for a dns tap message.
+    pub fn schema_definition(
+        &self,
+        schema: vector_core::schema::Definition,
+    ) -> vector_core::schema::Definition {
+        self.root_schema_definition(self.message_schema_definition(schema))
+    }
+
     pub const fn dnstap_root_data_schema(&self) -> &DnstapRootDataSchema {
         &self.dnstap_root_data_schema
     }
@@ -81,54 +351,36 @@ impl DnstapEventSchema {
 
 #[derive(Debug, Clone)]
 pub struct DnstapRootDataSchema {
-    server_identity: &'static str,
-    server_version: &'static str,
-    extra: &'static str,
-    data_type: &'static str,
-    data_type_id: &'static str,
     timestamp: &'static str,
-    time: &'static str,
-    time_precision: &'static str,
-    error: &'static str,
-    raw_data: &'static str,
 }
 
 impl Default for DnstapRootDataSchema {
     fn default() -> Self {
         Self {
-            server_identity: "serverId",
-            server_version: "serverVersion",
-            extra: "extraInfo",
-            data_type: "dataType",
-            data_type_id: "dataTypeId",
             timestamp: "timestamp",
-            time: "time",
-            time_precision: "timePrecision",
-            error: "error",
-            raw_data: "rawData",
         }
     }
 }
 
 impl DnstapRootDataSchema {
     pub const fn server_identity(&self) -> &'static str {
-        self.server_identity
+        "serverId"
     }
 
     pub const fn server_version(&self) -> &'static str {
-        self.server_version
+        "serverVersion"
     }
 
     pub const fn extra(&self) -> &'static str {
-        self.extra
+        "extraInfo"
     }
 
     pub const fn data_type(&self) -> &'static str {
-        self.data_type
+        "dataType"
     }
 
     pub const fn data_type_id(&self) -> &'static str {
-        self.data_type_id
+        "dataTypeId"
     }
 
     pub const fn timestamp(&self) -> &'static str {
@@ -136,19 +388,19 @@ impl DnstapRootDataSchema {
     }
 
     pub const fn time(&self) -> &'static str {
-        self.time
+        "time"
     }
 
     pub const fn time_precision(&self) -> &'static str {
-        self.time_precision
+        "timePrecision"
     }
 
     pub const fn error(&self) -> &'static str {
-        self.error
+        "error"
     }
 
     pub const fn raw_data(&self) -> &'static str {
-        self.raw_data
+        "rawData"
     }
 
     pub fn set_timestamp(&mut self, val: &'static str) -> &mut Self {
@@ -157,684 +409,502 @@ impl DnstapRootDataSchema {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DnstapMessageSchema {
-    socket_family: &'static str,
-    socket_protocol: &'static str,
-    query_address: &'static str,
-    query_port: &'static str,
-    response_address: &'static str,
-    response_port: &'static str,
-    query_zone: &'static str,
-    dnstap_message_type: &'static str,
-    dnstap_message_type_id: &'static str,
-    request_message: &'static str,
-    response_message: &'static str,
-}
-
-impl Default for DnstapMessageSchema {
-    fn default() -> Self {
-        Self {
-            socket_family: "socketFamily",
-            socket_protocol: "socketProtocol",
-            query_address: "sourceAddress",
-            query_port: "sourcePort",
-            response_address: "responseAddress",
-            response_port: "responsePort",
-            query_zone: "queryZone",
-            dnstap_message_type: "messageType",
-            dnstap_message_type_id: "messageTypeId",
-            request_message: "requestData",
-            response_message: "responseData",
-        }
-    }
-}
+#[derive(Debug, Default, Clone)]
+pub struct DnstapMessageSchema;
 
 impl DnstapMessageSchema {
     pub const fn socket_family(&self) -> &'static str {
-        self.socket_family
+        "socketFamily"
     }
 
     pub const fn socket_protocol(&self) -> &'static str {
-        self.socket_protocol
+        "socketProtocol"
     }
 
     pub const fn query_address(&self) -> &'static str {
-        self.query_address
+        "sourceAddress"
     }
 
     pub const fn query_port(&self) -> &'static str {
-        self.query_port
+        "sourcePort"
     }
 
     pub const fn response_address(&self) -> &'static str {
-        self.response_address
+        "responseAddress"
     }
 
     pub const fn response_port(&self) -> &'static str {
-        self.response_port
+        "responsePort"
     }
 
     pub const fn query_zone(&self) -> &'static str {
-        self.query_zone
+        "queryZone"
     }
 
     pub const fn dnstap_message_type(&self) -> &'static str {
-        self.dnstap_message_type
+        "messageType"
     }
 
     pub const fn dnstap_message_type_id(&self) -> &'static str {
-        self.dnstap_message_type_id
+        "messageTypeId"
     }
 
     pub const fn request_message(&self) -> &'static str {
-        self.request_message
+        "requestData"
     }
 
     pub const fn response_message(&self) -> &'static str {
-        self.response_message
+        "responseData"
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DnsMessageCommonSchema {
-    response_code: &'static str,
-    response: &'static str,
-    time: &'static str,
-    time_precision: &'static str,
-    raw_data: &'static str,
-    header: &'static str,
-}
-
-impl Default for DnsMessageCommonSchema {
-    fn default() -> Self {
-        Self {
-            response_code: "fullRcode",
-            response: "rcodeName",
-            time: "time",
-            time_precision: "timePrecision",
-            raw_data: "rawData",
-            header: "header",
-        }
-    }
-}
+#[derive(Debug, Default, Clone)]
+pub struct DnsMessageCommonSchema;
 
 impl DnsMessageCommonSchema {
-    pub const fn response_code(&self) -> &'static str {
-        self.response_code
+    pub const fn response_code() -> &'static str {
+        "fullRcode"
     }
 
-    pub const fn response(&self) -> &'static str {
-        self.response
+    pub const fn response() -> &'static str {
+        "rcodeName"
     }
 
-    pub const fn time(&self) -> &'static str {
-        self.time
+    pub const fn time() -> &'static str {
+        "time"
     }
 
-    pub const fn time_precision(&self) -> &'static str {
-        self.time_precision
+    pub const fn time_precision() -> &'static str {
+        "timePrecision"
     }
 
-    pub const fn raw_data(&self) -> &'static str {
-        self.raw_data
+    pub const fn raw_data() -> &'static str {
+        "rawData"
     }
 
-    pub const fn header(&self) -> &'static str {
-        self.header
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DnsQueryMessageSchema {
-    response_code: &'static str,
-    response: &'static str,
-    time: &'static str,
-    time_precision: &'static str,
-    raw_data: &'static str,
-    header: &'static str,
-    question_section: &'static str,
-    answer_section: &'static str,
-    authority_section: &'static str,
-    additional_section: &'static str,
-    opt_pseudo_section: &'static str,
-}
-
-impl Default for DnsQueryMessageSchema {
-    fn default() -> Self {
-        let common_schema = DnsMessageCommonSchema::default();
-        Self {
-            response_code: common_schema.response_code,
-            response: common_schema.response,
-            time: common_schema.time,
-            time_precision: common_schema.time_precision,
-            raw_data: common_schema.raw_data,
-            header: common_schema.header,
-            question_section: "question",
-            answer_section: "answers",
-            authority_section: "authority",
-            additional_section: "additional",
-            opt_pseudo_section: "opt",
-        }
+    pub const fn header() -> &'static str {
+        "header"
     }
 }
+
+#[derive(Debug, Default, Clone)]
+pub struct DnsQueryMessageSchema;
 
 impl DnsQueryMessageSchema {
     pub const fn response_code(&self) -> &'static str {
-        self.response_code
+        DnsMessageCommonSchema::response_code()
     }
 
     pub const fn response(&self) -> &'static str {
-        self.response
+        DnsMessageCommonSchema::response()
     }
 
     pub const fn time(&self) -> &'static str {
-        self.time
+        DnsMessageCommonSchema::time()
     }
 
     pub const fn time_precision(&self) -> &'static str {
-        self.time_precision
+        DnsMessageCommonSchema::time_precision()
     }
 
     pub const fn raw_data(&self) -> &'static str {
-        self.raw_data
+        DnsMessageCommonSchema::raw_data()
     }
 
     pub const fn header(&self) -> &'static str {
-        self.header
+        DnsMessageCommonSchema::header()
     }
 
     pub const fn question_section(&self) -> &'static str {
-        self.question_section
+        "question"
     }
 
     pub const fn answer_section(&self) -> &'static str {
-        self.answer_section
+        "answers"
     }
 
     pub const fn authority_section(&self) -> &'static str {
-        self.authority_section
+        "authority"
     }
 
     pub const fn additional_section(&self) -> &'static str {
-        self.additional_section
+        "additional"
     }
 
     pub const fn opt_pseudo_section(&self) -> &'static str {
-        self.opt_pseudo_section
+        "opt"
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DnsUpdateMessageSchema {
-    response_code: &'static str,
-    response: &'static str,
-    time: &'static str,
-    time_precision: &'static str,
-    raw_data: &'static str,
-    header: &'static str,
-    zone_section: &'static str,
-    prerequisite_section: &'static str,
-    update_section: &'static str,
-    additional_section: &'static str,
-}
-
-impl Default for DnsUpdateMessageSchema {
-    fn default() -> Self {
-        let common_schema = DnsMessageCommonSchema::default();
-        Self {
-            response_code: common_schema.response_code,
-            response: common_schema.response,
-            time: common_schema.time,
-            time_precision: common_schema.time_precision,
-            raw_data: common_schema.raw_data,
-            header: common_schema.header,
-            zone_section: "zone",
-            prerequisite_section: "prerequisite",
-            update_section: "update",
-            additional_section: "additional",
-        }
-    }
-}
+#[derive(Debug, Default, Clone)]
+pub struct DnsUpdateMessageSchema;
 
 impl DnsUpdateMessageSchema {
     pub const fn response_code(&self) -> &'static str {
-        self.response_code
+        DnsMessageCommonSchema::response_code()
     }
 
     pub const fn response(&self) -> &'static str {
-        self.response
+        DnsMessageCommonSchema::response()
     }
 
     pub const fn time(&self) -> &'static str {
-        self.time
+        DnsMessageCommonSchema::time()
     }
 
     pub const fn time_precision(&self) -> &'static str {
-        self.time_precision
+        DnsMessageCommonSchema::time_precision()
     }
 
     pub const fn raw_data(&self) -> &'static str {
-        self.raw_data
+        DnsMessageCommonSchema::raw_data()
     }
 
     pub const fn header(&self) -> &'static str {
-        self.header
+        DnsMessageCommonSchema::header()
     }
 
     pub const fn zone_section(&self) -> &'static str {
-        self.zone_section
+        "zone"
     }
 
     pub const fn prerequisite_section(&self) -> &'static str {
-        self.prerequisite_section
+        "prerequisite"
     }
 
     pub const fn update_section(&self) -> &'static str {
-        self.update_section
+        "update"
     }
 
     pub const fn additional_section(&self) -> &'static str {
-        self.additional_section
+        "additional"
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DnsMessageHeaderCommonSchema {
-    id: &'static str,
-    opcode: &'static str,
-    rcode: &'static str,
-    qr: &'static str,
-}
-
-impl Default for DnsMessageHeaderCommonSchema {
-    fn default() -> Self {
-        Self {
-            id: "id",
-            opcode: "opcode",
-            rcode: "rcode",
-            qr: "qr",
-        }
-    }
-}
+#[derive(Debug, Default, Clone)]
+pub struct DnsMessageHeaderCommonSchema;
 
 impl DnsMessageHeaderCommonSchema {
-    pub const fn id(&self) -> &'static str {
-        self.id
+    pub const fn id() -> &'static str {
+        "id"
     }
 
-    pub const fn opcode(&self) -> &'static str {
-        self.opcode
+    pub const fn opcode() -> &'static str {
+        "opcode"
     }
 
-    pub const fn rcode(&self) -> &'static str {
-        self.rcode
+    pub const fn rcode() -> &'static str {
+        "rcode"
     }
 
-    pub const fn qr(&self) -> &'static str {
-        self.qr
+    pub const fn qr() -> &'static str {
+        "qr"
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct DnsQueryHeaderSchema;
+
 impl DnsQueryHeaderSchema {
+    pub fn schema_definition(&self) -> Collection<Field> {
+        btreemap! {
+            self.id() => Kind::integer(),
+            self.opcode() => Kind::integer(),
+            self.rcode() => Kind::integer(),
+            self.qr() => Kind::integer(),
+            self.aa() => Kind::boolean(),
+            self.tc() => Kind::boolean(),
+            self.rd() => Kind::boolean(),
+            self.ra() => Kind::boolean(),
+            self.ad() => Kind::boolean(),
+            self.cd() => Kind::boolean(),
+            self.additional_count() => Kind::integer().or_undefined(),
+            self.question_count() => Kind::integer().or_undefined(),
+            self.answer_count() => Kind::integer().or_undefined(),
+            self.authority_count() => Kind::integer().or_undefined(),
+        }
+        .into()
+    }
+
     pub const fn id(&self) -> &'static str {
-        self.id
+        DnsMessageHeaderCommonSchema::id()
     }
 
     pub const fn opcode(&self) -> &'static str {
-        self.opcode
+        DnsMessageHeaderCommonSchema::opcode()
     }
 
     pub const fn rcode(&self) -> &'static str {
-        self.rcode
+        DnsMessageHeaderCommonSchema::rcode()
     }
 
     pub const fn qr(&self) -> &'static str {
-        self.qr
+        DnsMessageHeaderCommonSchema::qr()
     }
 
     pub const fn aa(&self) -> &'static str {
-        self.aa
+        "aa"
     }
 
     pub const fn tc(&self) -> &'static str {
-        self.tc
+        "tc"
     }
 
     pub const fn rd(&self) -> &'static str {
-        self.rd
+        "rd"
     }
 
     pub const fn ra(&self) -> &'static str {
-        self.ra
+        "ra"
     }
 
     pub const fn ad(&self) -> &'static str {
-        self.ad
+        "ad"
     }
 
     pub const fn cd(&self) -> &'static str {
-        self.cd
+        "cd"
     }
 
     pub const fn question_count(&self) -> &'static str {
-        self.question_count
+        "qdCount"
     }
 
     pub const fn answer_count(&self) -> &'static str {
-        self.answer_count
+        "anCount"
     }
 
     pub const fn authority_count(&self) -> &'static str {
-        self.authority_count
+        "nsCount"
     }
 
     pub const fn additional_count(&self) -> &'static str {
-        self.additional_count
+        "arCount"
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DnsQueryHeaderSchema {
-    id: &'static str,
-    opcode: &'static str,
-    rcode: &'static str,
-    qr: &'static str,
-    aa: &'static str,
-    tc: &'static str,
-    rd: &'static str,
-    ra: &'static str,
-    ad: &'static str,
-    cd: &'static str,
-    question_count: &'static str,
-    answer_count: &'static str,
-    authority_count: &'static str,
-    additional_count: &'static str,
-}
-
-impl Default for DnsQueryHeaderSchema {
-    fn default() -> Self {
-        let header_common_schema = DnsMessageHeaderCommonSchema::default();
-        Self {
-            id: header_common_schema.id,
-            opcode: header_common_schema.opcode,
-            rcode: header_common_schema.rcode,
-            qr: header_common_schema.qr,
-            aa: "aa",
-            tc: "tc",
-            rd: "rd",
-            ra: "ra",
-            ad: "ad",
-            cd: "cd",
-            question_count: "qdCount",
-            answer_count: "anCount",
-            authority_count: "nsCount",
-            additional_count: "arCount",
-        }
-    }
-}
+#[derive(Debug, Default, Clone)]
+pub struct DnsUpdateHeaderSchema;
 
 impl DnsUpdateHeaderSchema {
+    pub fn schema_definition(&self) -> Collection<Field> {
+        btreemap! {
+            self.id() => Kind::integer(),
+            self.opcode() => Kind::integer(),
+            self.rcode() => Kind::integer(),
+            self.qr() => Kind::integer(),
+            self.zone_count() => Kind::integer().or_undefined(),
+            self.prerequisite_count() => Kind::integer().or_undefined(),
+            self.update_count() => Kind::integer().or_undefined(),
+            self.additional_count() => Kind::integer().or_undefined(),
+        }
+        .into()
+    }
+
     pub const fn id(&self) -> &'static str {
-        self.id
+        DnsMessageHeaderCommonSchema::id()
     }
 
     pub const fn opcode(&self) -> &'static str {
-        self.opcode
+        DnsMessageHeaderCommonSchema::opcode()
     }
 
     pub const fn rcode(&self) -> &'static str {
-        self.rcode
+        DnsMessageHeaderCommonSchema::rcode()
     }
 
     pub const fn qr(&self) -> &'static str {
-        self.qr
+        DnsMessageHeaderCommonSchema::qr()
     }
 
     pub const fn zone_count(&self) -> &'static str {
-        self.zone_count
+        "zoCount"
     }
 
     pub const fn prerequisite_count(&self) -> &'static str {
-        self.prerequisite_count
+        "prCount"
     }
 
     pub const fn update_count(&self) -> &'static str {
-        self.update_count
+        "upCount"
     }
 
     pub const fn additional_count(&self) -> &'static str {
-        self.additional_count
+        "adCount"
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DnsUpdateHeaderSchema {
-    id: &'static str,
-    opcode: &'static str,
-    rcode: &'static str,
-    qr: &'static str,
-    zone_count: &'static str,
-    prerequisite_count: &'static str,
-    update_count: &'static str,
-    additional_count: &'static str,
-}
-
-impl Default for DnsUpdateHeaderSchema {
-    fn default() -> Self {
-        let header_common_schema = DnsMessageHeaderCommonSchema::default();
-        Self {
-            id: header_common_schema.id,
-            opcode: header_common_schema.opcode,
-            rcode: header_common_schema.rcode,
-            qr: header_common_schema.qr,
-            zone_count: "zoCount",
-            prerequisite_count: "prCount",
-            update_count: "upCount",
-            additional_count: "adCount",
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DnsMessageOptPseudoSectionSchema {
-    extended_rcode: &'static str,
-    version: &'static str,
-    do_flag: &'static str,
-    udp_max_payload_size: &'static str,
-    options: &'static str,
-}
-
-impl Default for DnsMessageOptPseudoSectionSchema {
-    fn default() -> Self {
-        Self {
-            extended_rcode: "extendedRcode",
-            version: "ednsVersion",
-            do_flag: "do",
-            udp_max_payload_size: "udpPayloadSize",
-            options: "options",
-        }
-    }
-}
+#[derive(Debug, Default, Clone)]
+pub struct DnsMessageOptPseudoSectionSchema;
 
 impl DnsMessageOptPseudoSectionSchema {
+    pub fn schema_definition(
+        &self,
+        dns_message_option_schema: &DnsMessageOptionSchema,
+    ) -> Collection<Field> {
+        btreemap! {
+            self.extended_rcode() => Kind::integer(),
+            self.version() => Kind::integer(),
+            self.do_flag() => Kind::boolean(),
+            self.udp_max_payload_size() => Kind::integer(),
+            self.options() => Kind::array(
+                Collection::from_unknown(Kind::object(dns_message_option_schema.schema_definition()))
+            ).or_undefined(),
+        }
+        .into()
+    }
+
     pub const fn extended_rcode(&self) -> &'static str {
-        self.extended_rcode
+        "extendedRcode"
     }
 
     pub const fn version(&self) -> &'static str {
-        self.version
+        "ednsVersion"
     }
 
     pub const fn do_flag(&self) -> &'static str {
-        self.do_flag
+        "do"
     }
 
     pub const fn udp_max_payload_size(&self) -> &'static str {
-        self.udp_max_payload_size
+        "udpPayloadSize"
     }
 
     pub const fn options(&self) -> &'static str {
-        self.options
+        "options"
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DnsMessageOptionSchema {
-    opt_code: &'static str,
-    opt_name: &'static str,
-    opt_data: &'static str,
-}
-
-impl Default for DnsMessageOptionSchema {
-    fn default() -> Self {
-        Self {
-            opt_code: "optCode",
-            opt_name: "optName",
-            opt_data: "optValue",
-        }
-    }
-}
+#[derive(Debug, Default, Clone)]
+pub struct DnsMessageOptionSchema;
 
 impl DnsMessageOptionSchema {
+    pub fn schema_definition(&self) -> Collection<Field> {
+        btreemap! {
+            self.opt_code() => Kind::integer(),
+            self.opt_name() => Kind::bytes(),
+            self.opt_data() => Kind::bytes(),
+        }
+        .into()
+    }
+
     pub const fn opt_code(&self) -> &'static str {
-        self.opt_code
+        "optCode"
     }
 
     pub const fn opt_name(&self) -> &'static str {
-        self.opt_name
+        "optName"
     }
 
     pub const fn opt_data(&self) -> &'static str {
-        self.opt_data
+        "optValue"
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DnsRecordSchema {
-    name: &'static str,
-    record_type: &'static str,
-    record_type_id: &'static str,
-    ttl: &'static str,
-    class: &'static str,
-    rdata: &'static str,
-    rdata_bytes: &'static str,
-}
-
-impl Default for DnsRecordSchema {
-    fn default() -> Self {
-        Self {
-            name: "domainName",
-            record_type: "recordType",
-            record_type_id: "recordTypeId",
-            ttl: "ttl",
-            class: "class",
-            rdata: "rData",
-            rdata_bytes: "rDataBytes",
-        }
-    }
-}
+#[derive(Debug, Default, Clone)]
+pub struct DnsRecordSchema;
 
 impl DnsRecordSchema {
+    pub fn schema_definition(&self) -> Collection<Field> {
+        btreemap! {
+            self.name() => Kind::bytes(),
+            self.record_type() => Kind::bytes().or_undefined(),
+            self.record_type_id() => Kind::integer(),
+            self.ttl() => Kind::integer(),
+            self.class() => Kind::bytes(),
+            self.rdata() => Kind::bytes(),
+            self.rdata_bytes() => Kind::bytes().or_undefined(),
+        }
+        .into()
+    }
+
     pub const fn name(&self) -> &'static str {
-        self.name
+        "domainName"
     }
 
     pub const fn record_type(&self) -> &'static str {
-        self.record_type
+        "recordType"
     }
 
     pub const fn record_type_id(&self) -> &'static str {
-        self.record_type_id
+        "recordTypeId"
     }
 
     pub const fn ttl(&self) -> &'static str {
-        self.ttl
+        "ttl"
     }
 
     pub const fn class(&self) -> &'static str {
-        self.class
+        "class"
     }
 
     pub const fn rdata(&self) -> &'static str {
-        self.rdata
+        "rData"
     }
 
     pub const fn rdata_bytes(&self) -> &'static str {
-        self.rdata_bytes
+        "rDataBytes"
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DnsQueryQuestionSchema {
-    name: &'static str,
-    question_type: &'static str,
-    question_type_id: &'static str,
-    class: &'static str,
-}
-
-impl Default for DnsQueryQuestionSchema {
-    fn default() -> Self {
-        Self {
-            name: "domainName",
-            question_type: "questionType",
-            question_type_id: "questionTypeId",
-            class: "class",
-        }
-    }
-}
+#[derive(Debug, Default, Clone)]
+pub struct DnsQueryQuestionSchema;
 
 impl DnsQueryQuestionSchema {
+    pub fn schema_definition(&self) -> Collection<Field> {
+        btreemap! {
+            self.class() => Kind::bytes(),
+            self.name() => Kind::bytes(),
+            self.question_type() => Kind::bytes(),
+            self.question_type_id() => Kind::integer(),
+        }
+        .into()
+    }
+
     pub const fn name(&self) -> &'static str {
-        self.name
+        "domainName"
     }
 
     pub const fn question_type(&self) -> &'static str {
-        self.question_type
+        "questionType"
     }
 
     pub const fn question_type_id(&self) -> &'static str {
-        self.question_type_id
+        "questionTypeId"
     }
 
     pub const fn class(&self) -> &'static str {
-        self.class
+        "class"
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DnsUpdateZoneInfoSchema {
-    zone_name: &'static str,
-    zone_class: &'static str,
-    zone_type: &'static str,
-    zone_type_id: &'static str,
-}
+#[derive(Debug, Default, Clone)]
+pub struct DnsUpdateZoneInfoSchema;
 
 impl DnsUpdateZoneInfoSchema {
+    pub fn schema_definition(&self) -> Collection<Field> {
+        btreemap! {
+            self.zone_name() => Kind::bytes(),
+            self.zone_type() => Kind::bytes().or_undefined(),
+            self.zone_type_id() => Kind::integer(),
+            self.zone_class() => Kind::bytes(),
+        }
+        .into()
+    }
+
     pub const fn zone_name(&self) -> &'static str {
-        self.zone_name
+        "zName"
     }
 
     pub const fn zone_class(&self) -> &'static str {
-        self.zone_class
+        "zClass"
     }
 
     pub const fn zone_type(&self) -> &'static str {
-        self.zone_type
+        "zType"
     }
 
     pub const fn zone_type_id(&self) -> &'static str {
-        self.zone_type_id
-    }
-}
-
-impl Default for DnsUpdateZoneInfoSchema {
-    fn default() -> Self {
-        Self {
-            zone_name: "zName",
-            zone_class: "zClass",
-            zone_type: "zType",
-            zone_type_id: "zTypeId",
-        }
+        "zTypeId"
     }
 }
