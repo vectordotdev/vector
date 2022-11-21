@@ -8,11 +8,12 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use lookup::path;
+use lookup::{owned_value_path, path};
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use value::Kind;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::NamedComponent;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::config::{LegacyKey, LogNamespace, Output};
 use vector_core::event::Event;
 use vector_core::ByteSizeOf;
 
@@ -191,4 +192,29 @@ async fn process_stream(
             Err(())
         }
     }
+}
+
+fn outputs(
+    log_namespace: LogNamespace,
+    host_key: &Option<String>,
+    decoding: &DeserializerConfig,
+    source_name: &'static str,
+) -> Vec<Output> {
+    let host_key_path = host_key.as_ref().map_or_else(
+        || owned_value_path!(log_schema().host_key()),
+        |x| owned_value_path!(x),
+    );
+
+    let schema_definition = decoding
+        .schema_definition(log_namespace)
+        .with_source_metadata(
+            source_name,
+            Some(LegacyKey::InsertIfEmpty(host_key_path)),
+            &owned_value_path!("host"),
+            Kind::bytes(),
+            None,
+        )
+        .with_standard_vector_source_metadata();
+
+    vec![Output::default(decoding.output_type()).with_schema_definition(schema_definition)]
 }
