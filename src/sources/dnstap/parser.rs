@@ -181,65 +181,11 @@ impl<'a> DnstapParser<'a> {
 
     fn parse_dnstap_message(&mut self, dnstap_message: DnstapMessage) -> Result<()> {
         if let Some(socket_family) = dnstap_message.socket_family {
-            self.insert(
-                self.event_schema.dnstap_message_schema().socket_family(),
-                to_socket_family_name(socket_family)?.to_string(),
-            );
-
-            if let Some(socket_protocol) = dnstap_message.socket_protocol {
-                self.insert(
-                    self.event_schema.dnstap_message_schema().socket_protocol(),
-                    to_socket_protocol_name(socket_protocol)?.to_string(),
-                );
-            }
-
-            if let Some(query_address) = dnstap_message.query_address {
-                let source_address = if socket_family == 1 {
-                    let address_buffer: [u8; 4] = query_address[0..4].try_into()?;
-                    IpAddr::V4(Ipv4Addr::from(address_buffer))
-                } else {
-                    let address_buffer: [u8; 16] = query_address[0..16].try_into()?;
-                    IpAddr::V6(Ipv6Addr::from(address_buffer))
-                };
-
-                self.insert(
-                    self.event_schema.dnstap_message_schema().query_address(),
-                    source_address.to_string(),
-                );
-            }
-
-            if let Some(query_port) = dnstap_message.query_port {
-                self.insert(
-                    self.event_schema.dnstap_message_schema().query_port(),
-                    query_port,
-                );
-            }
-
-            if let Some(response_address) = dnstap_message.response_address {
-                let response_addr = if socket_family == 1 {
-                    let address_buffer: [u8; 4] = response_address[0..4].try_into()?;
-                    IpAddr::V4(Ipv4Addr::from(address_buffer))
-                } else {
-                    let address_buffer: [u8; 16] = response_address[0..16].try_into()?;
-                    IpAddr::V6(Ipv6Addr::from(address_buffer))
-                };
-
-                self.insert(
-                    self.event_schema.dnstap_message_schema().response_address(),
-                    response_addr.to_string(),
-                );
-            }
-
-            if let Some(response_port) = dnstap_message.response_port {
-                self.insert(
-                    self.event_schema.dnstap_message_schema().response_port(),
-                    response_port,
-                );
-            }
+            self.parse_dnstap_message_socket_family(socket_family, &dnstap_message)?;
         }
 
-        if let Some(query_zone) = dnstap_message.query_zone {
-            let mut decoder: BinDecoder = BinDecoder::new(&query_zone);
+        if let Some(query_zone) = dnstap_message.query_zone.as_ref() {
+            let mut decoder: BinDecoder = BinDecoder::new(query_zone);
             match Name::read(&mut decoder) {
                 Ok(raw_data) => {
                     self.insert(
@@ -270,116 +216,44 @@ impl<'a> DnstapParser<'a> {
         let response_message_key = self.event_schema.dnstap_message_schema().response_message();
 
         if let Some(query_time_sec) = dnstap_message.query_time_sec {
-            let (time_in_nanosec, query_time_nsec) = match dnstap_message.query_time_nsec {
-                Some(nsec) => (
-                    query_time_sec as i64 * 1_000_000_000_i64 + nsec as i64,
-                    nsec,
-                ),
-                None => (query_time_sec as i64 * 1_000_000_000_i64, 0),
-            };
-
-            if DNSTAP_MESSAGE_REQUEST_TYPE_IDS.contains(&dnstap_message_type_id) {
-                self.log_time(
-                    self.event_schema.dnstap_root_data_schema().time(),
-                    time_in_nanosec,
-                    self.event_schema.dnstap_root_data_schema().time_precision(),
-                    "ns",
-                );
-
-                let timestamp = Utc.timestamp(query_time_sec.try_into().unwrap(), query_time_nsec);
-                self.insert(
-                    self.event_schema.dnstap_root_data_schema().timestamp(),
-                    timestamp,
-                );
-            }
-
-            if dnstap_message.query_message != None {
-                self.parent_key_path.push_field(request_message_key);
-
-                let time_key_name = if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
-                    self.event_schema.dns_query_message_schema().time()
-                } else {
-                    self.event_schema.dns_update_message_schema().time()
-                };
-
-                let time_precision_key_name =
-                    if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
-                        self.event_schema
-                            .dns_query_message_schema()
-                            .time_precision()
-                    } else {
-                        self.event_schema
-                            .dns_update_message_schema()
-                            .time_precision()
-                    };
-
-                self.log_time(
-                    time_key_name,
-                    time_in_nanosec,
-                    time_precision_key_name,
-                    "ns",
-                );
-
-                self.parent_key_path.segments.pop();
-            }
+            self.parse_dnstap_message_time(
+                query_time_sec,
+                dnstap_message.query_time_nsec,
+                dnstap_message_type_id,
+                request_message_key,
+                dnstap_message.query_message.as_ref(),
+                &DNSTAP_MESSAGE_REQUEST_TYPE_IDS,
+            );
         }
 
         if let Some(response_time_sec) = dnstap_message.response_time_sec {
-            let (time_in_nanosec, response_time_nsec) = match dnstap_message.response_time_nsec {
-                Some(nsec) => (
-                    response_time_sec as i64 * 1_000_000_000_i64 + nsec as i64,
-                    nsec,
-                ),
-                None => (response_time_sec as i64 * 1_000_000_000_i64, 0),
-            };
-
-            if DNSTAP_MESSAGE_RESPONSE_TYPE_IDS.contains(&dnstap_message_type_id) {
-                self.log_time(
-                    self.event_schema.dnstap_root_data_schema().time(),
-                    time_in_nanosec,
-                    self.event_schema.dnstap_root_data_schema().time_precision(),
-                    "ns",
-                );
-
-                let timestamp =
-                    Utc.timestamp(response_time_sec.try_into().unwrap(), response_time_nsec);
-                self.insert(
-                    self.event_schema.dnstap_root_data_schema().timestamp(),
-                    timestamp,
-                );
-            }
-
-            if dnstap_message.response_message != None {
-                self.parent_key_path.push_field(response_message_key);
-
-                let time_key_name = if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
-                    self.event_schema.dns_query_message_schema().time()
-                } else {
-                    self.event_schema.dns_update_message_schema().time()
-                };
-
-                let time_precision_key_name =
-                    if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
-                        self.event_schema
-                            .dns_query_message_schema()
-                            .time_precision()
-                    } else {
-                        self.event_schema
-                            .dns_update_message_schema()
-                            .time_precision()
-                    };
-
-                self.log_time(
-                    time_key_name,
-                    time_in_nanosec,
-                    time_precision_key_name,
-                    "ns",
-                );
-
-                self.parent_key_path.segments.pop();
-            }
+            self.parse_dnstap_message_time(
+                response_time_sec,
+                dnstap_message.response_time_nsec,
+                dnstap_message_type_id,
+                response_message_key,
+                dnstap_message.response_message.as_ref(),
+                &DNSTAP_MESSAGE_RESPONSE_TYPE_IDS,
+            );
         }
 
+        self.parse_dnstap_message_type(
+            dnstap_message_type_id,
+            dnstap_message,
+            request_message_key,
+            response_message_key,
+        )?;
+
+        Ok(())
+    }
+
+    fn parse_dnstap_message_type(
+        &mut self,
+        dnstap_message_type_id: i32,
+        dnstap_message: DnstapMessage,
+        request_message_key: &'static str,
+        response_message_key: &'static str,
+    ) -> Result<()> {
         match dnstap_message_type_id {
             1..=12 => {
                 if let Some(query_message) = dnstap_message.query_message {
@@ -453,6 +327,128 @@ impl<'a> DnstapParser<'a> {
         }
 
         Ok(())
+    }
+
+    fn parse_dnstap_message_time(
+        &mut self,
+        time_sec: u64,
+        time_nsec: Option<u32>,
+        dnstap_message_type_id: i32,
+        message_key: &str,
+        message: Option<&Vec<u8>>,
+        type_ids: &HashSet<i32>,
+    ) {
+        let (time_in_nanosec, query_time_nsec) = match time_nsec {
+            Some(nsec) => (time_sec as i64 * 1_000_000_000_i64 + nsec as i64, nsec),
+            None => (time_sec as i64 * 1_000_000_000_i64, 0),
+        };
+
+        if type_ids.contains(&dnstap_message_type_id) {
+            self.log_time(
+                self.event_schema.dnstap_root_data_schema().time(),
+                time_in_nanosec,
+                self.event_schema.dnstap_root_data_schema().time_precision(),
+                "ns",
+            );
+
+            let timestamp = Utc.timestamp(time_sec.try_into().unwrap(), query_time_nsec);
+            self.insert(
+                self.event_schema.dnstap_root_data_schema().timestamp(),
+                timestamp,
+            );
+        }
+
+        if message != None {
+            self.parent_key_path.push_field(message_key);
+
+            let time_key_name = if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
+                self.event_schema.dns_query_message_schema().time()
+            } else {
+                self.event_schema.dns_update_message_schema().time()
+            };
+
+            let time_precision_key_name =
+                if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
+                    self.event_schema
+                        .dns_query_message_schema()
+                        .time_precision()
+                } else {
+                    self.event_schema
+                        .dns_update_message_schema()
+                        .time_precision()
+                };
+
+            self.log_time(
+                time_key_name,
+                time_in_nanosec,
+                time_precision_key_name,
+                "ns",
+            );
+
+            self.parent_key_path.segments.pop();
+        }
+    }
+
+    fn parse_dnstap_message_socket_family(
+        &mut self,
+        socket_family: i32,
+        dnstap_message: &DnstapMessage,
+    ) -> Result<()> {
+        self.insert(
+            self.event_schema.dnstap_message_schema().socket_family(),
+            to_socket_family_name(socket_family)?.to_string(),
+        );
+
+        if let Some(socket_protocol) = dnstap_message.socket_protocol {
+            self.insert(
+                self.event_schema.dnstap_message_schema().socket_protocol(),
+                to_socket_protocol_name(socket_protocol)?.to_string(),
+            );
+        }
+
+        if let Some(query_address) = dnstap_message.query_address.as_ref() {
+            let source_address = if socket_family == 1 {
+                let address_buffer: [u8; 4] = query_address[0..4].try_into()?;
+                IpAddr::V4(Ipv4Addr::from(address_buffer))
+            } else {
+                let address_buffer: [u8; 16] = query_address[0..16].try_into()?;
+                IpAddr::V6(Ipv6Addr::from(address_buffer))
+            };
+
+            self.insert(
+                self.event_schema.dnstap_message_schema().query_address(),
+                source_address.to_string(),
+            );
+        }
+
+        if let Some(query_port) = dnstap_message.query_port {
+            self.insert(
+                self.event_schema.dnstap_message_schema().query_port(),
+                query_port,
+            );
+        }
+
+        if let Some(response_address) = dnstap_message.response_address.as_ref() {
+            let response_addr = if socket_family == 1 {
+                let address_buffer: [u8; 4] = response_address[0..4].try_into()?;
+                IpAddr::V4(Ipv4Addr::from(address_buffer))
+            } else {
+                let address_buffer: [u8; 16] = response_address[0..16].try_into()?;
+                IpAddr::V6(Ipv6Addr::from(address_buffer))
+            };
+
+            self.insert(
+                self.event_schema.dnstap_message_schema().response_address(),
+                response_addr.to_string(),
+            );
+        }
+
+        Ok(if let Some(response_port) = dnstap_message.response_port {
+            self.insert(
+                self.event_schema.dnstap_message_schema().response_port(),
+                response_port,
+            );
+        })
     }
 
     fn log_time(

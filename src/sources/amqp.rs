@@ -20,7 +20,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{path, PathPrefix};
+use lookup::{metadata_path, path, PathPrefix};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
@@ -234,29 +234,22 @@ fn populate_event(
     // This handles the transition from the original timestamp logic. Originally the
     // `timestamp_key` was populated by the `properties.timestamp()` time on the message, falling
     // back to calling `now()`.
-    match (log_namespace, timestamp) {
-        (LogNamespace::Vector, None) => {
-            log.metadata_mut()
-                .value_mut()
-                .insert(path!("vector", "ingest_timestamp"), Utc::now());
-        }
-        (LogNamespace::Vector, Some(timestamp)) => {
-            log.metadata_mut()
-                .value_mut()
-                .insert(path!(AmqpSourceConfig::NAME, "timestamp"), timestamp);
+    match log_namespace {
+        LogNamespace::Vector => {
+            if let Some(timestamp) = timestamp {
+                log.insert(
+                    metadata_path!(AmqpSourceConfig::NAME, "timestamp"),
+                    timestamp,
+                );
+            };
 
-            log.metadata_mut()
-                .value_mut()
-                .insert(path!("vector", "ingest_timestamp"), Utc::now());
+            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
-        (LogNamespace::Legacy, None) => {
+        LogNamespace::Legacy => {
             log.try_insert(
                 (PathPrefix::Event, log_schema().timestamp_key()),
-                Utc::now(),
+                timestamp.unwrap_or_else(Utc::now),
             );
-        }
-        (LogNamespace::Legacy, Some(timestamp)) => {
-            log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
         }
     };
 }

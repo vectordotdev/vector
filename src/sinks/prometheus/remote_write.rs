@@ -680,7 +680,7 @@ mod integration_tests {
                     }
                     _ => panic!("Unhandled metric value, fix the test"),
                 }
-                for (tag, value) in metric.tags().unwrap() {
+                for (tag, value) in metric.tags().unwrap().iter_single() {
                     assert_eq!(output[tag], Value::String(value.to_string()));
                 }
                 let timestamp =

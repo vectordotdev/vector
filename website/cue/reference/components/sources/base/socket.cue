@@ -118,6 +118,11 @@ base: components: sources: socket: configuration: {
 			type: uint: {}
 		}
 	}
+	log_namespace: {
+		description: "The namespace to use for logs. This overrides the global setting."
+		required:    false
+		type: bool: {}
+	}
 	max_length: {
 		description: """
 			The maximum buffer size, in bytes, of incoming messages.

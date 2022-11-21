@@ -117,13 +117,6 @@ impl Application {
         let mut rt_builder = runtime::Builder::new_multi_thread();
         rt_builder.enable_all().thread_name("vector-worker");
 
-        #[cfg(feature = "allocation-tracing")]
-        {
-            rt_builder.on_thread_start(|| {
-                crate::internal_telemetry::allocations::init_thread_id();
-            });
-        }
-
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
                 #[allow(clippy::print_stderr)]
