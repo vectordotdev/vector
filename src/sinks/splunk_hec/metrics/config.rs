@@ -163,6 +163,7 @@ impl HecMetricsSinkConfig {
                 client,
                 Arc::clone(&http_request_builder),
                 EndpointTarget::Event,
+                false,
             ));
 
         let service = HecService::new(
