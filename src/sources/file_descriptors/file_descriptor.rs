@@ -118,6 +118,7 @@ impl SourceConfig for FileDescriptorSourceConfig {
 
 #[cfg(test)]
 mod tests {
+    use lookup::path;
     use nix::unistd::{close, pipe, write};
 
     use super::*;
@@ -172,6 +173,55 @@ mod tests {
                     .to_string_lossy()
                     .into_owned())
             );
+
+            let event = stream.next().await;
+            assert!(event.is_none());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn file_descriptor_decodes_line_vector_namespace() {
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let (read_fd, write_fd) = pipe().unwrap();
+            let config = FileDescriptorSourceConfig {
+                max_length: crate::serde::default_max_length(),
+                host_key: Default::default(),
+                framing: None,
+                decoding: default_decoding(),
+                fd: read_fd as u32,
+                log_namespace: Some(true),
+            };
+
+            let mut stream = rx;
+
+            write(write_fd, b"hello world\nhello world again\n").unwrap();
+            close(write_fd).unwrap();
+
+            let context = SourceContext::new_test(tx, None);
+            config.build(context).await.unwrap().await.unwrap();
+
+            let event = stream.next().await;
+            let event = event.unwrap();
+            let log = event.as_log();
+            let meta = log.metadata().value();
+
+            assert_eq!(&vrl::value!("hello world"), log.value());
+            assert_eq!(
+                meta.get(path!("vector", "source_type")).unwrap(),
+                &vrl::value!("file_descriptor")
+            );
+            assert!(meta
+                .get(path!("vector", "ingest_timestamp"))
+                .unwrap()
+                .is_timestamp());
+
+            let event = stream.next().await;
+            let event = event.unwrap();
+            let log = event.as_log();
+
+            assert_eq!(&vrl::value!("hello world again"), log.value());
 
             let event = stream.next().await;
             assert!(event.is_none());
