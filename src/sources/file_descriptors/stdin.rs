@@ -133,6 +133,7 @@ mod tests {
         SourceSender,
     };
     use futures::StreamExt;
+    use lookup::path;
 
     #[test]
     fn generate_config() {
@@ -169,6 +170,48 @@ mod tests {
                     .to_string_lossy()
                     .into_owned())
             );
+
+            let event = stream.next().await;
+            assert!(event.is_none());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn stdin_decodes_line_vector_namespace() {
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let config = StdinConfig::default();
+            let buf = Cursor::new("hello world\nhello world again");
+
+            config
+                .source(buf, ShutdownSignal::noop(), tx, LogNamespace::Vector)
+                .unwrap()
+                .await
+                .unwrap();
+
+            let mut stream = rx;
+
+            let event = stream.next().await;
+            let event = event.unwrap();
+            let log = event.as_log();
+            let meta = log.metadata().value();
+
+            assert_eq!(&vrl::value!("hello world"), log.value());
+            assert_eq!(
+                meta.get(path!("vector", "source_type")).unwrap(),
+                &vrl::value!("stdin")
+            );
+            assert!(meta
+                .get(path!("vector", "ingest_timestamp"))
+                .unwrap()
+                .is_timestamp());
+
+            let event = stream.next().await;
+            let event = event.unwrap();
+            let log = event.as_log();
+
+            assert_eq!(&vrl::value!("hello world again"), log.value());
 
             let event = stream.next().await;
             assert!(event.is_none());
