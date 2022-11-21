@@ -143,16 +143,21 @@ pub struct VectorConfig {
     log_namespace: Option<bool>,
 }
 
-impl GenerateConfig for VectorConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+impl Default for VectorConfig {
+    fn default() -> Self {
+        Self {
             version: None,
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
             acknowledgements: Default::default(),
             log_namespace: None,
-        })
-        .unwrap()
+        }
+    }
+}
+
+impl GenerateConfig for VectorConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(VectorConfig::default()).unwrap()
     }
 }
 
@@ -199,9 +204,62 @@ impl SourceConfig for VectorConfig {
 
 #[cfg(test)]
 mod test {
+    use lookup::{owned_value_path, LookupBuf};
+    use value::{kind::Collection, Kind};
+    use vector_core::{config::LogNamespace, schema::Definition};
+
+    use crate::config::SourceConfig;
+
+    use super::VectorConfig;
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::VectorConfig>();
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = VectorConfig::default();
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                );
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = VectorConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
+
+        assert_eq!(definition, expected_definition)
     }
 }
 
