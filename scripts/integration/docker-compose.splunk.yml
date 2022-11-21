@@ -35,6 +35,7 @@ services:
     environment:
       - SPLUNK_HEC_ADDRESS=http://splunk-hec:8088
       - SPLUNK_API_ADDRESS=https://splunk-hec:8089
+      - SPLUNK_VERSION=${SPLUNK_VERSION}
     volumes:
       - ${PWD}:/code
       - target:/code/target
