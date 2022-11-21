@@ -194,6 +194,8 @@ async fn process_stream(
     }
 }
 
+/// Builds the `vector_core::config::Outputs` for stdin and
+/// file_descriptor sources.
 fn outputs(
     log_namespace: LogNamespace,
     host_key: &Option<String>,
