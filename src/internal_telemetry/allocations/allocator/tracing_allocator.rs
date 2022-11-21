@@ -46,7 +46,7 @@ impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
 }
 
 unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
-    #[track_caller]
+    #[inline]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
         let (group_id_ptr, object_ptr, _wrapped_layout) =
             self.get_wrapped_allocation(object_layout);
@@ -67,7 +67,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
         object_ptr
     }
 
-    #[track_caller]
+    #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
         // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
         // requested layout, not the wrapped layout that was actually allocated.
