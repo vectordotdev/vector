@@ -5,8 +5,6 @@ use std::sync::{
 
 use tokio::sync::{oneshot, Notify};
 
-use super::ComponentType;
-
 struct WaitGroupState {
     registered: AtomicUsize,
     done: AtomicUsize,
@@ -154,69 +152,42 @@ impl WaitHandle {
     }
 }
 
-#[derive(PartialEq)]
-enum ResourcePosition {
-    None,
-    Input,
-    Output,
-}
-
-pub struct Configured {
-    position: ResourcePosition,
+pub struct Configuring {
     tasks_started: WaitGroup,
     tasks_completed: WaitGroup,
     shutdown_trigger: WaitTrigger,
 }
 
 pub struct Started {
-    position: ResourcePosition,
     tasks_completed: Option<WaitGroup>,
     shutdown_trigger: Option<WaitTrigger>,
 }
 
-/// Coordination primitive for external resources.
+/// Coordination primitive for external tasks.
 ///
 /// When validating a component, an external resource may be spun up either to provide the inputs to
-/// the component or to act as the collector of outputs from the component. Depending on which
-/// orientation the external resource is in, the validator must trigger it to shutdown/finish its
-/// work, and wait for that to occur, at different points in the validator lifecycle.
+/// the component or to act as the collector of outputs from the component. Additionally, other
+/// tasks may be spawned to forward data between parts of the topology. The validation runner must
+/// be able to ensure that these tasks have started, and completed, at different stages of the
+/// validation run, to ensure all inputs have been processed, or that all outputs have been received.
 ///
-/// This mechanism is position-aware, meaning that it is constructed according to the external
-/// resource. The validator logic can blindly attempt to trigger position-specific operations --
-/// i.e. "trigger the shutdown of the external resource if it's in the input position" -- and this
-/// coordinator handles firing off those operations only if the external resource is actually in
-/// that position.
+/// This coordinator uses a state machine that is encoded into the type of the coordinator itself to
+/// ensure that once it has begin configured -- tasks are registered -- that it can only be used in
+/// a forward direction: waiting for all tasks to start, and after that, signalling all tasks to
+/// shutdown and waiting for them to do so.
 ///
-/// This allows the calling code (validator logic) to be agnostic to the external resource position
-/// without having to manage an excess of state (holding values in `Option` so they can be consumed,
-/// tracking if things have already been triggered, etc).
-pub struct ExternalResourceCoordinator<State> {
+/// This approach provides a stronger mechanism for avoiding bugs such as adding registered tasks
+/// after waiting for all tasks to start, and so on.
+pub struct TaskCoordinator<State> {
     state: State,
 }
 
-impl ExternalResourceCoordinator<()> {
-    /// Creates a new `ExternalResourceCoordinator` based on the given component type.
-    ///
-    /// If the component type is a transform, the coordinator functions in a no-op mode:
-    /// triggering/waiting for tasks to start and complete will return immediately.
-    pub fn from_component_type(
-        component_type: ComponentType,
-    ) -> (ExternalResourceCoordinator<Configured>, WaitHandle) {
-        let position = match component_type {
-            ComponentType::Source => ResourcePosition::Input,
-            ComponentType::Sink => ResourcePosition::Output,
-            // Transforms have no external resources, so we set the position to "none" which is a
-            // sentinel value for "don't ever actually trigger and wait for anything, just return
-            // immediately", so that the code using `ExternalResourceCoordinator` can be generic
-            // over all component types.
-            ComponentType::Transform => ResourcePosition::None,
-        };
-
+impl TaskCoordinator<()> {
+    /// Creates a new `TaskCoordinator`.
+    pub fn new() -> (TaskCoordinator<Configuring>, WaitHandle) {
         let (shutdown_trigger, shutdown_handle) = WaitTrigger::new();
-
-        let coordinator = ExternalResourceCoordinator {
-            state: Configured {
-                position,
+        let coordinator = TaskCoordinator {
+            state: Configuring {
                 tasks_started: WaitGroup::new(),
                 tasks_completed: WaitGroup::new(),
                 shutdown_trigger,
@@ -227,7 +198,7 @@ impl ExternalResourceCoordinator<()> {
     }
 }
 
-impl ExternalResourceCoordinator<Configured> {
+impl TaskCoordinator<Configuring> {
     /// Attachs a new child to the wait group that tracks when tasks have started.
     pub fn track_started(&self) -> WaitGroupChild {
         self.state.tasks_started.add_child()
@@ -239,22 +210,18 @@ impl ExternalResourceCoordinator<Configured> {
     }
 
     /// Waits for all tasks to have marked that they have started.
-    pub async fn wait_for_tasks_to_start(self) -> ExternalResourceCoordinator<Started> {
-        let Configured {
-            position,
+    pub async fn wait_for_tasks_to_start(self) -> TaskCoordinator<Started> {
+        let Configuring {
             mut tasks_started,
             tasks_completed,
             shutdown_trigger,
         } = self.state;
 
-        if position != ResourcePosition::None {
-            tasks_started.wait_for_children().await;
-            debug!("External resource child tasks started.");
-        }
+        tasks_started.wait_for_children().await;
+        debug!("All coordinated tasks reported as having started.");
 
-        ExternalResourceCoordinator {
+        TaskCoordinator {
             state: Started {
-                position,
                 tasks_completed: Some(tasks_completed),
                 shutdown_trigger: Some(shutdown_trigger),
             },
@@ -262,60 +229,29 @@ impl ExternalResourceCoordinator<Configured> {
     }
 }
 
-impl ExternalResourceCoordinator<Started> {
-    /// Triggers the external input resource to shutdown and waits for the resource tasks to mark
-    /// themselves as completed.
-    ///
-    /// If the external resource this coordinator was created for is not an input resource, then
-    /// this method does nothing.
-    ///
-    /// ## Panics
-    ///
-    /// If this coordinator was created for an input resource, and input shutdown has already been
-    /// triggered, this method will panic.
-    pub async fn trigger_and_wait_for_input_shutdown(&mut self) {
-        self.trigger_and_wait_for_shutdown(ResourcePosition::Input)
-            .await;
-    }
-
-    /// Triggers the external output resource to shutdown and waits for the resource tasks to mark
-    /// themselves as completed.
-    ///
-    /// If the external resource this coordinator was created for is not an output resource, then
-    /// this method does nothing.
-    ///
-    /// ## Panics
-    ///
-    /// If this coordinator was created for an output resource, and output shutdown has already been
-    /// triggered, this method will panic.
-    pub async fn trigger_and_wait_for_output_shutdown(&mut self) {
-        self.trigger_and_wait_for_shutdown(ResourcePosition::Output)
-            .await;
-    }
-
-    async fn trigger_and_wait_for_shutdown(&mut self, position: ResourcePosition) {
-        if self.state.position == position {
-            // This function is meant to be cancellation-safe, so trying to trigger multiple times
-            // is fine: once we've signalled to shutdown, we don't need to signal again.
-            if let Some(trigger) = self.state.shutdown_trigger.take() {
-                trigger.trigger();
-                debug!("Triggered external resource child tasks to shutdown.");
-            }
-
-            // This function is meant to be cancellation-safe, so in order to correctly wait for all
-            // children to complete, we need to mutably poll the wait group, and only when we get
-            // past waiting on all children can we actually clear the slot.
-            {
-                debug!("Waiting for external resource child tasks to complete...");
-                let tasks_completed = self
-                    .state
-                    .tasks_completed
-                    .as_mut()
-                    .expect("tasks completed wait group already consumed");
-                tasks_completed.wait_for_children().await;
-                debug!("External resource child tasks completed.");
-            }
-            self.state.tasks_completed.take();
+impl TaskCoordinator<Started> {
+    /// Triggers all coordinated tasks to shutdown, and waits for them to mark themselves as completed.
+    pub async fn trigger_and_wait_for_shutdown(&mut self) {
+        // This function is meant to be cancellation-safe, so trying to trigger multiple times
+        // is fine: once we've signalled to shutdown, we don't need to signal again.
+        if let Some(trigger) = self.state.shutdown_trigger.take() {
+            trigger.trigger();
+            debug!("Triggered coordinated tasks to shutdown.");
         }
+
+        // This function is meant to be cancellation-safe, so in order to correctly wait for all
+        // children to complete, we need to mutably poll the wait group, and only when we get
+        // past waiting on all children can we actually clear the slot.
+        {
+            debug!("Waiting for coordinated tasks to complete...");
+            let tasks_completed = self
+                .state
+                .tasks_completed
+                .as_mut()
+                .expect("tasks completed wait group already consumed");
+            tasks_completed.wait_for_children().await;
+            debug!("All coordinated tasks completed.");
+        }
+        self.state.tasks_completed.take();
     }
 }

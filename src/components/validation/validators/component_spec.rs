@@ -1,3 +1,7 @@
+use vector_core::event::Event;
+
+use crate::components::validation::{ComponentType, TestCaseExpectation};
+
 use super::Validator;
 
 /// Validates that the component meets the requirements of the [Component Specification][component_spec].
@@ -16,7 +20,14 @@ impl Validator for ComponentSpecValidator {
         "component_spec"
     }
 
-    fn into_results(self: Box<Self>) -> Result<Vec<String>, Vec<String>> {
+    fn check_validation(
+        &self,
+        _component_type: ComponentType,
+        _expectation: TestCaseExpectation,
+        _inputs: &[Event],
+        _outputs: &[Event],
+        _telemetry_events: &[Event],
+    ) -> Result<Vec<String>, Vec<String>> {
         Ok(vec![])
     }
 }

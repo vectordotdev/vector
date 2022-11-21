@@ -1,14 +1,19 @@
-use http::Uri;
-
 use crate::{
+    components::validation::{
+        sync::{Configuring, TaskCoordinator},
+        ComponentConfiguration,
+    },
     config::ConfigBuilder,
-    sinks::vector::VectorConfig as VectorSinkConfig,
-    sources::{
-        internal_logs::InternalLogsConfig, internal_metrics::InternalMetricsConfig, Sources,
-    }, test_util::next_http_addr,
+    sinks::{vector::VectorConfig as VectorSinkConfig, Sinks},
+    sources::{vector::VectorConfig as VectorSourceConfig, Sources},
+    test_util::{addr_as_http_uri, next_addr},
+    transforms::Transforms,
 };
 
-use super::edges::ControlledEdge;
+use super::{
+    io::{ControlledEdges, InputEdge, OutputEdge},
+    telemetry::{Telemetry, TelemetryCollector},
+};
 
 const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
 const INTERNAL_METRICS_KEY: &str = "_telemetry_metrics";
@@ -16,49 +21,105 @@ const VECTOR_SINK_KEY: &str = "_telemetry_out";
 
 pub struct TopologyBuilder {
     config_builder: ConfigBuilder,
-    controlled_edge: ControlledEdge,
-    telemetry_listen_addr: Uri,
+    input_edge: Option<InputEdge>,
+    output_edge: Option<OutputEdge>,
 }
 
 impl TopologyBuilder {
-    pub fn from_source(source: Sources) -> Self {
-        let output_listen_addr = next_http_addr();
-        let telemetry_listen_addr = next_http_addr();
+    /// Creates a component topology for the given component configuration.
+    pub fn from_component_configuration(component_configuration: ComponentConfiguration) -> Self {
+        // TODO: Should we take the component type as well, and validate that the component
+        // configuration variant matches the component type?
+        match component_configuration {
+            ComponentConfiguration::Source(source) => Self::from_source(source),
+            ComponentConfiguration::Transform(transform) => Self::from_transform(transform),
+            ComponentConfiguration::Sink(sink) => Self::from_sink(sink),
+        }
+    }
 
-        // Our "controlled" edge is the sink that we'll attach to the source being validated in
-        // order to form a complete topology and shuttle out the input events.
-        let controlled_edge = ControlledEdge::output(output_listen_addr.clone());
-        let output_sink = VectorSinkConfig::from_address(output_listen_addr);
+    /// Creates a component topology for validating a source.
+    fn from_source(source: Sources) -> Self {
+        let (output_edge, output_sink) = build_output_edge();
 
         let mut config_builder = ConfigBuilder::default();
-        config_builder.add_source("test_input", source);
-        config_builder.add_sink("output_sink", &["test_input"], output_sink);
-
-        attach_internal_telemetry_components(&mut config_builder, telemetry_listen_addr.clone());
+        config_builder.add_source("test_source", source);
+        config_builder.add_sink("output_sink", &["test_source"], output_sink);
 
         Self {
             config_builder,
-            controlled_edge,
-            telemetry_listen_addr,
+            input_edge: None,
+            output_edge: Some(output_edge),
         }
+    }
+
+    fn from_transform(transform: Transforms) -> Self {
+        let (input_edge, input_source) = build_input_edge();
+        let (output_edge, output_sink) = build_output_edge();
+
+        let mut config_builder = ConfigBuilder::default();
+        config_builder.add_source("input_source", input_source);
+        config_builder.add_transform("test_transform", &["input_source"], transform);
+        config_builder.add_sink("output_sink", &["test_transform"], output_sink);
+
+        Self {
+            config_builder,
+            input_edge: Some(input_edge),
+            output_edge: Some(output_edge),
+        }
+    }
+
+    fn from_sink(sink: Sinks) -> Self {
+        let (input_edge, input_source) = build_input_edge();
+
+        let mut config_builder = ConfigBuilder::default();
+        config_builder.add_source("input_source", input_source);
+        config_builder.add_sink("test_sink", &["input_source"], sink);
+
+        Self {
+            config_builder,
+            input_edge: Some(input_edge),
+            output_edge: None,
+        }
+    }
+
+    /// Finalizes the builder.
+    ///
+    /// The finalized configuration builder is returned, which can be used to create the running
+    /// topology itself. All controlled edges are built and spawned, and a channel sender/receiver
+    /// is provided for them. Additionally, the telemetry collector is also spawned and a channel
+    /// receiver for telemetry events is provided.
+    pub fn finalize(
+        mut self,
+        task_coordinator: &TaskCoordinator<Configuring>,
+    ) -> (ConfigBuilder, ControlledEdges, TelemetryCollector) {
+        let controlled_edges = ControlledEdges {
+            input: self
+                .input_edge
+                .map(|edge| edge.spawn_input_client(task_coordinator)),
+            output: self
+                .output_edge
+                .map(|edge| edge.spawn_output_server(task_coordinator)),
+        };
+
+        let telemetry = Telemetry::attach_to_config(&mut self.config_builder);
+        let telemetry_collector = telemetry.into_collector(task_coordinator);
+
+        (self.config_builder, controlled_edges, telemetry_collector)
     }
 }
 
-fn attach_internal_telemetry_components(
-    config_builder: &mut ConfigBuilder,
-    telemetry_listen_addr: Uri,
-) {
-    // Attach an internal logs and internal metrics source, and send them on to a dedicated Vector
-    // sink that we'll spawn a listener for to collect everything.
-    let internal_logs = InternalLogsConfig::default();
-    let internal_metrics = InternalMetricsConfig::default();
-    let vector_sink = VectorSinkConfig::from_address(telemetry_listen_addr);
+fn build_input_edge() -> (InputEdge, impl Into<Sources>) {
+    let input_listen_addr = next_addr();
+    let input_edge = InputEdge::from_address(addr_as_http_uri(input_listen_addr));
+    let input_source = VectorSourceConfig::from_address(input_listen_addr);
 
-    config_builder.add_source(INTERNAL_LOGS_KEY, internal_logs);
-    config_builder.add_source(INTERNAL_METRICS_KEY, internal_metrics);
-    config_builder.add_sink(
-        VECTOR_SINK_KEY,
-        &[INTERNAL_LOGS_KEY, INTERNAL_METRICS_KEY],
-        vector_sink,
-    );
+    (input_edge, input_source)
+}
+
+fn build_output_edge() -> (OutputEdge, impl Into<Sinks>) {
+    let output_listen_addr = addr_as_http_uri(next_addr());
+    let output_edge = OutputEdge::from_address(output_listen_addr.clone());
+    let output_sink = VectorSinkConfig::from_address(output_listen_addr);
+
+    (output_edge, output_sink)
 }

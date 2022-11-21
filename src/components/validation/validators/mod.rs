@@ -3,38 +3,28 @@ pub use self::component_spec::ComponentSpecValidator;
 
 use vector_core::event::Event;
 
-use super::ComponentType;
+use super::{ComponentType, TestCaseExpectation};
 
 /// A component validator.
 ///
-/// Validators perform the actual validation steps, based on component being run for validation, and
-/// collect all of the necessary data to do so.
-///
-/// Validators get access to the input events, and the output events, but are otherwise flexible and
-/// can collect whatever data is necessary to complete the validation, driven by pre/post hooks that
-/// are called prior to and after a component validation run is complete.
+/// Validators perform the actual validation logic that, based on the given inputs, determine of the
+/// component is valid or not for the given validator.
 pub trait Validator {
     /// Gets the unique name of this validator.
     fn name(&self) -> &'static str;
 
-    /// Runs the pre-hook logic for this validator.
+    /// Processes the given set of inputs/outputs, generating the validation results.
     ///
-    /// This hook allows validator implementations to execute any operations, collect any data, and
-    /// so on, before the component is actually run for validation.
-    ///
-    /// The given `inputs` are the same that will be sent to the component being validated.
-    fn run_pre_hook(&mut self, _component_type: ComponentType, _inputs: &[Event]) {}
-
-    /// Runs the post-hook logic for this validator.
-    ///
-    /// This hook allows validator implementations to execute any operations, collect any data, and
-    /// so on, after the component has finished its validation run and all outputs have been collected.
-    ///
-    /// The given `outputs` are all of the events received from the component being validated.
-    fn run_post_hook(&mut self, _outputs: &[Event]) {}
-
-    /// Consumes this validator, collecting and returning its results.
-    fn into_results(self: Box<Self>) -> Result<Vec<String>, Vec<String>>;
+    /// Additionally, all telemetry events received for the component for the validation run are
+    /// provided as well.
+    fn check_validation(
+        &self,
+        component_type: ComponentType,
+        expectation: TestCaseExpectation,
+        inputs: &[Event],
+        outputs: &[Event],
+        telemetry_events: &[Event],
+    ) -> Result<Vec<String>, Vec<String>>;
 }
 
 /// Standard component validators.

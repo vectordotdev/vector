@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio_util::codec::Encoder;
 use vector_core::event::Event;
 
-use crate::components::validation::sync::{Configured, ExternalResourceCoordinator, WaitHandle};
+use crate::components::validation::sync::{Configuring, TaskCoordinator, WaitHandle};
 
 use super::{ResourceCodec, ResourceDirection};
 
@@ -25,8 +25,8 @@ impl HttpConfig {
         direction: ResourceDirection,
         codec: ResourceCodec,
         input_rx: mpsc::Receiver<Event>,
-        resource_coordinator: &ExternalResourceCoordinator<Configured>,
-        resource_shutdown_handle: WaitHandle,
+        task_coordinator: &TaskCoordinator<Configuring>,
+        task_shutdown_handle: WaitHandle,
     ) {
         match direction {
             // The source will pull data from us.
@@ -34,16 +34,16 @@ impl HttpConfig {
                 self,
                 codec,
                 input_rx,
-                resource_coordinator,
-                resource_shutdown_handle,
+                task_coordinator,
+                task_shutdown_handle,
             ),
             // We'll push data to the source.
             ResourceDirection::Push => spawn_input_http_client(
                 self,
                 codec,
                 input_rx,
-                resource_coordinator,
-                resource_shutdown_handle,
+                task_coordinator,
+                task_shutdown_handle,
             ),
         }
     }
@@ -53,8 +53,8 @@ impl HttpConfig {
         direction: ResourceDirection,
         codec: ResourceCodec,
         output_tx: mpsc::Sender<Event>,
-        resource_coordinator: &ExternalResourceCoordinator<Configured>,
-        resource_shutdown_handle: WaitHandle,
+        task_coordinator: &TaskCoordinator<Configuring>,
+        task_shutdown_handle: WaitHandle,
     ) {
         match direction {
             // We'll pull data from the sink.
@@ -62,16 +62,16 @@ impl HttpConfig {
                 self,
                 codec,
                 output_tx,
-                resource_coordinator,
-                resource_shutdown_handle,
+                task_coordinator,
+                task_shutdown_handle,
             ),
             // The sink will push data data to us.
             ResourceDirection::Push => spawn_output_http_server(
                 self,
                 codec,
                 output_tx,
-                resource_coordinator,
-                resource_shutdown_handle,
+                task_coordinator,
+                task_shutdown_handle,
             ),
         }
     }
@@ -82,8 +82,8 @@ fn spawn_input_http_server(
     _config: HttpConfig,
     _codec: ResourceCodec,
     _input_rx: mpsc::Receiver<Event>,
-    _resource_coordinator: &ExternalResourceCoordinator<Configured>,
-    _resource_shutdown_handle: WaitHandle,
+    _task_coordinator: &TaskCoordinator<Configuring>,
+    _task_shutdown_handle: WaitHandle,
 ) {
     // Spin up an HTTP server that responds with all of the input data it has received since the
     // last request was responded to. Essentially, a client calling the server will never see data
@@ -94,19 +94,13 @@ fn spawn_input_http_client(
     config: HttpConfig,
     codec: ResourceCodec,
     mut input_rx: mpsc::Receiver<Event>,
-    resource_coordinator: &ExternalResourceCoordinator<Configured>,
-    _resource_shutdown_handle: WaitHandle,
+    task_coordinator: &TaskCoordinator<Configuring>,
+    _task_shutdown_handle: WaitHandle,
 ) {
-    // TODO: Should we actually obey the resource shutdown handle? Obviously we want to just keep
-    // draining messages until we're done, but what about if the component errors prematurely and
-    // now we're stuck waiting to be able to send requests to a server that isn't there and won't be
-    // coming back? I guess we might just end up getting a "connection refused" error immediately,
-    // but it's still worth thinking about more holistically, perhaps.
-
     // Spin up an HTTP client that will push the input data to the source on a
     // request-per-input-item basis. This runs serially and has no parallelism.
-    let started = resource_coordinator.track_started();
-    let completed = resource_coordinator.track_completed();
+    let started = task_coordinator.track_started();
+    let completed = task_coordinator.track_completed();
     let mut encoder = codec.into_encoder();
 
     tokio::spawn(async move {
@@ -157,8 +151,8 @@ fn spawn_output_http_server(
     _config: HttpConfig,
     _codec: ResourceCodec,
     _output_tx: mpsc::Sender<Event>,
-    _resource_coordinator: &ExternalResourceCoordinator<Configured>,
-    _resource_shutdown_handle: WaitHandle,
+    _task_coordinator: &TaskCoordinator<Configuring>,
+    _task_shutdown_handle: WaitHandle,
 ) {
 }
 
@@ -167,7 +161,7 @@ fn spawn_output_http_client(
     _config: HttpConfig,
     _codec: ResourceCodec,
     _output_tx: mpsc::Sender<Event>,
-    _resource_coordinator: &ExternalResourceCoordinator<Configured>,
-    _resource_shutdown_handle: WaitHandle,
+    _task_coordinator: &TaskCoordinator<Configuring>,
+    _task_shutdown_handle: WaitHandle,
 ) {
 }

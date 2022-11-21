@@ -119,6 +119,18 @@ pub struct VectorConfig {
     acknowledgements: SourceAcknowledgementsConfig,
 }
 
+impl VectorConfig {
+    /// Creates a `VectorConfig` with the given address.
+    pub fn from_address(addr: SocketAddr) -> Self {
+        Self {
+            version: None,
+            address: addr,
+            tls: None,
+            acknowledgements: true.into(),
+        }
+    }
+}
+
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {

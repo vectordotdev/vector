@@ -12,14 +12,14 @@ use http::{Method, StatusCode, Uri};
 use lookup::event_path;
 use tokio_util::codec::Decoder as _;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_core::{config::LogNamespace, event::LogEvent};
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     components::validation::{
-        self, BuiltComponent, ComponentBuilderParts, ComponentType, ExternalResource,
-        ResourceDirection, ValidatableComponent,
+        self, ComponentConfiguration, ComponentType, ExternalResource, ResourceDirection, TestCase,
+        ValidatableComponent,
     },
     config::{
         log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
@@ -161,6 +161,10 @@ impl ValidatableComponent for SimpleHttpConfig {
         ComponentType::Source
     }
 
+    fn component_configuration(&self) -> ComponentConfiguration {
+        ComponentConfiguration::Source(self.clone().into())
+    }
+
     fn external_resource(&self) -> Option<ExternalResource> {
         let scheme = self
             .tls
@@ -183,20 +187,17 @@ impl ValidatableComponent for SimpleHttpConfig {
 
         Some(ExternalResource::new(
             ResourceDirection::Push,
-            compliance::HttpConfig::from_parts(uri, method),
+            validation::HttpConfig::from_parts(uri, method),
             decoding_config,
         ))
     }
 
-    async fn build_component(
-        &self,
-        builder_parts: ComponentBuilderParts,
-    ) -> Result<BuiltComponent, String> {
-        let source_context = builder_parts.into_source_builder_parts();
-        self.build(source_context)
-            .await
-            .map(BuiltComponent::Source)
-            .map_err(|e| format!("failed to build source component: {}", e))
+    fn test_cases(&self) -> Vec<TestCase> {
+        vec![TestCase::success(vec![
+            LogEvent::from_str_legacy("simple message 1"),
+            LogEvent::from_str_legacy("simple message 2"),
+            LogEvent::from_str_legacy("simple message 3"),
+        ])]
     }
 }
 

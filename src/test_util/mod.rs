@@ -15,9 +15,9 @@ use std::{
     task::{ready, Context, Poll},
 };
 
+use ::http::Uri;
 use flate2::read::MultiGzDecoder;
 use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
-use ::http::Uri;
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
 use rand::{thread_rng, Rng};
@@ -115,18 +115,17 @@ pub fn next_addr() -> SocketAddr {
     next_addr_for_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
 }
 
-pub fn next_http_addr() -> Uri {
-    let addr = next_addr();
+pub fn next_addr_v6() -> SocketAddr {
+    next_addr_for_ip(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)))
+}
+
+pub fn addr_as_http_uri(addr: SocketAddr) -> Uri {
     let addr_str = addr.to_string();
     Uri::builder()
         .scheme("http")
-        .host(addr_str)
+        .authority(addr_str)
         .build()
         .expect("should not fail to build uri")
-}
-
-pub fn next_addr_v6() -> SocketAddr {
-    next_addr_for_ip(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)))
 }
 
 pub fn trace_init() {

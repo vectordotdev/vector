@@ -12,7 +12,7 @@ use crate::codecs::{DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithF
 
 pub use self::http::HttpConfig;
 
-use super::sync::{Configured, ExternalResourceCoordinator, WaitHandle};
+use super::sync::{Configuring, TaskCoordinator, WaitHandle};
 
 /// The codec used by the external resource.
 ///
@@ -246,16 +246,16 @@ impl ExternalResource {
     pub fn spawn_as_input(
         self,
         input_rx: mpsc::Receiver<Event>,
-        resource_coordinator: &ExternalResourceCoordinator<Configured>,
-        resource_shutdown_handle: WaitHandle,
+        task_coordinator: &TaskCoordinator<Configuring>,
+        task_shutdown_handle: WaitHandle,
     ) {
         match self.definition {
             ResourceDefinition::Http(http_config) => http_config.spawn_as_input(
                 self.direction,
                 self.codec,
                 input_rx,
-                resource_coordinator,
-                resource_shutdown_handle,
+                task_coordinator,
+                task_shutdown_handle,
             ),
         }
     }
@@ -264,16 +264,16 @@ impl ExternalResource {
     pub fn spawn_as_output(
         self,
         output_tx: mpsc::Sender<Event>,
-        resource_coordinator: &ExternalResourceCoordinator<Configured>,
-        resource_shutdown_handle: WaitHandle,
+        task_coordinator: &TaskCoordinator<Configuring>,
+        task_shutdown_handle: WaitHandle,
     ) {
         match self.definition {
             ResourceDefinition::Http(http_config) => http_config.spawn_as_output(
                 self.direction,
                 self.codec,
                 output_tx,
-                resource_coordinator,
-                resource_shutdown_handle,
+                task_coordinator,
+                task_shutdown_handle,
             ),
         }
     }

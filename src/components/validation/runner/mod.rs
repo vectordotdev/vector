@@ -1,41 +1,101 @@
 mod config;
-mod edges;
-mod sink;
-mod source;
-mod transform;
+mod io;
+mod telemetry;
 
-use std::{
-    collections::{HashMap, VecDeque},
-    future::Future,
-    iter,
-    pin::Pin,
-    time::Duration,
-};
+use std::{collections::HashMap, time::Duration};
 
-use tokio::{pin, runtime::Builder, select, sync::mpsc};
-use vector_common::finalization::{EventStatus, Finalizable};
-use vector_core::event::{Event, LogEvent};
+use tokio::{runtime::Builder, select, sync::mpsc};
+use vector_core::event::Event;
 
-use crate::components::validation::sync::ExternalResourceCoordinator;
+use crate::{config::ConfigDiff, topology};
 
 use super::{
-    sync::Configured, ComponentType, ValidatableComponent, Validator, WaitHandle, WaitTrigger,
+    sync::{Configuring, TaskCoordinator},
+    ComponentType, TestCaseExpectation, ValidatableComponent, Validator, WaitHandle,
 };
 
-use self::sink::build_sink_component_future;
-use self::source::build_source_component_future;
-use self::transform::build_transform_component_future;
+use self::config::TopologyBuilder;
 
 /// Runner input mechanism.
 ///
-/// This is the mechanism by which the Runner task pushes input to the component being validated.
-pub type RunnerInput = mpsc::Sender<Event>;
+/// This is the mechanism by which the runner task pushes input to the component being validated.
+pub enum RunnerInput {
+    /// The component uses an external resource for its input.
+    ///
+    /// The channel provides a mechanism to send inputs to the external resource, which is then
+    /// either pulled from by the component, or pushes directly to the component.
+    ///
+    /// Only sources have external inputs.
+    External(mpsc::Sender<Event>),
+
+    /// The component uses a "controlled" edge for its input.
+    ///
+    /// This represents a component we inject into the component topology that we send inputs to,
+    /// which forwards them to the component being validated.
+    Controlled,
+}
+
+impl RunnerInput {
+    /// Consumes this runner input, providing the channel sender for sending input events to the
+    /// component under validation.
+    ///
+    /// # Panics
+    ///
+    /// If the runner input is configured for an external resource, and a controlled edge is given,
+    /// or if the runner input is configured for a controlled edge and no controlled edge is given,
+    /// this function will panic, as one or the other must be provided.
+    pub fn into_sender(self, controlled_edge: Option<mpsc::Sender<Event>>) -> mpsc::Sender<Event> {
+        match (self, controlled_edge) {
+            (Self::External(_), Some(_)) => panic!("Runner input declared as external resource, but controlled input edge was also specified."),
+            (Self::Controlled, None) => panic!("Runner input declared as controlled, but no controlled input edge was specified."),
+            (Self::External(tx), None) => tx,
+            (Self::Controlled, Some(tx)) => tx,
+        }
+    }
+}
 
 /// Runner output mechanism.
 ///
-/// This is the mechanism by which the Runner task captures output from the component being
+/// This is the mechanism by which the runner task captures output from the component being
 /// validated.
-pub type RunnerOutput = mpsc::Receiver<Event>;
+pub enum RunnerOutput {
+    /// The component uses an external resource for its output.
+    ///
+    /// The channel provides a mechanism to send outputs collected by the external resource to the
+    /// validation runner, whether the sink pushes output events to the external resource, or the
+    /// external resource pulls output events from the sink.
+    ///
+    /// Only sinks have external inputs.
+    External(mpsc::Receiver<Event>),
+
+    /// The component uses a "controlled" edge for its output.
+    ///
+    /// This represents a component we inject into the component topology that we send outputs to,
+    /// which forwards them to the validation runner.
+    Controlled,
+}
+
+impl RunnerOutput {
+    /// Consumes this runner output, providing the channel receiver for receiving output events from the
+    /// component under validation.
+    ///
+    /// # Panics
+    ///
+    /// If the runner output is configured for an external resource, and a controlled edge is given,
+    /// or if the runner output is configured for a controlled edge and no controlled edge is given,
+    /// this function will panic, as one or the other must be provided.
+    pub fn into_receiver(
+        self,
+        controlled_edge: Option<mpsc::Receiver<Event>>,
+    ) -> mpsc::Receiver<Event> {
+        match (self, controlled_edge) {
+            (Self::External(_), Some(_)) => panic!("Runner output declared as external resource, but controlled output edge was also specified."),
+            (Self::Controlled, None) => panic!("Runner output declared as controlled, but no controlled output edge was specified."),
+            (Self::External(rx), None) => rx,
+            (Self::Controlled, Some(rx)) => rx,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum RunnerState {
@@ -68,12 +128,17 @@ impl RunnerState {
 }
 
 pub struct RunnerResults {
+    expectation: TestCaseExpectation,
     inputs: Vec<Event>,
     outputs: Vec<Event>,
     validator_results: Vec<Result<Vec<String>, Vec<String>>>,
 }
 
 impl RunnerResults {
+    pub fn expectation(&self) -> TestCaseExpectation {
+        self.expectation
+    }
+
     pub fn inputs(&self) -> &[Event] {
         &self.inputs
     }
@@ -87,10 +152,6 @@ impl RunnerResults {
     }
 }
 
-// TODO: We might actually want to make the runner spin up its own current-thread runtime so that we
-// can't shoot ourselves in the foot and run under a multi-threaded executor, since a lot of the
-// validation will depend on the component future running on the same thread as we're collecting the
-// validation results from i.e. metrics and so on.
 pub struct Runner<'comp, C: ?Sized> {
     validators: HashMap<String, Box<dyn Validator>>,
     component: &'comp C,
@@ -102,30 +163,6 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             component,
             validators: HashMap::new(),
         }
-    }
-
-    async fn build_component_future(
-        &mut self,
-        component_shutdown_handle: WaitHandle,
-    ) -> (
-        Pin<Box<dyn Future<Output = ()>>>,
-        ExternalResourceCoordinator<Configured>,
-        RunnerInput,
-        RunnerOutput,
-    ) {
-        match self.component.component_type() {
-            ComponentType::Source => {
-                build_source_component_future(&self.component, component_shutdown_handle).await
-            }
-            ComponentType::Transform => build_transform_component_future(&self.component).await,
-            ComponentType::Sink => build_sink_component_future(&self.component).await,
-        }
-    }
-
-    fn generate_input_payloads(&self) -> VecDeque<Event> {
-        let mut log_event = LogEvent::default();
-        log_event.insert("message", "compliance");
-        iter::once(Event::Log(log_event)).cycle().take(3).collect()
     }
 
     /// Adds a validator to this runner.
@@ -151,228 +188,236 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
         }
     }
 
-    pub fn run_validation(mut self) -> Result<RunnerResults, String> {
-        let runtime = Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("should not fail to build current-thread runtime");
+    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, String> {
+        // TODO: Make sure we initialize the metrics stuff in test mode so that it collects on a
+        // per-thread basis, which we need to happen to avoid cross-contamination between tests.
 
-        runtime.block_on(async move {
-            // Build our component future, which gets us the resulting input/output objects necessary to
-            // drive it. This will also spawn any external resource necessary for the given component,
-            // which also gets us the input/output objects necessary to send input payloads, or receive
-            // output payloads.
-            let (component_shutdown_trigger, component_shutdown_handle) = WaitTrigger::new();
-            let (component_future, resource_coordinator, runner_input, mut runner_output) =
-                self.build_component_future(component_shutdown_handle).await;
+        let mut test_case_results = Vec::new();
 
-            // Wait for our external resource tasks, if any, to start.
+        let test_cases = self.component.test_cases();
+        for test_case in test_cases {
+            let (task_coordinator, task_shutdown_handle) = TaskCoordinator::new();
+
+            // First, we get a topology builder for the given component being validated.
             //
-            // Once the external resource tasks are ready, start driving our core validation loop, where
-            // we inject events, drive the component itself to run and process those events, and then
-            // collect all results at the end.
-            let mut resource_coordinator = resource_coordinator.wait_for_tasks_to_start().await;
-
-            // Our core logic is straightforward: send inputs from the runner to the component, let
-            // the component process them, and have the runner collect any outputs from the
-            // component.
+            // The topology builder handles generating a valid topology (via `ConfigBuilder`) that
+            // wires up the component being validated, as well as any filler components (i.e.
+            // providing a source if the component being validated is a sink, and wiring the sink up
+            // to that source, etc).
             //
-            // We have various phases where we'll synchronize with the various pieces:
-            // - when we're done sending our inputs, we trigger a shutdown and close our inputs channel
-            // - being told to shutdown / having the input stream come to an end, the component should
-            //   finish up and do its remaining processing
-            // - once the component is done, we collect any remaining outputs and then we're done
+            // We then finalize the topology builder to get our actual `ConfigBuilder`, as well as
+            // any controlled edges (channel sender/receiver to the aforementioned filler
+            // components) and a telemetry client for collecting internal telemetry.
+            let topology_builder = TopologyBuilder::from_component_configuration(
+                self.component.component_configuration(),
+            );
+            let (config_builder, controlled_edges, telemetry_collector) =
+                topology_builder.finalize(&task_coordinator);
+
+            // After that, we'll build the external resource necessary for this component, if any.
+            // Once that's done, we build the input event/output event sender and receiver based on
+            // whatever we spawned for an external resource.
             //
-            // Below, we have this logic represented as a small state machine loop that ensures we're
-            // sending inputs to the component, driving the component so it can process those inputs and
-            // possibly generate outputs, and then collecting those outputs.
-            let mut input_payloads = self.generate_input_payloads();
-            let input_payloads_result = Vec::from_iter(input_payloads.iter().cloned());
-            let mut output_payloads = Vec::new();
-
-            // Run the pre-run hooks for all of our validators, which lets them configure and hook into
-            // various subsystems, as needed, to perform their respective validation tasks.
-            for validator in &mut self.validators.values_mut() {
-                validator.run_pre_hook(self.component.component_type(), &input_payloads_result[..]);
-            }
-
-            // Spawn a task that drives the sending of inputs to the component, whether it's
-            // direct or happening through an external resource. We do this here mostly to avoid tricky
-            // code in the core loop for dealing with cancellable futures and being able to drop the
-            // input sender when we've sent all inputs.
-
-            // TODO: We need a barrier here, to ensure that we don't start sending inputs to the
-            // external resource/component _until_ the component is ready. This is essentially only a
-            // problem for sources, where they start listening/polling for input data
-            // nondeterministically, which is not great for testing scenarios.
+            // This handles spawning any intermediate tasks necessary, both for the external
+            // resource itself, but also for the controlled edges.
             //
-            // We'll probably need to approximate this in the meantime by not letting the input task
-            // start sending messages until after like.. one or two seconds since the first time we
-            // polled the (source) component, since most sources will only start interacting with their
-            // input source once they've been polled for the first time.
-            let mut input_task_handle = tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_secs(1)).await;
+            // For example, if we're validating a source, we would have added a filler sink for our
+            // controlled output edge, which means we then need a server task listening for the
+            // events sent by that sink.
+            let (runner_input, runner_output) =
+                build_external_resource(self.component, &task_coordinator, task_shutdown_handle);
+            let input_tx = runner_input.into_sender(controlled_edges.input);
+            let mut output_rx = runner_output.into_receiver(controlled_edges.output);
 
-                while let Some(input) = input_payloads.pop_front() {
-                    runner_input
-                        .send(input)
-                        .await
-                        .expect("should not fail to send runner input to component");
-                }
+            // Now with any external resource spawned, as well as any tasks for handling controlled
+            // edges, we'll wait for all of those tasks to report that they're ready to go and
+            // listening, etc.
+            let mut task_coordinator = task_coordinator.wait_for_tasks_to_start().await;
 
-                drop(runner_input);
+            // At this point, we need to actually spawn the configured component topology so that it
+            // runs, and make sure we have a way to tell it when to shutdown so that we can properly
+            // sequence the test in terms of sending inputs, waiting for outputs, etc.
+            let mut config = config_builder
+                .build()
+                .expect("config should not have any errors");
+            config.healthchecks.set_require_healthy(Some(true));
+            let config_diff = ConfigDiff::initial(&config);
+
+            let (topology_task_coordinator, mut topology_shutdown_handle) = TaskCoordinator::new();
+            let topology_started = topology_task_coordinator.track_started();
+            let topology_completed = topology_task_coordinator.track_completed();
+
+            let _test_runtime_thread = std::thread::spawn(move || {
+                let test_runtime = Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("should not fail to build current-thread runtime");
+
+                test_runtime.block_on(async move {
+                    let pieces =
+                        topology::build_or_log_errors(&config, &config_diff, HashMap::new())
+                            .await
+                            .unwrap();
+                    let (topology, mut crash_rx) =
+                        topology::start_validated(config, config_diff, pieces)
+                            .await
+                            .unwrap();
+
+                    topology_started.mark_as_done();
+
+                    select! {
+                        // We got the signal to shutdown, so stop the topology gracefully.
+                        _ = topology_shutdown_handle.wait() => {
+                            topology.stop().await;
+                            info!("Component topology stopped gracefully.")
+                        },
+                        _ = crash_rx.recv() => {
+                            error!("Component topology under validation unexpectedly crashed.");
+                        }
+                    }
+
+                    topology_completed.mark_as_done();
+                });
             });
 
-            let mut component_shutdown_trigger = Some(component_shutdown_trigger);
-            pin!(component_future);
+            let mut topology_task_coordinator =
+                topology_task_coordinator.wait_for_tasks_to_start().await;
 
-            let mut runner_state = RunnerState::Running;
-            while !runner_state.is_completed() {
-                let maybe_new_runner_state = select! {
-                    // Drive our input sender until it's done sending all of the inputs.
-                    result = &mut input_task_handle, if runner_state.is_running() => match result {
-                        Ok(()) => Some(RunnerState::InputDone),
-                        Err(_) => panic!("Runner input sender task panicked unexpectedly."),
-                    },
+            // Now we'll spawn two tasks: one for sending inputs, and one for collecting outputs.
+            //
+            // We spawn these as discrete tasks because we want/need them to be able to run in an
+            // interleaved fashion, and we want to wait for each of them to complete without the act
+            // of waiting, in and of itself, causing any sort of deadlock behavior (i.e. trying to
+            // send all inputs until we have no more, when we can't send more because we need to
+            // drive output collection to allow forward progress to be made, etc.)
 
-                    // When all of the inputs are done being sent, we trigger any external input
-                    // resource tasks to shutdown, finishing up their work and returning. Once that's
-                    // complete, we can then trigger the component itself to shutdown.
-                    _ = resource_coordinator.trigger_and_wait_for_input_shutdown(), if runner_state.is_input_done() => {
-                        // Now signal the actual component to shutdown. Depending on the component,
-                        // this might also be a no-op, since source have to be tirggered to
-                        // shutdown, but transforms and sinks shut themselves down when the input
-                        // stream ends, which will happen when our Runner input sender task
-                        // finishes sending all input payloads.
-                        component_shutdown_trigger.take().expect("component shutdown trigger already consumed").trigger();
+            // We sleep for one second here because while we do wait for the component topology to
+            // mark itself as started, starting the topology does not necessaryily mean that all
+            // component tasks are actually ready for input, etc.
+            //
+            // TODO: The above problem is bigger than just component validation, and affects a lot
+            // of our unit tests that deal with spawning a topology and wanting to deterministically
+            // know when it's safe to send inputs, etc... so we won't fix it here, but we should,
+            // like the aforementioned unit tests, switch to any improved mechanism we come up with
+            // in the future to make these tests more deterministic and waste less time waiting
+            // around if we can avoid it.
+            tokio::time::sleep(Duration::from_secs(1)).await;
 
-                        Some(RunnerState::WaitingOnComponent)
-                    },
-
-                    // Drive the component if it is still actively processing.
-                    _ = &mut component_future, if runner_state.is_component_active() => {
-                        // When the component finishes, that means that all we have left to do is make
-                        // sure we've collected all of our outputs. We'll send the shutdown signal to
-                        // the external output resource, if it exists. This is to ensure that it flushes
-                        // any of its own internal state, or does a final poll, or whatever it has to
-                        // do, before we continue draining the Runner outputs.
-                        //
-                        // If we're not validating a sink component, these calls are no-ops that will
-                        // complete immediately.
-                        resource_coordinator.trigger_and_wait_for_output_shutdown().await;
-
-                        // At this point, since the component is done, we're just waiting for the
-                        // remaining outputs to be collected before we're all done.
-                        Some(RunnerState::WaitingOnOutputs)
-                    },
-
-                    // We got an output from the component, so stash it off to the side for now.
-                    maybe_output = runner_output.recv(), if !runner_state.is_completed() => match maybe_output {
-                        Some(mut output) => {
-                            // Finalize the event, which allows sources to shutdown cleanly if they're
-                            // waiting for acknowledgement-related wakeups.
-                            let mut finalizers = output.take_finalizers();
-                            finalizers.update_status(EventStatus::Delivered);
-                            finalizers.update_sources();
-
-                            output_payloads.push(output);
-                            None
-                        },
-
-                        // The channel can only be closed when the component has completed, so if we're here, mark
-                        // ourselves as having completed.
-                        None => Some(RunnerState::Completed),
-                    },
-                };
-
-                if let Some(new_runner_state) = maybe_new_runner_state {
-                    let existing_runner_state = runner_state;
-                    runner_state = new_runner_state;
-
-                    debug!(
-                        "Runner state transitioned from {:?} to {:?}.",
-                        existing_runner_state, new_runner_state
-                    );
+            let input_events = test_case.events.clone();
+            let input_driver = tokio::spawn(async move {
+                for input_event in input_events {
+                    input_tx
+                        .send(input_event)
+                        .await
+                        .expect("input channel should not be closed");
                 }
-            }
+            });
 
-            // Run the post-run hooks for all of our validators, which is where they would do any final
-            // cleanup, flushing, scraping of data, and so on. In doing so, we'll also collect their
-            // validation results.
-            let mut validator_results = Vec::new();
-            for (_, mut validator) in self.validators.into_iter() {
-                validator.run_post_hook(&output_payloads[..]);
-                validator_results.push(validator.into_results());
-            }
+            let output_driver = tokio::spawn(async move {
+                let mut output_events = Vec::new();
+                while let Some(output_event) = output_rx.recv().await {
+                    output_events.push(output_event);
+                }
+                output_events
+            });
 
-            Ok(RunnerResults {
-                inputs: input_payloads_result,
-                outputs: output_payloads,
+            // Once we've sent all of the events, we'll drop our input sender which triggers the input
+            // side -- external or controlled -- to finish whatever it's doing and gracefully close.
+            // We'll wait for the input driver to complete, which implies it has sent all input
+            // events and dropped the input sender.
+            //
+            // TODO: We need to wait here for our input-related tasks to mark themselves as
+            // completed, but we currently mix/match all coordinated tasks together via
+            // `task_coordinator` so we might need to tease that apart, as otherwise, we have no way
+            // to wait for _only_ the input-related tasks.
+            let _ = input_driver
+                .await
+                .expect("input driver task should not have panicked");
+
+            // Now that the input side has marked itself as completed, we'll signal the component
+            // topology to shutdown and wait until that happens.
+            topology_task_coordinator
+                .trigger_and_wait_for_shutdown()
+                .await;
+
+            // Now we'll trigger the output side, and telemetry collector, to finish up and
+            // shutdown, and wait for that to happen.
+            task_coordinator.trigger_and_wait_for_shutdown().await;
+            let output_events = output_driver
+                .await
+                .expect("input driver task should not have panicked");
+
+            // Now that the validation run has completed, run the results through each configured
+            // validator, collect _their_ results, and store them to the side so we can run any
+            // remaining test cases.
+            let component_type = self.component.component_type();
+            let expectation = test_case.expectation;
+            let input_events = test_case.events;
+            let telemetry_events = telemetry_collector.collect().await;
+
+            let validator_results = self
+                .validators
+                .iter()
+                .map(|(_, validator)| {
+                    validator.check_validation(
+                        component_type,
+                        expectation,
+                        &input_events,
+                        &output_events,
+                        &telemetry_events,
+                    )
+                })
+                .collect();
+
+            let test_case_result = RunnerResults {
+                expectation,
+                inputs: input_events,
+                outputs: output_events,
                 validator_results,
-            })
-        })
+            };
+
+            test_case_results.push(test_case_result);
+        }
+
+        Ok(test_case_results)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use async_trait::async_trait;
-    use vector_config::NamedComponent;
-    use vector_core::{
-        event::Event,
-        transform::{FunctionTransform, OutputBuffer, Transform},
-    };
+fn build_external_resource<C: ValidatableComponent + ?Sized>(
+    component: &C,
+    task_coordinator: &TaskCoordinator<Configuring>,
+    task_shutdown_handle: WaitHandle,
+) -> (RunnerInput, RunnerOutput) {
+    let component_type = component.component_type();
+    let maybe_external_resource = component.external_resource();
+    match component_type {
+        ComponentType::Source => {
+            // As an external resource for a source, we create a channel that the validation runner
+            // uses to send the input events to the external resource. We don't care if the source
+            // pulls those input events or has them pushed in: we just care about getting them to
+            // the external resource.
+            let (tx, rx) = mpsc::channel(1024);
+            let resource =
+                maybe_external_resource.expect("a source must always have an external resource");
+            resource.spawn_as_input(rx, task_coordinator, task_shutdown_handle);
 
-    use crate::components::validation::{BuiltComponent, ComponentBuilderParts, ExternalResource};
-
-    use super::*;
-
-    // A simple transform that just forwards its event untouched.
-    #[derive(Clone)]
-    struct ValidatableTransform;
-
-    impl FunctionTransform for ValidatableTransform {
-        fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-            output.push(event);
+            (RunnerInput::External(tx), RunnerOutput::Controlled)
         }
-    }
-
-    impl NamedComponent for ValidatableTransform {
-        const NAME: &'static str = "validatable_transform";
-    }
-
-    #[async_trait]
-    impl ValidatableComponent for ValidatableTransform {
-        fn component_name(&self) -> &'static str {
-            Self::NAME
+        ComponentType::Transform => {
+            // Transforms have no external resources.
+            (RunnerInput::Controlled, RunnerOutput::Controlled)
         }
+        ComponentType::Sink => {
+            // As an external resource for a sink, we create a channel that the validation runner
+            // uses to collect the output events from the external resource. We don't care if the sink
+            // pushes those output events to the external resource, or if the external resource
+            // pulls them from the sink: we just care about getting them from the external resource.
+            let (tx, rx) = mpsc::channel(1024);
+            let resource =
+                maybe_external_resource.expect("a sink must always have an external resource");
+            resource.spawn_as_output(tx, task_coordinator, task_shutdown_handle);
 
-        fn component_type(&self) -> ComponentType {
-            ComponentType::Transform
+            (RunnerInput::Controlled, RunnerOutput::External(rx))
         }
-
-        fn external_resource(&self) -> Option<ExternalResource> {
-            None
-        }
-
-        async fn build_component(
-            &self,
-            _builder_parts: ComponentBuilderParts,
-        ) -> Result<BuiltComponent, String> {
-            Ok(BuiltComponent::Transform(Transform::Function(Box::new(
-                ValidatableTransform,
-            ))))
-        }
-    }
-
-    #[test]
-    fn basic() {
-        let component = ValidatableTransform;
-        let runner = Runner::from_component(&component);
-        let results = runner.run_validation();
-        assert!(results.is_ok());
-
-        let results = results.expect("results should be ok");
-        assert_eq!(results.inputs, results.outputs);
     }
 }
