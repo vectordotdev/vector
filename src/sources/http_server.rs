@@ -141,7 +141,7 @@ impl SimpleHttpConfig {
                 SimpleHttpConfig::NAME,
                 parse_value_path(&self.path_key)
                     .ok()
-                    .map(LegacyKey::Overwrite),
+                    .map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("path"),
                 Kind::bytes(),
                 None,
@@ -212,6 +212,27 @@ fn default_path_key() -> String {
     "path".to_string()
 }
 
+/// Removes duplicates from the list, and logs a `warn!()` for each duplicate removed.
+fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
+    list.sort();
+
+    let mut dedup = false;
+    for (idx, name) in list.iter().enumerate() {
+        if idx < list.len() - 1 && list[idx] == list[idx + 1] {
+            warn!(
+                "`{}` configuration contains duplicate entry for `{}`. Removing duplicate.",
+                list_name, name
+            );
+            dedup = true;
+        }
+    }
+
+    if dedup {
+        list.dedup();
+    }
+    list
+}
+
 #[async_trait::async_trait]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
@@ -251,8 +272,8 @@ impl SourceConfig for SimpleHttpConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let source = SimpleHttpSource {
-            headers: self.headers.clone(),
-            query_parameters: self.query_parameters.clone(),
+            headers: remove_duplicates(self.headers.clone(), "headers"),
+            query_parameters: remove_duplicates(self.query_parameters.clone(), "query_parameters"),
             path_key: self.path_key.clone(),
             decoder,
             log_namespace,
@@ -305,7 +326,13 @@ struct SimpleHttpSource {
 
 impl SimpleHttpSource {
     /// Enriches the passed in events with metadata for the `request_path` and for each of the headers.
-    fn enrich_events(&self, events: &mut [Event], request_path: &str, headers: HeaderMap) {
+    fn enrich_events(
+        &self,
+        events: &mut [Event],
+        request_path: &str,
+        headers_config: HeaderMap,
+        query_parameters: HashMap<String, String>,
+    ) {
         for event in events.iter_mut() {
             let log = event.as_mut_log();
 
@@ -320,16 +347,35 @@ impl SimpleHttpSource {
 
             // add each header to each event
             for header_name in &self.headers {
-                let value = headers.get(header_name).map(HeaderValue::as_bytes);
+                let value = headers_config.get(header_name).map(HeaderValue::as_bytes);
 
                 self.log_namespace.insert_source_metadata(
                     SimpleHttpConfig::NAME,
                     log,
                     Some(LegacyKey::InsertIfEmpty(path!(header_name))),
-                    path!("headers"),
+                    path!("headers", header_name),
                     Value::from(value.map(Bytes::copy_from_slice)),
                 );
             }
+        }
+
+        add_query_parameters(
+            events,
+            &self.query_parameters,
+            query_parameters,
+            self.log_namespace,
+            SimpleHttpConfig::NAME,
+        );
+
+        let now = Utc::now();
+        for event in events {
+            let log = event.as_mut_log();
+
+            self.log_namespace.insert_standard_vector_source_metadata(
+                log,
+                SimpleHttpConfig::NAME,
+                now,
+            );
         }
     }
 }
@@ -351,7 +397,7 @@ fn add_query_parameters(
                 source_name,
                 event.as_mut_log(),
                 Some(LegacyKey::Overwrite(path!(query_parameter_name))),
-                path!("query_parameters"),
+                path!("query_parameters", query_parameter_name),
                 crate::event::Value::from(value.map(String::to_owned)),
             );
         }
@@ -388,26 +434,7 @@ impl HttpSource for SimpleHttpSource {
             }
         }
 
-        self.enrich_events(&mut events, request_path, header_map);
-
-        add_query_parameters(
-            &mut events,
-            &self.query_parameters,
-            query_parameters,
-            self.log_namespace,
-            SimpleHttpConfig::NAME,
-        );
-
-        let now = Utc::now();
-        for event in &mut events {
-            let log = event.as_mut_log();
-
-            self.log_namespace.insert_standard_vector_source_metadata(
-                log,
-                SimpleHttpConfig::NAME,
-                now,
-            );
-        }
+        self.enrich_events(&mut events, request_path, header_map, query_parameters);
 
         Ok(events)
     }
@@ -437,7 +464,7 @@ mod tests {
     use http::{HeaderMap, Method};
     use similar_asserts::assert_eq;
 
-    use super::SimpleHttpConfig;
+    use super::{remove_duplicates, SimpleHttpConfig};
     use crate::sources::http_server::HttpMethod;
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
@@ -1288,5 +1315,38 @@ mod tests {
         .unknown_fields(Kind::bytes());
 
         assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn validate_remove_duplicates() {
+        let mut list = vec![
+            "a".to_owned(),
+            "b".to_owned(),
+            "c".to_owned(),
+            "d".to_owned(),
+        ];
+
+        // no duplicates should be identical
+        {
+            let list_dedup = remove_duplicates(list.clone(), "foo");
+
+            assert_eq!(list, list_dedup);
+        }
+
+        list.push("b".to_owned());
+
+        // remove duplicate "b"
+        {
+            let list_dedup = remove_duplicates(list.clone(), "foo");
+            assert_eq!(
+                vec![
+                    "a".to_owned(),
+                    "b".to_owned(),
+                    "c".to_owned(),
+                    "d".to_owned()
+                ],
+                list_dedup
+            );
+        }
     }
 }
