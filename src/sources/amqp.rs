@@ -514,8 +514,8 @@ pub mod test {
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                 )
-                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("amqp", "timestamp"), Kind::timestamp())
+                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer());
 
@@ -545,9 +545,9 @@ pub mod test {
             Kind::bytes(),
             Some("message"),
         )
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("routing"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
 
