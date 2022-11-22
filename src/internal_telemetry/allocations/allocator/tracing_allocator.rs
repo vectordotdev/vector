@@ -128,7 +128,7 @@ unsafe fn get_wrapped_layout_unchecked(object_layout: Layout) -> (Layout, usize)
     // We generate a new allocation layout that gives us a location to store the active allocation group ID ahead
     // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path.
     let (actual_layout, offset_to_group_id) = object_layout
-        .extend_unsafe(HEADER_LAYOUT);
+        .unsafe_extend(HEADER_LAYOUT);
 
     (actual_layout.pad_to_align(), offset_to_group_id)
 }
