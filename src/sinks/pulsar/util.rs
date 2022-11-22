@@ -54,7 +54,7 @@ fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option
     .map(|ts| ts.timestamp_millis())
 }
 
-fn get_properties(
+pub(super) fn get_properties(
     event: &Event,
     properties_key: &Option<String>,
 ) -> Option<HashMap<String, Bytes>> {
@@ -88,26 +88,4 @@ fn get_properties(
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use bytes::Bytes;
-
-    use super::*;
-    use crate::event::LogEvent;
-
-    #[test]
-    fn pulsar_get_headers() {
-        let properties_key = "properties";
-        let mut property_values = BTreeMap::new();
-        property_values.insert("a-key".to_string(), Value::Bytes(Bytes::from("a-value")));
-        property_values.insert("b-key".to_string(), Value::Bytes(Bytes::from("b-value")));
-
-        let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert(properties_key, property_values);
-
-        let properties = get_properties(&event, &Some(properties_key.to_string())).unwrap();
-        assert_eq!(properties.get("a-key").unwrap(), "a-value".as_bytes());
-        assert_eq!(properties.get("b-key").unwrap(), "b-value".as_bytes());
-    }
-}
+mod tests {}

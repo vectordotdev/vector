@@ -1,7 +1,13 @@
-pub(crate) mod config;
-pub(crate) mod encoder;
-pub(crate) mod request_builder;
-pub(crate) mod service;
-pub(crate) mod sink;
-pub(crate) mod tests;
-mod util;
+pub(super) mod config;
+mod encoder;
+mod request_builder;
+mod service;
+mod sink;
+pub(super) mod util;
+
+#[cfg(test)]
+mod tests;
+
+#[cfg(all(test, feature = "pulsar-integration-tests"))]
+mod integration_tests;
+
