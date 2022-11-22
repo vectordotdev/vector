@@ -542,19 +542,19 @@ fn decode_value(input: Value) -> Option<event::Value> {
 }
 
 fn decode_map(fields: BTreeMap<String, Value>) -> Option<event::Value> {
-    let mut accum: BTreeMap<String, event::Value> = BTreeMap::new();
-    for (key, value) in fields {
-        accum.insert(key, decode_value(value)?);
-    }
-    Some(event::Value::Object(accum))
+    fields
+        .into_iter()
+        .map(|(key, value)| decode_value(value).map(|value| (key, value)))
+        .collect::<Option<BTreeMap<_, _>>>()
+        .map(event::Value::Object)
 }
 
 fn decode_array(items: Vec<Value>) -> Option<event::Value> {
-    let mut accum = Vec::with_capacity(items.len());
-    for value in items {
-        accum.push(decode_value(value)?);
-    }
-    Some(event::Value::Array(accum))
+    items
+        .into_iter()
+        .map(decode_value)
+        .collect::<Option<Vec<_>>>()
+        .map(event::Value::Array)
 }
 
 fn encode_value(value: event::Value) -> Value {
