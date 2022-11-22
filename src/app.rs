@@ -140,6 +140,12 @@ impl Application {
             let require_healthy = root_opts.require_healthy;
 
             rt.block_on(async move {
+                #[cfg(feature = "allocation-tracing")]
+                if root_opts.allocation_tracing {
+                    use std::sync::atomic::Ordering;
+                    crate::internal_telemetry::allocations::TRACK_ALLOCATIONS
+                        .store(true, Ordering::Relaxed);
+                }
                 trace::init(color, json, &level, root_opts.internal_log_rate_limit);
                 info!(
                     message = "Internal log rate limit configured.",
