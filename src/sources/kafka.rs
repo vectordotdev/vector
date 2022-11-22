@@ -12,6 +12,7 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{Stream, StreamExt};
+use lookup::path;
 use once_cell::sync::OnceCell;
 use rdkafka::{
     consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
@@ -21,8 +22,8 @@ use rdkafka::{
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 
@@ -155,6 +156,11 @@ pub struct KafkaSourceConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 const fn default_session_timeout_ms() -> u64 {
@@ -202,6 +208,8 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 #[async_trait::async_trait]
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let consumer = create_consumer(self)?;
         let decoder = DecodingConfig::new(
             self.framing.clone(),
@@ -218,6 +226,7 @@ impl SourceConfig for KafkaSourceConfig {
             cx.shutdown,
             cx.out,
             acknowledgements,
+            log_namespace,
         )))
     }
 
@@ -237,6 +246,7 @@ async fn kafka_source(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let (finalizer, mut ack_stream) =
@@ -276,7 +286,7 @@ async fn kafka_source(
                         partition: msg.partition(),
                     });
 
-                    parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer).await;
+                    parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer, log_namespace).await;
                 }
             },
         }
@@ -292,8 +302,9 @@ async fn parse_message(
     finalizer: &Option<Arc<OrderedFinalizer<FinalizerEntry>>>,
     out: &mut SourceSender,
     consumer: &Arc<StreamConsumer<CustomContext>>,
+    log_namespace: LogNamespace,
 ) {
-    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys) {
+    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys, log_namespace) {
         match finalizer {
             Some(finalizer) => {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -331,6 +342,7 @@ fn parse_stream<'a>(
     msg: &BorrowedMessage<'a>,
     decoder: Decoder,
     keys: Keys<'a>,
+    log_namespace: LogNamespace,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
     let payload = msg.payload()?; // skip messages with empty payload
 
@@ -351,7 +363,7 @@ fn parse_stream<'a>(
                         partition: rmsg.partition,
                     });
                     for mut event in events {
-                        rmsg.apply(&keys, &mut event);
+                        rmsg.apply(&keys, &mut event, log_namespace);
                         yield event;
                     }
                 },
@@ -371,7 +383,6 @@ fn parse_stream<'a>(
 
 #[derive(Clone, Copy)]
 struct Keys<'a> {
-    source_type: &'a str,
     timestamp: &'a str,
     key_field: &'a str,
     topic: &'a str,
@@ -383,7 +394,6 @@ struct Keys<'a> {
 impl<'a> Keys<'a> {
     fn from(schema: &'a LogSchema, config: &'a KafkaSourceConfig) -> Self {
         Self {
-            source_type: schema.source_type_key(),
             timestamp: schema.timestamp_key(),
             key_field: config.key_field.as_str(),
             topic: config.topic_key.as_str(),
@@ -395,7 +405,7 @@ impl<'a> Keys<'a> {
 }
 
 struct ReceivedMessage {
-    timestamp: DateTime<Utc>,
+    timestamp: Option<DateTime<Utc>>,
     key: Value,
     headers: BTreeMap<String, Value>,
     topic: String,
@@ -409,8 +419,7 @@ impl ReceivedMessage {
         let timestamp = msg
             .timestamp()
             .to_millis()
-            .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
-            .unwrap_or_else(Utc::now);
+            .and_then(|millis| Utc.timestamp_millis_opt(millis).latest());
 
         let key = msg
             .key()
@@ -439,15 +448,61 @@ impl ReceivedMessage {
         }
     }
 
-    fn apply(&self, keys: &Keys<'_>, event: &mut Event) {
+    fn apply(&self, keys: &Keys<'_>, event: &mut Event, log_namespace: LogNamespace) {
         if let Event::Log(ref mut log) = event {
-            log.insert(keys.source_type, Bytes::from("kafka"));
-            log.insert(keys.timestamp, self.timestamp);
-            log.insert(keys.key_field, self.key.clone());
-            log.insert(keys.topic, Value::from(self.topic.clone()));
-            log.insert(keys.partition, Value::from(self.partition));
-            log.insert(keys.offset, Value::from(self.offset));
-            log.insert(keys.headers, Value::from(self.headers.clone()));
+            log_namespace.insert_standard_vector_source_metadata(
+                log,
+                KafkaSourceConfig::NAME,
+                Utc::now(),
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.timestamp)),
+                path!("timestamp"),
+                self.timestamp,
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.key_field)),
+                path!(default_key_field().as_str()),
+                self.key.clone(),
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.topic)),
+                path!(default_topic_key().as_str()),
+                self.topic.clone(),
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.partition)),
+                path!(default_partition_key().as_str()),
+                self.partition,
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.offset)),
+                path!(default_offset_key().as_str()),
+                self.offset,
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.headers)),
+                path!(default_headers_key().as_str()),
+                self.headers.clone(),
+            );
         }
     }
 }
@@ -772,6 +827,7 @@ mod integration_test {
             shutdown,
             tx,
             acknowledgements,
+            LogNamespace::Legacy,
         ));
         (trigger_shutdown, shutdown_done)
     }
