@@ -1,13 +1,17 @@
 use bytes::BytesMut;
+use codecs::encoding;
 use http::{Method, Request, Uri};
 use hyper::{Body, Client};
 use tokio::sync::mpsc;
-use tokio_util::codec::Encoder;
+use tokio_util::codec::Encoder as _;
 use vector_core::event::Event;
 
-use crate::components::validation::sync::{Configuring, TaskCoordinator, WaitHandle};
+use crate::{
+    codecs::Encoder,
+    components::validation::sync::{Configuring, TaskCoordinator},
+};
 
-use super::{ResourceCodec, ResourceDirection};
+use super::{ResourceCodec, ResourceDirection, TestEvent};
 
 /// An HTTP resource.
 pub struct HttpConfig {
@@ -24,27 +28,18 @@ impl HttpConfig {
         self,
         direction: ResourceDirection,
         codec: ResourceCodec,
-        input_rx: mpsc::Receiver<Event>,
+        input_rx: mpsc::Receiver<TestEvent>,
         task_coordinator: &TaskCoordinator<Configuring>,
-        task_shutdown_handle: WaitHandle,
     ) {
         match direction {
             // The source will pull data from us.
-            ResourceDirection::Pull => spawn_input_http_server(
-                self,
-                codec,
-                input_rx,
-                task_coordinator,
-                task_shutdown_handle,
-            ),
+            ResourceDirection::Pull => {
+                spawn_input_http_server(self, codec, input_rx, task_coordinator)
+            }
             // We'll push data to the source.
-            ResourceDirection::Push => spawn_input_http_client(
-                self,
-                codec,
-                input_rx,
-                task_coordinator,
-                task_shutdown_handle,
-            ),
+            ResourceDirection::Push => {
+                spawn_input_http_client(self, codec, input_rx, task_coordinator)
+            }
         }
     }
 
@@ -54,25 +49,16 @@ impl HttpConfig {
         codec: ResourceCodec,
         output_tx: mpsc::Sender<Event>,
         task_coordinator: &TaskCoordinator<Configuring>,
-        task_shutdown_handle: WaitHandle,
     ) {
         match direction {
             // We'll pull data from the sink.
-            ResourceDirection::Pull => spawn_output_http_client(
-                self,
-                codec,
-                output_tx,
-                task_coordinator,
-                task_shutdown_handle,
-            ),
+            ResourceDirection::Pull => {
+                spawn_output_http_client(self, codec, output_tx, task_coordinator)
+            }
             // The sink will push data data to us.
-            ResourceDirection::Push => spawn_output_http_server(
-                self,
-                codec,
-                output_tx,
-                task_coordinator,
-                task_shutdown_handle,
-            ),
+            ResourceDirection::Push => {
+                spawn_output_http_server(self, codec, output_tx, task_coordinator)
+            }
         }
     }
 }
@@ -81,9 +67,8 @@ impl HttpConfig {
 fn spawn_input_http_server(
     _config: HttpConfig,
     _codec: ResourceCodec,
-    _input_rx: mpsc::Receiver<Event>,
+    _input_rx: mpsc::Receiver<TestEvent>,
     _task_coordinator: &TaskCoordinator<Configuring>,
-    _task_shutdown_handle: WaitHandle,
 ) {
     // Spin up an HTTP server that responds with all of the input data it has received since the
     // last request was responded to. Essentially, a client calling the server will never see data
@@ -93,9 +78,8 @@ fn spawn_input_http_server(
 fn spawn_input_http_client(
     config: HttpConfig,
     codec: ResourceCodec,
-    mut input_rx: mpsc::Receiver<Event>,
+    mut input_rx: mpsc::Receiver<TestEvent>,
     task_coordinator: &TaskCoordinator<Configuring>,
-    _task_shutdown_handle: WaitHandle,
 ) {
     // Spin up an HTTP client that will push the input data to the source on a
     // request-per-input-item basis. This runs serially and has no parallelism.
@@ -117,9 +101,7 @@ fn spawn_input_http_client(
             debug!("Got event to send from runner.");
 
             let mut buffer = BytesMut::new();
-            encoder
-                .encode(event, &mut buffer)
-                .expect("should not fail to encode input event");
+            encode_test_event(&mut encoder, &mut buffer, event);
 
             let request = Request::builder()
                 .uri(request_uri.clone())
@@ -152,7 +134,6 @@ fn spawn_output_http_server(
     _codec: ResourceCodec,
     _output_tx: mpsc::Sender<Event>,
     _task_coordinator: &TaskCoordinator<Configuring>,
-    _task_shutdown_handle: WaitHandle,
 ) {
 }
 
@@ -162,6 +143,26 @@ fn spawn_output_http_client(
     _codec: ResourceCodec,
     _output_tx: mpsc::Sender<Event>,
     _task_coordinator: &TaskCoordinator<Configuring>,
-    _task_shutdown_handle: WaitHandle,
 ) {
+}
+
+fn encode_test_event(
+    encoder: &mut Encoder<encoding::Framer>,
+    buf: &mut BytesMut,
+    event: TestEvent,
+) {
+    match event {
+        TestEvent::Passthrough(event) => {
+            // Encode the event normally.
+            encoder
+                .encode(event, buf)
+                .expect("should not fail to encode input event");
+        }
+        TestEvent::Modified(event) => {
+            // TODO: Actually use a different encoder to encode this.
+            encoder
+                .encode(event, buf)
+                .expect("should not fail to encode input event");
+        }
+    }
 }

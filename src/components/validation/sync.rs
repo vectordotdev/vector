@@ -1,6 +1,6 @@
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 
 use tokio::sync::{oneshot, Notify};
@@ -155,12 +155,12 @@ impl WaitHandle {
 pub struct Configuring {
     tasks_started: WaitGroup,
     tasks_completed: WaitGroup,
-    shutdown_trigger: WaitTrigger,
+    shutdown_triggers: Mutex<Vec<WaitTrigger>>,
 }
 
 pub struct Started {
     tasks_completed: Option<WaitGroup>,
-    shutdown_trigger: Option<WaitTrigger>,
+    shutdown_triggers: Vec<WaitTrigger>,
 }
 
 /// Coordination primitive for external tasks.
@@ -184,17 +184,16 @@ pub struct TaskCoordinator<State> {
 
 impl TaskCoordinator<()> {
     /// Creates a new `TaskCoordinator`.
-    pub fn new() -> (TaskCoordinator<Configuring>, WaitHandle) {
-        let (shutdown_trigger, shutdown_handle) = WaitTrigger::new();
+    pub fn new() -> TaskCoordinator<Configuring> {
         let coordinator = TaskCoordinator {
             state: Configuring {
                 tasks_started: WaitGroup::new(),
                 tasks_completed: WaitGroup::new(),
-                shutdown_trigger,
+                shutdown_triggers: Mutex::new(Vec::new()),
             },
         };
 
-        (coordinator, shutdown_handle)
+        coordinator
     }
 }
 
@@ -209,21 +208,32 @@ impl TaskCoordinator<Configuring> {
         self.state.tasks_completed.add_child()
     }
 
+    /// Registers a handle that will be notified when shutdown is triggered.
+    pub fn register_for_shutdown(&self) -> WaitHandle {
+        let (trigger, handle) = WaitTrigger::new();
+        self.state
+            .shutdown_triggers
+            .lock()
+            .expect("poisoned")
+            .push(trigger);
+        handle
+    }
+
     /// Waits for all tasks to have marked that they have started.
-    pub async fn wait_for_tasks_to_start(self) -> TaskCoordinator<Started> {
+    pub async fn started(self) -> TaskCoordinator<Started> {
         let Configuring {
             mut tasks_started,
             tasks_completed,
-            shutdown_trigger,
+            shutdown_triggers,
         } = self.state;
 
         tasks_started.wait_for_children().await;
-        debug!("All coordinated tasks reported as having started.");
+        trace!("All coordinated tasks reported as having started.");
 
         TaskCoordinator {
             state: Started {
                 tasks_completed: Some(tasks_completed),
-                shutdown_trigger: Some(shutdown_trigger),
+                shutdown_triggers: shutdown_triggers.into_inner().expect("poisoned"),
             },
         }
     }
@@ -231,27 +241,21 @@ impl TaskCoordinator<Configuring> {
 
 impl TaskCoordinator<Started> {
     /// Triggers all coordinated tasks to shutdown, and waits for them to mark themselves as completed.
-    pub async fn trigger_and_wait_for_shutdown(&mut self) {
-        // This function is meant to be cancellation-safe, so trying to trigger multiple times
-        // is fine: once we've signalled to shutdown, we don't need to signal again.
-        if let Some(trigger) = self.state.shutdown_trigger.take() {
+    pub async fn shutdown(mut self) {
+        // Trigger all registered shutdown handles.
+        for trigger in self.state.shutdown_triggers.drain(..) {
             trigger.trigger();
-            debug!("Triggered coordinated tasks to shutdown.");
+            trace!("Shutdown triggered for coordinated tasks.");
         }
 
-        // This function is meant to be cancellation-safe, so in order to correctly wait for all
-        // children to complete, we need to mutably poll the wait group, and only when we get
-        // past waiting on all children can we actually clear the slot.
-        {
-            debug!("Waiting for coordinated tasks to complete...");
-            let tasks_completed = self
-                .state
-                .tasks_completed
-                .as_mut()
-                .expect("tasks completed wait group already consumed");
-            tasks_completed.wait_for_children().await;
-            debug!("All coordinated tasks completed.");
-        }
-        self.state.tasks_completed.take();
+        // Now simply wait for all of them to mark themselves as completed.
+        trace!("Waiting for coordinated tasks to complete...");
+        let tasks_completed = self
+            .state
+            .tasks_completed
+            .as_mut()
+            .expect("tasks completed wait group already consumed");
+        tasks_completed.wait_for_children().await;
+        trace!("All coordinated tasks completed.");
     }
 }

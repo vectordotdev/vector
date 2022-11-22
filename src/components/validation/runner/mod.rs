@@ -7,11 +7,14 @@ use std::{collections::HashMap, time::Duration};
 use tokio::{runtime::Builder, select, sync::mpsc};
 use vector_core::event::Event;
 
-use crate::{config::ConfigDiff, topology};
+use crate::{
+    config::{ConfigBuilder, ConfigDiff},
+    topology,
+};
 
 use super::{
     sync::{Configuring, TaskCoordinator},
-    ComponentType, TestCaseExpectation, ValidatableComponent, Validator, WaitHandle,
+    ComponentType, TestCaseExpectation, TestEvent, ValidatableComponent, Validator,
 };
 
 use self::config::TopologyBuilder;
@@ -26,7 +29,7 @@ pub enum RunnerInput {
     /// either pulled from by the component, or pushes directly to the component.
     ///
     /// Only sources have external inputs.
-    External(mpsc::Sender<Event>),
+    External(mpsc::Sender<TestEvent>),
 
     /// The component uses a "controlled" edge for its input.
     ///
@@ -44,7 +47,10 @@ impl RunnerInput {
     /// If the runner input is configured for an external resource, and a controlled edge is given,
     /// or if the runner input is configured for a controlled edge and no controlled edge is given,
     /// this function will panic, as one or the other must be provided.
-    pub fn into_sender(self, controlled_edge: Option<mpsc::Sender<Event>>) -> mpsc::Sender<Event> {
+    pub fn into_sender(
+        self,
+        controlled_edge: Option<mpsc::Sender<TestEvent>>,
+    ) -> mpsc::Sender<TestEvent> {
         match (self, controlled_edge) {
             (Self::External(_), Some(_)) => panic!("Runner input declared as external resource, but controlled input edge was also specified."),
             (Self::Controlled, None) => panic!("Runner input declared as controlled, but no controlled input edge was specified."),
@@ -97,39 +103,9 @@ impl RunnerOutput {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum RunnerState {
-    Running,
-    InputDone,
-    WaitingOnComponent,
-    WaitingOnOutputs,
-    Completed,
-}
-
-impl RunnerState {
-    fn is_running(self) -> bool {
-        self == RunnerState::Running
-    }
-
-    fn is_input_done(self) -> bool {
-        self == RunnerState::InputDone
-    }
-
-    const fn is_component_active(self) -> bool {
-        matches!(
-            self,
-            Self::Running | Self::InputDone | Self::WaitingOnComponent
-        )
-    }
-
-    fn is_completed(self) -> bool {
-        self == RunnerState::Completed
-    }
-}
-
 pub struct RunnerResults {
     expectation: TestCaseExpectation,
-    inputs: Vec<Event>,
+    inputs: Vec<TestEvent>,
     outputs: Vec<Event>,
     validator_results: Vec<Result<Vec<String>, Vec<String>>>,
 }
@@ -139,7 +115,7 @@ impl RunnerResults {
         self.expectation
     }
 
-    pub fn inputs(&self) -> &[Event] {
+    pub fn inputs(&self) -> &[TestEvent] {
         &self.inputs
     }
 
@@ -189,14 +165,21 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
     }
 
     pub async fn run_validation(self) -> Result<Vec<RunnerResults>, String> {
-        // TODO: Make sure we initialize the metrics stuff in test mode so that it collects on a
-        // per-thread basis, which we need to happen to avoid cross-contamination between tests.
+        // Initialize our test environment.
+        initialize_test_environment();
 
         let mut test_case_results = Vec::new();
 
         let test_cases = self.component.test_cases();
         for test_case in test_cases {
-            let (task_coordinator, task_shutdown_handle) = TaskCoordinator::new();
+            // Create a task coordinator for each relevant phase of the test.
+            //
+            // This provides us the granularity to know when the tasks associated with each phase
+            // (inputs, component topology, outputs/telemetry, etc) have started, and the ability to
+            // trigger them to shutdown and then wait until the associated tasks have completed.
+            let input_task_coordinator = TaskCoordinator::new();
+            let output_task_coordinator = TaskCoordinator::new();
+            let topology_task_coordinator = TaskCoordinator::new();
 
             // First, we get a topology builder for the given component being validated.
             //
@@ -208,11 +191,10 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             // We then finalize the topology builder to get our actual `ConfigBuilder`, as well as
             // any controlled edges (channel sender/receiver to the aforementioned filler
             // components) and a telemetry client for collecting internal telemetry.
-            let topology_builder = TopologyBuilder::from_component_configuration(
-                self.component.component_configuration(),
-            );
+            let topology_builder = TopologyBuilder::from_component(self.component);
             let (config_builder, controlled_edges, telemetry_collector) =
-                topology_builder.finalize(&task_coordinator);
+                topology_builder.finalize(&input_task_coordinator, &output_task_coordinator);
+            debug!("Component topology configuration built and telemetry collector spawned.");
 
             // After that, we'll build the external resource necessary for this component, if any.
             // Once that's done, we build the input event/output event sender and receiver based on
@@ -224,64 +206,29 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             // For example, if we're validating a source, we would have added a filler sink for our
             // controlled output edge, which means we then need a server task listening for the
             // events sent by that sink.
-            let (runner_input, runner_output) =
-                build_external_resource(self.component, &task_coordinator, task_shutdown_handle);
+            let (runner_input, runner_output) = build_external_resource(
+                self.component,
+                &input_task_coordinator,
+                &output_task_coordinator,
+            );
             let input_tx = runner_input.into_sender(controlled_edges.input);
             let mut output_rx = runner_output.into_receiver(controlled_edges.output);
+            debug!("External resource (if any) and controlled edges built and spawned.");
 
             // Now with any external resource spawned, as well as any tasks for handling controlled
             // edges, we'll wait for all of those tasks to report that they're ready to go and
             // listening, etc.
-            let mut task_coordinator = task_coordinator.wait_for_tasks_to_start().await;
+            let input_task_coordinator = input_task_coordinator.started().await;
+            debug!("All input task(s) started.");
+
+            let output_task_coordinator = output_task_coordinator.started().await;
+            debug!("All output task(s) started.");
 
             // At this point, we need to actually spawn the configured component topology so that it
             // runs, and make sure we have a way to tell it when to shutdown so that we can properly
             // sequence the test in terms of sending inputs, waiting for outputs, etc.
-            let mut config = config_builder
-                .build()
-                .expect("config should not have any errors");
-            config.healthchecks.set_require_healthy(Some(true));
-            let config_diff = ConfigDiff::initial(&config);
-
-            let (topology_task_coordinator, mut topology_shutdown_handle) = TaskCoordinator::new();
-            let topology_started = topology_task_coordinator.track_started();
-            let topology_completed = topology_task_coordinator.track_completed();
-
-            let _test_runtime_thread = std::thread::spawn(move || {
-                let test_runtime = Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .expect("should not fail to build current-thread runtime");
-
-                test_runtime.block_on(async move {
-                    let pieces =
-                        topology::build_or_log_errors(&config, &config_diff, HashMap::new())
-                            .await
-                            .unwrap();
-                    let (topology, mut crash_rx) =
-                        topology::start_validated(config, config_diff, pieces)
-                            .await
-                            .unwrap();
-
-                    topology_started.mark_as_done();
-
-                    select! {
-                        // We got the signal to shutdown, so stop the topology gracefully.
-                        _ = topology_shutdown_handle.wait() => {
-                            topology.stop().await;
-                            info!("Component topology stopped gracefully.")
-                        },
-                        _ = crash_rx.recv() => {
-                            error!("Component topology under validation unexpectedly crashed.");
-                        }
-                    }
-
-                    topology_completed.mark_as_done();
-                });
-            });
-
-            let mut topology_task_coordinator =
-                topology_task_coordinator.wait_for_tasks_to_start().await;
+            spawn_component_topology(config_builder, &topology_task_coordinator);
+            let topology_task_coordinator = topology_task_coordinator.started().await;
 
             // Now we'll spawn two tasks: one for sending inputs, and one for collecting outputs.
             //
@@ -321,35 +268,34 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
                 output_events
             });
 
-            // Once we've sent all of the events, we'll drop our input sender which triggers the input
-            // side -- external or controlled -- to finish whatever it's doing and gracefully close.
-            // We'll wait for the input driver to complete, which implies it has sent all input
-            // events and dropped the input sender.
+            // At this point, the component topology is running, and all input/output/telemetry
+            // tasks are running as well. Our input driver should be sending (or will have already
+            // sent) all of the input events, which will cascade through the component topology as
+            // they're processed.
             //
-            // TODO: We need to wait here for our input-related tasks to mark themselves as
-            // completed, but we currently mix/match all coordinated tasks together via
-            // `task_coordinator` so we might need to tease that apart, as otherwise, we have no way
-            // to wait for _only_ the input-related tasks.
+            // We'll trigger each phase to shutdown, in order, to deterministically ensure each
+            // section has completed. We additionally wait for the input driver task to complete
+            // first, and the output driver task to complete last, as those tasks are freerunning
+            // and don't require special shutdown coordination.
             let _ = input_driver
                 .await
                 .expect("input driver task should not have panicked");
 
-            // Now that the input side has marked itself as completed, we'll signal the component
-            // topology to shutdown and wait until that happens.
-            topology_task_coordinator
-                .trigger_and_wait_for_shutdown()
-                .await;
+            input_task_coordinator.shutdown().await;
+            debug!("Input task(s) have been shutdown.");
 
-            // Now we'll trigger the output side, and telemetry collector, to finish up and
-            // shutdown, and wait for that to happen.
-            task_coordinator.trigger_and_wait_for_shutdown().await;
+            topology_task_coordinator.shutdown().await;
+            debug!("Component topology task has been shutdown.");
+
+            output_task_coordinator.shutdown().await;
+            debug!("Output task(s) have been shutdown.");
+
             let output_events = output_driver
                 .await
                 .expect("input driver task should not have panicked");
 
-            // Now that the validation run has completed, run the results through each configured
-            // validator, collect _their_ results, and store them to the side so we can run any
-            // remaining test cases.
+            // Run the relevant data -- inputs, outputs, telemetry, etc -- through each validator to
+            // get the validation results for this test.
             let component_type = self.component.component_type();
             let expectation = test_case.expectation;
             let input_events = test_case.events;
@@ -383,10 +329,10 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
     }
 }
 
-fn build_external_resource<C: ValidatableComponent + ?Sized>(
-    component: &C,
-    task_coordinator: &TaskCoordinator<Configuring>,
-    task_shutdown_handle: WaitHandle,
+fn build_external_resource<C: ValidatableComponent>(
+    component: C,
+    input_task_coordinator: &TaskCoordinator<Configuring>,
+    output_task_coordinator: &TaskCoordinator<Configuring>,
 ) -> (RunnerInput, RunnerOutput) {
     let component_type = component.component_type();
     let maybe_external_resource = component.external_resource();
@@ -399,7 +345,7 @@ fn build_external_resource<C: ValidatableComponent + ?Sized>(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a source must always have an external resource");
-            resource.spawn_as_input(rx, task_coordinator, task_shutdown_handle);
+            resource.spawn_as_input(rx, input_task_coordinator);
 
             (RunnerInput::External(tx), RunnerOutput::Controlled)
         }
@@ -415,9 +361,73 @@ fn build_external_resource<C: ValidatableComponent + ?Sized>(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a sink must always have an external resource");
-            resource.spawn_as_output(tx, task_coordinator, task_shutdown_handle);
+            resource.spawn_as_output(tx, output_task_coordinator);
 
             (RunnerInput::Controlled, RunnerOutput::External(rx))
         }
     }
+}
+
+fn spawn_component_topology(
+    config_builder: ConfigBuilder,
+    topology_task_coordinator: &TaskCoordinator<Configuring>,
+) {
+    let topology_started = topology_task_coordinator.track_started();
+    let topology_completed = topology_task_coordinator.track_completed();
+    let mut topology_shutdown_handle = topology_task_coordinator.register_for_shutdown();
+
+    let mut config = config_builder
+        .build()
+        .expect("config should not have any errors");
+    config.healthchecks.set_require_healthy(Some(true));
+    let config_diff = ConfigDiff::initial(&config);
+
+    let _ = std::thread::spawn(move || {
+        let test_runtime = Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("should not fail to build current-thread runtime");
+
+        test_runtime.block_on(async move {
+            debug!("Building component topology...");
+
+            let pieces = topology::build_or_log_errors(&config, &config_diff, HashMap::new())
+                .await
+                .unwrap();
+            let (topology, mut crash_rx) = topology::start_validated(config, config_diff, pieces)
+                .await
+                .unwrap();
+
+            debug!("Component topology built and spawned.");
+            topology_started.mark_as_done();
+
+            select! {
+                // We got the signal to shutdown, so stop the topology gracefully.
+                _ = topology_shutdown_handle.wait() => {
+                    debug!("Shutdown signal received, stopping topology...");
+                    topology.stop().await;
+                    debug!("Component topology stopped gracefully.")
+                },
+                _ = crash_rx.recv() => {
+                    error!("Component topology under validation unexpectedly crashed.");
+                }
+            }
+
+            topology_completed.mark_as_done();
+        });
+    });
+}
+
+fn initialize_test_environment() {
+    // Make sure our metrics recorder is installed and in test mode. This is necessary for
+    // proper internal telemetry collect when running the component topology, even though it's
+    // running in an isolated current-thread runtime, as test mode isolates metrics on a
+    // per-thread basis.
+    crate::metrics::init_test();
+
+    // Make sure that early buffering is stopped for logging.
+    //
+    // If we don't do this, the `internal_logs` source can never actually run in a meaningful way,
+    // which means it ends up deadlocked, unable to process input _or_ respond to a shutdown signal.
+    crate::trace::stop_early_buffering();
 }

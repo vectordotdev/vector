@@ -1,4 +1,4 @@
-use vector_core::event::Event;
+use super::TestEvent;
 
 /// Expected outcome of a validation test case.
 #[derive(Clone, Copy)]
@@ -20,7 +20,7 @@ pub enum TestCaseExpectation {
 /// be processed successfully, or fail to be processed, and so on.
 pub struct TestCase {
     pub expectation: TestCaseExpectation,
-    pub events: Vec<Event>,
+    pub events: Vec<TestEvent>,
 }
 
 impl TestCase {
@@ -28,7 +28,7 @@ impl TestCase {
     pub fn success<I, E>(events: I) -> Self
     where
         I: IntoIterator<Item = E>,
-        E: Into<Event>,
+        E: Into<TestEvent>,
     {
         Self::from_events(TestCaseExpectation::Success, events)
     }
@@ -37,7 +37,7 @@ impl TestCase {
     pub fn failure<I, E>(events: I) -> Self
     where
         I: IntoIterator<Item = E>,
-        E: Into<Event>,
+        E: Into<TestEvent>,
     {
         Self::from_events(TestCaseExpectation::Failure, events)
     }
@@ -46,7 +46,7 @@ impl TestCase {
     pub fn partial_failure<I, E>(events: I) -> Self
     where
         I: IntoIterator<Item = E>,
-        E: Into<Event>,
+        E: Into<TestEvent>,
     {
         Self::from_events(TestCaseExpectation::PartialFailure, events)
     }
@@ -54,7 +54,7 @@ impl TestCase {
     fn from_events<I, E>(expectation: TestCaseExpectation, events: I) -> Self
     where
         I: IntoIterator<Item = E>,
-        E: Into<Event>,
+        E: Into<TestEvent>,
     {
         Self {
             expectation,

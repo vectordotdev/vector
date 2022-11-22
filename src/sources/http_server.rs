@@ -1,6 +1,5 @@
 use std::{collections::HashMap, net::SocketAddr};
 
-use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codecs::{
@@ -151,7 +150,6 @@ impl Default for SimpleHttpConfig {
 
 impl_generate_config_from_default!(SimpleHttpConfig);
 
-#[async_trait]
 impl ValidatableComponent for SimpleHttpConfig {
     fn component_name(&self) -> &'static str {
         Self::NAME

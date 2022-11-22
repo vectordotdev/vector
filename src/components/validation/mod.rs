@@ -2,18 +2,20 @@ mod resources;
 mod runner;
 mod sync;
 mod test_case;
+pub mod util;
 mod validators;
 
 use crate::{sinks::Sinks, sources::Sources, transforms::Transforms};
 
 pub use self::resources::*;
 pub use self::runner::*;
-use self::sync::*;
 pub use self::test_case::{TestCase, TestCaseExpectation};
 pub use self::validators::*;
 
 /// Component types that can be validated.
-#[derive(Clone, Copy)]
+// TODO: We should centralize this in `vector-common` or something, where both this code and the
+// configuration schema stuff (namely the proc macros that use this) can share it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ComponentType {
     Source,
     Transform,
@@ -136,37 +138,79 @@ mod tests {
 
         let validatable_components = get_all_validatable_components();
         for validatable_component in validatable_components {
+            let component_name = validatable_component.component_name();
+            let component_type = validatable_component.component_type();
+            info!(
+                "Running validation for component '{}' (type: {:?})...",
+                component_name, component_type
+            );
+
             let mut runner = Runner::from_component(validatable_component);
             runner.add_validator(StandardValidators::ComponentSpec);
 
             match runner.run_validation().await {
                 Ok(test_case_results) => {
-                    for test_case_result in test_case_results {
+                    let mut details = Vec::new();
+                    let mut had_failures = false;
+
+                    for (idx, test_case_result) in test_case_results.into_iter().enumerate() {
                         for validator_result in test_case_result.validator_results() {
                             match validator_result {
-                                // Getting results in the success case will be rare, but perhaps we want to always print
-                                // successful validations so that we can verify that specific components are being validated,
-                                // and verify what things we're validating them against.
-                                Ok(_success_results) => {}
-                                Err(failure_results) => {
-                                    let formatted_failures = failure_results
-                                        .iter()
-                                        .map(|s| format!(" - {}\n", s))
-                                        .collect::<Vec<_>>();
-                                    panic!(
-                                        "Failed to validate component '{}':\n\n{}",
-                                        validatable_component.component_name(),
-                                        formatted_failures.join("")
-                                    );
+                                Ok(success) => {
+                                    if success.is_empty() {
+                                        details.push(format!("  test case #{}: passed", idx));
+                                    } else {
+                                        let formatted = success
+                                            .iter()
+                                            .map(|s| format!("    - {}\n", s))
+                                            .collect::<Vec<_>>();
+
+                                        details.push(format!(
+                                            "  test case #{}: passed\n{}",
+                                            idx,
+                                            formatted.join("")
+                                        ));
+                                    }
+                                }
+                                Err(failure) => {
+                                    had_failures = true;
+
+                                    if failure.is_empty() {
+                                        details.push(format!("  test case #{}: failed", idx));
+                                    } else {
+                                        let formatted = failure
+                                            .iter()
+                                            .map(|s| format!("    - {}\n", s))
+                                            .collect::<Vec<_>>();
+
+                                        details.push(format!(
+                                            "  test case #{}: failed\n{}",
+                                            idx,
+                                            formatted.join("")
+                                        ));
+                                    }
                                 }
                             }
                         }
                     }
+
+                    if had_failures {
+                        panic!(
+                            "Failed to validate component '{}':\n{}",
+                            component_name,
+                            details.join("")
+                        );
+                    } else {
+                        info!(
+                            "Successfully validated component '{}':\n{}",
+                            component_name,
+                            details.join("")
+                        );
+                    }
                 }
                 Err(e) => panic!(
                     "Failed to complete validation run for component '{}': {}",
-                    validatable_component.component_name(),
-                    e
+                    component_name, e
                 ),
             }
         }

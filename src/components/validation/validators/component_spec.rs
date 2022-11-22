@@ -1,6 +1,6 @@
 use vector_core::event::Event;
 
-use crate::components::validation::{ComponentType, TestCaseExpectation};
+use crate::components::validation::{ComponentType, TestCaseExpectation, TestEvent};
 
 use super::Validator;
 
@@ -24,10 +24,17 @@ impl Validator for ComponentSpecValidator {
         &self,
         _component_type: ComponentType,
         _expectation: TestCaseExpectation,
-        _inputs: &[Event],
-        _outputs: &[Event],
-        _telemetry_events: &[Event],
+        inputs: &[TestEvent],
+        outputs: &[Event],
+        telemetry_events: &[Event],
     ) -> Result<Vec<String>, Vec<String>> {
-        Ok(vec![])
+        Ok(vec![
+            format!(
+                "sent {} inputs and received {} outputs",
+                inputs.len(),
+                outputs.len()
+            ),
+            format!("received {} telemetry events", telemetry_events.len()),
+        ])
     }
 }

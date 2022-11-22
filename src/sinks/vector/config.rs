@@ -149,16 +149,16 @@ async fn healthcheck(
     }
 
     let request = service.client.health_check(proto::HealthCheckRequest {});
-
-    if let Ok(response) = request.await {
-        let status = proto::ServingStatus::from_i32(response.into_inner().status);
-
-        if let Some(proto::ServingStatus::Serving) = status {
-            return Ok(());
-        }
+    match request.await {
+        Ok(response) => match proto::ServingStatus::from_i32(response.into_inner().status) {
+            Some(proto::ServingStatus::Serving) => Ok(()),
+            Some(status) => Err(Box::new(VectorSinkError::Health {
+                status: Some(status.as_str_name()),
+            })),
+            None => Err(Box::new(VectorSinkError::Health { status: None })),
+        },
+        Err(source) => Err(Box::new(VectorSinkError::Request { source })),
     }
-
-    Err(Box::new(VectorSinkError::Health))
 }
 
 /// grpc doesn't like an address without a scheme, so we default to http or https if one isn't

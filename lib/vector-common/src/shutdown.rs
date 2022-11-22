@@ -72,6 +72,8 @@ impl Future for ShutdownSignal {
                     Poll::Pending
                 }
             }
+            // TODO: This should almost certainly be a panic to avoid deadlocking in the case of a
+            // poll-after-ready situation.
             None => Poll::Pending,
         }
     }

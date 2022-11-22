@@ -3,7 +3,7 @@ pub use self::component_spec::ComponentSpecValidator;
 
 use vector_core::event::Event;
 
-use super::{ComponentType, TestCaseExpectation};
+use super::{ComponentType, TestCaseExpectation, TestEvent};
 
 /// A component validator.
 ///
@@ -21,7 +21,7 @@ pub trait Validator {
         &self,
         component_type: ComponentType,
         expectation: TestCaseExpectation,
-        inputs: &[Event],
+        inputs: &[TestEvent],
         outputs: &[Event],
         telemetry_events: &[Event],
     ) -> Result<Vec<String>, Vec<String>>;

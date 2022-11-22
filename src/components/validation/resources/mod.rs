@@ -1,3 +1,4 @@
+mod event;
 mod http;
 
 use codecs::{
@@ -10,9 +11,10 @@ use vector_core::{config::DataType, event::Event};
 
 use crate::codecs::{DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
+pub use self::event::TestEvent;
 pub use self::http::HttpConfig;
 
-use super::sync::{Configuring, TaskCoordinator, WaitHandle};
+use super::sync::{Configuring, TaskCoordinator};
 
 /// The codec used by the external resource.
 ///
@@ -245,18 +247,13 @@ impl ExternalResource {
     /// Spawns this resource for use as an input to a source.
     pub fn spawn_as_input(
         self,
-        input_rx: mpsc::Receiver<Event>,
+        input_rx: mpsc::Receiver<TestEvent>,
         task_coordinator: &TaskCoordinator<Configuring>,
-        task_shutdown_handle: WaitHandle,
     ) {
         match self.definition {
-            ResourceDefinition::Http(http_config) => http_config.spawn_as_input(
-                self.direction,
-                self.codec,
-                input_rx,
-                task_coordinator,
-                task_shutdown_handle,
-            ),
+            ResourceDefinition::Http(http_config) => {
+                http_config.spawn_as_input(self.direction, self.codec, input_rx, task_coordinator)
+            }
         }
     }
 
@@ -265,16 +262,11 @@ impl ExternalResource {
         self,
         output_tx: mpsc::Sender<Event>,
         task_coordinator: &TaskCoordinator<Configuring>,
-        task_shutdown_handle: WaitHandle,
     ) {
         match self.definition {
-            ResourceDefinition::Http(http_config) => http_config.spawn_as_output(
-                self.direction,
-                self.codec,
-                output_tx,
-                task_coordinator,
-                task_shutdown_handle,
-            ),
+            ResourceDefinition::Http(http_config) => {
+                http_config.spawn_as_output(self.direction, self.codec, output_tx, task_coordinator)
+            }
         }
     }
 }

@@ -499,12 +499,12 @@ pub async fn build_pieces(
                 timeout(duration, healthcheck)
                     .map(|result| match result {
                         Ok(Ok(_)) => {
-                            info!("Healthcheck: Passed.");
+                            info!("Healthcheck passed.");
                             Ok(TaskOutput::Healthcheck)
                         }
                         Ok(Err(error)) => {
                             error!(
-                                msg = "Healthcheck: Failed Reason.",
+                                msg = "Healthcheck failed.",
                                 %error,
                                 component_kind = "sink",
                                 component_type = typetag,
@@ -516,7 +516,7 @@ pub async fn build_pieces(
                         }
                         Err(e) => {
                             error!(
-                                msg = "Healthcheck: timeout.",
+                                msg = "Healthcheck timed out.",
                                 component_kind = "sink",
                                 component_type = typetag,
                                 component_id = %component_key.id(),
@@ -528,7 +528,7 @@ pub async fn build_pieces(
                     })
                     .await
             } else {
-                info!("Healthcheck: Disabled.");
+                info!("Healthcheck disabled.");
                 Ok(TaskOutput::Healthcheck)
             }
         };

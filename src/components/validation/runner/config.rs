@@ -1,12 +1,13 @@
 use crate::{
     components::validation::{
         sync::{Configuring, TaskCoordinator},
-        ComponentConfiguration,
+        util::GrpcAddress,
+        ComponentConfiguration, ComponentType, ValidatableComponent,
     },
     config::ConfigBuilder,
     sinks::{vector::VectorConfig as VectorSinkConfig, Sinks},
     sources::{vector::VectorConfig as VectorSourceConfig, Sources},
-    test_util::{addr_as_http_uri, next_addr},
+    test_util::next_addr,
     transforms::Transforms,
 };
 
@@ -27,13 +28,21 @@ pub struct TopologyBuilder {
 
 impl TopologyBuilder {
     /// Creates a component topology for the given component configuration.
-    pub fn from_component_configuration(component_configuration: ComponentConfiguration) -> Self {
-        // TODO: Should we take the component type as well, and validate that the component
-        // configuration variant matches the component type?
+    pub fn from_component<C: ValidatableComponent>(component: C) -> Self {
+        let component_configuration = component.component_configuration();
         match component_configuration {
-            ComponentConfiguration::Source(source) => Self::from_source(source),
-            ComponentConfiguration::Transform(transform) => Self::from_transform(transform),
-            ComponentConfiguration::Sink(sink) => Self::from_sink(sink),
+            ComponentConfiguration::Source(source) => {
+                debug_assert_eq!(component.component_type(), ComponentType::Source);
+                Self::from_source(source)
+            }
+            ComponentConfiguration::Transform(transform) => {
+                debug_assert_eq!(component.component_type(), ComponentType::Transform);
+                Self::from_transform(transform)
+            }
+            ComponentConfiguration::Sink(sink) => {
+                debug_assert_eq!(component.component_type(), ComponentType::Sink);
+                Self::from_sink(sink)
+            }
         }
     }
 
@@ -90,36 +99,41 @@ impl TopologyBuilder {
     /// receiver for telemetry events is provided.
     pub fn finalize(
         mut self,
-        task_coordinator: &TaskCoordinator<Configuring>,
+        input_task_coordinator: &TaskCoordinator<Configuring>,
+        output_task_coordinator: &TaskCoordinator<Configuring>,
     ) -> (ConfigBuilder, ControlledEdges, TelemetryCollector) {
         let controlled_edges = ControlledEdges {
             input: self
                 .input_edge
-                .map(|edge| edge.spawn_input_client(task_coordinator)),
+                .map(|edge| edge.spawn_input_client(input_task_coordinator)),
             output: self
                 .output_edge
-                .map(|edge| edge.spawn_output_server(task_coordinator)),
+                .map(|edge| edge.spawn_output_server(output_task_coordinator)),
         };
 
         let telemetry = Telemetry::attach_to_config(&mut self.config_builder);
-        let telemetry_collector = telemetry.into_collector(task_coordinator);
+        let telemetry_collector = telemetry.into_collector(output_task_coordinator);
 
         (self.config_builder, controlled_edges, telemetry_collector)
     }
 }
 
 fn build_input_edge() -> (InputEdge, impl Into<Sources>) {
-    let input_listen_addr = next_addr();
-    let input_edge = InputEdge::from_address(addr_as_http_uri(input_listen_addr));
-    let input_source = VectorSourceConfig::from_address(input_listen_addr);
+    let input_listen_addr = GrpcAddress::from(next_addr());
+    debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
+
+    let input_source = VectorSourceConfig::from_address(input_listen_addr.as_socket_addr());
+    let input_edge = InputEdge::from_address(input_listen_addr);
 
     (input_edge, input_source)
 }
 
 fn build_output_edge() -> (OutputEdge, impl Into<Sinks>) {
-    let output_listen_addr = addr_as_http_uri(next_addr());
-    let output_edge = OutputEdge::from_address(output_listen_addr.clone());
-    let output_sink = VectorSinkConfig::from_address(output_listen_addr);
+    let output_listen_addr = GrpcAddress::from(next_addr());
+    debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
+
+    let output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
+    let output_edge = OutputEdge::from_address(output_listen_addr);
 
     (output_edge, output_sink)
 }
