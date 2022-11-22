@@ -1,6 +1,6 @@
 use std::{
-    cmp,
     alloc::{handle_alloc_error, GlobalAlloc, Layout},
+    cmp,
     sync::atomic::Ordering,
 };
 
@@ -127,8 +127,7 @@ unsafe fn get_wrapped_layout_unchecked(object_layout: Layout) -> (Layout, usize)
 
     // We generate a new allocation layout that gives us a location to store the active allocation group ID ahead
     // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path.
-    let (actual_layout, offset_to_group_id) = object_layout
-        .unsafe_extend(HEADER_LAYOUT);
+    let (actual_layout, offset_to_group_id) = object_layout.unsafe_extend(HEADER_LAYOUT);
 
     (actual_layout.pad_to_align(), offset_to_group_id)
 }
@@ -136,7 +135,7 @@ trait LayoutExtensions: Sized {
     unsafe fn unsafe_extend(&self, next: Self) -> (Self, usize);
 }
 
-impl LayoutExtensions for Layout { 
+impl LayoutExtensions for Layout {
     #[inline]
     unsafe fn unsafe_extend(&self, next: Self) -> (Self, usize) {
         let new_align = cmp::max(self.align(), next.align());
