@@ -20,10 +20,11 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{metadata_path, path, PathPrefix};
+use lookup::{metadata_path, owned_value_path, path, PathPrefix};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
+use value::Kind;
 use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
@@ -135,7 +136,14 @@ impl SourceConfig for AmqpSourceConfig {
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                AmqpSourceConfig::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            );
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }

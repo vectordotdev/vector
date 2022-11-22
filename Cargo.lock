@@ -8000,7 +8000,7 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost 0.11.2",
- "prost-derive 0.11.2",
+ "prost-derive 0.11.0",
  "rustls-native-certs 0.6.2",
  "rustls-pemfile 1.0.1",
  "tokio",
