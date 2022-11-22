@@ -551,12 +551,6 @@ pub mod test {
         .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
 
-        println!("event {}", definition.event_kind());
-        println!("{}", definition.metadata_kind());
-
-        println!("event {}", expected_definition.event_kind());
-        println!("{}", expected_definition.metadata_kind());
-
         assert_eq!(definition, expected_definition);
     }
 }
