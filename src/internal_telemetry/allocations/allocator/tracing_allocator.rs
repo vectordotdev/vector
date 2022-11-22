@@ -1,4 +1,5 @@
 use std::{
+    cmp,
     alloc::{handle_alloc_error, GlobalAlloc, Layout},
     sync::atomic::Ordering,
 };
@@ -68,10 +69,19 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
     }
 
     #[inline]
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        let new_layout = Layout::from_size_align_unchecked(new_size, layout.align());
+        let new_ptr = self.alloc(new_layout);
+        std::ptr::copy_nonoverlapping(ptr, new_ptr, cmp::min(layout.size(), new_size));
+        self.dealloc(ptr, layout);
+        new_ptr
+    }
+
+    #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
         // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
         // requested layout, not the wrapped layout that was actually allocated.
-        let (wrapped_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
+        let (wrapped_layout, offset_to_group_id) = get_wrapped_layout_unchecked(object_layout);
 
         // SAFETY: We know that `object_ptr` with offset is at least aligned enough for casting it to `*mut u8` as the layout for
         // the allocation backing this pointer ensures the last field in the layout is `u8.
@@ -109,4 +119,37 @@ fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
         .expect("wrapping requested layout resulted in overflow");
 
     (actual_layout.pad_to_align(), offset_to_group_id)
+}
+
+#[inline(always)]
+unsafe fn get_wrapped_layout_unchecked(object_layout: Layout) -> (Layout, usize) {
+    static HEADER_LAYOUT: Layout = Layout::new::<u8>();
+
+    // We generate a new allocation layout that gives us a location to store the active allocation group ID ahead
+    // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path.
+    let (actual_layout, offset_to_group_id) = object_layout
+        .extend_unsafe(HEADER_LAYOUT);
+
+    (actual_layout.pad_to_align(), offset_to_group_id)
+}
+trait LayoutExtensions: Sized {
+    unsafe fn unsafe_extend(&self, next: Self) -> (Self, usize);
+}
+
+impl LayoutExtensions for Layout { 
+    #[inline]
+    unsafe fn unsafe_extend(&self, next: Self) -> (Self, usize) {
+        let new_align = cmp::max(self.align(), next.align());
+        let pad = {
+            let align = next.align();
+            let len = self.size();
+            let len_rounded_up = len.wrapping_add(align).wrapping_sub(1) & !align.wrapping_sub(1);
+            len_rounded_up.wrapping_sub(len)
+        };
+        let offset = self.size() + pad;
+        let new_size = offset + next.size();
+
+        let layout = Layout::from_size_align_unchecked(new_size, new_align);
+        (layout, offset)
+    }
 }
