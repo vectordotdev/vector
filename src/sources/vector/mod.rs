@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use chrono::Utc;
-use codecs::BytesDeserializerConfig;
+use codecs::NativeDeserializerConfig;
 use futures::TryFutureExt;
 use lookup::path;
 use tonic::{Request, Response, Status};
@@ -186,7 +186,7 @@ impl SourceConfig for VectorConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let schema_definition = BytesDeserializerConfig
+        let schema_definition = NativeDeserializerConfig
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
@@ -204,7 +204,7 @@ impl SourceConfig for VectorConfig {
 
 #[cfg(test)]
 mod test {
-    use lookup::{owned_value_path, LookupBuf};
+    use lookup::owned_value_path;
     use value::{kind::Collection, Kind};
     use vector_core::{config::LogNamespace, schema::Definition};
 
@@ -227,8 +227,7 @@ mod test {
             .unwrap();
 
         let expected_definition =
-            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
+            Definition::new_with_default_metadata(Kind::any(), [LogNamespace::Vector])
                 .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
@@ -250,11 +249,6 @@ mod test {
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
             [LogNamespace::Legacy],
-        )
-        .with_event_field(
-            &owned_value_path!("message"),
-            Kind::bytes(),
-            Some("message"),
         )
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
