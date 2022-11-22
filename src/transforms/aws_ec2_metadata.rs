@@ -39,6 +39,7 @@ const REGION_KEY: &str = "region";
 const SUBNET_ID_KEY: &str = "subnet-id";
 const VPC_ID_KEY: &str = "vpc-id";
 const ROLE_NAME_KEY: &str = "role-name";
+const TAGS_KEY: &str = "tags";
 
 static AVAILABILITY_ZONE: Lazy<PathAndQuery> =
     Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone"));
@@ -103,6 +104,12 @@ pub struct Ec2Metadata {
     #[configurable(metadata(docs::examples = "instance-id", docs::examples = "local-hostname",))]
     fields: Vec<String>,
 
+    /// A list of instance tags to include in each transformed event.
+    #[serde(default = "default_tags")]
+    #[derivative(Default(value = "default_tags()"))]
+    #[configurable(metadata(docs::examples = "Name", docs::examples = "Project",))]
+    tags: Vec<String>,
+
     /// The timeout for querying the EC2 metadata endpoint, in seconds.
     #[serde(default = "default_refresh_timeout_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
@@ -141,6 +148,10 @@ fn default_fields() -> Vec<String> {
         .collect()
 }
 
+const fn default_tags() -> Vec<String> {
+    Vec::<String>::new()
+}
+
 const fn default_required() -> bool {
     true
 }
@@ -171,6 +182,7 @@ struct Keys {
     subnet_id_key: MetadataKey,
     vpc_id_key: MetadataKey,
     role_name_key: MetadataKey,
+    tags_key: MetadataKey,
 }
 
 impl_generate_config_from_default!(Ec2Metadata);
@@ -184,6 +196,7 @@ impl TransformConfig for Ec2Metadata {
         let host = Uri::from_maybe_shared(self.endpoint.clone()).unwrap();
         let refresh_interval = self.refresh_interval_secs;
         let fields = self.fields.clone();
+        let tags = self.tags.clone();
         let refresh_timeout = self.refresh_timeout_secs;
         let required = self.required;
 
@@ -198,6 +211,7 @@ impl TransformConfig for Ec2Metadata {
             refresh_interval,
             refresh_timeout,
             fields,
+            tags,
         );
 
         // If initial metadata is not required, log and proceed. Otherwise return error.
@@ -241,6 +255,7 @@ impl TransformConfig for Ec2Metadata {
             &added_keys.subnet_id_key.log_path,
             &added_keys.vpc_id_key.log_path,
             &added_keys.role_name_key.log_path,
+            &added_keys.tags_key.log_path,
         ];
 
         let mut schema_definition = merged_definition.clone();
@@ -297,6 +312,7 @@ struct MetadataClient {
     refresh_interval: Duration,
     refresh_timeout: Duration,
     fields: HashSet<String>,
+    tags: HashSet<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -314,6 +330,7 @@ struct IdentityDocument {
 }
 
 impl MetadataClient {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client: HttpClient<Body>,
         host: Uri,
@@ -322,6 +339,7 @@ impl MetadataClient {
         refresh_interval: Duration,
         refresh_timeout: Duration,
         fields: Vec<String>,
+        tags: Vec<String>,
     ) -> Self {
         Self {
             client,
@@ -332,6 +350,7 @@ impl MetadataClient {
             refresh_interval,
             refresh_timeout,
             fields: fields.into_iter().collect(),
+            tags: tags.into_iter().collect(),
         }
     }
 
@@ -516,6 +535,24 @@ impl MetadataClient {
                 }
             }
 
+            for tag in self.tags.clone() {
+                let tag_path = format!("/latest/meta-data/tags/instance/{}", tag);
+
+                let tag_path = tag_path.parse().context(ParsePathSnafu {
+                    value: tag_path.clone(),
+                })?;
+
+                if let Some(tag_content) = self.get_metadata(&tag_path).await? {
+                    new_state.push((
+                        MetadataKey {
+                            log_path: self.keys.tags_key.log_path.with_field_appended(&tag),
+                            metric_tag: format!("{}[{}]", self.keys.tags_key.metric_tag, &tag),
+                        },
+                        tag_content,
+                    ));
+                }
+            }
+
             self.state.store(Arc::new(new_state));
         }
 
@@ -619,6 +656,7 @@ impl Keys {
             subnet_id_key: create_key(&namespace, SUBNET_ID_KEY),
             vpc_id_key: create_key(&namespace, VPC_ID_KEY),
             role_name_key: create_key(&namespace, ROLE_NAME_KEY),
+            tags_key: create_key(&namespace, TAGS_KEY),
         }
     }
 }
@@ -663,6 +701,8 @@ mod integration_tests {
         test_util::{components::assert_transform_compliance, next_addr},
         transforms::test::create_topology,
     };
+    use std::collections::BTreeMap;
+    use value::Value;
     use warp::Filter;
 
     fn ec2_metadata_address() -> String {
@@ -714,6 +754,8 @@ mod integration_tests {
                 "subnet-0ac62554",
             ),
             (owned_value_path!("role-name", 0), "baskinc-role"),
+            (owned_value_path!("tags", "Name"), "test-instance"),
+            (owned_value_path!("tags", "Test"), "test-tag"),
         ]
     }
 
@@ -735,6 +777,8 @@ mod integration_tests {
             (VPC_ID_KEY, "vpc-d295a6a7"),
             (SUBNET_ID_KEY, "subnet-0ac62554"),
             ("role-name[0]", "baskinc-role"),
+            ("tags[Name]", "test-instance"),
+            ("tags[Test]", "test-tag"),
         ]
     }
 
@@ -757,9 +801,16 @@ mod integration_tests {
             let mut fields = default_fields();
             fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
+            let tags = vec![
+                String::from("Name"),
+                String::from("Test"),
+                String::from("MISSING_TAG"),
+            ];
+
             let transform_config = Ec2Metadata {
                 endpoint: ec2_metadata_address(),
                 fields,
+                tags,
                 ..Default::default()
             };
 
@@ -851,9 +902,16 @@ mod integration_tests {
             let mut fields = default_fields();
             fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
+            let tags = vec![
+                String::from("Name"),
+                String::from("Test"),
+                String::from("MISSING_TAG"),
+            ];
+
             let transform_config = Ec2Metadata {
                 endpoint: ec2_metadata_address(),
                 fields,
+                tags,
                 ..Default::default()
             };
 
@@ -888,6 +946,11 @@ mod integration_tests {
             let transform_config = Ec2Metadata {
                 endpoint: ec2_metadata_address(),
                 fields: vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()],
+                tags: vec![
+                    String::from("Name"),
+                    String::from("Test"),
+                    String::from("MISSING_TAG"),
+                ],
                 ..Default::default()
             };
 
@@ -902,6 +965,13 @@ mod integration_tests {
             let mut expected_log = log.clone();
             expected_log.insert(format!("\"{}\"", PUBLIC_IPV4_KEY).as_str(), "192.0.2.54");
             expected_log.insert(format!("\"{}\"", REGION_KEY).as_str(), "us-east-1");
+            expected_log.insert(
+                format!("\"{}\"", TAGS_KEY).as_str(),
+                BTreeMap::from([
+                    ("Name".to_string(), Value::from("test-instance")),
+                    ("Test".to_string(), Value::from("test-tag")),
+                ]),
+            );
 
             tx.send(log.into()).await.unwrap();
 
@@ -921,6 +991,11 @@ mod integration_tests {
             let transform_config = Ec2Metadata {
                 endpoint: ec2_metadata_address(),
                 fields: vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()],
+                tags: vec![
+                    String::from("Name"),
+                    String::from("Test"),
+                    String::from("MISSING_TAG"),
+                ],
                 ..Default::default()
             };
 
@@ -935,6 +1010,11 @@ mod integration_tests {
             let mut expected_metric = metric.clone();
             expected_metric.insert_tag(PUBLIC_IPV4_KEY.to_string(), "192.0.2.54".to_string());
             expected_metric.insert_tag(REGION_KEY.to_string(), "us-east-1".to_string());
+            expected_metric.insert_tag(
+                format!("{}[{}]", TAGS_KEY, "Name"),
+                "test-instance".to_string(),
+            );
+            expected_metric.insert_tag(format!("{}[{}]", TAGS_KEY, "Test"), "test-tag".to_string());
 
             tx.send(metric.into()).await.unwrap();
 
