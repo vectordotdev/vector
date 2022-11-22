@@ -34,8 +34,7 @@ components: transforms: aws_ec2_metadata: {
 				```
 				""",
 				"""
-				Accessing instance tags must be explicitly enabled for each instance.  
-				This can be done in the AWS Console, or with the following CLI command:
+				Accessing instance tags must be explicitly enabled for each instance. This can be done in the AWS Console, or with the following CLI command:
 
 				```bash
 				aws ec2 modify-instance-metadata-options --instance-id <ID> --instance-metadata-tags enabled
