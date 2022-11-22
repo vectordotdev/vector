@@ -93,6 +93,8 @@ pub mod splunk_hec;
 pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
+#[cfg(feature = "sinks-warp10")]
+pub mod warp10;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
 
@@ -363,6 +365,10 @@ pub enum Sinks {
     /// Websocket.
     #[cfg(feature = "sinks-websocket")]
     Websocket(#[configurable(derived)] websocket::WebSocketSinkConfig),
+
+    /// Warp10.
+    #[cfg(feature = "sinks-warp10")]
+    Warp10(#[configurable(derived)] warp10::Warp10SinkConfig),
 }
 
 impl NamedComponent for Sinks {
@@ -482,6 +488,8 @@ impl NamedComponent for Sinks {
             Self::Vector(config) => config.get_component_name(),
             #[cfg(feature = "sinks-websocket")]
             Self::Websocket(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-warp10")]
+            Self::Warp10(config) => config.get_component_name(),
         }
     }
 }

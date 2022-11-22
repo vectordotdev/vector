@@ -632,6 +632,7 @@ urls: {
 	vrl_safety:                                 "\(vrl_reference)#safety"
 	vrl_type_safety:                            "\(vrl_reference)#type-safety"
 	vote_feature:                               "\(vector_repo)/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22"
+	warp10:                                     "https://www.warp10.io/"
 	wasm:                                       "https://webassembly.org/"
 	wasm_languages:                             "\(github)/appcypher/awesome-wasm-langs"
 	websocket:                                  "\(wikipedia)/wiki/WebSocket"

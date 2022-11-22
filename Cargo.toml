@@ -642,7 +642,8 @@ sinks-metrics = [
   "sinks-sematext",
   "sinks-statsd",
   "sinks-vector",
-  "sinks-splunk_hec"
+  "sinks-splunk_hec",
+  "sinks-warp10",
 ]
 
 sinks-amqp = ["lapin"]
@@ -688,6 +689,7 @@ sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build"]
+sinks-warp10 = []
 sinks-websocket = ["dep:tokio-tungstenite"]
 
 # Datadog integration
@@ -802,7 +804,7 @@ redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap"]
 disable-resolv-conf = []
-shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
+shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-warp10", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
 vector-api-tests = [
   "sources-demo_logs",
@@ -815,7 +817,8 @@ vector-unit-test-tests = [
   "transforms-route",
   "transforms-filter",
   "transforms-reduce",
-  "sinks-console"
+  "sinks-console",
+  "sinks-warp10"
 ]
 enterprise-tests = [
   "enterprise",

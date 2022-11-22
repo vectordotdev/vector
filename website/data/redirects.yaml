@@ -42,6 +42,7 @@ sinks:
 - socket
 - splunk_hec
 - statsd
+- warp10
 
 sources:
 - apache_metrics

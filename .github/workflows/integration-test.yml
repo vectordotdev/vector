@@ -91,6 +91,7 @@ jobs:
             env:
               SPLUNK_VERSION: 7.3.9
           - test: 'splunk'
+          - test: 'warp10'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3

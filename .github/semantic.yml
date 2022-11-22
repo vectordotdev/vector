@@ -229,6 +229,7 @@ scopes:
   - splunk_hec sink # Anything `splunk_hec` sink related
   - statsd sink # Anything `statsd` sink related
   - vector sink # Anything `vector` sink related
+  - warp10 sink # Anything `warp10` sink related
   - websocket sink # Anything `websocket` sink related
 
   # website
