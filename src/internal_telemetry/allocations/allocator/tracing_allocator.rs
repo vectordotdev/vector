@@ -132,7 +132,8 @@ trait LayoutExtensions: Sized {
 impl LayoutExtensions for Layout {
     #[inline]
     unsafe fn extend_unchecked(&self, next: Self) -> (Self, usize) {
-        let new_align = cmp::max(self.align(), next.align());
+        // We know object layout's alignment is >= the header layout.
+        let new_align = self.align();
         let pad = {
             let align = next.align();
             let len = self.size();
