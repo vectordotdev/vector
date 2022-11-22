@@ -19,6 +19,8 @@ pub struct GroupedTraceableAllocator<A, T> {
     tracer: T,
 }
 
+static HEADER_LAYOUT: Layout = Layout::new::<u8>();
+
 impl<A, T> GroupedTraceableAllocator<A, T> {
     /// Creates a new `GroupedTraceableAllocator` that wraps the given allocator and tracer.
     #[must_use]
@@ -37,10 +39,7 @@ impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
             handle_alloc_error(actual_layout);
         }
 
-        // SAFETY: We know that `actual_ptr` with offset is at least aligned enough for casting it to `*mut u8` as the layout for
-        // the allocation backing this pointer ensures the last field in the layout is `u8.
-        #[allow(clippy::cast_ptr_alignment)]
-        let group_id_ptr = actual_ptr.add(offset_to_group_id).cast::<u8>();
+        let group_id_ptr = actual_ptr.add(offset_to_group_id);
 
         (group_id_ptr, actual_ptr, actual_layout)
     }
@@ -70,6 +69,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
     #[inline]
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        // Code is directly from the default realloc impl, but is now inlined.
         let new_layout = Layout::from_size_align_unchecked(new_size, layout.align());
         let new_ptr = self.alloc(new_layout);
         std::ptr::copy_nonoverlapping(ptr, new_ptr, cmp::min(layout.size(), new_size));
@@ -81,12 +81,10 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
         // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
         // requested layout, not the wrapped layout that was actually allocated.
+        // We do not need to check for overflows here, since we have already done so during the allocation phase.
         let (wrapped_layout, offset_to_group_id) = get_wrapped_layout_unchecked(object_layout);
 
-        // SAFETY: We know that `object_ptr` with offset is at least aligned enough for casting it to `*mut u8` as the layout for
-        // the allocation backing this pointer ensures the last field in the layout is `u8.
-        #[allow(clippy::cast_ptr_alignment)]
-        let raw_group_id = object_ptr.add(offset_to_group_id).cast::<u8>().read();
+        let raw_group_id = object_ptr.add(offset_to_group_id).read();
 
         // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
         self.allocator.dealloc(object_ptr, wrapped_layout);
@@ -110,8 +108,6 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
 #[inline(always)]
 fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
-    static HEADER_LAYOUT: Layout = Layout::new::<u8>();
-
     // We generate a new allocation layout that gives us a location to store the active allocation group ID ahead
     // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path.
     let (actual_layout, offset_to_group_id) = object_layout
@@ -123,21 +119,19 @@ fn get_wrapped_layout(object_layout: Layout) -> (Layout, usize) {
 
 #[inline(always)]
 unsafe fn get_wrapped_layout_unchecked(object_layout: Layout) -> (Layout, usize) {
-    static HEADER_LAYOUT: Layout = Layout::new::<u8>();
-
     // We generate a new allocation layout that gives us a location to store the active allocation group ID ahead
     // of the requested allocation, which lets us always attempt to retrieve it on the deallocation path.
-    let (actual_layout, offset_to_group_id) = object_layout.unsafe_extend(HEADER_LAYOUT);
+    let (actual_layout, offset_to_group_id) = object_layout.extend_unchecked(HEADER_LAYOUT);
 
     (actual_layout.pad_to_align(), offset_to_group_id)
 }
 trait LayoutExtensions: Sized {
-    unsafe fn unsafe_extend(&self, next: Self) -> (Self, usize);
+    unsafe fn extend_unchecked(&self, next: Self) -> (Self, usize);
 }
 
 impl LayoutExtensions for Layout {
     #[inline]
-    unsafe fn unsafe_extend(&self, next: Self) -> (Self, usize) {
+    unsafe fn extend_unchecked(&self, next: Self) -> (Self, usize) {
         let new_align = cmp::max(self.align(), next.align());
         let pad = {
             let align = next.align();
