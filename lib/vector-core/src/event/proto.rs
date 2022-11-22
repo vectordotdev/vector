@@ -163,6 +163,9 @@ impl From<Metric> for event::Metric {
                 })
                 .collect(),
         );
+        // The current Vector encoding includes copies of the "single" values of tags in `tags_v2`
+        // above. This `extend` will re-add those values, forcing them to become the last added in
+        // the value set.
         tags.extend(metric.tags_v1.into_iter());
         let tags = (!tags.is_empty()).then_some(tags);
 
@@ -398,24 +401,38 @@ impl From<event::Metric> for WithMetadata<Metric> {
             },
         };
 
+        // Include the "single" value of the tags in order to be forward-compatible with older
+        // versions of Vector.
+        let tags_v1 = tags
+            .0
+            .iter()
+            .filter_map(|(tag, values)| {
+                values
+                    .as_single()
+                    .map(|value| (tag.clone(), value.to_string()))
+            })
+            .collect();
+        // These are the full tag values.
+        let tags_v2 = tags
+            .0
+            .into_iter()
+            .map(|(tag, values)| {
+                let values = values
+                    .into_iter()
+                    .map(|value| TagValue {
+                        value: value.into_option(),
+                    })
+                    .collect();
+                (tag, TagValues { values })
+            })
+            .collect();
+
         let data = Metric {
             name,
             namespace,
             timestamp,
-            tags_v1: Default::default(),
-            tags_v2: tags
-                .0
-                .into_iter()
-                .map(|(tag, values)| {
-                    let values = values
-                        .into_iter()
-                        .map(|value| TagValue {
-                            value: value.into_option(),
-                        })
-                        .collect();
-                    (tag, TagValues { values })
-                })
-                .collect(),
+            tags_v1,
+            tags_v2,
             kind,
             interval_ms,
             value: Some(metric),
