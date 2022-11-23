@@ -10,4 +10,3 @@ mod tests;
 
 #[cfg(all(test, feature = "pulsar-integration-tests"))]
 mod integration_tests;
-

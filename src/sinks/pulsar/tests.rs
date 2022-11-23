@@ -1,8 +1,8 @@
+use crate::event::Event;
 use crate::sinks::pulsar::config::PulsarSinkConfig;
 use std::collections::BTreeMap;
-use vector_config::component::GenerateConfig;
 use value::Value;
-use crate::event::Event;
+use vector_config::component::GenerateConfig;
 
 use bytes::Bytes;
 
@@ -23,7 +23,8 @@ fn pulsar_get_headers() {
     let mut event = Event::Log(LogEvent::from("hello"));
     event.as_mut_log().insert(properties_key, property_values);
 
-    let properties = super::util::get_properties(&event, &Some(properties_key.to_string())).unwrap();
+    let properties =
+        super::util::get_properties(&event, &Some(properties_key.to_string())).unwrap();
     assert_eq!(properties.get("a-key").unwrap(), "a-value".as_bytes());
     assert_eq!(properties.get("b-key").unwrap(), "b-value".as_bytes());
 }
