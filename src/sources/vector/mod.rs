@@ -3,7 +3,6 @@ use std::net::SocketAddr;
 use chrono::Utc;
 use codecs::NativeDeserializerConfig;
 use futures::TryFutureExt;
-use lookup::path;
 use tonic::{Request, Response, Status};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
@@ -54,17 +53,18 @@ impl proto::Service for Service {
             .map(Event::from)
             .collect();
 
+        // TODO need to resolve this query before merging-
+        // should we remove this check for Vector namespace, and thus change the shape of the legacy namespace events,
+        // introducing a breaking change?
         if self.log_namespace == LogNamespace::Vector {
             let now = Utc::now();
             for event in &mut events {
                 if let Event::Log(ref mut log) = event {
-                    log.metadata_mut()
-                        .value_mut()
-                        .insert(path!("vector", "source_type"), VectorConfig::NAME);
-
-                    log.metadata_mut()
-                        .value_mut()
-                        .insert(path!("vector", "ingest_timestamp"), now);
+                    self.log_namespace.insert_standard_vector_source_metadata(
+                        log,
+                        VectorConfig::NAME,
+                        now,
+                    );
                 }
             }
         }
