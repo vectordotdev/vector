@@ -15,7 +15,7 @@ no-proxy = { version  = "0.3.1", default-features = false, features = ["serializ
 num-traits = { version = "0.2.15", default-features = false }
 schemars = { version = "0.8.11", default-features = true, features = ["preserve_order"] }
 serde = { version = "1.0", default-features = false }
-serde_json = { version = "1.0.88", default-features = false }
+serde_json = { version = "1.0.87", default-features = false }
 serde_with = { version = "2.1.0", default-features = false, features = ["std"] }
 snafu = { version = "0.7.3", default-features = false }
 toml = { version = "0.5.9", default-features = false }
