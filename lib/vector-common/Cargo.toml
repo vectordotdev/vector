@@ -50,24 +50,24 @@ tokenize = [
 
 [dependencies]
 async-stream = "0.3.3"
-bytes = { version = "1.2.1", default-features = false, optional = true }
+bytes = { version = "1.3.0", default-features = false, optional = true }
 chrono-tz = { version = "0.8.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4", default-features = false, optional = true, features = ["clock"] }
-crossbeam-utils = { version = "0.8.12", default-features = false }
+crossbeam-utils = { version = "0.8.14", default-features = false }
 derivative = "2.1.3"
 futures = { version = "0.3.25", default-features = false, features = ["std"] }
-indexmap = { version = "~1.9.1", default-features = false }
+indexmap = { version = "~1.9.2", default-features = false }
 metrics = "0.20.1"
 nom = { version = "7", optional = true }
 ordered-float = { version = "3.4.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 ryu = { version = "1", default-features = false }
-serde_json = { version = "1.0.87", default-features = false, features = ["std", "raw_value"] }
+serde_json = { version = "1.0.89", default-features = false, features = ["std", "raw_value"] }
 serde = { version = "1.0.147", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.1", default-features = false }
-tokio = { version = "1.21.2", default-features = false, features = ["macros", "time"] }
+tokio = { version = "1.22.0", default-features = false, features = ["macros", "time"] }
 tracing = { version = "0.1.34", default-features = false }
 value = { path = "../value", features = ["json", "arbitrary"] }
 vector-config = { path = "../vector-config" }
@@ -76,6 +76,6 @@ vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 futures = { version = "0.3.25", default-features = false, features = ["async-await", "std"] }
-tokio = { version = "1.21.2", default-features = false, features = ["rt", "time"] }
+tokio = { version = "1.22.0", default-features = false, features = ["rt", "time"] }
 quickcheck = "1"
 quickcheck_macros = "1"

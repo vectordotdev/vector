@@ -3,7 +3,7 @@
 mod allocator;
 use std::{
     sync::{
-        atomic::{AtomicI64, Ordering},
+        atomic::{AtomicBool, AtomicI64, Ordering},
         Mutex,
     },
     thread,
@@ -21,6 +21,7 @@ pub(crate) use self::allocator::{
 };
 
 const NUM_GROUPS: usize = 128;
+pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
 
 type GroupMemStatsArray = [AtomicI64; NUM_GROUPS];
 
@@ -80,7 +81,7 @@ impl Tracer for MainTracer {
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
         let _ = GROUP_MEM_STATS.try_with(|t| {
-            t.stats[group_id.as_raw()].fetch_add(object_size as i64, Ordering::Relaxed)
+            t.stats[group_id.as_raw() as usize].fetch_add(object_size as i64, Ordering::Relaxed)
         });
     }
 
@@ -88,7 +89,8 @@ impl Tracer for MainTracer {
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
         let _ = GROUP_MEM_STATS.try_with(|t| {
-            t.stats[source_group_id.as_raw()].fetch_sub(object_size as i64, Ordering::Relaxed)
+            t.stats[source_group_id.as_raw() as usize]
+                .fetch_sub(object_size as i64, Ordering::Relaxed)
         });
     }
 }
@@ -105,27 +107,29 @@ pub fn init_allocation_tracing() {
     }
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
-        .spawn(|| {
-            without_allocation_tracing(|| loop {
-                for (group_idx, group) in GROUP_INFO.iter().enumerate() {
-                    let mut mem_used = 0;
-                    let mutex = THREAD_LOCAL_REFS.lock().unwrap();
-                    for idx in 0..mutex.len() {
-                        mem_used += mutex[idx][group_idx].load(Ordering::Relaxed);
-                    }
-                    if mem_used == 0 {
-                        continue;
-                    }
-                    let group_info = group.lock().unwrap();
-                    gauge!(
+        .spawn(|| loop {
+            if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+                without_allocation_tracing(|| {
+                    for (group_idx, group) in GROUP_INFO.iter().enumerate() {
+                        let mut mem_used = 0;
+                        let mutex = THREAD_LOCAL_REFS.lock().unwrap();
+                        for idx in 0..mutex.len() {
+                            mem_used += mutex[idx][group_idx].load(Ordering::Relaxed);
+                        }
+                        if mem_used == 0 {
+                            continue;
+                        }
+                        let group_info = group.lock().unwrap();
+                        gauge!(
                         "component_allocated_bytes",
                         mem_used.to_f64().expect("failed to convert group_id from int to float"),
                         "component_kind" => group_info.component_kind.clone(),
                         "component_type" => group_info.component_type.clone(),
                         "component_id" => group_info.component_id.clone());
-                }
-                thread::sleep(Duration::from_millis(5000));
-            })
+                    }
+                });
+            }
+            thread::sleep(Duration::from_millis(5000));
         })
         .unwrap();
 }
@@ -145,7 +149,7 @@ pub fn acquire_allocation_group_id(
     let group_id =
         AllocationGroupId::register().expect("failed to register allocation group token");
     let idx = group_id.as_raw();
-    match GROUP_INFO.get(idx) {
+    match GROUP_INFO.get(idx as usize) {
         Some(mutex) => {
             let mut writer = mutex.lock().unwrap();
             *writer = GroupInfo {
