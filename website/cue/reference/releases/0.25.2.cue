@@ -35,7 +35,11 @@ releases: "0.25.2": {
 			type: "fix"
 			scopes: ["datadog_traces sink"]
 			description: """
-				<TODO>
+				The `datadog traces` sink now correctly aggregates (caches) the computed APM stats, and sends the aggregated
+				payloads to Datadog at a fixed interval, decoupled from the trace payloads. The stats payloads were previously
+				not being cached and instead sent to Datadog as each batch of traces was processed, which is not compatible
+				with Datadog's backend APM API. A robust integration test was also added, to validate the correct aggregation
+				behavior.
 				"""
 			pr_numbers: [14694, 14757, 14861, 15084]
 		}

@@ -26,9 +26,6 @@ releases: "0.25.0": {
 			The `azure_blob` sink incorrectly passes a redacted value for the `connection_string`, rather than the actual
 			contents. Fixed in 0.25.2.
 			""",
-		"""
-			<TODO>The `datadog_traces` sink. Fixed in 0.25.2.
-			""",
 	]
 
 	description: """
