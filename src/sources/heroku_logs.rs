@@ -32,7 +32,10 @@ use crate::{
     event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::util::{http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{
+        http::{add_query_parameters, HttpMethod},
+        ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    },
     tls::TlsEnableableConfig,
 };
 
@@ -271,28 +274,6 @@ impl HttpSource for LogplexSource {
         );
 
         Ok(events)
-    }
-}
-
-// TODO move to util/http/query.rs after merging in the http_server commit from master
-fn add_query_parameters(
-    events: &mut [Event],
-    query_parameters_config: &[String],
-    query_parameters: HashMap<String, String>,
-    log_namespace: LogNamespace,
-    source_name: &'static str,
-) {
-    for query_parameter_name in query_parameters_config {
-        let value = query_parameters.get(query_parameter_name);
-        for event in events.iter_mut() {
-            log_namespace.insert_source_metadata(
-                source_name,
-                event.as_mut_log(),
-                Some(LegacyKey::Overwrite(path!(query_parameter_name))),
-                path!("query_parameters"),
-                crate::event::Value::from(value.map(String::to_owned)),
-            );
-        }
     }
 }
 
