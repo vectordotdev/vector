@@ -50,6 +50,17 @@ pub struct AzureBlobSinkConfig {
     /// [az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
     pub storage_account: Option<String>,
 
+    /// The Azure Blob Storage Endpoint URL.
+    ///
+    /// This is used to override the default blob storage endpoint URL in cases where you are using
+    /// credentials read from the environment/managed identities or access tokens without using an
+    /// explicit connection_string (which already explicitly supports overriding the blob endpoint
+    /// URL).
+    ///
+    /// This may only be used with `storage_account` and will be ignored when used with
+    /// `connection_string`.
+    pub endpoint: Option<String>,
+
     /// The Azure Blob Storage Account container name.
     pub(super) container_name: String,
 
@@ -119,6 +130,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
             storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),
+            endpoint: None,
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
@@ -141,6 +153,7 @@ impl SinkConfig for AzureBlobSinkConfig {
                 .map(|v| v.inner().to_string()),
             self.storage_account.as_ref().map(|v| v.to_string()),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )?;
 
         let healthcheck = azure_common::config::build_healthcheck(
