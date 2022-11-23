@@ -23,7 +23,7 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::config::{LegacyKey, LogNamespace, NO_LEGACY_KEY};
 
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 
@@ -450,11 +450,18 @@ impl ReceivedMessage {
 
     fn apply(&self, keys: &Keys<'_>, event: &mut Event, log_namespace: LogNamespace) {
         if let Event::Log(ref mut log) = event {
-            log_namespace.insert_standard_vector_source_metadata(
-                log,
-                KafkaSourceConfig::NAME,
-                Utc::now(),
-            );
+            if let LogNamespace::Vector = log_namespace {
+                // Pre-log namespace behavior is to use the
+                // "timestamp" key, not "ingest_timestamp", so we
+                // won't use ingest_timestamp in legacy namespaces.
+                log_namespace.insert_standard_vector_source_metadata(
+                    log,
+                    KafkaSourceConfig::NAME,
+                    Utc::now(),
+                );
+            } else {
+                log.insert("source_type", KafkaSourceConfig::NAME);
+            }
 
             log_namespace.insert_source_metadata(
                 KafkaSourceConfig::NAME,
