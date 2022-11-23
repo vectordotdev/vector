@@ -10,9 +10,10 @@ use std::{
 };
 
 use bytes::Bytes;
-use chrono::TimeZone;
-use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
+use chrono::{TimeZone, Utc};
+use codecs::{decoding::BoxedFramingError, BytesDeserializerConfig, CharacterDelimitedDecoder};
 use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
+use lookup::{lookup_v2::parse_value_path, metadata_path, owned_value_path, path, PathPrefix};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -28,18 +29,22 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
+use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    schema::Definition,
+};
 
 use crate::{
     config::{
         log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
     },
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent},
     internal_events::{
         EventsReceived, JournaldCheckpointFileOpenError, JournaldCheckpointSetError,
         JournaldInvalidRecordError, JournaldReadError, JournaldStartJournalctlError,
@@ -152,6 +157,11 @@ pub struct JournaldConfig {
     #[serde(default)]
     #[configurable(deprecated)]
     remap_priority: bool,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl JournaldConfig {
@@ -179,6 +189,28 @@ impl JournaldConfig {
             entry.or_default().insert(fixup_unit(unit));
         }
         matches
+    }
+
+    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+        BytesDeserializerConfig
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                JournaldConfig::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp().or_undefined(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                JournaldConfig::NAME,
+                parse_value_path(log_schema().host_key())
+                    .ok()
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("host"),
+                Kind::bytes().or_undefined(),
+                Some("host"),
+            )
     }
 }
 
@@ -231,6 +263,7 @@ impl SourceConfig for JournaldConfig {
 
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let log_namespace = cx.log_namespace(self.log_namespace);
 
         Ok(Box::pin(
             JournaldSource {
@@ -242,13 +275,17 @@ impl SourceConfig for JournaldConfig {
                 out: cx.out,
                 acknowledgements,
                 starter,
+                log_namespace,
             }
             .run_shutdown(cx.shutdown),
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let schema_definition =
+            self.schema_definition(global_log_namespace.merge(self.log_namespace));
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -265,6 +302,7 @@ struct JournaldSource {
     out: SourceSender,
     acknowledgements: bool,
     starter: StartJournalctl,
+    log_namespace: LogNamespace,
 }
 
 impl JournaldSource {
@@ -421,7 +459,8 @@ impl<'a> Batch<'a> {
                             &self.source.exclude_matches,
                         ) {
                             self.record_size += bytes.len();
-                            let event = create_event(record, &self.batch);
+                            let event =
+                                create_event(record, &self.batch, self.source.log_namespace);
                             self.events.push(event);
                         }
                     }
@@ -552,7 +591,11 @@ impl Drop for RunningJournalctl {
     }
 }
 
-fn create_event(record: Record, batch: &Option<BatchNotifier>) -> LogEvent {
+fn create_event(
+    record: Record,
+    batch: &Option<BatchNotifier>,
+    log_namespace: LogNamespace,
+) -> LogEvent {
     let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
     // Convert some journald-specific field names into Vector standard ones.
@@ -560,23 +603,53 @@ fn create_event(record: Record, batch: &Option<BatchNotifier>) -> LogEvent {
         log.insert(log_schema().message_key(), message);
     }
     if let Some(host) = log.remove(HOSTNAME) {
-        log.insert(log_schema().host_key(), host);
+        log_namespace.insert_source_metadata(
+            JournaldConfig::NAME,
+            &mut log,
+            parse_value_path(log_schema().host_key())
+                .ok()
+                .as_ref()
+                .map(LegacyKey::Overwrite),
+            path!("host"),
+            host,
+        );
     }
-    // Translate the timestamp, and so leave both old and new names.
-    if let Some(Value::Bytes(timestamp)) = log
+
+    // Create a Utc timestamp from an existing log field if present.
+    let timestamp = log
         .get(SOURCE_TIMESTAMP)
         .or_else(|| log.get(RECEIVED_TIMESTAMP))
-    {
-        if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
-            let timestamp = chrono::Utc.timestamp(
-                (timestamp / 1_000_000) as i64,
-                (timestamp % 1_000_000) as u32 * 1_000,
-            );
-            log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+        .filter(|&ts| ts.is_bytes())
+        .and_then(|ts| {
+            String::from_utf8_lossy(ts.as_bytes().unwrap())
+                .parse::<u64>()
+                .ok()
+        })
+        .map(|ts| chrono::Utc.timestamp((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000));
+
+    // Add timestamp.
+    match log_namespace {
+        LogNamespace::Vector => {
+            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
+
+            if let Some(ts) = timestamp {
+                log.insert(metadata_path!(JournaldConfig::NAME, "timestamp"), ts);
+            }
+        }
+        LogNamespace::Legacy => {
+            if let Some(ts) = timestamp {
+                log.insert((PathPrefix::Event, log_schema().timestamp_key()), ts);
+            }
         }
     }
-    // Add source type
-    log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
+
+    // Add source type.
+    log_namespace.insert_vector_metadata(
+        &mut log,
+        log_schema().source_type_key(),
+        path!("source_type"),
+        JournaldConfig::NAME,
+    );
 
     log
 }
@@ -850,8 +923,10 @@ mod checkpointer_tests {
 mod tests {
     use std::{fs, path::Path};
 
+    use lookup::LookupBuf;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration, Instant};
+    use value::{kind::Collection, Value};
 
     use super::*;
     use crate::{
@@ -1255,5 +1330,66 @@ mod tests {
 
     fn priority(event: &Event) -> Value {
         event.as_log()["PRIORITY"].clone()
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = JournaldConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(JournaldConfig::NAME, "timestamp"),
+                    Kind::timestamp().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(JournaldConfig::NAME, "host"),
+                    Kind::bytes().or_undefined(),
+                );
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = JournaldConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(
+            &owned_value_path!("host"),
+            Kind::bytes().or_undefined(),
+            Some("host"),
+        );
+
+        assert_eq!(definition, expected_definition)
     }
 }
