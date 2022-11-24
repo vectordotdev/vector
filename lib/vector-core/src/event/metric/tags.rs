@@ -451,6 +451,13 @@ impl MetricTags {
         self.0.get(name).and_then(TagValueSet::as_single)
     }
 
+    /// Add a value to a tag. This does not replace any existing tags unless the value is a
+    /// duplicate.
+    pub fn insert(&mut self, name: String, value: impl Into<TagValue>) {
+        self.0.entry(name).or_default().insert(value.into());
+    }
+
+    /// Replace all the values of a tag with a single value.
     pub fn replace(&mut self, name: String, value: impl Into<TagValue>) -> Option<String> {
         self.0
             .insert(name, TagValueSet::from([value.into()]))
