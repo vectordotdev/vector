@@ -104,7 +104,7 @@ fn format_metric(total: i64, throughput: i64, human_metrics: bool) -> String {
     }
 }
 
-const NUM_COLUMNS: usize = 8;
+const NUM_COLUMNS: usize = 9;
 static HEADER: [&str; NUM_COLUMNS] = [
     "ID",
     "Output",
@@ -114,6 +114,7 @@ static HEADER: [&str; NUM_COLUMNS] = [
     "Events Out",
     "Bytes",
     "Errors",
+    "Mem",
 ];
 
 struct Widgets<'a> {
@@ -209,6 +210,7 @@ impl<'a> Widgets<'a> {
                 } else {
                     r.errors.thousands_format()
                 },
+                r.allocated_bytes.human_format(),
             ];
 
             data.extend_from_slice(&formatted_metrics);
@@ -239,13 +241,14 @@ impl<'a> Widgets<'a> {
             .column_spacing(2)
             .widths(&[
                 Constraint::Percentage(15), // ID
-                Constraint::Percentage(15), // Output
+                Constraint::Percentage(10), // Output
                 Constraint::Percentage(10), // Kind
                 Constraint::Percentage(10), // Type
                 Constraint::Percentage(10), // Events In
                 Constraint::Percentage(10), // Events Out
                 Constraint::Percentage(10), // Bytes
-                Constraint::Percentage(10), // Errors
+                Constraint::Percentage(5),  // Errors
+                Constraint::Percentage(10), // Allocated Bytes
             ]);
 
         f.render_widget(w, area);

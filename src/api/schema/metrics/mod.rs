@@ -11,10 +11,12 @@ mod sink;
 pub mod source;
 mod transform;
 mod uptime;
+mod allocated_bytes;
 
 #[cfg(feature = "sources-host_metrics")]
 mod host;
 
+pub use allocated_bytes::{AllocatedBytes, ComponentAllocatedBytes};
 use async_graphql::{Interface, Object, Subscription};
 use chrono::{DateTime, Utc};
 pub use errors::{ComponentErrorsTotal, ErrorsTotal};
@@ -286,6 +288,19 @@ impl MetricsSubscription {
         get_metrics(interval)
             .filter(|m| m.name().ends_with("_errors_total"))
             .map(ErrorsTotal::new)
+    }
+
+    /// Allocated bytes metrics.
+    async fn allocated_bytes(&self) -> impl Stream<Item = AllocatedBytes> {
+        get_metrics(1000)
+            .filter(|m| m.name() == "component_allocated_bytes")
+            .map(AllocatedBytes::new)
+    }
+
+    /// Component allocation metrics
+    async fn component_allocated_bytes(&self) -> impl Stream<Item = Vec<ComponentAllocatedBytes>> {
+        component_gauge_metrics(1000, &|m| m.name() == "component_allocated_bytes")
+            .map(|m| m.into_iter().map(ComponentAllocatedBytes::new).collect())
     }
 
     /// Component error metrics over `interval`.

@@ -35,6 +35,7 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
                     sent_events_throughput_sec: 0,
                     processed_bytes_total: 0,
                     processed_bytes_throughput_sec: 0,
+                    allocated_bytes: 0,
                     errors: 0,
                 }))
                 .await;
@@ -42,6 +43,29 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     }
 }
 
+async fn allocated_bytes(client: Arc<SubscriptionClient>, tx: state::EventTx) {
+    tokio::pin! {
+        let stream = client.component_allocated_bytes_subscription();
+    };
+
+    while let Some(Some(res)) = stream.next().await {
+        if let Some(d) = res.data {
+            let c = d.component_allocated_bytes;
+            let _ = tx
+                .send(state::EventType::AllocatedBytes(
+                    c.into_iter()
+                        .map(|c| {
+                            (
+                                ComponentKey::from(c.component_id.as_str()),
+                                c.metric.allocated_bytes as i64,
+                            )
+                        })
+                        .collect(),
+                ))
+                .await;
+        }
+    }
+}
 /// Components that have been removed
 async fn component_removed(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     tokio::pin! {
@@ -278,6 +302,7 @@ pub fn subscribe(
             tx.clone(),
             interval,
         )),
+        tokio::spawn(allocated_bytes(Arc::clone(&client), tx.clone())),
         tokio::spawn(errors_totals(Arc::clone(&client), tx, interval)),
     ]
 }
@@ -321,6 +346,7 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                         sent_events_throughput_sec: 0,
                         processed_bytes_total: d.on.processed_bytes_total(),
                         processed_bytes_throughput_sec: 0,
+                        allocated_bytes: 0,
                         errors: 0,
                     },
                 ))
