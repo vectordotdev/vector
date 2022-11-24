@@ -30,7 +30,7 @@ metrics-util = { version = "0.14.0", default-features = false, features = ["regi
 mlua = { version = "0.8.6", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.16", default-features = false }
-openssl = { version = "0.10.42", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.43", default-features = false, features = ["vendored"] }
 ordered-float = { version = "3.4.0", default-features = false }
 parking_lot = { version = "0.12.1", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
