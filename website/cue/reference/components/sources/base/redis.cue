@@ -2,7 +2,7 @@ package metadata
 
 base: components: sources: redis: configuration: {
 	data_type: {
-		description: "The Redis data type (`list` or `channel`) to use."
+		description: "The Redis data type (`list`, `channel` or `stream`) to use."
 		required:    false
 		type: string: {
 			default: "list"
@@ -13,6 +13,7 @@ base: components: sources: redis: configuration: {
 					This is based on Redis' Pub/Sub capabilities.
 					"""
 				list: "The `list` data type."
+				stream: "The `stream` data type."
 			}
 		}
 	}

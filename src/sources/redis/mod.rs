@@ -27,6 +27,7 @@ use crate::{
 
 mod channel;
 mod list;
+mod stream;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -48,6 +49,9 @@ pub enum DataTypeConfig {
     ///
     /// This is based on Redis' Pub/Sub capabilities.
     Channel,
+
+    /// The `stream` data type.
+    Stream,
 }
 
 /// Options for the Redis `list` data type.
@@ -97,7 +101,7 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSourceConfig {
-    /// The Redis data type (`list` or `channel`) to use.
+    /// The Redis data type (`list`, `channel` or `stream`) to use.
     #[serde(default)]
     data_type: DataTypeConfig,
 
@@ -155,7 +159,7 @@ impl SourceConfig for RedisSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        // A key must be specified to actually query i.e. the list to pop from, or the channel to subscribe to.
+        // A key must be specified to actually query i.e. the list to pop from, the channel to subscribe to, or the stream to read from.
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
         }
@@ -188,6 +192,18 @@ impl SourceConfig for RedisSourceConfig {
                 channel::subscribe(channel::SubscribeInputs {
                     client,
                     connection_info,
+                    bytes_received: bytes_received.clone(),
+                    key: self.key.clone(),
+                    redis_key: self.redis_key.clone(),
+                    decoder,
+                    cx,
+                    log_namespace,
+                })
+                .await
+            }
+            DataTypeConfig::Stream => {
+                stream::read(stream::StreamInputs {
+                    client,
                     bytes_received: bytes_received.clone(),
                     key: self.key.clone(),
                     redis_key: self.redis_key.clone(),

@@ -79,13 +79,14 @@ components: sources: redis: {
 		}
 		data_type: {
 			common:      false
-			description: "The Redis data type (`list` or `channel`) to use."
+			description: "The Redis data type (`list`, `channel` or `stream`) to use."
 			required:    false
 			type: string: {
 				default: "list"
 				enum: {
 					list:    "Use the Redis `list` data type."
 					channel: "Use the Redis `channel` data type."
+					stream:  "Use the Redis `stream` data type."
 				}
 				syntax: "literal"
 			}
