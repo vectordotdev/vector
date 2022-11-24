@@ -184,7 +184,7 @@ fn render_tags(
             for (name, template) in tags {
                 match render_template(template, event) {
                     Ok(tag) => {
-                        map.insert(name.to_string(), tag);
+                        map.replace(name.to_string(), tag);
                     }
                     Err(TransformError::TemplateRenderingError(error)) => {
                         emit!(crate::internal_events::TemplateRenderingError {

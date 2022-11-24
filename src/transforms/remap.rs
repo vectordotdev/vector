@@ -449,16 +449,16 @@ where
             },
             Event::Metric(ref mut metric) => {
                 let m = log_schema().metadata_key();
-                metric.insert_tag(format!("{}.dropped.reason", m), reason.into());
-                metric.insert_tag(
+                metric.replace_tag(format!("{}.dropped.reason", m), reason.into());
+                metric.replace_tag(
                     format!("{}.dropped.component_id", m),
                     self.component_key
                         .as_ref()
                         .map(ToString::to_string)
                         .unwrap_or_else(String::new),
                 );
-                metric.insert_tag(format!("{}.dropped.component_type", m), "remap".into());
-                metric.insert_tag(format!("{}.dropped.component_kind", m), "transform".into());
+                metric.replace_tag(format!("{}.dropped.component_type", m), "remap".into());
+                metric.replace_tag(format!("{}.dropped.component_kind", m), "transform".into());
             }
             Event::Trace(ref mut trace) => {
                 trace.insert(
@@ -991,7 +991,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.insert_tag("hello".into(), "world".into());
+            metric.replace_tag("hello".into(), "world".into());
             Event::Metric(metric)
         };
 
@@ -1001,7 +1001,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.insert_tag("hello".into(), "goodbye".into());
+            metric.replace_tag("hello".into(), "goodbye".into());
             Event::Metric(metric)
         };
 
@@ -1011,7 +1011,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.insert_tag("not_hello".into(), "oops".into());
+            metric.replace_tag("not_hello".into(), "oops".into());
             Event::Metric(metric)
         };
 

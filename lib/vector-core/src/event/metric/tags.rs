@@ -445,7 +445,7 @@ impl MetricTags {
         self.0.get(name).and_then(TagValueSet::as_single)
     }
 
-    pub fn insert(&mut self, name: String, value: String) -> Option<String> {
+    pub fn replace(&mut self, name: String, value: String) -> Option<String> {
         self.0
             .insert(name, TagValueSet::from([value]))
             .and_then(TagValueSet::into_single)
