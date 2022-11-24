@@ -478,7 +478,7 @@ fn network_metrics(
     tags: &MetricTags,
 ) -> Vec<Metric> {
     let mut tags = tags.clone();
-    tags.replace("device".into(), interface.into());
+    tags.replace("device".into(), interface.to_string());
 
     [
         ("receive_bytes_total", network.rx_bytes),
