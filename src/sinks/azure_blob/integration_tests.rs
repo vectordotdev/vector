@@ -36,6 +36,7 @@ async fn azure_blob_healthcheck_passed() {
         config.connection_string.map(Into::into),
         None,
         config.container_name.clone(),
+        None,
     )
     .expect("Failed to create client");
 
@@ -55,6 +56,7 @@ async fn azure_blob_healthcheck_unknown_container() {
         config.connection_string.map(Into::into),
         config.storage_account.map(Into::into),
         config.container_name.clone(),
+        config.endpoint.clone(),
     )
     .expect("Failed to create client");
 
@@ -220,6 +222,7 @@ impl AzureBlobSinkConfig {
                 connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{}:10000/devstoreaccount1;QueueEndpoint=http://{}:10001/devstoreaccount1;TableEndpoint=http://{}:10002/devstoreaccount1;", address, address, address).into()),
                 storage_account: None,
                 container_name: "logs".to_string(),
+                endpoint: None,
                 blob_prefix: None,
                 blob_time_format: None,
                 blob_append_uuid: None,
@@ -240,6 +243,7 @@ impl AzureBlobSinkConfig {
             self.connection_string.clone().map(Into::into),
             self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )
         .expect("Failed to create client");
 
@@ -258,6 +262,7 @@ impl AzureBlobSinkConfig {
             self.connection_string.clone().map(Into::into),
             self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )
         .unwrap();
         let response = client
@@ -286,6 +291,7 @@ impl AzureBlobSinkConfig {
             self.connection_string.clone().map(Into::into),
             self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )
         .unwrap();
         let response = client
@@ -322,6 +328,7 @@ impl AzureBlobSinkConfig {
             self.connection_string.clone().map(Into::into),
             self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )
         .unwrap();
         let request = client
