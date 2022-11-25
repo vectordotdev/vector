@@ -34,7 +34,7 @@ pub struct SqsSource {
     pub poll_secs: u32,
     pub visibility_timeout_secs: u32,
     pub delete_message: bool,
-    pub concurrency: u32,
+    pub concurrency: usize,
     pub(super) acknowledgements: bool,
 }
 

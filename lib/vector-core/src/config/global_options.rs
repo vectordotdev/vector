@@ -60,7 +60,7 @@ pub struct GlobalOptions {
     ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
-    pub timezone: TimeZone,
+    pub timezone: Option<TimeZone>,
 
     #[configurable(derived)]
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
@@ -175,6 +175,10 @@ impl GlobalOptions {
             errors.push("conflicting values for 'proxy.no_proxy' found".to_owned());
         }
 
+        if conflicts(&self.timezone, &with.timezone) {
+            errors.push("conflicting values for 'timezone' found".to_owned());
+        }
+
         let data_dir = if self.data_dir.is_none() || self.data_dir == default_data_dir() {
             with.data_dir
         } else if with.data_dir != default_data_dir() && self.data_dir != with.data_dir {
@@ -193,16 +197,12 @@ impl GlobalOptions {
             errors.extend(merge_errors);
         }
 
-        if self.timezone != with.timezone {
-            errors.push("conflicting values for 'timezone' found".to_owned());
-        }
-
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
                 log_schema,
                 acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),
-                timezone: self.timezone,
+                timezone: self.timezone.or(with.timezone),
                 proxy: self.proxy.merge(&with.proxy),
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
@@ -211,8 +211,51 @@ impl GlobalOptions {
             Err(errors)
         }
     }
+
+    /// Get the configured time zone, using "local" time if none is set.
+    pub fn timezone(&self) -> TimeZone {
+        self.timezone.unwrap_or(TimeZone::Local)
+    }
 }
 
 fn conflicts<T: PartialEq>(this: &Option<T>, that: &Option<T>) -> bool {
     matches!((this, that), (Some(this), Some(that)) if this != that)
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono_tz::Tz;
+
+    use super::*;
+
+    #[test]
+    fn merges_timezones() {
+        fn merge(tz1: Option<&str>, tz2: Option<&str>) -> Result<TimeZone, Vec<String>> {
+            // Use TOML parsing to match the behavior of what a user would actually configure.
+            let tz1 = tz1.map_or(String::new(), |tz| format!(r#"timezone = "{tz}""#));
+            let tz2 = tz2.map_or(String::new(), |tz| format!(r#"timezone = "{tz}""#));
+            toml::from_str::<GlobalOptions>(&tz1)
+                .unwrap()
+                .merge(toml::from_str::<GlobalOptions>(&tz2).unwrap())
+                .map(|go| go.timezone())
+        }
+
+        assert_eq!(merge(None, None), Ok(TimeZone::Local));
+        assert_eq!(merge(Some("local"), None), Ok(TimeZone::Local));
+        assert_eq!(merge(None, Some("local")), Ok(TimeZone::Local));
+        assert_eq!(merge(Some("local"), Some("local")), Ok(TimeZone::Local),);
+        assert_eq!(merge(Some("UTC"), None), Ok(TimeZone::Named(Tz::UTC)));
+        assert_eq!(
+            merge(None, Some("EST5EDT")),
+            Ok(TimeZone::Named(Tz::EST5EDT))
+        );
+        assert_eq!(
+            merge(Some("UTC"), Some("UTC")),
+            Ok(TimeZone::Named(Tz::UTC))
+        );
+        assert_eq!(
+            merge(Some("CST6CDT"), Some("GMT")),
+            Err(vec!["conflicting values for 'timezone' found".into()])
+        );
+    }
 }

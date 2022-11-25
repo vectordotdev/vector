@@ -13,7 +13,10 @@ use tokio::{
     sync::watch,
     time::{interval, sleep_until},
 };
-use vector_core::{internal_event::EventsSent, ByteSizeOf};
+use vector_core::{
+    internal_event::{BytesSent, EventsSent},
+    ByteSizeOf,
+};
 
 use crate::{
     event::{EventArray, EventContainer},
@@ -93,6 +96,11 @@ impl StreamSink<EventArray> for BlackholeSink {
                 count: events.len(),
                 byte_size: message_len,
                 output: None,
+            });
+
+            emit!(BytesSent {
+                byte_size: message_len,
+                protocol: "blackhole".to_string().into(),
             });
         }
 

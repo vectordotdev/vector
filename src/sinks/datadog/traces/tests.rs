@@ -10,7 +10,8 @@ use prost::Message;
 use rmp_serde;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
-use super::{dd_proto, ddsketch_full, stats::StatsPayload, DatadogTracesConfig};
+use super::{apm_stats::StatsPayload, dd_proto, ddsketch_full, DatadogTracesConfig};
+
 use crate::{
     config::SinkConfig,
     event::{TraceEvent, Value},
@@ -135,8 +136,8 @@ async fn smoke() {
     // encoded & emitted in the same payload but we also get an APM stats payload
     let mut output = rx.take(2).collect::<Vec<_>>().await;
 
-    let trace = output.pop();
     let stats = output.pop();
+    let trace = output.pop();
 
     assert!(trace.is_some());
     assert!(stats.is_some());
@@ -246,8 +247,8 @@ async fn multiple_traces() {
 
     let mut output = rx.take(2).collect::<Vec<_>>().await;
 
-    let trace = output.pop();
     let stats = output.pop();
+    let trace = output.pop();
 
     assert!(trace.is_some());
     assert!(stats.is_some());

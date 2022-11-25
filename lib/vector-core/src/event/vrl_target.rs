@@ -312,7 +312,7 @@ impl vrl_lib::Target for VrlTarget {
                             ["namespace"] => metric.series.name.namespace.take().map(Into::into),
                             ["timestamp"] => metric.data.time.timestamp.take().map(Into::into),
                             ["tags"] => metric.series.tags.take().map(|map| {
-                                map.into_iter()
+                                map.into_iter_single()
                                     .map(|(k, v)| (k, v.into()))
                                     .collect::<::value::Value>()
                             }),
@@ -478,7 +478,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                 if let Some(tags) = metric.tags().cloned() {
                     map.insert(
                         "tags".to_owned(),
-                        tags.into_iter()
+                        tags.into_iter_single()
                             .map(|(tag, value)| (tag, value.into()))
                             .collect::<BTreeMap<_, _>>()
                             .into(),
@@ -524,7 +524,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                             .tags()
                             .cloned()
                             .unwrap()
-                            .into_iter()
+                            .into_iter_single()
                             .map(|(tag, value)| (tag, value.into()))
                             .collect::<BTreeMap<_, _>>()
                             .into(),
@@ -555,10 +555,9 @@ mod test {
     use vector_common::btreemap;
     use vrl_lib::Target;
 
-    use super::{
-        super::{MetricTags, MetricValue},
-        *,
-    };
+    use super::super::MetricValue;
+    use super::*;
+    use crate::metric_tags;
 
     #[test]
     fn log_get() {
@@ -900,11 +899,7 @@ mod test {
             MetricValue::Counter { value: 1.23 },
         )
         .with_namespace(Some("zoob"))
-        .with_tags(Some({
-            let mut map = MetricTags::default();
-            map.insert("tig".to_string(), "tog".to_string());
-            map
-        }))
+        .with_tags(Some(metric_tags!("tig" => "tog")))
         .with_timestamp(Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)));
 
         let info = ProgramInfo {
@@ -947,11 +942,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         )
-        .with_tags(Some({
-            let mut map = MetricTags::default();
-            map.insert("tig".to_string(), "tog".to_string());
-            map
-        }));
+        .with_tags(Some(metric_tags!("tig" => "tog")));
 
         let cases = vec![
             (
@@ -1029,11 +1020,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         )
-        .with_tags(Some({
-            let mut map = MetricTags::default();
-            map.insert("tig".to_string(), "tog".to_string());
-            map
-        }));
+        .with_tags(Some(metric_tags!("tig" => "tog")));
 
         let info = ProgramInfo {
             fallible: false,
@@ -1050,10 +1037,7 @@ mod test {
         match target {
             VrlTarget::Metric { metric, value: _ } => {
                 assert!(metric.tags().is_some());
-                assert_eq!(
-                    metric.tags().unwrap(),
-                    &MetricTags::from([("a".into(), "b".into())])
-                );
+                assert_eq!(metric.tags().unwrap(), &crate::metric_tags!("a" => "b"));
             }
             _ => panic!("must be a metric"),
         }

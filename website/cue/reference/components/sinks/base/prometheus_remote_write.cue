@@ -89,7 +89,18 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				type: string: enum: {
 					aws:   "Amazon Prometheus Service-specific authentication."
 					basic: "HTTP Basic Authentication."
+					bearer: """
+						Bearer authentication.
+
+						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						"""
 				}
+			}
+			token: {
+				description:   "The bearer token to send."
+				relevant_when: "strategy = \"bearer\""
+				required:      true
+				type: string: syntax: "literal"
 			}
 			user: {
 				description:   "Basic authentication username."

@@ -120,7 +120,10 @@ impl Application {
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
-                error!("The `threads` argument must be greater or equal to 1.");
+                #[allow(clippy::print_stderr)]
+                {
+                    eprintln!("The `threads` argument must be greater or equal to 1.");
+                }
                 return Err(exitcode::CONFIG);
             } else {
                 WORKER_THREADS
@@ -138,6 +141,12 @@ impl Application {
             let require_healthy = root_opts.require_healthy;
 
             rt.block_on(async move {
+                #[cfg(feature = "allocation-tracing")]
+                if root_opts.allocation_tracing {
+                    use std::sync::atomic::Ordering;
+                    crate::internal_telemetry::allocations::TRACK_ALLOCATIONS
+                        .store(true, Ordering::Relaxed);
+                }
                 trace::init(color, json, &level, root_opts.internal_log_rate_limit);
                 info!(
                     message = "Internal log rate limit configured.",

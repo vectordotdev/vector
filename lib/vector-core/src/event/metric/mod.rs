@@ -1,7 +1,6 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
-    collections::btree_map,
     convert::AsRef,
     fmt::{self, Display, Formatter},
     num::NonZeroU32,
@@ -33,9 +32,22 @@ pub use self::tags::*;
 mod value;
 pub use self::value::*;
 
+#[macro_export]
+macro_rules! metric_tags {
+    () => { $crate::event::MetricTags::default() };
+
+    ($($key:expr => $value:expr,)+) => { $crate::metric_tags!($($key => $value),+) };
+
+    ($($key:expr => $value:expr),*) => {
+        $crate::event::MetricTags::from([
+            $( ($key.into(), $value.into()), )*
+        ])
+    };
+}
+
 /// A metric.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Metric {
     #[serde(flatten)]
     pub(super) series: MetricSeries,
@@ -334,13 +346,6 @@ impl Metric {
         self.series.insert_tag(name, value)
     }
 
-    /// Gets the given tag's corresponding entry in this metric.
-    ///
-    /// *Note:* This will create the tags map if it is not present, even if nothing is later inserted.
-    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
-        self.series.tag_entry(key)
-    }
-
     /// Zeroes out the data in this metric.
     pub fn zero(&mut self) {
         self.data.zero();
@@ -615,13 +620,11 @@ mod test {
     }
 
     fn tags() -> MetricTags {
-        vec![
-            ("normal_tag".to_owned(), "value".to_owned()),
-            ("true_tag".to_owned(), "true".to_owned()),
-            ("empty_tag".to_owned(), "".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+        metric_tags!(
+            "normal_tag" => "value",
+            "true_tag" => "true",
+            "empty_tag" => "",
+        )
     }
 
     #[test]

@@ -196,6 +196,7 @@ mod tests {
     use futures::stream;
     use indoc::indoc;
     use similar_asserts::assert_eq;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -262,11 +263,7 @@ mod tests {
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 42.0 },
                 )
-                .with_tags(Some(
-                    vec![("os.host".to_string(), "somehost".to_string())]
-                        .into_iter()
-                        .collect(),
-                ))
+                .with_tags(Some(metric_tags!("os.host" => "somehost")))
                 .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1))),
             ),
             Event::from(
@@ -278,11 +275,7 @@ mod tests {
                         statistic: StatisticKind::Histogram,
                     },
                 )
-                .with_tags(Some(
-                    vec![("os.host".to_string(), "somehost".to_string())]
-                        .into_iter()
-                        .collect(),
-                ))
+                .with_tags(Some(metric_tags!("os.host" => "somehost")))
                 .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2))),
             ),
         ];

@@ -203,24 +203,23 @@ impl Arbitrary for MetricValue {
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
             6 => {
-                let bin_keys = Vec::<i16>::arbitrary(g);
-                let bin_counts = bin_keys
-                    .iter()
-                    .map(|_| u16::arbitrary(g))
-                    .collect::<Vec<_>>();
+                // We're working around quickcheck's limitations here, and
+                // should really migrate the tests in question to use proptest
+                let num_samples = u8::arbitrary(g);
+                let samples = std::iter::repeat_with(|| loop {
+                    let f = f64::arbitrary(g);
+                    if f.is_normal() {
+                        return f;
+                    }
+                })
+                .take(num_samples as usize)
+                .collect::<Vec<_>>();
+
+                let mut sketch = AgentDDSketch::with_agent_defaults();
+                sketch.insert_many(&samples);
+
                 MetricValue::Sketch {
-                    sketch: MetricSketch::AgentDDSketch(
-                        AgentDDSketch::from_raw(
-                            u32::arbitrary(g),                // count
-                            f64::arbitrary(g) % MAX_F64_SIZE, // min
-                            f64::arbitrary(g) % MAX_F64_SIZE, // max
-                            f64::arbitrary(g) % MAX_F64_SIZE, // sum
-                            f64::arbitrary(g) % MAX_F64_SIZE, // avg
-                            bin_keys.as_slice(),
-                            bin_counts.as_slice(),
-                        )
-                        .unwrap(),
-                    ),
+                    sketch: MetricSketch::AgentDDSketch(sketch),
                 }
             }
 

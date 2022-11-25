@@ -27,6 +27,15 @@ pub enum Terminate {
     Error(ExpressionError),
 }
 
+impl Terminate {
+    pub fn get_expression_error(self) -> ExpressionError {
+        match self {
+            Terminate::Abort(error) => error,
+            Terminate::Error(error) => error,
+        }
+    }
+}
+
 impl fmt::Display for Terminate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

@@ -21,7 +21,14 @@ use crate::{
 };
 
 fn internal_metrics_source() -> InternalMetricsConfig {
-    InternalMetricsConfig::default()
+    InternalMetricsConfig {
+        // TODO: A scrape interval left at the default of 1.0 seconds or less triggers some kind of
+        // race condition in the `topology_disk_buffer_conflict` test below, but it is unclear
+        // why. All these tests should work regardless of the scrape interval. This warrants further
+        // investigation.
+        scrape_interval_secs: 1.1,
+        ..Default::default()
+    }
 }
 
 fn prom_remote_write_source(addr: SocketAddr) -> PrometheusRemoteWriteConfig {

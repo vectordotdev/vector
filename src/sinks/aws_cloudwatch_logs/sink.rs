@@ -53,6 +53,7 @@ where
             .map(|(key, events)| {
                 let metadata =
                     RequestMetadata::from_batch(events.iter().map(|req| req.get_metadata()));
+
                 BatchCloudwatchRequest {
                     key,
                     events,

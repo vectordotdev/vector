@@ -602,7 +602,7 @@ mod tests {
         finalization::{BatchNotifier, BatchStatus},
         sensitive_string::SensitiveString,
     };
-    use vector_core::{event::StatisticKind, samples};
+    use vector_core::{event::StatisticKind, metric_tags, samples};
 
     use super::*;
     use crate::{
@@ -1002,11 +1002,7 @@ mod tests {
     pub(self) fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
         let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
         let event = Metric::new(name.clone(), MetricKind::Incremental, value)
-            .with_tags(Some(
-                vec![("some_tag".to_owned(), "some_value".to_owned())]
-                    .into_iter()
-                    .collect(),
-            ))
+            .with_tags(Some(metric_tags!("some_tag" => "some_value")))
             .into();
         (name, event)
     }
@@ -1026,17 +1022,9 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 32. },
         )
-        .with_tags(Some(
-            vec![("tag1".to_owned(), "value1".to_owned())]
-                .into_iter()
-                .collect(),
-        ));
+        .with_tags(Some(metric_tags!("tag1" => "value1")));
 
-        let m2 = m1.clone().with_tags(Some(
-            vec![("tag1".to_owned(), "value2".to_owned())]
-                .into_iter()
-                .collect(),
-        ));
+        let m2 = m1.clone().with_tags(Some(metric_tags!("tag1" => "value2")));
 
         let events = vec![
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 32. })),

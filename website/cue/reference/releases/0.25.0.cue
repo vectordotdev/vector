@@ -6,7 +6,20 @@ releases: "0.25.0": {
 
 	whats_next: []
 
-	known_issues: []
+	known_issues: [
+		"""
+			Vector fails to load configurations using environment variables outside of string values
+			for configuration options. This will be fixed in 0.25.1.
+			""",
+		"""
+			Vector fails to load multi-file configurations using the global `timezone` configuration
+			option. This will be fixed in 0.25.1.
+			""",
+		"""
+			The `prometheus_remote_write` sink doesn't support specifying `auth.bearer` as it
+			should. This will be fixed in 0.25.1.
+			""",
+	]
 
 	description: """
 		The Vector team is pleased to announce version 0.25.0!

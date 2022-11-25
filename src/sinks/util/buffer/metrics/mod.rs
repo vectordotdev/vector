@@ -127,8 +127,8 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 #[cfg(test)]
 pub(self) mod tests {
     use similar_asserts::assert_eq;
-    use vector_core::event::metric::{MetricKind::*, MetricTags, MetricValue, StatisticKind};
-    use vector_core::event::MetricKind;
+    use vector_core::event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind};
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -144,7 +144,7 @@ pub(self) mod tests {
             kind,
             MetricValue::Counter { value },
         )
-        .with_tags(Some(tag(tagstr)))
+        .with_tags(Some(metric_tags!(tagstr => "true")))
     }
 
     pub fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
@@ -208,10 +208,6 @@ pub(self) mod tests {
                 sum: factor * 7.0,
             },
         )
-    }
-
-    fn tag(name: &str) -> MetricTags {
-        MetricTags::from([(name.to_owned(), "true".to_owned())])
     }
 
     fn rebuffer<State: MetricNormalize + Default>(metrics: Vec<Metric>) -> Buffer {
