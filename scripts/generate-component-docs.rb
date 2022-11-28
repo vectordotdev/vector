@@ -3,32 +3,80 @@
 
 begin
   require 'json'
-  require 'logging'
   require 'tempfile'
 rescue LoadError => e
   puts "Load error: #{e.message}"
   exit
 end
 
-@logger = Logging.logger['default']
-@logger.add_appenders(Logging.appenders.stdout(
-  'stdout',
-  layout: Logging.layouts.pattern(
-    pattern: '[%d] %l %m\n',
-    color_scheme: 'default'
-  )
-))
-@logger.level = ENV['LOG_LEVEL'] || 'info'
+DEBUG_LEVEL = 1
+INFO_LEVEL = 2
+ERROR_LEVEL = 3
+
+LEVEL_MAPPINGS = {
+  'debug' => { 'numeric' => DEBUG_LEVEL, 'colored' => "\033[34mDEBUG\033[0m" },
+  'info' => { 'numeric' => INFO_LEVEL, 'colored' => "\033[32mINFO\033[0m" },
+  'error' => { 'numeric' => ERROR_LEVEL, 'colored' => "\033[31mERROR\033[0m" },
+}
+
+def numerical_level(level_str)
+  LEVEL_MAPPINGS.dig(level_str.downcase, 'numeric') if !level_str.nil?
+end
+
+def colored_level(level_str)
+  LEVEL_MAPPINGS.dig(level_str.downcase, 'colored') if !level_str.nil?
+end
+
+class Logger
+  def initialize
+    @level = numerical_level(ENV['LOG_LEVEL'] || '') || INFO_LEVEL
+    @is_tty = STDOUT.isatty
+  end
+
+  def formatted_level(level)
+    if @is_tty
+      colored_level(level)
+    else
+      level.upcase
+    end
+  end
+
+  def log(level, msg)
+    numeric_level = numerical_level(level)
+    if numeric_level >= @level
+      formatted_level = self.formatted_level(level)
+      dt = Time.now.strftime('%Y-%m-%dT%H:%M:%S')
+      puts "[#{dt}] #{formatted_level} #{msg}"
+    end
+  end
+
+  def debug(msg)
+    self.log('debug', msg)
+  end
+
+  def info(msg)
+    self.log('info', msg)
+  end
+
+  def error(msg)
+    self.log('error', msg)
+  end
+end
+
+@logger = Logger.new
 
 @default_schema_type_values = {
   "array" => [],
   "uint" => 0,
+  "int" => 0,
   "float" => 0,
   "string" => "",
   "boolean" => false,
 }
 
-@numeric_schema_types = %w[uint int float]
+@integer_schema_types = %w[uint int]
+@number_schema_types = %w[float]
+@numeric_schema_types = @integer_schema_types + @number_schema_types
 
 # Cross-platform friendly method of finding if command exists on the current path.
 #
@@ -46,15 +94,18 @@ end
 
 @cue_binary_path = find_command_on_path('cue')
 
-# Helpers for caching resolved schemas and detecting schema resolution cycles.
+# Helpers for caching resolved/expanded schemas and detecting schema resolution cycles.
 @resolved_schema_cache = {}
+@expanded_schema_cache = {}
 @schema_resolution_queue = {}
 
 def add_to_schema_resolution_stack(schema_name)
+  @logger.debug "Adding '#{schema_name}' to resolution stack."
   @schema_resolution_queue[schema_name] = true
 end
 
 def remove_from_schema_resolution_stack(schema_name)
+  @logger.debug "Removing '#{schema_name}' from resolution stack."
   @schema_resolution_queue.delete(schema_name)
 end
 
@@ -65,6 +116,11 @@ end
 # Gets the schema of the given `name` from the resolved schema cache, if it exists.
 def get_cached_resolved_schema(schema_name)
   @resolved_schema_cache[schema_name]
+end
+
+# Gets the schema of the given `name` from the expanded schema cache, if it exists.
+def get_cached_expanded_schema(schema_name)
+  @expanded_schema_cache[schema_name]
 end
 
 # Generic helpers for making working with Ruby a bit easier.
@@ -95,7 +151,7 @@ def nested_merge(base, override)
       [:undefined, nil, :nil].include?(v2) ? v1 : v2
     end
   }
-  base.merge(override.to_h, &merger)
+  deep_copy(base).merge(override.to_h, &merger)
 end
 
 def sort_hash_nested(input)
@@ -120,7 +176,9 @@ end
 def json_type_str(value)
   if value.is_a?(String)
     'string'
-  elsif value.is_a?(Numeric)
+  elsif value.is_a?(Integer)
+    'integer'
+  elsif value.is_a?(Float)
     'number'
   elsif [true, false].include?(value)
     'boolean'
@@ -149,7 +207,6 @@ end
 def resolved_schema_type?(resolved_schema)
   if resolved_schema['type'].length == 1
     resolved_schema['type'].keys.first
-  else
   end
 end
 
@@ -160,6 +217,65 @@ end
 def numeric_schema_type(resolved_schema)
   schema_type = resolved_schema_type?(resolved_schema)
   schema_type if @numeric_schema_types.include?(schema_type)
+end
+
+# Gets the docs type for the given value's type.
+#
+# When dealing with a source schema, and trying to get the "docs"-compatible schema type, we need to
+# cross-reference the original schema with the type of the value we have on the Ruby side. While
+# some types like a string will always have a type of "string", numbers represent an area where we
+# need to do some digging.
+#
+# For example, we encode the specific class of number on the source schema -- unsigned, signed, or
+# floating-point -- and we can discern nearly as much from the Ruby value itself (integer vs float),
+# but we need to be able to discern the precise type i.e. the unsigned vs signed vs floating-point
+# bit.
+#
+# This function cross-references the Ruby value given with the source schema it is associated with
+# and returns the appropriate "docs" schema type for that value. If the value is not recognized, or
+# if the source schema does not match the given value, `nil` is returned.
+#
+# Otherwise, the most precise "docs" schema type for the given value is returned.
+def get_docs_type_for_value(schema, value)
+  # If there's no schema to check against, or there is but it has no type field, that means we're
+  # dealing with something like a complex, overlapping `oneOf` subschema, where we couldn't
+  # declaratively figure out the right field to dig into if we were discerning an integer/number
+  # value, and so on.
+  #
+  # We just use the detected value type.
+  schema_type = schema['type'] unless schema.nil?
+  if schema.nil? || schema_type.nil?
+    return docs_type_str(value)
+  end
+
+  # If the schema defines a type, see if it matches the value type. If it doesn't, that's a bad sign
+  # and we abort. Otherwise, we fallthrough below to make sure we're handling special cases i.e.
+  # numeric types.
+  value_type = json_type_str(value)
+  if value_type != schema_type
+    @logger.error "Schema type and value type are a mismatch, which should not happen."
+    @logger.error "Schema type: #{schema_type}"
+    @logger.error "Value: #{value} (type: #{value_type})"
+    exit
+  end
+
+  # For any numeric type, extract the value of `docs::numeric_type`, which must always be present in
+  # the schema for numeric fields. If the schema is `nil`, though, then it means we're dealing with
+  # a complex schema (like an overlapping `oneOf` subschema, etc) and we just fallback to the
+  # detected type.
+  if ['number', 'integer'].include?(value_type)
+    numeric_type = get_schema_metadata(schema, 'docs::numeric_type')
+    if numeric_type.nil?
+      @logger.error "All fields with numeric types should have 'docs::numeric_type' metadata included."
+      exit
+    end
+
+    return numeric_type
+  end
+
+  # TODO: The documentation should really just use `boolean` to match JSON Schema, which would let
+  # us get rid of this weird `json_type_str`/`docs_type_str` dichotomy.
+  docs_type_str(value)
 end
 
 # Gets the schema type field for the given value's type.
@@ -178,17 +294,51 @@ end
 # Ruby side) if a value is the `number` type. To handle this, for any value of the type `number`, we
 # iteratively try and find a matching type definition in the resolved schema for any of the possible
 # numeric types.
-def get_schema_type_field_for_value(schema, value)
-  value_type = docs_type_str(value)
-  case value_type
-  when 'number'
-    @numeric_schema_types.each do |numeric_type|
-      type_field = schema.dig('type', numeric_type)
-      return type_field unless type_field.nil?
-    end
-  else
-    schema.dig('type', value_type)
+def get_schema_type_field_for_value(source_schema, resolved_schema, value)
+  value_type = get_docs_type_for_value(source_schema, value)
+  resolved_schema.dig('type', value_type)
+end
+
+# Tries to find the schema for an object property nested in the given schema.
+#
+# This function will search through either the properties of the schema itself, if it is an object
+# schema, or the properties of any object subschema that is present in `oneOf`/`allOf`.
+#
+# If no property is found, `nil` is returned.
+def find_nested_object_property_schema(schema, property_name)
+  # See if we're checking an object schema directly.
+  if !schema['properties'].nil?
+    return schema['properties'][property_name]
   end
+
+  # The schema isn't an object schema, so check to see if it's a `oneOf`/`allOf`, and if so,
+  # recursively visit each of those subschemas, looking for object schemas along the way that we can
+  # check for the given property within.
+  matching_property_schemas = []
+  unvisited_subschemas = schema['oneOf'].dup || schema['allOf'].dup || []
+  while !unvisited_subschemas.empty? do
+    unvisited_subschema = unvisited_subschemas.pop
+
+    # If the subschema has object properties, it won't be `oneOf`/`allOf`, so just try and grab the
+    # property if it exists, and move on.
+    if !unvisited_subschema['properties'].nil?
+      subschema_property = unvisited_subschema.dig('properties', property_name)
+      matching_property_schemas.push(subschema_property) unless subschema_property.nil?
+      next
+    end
+
+    # If the subschema had no object properties, see if it's an `oneOf`/`allOf` subschema, and if
+    # so, collect any of _those_ subschemas and add them to our list of subschemas to visit.
+    maybe_unvisited_subschemas = unvisited_subschema['oneOf'].dup || unvisited_subschema['allOf'].dup || []
+    unvisited_subschemas.concat(maybe_unvisited_subschemas) unless maybe_unvisited_subschemas.nil?
+  end
+
+  # Compare all matching property schemas to each other -- in their reduced form -- to see if they're
+  # identical. If they're not, or there were no matches, return `nil`.
+  #
+  # Otherwise, return the first matching property schema.
+  reduced_matching_property_schemas = matching_property_schemas.map { |schema| get_reduced_schema(schema) }
+  matching_property_schemas[0] unless reduced_matching_property_schemas.uniq.count != 1
 end
 
 def get_schema_metadata(schema, key)
@@ -214,6 +364,53 @@ def get_schema_type(schema)
   end
 end
 
+# Fixes grouped enums by adjusting the schema type where necessary.
+#
+# For "grouped enums", these represent the sum of all possible enum values in an `enum` schema being
+# grouped by their JSON type. For example, a set of enums such as `[0, 1, 2, true, false]` would be
+# grouped as:
+#
+# { "bool": [true, false], "number": [0, 1, 2] }
+#
+# This is technically correct, but in the documentation output, that `number` key needs to be `uint`
+# or `int` or what have you. Since `enum` schemas don't carry the "numeric type" information, we try
+# and figure that out here.
+#
+# If we find a `number` group, we check all of its values to see if they fit neatly within the
+# bounds of any of the possible numeric types `int`, `uint`, or `float`. We try and coalesce
+# towards `uint` as it's by far the most common numeric type in Vector configuration, but after
+# that, we aim for `int`, unless the values are too large, in which case we'll shift up to `float`.
+def fix_grouped_enums_if_numeric!(grouped_enums)
+  ['integer', 'number'].each { |type_name|
+    number_group = grouped_enums.delete(type_name)
+    if !number_group.nil?
+      is_integer = number_group.all? { |n| n.is_a?(Integer) }
+      within_uint = number_group.all? { |n| n >= 0 && n <= 2 ** 64 }
+      within_int = number_group.all? { |n| n >= -(2 ** 63) && n <= (2 ** 63) - 1 }
+
+      # If the values themselves are not all integers, or they are but not all of them can fit within
+      # a normal 64-bit signed/unsigned integer, then we use `float` as it's the only other type that
+      # could reasonably satisfy the constraints.
+      numeric_type = if !is_integer || (!within_int && !within_uint)
+        'float'
+      else
+        if within_uint
+          'uint'
+        elsif within_int
+          'int'
+        else
+          # This should never actually happen, _but_, technically Ruby integers could be a "BigNum"
+          # aka arbitrary-precision integer, so this protects us if somehow we get a value that is an
+          # integer but doesn't actually fit neatly into 64 bits.
+          'float'
+        end
+      end
+
+      grouped_enums[numeric_type] = number_group
+    end
+  }
+end
+
 # Gets a schema definition from the root schema, by name.
 def get_schema_by_name(root_schema, schema_name)
   schema_name = schema_name.gsub(%r{#/definitions/}, '')
@@ -224,6 +421,16 @@ def get_schema_by_name(root_schema, schema_name)
   end
 
   schema_def
+end
+
+# Gets the dereferenced version of this schema.
+#
+# If the schema has no schema reference, `nil` is returned.
+def dereferenced_schema(schema)
+  schema_name = get_schema_ref(schema)
+  if !schema_ref.nil?
+    get_schema_by_name(root_schema, schema_name)
+  end
 end
 
 # Applies various fields to an object property.
@@ -255,21 +462,121 @@ def apply_object_property_fields!(parent_schema, property_schema, property_name,
   property['required'] = required_properties.include?(property_name) && !has_default_value
 end
 
-# Resolves a schema reference, if present.
+# Expands any schema references in the given schema.
 #
-# If the given schema in fact is a reference to a schema definition, it is retrieved and merged into
-# the given schema, and the reference field is removed.
+# If the schema contains a top-level schema reference, or if any of the parts of its schema contain
+# schema references (array items schema, any subschemas in `oneOf`/`allOf`, etc), then those
+# references are expanded. Expansion happens recursively until all schema references
 #
 # For any overlapping fields in the given schema and the referenced schema, the fields from the
 # given schema will win.
-def resolve_schema_reference(root, schema)
-  schema = deep_copy(schema)
+def expand_schema_references(root_schema, unexpanded_schema)
+  # Break any cycles during expansion, the same as we do during resolution.
+  if get_schema_metadata(unexpanded_schema, 'docs::cycle_entrypoint')
+    return unexpanded_schema
+  end
 
-  until schema['$ref'].nil?
-    resolved_schema = get_schema_by_name(root, schema['$ref'])
+  schema = deep_copy(unexpanded_schema)
 
-    schema.delete('$ref')
-    schema = nested_merge(schema, resolved_schema)
+  # Grab the existing title/description from our unexpanded schema, and reset them after
+  # merging. This avoids us adding a title where there was only a description, and so on, since
+  # we have special handling rules around titles vs descriptions.
+  #
+  # TODO: If we ever just get rid of the title/description dichotomy, we could clean up this
+  # logic.
+  original_title = unexpanded_schema['title']
+  original_description = unexpanded_schema['description']
+
+  loop do
+    expanded = false
+
+    # If the schema has a top level reference, we expand it.
+    schema_ref = schema['$ref']
+    if !schema_ref.nil?
+      expanded_schema_ref = get_cached_expanded_schema(schema_ref)
+      if expanded_schema_ref.nil?
+        @logger.debug "Expanding top-level schema ref of '#{schema_ref}'..."
+
+        unexpanded_schema_ref = get_schema_by_name(root_schema, schema_ref)
+        expanded_schema_ref = expand_schema_references(root_schema, unexpanded_schema_ref)
+
+        @expanded_schema_cache[schema_ref] = expanded_schema_ref
+      end
+
+      schema.delete('$ref')
+      schema = nested_merge(expanded_schema_ref, schema)
+
+      expanded = true
+    end
+
+    # If the schema is an array type and has a reference for its items, we expand that.
+    items_ref = schema.dig('items', '$ref')
+    if !items_ref.nil?
+      expanded_items_schema_ref = expand_schema_references(root_schema, schema['items'])
+
+      schema['items'].delete('$ref')
+      schema['items'] = nested_merge(expanded_items_schema_ref, schema['items'])
+
+      expanded = true
+    end
+
+    # If the schema has any object properties, we expand those.
+    if !schema['properties'].nil?
+      schema['properties'] = schema['properties'].transform_values { |property_schema|
+        new_property_schema = expand_schema_references(root_schema, property_schema)
+        if new_property_schema != property_schema
+          expanded = true
+        end
+
+        new_property_schema
+      }
+    end
+
+    # If the schema has any `allOf`/`oneOf` subschemas, we expand those, too.
+    if !schema['allOf'].nil?
+      schema['allOf'] = schema['allOf'].map { |subschema|
+        new_subschema = expand_schema_references(root_schema, subschema)
+        if new_subschema != subschema
+          expanded = true
+        end
+
+        new_subschema
+      }
+    end
+
+    if !schema['oneOf'].nil?
+      schema['oneOf'] = schema['oneOf'].map { |subschema|
+        new_subschema = expand_schema_references(root_schema, subschema)
+        if new_subschema != subschema
+          expanded = true
+        end
+
+        new_subschema
+      }
+    end
+
+    if !expanded
+      break
+    end
+  end
+
+  # If the original schema had either a title or description, we forcefully reset both of them back
+  # to their original state, either in terms of their value or them not existing as fields.
+  #
+  # If neither were present, we allow the merged in title/description, if any, to persist, as this
+  # maintains the "#[configurable(derived)]" behavior of titles/descriptions for struct fields.
+  if !original_title.nil? || !original_description.nil?
+    if !original_title.nil?
+      schema['title'] = original_title
+    else
+      schema.delete('title')
+    end
+
+    if
+      schema['description'] = original_description
+    else
+      schema.delete('description')
+    end
   end
 
   schema
@@ -284,15 +591,27 @@ end
 def get_reduced_schema(schema)
   schema = deep_copy(schema)
 
-  allowed_properties = ['type', 'const', 'enum', 'allOf', 'oneOf', '$ref', 'items']
+  allowed_properties = ['type', 'const', 'enum', 'allOf', 'oneOf', '$ref', 'items', 'properties']
   schema.delete_if { |key, _value| !allowed_properties.include?(key) }
 
-  schema['allOf'].map!(get_reduced_schema) if schema.key?('allOf')
-  schema['oneOf'].map!(get_reduced_schema) if schema.key?('oneOf')
+  if schema.key?('items')
+    schema['items'] = get_reduced_schema(schema['items'])
+  end
+
+  if schema.key?('properties')
+    schema['properties'] = schema['properties'].transform_values { |property_schema| get_reduced_schema(property_schema) }
+  end
+
+  if schema.key?('allOf')
+    schema['allOf'] = schema['allOf'].map { |subschema| get_reduced_schema(subschema) }
+  end
+
+  if schema.key?('oneOf')
+    schema['oneOf'] = schema['oneOf'].map { |subschema| get_reduced_schema(subschema) }
+  end
 
   schema
 end
-
 
 # Gets a reduced version of a resolved schema.
 #
@@ -330,8 +649,10 @@ end
 
 # Fully resolves a schema definition, if it exists.
 #
-# This looks up a schema definition by the given `name` within `root_schema` and resolves it, if it
-# exists, Otherwise, `nil` is returned.
+# This looks up a schema definition by the given `name` within `root_schema` and resolves it.
+# If no schema definition exists for the given name, `nil` is returned. Otherwise, the schema
+# definition is preprocessed (collapsing schema references, etc), and then resolved. Both the
+# "source" schema (preprocessed value) and the resolved schema are returned.
 #
 # Resolved schemas are cached.
 #
@@ -366,6 +687,12 @@ end
 # transforming certain usages -- composite/enum (`allOf`, `oneOf`), etc -- into more human-readable
 # forms.
 def resolve_schema(root_schema, schema)
+  # If the schema we've been given if a schema reference, we expand that first. This happens
+  # recursively, such that the resulting expanded schema has no schema references left. We need this
+  # because in further steps, we need the access to the full input schema that was used to generate
+  # the resolved schema.
+  schema = expand_schema_references(root_schema, schema)
+
   # Skip any schema that is marked as hidden.
   #
   # While this is already sort of obvious, one non-obvious usage is for certain types that we
@@ -413,20 +740,9 @@ def resolve_schema(root_schema, schema)
     return resolved
   end
 
-  # Figure out if we're resolving a bare schema, or a reference to an existing schema.
-  #
-  # If it is, we resolve _that_ schema first, which may also involve getting a cached version of the
-  # resolved schema. This is useful from a performance perspective, but primarily serves as a way to
-  # break cycles when resolving self-referential schemas, such as the `pipelines` transform.
-  #
-  # Otherwise, we simply resolve the schema as it exists.
-  referenced_schema_name = get_schema_ref(schema)
-  resolved = if !referenced_schema_name.nil?
-    @logger.debug "Resolving referenced schema '#{referenced_schema_name}..."
-    resolve_schema_by_name(root_schema, referenced_schema_name)
-  else
-    resolve_bare_schema(root_schema, schema)
-  end
+  # Now that the schema is fully expanded and it didn't need special handling, we'll go ahead and
+  # fully resolve it.
+  resolved = resolve_bare_schema(root_schema, schema)
 
   # If this is an array schema, remove the description from the schema used for the items, as we
   # want the description for the overall property, using this array schema, to describe everything.
@@ -508,6 +824,8 @@ def resolve_bare_schema(root_schema, schema)
       # (`*`) which uses the specified schema for that field.
       additional_properties = schema['additionalProperties']
       if !additional_properties.nil?
+        @logger.debug "Handling additional properties."
+
         # If the schema has no other properties -- i.e. it's always just a free-form "whatever
         # properties you want" object schema -- then copy the title/description of the schema to
         # this free-form schema we're generating. Since it's still a property on an object schema at
@@ -528,7 +846,7 @@ def resolve_bare_schema(root_schema, schema)
       string_def['default'] = schema['default'] unless schema['default'].nil?
 
       { 'string' => string_def }
-    when 'number'
+    when 'number', 'integer'
       @logger.debug 'Resolving number schema.'
 
       numeric_type = get_schema_metadata(schema, 'docs::numeric_type') || 'number'
@@ -551,7 +869,7 @@ def resolve_bare_schema(root_schema, schema)
       # For `const` schemas, just figure out the type of the constant value so we can generate the
       # resolved output.
       const_value = schema['const']
-      const_type = docs_type_str(const_value)
+      const_type = get_docs_type_for_value(schema, const_value)
       { const_type => { 'const' => const_value } }
     when 'enum'
       @logger.debug 'Resolving enum const schema.'
@@ -561,6 +879,7 @@ def resolve_bare_schema(root_schema, schema)
       # type to get the resolved output.
       enum_values = schema['enum']
       grouped = enum_values.group_by { |value| docs_type_str(value) }
+      fix_grouped_enums_if_numeric!(grouped)
       grouped.transform_values! { |values| { 'enum' => values } }
       grouped
     else
@@ -649,7 +968,7 @@ def resolve_enum_schema(root_schema, schema)
     # This transformation only makes sense when all subschemas are objects, so only resolve the ones
     # that are objects, and only proceed if all of them were resolved.
     resolved_subschemas = subschemas.filter_map do |subschema|
-      # the exact enum variant probably isn't an object? but probabilistic is... gotta handle that
+      # TODO: the exact enum variant probably isn't an object? but probabilistic is... gotta handle that
       resolved = resolve_schema(root_schema, subschema)
       resolved if resolved_schema_type?(resolved) == 'object'
     end
@@ -661,6 +980,7 @@ def resolve_enum_schema(root_schema, schema)
       unique_tag_values = {}
 
       resolved_subschemas.each do |resolved_subschema|
+        @logger.debug "Resolved subschema: #{JSON.dump(resolved_subschema)}"
         resolved_subschema_properties = resolved_subschema.dig('type', 'object', 'options')
 
         # Extract the tag property and figure out any necessary intersections, etc.
@@ -678,7 +998,7 @@ def resolve_enum_schema(root_schema, schema)
         tag_subschema['description'] = resolved_subschema['description'] if !resolved_subschema['description'].nil?
         tag_value = nil
 
-        %w[string number boolean].each do |allowed_type|
+        %w[string number integer boolean].each do |allowed_type|
           maybe_tag_value = tag_subschema.dig('type', allowed_type, 'const')
           unless maybe_tag_value.nil?
             tag_value = maybe_tag_value
@@ -928,13 +1248,15 @@ def resolve_enum_schema(root_schema, schema)
 end
 
 def apply_schema_default_value!(source_schema, resolved_schema)
+  @logger.debug "Applying schema default values."
+
   default_value = source_schema['default']
   unless default_value.nil?
     # Make sure that the resolved schema actually has a type definition that matches the type of the
     # given default value, since anything else would be indicative of a nasty bug in schema
     # generation.
     default_value_type = docs_type_str(default_value)
-    resolved_schema_type_field = get_schema_type_field_for_value(resolved_schema, default_value)
+    resolved_schema_type_field = get_schema_type_field_for_value(source_schema, resolved_schema, default_value)
     if resolved_schema_type_field.nil?
       @logger.error "Schema has default value declared that does not match type of resolved schema: \
       \
@@ -980,10 +1302,18 @@ def apply_schema_default_value!(source_schema, resolved_schema)
       #
       resolved_properties = resolved_schema_type_field['options']
       resolved_properties.each do |property_name, resolved_property|
+        @logger.debug "Trying to apply default value for resolved property '#{property_name}'..."
         property_default_value = default_value[property_name]
-        property_type_field = get_schema_type_field_for_value(resolved_property, property_default_value)
-        property_type_field['default'] = property_default_value unless property_type_field.nil?
-        resolved_property['required'] = false unless property_type_field.nil?
+        if !property_default_value.nil?
+          source_property = find_nested_object_property_schema(source_schema, property_name)
+          property_type_field = get_schema_type_field_for_value(source_property, resolved_property, property_default_value)
+          if property_type_field.nil?
+            @logger.debug "Could not find correct property type field to apply default value to."
+          end
+
+          property_type_field['default'] = property_default_value unless property_type_field.nil?
+          resolved_property['required'] = false unless property_type_field.nil?
+        end
       end
     else
       # We're dealing with a normal scalar or whatever, so just apply the default directly.

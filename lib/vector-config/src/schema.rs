@@ -151,13 +151,16 @@ pub fn generate_number_schema<N>() -> SchemaObject
 where
     N: Configurable + ConfigurableNumber,
 {
+    // TODO: Once `schemars` has proper integer support, we should allow specifying min/max bounds
+    // in a way that's relevant to the number class. As is, we're always forcing bounds to fit into
+    // `f64` regardless of whether or not we're using `u64` vs `f64` vs `i16`, and so on.
     let minimum = N::get_enforced_min_bound();
     let maximum = N::get_enforced_max_bound();
 
     // We always set the minimum/maximum bound to the mechanical limits. Any additional constraining as part of field
     // validators will overwrite these limits.
     let mut schema = SchemaObject {
-        instance_type: Some(InstanceType::Number.into()),
+        instance_type: Some(N::class().as_instance_type().into()),
         number: Some(Box::new(NumberValidation {
             minimum: Some(minimum),
             maximum: Some(maximum),

@@ -10,7 +10,7 @@ license = "MPL-2.0"
 
 # Serde
 serde = { version = "1.0.147", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.87", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.89", default-features = false, features = ["raw_value"] }
 
 # Error handling
 anyhow = { version = "1.0.66", default-features = false, features = ["std"] }
@@ -18,19 +18,19 @@ anyhow = { version = "1.0.66", default-features = false, features = ["std"] }
 # Tokio / Futures
 async-trait = { version = "0.1", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.21.2", default-features = false, features = ["macros", "rt", "sync"] }
+tokio = { version = "1.22.0", default-features = false, features = ["macros", "rt", "sync"] }
 tokio-stream = { version = "0.1.11", default-features = false, features = ["sync"] }
 
 # GraphQL
 graphql_client = { version = "0.11.0", default-features = false, features = ["graphql_query_derive"] }
 
 # HTTP / WebSockets
-reqwest = { version = "0.11.12", default-features = false, features = ["json"] }
+reqwest = { version = "0.11.13", default-features = false, features = ["json"] }
 tokio-tungstenite = { version = "0.17.2", default-features = false, features = ["connect", "rustls"] }
 
 # External libs
 chrono = { version = "0.4.6", default-features = false, features = ["serde"] }
-clap = { version = "4.0.23", default-features = false, features = ["derive"] }
+clap = { version = "4.0.27", default-features = false, features = ["derive"] }
 url = { version = "2.3.1", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 indoc = { version = "1.0.7", default-features = false }

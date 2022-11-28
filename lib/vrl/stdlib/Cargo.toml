@@ -17,7 +17,7 @@ lookup_lib = {package = "lookup", path = "../../lookup", optional = true }
 vector-common = { path = "../../vector-common", default-features = false, optional = true }
 
 base64 = { version = "0.13", optional = true }
-bytes = { version = "1.2.1", optional = true }
+bytes = { version = "1.3.0", optional = true }
 charset = { version = "0.1.3", optional = true }
 chrono = { version = "0.4", optional = true }
 cidr-utils = { version = "0.5", optional = true }
@@ -27,7 +27,7 @@ dns-lookup = { version = "1.0.8", optional = true }
 grok = { version = "2", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
-indexmap = { version = "~1.9.1", default-features = false, optional = true}
+indexmap = { version = "~1.9.2", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.2", optional = true }

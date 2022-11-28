@@ -1,183 +1,175 @@
 use std::{
     fs::{self, File},
     io::Read,
+    path::{Path, PathBuf},
 };
 
 use bytes::{Bytes, BytesMut};
 use codecs::{
-    decoding::format::Deserializer, NativeDeserializerConfig, NativeJsonDeserializerConfig,
-    NativeJsonSerializerConfig, NativeSerializerConfig,
+    decoding::format::Deserializer, encoding::format::Serializer, NativeDeserializerConfig,
+    NativeJsonDeserializerConfig, NativeJsonSerializerConfig, NativeSerializerConfig,
 };
 use similar_asserts::assert_eq;
-use tokio_util::codec::Encoder;
-use vector_core::config::LogNamespace;
+use vector_core::{config::LogNamespace, event::Event};
 
 #[test]
-fn roundtrip_native_fixtures() {
-    let config = NativeJsonDeserializerConfig;
-    let json_deserializer = config.build();
+fn pre_v24_fixtures_match() {
+    fixtures_match("pre-v24");
+}
 
-    let config = NativeDeserializerConfig;
-    let proto_deserializer = config.build();
+#[test]
+fn current_fixtures_match() {
+    fixtures_match("");
+}
 
-    let config = NativeJsonSerializerConfig;
-    let mut json_serializer = config.build();
+#[test]
+fn roundtrip_current_native_json_fixtures() {
+    roundtrip_fixtures(
+        "json",
+        "",
+        &NativeJsonDeserializerConfig.build(),
+        &mut NativeJsonSerializerConfig.build(),
+        false,
+    );
+}
 
-    let config = NativeSerializerConfig;
-    let mut proto_serializer = config.build();
+#[test]
+fn roundtrip_current_native_proto_fixtures() {
+    roundtrip_fixtures(
+        "proto",
+        "",
+        &NativeDeserializerConfig.build(),
+        &mut NativeSerializerConfig.build(),
+        false,
+    );
+}
 
-    let mut json_entries = fs::read_dir("tests/data/native_encoding/json/")
-        .unwrap()
-        .map(Result::unwrap)
-        .filter(|e| e.file_type().unwrap().is_file())
-        .map(|e| e.path())
-        .collect::<Vec<_>>();
-    json_entries.sort();
+/// The event proto file was changed in v0.24. This test ensures we can still load the old version
+/// binary and that when serialized and deserialized in the new format we still get the same event.
+#[test]
+fn reserialize_pre_v24_native_json_fixtures() {
+    roundtrip_fixtures(
+        "json",
+        "pre-v24",
+        &NativeJsonDeserializerConfig.build(),
+        &mut NativeJsonSerializerConfig.build(),
+        true,
+    );
+}
 
-    let mut proto_entries = fs::read_dir("tests/data/native_encoding/proto/")
-        .unwrap()
-        .map(Result::unwrap)
-        .filter(|e| e.file_type().unwrap().is_file())
-        .map(|e| e.path())
-        .collect::<Vec<_>>();
-    proto_entries.sort();
+#[test]
+fn reserialize_pre_v24_native_proto_fixtures() {
+    roundtrip_fixtures(
+        "proto",
+        "pre-v24",
+        &NativeDeserializerConfig.build(),
+        &mut NativeSerializerConfig.build(),
+        true,
+    );
+}
 
+#[test]
+fn current_native_decoding_matches() {
+    decoding_matches("");
+}
+
+#[test]
+fn pre_v24_native_decoding_matches() {
+    decoding_matches("pre-v24");
+}
+
+/// This test ensures that the different sets of protocol fixture names match.
+fn fixtures_match(suffix: &str) {
+    let json_entries = list_fixtures("json", suffix);
+    let proto_entries = list_fixtures("proto", suffix);
     for (json_path, proto_path) in json_entries.into_iter().zip(proto_entries.into_iter()) {
         // Make sure we're looking at the matching files for each format
         assert_eq!(
             json_path.file_stem().unwrap(),
             proto_path.file_stem().unwrap(),
         );
-
-        let mut json_file = File::open(json_path).unwrap();
-        let mut json_buf = Vec::new();
-        json_file.read_to_end(&mut json_buf).unwrap();
-        let json_buf = Bytes::from(json_buf);
-
-        // Ensure that we can parse the json fixture successfully
-        let json_events = json_deserializer
-            .parse(json_buf.clone(), LogNamespace::Legacy)
-            .unwrap();
-        assert_eq!(json_events.len(), 1);
-
-        // Ensure that the parsed event is serialized to the same bytes
-        let mut buf = BytesMut::new();
-        json_serializer
-            .encode(json_events[0].clone(), &mut buf)
-            .unwrap();
-        assert_eq!(json_buf, buf);
-
-        let mut proto_file = File::open(proto_path).unwrap();
-        let mut proto_buf = Vec::new();
-        proto_file.read_to_end(&mut proto_buf).unwrap();
-        let proto_buf = Bytes::from(proto_buf);
-
-        // Ensure that we can parse the proto fixture successfully
-        let proto_events = proto_deserializer
-            .parse(proto_buf.clone(), LogNamespace::Legacy)
-            .unwrap();
-        assert_eq!(proto_events.len(), 1);
-
-        // Ensure that the parsed event is serialized to the same bytes
-        let mut buf = BytesMut::new();
-        proto_serializer
-            .encode(proto_events[0].clone(), &mut buf)
-            .unwrap();
-        assert_eq!(proto_buf, buf);
-
-        // Ensure that the json version and proto versions were parsed into equivalent
-        // native representations
-        assert_eq!(json_events, proto_events);
     }
 }
 
-/// The event proto file was changed in v23. This test ensures we can still load the old version
-/// binary and that when serialized and deserialized in the new format we still get the same event.
-#[test]
-fn updated_native_fixtures() {
-    let config = NativeJsonDeserializerConfig;
-    let json_deserializer = config.build();
+/// This test ensures we can load the serialized binaries binary and that they match across
+/// protocols.
+fn decoding_matches(suffix: &str) {
+    let json_deserializer = NativeJsonDeserializerConfig.build();
+    let proto_deserializer = NativeDeserializerConfig.build();
 
-    let config = NativeDeserializerConfig;
-    let proto_deserializer = config.build();
-
-    let config = NativeJsonSerializerConfig;
-    let mut json_serializer = config.build();
-
-    let config = NativeSerializerConfig;
-    let mut proto_serializer = config.build();
-
-    let mut json_entries = fs::read_dir("tests/data/native_encoding/json/v23/")
-        .unwrap()
-        .map(Result::unwrap)
-        .map(|e| e.path())
-        .collect::<Vec<_>>();
-    json_entries.sort();
-
-    let mut proto_entries = fs::read_dir("tests/data/native_encoding/proto/v23/")
-        .unwrap()
-        .map(Result::unwrap)
-        .map(|e| e.path())
-        .collect::<Vec<_>>();
-    proto_entries.sort();
+    let json_entries = list_fixtures("json", suffix);
+    let proto_entries = list_fixtures("proto", suffix);
 
     for (json_path, proto_path) in json_entries.into_iter().zip(proto_entries.into_iter()) {
-        // Make sure we're looking at the matching files for each format
-        assert_eq!(
-            json_path.file_stem().unwrap(),
-            proto_path.file_stem().unwrap(),
-        );
+        let (_, json_event) = load_deserialize(&json_path, &json_deserializer);
 
-        let mut json_file = File::open(json_path).unwrap();
-        let mut json_buf = Vec::new();
-        json_file.read_to_end(&mut json_buf).unwrap();
-        let json_buf = Bytes::from(json_buf);
-
-        // Ensure that we can parse the json fixture successfully
-        let json_events = json_deserializer
-            .parse(json_buf.clone(), LogNamespace::Legacy)
-            .unwrap();
-        assert_eq!(json_events.len(), 1);
-
-        // Serialize the parsed event
-        let mut buf = BytesMut::new();
-        json_serializer
-            .encode(json_events[0].clone(), &mut buf)
-            .unwrap();
-        // Deserialize the event from these bytes
-        let new_json_events = json_deserializer
-            .parse(buf.into(), LogNamespace::Legacy)
-            .unwrap();
-
-        // Ensure we still have the same event
-        assert_eq!(new_json_events, json_events);
-
-        let mut proto_file = File::open(proto_path).unwrap();
-        let mut proto_buf = Vec::new();
-        proto_file.read_to_end(&mut proto_buf).unwrap();
-        let proto_buf = Bytes::from(proto_buf);
-
-        // Ensure that we can parse the proto fixture successfully
-        let proto_events = proto_deserializer
-            .parse(proto_buf.clone(), LogNamespace::Legacy)
-            .unwrap();
-        assert_eq!(proto_events.len(), 1);
-
-        // Ensure that the parsed event is serialized to the same bytes
-        let mut buf = BytesMut::new();
-        proto_serializer
-            .encode(proto_events[0].clone(), &mut buf)
-            .unwrap();
-        // Deserialize the event from these bytes.
-        let new_proto_events = proto_deserializer
-            .parse(buf.into(), LogNamespace::Legacy)
-            .unwrap();
-
-        // Ensure we have the same event.
-        assert_eq!(proto_events, new_proto_events);
+        let (_, proto_event) = load_deserialize(&proto_path, &proto_deserializer);
 
         // Ensure that the json version and proto versions were parsed into equivalent
         // native representations
-        assert_eq!(json_events, proto_events);
+        assert_eq!(
+            json_event,
+            proto_event,
+            "Parsed events don't match: {} {}",
+            json_path.display(),
+            proto_path.display()
+        );
     }
+}
+
+fn list_fixtures(proto: &str, suffix: &str) -> Vec<PathBuf> {
+    let path = format!("tests/data/native_encoding/{proto}/{suffix}");
+    let mut entries = fs::read_dir(path)
+        .unwrap()
+        .map(Result::unwrap)
+        .filter(|e| e.file_type().unwrap().is_file())
+        .map(|e| e.path())
+        .collect::<Vec<_>>();
+    entries.sort();
+    entries
+}
+
+fn roundtrip_fixtures(
+    proto: &str,
+    suffix: &str,
+    deserializer: &dyn Deserializer,
+    serializer: &mut dyn Serializer,
+    reserialize: bool,
+) {
+    for path in list_fixtures(proto, suffix) {
+        let (buf, event) = load_deserialize(&path, deserializer);
+
+        if reserialize {
+            // Serialize the parsed event
+            let mut buf = BytesMut::new();
+            serializer.encode(event.clone(), &mut buf).unwrap();
+            // Deserialize the event from these bytes
+            let new_events = deserializer
+                .parse(buf.into(), LogNamespace::Legacy)
+                .unwrap();
+
+            // Ensure we have the same event.
+            assert_eq!(new_events.len(), 1);
+            assert_eq!(new_events[0], event);
+        } else {
+            // Ensure that the parsed event is serialized to the same bytes
+            let mut new_buf = BytesMut::new();
+            serializer.encode(event.clone(), &mut new_buf).unwrap();
+            assert_eq!(buf, new_buf);
+        }
+    }
+}
+
+fn load_deserialize(path: &Path, deserializer: &dyn Deserializer) -> (Bytes, Event) {
+    let mut file = File::open(path).unwrap();
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf).unwrap();
+    let buf = Bytes::from(buf);
+
+    // Ensure that we can parse the json fixture successfully
+    let mut events = deserializer
+        .parse(buf.clone(), LogNamespace::Legacy)
+        .unwrap();
+    assert_eq!(events.len(), 1);
+    (buf, events.pop().unwrap())
 }
