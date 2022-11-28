@@ -5,7 +5,9 @@ use std::{
     str,
 };
 
-use bytes::Bytes;
+use rand::distributions::{Alphanumeric, DistString};
+
+use bytes::{Bytes, BytesMut, BufMut};
 use chrono::{TimeZone, Utc};
 use codecs::{
     decoding::{Deserializer, DeserializerConfig, Framer},
@@ -61,6 +63,104 @@ fn test_metrics_schema_definition() -> schema::Definition {
     )
 }
 
+#[derive(Clone, Debug)]
+struct DdTagKey {
+    key: String,
+}
+
+impl Arbitrary for DdTagKey {
+    fn arbitrary(g: &mut Gen) -> Self {
+        // Datadog only allows up to 200-character tags
+        let size = usize::arbitrary(g) % 200;
+        
+        DdTagKey {
+            key:  Alphanumeric.sample_string(&mut rand::thread_rng(), size)
+        }
+    }
+}
+
+impl DdTagKey {
+    fn as_bytes(&self) -> Bytes {
+        let mut b = BytesMut::new();
+        b.put(self.key.as_bytes());
+
+        b.freeze()
+    }
+}
+
+#[derive(Clone, Debug)]
+enum DdTag {
+    Implicit{ key: DdTagKey },
+    Explicit{key: DdTagKey, value: String},
+}
+
+impl Arbitrary for DdTag {
+    fn arbitrary(g: &mut Gen) -> Self {
+        let key = DdTagKey::arbitrary(g);
+
+        let implicit = bool::arbitrary(g);
+        if implicit {
+            DdTag::Implicit {
+                key,
+            }
+        } else {
+            let value =  String::arbitrary(g);
+
+            DdTag::Explicit {
+                key,
+                value,
+            }
+        }
+    }
+}
+
+impl DdTag {
+    fn to_bytes(&self) -> Bytes {
+        let mut b = BytesMut::new();
+        match self {
+            DdTag::Implicit { key } => {
+                b.put(key.as_bytes());
+            }
+            DdTag::Explicit { key, value } => {
+                b.put(key.as_bytes());
+                b.put(&b":"[..]);
+                b.put(value.as_bytes());
+            }
+        }
+
+        b.freeze()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct DdTags {
+    tags: Vec<DdTag>,
+    // TODO: allow_trailing_comma?
+}
+
+impl Arbitrary for DdTags {
+    fn arbitrary(g: &mut Gen) -> Self {
+        DdTags {
+            tags: Vec::arbitrary(g),
+        }
+    }
+}
+
+impl DdTags {
+    fn to_bytes(self) -> Bytes {
+        let mut b = BytesMut::new();
+        let mut it = self.tags.iter().peekable();
+        while let Some(tag) = it.next()  {
+            b.put(tag.to_bytes());
+            if !it.peek().is_none() {
+                b.put(&b","[..]);
+            }
+        }
+
+        b.freeze()
+    }
+}
+
 impl Arbitrary for LogMsg {
     fn arbitrary(g: &mut Gen) -> Self {
         LogMsg {
@@ -70,7 +170,7 @@ impl Arbitrary for LogMsg {
             hostname: Bytes::from(String::arbitrary(g)),
             service: Bytes::from(String::arbitrary(g)),
             ddsource: Bytes::from(String::arbitrary(g)),
-            ddtags: Bytes::from(String::arbitrary(g)),
+            ddtags: DdTags::arbitrary(g).to_bytes(),
         }
     }
 }
@@ -81,7 +181,7 @@ impl Arbitrary for LogMsg {
 // necessarily part of the contract of that function.
 #[test]
 fn test_decode_log_body() {
-    fn inner(msgs: Vec<LogMsg>) -> TestResult {
+    fn inner(msgs: Vec<LogMsg>, simplify_log_tags: bool) -> TestResult {
         let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
         let api_key = None;
         let decoder = crate::codecs::Decoder::new(
@@ -98,7 +198,7 @@ fn test_decode_log_body() {
             LogNamespace::Legacy,
         );
 
-        let events = decode_log_body(body, api_key, &source).unwrap();
+        let events = decode_log_body(body, api_key, &source, simplify_log_tags).unwrap();
         assert_eq!(events.len(), msgs.len());
         for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
             let log = event.as_log();
@@ -108,7 +208,14 @@ fn test_decode_log_body() {
             assert_eq!(log["hostname"], msg.hostname.into());
             assert_eq!(log["service"], msg.service.into());
             assert_eq!(log["ddsource"], msg.ddsource.into());
-            assert_eq!(log["ddtags"], msg.ddtags.into());
+
+            if !simplify_log_tags {
+                assert_eq!(log["ddtags"], msg.ddtags.into());
+            } else {
+                assert_eq!(log.contains("ddtags"), false);
+                assert_eq!(log.contains("tags"), true);
+            }
+            // TODO: check that the parsed tags are equivalent
 
             assert_eq!(
                 event.metadata().schema_definition(),
@@ -119,7 +226,7 @@ fn test_decode_log_body() {
         TestResult::passed()
     }
 
-    QuickCheck::new().quickcheck(inner as fn(Vec<LogMsg>) -> TestResult);
+    QuickCheck::new().quickcheck(inner as fn(Vec<LogMsg>, bool) -> TestResult);
 }
 
 #[test]
@@ -1554,6 +1661,7 @@ fn test_config_outputs() {
             disable_metrics: false,
             disable_traces: false,
             log_namespace: Some(false),
+            simplify_log_tags: false,
         };
 
         let mut outputs = config

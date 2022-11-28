@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::collections::BTreeMap;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
@@ -6,6 +7,7 @@ use codecs::StreamDecodingError;
 use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder;
+use value::Value;
 use vector_core::ByteSizeOf;
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
@@ -24,6 +26,7 @@ pub(crate) fn build_warp_filter(
     multiple_outputs: bool,
     out: SourceSender,
     source: DatadogAgentSource,
+    standardize_tags: bool,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp_path!("v1" / "input" / ..).or(warp_path!("api" / "v2" / "logs" / ..)))
@@ -50,6 +53,7 @@ pub(crate) fn build_warp_filter(
                                 query_params.dd_api_key,
                             ),
                             &source,
+                            standardize_tags,
                         )
                     });
 
@@ -67,6 +71,7 @@ pub(crate) fn decode_log_body(
     body: Bytes,
     api_key: Option<Arc<str>>,
     source: &DatadogAgentSource,
+    simplify_log_tags: bool,
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
@@ -143,13 +148,50 @@ pub(crate) fn decode_log_body(
                                 path!("ddsource"),
                                 ddsource.clone(),
                             );
-                            namespace.insert_source_metadata(
-                                source_name,
-                                log,
-                                path!("ddtags"),
-                                path!("ddtags"),
-                                ddtags.clone(),
-                            );
+
+                            if !simplify_log_tags {
+                                namespace.insert_source_metadata(
+                                    source_name,
+                                    log,
+                                    path!("ddtags"),
+                                    path!("ddtags"),
+                                    ddtags.clone(),
+                                );
+                            } else {
+                                let ts = String::from_utf8(ddtags.to_vec()).unwrap();
+                                let s = ts.split(',');
+                                let mut tags = Value::from(BTreeMap::new());
+
+                                for each in s {
+                                    // The expected format is a comma-delimited list of key-value pairs,
+                                    // which are themselves separated by colons. If no colon is present,
+                                    // then we normalize to a sentinel value. This allows us to
+                                    // handle the fact that Datadog tags are not required to have a value.
+                                    // e.g., one:yes,two:no,three
+                                    let mut kv = each.split(':');
+                                    let k = kv.next().unwrap();
+                                    match kv.next() {
+                                        Some(v) => {
+                                            tags.insert(k, v);
+                                        }
+                                        None => {
+                                            tags.insert(k, None::<Value>);
+                                        }
+                                    }
+                                }
+                                namespace.insert_source_metadata(
+                                    source_name,
+                                    log,
+                                    path!("tags"),
+                                    path!("tags"),
+                                    tags.clone(),
+                                );
+
+                                // Having the original `ddtags` value in the log event would
+                                // just be confusing, so let's remove it. It will be re-assembled
+                                // later, at the sink level.
+                                log.remove("ddtags");
+                            }
 
                             namespace.insert_vector_metadata(
                                 log,

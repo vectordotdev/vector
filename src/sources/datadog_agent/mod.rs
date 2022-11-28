@@ -105,6 +105,11 @@ pub struct DatadogAgentConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// If this setting is set to `true`, then the source will do some additional parsing to
+    /// simplify received tags on log messages from the Datadog Agent into a common format.
+    #[serde(default = "crate::serde::default_false")]
+    simplify_log_tags: bool,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -121,6 +126,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_traces: false,
             multiple_outputs: false,
             log_namespace: Some(false),
+            simplify_log_tags: false,
         })
         .unwrap()
     }
@@ -359,6 +365,7 @@ impl DatadogAgentSource {
                 config.multiple_outputs,
                 out.clone(),
                 self.clone(),
+                config.simplify_log_tags,
             )
         });
 
