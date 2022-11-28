@@ -16,7 +16,7 @@ reqwest = { version = "0.11.13", features = ["json"] }
 serde_json = "1"
 tokio = { version = "1.22.0", features = ["full"] }
 indoc = "1.0.7"
-env_logger = "0.9"
+env_logger = "0.10"
 tracing = { version = "0.1", features = ["log"] }
 rand = "0.8"
 
