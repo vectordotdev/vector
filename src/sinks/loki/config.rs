@@ -53,6 +53,10 @@ impl Default for CompressionConfigAdapter {
     }
 }
 
+fn default_loki_path() -> String {
+    "/loki/api/v1/push".to_string()
+}
+
 /// Configuration for the `loki` sink.
 #[configurable_component(sink("loki"))]
 #[derive(Clone, Debug)]
@@ -60,8 +64,14 @@ impl Default for CompressionConfigAdapter {
 pub struct LokiConfig {
     /// The base URL of the Loki instance.
     ///
-    /// Vector will append `/loki/api/v1/push` to this.
+    /// Vector will append the value of `path` to this.
     pub endpoint: UriSerde,
+
+    /// The path to use in the URL of the Loki instance.
+    ///
+    /// By default, `"/loki/api/v1/push"` is used.
+    #[serde(default = "default_loki_path")]
+    pub path: String,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,

@@ -11,7 +11,7 @@ name = "vrl"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.0.23", features = ["derive"] }
+clap = { version = "4.0.27", features = ["derive"] }
 exitcode = "1"
 indoc = "1.0.7"
 once_cell = { version = "1.16", optional = true }

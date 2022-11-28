@@ -9,6 +9,7 @@ use futures::{FutureExt, StreamExt};
 use tokio::{pin, select};
 use tracing_futures::Instrument;
 use vector_common::finalizer::UnorderedFinalizer;
+use vector_core::config::LogNamespace;
 
 use crate::{
     codecs::Decoder,
@@ -143,6 +144,8 @@ impl SqsSource {
                         body.as_bytes(),
                         timestamp,
                         &batch,
+                        // TODO: Update this when updating the source to use log_namespaces.
+                        LogNamespace::Legacy,
                     );
                     events.extend(decoded);
                 }
@@ -212,9 +215,15 @@ mod tests {
     async fn test_decode() {
         let message = "test";
         let now = Utc::now();
-        let events: Vec<_> =
-            util::decode_message(Decoder::default(), "aws_sqs", b"test", Some(now), &None)
-                .collect();
+        let events: Vec<_> = util::decode_message(
+            Decoder::default(),
+            "aws_sqs",
+            b"test",
+            Some(now),
+            &None,
+            LogNamespace::Legacy,
+        )
+        .collect();
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0]
