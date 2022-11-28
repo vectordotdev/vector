@@ -42,7 +42,7 @@ releases: "0.25.2": {
 				behavior.
 				"""
 			pr_numbers: [14694, 14757, 14861, 15084]
-		}
+		},
 	]
 
 	commits: [
