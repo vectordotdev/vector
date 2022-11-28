@@ -8,7 +8,10 @@ base: components: sources: eventstoredb_metrics: configuration: {
 			By default, `eventstoredb` is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	endpoint: {
 		description: "Endpoints to scrape stats from."

@@ -17,6 +17,7 @@ base: components: transforms: sample: configuration: {
 			"""
 		required: false
 		type: string: {
+			default: null
 			examples: ["message"]
 			syntax: "literal"
 		}

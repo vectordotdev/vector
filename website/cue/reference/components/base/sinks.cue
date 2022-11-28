@@ -115,7 +115,10 @@ base: components: sinks: configuration: {
 					components -- port, path, etc -- are allowed as well.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 		}
 	}
@@ -160,6 +163,7 @@ base: components: sinks: configuration: {
 					"""
 				required: false
 				type: string: {
+					default: null
 					examples: ["http://foo.bar:3128"]
 					syntax: "literal"
 				}
@@ -172,6 +176,7 @@ base: components: sinks: configuration: {
 					"""
 				required: false
 				type: string: {
+					default: null
 					examples: ["http://foo.bar:3128"]
 					syntax: "literal"
 				}

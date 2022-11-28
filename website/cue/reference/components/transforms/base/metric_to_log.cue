@@ -12,6 +12,7 @@ base: components: transforms: metric_to_log: configuration: {
 			"""
 		required: false
 		type: string: {
+			default: null
 			examples: ["host", "hostname"]
 			syntax: "literal"
 		}
@@ -28,6 +29,9 @@ base: components: transforms: metric_to_log: configuration: {
 			[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 			"""
 		required: false
-		type: string: examples: ["local", "America/New_York", "EST5EDT"]
+		type: string: {
+			default: null
+			examples: ["local", "America/New_York", "EST5EDT"]
+		}
 	}
 }

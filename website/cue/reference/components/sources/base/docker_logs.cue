@@ -15,7 +15,10 @@ base: components: sources: docker_logs: configuration: {
 			If absent, Vector will try to use `DOCKER_HOST` environment variable. If `DOCKER_HOST` is also absent, Vector will use default Docker local socket (`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows).
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	exclude_containers: {
 		description: """
@@ -32,7 +35,10 @@ base: components: sources: docker_logs: configuration: {
 			This can be used in conjunction with `include_containers`.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: {
+			default: null
+			items: type: string: syntax: "literal"
+		}
 	}
 	host_key: {
 		description: """
@@ -63,7 +69,10 @@ base: components: sources: docker_logs: configuration: {
 			This can be used in conjunction with `include_containers`.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: {
+			default: null
+			items: type: string: syntax: "literal"
+		}
 	}
 	include_images: {
 		description: """
@@ -72,7 +81,10 @@ base: components: sources: docker_logs: configuration: {
 			If not provided, all images will be included.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: {
+			default: null
+			items: type: string: syntax: "literal"
+		}
 	}
 	include_labels: {
 		description: """
@@ -81,7 +93,10 @@ base: components: sources: docker_logs: configuration: {
 			Labels should follow the syntax described in the [Docker object labels](https://docs.docker.com/config/labels-custom-metadata/) documentation.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: {
+			default: null
+			items: type: string: syntax: "literal"
+		}
 	}
 	multiline: {
 		description: """

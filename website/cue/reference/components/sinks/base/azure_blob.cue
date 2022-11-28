@@ -24,7 +24,7 @@ base: components: sinks: azure_blob: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	batch: {
@@ -39,17 +39,17 @@ base: components: sinks: azure_blob: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: default: null
 			}
 			max_events: {
 				description: "The maximum size of a batch, in events, before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch, in seconds, before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: default: null
 			}
 		}
 	}
@@ -66,7 +66,7 @@ base: components: sinks: azure_blob: configuration: {
 			blob keys must be unique.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: null
 	}
 	blob_prefix: {
 		description: """
@@ -77,7 +77,10 @@ base: components: sinks: azure_blob: configuration: {
 			in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	blob_time_format: {
 		description: """
@@ -99,7 +102,10 @@ base: components: sinks: azure_blob: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	compression: {
 		description: "Compression configuration."
@@ -117,8 +123,14 @@ base: components: sinks: azure_blob: configuration: {
 					description: "Compression level."
 					required:    false
 					type: {
-						string: enum: ["none", "fast", "best", "default"]
-						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+						string: {
+							default: null
+							enum: ["none", "fast", "best", "default"]
+						}
+						uint: {
+							default: null
+							enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+						}
 					}
 				}
 			}
@@ -134,7 +146,10 @@ base: components: sinks: azure_blob: configuration: {
 			Either `storage_account`, or this field, must be specified.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	container_name: {
 		description: "The Azure Blob Storage Account container name."
@@ -185,19 +200,28 @@ base: components: sinks: azure_blob: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
+						unix:    "Represent the timestamp as a Unix timestamp."
+					}
 				}
 			}
 		}
@@ -369,6 +393,9 @@ base: components: sinks: azure_blob: configuration: {
 			[az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 }

@@ -24,7 +24,7 @@ base: components: sinks: pulsar: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	auth: {
@@ -39,7 +39,10 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be `token`.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			oauth2: {
 				description: "OAuth2-specific authenticatgion configuration."
@@ -48,7 +51,10 @@ base: components: sinks: pulsar: configuration: {
 					audience: {
 						description: "The OAuth2 audience."
 						required:    false
-						type: string: syntax: "literal"
+						type: string: {
+							default: null
+							syntax:  "literal"
+						}
 					}
 					credentials_url: {
 						description: """
@@ -67,7 +73,10 @@ base: components: sinks: pulsar: configuration: {
 					scope: {
 						description: "The OAuth2 scope."
 						required:    false
-						type: string: syntax: "literal"
+						type: string: {
+							default: null
+							syntax:  "literal"
+						}
 					}
 				}
 			}
@@ -79,7 +88,10 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be the signed JWT, in the compact representation.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 		}
 	}
@@ -127,19 +139,28 @@ base: components: sinks: pulsar: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
+						unix:    "Represent the timestamp as a Unix timestamp."
+					}
 				}
 			}
 		}
@@ -152,7 +173,10 @@ base: components: sinks: pulsar: configuration: {
 	partition_key_field: {
 		description: "Log field to use as Pulsar message key"
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	topic: {
 		description: "The Pulsar topic name to write events to."

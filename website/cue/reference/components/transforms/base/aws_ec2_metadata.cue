@@ -24,6 +24,7 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 		description: "Sets a prefix for all event fields added by the transform."
 		required:    false
 		type: string: {
+			default: null
 			examples: ["", "ec2", "aws.ec2"]
 			syntax: "literal"
 		}
@@ -51,6 +52,7 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 					"""
 				required: false
 				type: string: {
+					default: null
 					examples: ["http://foo.bar:3128"]
 					syntax: "literal"
 				}
@@ -63,6 +65,7 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 					"""
 				required: false
 				type: string: {
+					default: null
 					examples: ["http://foo.bar:3128"]
 					syntax: "literal"
 				}

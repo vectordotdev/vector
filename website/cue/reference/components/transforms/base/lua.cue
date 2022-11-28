@@ -20,6 +20,7 @@ base: components: transforms: lua: configuration: {
 					"""
 				required: false
 				type: string: {
+					default: null
 					examples: ["""
 						function (emit)
 						\t-- Custom Lua code here
@@ -63,6 +64,7 @@ base: components: transforms: lua: configuration: {
 					"""
 				required: false
 				type: string: {
+					default: null
 					examples: ["""
 						function (emit)
 						\t-- Custom Lua code here
@@ -98,6 +100,7 @@ base: components: transforms: lua: configuration: {
 			"""
 		required: false
 		type: string: {
+			default: null
 			examples: ["""
 				function init()
 				\tcount = 0

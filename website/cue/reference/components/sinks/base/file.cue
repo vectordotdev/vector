@@ -24,7 +24,7 @@ base: components: sinks: file: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	compression: {
@@ -83,19 +83,28 @@ base: components: sinks: file: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
+						unix:    "Represent the timestamp as a Unix timestamp."
+					}
 				}
 			}
 		}
@@ -136,7 +145,7 @@ base: components: sinks: file: configuration: {
 			After not receiving any events in this amount of time, the file will be flushed and closed.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: default: null
 	}
 	path: {
 		description: "File name to write events to."

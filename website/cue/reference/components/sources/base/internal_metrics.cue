@@ -8,7 +8,10 @@ base: components: sources: internal_metrics: configuration: {
 			By default, `vector` is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	scrape_interval_secs: {
 		description: "The interval between metric gathering, in seconds."
@@ -33,7 +36,10 @@ base: components: sources: internal_metrics: configuration: {
 						By default, the [global `log_schema.host_key` option][global_host_key] is used.
 						"""
 					required: false
-					type: string: syntax: "literal"
+					type: string: {
+						default: null
+						syntax:  "literal"
+					}
 				}
 				pid_key: {
 					description: """
@@ -44,7 +50,10 @@ base: components: sources: internal_metrics: configuration: {
 						By default, this is not set and the tag will not be automatically added.
 						"""
 					required: false
-					type: string: syntax: "literal"
+					type: string: {
+						default: null
+						syntax:  "literal"
+					}
 				}
 			}
 		}

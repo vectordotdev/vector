@@ -24,7 +24,7 @@ base: components: sinks: aws_sqs: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	assume_role: {
@@ -34,7 +34,10 @@ base: components: sinks: aws_sqs: configuration: {
 			[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
@@ -58,12 +61,15 @@ base: components: sinks: aws_sqs: configuration: {
 			load_timeout_secs: {
 				description: "Timeout for successfully loading any credentials, in seconds."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			profile: {
 				description: "The credentials profile to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			region: {
 				description: """
@@ -73,7 +79,10 @@ base: components: sinks: aws_sqs: configuration: {
 					for the service itself.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
@@ -126,19 +135,28 @@ base: components: sinks: aws_sqs: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
+						unix:    "Represent the timestamp as a Unix timestamp."
+					}
 				}
 			}
 		}
@@ -146,7 +164,10 @@ base: components: sinks: aws_sqs: configuration: {
 	endpoint: {
 		description: "The API endpoint of the service."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	message_deduplication_id: {
 		description: """
@@ -158,7 +179,10 @@ base: components: sinks: aws_sqs: configuration: {
 			[deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	message_group_id: {
 		description: """
@@ -167,7 +191,10 @@ base: components: sinks: aws_sqs: configuration: {
 			Can be applied only to FIFO queues.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	queue_url: {
 		description: "The URL of the Amazon SQS queue to which messages are sent."
@@ -177,7 +204,10 @@ base: components: sinks: aws_sqs: configuration: {
 	region: {
 		description: "The AWS region to use."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	request: {
 		description: """
@@ -312,7 +342,10 @@ base: components: sinks: aws_sqs: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -321,7 +354,10 @@ base: components: sinks: aws_sqs: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -333,7 +369,10 @@ base: components: sinks: aws_sqs: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_file: {
 				description: """
@@ -342,7 +381,10 @@ base: components: sinks: aws_sqs: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -351,7 +393,10 @@ base: components: sinks: aws_sqs: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -367,7 +412,7 @@ base: components: sinks: aws_sqs: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -381,7 +426,7 @@ base: components: sinks: aws_sqs: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}

@@ -24,7 +24,7 @@ base: components: sinks: aws_s3: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	acl: {
@@ -36,66 +36,69 @@ base: components: sinks: aws_s3: configuration: {
 			[canned_acl]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
 			"""
 		required: false
-		type: string: enum: {
-			"authenticated-read": """
-				Bucket/object can be read by authenticated users.
+		type: string: {
+			default: null
+			enum: {
+				"authenticated-read": """
+					Bucket/object can be read by authenticated users.
 
-				The bucket/object owner is granted the `FULL_CONTROL` permission, and anyone in the
-				`AuthenticatedUsers` grantee group is granted the `READ` permission.
-				"""
-			"aws-exec-read": """
-				Bucket/object are private, and readable by EC2.
+					The bucket/object owner is granted the `FULL_CONTROL` permission, and anyone in the
+					`AuthenticatedUsers` grantee group is granted the `READ` permission.
+					"""
+				"aws-exec-read": """
+					Bucket/object are private, and readable by EC2.
 
-				The bucket/object owner is granted the `FULL_CONTROL` permission, and the AWS EC2 service is
-				granted the `READ` permission for the purpose of reading Amazon Machine Image (AMI) bundles
-				from the given bucket.
-				"""
-			"bucket-owner-full-control": """
-				Object is semi-private.
+					The bucket/object owner is granted the `FULL_CONTROL` permission, and the AWS EC2 service is
+					granted the `READ` permission for the purpose of reading Amazon Machine Image (AMI) bundles
+					from the given bucket.
+					"""
+				"bucket-owner-full-control": """
+					Object is semi-private.
 
-				Both the object owner and bucket owner are granted the `FULL_CONTROL` permission.
+					Both the object owner and bucket owner are granted the `FULL_CONTROL` permission.
 
-				Only relevant when specified for an object: this canned ACL is otherwise ignored when
-				specified for a bucket.
-				"""
-			"bucket-owner-read": """
-				Object is private, except to the bucket owner.
+					Only relevant when specified for an object: this canned ACL is otherwise ignored when
+					specified for a bucket.
+					"""
+				"bucket-owner-read": """
+					Object is private, except to the bucket owner.
 
-				The object owner is granted the `FULL_CONTROL` permission, and the bucket owner is granted the `READ` permission.
+					The object owner is granted the `FULL_CONTROL` permission, and the bucket owner is granted the `READ` permission.
 
-				Only relevant when specified for an object: this canned ACL is otherwise ignored when
-				specified for a bucket.
-				"""
-			"log-delivery-write": """
-				Bucket can have logs written.
+					Only relevant when specified for an object: this canned ACL is otherwise ignored when
+					specified for a bucket.
+					"""
+				"log-delivery-write": """
+					Bucket can have logs written.
 
-				The `LogDelivery` grantee group is granted `WRITE` and `READ_ACP` permissions.
+					The `LogDelivery` grantee group is granted `WRITE` and `READ_ACP` permissions.
 
-				Only relevant when specified for a bucket: this canned ACL is otherwise ignored when
-				specified for an object.
-				"""
-			private: """
-				Bucket/object are private.
+					Only relevant when specified for a bucket: this canned ACL is otherwise ignored when
+					specified for an object.
+					"""
+				private: """
+					Bucket/object are private.
 
-				The bucket/object owner is granted the `FULL_CONTROL` permission, and no one else has
-				access.
+					The bucket/object owner is granted the `FULL_CONTROL` permission, and no one else has
+					access.
 
-				This is the default.
-				"""
-			"public-read": """
-				Bucket/object can be read publically.
+					This is the default.
+					"""
+				"public-read": """
+					Bucket/object can be read publically.
 
-				The bucket/object owner is granted the `FULL_CONTROL` permission, and anyone in the
-				`AllUsers` grantee group is granted the `READ` permission.
-				"""
-			"public-read-write": """
-				Bucket/object can be read and written publically.
+					The bucket/object owner is granted the `FULL_CONTROL` permission, and anyone in the
+					`AllUsers` grantee group is granted the `READ` permission.
+					"""
+				"public-read-write": """
+					Bucket/object can be read and written publically.
 
-				The bucket/object owner is granted the `FULL_CONTROL` permission, and anyone in the
-				`AllUsers` grantee group is granted the `READ` and `WRITE` permissions.
+					The bucket/object owner is granted the `FULL_CONTROL` permission, and anyone in the
+					`AllUsers` grantee group is granted the `READ` and `WRITE` permissions.
 
-				This is generally not recommended.
-				"""
+					This is generally not recommended.
+					"""
+			}
 		}
 	}
 	auth: {
@@ -120,12 +123,15 @@ base: components: sinks: aws_s3: configuration: {
 			load_timeout_secs: {
 				description: "Timeout for successfully loading any credentials, in seconds."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			profile: {
 				description: "The credentials profile to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			region: {
 				description: """
@@ -135,7 +141,10 @@ base: components: sinks: aws_s3: configuration: {
 					for the service itself.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
@@ -156,17 +165,17 @@ base: components: sinks: aws_s3: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: default: null
 			}
 			max_events: {
 				description: "The maximum size of a batch, in events, before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch, in seconds, before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: default: null
 			}
 		}
 	}
@@ -195,8 +204,14 @@ base: components: sinks: aws_s3: configuration: {
 					description: "Compression level."
 					required:    false
 					type: {
-						string: enum: ["none", "fast", "best", "default"]
-						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+						string: {
+							default: null
+							enum: ["none", "fast", "best", "default"]
+						}
+						uint: {
+							default: null
+							enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+						}
 					}
 				}
 			}
@@ -212,7 +227,10 @@ base: components: sinks: aws_s3: configuration: {
 			By default, the compression scheme used dictates this value.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	content_type: {
 		description: """
@@ -223,7 +241,10 @@ base: components: sinks: aws_s3: configuration: {
 			By default, `text/x-log` is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	encoding: {
 		description: "Encoding configuration."
@@ -269,19 +290,28 @@ base: components: sinks: aws_s3: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
+						unix:    "Represent the timestamp as a Unix timestamp."
+					}
 				}
 			}
 		}
@@ -289,7 +319,10 @@ base: components: sinks: aws_s3: configuration: {
 	endpoint: {
 		description: "The API endpoint of the service."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	filename_append_uuid: {
 		description: """
@@ -303,12 +336,15 @@ base: components: sinks: aws_s3: configuration: {
 			object keys must be unique.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: null
 	}
 	filename_extension: {
 		description: "The filename extension to use in the object key."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	filename_time_format: {
 		description: """
@@ -330,7 +366,10 @@ base: components: sinks: aws_s3: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	framing: {
 		description: "Framing configuration."
@@ -371,7 +410,10 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	grant_read: {
 		description: """
@@ -382,7 +424,10 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	grant_read_acp: {
 		description: """
@@ -393,7 +438,10 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	grant_write_acp: {
 		description: """
@@ -404,7 +452,10 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	key_prefix: {
 		description: """
@@ -415,12 +466,18 @@ base: components: sinks: aws_s3: configuration: {
 			in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			default: null
+			syntax:  "template"
+		}
 	}
 	region: {
 		description: "The AWS region to use."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	request: {
 		description: """
@@ -546,19 +603,22 @@ base: components: sinks: aws_s3: configuration: {
 	server_side_encryption: {
 		description: "The Server-side Encryption algorithm used when storing these objects."
 		required:    false
-		type: string: enum: {
-			AES256: """
-				Each object is encrypted with AES-256 using a unique key.
+		type: string: {
+			default: null
+			enum: {
+				AES256: """
+					Each object is encrypted with AES-256 using a unique key.
 
-				This corresponds to the `SSE-S3` option.
-				"""
-			"aws:kms": """
-				Each object is encrypted with AES-256 using keys managed by AWS KMS.
+					This corresponds to the `SSE-S3` option.
+					"""
+				"aws:kms": """
+					Each object is encrypted with AES-256 using keys managed by AWS KMS.
 
-				Depending on whether or not a KMS key ID is specified, this will correspond either to the
-				`SSE-KMS` option (keys generated/managed by KMS) or the `SSE-C` option (keys generated by
-				the customer, managed by KMS).
-				"""
+					Depending on whether or not a KMS key ID is specified, this will correspond either to the
+					`SSE-KMS` option (keys generated/managed by KMS) or the `SSE-C` option (keys generated by
+					the customer, managed by KMS).
+					"""
+			}
 		}
 	}
 	ssekms_key_id: {
@@ -571,7 +631,10 @@ base: components: sinks: aws_s3: configuration: {
 			If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			default: null
+			syntax:  "template"
+		}
 	}
 	storage_class: {
 		description: """
@@ -582,18 +645,21 @@ base: components: sinks: aws_s3: configuration: {
 			[s3_storage_classes]: https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html
 			"""
 		required: false
-		type: string: enum: {
-			DEEP_ARCHIVE:        "Glacier Deep Archive."
-			GLACIER:             "Glacier Flexible Retrieval."
-			INTELLIGENT_TIERING: "Intelligent Tiering."
-			ONEZONE_IA:          "Infrequently Accessed (single Availability zone)."
-			REDUCED_REDUNDANCY:  "Reduced Redundancy."
-			STANDARD: """
-				Standard Redundancy.
+		type: string: {
+			default: null
+			enum: {
+				DEEP_ARCHIVE:        "Glacier Deep Archive."
+				GLACIER:             "Glacier Flexible Retrieval."
+				INTELLIGENT_TIERING: "Intelligent Tiering."
+				ONEZONE_IA:          "Infrequently Accessed (single Availability zone)."
+				REDUCED_REDUNDANCY:  "Reduced Redundancy."
+				STANDARD: """
+					Standard Redundancy.
 
-				This is the default.
-				"""
-			STANDARD_IA: "Infrequently Accessed."
+					This is the default.
+					"""
+				STANDARD_IA: "Infrequently Accessed."
+			}
 		}
 	}
 	tags: {
@@ -617,7 +683,10 @@ base: components: sinks: aws_s3: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -626,7 +695,10 @@ base: components: sinks: aws_s3: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -638,7 +710,10 @@ base: components: sinks: aws_s3: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_file: {
 				description: """
@@ -647,7 +722,10 @@ base: components: sinks: aws_s3: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -656,7 +734,10 @@ base: components: sinks: aws_s3: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -672,7 +753,7 @@ base: components: sinks: aws_s3: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -686,7 +767,7 @@ base: components: sinks: aws_s3: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}

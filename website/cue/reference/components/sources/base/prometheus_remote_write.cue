@@ -16,7 +16,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 		type: object: options: enabled: {
 			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	address: {
@@ -56,7 +56,10 @@ base: components: sources: prometheus_remote_write: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -65,7 +68,10 @@ base: components: sources: prometheus_remote_write: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -77,7 +83,10 @@ base: components: sources: prometheus_remote_write: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			enabled: {
 				description: """
@@ -87,7 +96,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 					more information.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			key_file: {
 				description: """
@@ -96,7 +105,10 @@ base: components: sources: prometheus_remote_write: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -105,7 +117,10 @@ base: components: sources: prometheus_remote_write: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -121,7 +136,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -135,7 +150,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}

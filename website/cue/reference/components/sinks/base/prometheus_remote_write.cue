@@ -24,7 +24,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	auth: {
@@ -53,7 +53,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "Timeout for successfully loading any credentials, in seconds."
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: uint: {}
+				type: uint: default: null
 			}
 			password: {
 				description:   "Basic authentication password."
@@ -65,7 +65,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "The credentials profile to use."
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			region: {
 				description: """
@@ -76,7 +79,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			secret_access_key: {
 				description:   "The AWS secret access key."
@@ -117,12 +123,18 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			endpoint: {
 				description: "The API endpoint of the service."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			region: {
 				description: "The AWS region to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 		}
 	}
@@ -138,17 +150,17 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: default: null
 			}
 			max_events: {
 				description: "The maximum size of a batch, in events, before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch, in seconds, before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: default: null
 			}
 		}
 	}
@@ -176,7 +188,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			[prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	endpoint: {
 		description: "The endpoint to send data to."
@@ -325,7 +340,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			This may be used by Cortex or other remote services to identify the tenant making the request.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			default: null
+			syntax:  "template"
+		}
 	}
 	tls: {
 		description: "Standard TLS options."
@@ -339,7 +357,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -348,7 +369,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -360,7 +384,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_file: {
 				description: """
@@ -369,7 +396,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -378,7 +408,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -394,7 +427,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -408,7 +441,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}

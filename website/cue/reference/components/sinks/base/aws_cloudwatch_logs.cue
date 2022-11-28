@@ -24,17 +24,8 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
-	}
-	assume_role: {
-		description: """
-			The ARN of an [IAM role][iam_role] to assume at startup.
-
-			[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
-			"""
-		required: false
-		type: string: syntax: "literal"
 	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
@@ -58,12 +49,15 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			load_timeout_secs: {
 				description: "Timeout for successfully loading any credentials, in seconds."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			profile: {
 				description: "The credentials profile to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			region: {
 				description: """
@@ -73,7 +67,10 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					for the service itself.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
@@ -94,17 +91,17 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: default: null
 			}
 			max_events: {
 				description: "The maximum size of a batch, in events, before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch, in seconds, before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: default: null
 			}
 		}
 	}
@@ -124,8 +121,14 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					description: "Compression level."
 					required:    false
 					type: {
-						string: enum: ["none", "fast", "best", "default"]
-						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+						string: {
+							default: null
+							enum: ["none", "fast", "best", "default"]
+						}
+						uint: {
+							default: null
+							enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+						}
 					}
 				}
 			}
@@ -142,7 +145,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			[log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: null
 	}
 	create_missing_stream: {
 		description: """
@@ -151,7 +154,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			[log_stream]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: null
 	}
 	encoding: {
 		description: "Encoding configuration."
@@ -197,19 +200,28 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
+						unix:    "Represent the timestamp as a Unix timestamp."
+					}
 				}
 			}
 		}
@@ -217,7 +229,10 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 	endpoint: {
 		description: "The API endpoint of the service."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	group_name: {
 		description: """
@@ -231,7 +246,10 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 	region: {
 		description: "The AWS region to use."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	request: {
 		description: "Outbound HTTP request settings."
@@ -389,7 +407,10 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -398,7 +419,10 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -410,7 +434,10 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_file: {
 				description: """
@@ -419,7 +446,10 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -428,7 +458,10 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -444,7 +477,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -458,7 +491,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}

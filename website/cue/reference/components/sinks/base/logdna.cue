@@ -24,7 +24,7 @@ base: components: sinks: logdna: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	api_key: {
@@ -44,29 +44,35 @@ base: components: sinks: logdna: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: default: null
 			}
 			max_events: {
 				description: "The maximum size of a batch, in events, before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch, in seconds, before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: default: null
 			}
 		}
 	}
 	default_app: {
 		description: "The default app that will be set for events that do not contain a `file` or `app` field."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	default_env: {
 		description: "The default environment that will be set for events that do not contain an `env` field."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -75,19 +81,28 @@ base: components: sinks: logdna: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
+						unix:    "Represent the timestamp as a Unix timestamp."
+					}
 				}
 			}
 		}
@@ -95,7 +110,10 @@ base: components: sinks: logdna: configuration: {
 	endpoint: {
 		description: "The endpoint to send logs to."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	hostname: {
 		description: "The hostname that will be attached to each batch of events."
@@ -105,12 +123,18 @@ base: components: sinks: logdna: configuration: {
 	ip: {
 		description: "The IP address that will be attached to each batch of events."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	mac: {
 		description: "The MAC address that will be attached to each batch of events."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	request: {
 		description: """
@@ -236,6 +260,9 @@ base: components: sinks: logdna: configuration: {
 	tags: {
 		description: "The tags that will be attached to each batch of events."
 		required:    false
-		type: array: items: type: string: syntax: "template"
+		type: array: {
+			default: null
+			items: type: string: syntax: "template"
+		}
 	}
 }

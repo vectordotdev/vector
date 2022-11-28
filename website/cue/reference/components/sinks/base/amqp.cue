@@ -24,21 +24,27 @@ base: components: sinks: amqp: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	connection: {
-		description: "Connection options for the `amqp` sink."
+		description: "AMQP connection options."
 		required:    true
 		type: object: options: {
 			connection_string: {
 				description: """
-					URI for the `AMQP` server.
+					URI for the AMQP server.
 
-					Format: amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>
+					The URI has the format of
+					`amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>`.
+
+					The default vhost can be specified by using a value of `%2f`.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: {
+					examples: ["amqp://user:password@127.0.0.1:5672/%2f?timeout=10"]
+					syntax: "literal"
+				}
 			}
 			tls: {
 				description: "Standard TLS options."
@@ -52,7 +58,10 @@ base: components: sinks: amqp: configuration: {
 																they are defined.
 																"""
 						required: false
-						type: array: items: type: string: syntax: "literal"
+						type: array: {
+							default: null
+							items: type: string: syntax: "literal"
+						}
 					}
 					ca_file: {
 						description: """
@@ -61,7 +70,10 @@ base: components: sinks: amqp: configuration: {
 																The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {
+							default: null
+							syntax:  "literal"
+						}
 					}
 					crt_file: {
 						description: """
@@ -73,7 +85,10 @@ base: components: sinks: amqp: configuration: {
 																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {
+							default: null
+							syntax:  "literal"
+						}
 					}
 					key_file: {
 						description: """
@@ -82,7 +97,10 @@ base: components: sinks: amqp: configuration: {
 																The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {
+							default: null
+							syntax:  "literal"
+						}
 					}
 					key_pass: {
 						description: """
@@ -91,7 +109,10 @@ base: components: sinks: amqp: configuration: {
 																This has no effect unless `key_file` is set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {
+							default: null
+							syntax:  "literal"
+						}
 					}
 					verify_certificate: {
 						description: """
@@ -107,7 +128,7 @@ base: components: sinks: amqp: configuration: {
 																Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 																"""
 						required: false
-						type: bool: {}
+						type: bool: default: null
 					}
 					verify_hostname: {
 						description: """
@@ -121,7 +142,7 @@ base: components: sinks: amqp: configuration: {
 																Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 																"""
 						required: false
-						type: bool: {}
+						type: bool: default: null
 					}
 				}
 			}
@@ -171,19 +192,28 @@ base: components: sinks: amqp: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
+						unix:    "Represent the timestamp as a Unix timestamp."
+					}
 				}
 			}
 		}
@@ -196,6 +226,9 @@ base: components: sinks: amqp: configuration: {
 	routing_key: {
 		description: "Template used to generate a routing key which corresponds to a queue binding."
 		required:    false
-		type: string: syntax: "template"
+		type: string: {
+			default: null
+			syntax:  "template"
+		}
 	}
 }

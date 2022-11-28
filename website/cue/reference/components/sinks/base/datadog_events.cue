@@ -24,7 +24,7 @@ base: components: sinks: datadog_events: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	default_api_key: {
@@ -42,7 +42,10 @@ base: components: sinks: datadog_events: configuration: {
 	endpoint: {
 		description: "The endpoint to send events to."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	region: {
 		description: """
@@ -51,9 +54,12 @@ base: components: sinks: datadog_events: configuration: {
 			This option is deprecated, and the `site` field should be used instead.
 			"""
 		required: false
-		type: string: enum: {
-			eu: "EU region."
-			us: "US region."
+		type: string: {
+			default: null
+			enum: {
+				eu: "EU region."
+				us: "US region."
+			}
 		}
 	}
 	request: {
@@ -184,7 +190,10 @@ base: components: sinks: datadog_events: configuration: {
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -198,7 +207,10 @@ base: components: sinks: datadog_events: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -207,7 +219,10 @@ base: components: sinks: datadog_events: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -219,7 +234,10 @@ base: components: sinks: datadog_events: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			enabled: {
 				description: """
@@ -229,7 +247,7 @@ base: components: sinks: datadog_events: configuration: {
 					more information.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			key_file: {
 				description: """
@@ -238,7 +256,10 @@ base: components: sinks: datadog_events: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -247,7 +268,10 @@ base: components: sinks: datadog_events: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -263,7 +287,7 @@ base: components: sinks: datadog_events: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -277,7 +301,7 @@ base: components: sinks: datadog_events: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}

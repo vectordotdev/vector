@@ -67,24 +67,32 @@ impl StreamDecodingError for Error {
     }
 }
 
-/// Configuration for building a `Framer`.
+/// Framing configuration.
+///
+/// Framing deals with how events are separated when encoded in a raw byte form, where each event is
+/// a "frame" that must be prefixed, or delimited, in a way that marks where an event begins and
+/// ends within the byte stream.
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "method", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The framing method."))]
 pub enum FramingConfig {
-    /// Configures the `BytesDecoder`.
+    /// Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments).
     Bytes,
-    /// Configures the `CharacterDelimitedDecoder`.
+
+    /// Byte frames which are delimited by a chosen character.
     CharacterDelimited {
         /// Options for the character delimited decoder.
         character_delimited: CharacterDelimitedDecoderOptions,
     },
-    /// Configures the `LengthDelimitedDecoder`.
+
+    /// Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length.
     LengthDelimited,
-    /// Configures the `NewlineDelimitedDecoder`.
+
+    /// Byte frames which are delimited by a newline character.
     NewlineDelimited {
         #[serde(
             default,
@@ -93,7 +101,10 @@ pub enum FramingConfig {
         /// Options for the newline delimited decoder.
         newline_delimited: NewlineDelimitedDecoderOptions,
     },
-    /// Configures the `OctetCountingDecoder`.
+
+    /// Byte frames according to the [octet counting][octet_counting] format.
+    ///
+    /// [octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
     OctetCounting {
         #[serde(
             default,
@@ -216,26 +227,40 @@ impl tokio_util::codec::Decoder for Framer {
     }
 }
 
-/// Configuration for building a `Deserializer`.
+/// Decoding configuration.
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The decoding method."))]
 pub enum DeserializerConfig {
-    /// Configures the `BytesDeserializer`.
+    /// Events containing the byte frame as-is.
     Bytes,
-    /// Configures the `JsonDeserializer`.
+
+    /// Events being parsed from a JSON string.
     Json,
+
     #[cfg(feature = "syslog")]
-    /// Configures the `SyslogDeserializer`.
+    /// Events being parsed from a Syslog message.
     Syslog,
-    /// Configures the `NativeDeserializer`.
+
+    /// Events being parsed from Vector’s [native protobuf format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+    ///
+    /// [vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+    /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
-    /// Configures the `NativeJsonDeserializer`.
+
+    /// Events being parsed from Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+    ///
+    /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+    /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     NativeJson,
-    /// Configures the `GelfDeserializer`.
+
+    /// Events being parsed from a [GELF][gelf] message.
+    ///
+    /// [gelf]: https://docs.graylog.org/docs/gelf
     Gelf,
 }
 

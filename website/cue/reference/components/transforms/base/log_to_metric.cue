@@ -44,12 +44,18 @@ base: components: transforms: log_to_metric: configuration: metrics: {
 				If not specified, `field` is used as the name of the metric.
 				"""
 			required: false
-			type: string: syntax: "template"
+			type: string: {
+				default: null
+				syntax:  "template"
+			}
 		}
 		namespace: {
 			description: "Sets the namespace for the metric."
 			required:    false
-			type: string: syntax: "template"
+			type: string: {
+				default: null
+				syntax:  "template"
+			}
 		}
 		tags: {
 			description: "Tags to apply to the metric."

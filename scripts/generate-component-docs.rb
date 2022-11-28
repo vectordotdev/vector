@@ -65,15 +65,7 @@ end
 
 @logger = Logger.new
 
-@default_schema_type_values = {
-  "array" => [],
-  "uint" => 0,
-  "int" => 0,
-  "float" => 0,
-  "string" => "",
-  "boolean" => false,
-}
-
+@defaultable_schema_types = %w[uint int float string bool array]
 @integer_schema_types = %w[uint int]
 @number_schema_types = %w[float]
 @numeric_schema_types = @integer_schema_types + @number_schema_types
@@ -460,6 +452,19 @@ def apply_object_property_fields!(parent_schema, property_schema, property_name,
 
   # Set whether or not this property is required.
   property['required'] = required_properties.include?(property_name) && !has_default_value
+
+  # If the property has no default value provided at all and it isn't required, set the default
+  # value for any of its type fields to `nil`, which authoritatively states the field be be `null`,
+  # or omitted entirely.
+  #
+  # We only do this for schema types that are, essentially, scalars. It doesn't make for custom
+  # types like `condition`, etc.
+  if !is_required && !has_default_value
+    property['type'].keys.each { |type_field|
+      @logger.debug "Setting default value of `nil` for type field '#{type_field}' on property '#{property_name}'."
+      property['type'][type_field]['default'] = nil unless !@defaultable_schema_types.include?(type_field)
+    }
+  end
 end
 
 # Expands any schema references in the given schema.
@@ -759,6 +764,12 @@ def resolve_schema(root_schema, schema)
 
   description = get_rendered_description_from_schema(schema)
   resolved['description'] = description unless description.empty?
+
+  # Reconcile the resolve schema, which essentially gives us a chance to, once the schema is
+  # entirely resolved, check it for logical inconsistencies, fix up anything that we reasonably can,
+  # and so on.
+  reconcile_resolved_schema!(resolved)
+
   resolved
 end
 
@@ -1079,7 +1090,7 @@ def resolve_enum_schema(root_schema, schema)
 
       # Now we build our property for the tag field itself, and add that in before returning all of
       # the unique resolved properties.
-      unique_resolved_properties[enum_tag_field] = {
+      resolved_tag_property = {
         'required' => true,
         'type' => {
           'string' => {
@@ -1090,6 +1101,9 @@ def resolve_enum_schema(root_schema, schema)
           }
         }
       }
+      tag_description = get_schema_metadata(schema, 'docs::enum_tag_description')
+      resolved_tag_property['description'] = tag_description unless tag_description.nil?
+      unique_resolved_properties[enum_tag_field] = resolved_tag_property
 
       @logger.debug "Resolved as 'internally-tagged with named fields' enum schema."
       @logger.debug "Resolved properties for ITNF enum schema: #{unique_resolved_properties}"
@@ -1386,6 +1400,54 @@ def apply_schema_metadata!(source_schema, resolved_schema)
     end
 
     resolved_schema['type']['string']['syntax'] = syntax_override.to_s
+  end
+end
+
+# Reconciles the resolved schema, detecting and fixing any logical inconsistencies.
+#
+# This provides a mechanism to fix up any inconsistencies that are created during the resolution
+# process that would otherwise be very complex to fix in the resolution codepath. Sometimes,
+# inconsistencies are only present after resolving merged subschemas, and so on, and so this
+# function serves as a spot to do such reconcilation, as it is called right before returning a
+# resolved schema.
+def reconcile_resolved_schema!(resolved_schema)
+  @logger.debug "Reconciling resolved schema: #{JSON.pretty_generate(resolved_schema)}"
+
+  # Only works if `type` is an object, which it won't be in some cases, such as a schema that maps
+  # to a cycle entrypoint, or is hidden, and so on.
+  if !resolved_schema['type'].is_a?(Hash)
+    return
+  end
+
+  # If we're dealing with an object schema, run this for each of its properties.
+  object_properties = resolved_schema.dig('type', 'object', 'options')
+  if !object_properties.nil?
+    object_properties.values.each { |resolved_property| reconcile_resolved_schema!(resolved_property) }
+  else
+    # Look for required/default value inconsistencies.
+    #
+    # One example is the `lua` transform and the `version` field. It's marked as required by the
+    # version 2 configuration types, but it's optional for version 1, which allows the deserializer to
+    # only deserialize things as version 1 if `version` isn't set, avoiding a backwards-incompatible
+    # situation... but in this script, we only compare the subschemas in terms of their const-ness,
+    # and don't look at the `required` portion.
+    #
+    # This means that we can generate output for a field that says it has a default value of `null`
+    # but is a required field, which is a logical inconsistency in terms of the Cue schema where we
+    # import the generated output of this script: it doesn't allow setting a default value for a field
+    # if the field is required, and vise versa.
+    if resolved_schema['required']
+      # For all schema type fields, see if they have a default value equal to `nil`. If so, remove
+      # the `default` field entirely.
+      resolved_schema['type'].keys.each { |type_field|
+        type_field_default_value = resolved_schema['type'][type_field].fetch('default', :does_not_exist)
+        if type_field_default_value.nil?
+          @logger.debug "Reconciling type field '#{type_field}'..."
+
+          resolved_schema['type'][type_field].delete('default')
+        end
+      }
+    end
   end
 end
 

@@ -13,7 +13,10 @@ base: components: sources: kubernetes_logs: configuration: {
 			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	delay_deletion_ms: {
 		description: """
@@ -80,7 +83,10 @@ base: components: sources: kubernetes_logs: configuration: {
 			processed by the `kubernetes_logs` source.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	kube_config_file: {
 		description: """
@@ -88,7 +94,10 @@ base: components: sources: kubernetes_logs: configuration: {
 			Vector will try to connect to Kubernetes using in-cluster configuration.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	max_line_bytes: {
 		description: """
@@ -271,6 +280,9 @@ base: components: sources: kubernetes_logs: configuration: {
 	timezone: {
 		description: "The default time zone for timestamps without an explicit zone."
 		required:    false
-		type: string: examples: ["local", "America/New_York", "EST5EDT"]
+		type: string: {
+			default: null
+			examples: ["local", "America/New_York", "EST5EDT"]
+		}
 	}
 }

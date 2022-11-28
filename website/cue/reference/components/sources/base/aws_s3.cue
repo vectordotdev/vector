@@ -18,7 +18,7 @@ base: components: sources: aws_s3: configuration: {
 			options: enabled: {
 				description: "Whether or not end-to-end acknowledgements are enabled for this source."
 				required:    false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}
@@ -29,7 +29,10 @@ base: components: sources: aws_s3: configuration: {
 			[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
@@ -55,12 +58,15 @@ base: components: sources: aws_s3: configuration: {
 				load_timeout_secs: {
 					description: "Timeout for successfully loading any credentials, in seconds."
 					required:    false
-					type: uint: {}
+					type: uint: default: null
 				}
 				profile: {
 					description: "The credentials profile to use."
 					required:    false
-					type: string: syntax: "literal"
+					type: string: {
+						default: null
+						syntax:  "literal"
+					}
 				}
 				region: {
 					description: """
@@ -70,7 +76,10 @@ base: components: sources: aws_s3: configuration: {
 						for the service itself.
 						"""
 					required: false
-					type: string: syntax: "literal"
+					type: string: {
+						default: null
+						syntax:  "literal"
+					}
 				}
 				secret_access_key: {
 					description: "The AWS secret access key."
@@ -103,7 +112,10 @@ base: components: sources: aws_s3: configuration: {
 	endpoint: {
 		description: "The API endpoint of the service."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	multiline: {
 		description: """
@@ -175,7 +187,10 @@ base: components: sources: aws_s3: configuration: {
 	region: {
 		description: "The AWS region to use."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	sqs: {
 		description: """
@@ -197,7 +212,7 @@ base: components: sources: aws_s3: configuration: {
 					consumption rate affects the S3 object retrieval rate.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: default: null
 			}
 			delete_message: {
 				description: """
@@ -235,7 +250,10 @@ base: components: sources: aws_s3: configuration: {
 																they are defined.
 																"""
 						required: false
-						type: array: items: type: string: syntax: "literal"
+						type: array: {
+							default: null
+							items: type: string: syntax: "literal"
+						}
 					}
 					ca_file: {
 						description: """
@@ -244,7 +262,10 @@ base: components: sources: aws_s3: configuration: {
 																The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {
+							default: null
+							syntax:  "literal"
+						}
 					}
 					crt_file: {
 						description: """
@@ -256,7 +277,10 @@ base: components: sources: aws_s3: configuration: {
 																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {
+							default: null
+							syntax:  "literal"
+						}
 					}
 					key_file: {
 						description: """
@@ -265,7 +289,10 @@ base: components: sources: aws_s3: configuration: {
 																The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {
+							default: null
+							syntax:  "literal"
+						}
 					}
 					key_pass: {
 						description: """
@@ -274,7 +301,10 @@ base: components: sources: aws_s3: configuration: {
 																This has no effect unless `key_file` is set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {
+							default: null
+							syntax:  "literal"
+						}
 					}
 					verify_certificate: {
 						description: """
@@ -290,7 +320,7 @@ base: components: sources: aws_s3: configuration: {
 																Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 																"""
 						required: false
-						type: bool: {}
+						type: bool: default: null
 					}
 					verify_hostname: {
 						description: """
@@ -304,7 +334,7 @@ base: components: sources: aws_s3: configuration: {
 																Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 																"""
 						required: false
-						type: bool: {}
+						type: bool: default: null
 					}
 				}
 			}
@@ -346,7 +376,10 @@ base: components: sources: aws_s3: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -355,7 +388,10 @@ base: components: sources: aws_s3: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -367,7 +403,10 @@ base: components: sources: aws_s3: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_file: {
 				description: """
@@ -376,7 +415,10 @@ base: components: sources: aws_s3: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -385,7 +427,10 @@ base: components: sources: aws_s3: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -401,7 +446,7 @@ base: components: sources: aws_s3: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -415,7 +460,7 @@ base: components: sources: aws_s3: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}

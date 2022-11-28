@@ -16,7 +16,7 @@ base: components: sources: aws_sqs: configuration: {
 		type: object: options: enabled: {
 			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	auth: {
@@ -41,12 +41,15 @@ base: components: sources: aws_sqs: configuration: {
 			load_timeout_secs: {
 				description: "Timeout for successfully loading any credentials, in seconds."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			profile: {
 				description: "The credentials profile to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			region: {
 				description: """
@@ -56,7 +59,10 @@ base: components: sources: aws_sqs: configuration: {
 					for the service itself.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
@@ -77,22 +83,37 @@ base: components: sources: aws_sqs: configuration: {
 			fetching the messages than processing them.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: default: null
 	}
 	decoding: {
-		description: "Configuration for building a `Deserializer`."
+		description: "Decoding configuration."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The decoding method."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
-					bytes:       "Configures the `BytesDeserializer`."
-					gelf:        "Configures the `GelfDeserializer`."
-					json:        "Configures the `JsonDeserializer`."
-					native:      "Configures the `NativeDeserializer`."
-					native_json: "Configures the `NativeJsonDeserializer`."
-					syslog:      "Configures the `SyslogDeserializer`."
+					bytes: "Events containing the byte frame as-is."
+					gelf: """
+						Events being parsed from a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: "Events being parsed from a JSON string."
+					native: """
+						Events being parsed from Vector’s [native protobuf format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Events being parsed from Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					syslog: "Events being parsed from a Syslog message."
 				}
 			}
 		}
@@ -109,11 +130,20 @@ base: components: sources: aws_sqs: configuration: {
 	endpoint: {
 		description: "The API endpoint of the service."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	framing: {
-		description: "Configuration for building a `Framer`."
-		required:    false
+		description: """
+			Framing configuration.
+
+			Framing deals with how events are separated when encoded in a raw byte form, where each event is
+			a "frame" that must be prefixed, or delimited, in a way that marks where an event begins and
+			ends within the byte stream.
+			"""
+		required: false
 		type: object: options: {
 			character_delimited: {
 				description:   "Options for the character delimited decoder."
@@ -132,20 +162,25 @@ base: components: sources: aws_sqs: configuration: {
 																This length does *not* include the trailing delimiter.
 																"""
 						required: false
-						type: uint: {}
+						type: uint: default: null
 					}
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Configures the `BytesDecoder`."
-						character_delimited: "Configures the `CharacterDelimitedDecoder`."
-						length_delimited:    "Configures the `LengthDelimitedDecoder`."
-						newline_delimited:   "Configures the `NewlineDelimitedDecoder`."
-						octet_counting:      "Configures the `OctetCountingDecoder`."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+						character_delimited: "Byte frames which are delimited by a chosen character."
+						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited:   "Byte frames which are delimited by a newline character."
+						octet_counting: """
+															Byte frames according to the [octet counting][octet_counting] format.
+
+															[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+															"""
 					}
 				}
 			}
@@ -160,7 +195,7 @@ base: components: sources: aws_sqs: configuration: {
 						This length does *not* include the trailing delimiter.
 						"""
 					required: false
-					type: uint: {}
+					type: uint: default: null
 				}
 			}
 			octet_counting: {
@@ -170,7 +205,7 @@ base: components: sources: aws_sqs: configuration: {
 				type: object: options: max_length: {
 					description: "The maximum length of the byte buffer."
 					required:    false
-					type: uint: {}
+					type: uint: default: null
 				}
 			}
 		}
@@ -193,7 +228,10 @@ base: components: sources: aws_sqs: configuration: {
 	region: {
 		description: "The AWS region to use."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	tls: {
 		description: "Standard TLS options."
@@ -207,7 +245,10 @@ base: components: sources: aws_sqs: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -216,7 +257,10 @@ base: components: sources: aws_sqs: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -228,7 +272,10 @@ base: components: sources: aws_sqs: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_file: {
 				description: """
@@ -237,7 +284,10 @@ base: components: sources: aws_sqs: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -246,7 +296,10 @@ base: components: sources: aws_sqs: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -262,7 +315,7 @@ base: components: sources: aws_sqs: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -276,7 +329,7 @@ base: components: sources: aws_sqs: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}

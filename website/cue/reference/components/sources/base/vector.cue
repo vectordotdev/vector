@@ -16,7 +16,7 @@ base: components: sources: vector: configuration: {
 		type: object: options: enabled: {
 			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	address: {
@@ -40,7 +40,10 @@ base: components: sources: vector: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -49,7 +52,10 @@ base: components: sources: vector: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -61,7 +67,10 @@ base: components: sources: vector: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			enabled: {
 				description: """
@@ -71,7 +80,7 @@ base: components: sources: vector: configuration: {
 					more information.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			key_file: {
 				description: """
@@ -80,7 +89,10 @@ base: components: sources: vector: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -89,7 +101,10 @@ base: components: sources: vector: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -105,7 +120,7 @@ base: components: sources: vector: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -119,13 +134,16 @@ base: components: sources: vector: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}
 	version: {
 		description: "Version of the configuration."
 		required:    false
-		type: string: enum: "2": "Marker value for version two."
+		type: string: {
+			default: null
+			enum: "2": "Marker value for version two."
+		}
 	}
 }

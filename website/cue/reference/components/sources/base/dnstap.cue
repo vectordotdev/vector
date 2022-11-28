@@ -12,17 +12,20 @@ base: components: sources: dnstap: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	log_namespace: {
 		description: "The namespace to use for logs. This overrides the global settings."
 		required:    false
-		type: bool: {}
+		type: bool: default: null
 	}
 	max_frame_handling_tasks: {
 		description: "Maximum number of frames that can be processed concurrently."
 		required:    false
-		type: uint: {}
+		type: uint: default: null
 	}
 	max_frame_length: {
 		description: "Maximum length, in bytes, that a frame can be."
@@ -32,7 +35,7 @@ base: components: sources: dnstap: configuration: {
 	multithreaded: {
 		description: "Whether or not to concurrently process DNSTAP frames."
 		required:    false
-		type: bool: {}
+		type: bool: default: null
 	}
 	raw_data_only: {
 		description: """
@@ -42,7 +45,7 @@ base: components: sources: dnstap: configuration: {
 			(called `rawData`) and encoded as a base64 string.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: null
 	}
 	socket_file_mode: {
 		description: """
@@ -52,7 +55,7 @@ base: components: sources: dnstap: configuration: {
 			language, but it is most intuitive to use an octal number.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: default: null
 	}
 	socket_path: {
 		description: """
@@ -71,7 +74,7 @@ base: components: sources: dnstap: configuration: {
 			This should not typically needed to be changed.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: default: null
 	}
 	socket_send_buffer_size: {
 		description: """
@@ -80,6 +83,6 @@ base: components: sources: dnstap: configuration: {
 			This should not typically needed to be changed.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: default: null
 	}
 }

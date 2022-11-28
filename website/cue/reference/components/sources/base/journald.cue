@@ -18,19 +18,19 @@ base: components: sources: journald: configuration: {
 			options: enabled: {
 				description: "Whether or not end-to-end acknowledgements are enabled for this source."
 				required:    false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}
 	batch_size: {
 		description: "The `systemd` journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch."
 		required:    false
-		type: uint: {}
+		type: uint: default: null
 	}
 	current_boot_only: {
 		description: "Only include entries that occurred after the current boot of the system."
 		required:    false
-		type: bool: {}
+		type: bool: default: null
 	}
 	data_dir: {
 		description: """
@@ -39,7 +39,10 @@ base: components: sources: journald: configuration: {
 			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	exclude_matches: {
 		description: """
@@ -112,7 +115,10 @@ base: components: sources: journald: configuration: {
 			If not set, `journalctl` will use the default system journal paths.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	journalctl_path: {
 		description: """
@@ -121,7 +127,10 @@ base: components: sources: journald: configuration: {
 			If not set, Vector will search the path for `journalctl`.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	remap_priority: {
 		description: """
@@ -135,7 +144,7 @@ base: components: sources: journald: configuration: {
 	since_now: {
 		description: "Only include entries that appended to the journal after Vector starts reading it."
 		required:    false
-		type: bool: {}
+		type: bool: default: null
 	}
 	units: {
 		description: """

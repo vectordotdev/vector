@@ -12,7 +12,10 @@ base: components: sources: internal_logs: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	pid_key: {
 		description: """
@@ -23,6 +26,9 @@ base: components: sources: internal_logs: configuration: {
 			By default, `"pid"` is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 }

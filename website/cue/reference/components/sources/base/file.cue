@@ -16,7 +16,7 @@ base: components: sources: file: configuration: {
 		type: object: options: enabled: {
 			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	data_dir: {
@@ -26,7 +26,10 @@ base: components: sources: file: configuration: {
 			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	encoding: {
 		description: "Character set encoding."
@@ -94,7 +97,7 @@ base: components: sources: file: configuration: {
 					"""
 				relevant_when: "strategy = \"checksum\""
 				required:      false
-				type: uint: {}
+				type: uint: default: null
 			}
 			ignored_header_bytes: {
 				description: """
@@ -150,7 +153,10 @@ base: components: sources: file: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	ignore_checkpoints: {
 		description: """
@@ -159,7 +165,7 @@ base: components: sources: file: configuration: {
 			Checkpoints are still written normally.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: null
 	}
 	ignore_not_found: {
 		description: """
@@ -173,7 +179,7 @@ base: components: sources: file: configuration: {
 	ignore_older_secs: {
 		description: "Ignore files with a data modification date older than the specified number of seconds."
 		required:    false
-		type: uint: {}
+		type: uint: default: null
 	}
 	include: {
 		description: "Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported."
@@ -209,7 +215,10 @@ base: components: sources: file: configuration: {
 			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	multi_line_timeout: {
 		description: """
@@ -296,7 +305,10 @@ base: components: sources: file: configuration: {
 			Off by default, the offset is only added to the event if this is set.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	oldest_first: {
 		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
@@ -306,9 +318,12 @@ base: components: sources: file: configuration: {
 	read_from: {
 		description: "File position to use when reading a new file."
 		required:    false
-		type: string: enum: {
-			beginning: "Read from the beginning of the file."
-			end:       "Start reading from the current end of the file."
+		type: string: {
+			default: null
+			enum: {
+				beginning: "Read from the beginning of the file."
+				end:       "Start reading from the current end of the file."
+			}
 		}
 	}
 	remove_after_secs: {
@@ -318,7 +333,7 @@ base: components: sources: file: configuration: {
 			If not specified, files will not be removed.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: default: null
 	}
 	start_at_beginning: {
 		description: """
@@ -327,6 +342,6 @@ base: components: sources: file: configuration: {
 			DEPRECATED: This is a deprecated option -- replaced by `ignore_checkpoints`/`read_from` -- and should be removed.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: null
 	}
 }

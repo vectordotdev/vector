@@ -17,6 +17,7 @@ base: components: transforms: throttle: configuration: {
 			"""
 		required: false
 		type: string: {
+			default: null
 			examples: ["{{ message }}", "{{ hostname }}"]
 			syntax: "template"
 		}

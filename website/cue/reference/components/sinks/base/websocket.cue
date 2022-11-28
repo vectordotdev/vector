@@ -24,7 +24,7 @@ base: components: sinks: websocket: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	auth: {
@@ -115,19 +115,28 @@ base: components: sinks: websocket: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
+						unix:    "Represent the timestamp as a Unix timestamp."
+					}
 				}
 			}
 		}
@@ -135,7 +144,7 @@ base: components: sinks: websocket: configuration: {
 	ping_interval: {
 		description: "The interval, in seconds, between sending PINGs to the remote peer."
 		required:    false
-		type: uint: {}
+		type: uint: default: null
 	}
 	ping_timeout: {
 		description: """
@@ -144,7 +153,7 @@ base: components: sinks: websocket: configuration: {
 			If a response is not received in this time, the connection is reestablished.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: default: null
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -158,7 +167,10 @@ base: components: sinks: websocket: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -167,7 +179,10 @@ base: components: sinks: websocket: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -179,7 +194,10 @@ base: components: sinks: websocket: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			enabled: {
 				description: """
@@ -189,7 +207,7 @@ base: components: sinks: websocket: configuration: {
 					more information.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			key_file: {
 				description: """
@@ -198,7 +216,10 @@ base: components: sinks: websocket: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -207,7 +228,10 @@ base: components: sinks: websocket: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -223,7 +247,7 @@ base: components: sinks: websocket: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -237,7 +261,7 @@ base: components: sinks: websocket: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}

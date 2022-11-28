@@ -24,7 +24,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	acl: {
@@ -36,50 +36,53 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			[predefined_acls]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 			"""
 		required: false
-		type: string: enum: {
-			"authenticated-read": """
-				Bucket/object can be read by authenticated users.
+		type: string: {
+			default: null
+			enum: {
+				"authenticated-read": """
+					Bucket/object can be read by authenticated users.
 
-				The bucket/object owner is granted the `OWNER` permission, and anyone authenticated Google
-				account holder is granted the `READER` permission.
-				"""
-			"bucket-owner-full-control": """
-				Object is semi-private.
+					The bucket/object owner is granted the `OWNER` permission, and anyone authenticated Google
+					account holder is granted the `READER` permission.
+					"""
+				"bucket-owner-full-control": """
+					Object is semi-private.
 
-				Both the object owner and bucket owner are granted the `OWNER` permission.
+					Both the object owner and bucket owner are granted the `OWNER` permission.
 
-				Only relevant when specified for an object: this predefined ACL is otherwise ignored when
-				specified for a bucket.
-				"""
-			"bucket-owner-read": """
-				Object is private, except to the bucket owner.
+					Only relevant when specified for an object: this predefined ACL is otherwise ignored when
+					specified for a bucket.
+					"""
+				"bucket-owner-read": """
+					Object is private, except to the bucket owner.
 
-				The object owner is granted the `OWNER` permission, and the bucket owner is granted the
-				`READER` permission.
+					The object owner is granted the `OWNER` permission, and the bucket owner is granted the
+					`READER` permission.
 
-				Only relevant when specified for an object: this predefined ACL is otherwise ignored when
-				specified for a bucket.
-				"""
-			private: """
-				Bucket/object are private.
+					Only relevant when specified for an object: this predefined ACL is otherwise ignored when
+					specified for a bucket.
+					"""
+				private: """
+					Bucket/object are private.
 
-				The bucket/object owner is granted the `OWNER` permission, and no one else has
-				access.
-				"""
-			"project-private": """
-				Bucket/object are private within the project.
+					The bucket/object owner is granted the `OWNER` permission, and no one else has
+					access.
+					"""
+				"project-private": """
+					Bucket/object are private within the project.
 
-				Project owners and project editors are granted the `OWNER` permission, and anyone who is
-				part of the project team is granted the `READER` permission.
+					Project owners and project editors are granted the `OWNER` permission, and anyone who is
+					part of the project team is granted the `READER` permission.
 
-				This is the default.
-				"""
-			"public-read": """
-				Bucket/object can be read publically.
+					This is the default.
+					"""
+				"public-read": """
+					Bucket/object can be read publically.
 
-				The bucket/object owner is granted the `OWNER` permission, and all other users, whether
-				authenticated or anonymous, are granted the `READER` permission.
-				"""
+					The bucket/object owner is granted the `OWNER` permission, and all other users, whether
+					authenticated or anonymous, are granted the `READER` permission.
+					"""
+			}
 		}
 	}
 	api_key: {
@@ -94,7 +97,10 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -108,17 +114,17 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: default: null
 			}
 			max_events: {
 				description: "The maximum size of a batch, in events, before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch, in seconds, before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: default: null
 			}
 		}
 	}
@@ -143,8 +149,14 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					description: "Compression level."
 					required:    false
 					type: {
-						string: enum: ["none", "fast", "best", "default"]
-						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+						string: {
+							default: null
+							enum: ["none", "fast", "best", "default"]
+						}
+						uint: {
+							default: null
+							enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+						}
 					}
 				}
 			}
@@ -163,7 +175,10 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	encoding: {
 		description: "Encoding configuration."
@@ -209,19 +224,28 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
-				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+				type: string: {
+					default: null
+					enum: {
+						rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
+						unix:    "Represent the timestamp as a Unix timestamp."
+					}
 				}
 			}
 		}
@@ -238,12 +262,15 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			object keys must be unique.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: null
 	}
 	filename_extension: {
 		description: "The filename extension to use in the object key."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	filename_time_format: {
 		description: """
@@ -265,7 +292,10 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	framing: {
 		description: "Framing configuration."
@@ -305,7 +335,10 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			default: null
+			syntax:  "template"
+		}
 	}
 	metadata: {
 		description: """
@@ -463,15 +496,18 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			[storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 			"""
 		required: false
-		type: string: enum: {
-			ARCHIVE:  "Archive storage."
-			COLDLINE: "Coldline storage."
-			NEARLINE: "Nearline storage."
-			STANDARD: """
-				Standard storage.
+		type: string: {
+			default: null
+			enum: {
+				ARCHIVE:  "Archive storage."
+				COLDLINE: "Coldline storage."
+				NEARLINE: "Nearline storage."
+				STANDARD: """
+					Standard storage.
 
-				This is the default.
-				"""
+					This is the default.
+					"""
+			}
 		}
 	}
 	tls: {
@@ -486,7 +522,10 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: {
+					default: null
+					items: type: string: syntax: "literal"
+				}
 			}
 			ca_file: {
 				description: """
@@ -495,7 +534,10 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			crt_file: {
 				description: """
@@ -507,7 +549,10 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_file: {
 				description: """
@@ -516,7 +561,10 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			key_pass: {
 				description: """
@@ -525,7 +573,10 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			verify_certificate: {
 				description: """
@@ -541,7 +592,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 			verify_hostname: {
 				description: """
@@ -555,7 +606,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 					"""
 				required: false
-				type: bool: {}
+				type: bool: default: null
 			}
 		}
 	}

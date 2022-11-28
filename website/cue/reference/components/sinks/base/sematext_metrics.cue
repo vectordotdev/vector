@@ -24,7 +24,7 @@ base: components: sinks: sematext_metrics: configuration: {
 				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 				"""
 			required: false
-			type: bool: {}
+			type: bool: default: null
 		}
 	}
 	batch: {
@@ -39,17 +39,17 @@ base: components: sinks: sematext_metrics: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: default: null
 			}
 			max_events: {
 				description: "The maximum size of a batch, in events, before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: default: null
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch, in seconds, before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: default: null
 			}
 		}
 	}
@@ -66,14 +66,20 @@ base: components: sinks: sematext_metrics: configuration: {
 	endpoint: {
 		description: "The endpoint to send data to."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {
+			default: null
+			syntax:  "literal"
+		}
 	}
 	region: {
 		description: "Sematext region."
 		required:    false
-		type: string: enum: {
-			eu: "EU region."
-			us: "US region."
+		type: string: {
+			default: null
+			enum: {
+				eu: "EU region."
+				us: "US region."
+			}
 		}
 	}
 	request: {

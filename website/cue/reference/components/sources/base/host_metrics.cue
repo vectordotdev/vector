@@ -12,12 +12,18 @@ base: components: sources: host_metrics: configuration: {
 			base: {
 				description: "The base cgroup name to provide metrics for."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			base_dir: {
 				description: "Base cgroup directory, for testing use only"
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {
+					default: null
+					syntax:  "literal"
+				}
 			}
 			groups: {
 				description: "Lists of group name patterns to include or exclude."
@@ -31,12 +37,18 @@ base: components: sources: host_metrics: configuration: {
 						excludes: {
 							description: "Any patterns which should be excluded."
 							required:    false
-							type: array: items: type: string: syntax: "literal"
+							type: array: {
+								default: null
+								items: type: string: syntax: "literal"
+							}
 						}
 						includes: {
 							description: "Any patterns which should be included."
 							required:    false
-							type: array: items: type: string: syntax: "literal"
+							type: array: {
+								default: null
+								items: type: string: syntax: "literal"
+							}
 						}
 					}
 				}
@@ -59,15 +71,18 @@ base: components: sources: host_metrics: configuration: {
 			Defaults to all collectors.
 			"""
 		required: false
-		type: array: items: type: string: enum: {
-			cgroups:    "CGroups."
-			cpu:        "CPU."
-			disk:       "Disk."
-			filesystem: "Filesystem."
-			host:       "Host."
-			load:       "Load average."
-			memory:     "Memory."
-			network:    "Network."
+		type: array: {
+			default: null
+			items: type: string: enum: {
+				cgroups:    "CGroups."
+				cpu:        "CPU."
+				disk:       "Disk."
+				filesystem: "Filesystem."
+				host:       "Host."
+				load:       "Load average."
+				memory:     "Memory."
+				network:    "Network."
+			}
 		}
 	}
 	disk: {
@@ -85,12 +100,18 @@ base: components: sources: host_metrics: configuration: {
 					excludes: {
 						description: "Any patterns which should be excluded."
 						required:    false
-						type: array: items: type: string: syntax: "literal"
+						type: array: {
+							default: null
+							items: type: string: syntax: "literal"
+						}
 					}
 					includes: {
 						description: "Any patterns which should be included."
 						required:    false
-						type: array: items: type: string: syntax: "literal"
+						type: array: {
+							default: null
+							items: type: string: syntax: "literal"
+						}
 					}
 				}
 			}
@@ -112,12 +133,18 @@ base: components: sources: host_metrics: configuration: {
 						excludes: {
 							description: "Any patterns which should be excluded."
 							required:    false
-							type: array: items: type: string: syntax: "literal"
+							type: array: {
+								default: null
+								items: type: string: syntax: "literal"
+							}
 						}
 						includes: {
 							description: "Any patterns which should be included."
 							required:    false
-							type: array: items: type: string: syntax: "literal"
+							type: array: {
+								default: null
+								items: type: string: syntax: "literal"
+							}
 						}
 					}
 				}
@@ -134,12 +161,18 @@ base: components: sources: host_metrics: configuration: {
 						excludes: {
 							description: "Any patterns which should be excluded."
 							required:    false
-							type: array: items: type: string: syntax: "literal"
+							type: array: {
+								default: null
+								items: type: string: syntax: "literal"
+							}
 						}
 						includes: {
 							description: "Any patterns which should be included."
 							required:    false
-							type: array: items: type: string: syntax: "literal"
+							type: array: {
+								default: null
+								items: type: string: syntax: "literal"
+							}
 						}
 					}
 				}
@@ -156,12 +189,18 @@ base: components: sources: host_metrics: configuration: {
 						excludes: {
 							description: "Any patterns which should be excluded."
 							required:    false
-							type: array: items: type: string: syntax: "literal"
+							type: array: {
+								default: null
+								items: type: string: syntax: "literal"
+							}
 						}
 						includes: {
 							description: "Any patterns which should be included."
 							required:    false
-							type: array: items: type: string: syntax: "literal"
+							type: array: {
+								default: null
+								items: type: string: syntax: "literal"
+							}
 						}
 					}
 				}
@@ -195,12 +234,18 @@ base: components: sources: host_metrics: configuration: {
 					excludes: {
 						description: "Any patterns which should be excluded."
 						required:    false
-						type: array: items: type: string: syntax: "literal"
+						type: array: {
+							default: null
+							items: type: string: syntax: "literal"
+						}
 					}
 					includes: {
 						description: "Any patterns which should be included."
 						required:    false
-						type: array: items: type: string: syntax: "literal"
+						type: array: {
+							default: null
+							items: type: string: syntax: "literal"
+						}
 					}
 				}
 			}

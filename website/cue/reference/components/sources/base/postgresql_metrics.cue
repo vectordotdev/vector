@@ -25,7 +25,10 @@ base: components: sources: postgresql_metrics: configuration: {
 			This can be used in conjunction with `include_databases`.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: {
+			default: null
+			items: type: string: syntax: "literal"
+		}
 	}
 	include_databases: {
 		description: """
@@ -39,7 +42,10 @@ base: components: sources: postgresql_metrics: configuration: {
 			This can be used in conjunction with `exclude_databases`.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: {
+			default: null
+			items: type: string: syntax: "literal"
+		}
 	}
 	namespace: {
 		description: """

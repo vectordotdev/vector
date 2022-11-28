@@ -47,6 +47,7 @@ base: components: transforms: remap: configuration: {
 			"""
 		required: false
 		type: string: {
+			default: null
 			examples: ["./my/program.vrl"]
 			syntax: "literal"
 		}
@@ -88,6 +89,7 @@ base: components: transforms: remap: configuration: {
 			"""
 		required: false
 		type: string: {
+			default: null
 			examples: ["""
 				. = parse_json!(.message)
 				.new_field = "new value"
