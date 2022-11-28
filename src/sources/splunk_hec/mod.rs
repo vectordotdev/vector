@@ -95,6 +95,7 @@ pub struct SplunkConfig {
     acknowledgements: HecAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global settings.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
 }
