@@ -9,7 +9,7 @@ use crate::{
     serde::default_decoding,
 };
 
-use super::FileDescriptorConfig;
+use super::{outputs, FileDescriptorConfig};
 
 /// Configuration for the `stdin` source.
 #[configurable_component(source("stdin"))]
@@ -37,6 +37,11 @@ pub struct StdinConfig {
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl FileDescriptorConfig for StdinConfig {
@@ -64,6 +69,7 @@ impl Default for StdinConfig {
             host_key: Default::default(),
             framing: None,
             decoding: default_decoding(),
+            log_namespace: None,
         }
     }
 }
@@ -73,11 +79,19 @@ impl_generate_config_from_default!(StdinConfig);
 #[async_trait::async_trait]
 impl SourceConfig for StdinConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
-        self.source(io::BufReader::new(io::stdin()), cx.shutdown, cx.out)
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        self.source(
+            io::BufReader::new(io::stdin()),
+            cx.shutdown,
+            cx.out,
+            log_namespace,
+        )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        outputs(log_namespace, &self.host_key, &self.decoding, Self::NAME)
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -100,6 +114,7 @@ mod tests {
         SourceSender,
     };
     use futures::StreamExt;
+    use lookup::path;
 
     #[test]
     fn generate_config() {
@@ -114,7 +129,7 @@ mod tests {
             let buf = Cursor::new("hello world\nhello world again");
 
             config
-                .source(buf, ShutdownSignal::noop(), tx)
+                .source(buf, ShutdownSignal::noop(), tx, LogNamespace::Legacy)
                 .unwrap()
                 .await
                 .unwrap();
@@ -136,6 +151,48 @@ mod tests {
                     .to_string_lossy()
                     .into_owned())
             );
+
+            let event = stream.next().await;
+            assert!(event.is_none());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn stdin_decodes_line_vector_namespace() {
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let config = StdinConfig::default();
+            let buf = Cursor::new("hello world\nhello world again");
+
+            config
+                .source(buf, ShutdownSignal::noop(), tx, LogNamespace::Vector)
+                .unwrap()
+                .await
+                .unwrap();
+
+            let mut stream = rx;
+
+            let event = stream.next().await;
+            let event = event.unwrap();
+            let log = event.as_log();
+            let meta = log.metadata().value();
+
+            assert_eq!(&vrl::value!("hello world"), log.value());
+            assert_eq!(
+                meta.get(path!("vector", "source_type")).unwrap(),
+                &vrl::value!("stdin")
+            );
+            assert!(meta
+                .get(path!("vector", "ingest_timestamp"))
+                .unwrap()
+                .is_timestamp());
+
+            let event = stream.next().await;
+            let event = event.unwrap();
+            let log = event.as_log();
+
+            assert_eq!(&vrl::value!("hello world again"), log.value());
 
             let event = stream.next().await;
             assert!(event.is_none());
