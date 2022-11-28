@@ -19,8 +19,7 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use value::kind::Collection;
-use value::Kind;
+use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
@@ -321,7 +320,7 @@ impl SourceConfig for PubsubConfig {
                 PubsubConfig::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("attributes"))),
                 &owned_value_path!("attributes"),
-                Kind::object(Collection::empty()),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
             )
             .with_source_metadata(
@@ -759,7 +758,7 @@ mod tests {
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "attributes"),
-                    Kind::object(Collection::empty()),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "message_id"),
@@ -795,7 +794,7 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(
             &owned_value_path!("attributes"),
-            Kind::object(Collection::empty()),
+            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
             None,
         )
         .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None);
