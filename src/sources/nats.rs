@@ -11,7 +11,7 @@ use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{GenerateConfig, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::StreamClosedError,
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
@@ -216,11 +216,63 @@ async fn create_subscription(
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
+    use lookup::{owned_value_path, LookupBuf};
+    use value::{kind::Collection, Kind};
+    use vector_core::schema::Definition;
+
     use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<NatsSourceConfig>();
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = NatsSourceConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                );
+
+        assert_eq!(definition, expected_definition);
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = NatsSourceConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None);
+
+        assert_eq!(definition, expected_definition);
     }
 }
 
