@@ -1,3 +1,4 @@
+mod allocated_bytes;
 mod errors;
 mod events_in;
 mod events_out;
@@ -11,7 +12,6 @@ mod sink;
 pub mod source;
 mod transform;
 mod uptime;
-mod allocated_bytes;
 
 #[cfg(feature = "sources-host_metrics")]
 mod host;

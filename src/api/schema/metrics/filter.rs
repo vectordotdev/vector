@@ -229,7 +229,6 @@ pub fn component_counter_metrics(
     })
 }
 
-
 /// Returns a stream of `Vec<Metric>`, where `metric_name` matches the name of the metric
 /// (e.g. "processed_events_total"), and the value is derived from `MetricValue::Gauge`. Uses a
 /// local cache to match against the `component_id` of a metric, to return results only when
@@ -257,7 +256,6 @@ pub fn component_gauge_metrics(
             .collect()
     })
 }
-
 
 /// Returns the throughput of a 'counter' metric, sampled over `interval` milliseconds
 /// and filtered by the provided `filter_fn`.
