@@ -53,19 +53,14 @@ impl proto::Service for Service {
             .map(Event::from)
             .collect();
 
-        // TODO need to resolve this query before merging-
-        // should we remove this check for Vector namespace, and thus change the shape of the legacy namespace events,
-        // introducing a breaking change?
-        if self.log_namespace == LogNamespace::Vector {
-            let now = Utc::now();
-            for event in &mut events {
-                if let Event::Log(ref mut log) = event {
-                    self.log_namespace.insert_standard_vector_source_metadata(
-                        log,
-                        VectorConfig::NAME,
-                        now,
-                    );
-                }
+        let now = Utc::now();
+        for event in &mut events {
+            if let Event::Log(ref mut log) = event {
+                self.log_namespace.insert_standard_vector_source_metadata(
+                    log,
+                    VectorConfig::NAME,
+                    now,
+                );
             }
         }
 
@@ -261,6 +256,7 @@ mod test {
 #[cfg(test)]
 mod tests {
     use vector_common::assert_event_data_eq;
+    use vector_core::config::log_schema;
 
     use super::*;
     use crate::{
@@ -273,70 +269,60 @@ mod tests {
         SourceSender,
     };
 
+    async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
+        let config = format!(r#"address = "{}""#, addr);
+        let source: VectorConfig = toml::from_str(&config).unwrap();
+
+        let (tx, rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        // Ideally, this would be a fully custom agent to send the data,
+        // but the sink side already does such a test and this is good
+        // to ensure interoperability.
+        let sink: SinkConfig = toml::from_str(vector_source_config_str).unwrap();
+        let cx = SinkContext::new_test();
+        let (sink, _) = sink.build(cx).await.unwrap();
+
+        let (mut events, stream) = test_util::random_events_with_stream(100, 100, None);
+        sink.run(stream).await.unwrap();
+
+        for event in &mut events {
+            event
+                .as_mut_log()
+                .insert(log_schema().source_type_key(), "vector");
+        }
+
+        let output = test_util::collect_ready(rx).await;
+        assert_event_data_eq!(events, output);
+    }
+
     #[tokio::test]
     async fn receive_message() {
+        let addr = test_util::next_addr();
+
         assert_source_compliance(&SOURCE_TAGS, async {
-            let addr = test_util::next_addr();
             let config = format!(r#"address = "{}""#, addr);
-            let source: VectorConfig = toml::from_str(&config).unwrap();
-
-            let (tx, rx) = SourceSender::new_test();
-            let server = source
-                .build(SourceContext::new_test(tx, None))
-                .await
-                .unwrap();
-            tokio::spawn(server);
-            test_util::wait_for_tcp(addr).await;
-
-            // Ideally, this would be a fully custom agent to send the data,
-            // but the sink side already does such a test and this is good
-            // to ensure interoperability.
-            let config = format!(r#"address = "{}""#, addr);
-            let sink: SinkConfig = toml::from_str(&config).unwrap();
-            let cx = SinkContext::new_test();
-            let (sink, _) = sink.build(cx).await.unwrap();
-
-            let (events, stream) = test_util::random_events_with_stream(100, 100, None);
-            sink.run(stream).await.unwrap();
-
-            let output = test_util::collect_ready(rx).await;
-            assert_event_data_eq!(events, output);
+            run_test(&config, addr).await;
         })
         .await;
     }
 
     #[tokio::test]
     async fn receive_compressed_message() {
+        let addr = test_util::next_addr();
+
         assert_source_compliance(&SOURCE_TAGS, async {
-            let addr = test_util::next_addr();
-            let config = format!(r#"address = "{}""#, addr);
-            let source: VectorConfig = toml::from_str(&config).unwrap();
-
-            let (tx, rx) = SourceSender::new_test();
-            let server = source
-                .build(SourceContext::new_test(tx, None))
-                .await
-                .unwrap();
-            tokio::spawn(server);
-            test_util::wait_for_tcp(addr).await;
-
-            // Ideally, this would be a fully custom agent to send the data,
-            // but the sink side already does such a test and this is good
-            // to ensure interoperability.
             let config = format!(
                 r#"address = "{}"
             compression=true"#,
                 addr
             );
-            let sink: SinkConfig = toml::from_str(&config).unwrap();
-            let cx = SinkContext::new_test();
-            let (sink, _) = sink.build(cx).await.unwrap();
-
-            let (events, stream) = test_util::random_events_with_stream(100, 100, None);
-            sink.run(stream).await.unwrap();
-
-            let output = test_util::collect_ready(rx).await;
-            assert_event_data_eq!(events, output);
+            run_test(&config, addr).await;
         })
         .await;
     }
