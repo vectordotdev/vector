@@ -104,6 +104,9 @@ fn format_metric(total: i64, throughput: i64, human_metrics: bool) -> String {
     }
 }
 
+#[cfg(not(feature = "allocation-tracing"))]
+const NUM_COLUMNS: usize = 8;
+#[cfg(feature = "allocation-tracing")]
 const NUM_COLUMNS: usize = 9;
 static HEADER: [&str; NUM_COLUMNS] = [
     "ID",
@@ -114,6 +117,7 @@ static HEADER: [&str; NUM_COLUMNS] = [
     "Events Out",
     "Bytes",
     "Errors",
+    #[cfg(feature = "allocation-tracing")]
     "Mem Usage Bytes",
 ];
 
@@ -210,6 +214,7 @@ impl<'a> Widgets<'a> {
                 } else {
                     r.errors.thousands_format()
                 },
+                #[cfg(feature = "allocation-tracing")]
                 r.allocated_bytes.human_format(),
             ];
 
@@ -235,6 +240,7 @@ impl<'a> Widgets<'a> {
             }
         }
 
+        #[cfg(feature = "allocation-tracing")]
         let w = Table::new(items)
             .header(Row::new(header).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL).title("Components"))
@@ -249,6 +255,22 @@ impl<'a> Widgets<'a> {
                 Constraint::Percentage(10), // Bytes
                 Constraint::Percentage(5),  // Errors
                 Constraint::Percentage(16), // Allocated Bytes
+            ]);
+
+        #[cfg(not(feature = "allocation-tracing"))]
+        let w = Table::new(items)
+            .header(Row::new(header).bottom_margin(1))
+            .block(Block::default().borders(Borders::ALL).title("Components"))
+            .column_spacing(2)
+            .widths(&[
+                Constraint::Percentage(15), // ID
+                Constraint::Percentage(15), // Output
+                Constraint::Percentage(10), // Kind
+                Constraint::Percentage(10), // Type
+                Constraint::Percentage(10), // Events In
+                Constraint::Percentage(10), // Events Out
+                Constraint::Percentage(10), // Bytes
+                Constraint::Percentage(10), // Errors
             ]);
 
         f.render_widget(w, area);

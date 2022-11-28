@@ -32,6 +32,7 @@ pub enum EventType {
     /// Interval + identified metric
     ProcessedBytesThroughputs(i64, Vec<IdentifiedMetric>),
     ErrorsTotals(Vec<IdentifiedMetric>),
+    #[cfg(feature = "allocation-tracing")]
     AllocatedBytes(Vec<IdentifiedMetric>),
     ComponentAdded(ComponentRow),
     ComponentRemoved(ComponentKey),
@@ -119,6 +120,7 @@ pub struct ComponentRow {
     pub received_events_throughput_sec: i64,
     pub sent_events_total: i64,
     pub sent_events_throughput_sec: i64,
+    #[cfg(feature = "allocation-tracing")]
     pub allocated_bytes: i64,
     pub errors: i64,
 }
@@ -210,6 +212,7 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                         }
                     }
                 }
+                #[cfg(feature = "allocation-tracing")]
                 EventType::AllocatedBytes(rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
