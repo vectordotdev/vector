@@ -43,9 +43,9 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     }
 }
 
-async fn allocated_bytes(client: Arc<SubscriptionClient>, tx: state::EventTx) {
+async fn allocated_bytes(client: Arc<SubscriptionClient>, tx: state::EventTx, interval: i64) {
     tokio::pin! {
-        let stream = client.component_allocated_bytes_subscription();
+        let stream = client.component_allocated_bytes_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -302,7 +302,7 @@ pub fn subscribe(
             tx.clone(),
             interval,
         )),
-        tokio::spawn(allocated_bytes(Arc::clone(&client), tx.clone())),
+        tokio::spawn(allocated_bytes(Arc::clone(&client), tx.clone(), interval)),
         tokio::spawn(errors_totals(Arc::clone(&client), tx, interval)),
     ]
 }

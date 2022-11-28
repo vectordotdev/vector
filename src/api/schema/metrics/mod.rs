@@ -291,15 +291,21 @@ impl MetricsSubscription {
     }
 
     /// Allocated bytes metrics.
-    async fn allocated_bytes(&self) -> impl Stream<Item = AllocatedBytes> {
-        get_metrics(1000)
+    async fn allocated_bytes(
+        &self,
+        #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
+    ) -> impl Stream<Item = AllocatedBytes> {
+        get_metrics(interval)
             .filter(|m| m.name() == "component_allocated_bytes")
             .map(AllocatedBytes::new)
     }
 
     /// Component allocation metrics
-    async fn component_allocated_bytes(&self) -> impl Stream<Item = Vec<ComponentAllocatedBytes>> {
-        component_gauge_metrics(1000, &|m| m.name() == "component_allocated_bytes")
+    async fn component_allocated_bytes(
+        &self,
+        #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
+    ) -> impl Stream<Item = Vec<ComponentAllocatedBytes>> {
+        component_gauge_metrics(interval, &|m| m.name() == "component_allocated_bytes")
             .map(|m| m.into_iter().map(ComponentAllocatedBytes::new).collect())
     }
 

@@ -5715,8 +5715,23 @@
             },
             {
               "name": "componentAllocatedBytes",
-              "description": "Component allocated bytes metrics.",
-              "args": [],
+              "description": "Component allocated bytes metrics over `interval`.",
+              "args": [
+                {
+                  "name": "interval",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": "1000"
+                }
+              ],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,

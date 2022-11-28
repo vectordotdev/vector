@@ -185,6 +185,7 @@ pub trait MetricsSubscriptionExt {
     /// Executes an all component allocated bytes subscription.
     fn component_allocated_bytes_subscription(
         &self,
+        interval: i64,
     ) -> BoxedSubscription<ComponentAllocatedBytesSubscription>;
 
     /// Executes an events processed metrics subscription.
@@ -354,9 +355,10 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
     /// Executes an all component allocated bytes subscription.
     fn component_allocated_bytes_subscription(
         &self,
+        interval: i64,
     ) -> BoxedSubscription<ComponentAllocatedBytesSubscription> {
         let request_body = ComponentAllocatedBytesSubscription::build_query(
-            component_allocated_bytes_subscription::Variables,
+            component_allocated_bytes_subscription::Variables { interval },
         );
 
         self.start::<ComponentAllocatedBytesSubscription>(&request_body)

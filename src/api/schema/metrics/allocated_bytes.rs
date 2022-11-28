@@ -64,7 +64,7 @@ impl ComponentAllocatedBytes {
         self.component_key.id()
     }
 
-    /// Errors processed metric
+    /// Allocated bytes metric
     async fn metric(&self) -> AllocatedBytes {
         AllocatedBytes::new(self.metric.clone())
     }

@@ -114,7 +114,7 @@ static HEADER: [&str; NUM_COLUMNS] = [
     "Events Out",
     "Bytes",
     "Errors",
-    "Mem",
+    "Mem Usage Bytes",
 ];
 
 struct Widgets<'a> {
@@ -241,14 +241,14 @@ impl<'a> Widgets<'a> {
             .column_spacing(2)
             .widths(&[
                 Constraint::Percentage(15), // ID
-                Constraint::Percentage(10), // Output
-                Constraint::Percentage(10), // Kind
+                Constraint::Percentage(6),  // Output
+                Constraint::Percentage(8),  // Kind
                 Constraint::Percentage(10), // Type
                 Constraint::Percentage(10), // Events In
                 Constraint::Percentage(10), // Events Out
                 Constraint::Percentage(10), // Bytes
                 Constraint::Percentage(5),  // Errors
-                Constraint::Percentage(10), // Allocated Bytes
+                Constraint::Percentage(16), // Allocated Bytes
             ]);
 
         f.render_widget(w, area);
