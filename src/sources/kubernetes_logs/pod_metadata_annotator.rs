@@ -240,13 +240,11 @@ fn annotate_from_metadata(
     }
 
     if let Some(labels) = &metadata.labels {
+        let legacy_key_prefix = fields_spec.pod_labels.path.as_ref().map(|k| &k.path);
+
         for (key, value) in labels.iter() {
             let key_path = path!(key);
-            let legacy_key = fields_spec
-                .pod_labels
-                .path
-                .as_ref()
-                .map(|k| &k.path)
+            let legacy_key = legacy_key_prefix
                 .map(|k| k.concat(key_path))
                 .map(LegacyKey::Overwrite);
 
@@ -261,13 +259,11 @@ fn annotate_from_metadata(
     }
 
     if let Some(annotations) = &metadata.annotations {
+        let legacy_key_prefix = fields_spec.pod_annotations.path.as_ref().map(|k| &k.path);
+
         for (key, value) in annotations.iter() {
             let key_path = path!(key);
-            let legacy_key = fields_spec
-                .pod_annotations
-                .path
-                .as_ref()
-                .map(|k| &k.path)
+            let legacy_key = legacy_key_prefix
                 .map(|k| k.concat(key_path))
                 .map(LegacyKey::Overwrite);
 

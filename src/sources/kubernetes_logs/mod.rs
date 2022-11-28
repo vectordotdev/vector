@@ -405,7 +405,7 @@ impl SourceConfig for Config {
                 ))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
-                None,
+                Some("timestamp"),
             )
             .with_standard_vector_source_metadata();
 
@@ -1250,7 +1250,11 @@ mod tests {
                 None
             )
             .with_event_field(&owned_value_path!("stream"), Kind::bytes(), None)
-            .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+            .with_event_field(
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp")
+            )
             .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         )
     }
