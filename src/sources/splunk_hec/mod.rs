@@ -176,17 +176,11 @@ impl SourceConfig for SplunkConfig {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = match log_namespace {
-            LogNamespace::Legacy => {
-                let schema = vector_core::schema::Definition::empty_legacy_namespace();
-                schema
-            }
-            LogNamespace::Vector => {
-                let schema = vector_core::schema::Definition::new_with_default_metadata(
-                    Kind::object(Collection::empty()),
-                    [log_namespace],
-                );
-                schema
-            }
+            LogNamespace::Legacy => vector_core::schema::Definition::empty_legacy_namespace(),
+            LogNamespace::Vector => vector_core::schema::Definition::new_with_default_metadata(
+                Kind::object(Collection::empty()),
+                [log_namespace],
+            ),
         }
         .with_standard_vector_source_metadata()
         .with_source_metadata(
