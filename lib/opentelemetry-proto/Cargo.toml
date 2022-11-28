@@ -6,14 +6,14 @@ edition = "2021"
 publish = false
 
 [build-dependencies]
-prost-build = { version = "0.11.1", default-features = false}
+prost-build = { version = "0.11.2", default-features = false}
 tonic-build = { version = "0.8", default-features = false, features = ["prost", "transport"] }
 
 [dependencies]
 tonic = { version = "0.8", default-features = false, features = ["codegen", "gzip", "prost", "tls", "tls-roots", "transport"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-prost = { version = "0.11.0", default-features = false, features = ["std"] }
-bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
+prost = { version = "0.11.2", default-features = false, features = ["std"] }
+bytes = { version = "1.3.0", default-features = false, features = ["serde"] }
 vector-core = { path = "../vector-core", default-features = false }
 value = {path = "../value"}
 hex = { version = "0.4.3", default-features = false, features = ["std"] }

@@ -20,10 +20,11 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{metadata_path, path, PathPrefix};
+use lookup::{metadata_path, owned_value_path, path, PathPrefix};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
+use value::Kind;
 use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
@@ -135,7 +136,37 @@ impl SourceConfig for AmqpSourceConfig {
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                AmqpSourceConfig::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                AmqpSourceConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(
+                    &self.routing_key_field
+                ))),
+                &owned_value_path!("routing"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                AmqpSourceConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(&self.exchange_key))),
+                &owned_value_path!("exchange"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                AmqpSourceConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(&self.offset_key))),
+                &owned_value_path!("offset"),
+                Kind::integer(),
+                None,
+            );
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
@@ -439,6 +470,10 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 
 #[cfg(test)]
 pub mod test {
+    use lookup::LookupBuf;
+    use value::kind::Collection;
+    use vector_core::schema::Definition;
+
     use super::*;
 
     #[test]
@@ -457,6 +492,66 @@ pub mod test {
         config.connection.connection_string =
             format!("amqp://{}:{}@rabbitmq:5672/{}", user, pass, vhost);
         config
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = AmqpSourceConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                )
+                .with_metadata_field(&owned_value_path!("amqp", "timestamp"), Kind::timestamp())
+                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer());
+
+        assert_eq!(definition, expected_definition);
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = AmqpSourceConfig {
+            routing_key_field: "routing".to_string(),
+            exchange_key: "exchange".to_string(),
+            offset_key: "offset".to_string(),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("routing"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
+
+        assert_eq!(definition, expected_definition);
     }
 }
 

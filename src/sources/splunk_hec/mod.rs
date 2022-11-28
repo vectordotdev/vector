@@ -1085,6 +1085,7 @@ mod tests {
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
             timestamp_key: timestamp_key(),
+            auto_extract_timestamp: None,
             endpoint_target: Default::default(),
         }
         .build(SinkContext::new_test())

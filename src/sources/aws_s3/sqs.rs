@@ -669,7 +669,7 @@ enum Event {
 #[serde(rename_all = "PascalCase")]
 pub struct S3TestEvent {
     pub service: String,
-    pub event_name: S3EventName,
+    pub event: S3EventName,
     pub bucket: String,
 }
 
@@ -863,4 +863,24 @@ fn test_key_deserialize() {
         },
         value
     );
+}
+
+#[test]
+fn test_s3_testevent() {
+    let value: S3TestEvent = serde_json::from_str(
+        r#"{
+        "Service":"Amazon S3",
+        "Event":"s3:TestEvent",
+        "Time":"2014-10-13T15:57:02.089Z",
+        "Bucket":"bucketname",
+        "RequestId":"5582815E1AEA5ADF",
+        "HostId":"8cLeGAmw098X5cv4Zkwcmo8vvZa3eH3eKxsPzbB9wrR+YstdA6Knx4Ip8EXAMPLE"
+     }"#,
+    )
+    .unwrap();
+
+    assert_eq!(value.service, "Amazon S3".to_string());
+    assert_eq!(value.bucket, "bucketname".to_string());
+    assert_eq!(value.event.kind, "s3".to_string());
+    assert_eq!(value.event.name, "TestEvent".to_string());
 }

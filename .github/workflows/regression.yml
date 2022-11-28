@@ -38,9 +38,9 @@ jobs:
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
 
-      comparison: ${{ steps.comparison.outputs.COMPARISON }}
+      comparison-sha: ${{ steps.comparison.outputs.COMPARISON }}
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
-      baseline: ${{ steps.baseline.outputs.BASELINE }}
+      baseline-sha: ${{ steps.baseline.outputs.BASELINE }}
       baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
     steps:
       - uses: actions/checkout@v3
@@ -95,7 +95,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
-          ref: ${{ needs.compute-soak-meta.outputs.baseline-sha }}
+          ref: ${{ needs.compute-metadata.outputs.baseline-sha }}
           path: baseline-vector
 
       - name: Set up Docker Buildx
@@ -132,7 +132,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
-          ref: ${{ needs.compute-soak-meta.outputs.comparison-sha }}
+          ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
           path: comparison-vector
 
       - name: Set up Docker Buildx
@@ -166,9 +166,9 @@ jobs:
       - name: Write out metadata
         run: |
           echo "COMPARISON_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.comparison-tag }}" > ${{ runner.temp }}/meta
-          echo "COMPARISON_SHA=${{ needs.compute-metadata.outputs.comparison }}" >> ${{ runner.temp }}/meta
+          echo "COMPARISON_SHA=${{ needs.compute-metadata.outputs.comparison-sha }}" >> ${{ runner.temp }}/meta
           echo "BASELINE_TAG=${{ needs.compute-metadata.outputs.pr-number }}-${{ needs.compute-metadata.outputs.baseline-tag }}" >> ${{ runner.temp }}/meta
-          echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline }}" >> ${{ runner.temp }}/meta
+          echo "BASELINE_SHA=${{ needs.compute-metadata.outputs.baseline-sha }}" >> ${{ runner.temp }}/meta
           echo "CHECKOUT_SHA=${{ github.sha }}" >> ${{ runner.temp }}/meta
           echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> ${{ runner.temp }}/meta
           echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> ${{ runner.temp }}/meta

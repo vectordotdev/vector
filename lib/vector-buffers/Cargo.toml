@@ -10,15 +10,15 @@ async-recursion = "1.0.0"
 async-stream = "0.3.3"
 async-trait = { version = "0.1", default-features = false }
 bytecheck = { version = "0.6.9", default-features = false, features = ["std"] }
-bytes = { version = "1.2.1", default-features = false }
+bytes = { version = "1.3.0", default-features = false }
 crc32fast = { version = "1.3.2", default-features = false }
-crossbeam-queue = { version = "0.3.6", default-features = false, features = ["std"] }
-crossbeam-utils = { version = "0.8.12", default-features = false }
+crossbeam-queue = { version = "0.3.8", default-features = false, features = ["std"] }
+crossbeam-utils = { version = "0.8.14", default-features = false }
 db-key = { version = "0.0.5", default-features = false }
 fslock = { version = "0.2.1", default-features = false, features = ["std"] }
 futures = { version = "0.3.25", default-features = false, features = ["std"] }
 leveldb = { version = "0.8.6", default-features = false }
-memmap2 = { version = "0.5.7", default-features = false }
+memmap2 = { version = "0.5.8", default-features = false }
 metrics = "0.20.1"
 num-traits = { version = "0.2.15", default-features = false }
 parking_lot = { version = "0.12.1", default-features = false }
@@ -27,7 +27,7 @@ rkyv = { version = "0.7.39", default-features = false, features = ["size_32", "s
 serde = { version = "1.0.147", default-features = false, features = ["derive"] }
 snafu = { version = "0.7.3", default-features = false, features = ["std"] }
 tokio-util = { version = "0.7.0", default-features = false }
-tokio = { version = "1.21.2", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
+tokio = { version = "1.22.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tracing = { version = "0.1.34", default-features = false, features = ["attributes"] }
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-common = { path = "../vector-config-common", default-features = false }
@@ -35,9 +35,9 @@ vector-config-macros = { path = "../vector-config-macros", default-features = fa
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of", "serde"] }
 
 [dev-dependencies]
-clap = "4.0.23"
+clap = "4.0.27"
 criterion = { version = "0.4", features = ["html_reports", "async_tokio"] }
-crossbeam-queue = "0.3.6"
+crossbeam-queue = "0.3.8"
 hdrhistogram = "7.5.2"
 metrics-tracing-context = { version = "0.12.0", default-features = false }
 metrics-util = { version = "0.14.0", default-features = false, features = ["debugging"] }

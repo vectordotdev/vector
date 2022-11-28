@@ -139,7 +139,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.58", default-features = false }
 futures = { version = "0.3.25", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.21.2", default-features = false, features = ["full"] }
+tokio = { version = "1.22.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.11", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -185,8 +185,8 @@ tower = { version = "0.4.13", default-features = false, features = ["buffer", "l
 serde = { version = "1.0.147", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.7", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.87", default-features = false, features = ["raw_value"] }
-serde_with = { version = "2.0.1", default-features = false, features = ["macros", "std"], optional = true }
+serde_json = { version = "1.0.89", default-features = false, features = ["raw_value"] }
+serde_with = { version = "2.1.0", default-features = false, features = ["macros", "std"], optional = true }
 serde_yaml = { version = "0.9.14", default-features = false }
 
 # Messagepack
@@ -194,8 +194,8 @@ rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.11.0", default-features = false, features = ["std"] }
-prost-types = { version = "0.11.0", default-features = false, optional = true }
+prost = { version = "0.11.2", default-features = false, features = ["std"] }
+prost-types = { version = "0.11.2", default-features = false, optional = true }
 
 # GCP
 goauth = { version = "0.13.1", optional = true }
@@ -233,11 +233,11 @@ axum = { version = "0.5.17", default-features = false }
 base64 = { version = "0.13.1", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.13.0", default-features = false, features = ["ssl", "chrono"] }
-bytes = { version = "1.2.1", default-features = false, features = ["serde"] }
+bytes = { version = "1.3.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.9", default-features = false }
-clap = { version = "4.0.23", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.0.27", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -246,7 +246,7 @@ dyn-clone = { version = "1.0.9", default-features = false }
 encoding_rs = { version = "0.8.31", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.8", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.24", default-features = false, features = ["default"] }
+flate2 = { version = "1.0.25", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.25", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.5.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
@@ -261,7 +261,7 @@ http-body = { version = "0.4.5", default-features = false }
 hyper = { version = "0.14.23", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "~1.9.1", default-features = false, features = ["serde"] }
+indexmap = { version = "~1.9.2", default-features = false, features = ["serde"] }
 infer = { version = "0.11.0", default-features = false, optional = true}
 indoc = { version = "1.0.7", default-features = false }
 inventory = { version = "0.3.2", default-features = false }
@@ -278,7 +278,7 @@ nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
 once_cell = { version = "1.16", default-features = false }
-openssl = { version = "0.10.42", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.43", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.4.0", default-features = false }
@@ -296,7 +296,7 @@ seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.14", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.3", default-features = false, features = ["futures"] }
-snap = { version = "1.0.5", default-features = false, optional = true }
+snap = { version = "1.1.0", default-features = false, optional = true }
 socket2 = { version = "0.4.7", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
@@ -328,7 +328,7 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.25.0", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.11.1", default-features = false, optional = true }
+prost-build = { version = "0.11.2", default-features = false, optional = true }
 tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
@@ -348,7 +348,7 @@ quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
 tokio-test = "0.4.2"
-tokio = { version = "1.21.2", features = ["test-util"] }
+tokio = { version = "1.22.0", features = ["test-util"] }
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
