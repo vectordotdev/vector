@@ -9307,6 +9307,7 @@ dependencies = [
  "dns-lookup",
  "grok",
  "hex",
+ "hmac",
  "hostname",
  "indexmap",
  "lookup",

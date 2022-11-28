@@ -98,6 +98,8 @@ mod get;
 mod get_env_var;
 #[cfg(feature = "get_hostname")]
 mod get_hostname;
+#[cfg(feature = "hmac")]
+mod hmac;
 #[cfg(feature = "includes")]
 mod includes;
 #[cfg(feature = "integer")]
@@ -389,6 +391,8 @@ pub use get::Get;
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]
 pub use get_hostname::GetHostname;
+#[cfg(feature = "hmac")]
+pub use crate::hmac::Hmac;
 #[cfg(feature = "includes")]
 pub use includes::Includes;
 #[cfg(feature = "integer")]
@@ -680,6 +684,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(GetEnvVar),
         #[cfg(feature = "get_hostname")]
         Box::new(GetHostname),
+        #[cfg(feature = "hmac")]
+        Box::new(Hmac),
         #[cfg(feature = "includes")]
         Box::new(Includes),
         #[cfg(feature = "integer")]
