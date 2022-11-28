@@ -1,5 +1,4 @@
-use std::io::stdout;
-
+use crate::internal_telemetry::is_allocation_tracking_enabled;
 use crossterm::{
     cursor::Show,
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -10,6 +9,7 @@ use crossterm::{
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
+use std::io::stdout;
 use tokio::sync::oneshot;
 use tui::{
     backend::{Backend, CrosstermBackend},
@@ -104,10 +104,12 @@ fn format_metric(total: i64, throughput: i64, human_metrics: bool) -> String {
     }
 }
 
-#[cfg(not(feature = "allocation-tracing"))]
-const NUM_COLUMNS: usize = 8;
-#[cfg(feature = "allocation-tracing")]
-const NUM_COLUMNS: usize = 9;
+const NUM_COLUMNS: usize = if is_allocation_tracking_enabled() {
+    9
+} else {
+    8
+};
+
 static HEADER: [&str; NUM_COLUMNS] = [
     "ID",
     "Output",
@@ -240,39 +242,34 @@ impl<'a> Widgets<'a> {
             }
         }
 
-        #[cfg(feature = "allocation-tracing")]
         let w = Table::new(items)
             .header(Row::new(header).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL).title("Components"))
             .column_spacing(2)
-            .widths(&[
-                Constraint::Percentage(15), // ID
-                Constraint::Percentage(6),  // Output
-                Constraint::Percentage(8),  // Kind
-                Constraint::Percentage(10), // Type
-                Constraint::Percentage(10), // Events In
-                Constraint::Percentage(10), // Events Out
-                Constraint::Percentage(10), // Bytes
-                Constraint::Percentage(5),  // Errors
-                Constraint::Percentage(16), // Allocated Bytes
-            ]);
-
-        #[cfg(not(feature = "allocation-tracing"))]
-        let w = Table::new(items)
-            .header(Row::new(header).bottom_margin(1))
-            .block(Block::default().borders(Borders::ALL).title("Components"))
-            .column_spacing(2)
-            .widths(&[
-                Constraint::Percentage(15), // ID
-                Constraint::Percentage(15), // Output
-                Constraint::Percentage(10), // Kind
-                Constraint::Percentage(10), // Type
-                Constraint::Percentage(10), // Events In
-                Constraint::Percentage(10), // Events Out
-                Constraint::Percentage(10), // Bytes
-                Constraint::Percentage(10), // Errors
-            ]);
-
+            .widths(if is_allocation_tracking_enabled() {
+                &[
+                    Constraint::Percentage(15), // ID
+                    Constraint::Percentage(6),  // Output
+                    Constraint::Percentage(8),  // Kind
+                    Constraint::Percentage(10), // Type
+                    Constraint::Percentage(10), // Events In
+                    Constraint::Percentage(10), // Events Out
+                    Constraint::Percentage(10), // Bytes
+                    Constraint::Percentage(5),  // Errors
+                    Constraint::Percentage(16), // Allocated Bytes
+                ]
+            } else {
+                &[
+                    Constraint::Percentage(15), // ID
+                    Constraint::Percentage(15), // Output
+                    Constraint::Percentage(10), // Kind
+                    Constraint::Percentage(10), // Type
+                    Constraint::Percentage(10), // Events In
+                    Constraint::Percentage(10), // Events Out
+                    Constraint::Percentage(10), // Bytes
+                    Constraint::Percentage(10), // Errors
+                ]
+            });
         f.render_widget(w, area);
     }
 
