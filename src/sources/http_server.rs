@@ -25,7 +25,10 @@ use crate::{
     },
     event::{Event, Value},
     serde::{bool_or_struct, default_decoding},
-    sources::util::{http::HttpMethod, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{
+        http::{add_query_parameters, HttpMethod},
+        Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    },
     tls::TlsEnableableConfig,
 };
 
@@ -375,30 +378,6 @@ impl SimpleHttpSource {
                 log,
                 SimpleHttpConfig::NAME,
                 now,
-            );
-        }
-    }
-}
-
-// TODO when the `heroku` log namespacing work is undertaken, move this function out of this file and replace the
-// sources::util::http::query::add_query_parameters() function body with it.
-// (https://github.com/vectordotdev/vector/issues/15022)
-fn add_query_parameters(
-    events: &mut [Event],
-    query_parameters_config: &[String],
-    query_parameters: HashMap<String, String>,
-    log_namespace: LogNamespace,
-    source_name: &'static str,
-) {
-    for query_parameter_name in query_parameters_config {
-        let value = query_parameters.get(query_parameter_name);
-        for event in events.iter_mut() {
-            log_namespace.insert_source_metadata(
-                source_name,
-                event.as_mut_log(),
-                Some(LegacyKey::Overwrite(path!(query_parameter_name))),
-                path!("query_parameters", query_parameter_name),
-                crate::event::Value::from(value.map(String::to_owned)),
             );
         }
     }
