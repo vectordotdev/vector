@@ -346,7 +346,11 @@ impl Metric {
         self.series.insert_tag(name, value)
     }
 
-    pub fn set_multi_value_tag(&mut self, name: String, values: Vec<TagValue>) {
+    pub fn set_multi_value_tag(
+        &mut self,
+        name: String,
+        values: impl IntoIterator<Item = TagValue>,
+    ) {
         self.series.set_multi_value_tag(name, values);
     }
 

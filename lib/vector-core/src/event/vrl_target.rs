@@ -192,6 +192,8 @@ fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi
         // set a single tag value
         if let Ok(tag_value) = value.try_bytes_utf8_lossy().map(Cow::into_owned) {
             metric.insert_tag(name, tag_value);
+        } else if value.is_null() {
+            metric.set_multi_value_tag(name, vec![TagValue::Bare]);
         }
     }
 }

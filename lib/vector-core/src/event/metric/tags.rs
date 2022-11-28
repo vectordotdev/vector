@@ -451,8 +451,9 @@ impl MetricTags {
             .and_then(TagValueSet::into_single)
     }
 
-    pub fn set_multi_value_tag(&mut self, name: String, values: Vec<TagValue>) {
-        self.0.insert(name, TagValueSet::from(values));
+    pub fn set_multi_value(&mut self, name: String, values: impl IntoIterator<Item = TagValue>) {
+        let x = TagValueSet::from_iter(values);
+        self.0.insert(name, x);
     }
 
     pub fn remove(&mut self, name: &str) -> Option<String> {

@@ -46,8 +46,8 @@ impl MetricSeries {
         (self.tags.get_or_insert_with(Default::default)).insert(key, value)
     }
 
-    pub fn set_multi_value_tag(&mut self, key: String, values: Vec<TagValue>) {
-        (self.tags.get_or_insert_with(Default::default)).set_multi_value_tag(key, values);
+    pub fn set_multi_value_tag(&mut self, key: String, values: impl IntoIterator<Item = TagValue>) {
+        (self.tags.get_or_insert_with(Default::default)).set_multi_value(key, values);
     }
 
     /// Removes all the tags.
