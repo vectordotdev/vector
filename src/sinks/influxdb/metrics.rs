@@ -278,7 +278,7 @@ fn encode_events(
         let (metric_type, fields) = get_type_and_fields(event.value(), quantiles);
 
         let mut unwrapped_tags = tags.unwrap_or_default();
-        unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
+        unwrapped_tags.replace("metric_type".to_owned(), metric_type.to_owned());
 
         if let Err(error_message) = influx_line_protocol(
             protocol_version,

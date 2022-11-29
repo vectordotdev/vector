@@ -2,6 +2,7 @@ pub mod v1;
 pub mod v2;
 
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{GenerateConfig, Input, Output, TransformConfig, TransformContext},
@@ -98,7 +99,7 @@ impl TransformConfig for LuaConfig {
         }
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         match self {
             LuaConfig::V1(v1) => v1.config.outputs(merged_definition),
             LuaConfig::V2(v2) => v2.config.outputs(merged_definition),

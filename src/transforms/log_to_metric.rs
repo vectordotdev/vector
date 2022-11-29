@@ -3,6 +3,7 @@ use std::num::ParseFloatError;
 use chrono::Utc;
 use indexmap::IndexMap;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{
@@ -138,7 +139,7 @@ impl TransformConfig for LogToMetricConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 
@@ -184,7 +185,7 @@ fn render_tags(
             for (name, template) in tags {
                 match render_template(template, event) {
                     Ok(tag) => {
-                        map.insert(name.to_string(), tag);
+                        map.replace(name.to_string(), tag);
                     }
                     Err(TransformError::TemplateRenderingError(error)) => {
                         emit!(crate::internal_events::TemplateRenderingError {

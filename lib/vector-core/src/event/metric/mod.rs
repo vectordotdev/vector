@@ -342,8 +342,8 @@ impl Metric {
     /// containing the previous value of the tag.
     ///
     /// *Note:* This will create the tags map if it is not present.
-    pub fn insert_tag(&mut self, name: String, value: String) -> Option<String> {
-        self.series.insert_tag(name, value)
+    pub fn replace_tag(&mut self, name: String, value: String) -> Option<String> {
+        self.series.replace_tag(name, value)
     }
 
     /// Zeroes out the data in this metric.
