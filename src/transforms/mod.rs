@@ -232,7 +232,7 @@ mod test {
         );
 
         let config = builder.build().expect("building config should not fail");
-        let (topology, _, _) = start_topology(config, false).await;
+        let (topology, _) = start_topology(config, false).await;
 
         (topology, rx)
     }

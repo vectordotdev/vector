@@ -680,8 +680,10 @@ pub async fn start_topology(
     require_healthy: impl Into<Option<bool>>,
 ) -> (
     RunningTopology,
-    tokio::sync::mpsc::UnboundedSender<()>,
-    tokio::sync::mpsc::UnboundedReceiver<()>,
+    (
+        tokio::sync::mpsc::UnboundedSender<()>,
+        tokio::sync::mpsc::UnboundedReceiver<()>,
+    ),
 ) {
     config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);

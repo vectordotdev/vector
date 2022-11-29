@@ -117,7 +117,7 @@ pub async fn start_validated(
     running_topology.connect_diff(&diff, &mut pieces).await;
     running_topology.spawn_diff(&diff, pieces);
 
-    Some((running_topology, abort_tx, abort_rx))
+    Some((running_topology, (abort_tx, abort_rx)))
 }
 
 pub async fn build_or_log_errors(

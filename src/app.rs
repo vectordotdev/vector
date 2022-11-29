@@ -239,7 +239,7 @@ impl Application {
                 let api = config.api;
 
                 let result = topology::start_validated(config, diff, pieces).await;
-                let (topology, graceful_crash_sender, graceful_crash_receiver) =
+                let (topology, (graceful_crash_sender, graceful_crash_receiver)) =
                     result.ok_or(exitcode::CONFIG)?;
 
                 Ok(ApplicationConfig {
