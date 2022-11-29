@@ -10,7 +10,7 @@ use codecs::{
 };
 use futures::StreamExt;
 use listenfd::ListenFd;
-use lookup::{metadata_path, path, PathPrefix};
+use lookup::PathPrefix;
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
 use vector_config::{configurable_component, NamedComponent};
@@ -366,13 +366,6 @@ fn enrich_syslog_event(
 ) {
     let log = event.as_mut_log();
 
-    log_namespace.insert_vector_metadata(
-        log,
-        path!(log_schema().source_type_key()),
-        path!("source_type"),
-        SyslogConfig::NAME,
-    );
-
     if let Some(default_host) = &default_host {
         log.insert("source_ip", default_host.clone());
     }
@@ -380,21 +373,28 @@ fn enrich_syslog_event(
     let parsed_hostname = log
         .get("hostname")
         .map(|hostname| hostname.coerce_to_bytes());
+
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
         log.insert(host_key, parsed_host);
     }
 
+    log_namespace.insert_standard_vector_source_metadata(log, SyslogConfig::NAME, Utc::now());
+
+    // For the Vector namespace, if the timestamp exists in the message it in the metadata.
+    // For Legacy we insert it in the message - and default to Now if it doesn't exist.
     let timestamp = log
         .get("timestamp")
-        .and_then(|timestamp| timestamp.as_timestamp().cloned())
-        .unwrap_or_else(Utc::now);
+        .and_then(|timestamp| timestamp.as_timestamp().cloned());
+
     match log_namespace {
         LogNamespace::Vector => {
-            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
-            log.insert(metadata_path!(SyslogConfig::NAME, "timestamp"), timestamp);
+            if let Some(timestamp) = timestamp {
+                log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+            }
         }
         LogNamespace::Legacy => {
-            log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+            let timestamp = timestamp.unwrap_or_else(Utc::now);
+            log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
         }
     };
 
