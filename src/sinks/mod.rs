@@ -103,7 +103,6 @@ use crate::config::{
     unit_test::{UnitTestSinkConfig, UnitTestStreamSinkConfig},
     AcknowledgementsConfig, Resource, SinkConfig, SinkContext,
 };
-use crate::sinks::datadog_archives::DatadogArchivesSinkConfig;
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
 
@@ -193,7 +192,7 @@ pub enum Sinks {
 
     /// Datadog Archives.
     #[cfg(feature = "sinks-datadog_archives")]
-    DatadogArchives(#[configurable(derived)] DatadogArchivesSinkConfig),
+    DatadogArchives(#[configurable(derived)] datadog_archives::DatadogArchivesSinkConfig),
 
     /// Datadog Events.
     #[cfg(feature = "sinks-datadog_events")]
