@@ -281,6 +281,8 @@ mod tests {
 mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
+    use vector_core::config::log_schema;
+
     use super::*;
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
     use crate::test_util::{
@@ -304,7 +306,14 @@ mod integration_tests {
                 LogNamespace::Legacy,
             )
             .build();
-            tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
+            tokio::spawn(nats_source(
+                nc,
+                sub,
+                decoder,
+                LogNamespace::Legacy,
+                ShutdownSignal::noop(),
+                tx,
+            ));
             nc_pub.publish(&subject, msg).await.unwrap();
 
             collect_n(rx, 1).await
@@ -331,6 +340,7 @@ mod integration_tests {
             decoding: default_decoding(),
             tls: None,
             auth: None,
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -361,6 +371,7 @@ mod integration_tests {
                     password: "natspass".to_string().into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -391,6 +402,7 @@ mod integration_tests {
                     password: "wrongpass".to_string().into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -420,6 +432,7 @@ mod integration_tests {
                     value: "secret".to_string().into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -449,6 +462,7 @@ mod integration_tests {
                     value: "wrongsecret".to_string().into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -479,6 +493,7 @@ mod integration_tests {
                     seed: "SUANIRXEZUROTXNFN3TJYMT27K7ZZVMD46FRIHF6KXKS4KGNVBS57YAFGY".into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -509,6 +524,7 @@ mod integration_tests {
                     seed: "SBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -540,6 +556,7 @@ mod integration_tests {
                 },
             }),
             auth: None,
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -565,6 +582,7 @@ mod integration_tests {
             decoding: default_decoding(),
             tls: None,
             auth: None,
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -598,6 +616,7 @@ mod integration_tests {
                 },
             }),
             auth: None,
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -629,6 +648,7 @@ mod integration_tests {
                 },
             }),
             auth: None,
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -664,6 +684,7 @@ mod integration_tests {
                     path: "tests/data/nats/nats.creds".into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -699,6 +720,7 @@ mod integration_tests {
                     path: "tests/data/nats/nats-bad.creds".into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
