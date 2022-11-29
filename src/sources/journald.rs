@@ -11,7 +11,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::{decoding::BoxedFramingError, BytesDeserializerConfig, CharacterDelimitedDecoder};
+use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
 use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
 use lookup::{lookup_v2::parse_value_path, metadata_path, owned_value_path, path, PathPrefix};
 use nix::{
@@ -29,7 +29,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use value::Kind;
+use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
@@ -192,8 +192,16 @@ impl JournaldConfig {
     }
 
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
-        BytesDeserializerConfig
-            .schema_definition(log_namespace)
+        let definition = Definition::new_with_default_metadata(
+            Kind::object(
+                Collection::empty()
+                    .with_unknown(Kind::bytes())
+                    .with_known("message", Kind::bytes().or_undefined()),
+            ),
+            [log_namespace],
+        );
+
+        definition
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 JournaldConfig::NAME,
@@ -923,7 +931,6 @@ mod checkpointer_tests {
 mod tests {
     use std::{fs, path::Path};
 
-    use lookup::LookupBuf;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration, Instant};
     use value::{kind::Collection, Value};
@@ -1344,22 +1351,27 @@ mod tests {
             .log_schema_definition
             .unwrap();
 
-        let expected_definition =
-            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
-                .with_metadata_field(
-                    &owned_value_path!("vector", "ingest_timestamp"),
-                    Kind::timestamp(),
-                )
-                .with_metadata_field(
-                    &owned_value_path!(JournaldConfig::NAME, "timestamp"),
-                    Kind::timestamp().or_undefined(),
-                )
-                .with_metadata_field(
-                    &owned_value_path!(JournaldConfig::NAME, "host"),
-                    Kind::bytes().or_undefined(),
-                );
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(
+                Collection::empty()
+                    .with_unknown(Kind::bytes())
+                    .with_known("message", Kind::bytes().or_undefined()),
+            ),
+            [LogNamespace::Vector],
+        )
+        .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+        .with_metadata_field(
+            &owned_value_path!("vector", "ingest_timestamp"),
+            Kind::timestamp(),
+        )
+        .with_metadata_field(
+            &owned_value_path!(JournaldConfig::NAME, "timestamp"),
+            Kind::timestamp().or_undefined(),
+        )
+        .with_metadata_field(
+            &owned_value_path!(JournaldConfig::NAME, "host"),
+            Kind::bytes().or_undefined(),
+        );
 
         assert_eq!(definition, expected_definition)
     }
@@ -1374,16 +1386,19 @@ mod tests {
             .unwrap();
 
         let expected_definition = Definition::new_with_default_metadata(
-            Kind::object(Collection::empty()),
+            Kind::object(
+                Collection::empty()
+                    .with_unknown(Kind::bytes())
+                    .with_known("message", Kind::bytes().or_undefined()),
+            ),
             [LogNamespace::Legacy],
         )
-        .with_event_field(
-            &owned_value_path!("message"),
-            Kind::bytes(),
-            Some("message"),
-        )
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(
+            &owned_value_path!("timestamp"),
+            Kind::timestamp().or_bytes(),
+            None,
+        )
         .with_event_field(
             &owned_value_path!("host"),
             Kind::bytes().or_undefined(),
