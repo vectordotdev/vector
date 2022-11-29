@@ -144,11 +144,11 @@ impl<'a> InternalMetrics<'a> {
 
                 if let Some(host_key) = &self.host_key {
                     if let Ok(hostname) = &hostname {
-                        metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+                        metric.replace_tag(host_key.to_owned(), hostname.to_owned());
                     }
                 }
                 if let Some(pid_key) = &self.pid_key {
-                    metric.insert_tag(pid_key.to_owned(), pid.clone());
+                    metric.replace_tag(pid_key.to_owned(), pid.clone());
                 }
                 metric
             });
