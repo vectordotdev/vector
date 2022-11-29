@@ -302,7 +302,7 @@ impl SerializerConfig {
             // `len` bytes -- with a "zero-length buffer" to terminate the overall message... which
             // our length delimited framer obviously will not do.
             //
-            // This is OK for now, because the Avro serializer is more ceremonially than anything
+            // This is OK for now, because the Avro serializer is more ceremonial than anything
             // else, existing to curry serializer config options to Pulsar's native client, not to
             // actually serialize the bytes themselves... but we're still exposing this method and
             // we should do so accurately, even if practically it doesn't need to be.
