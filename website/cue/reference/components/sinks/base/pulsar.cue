@@ -160,7 +160,7 @@ base: components: sinks: pulsar: configuration: {
 		type: string: syntax: "literal"
 	}
 	producer_name: {
-		description: "The name of the producer. If not specified, the default name will be used."
+		description: "The name of the producer. If not specified, the default name assigned by Pulsar will be used."
 		required:    false
 		type: string: syntax: "literal"
 	}

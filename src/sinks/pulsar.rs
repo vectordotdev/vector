@@ -50,7 +50,7 @@ pub struct PulsarSinkConfig {
     /// The Pulsar topic name to write events to.
     topic: String,
 
-    /// The name of the producer. If not specified, the default name will be used.
+    /// The name of the producer. If not specified, the default name assigned by Pulsar will be used.
     producer_name: Option<String>,
 
     #[configurable(derived)]
