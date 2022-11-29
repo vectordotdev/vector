@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
     io::SeekFrom,
-    iter::FromIterator,
     path::PathBuf,
     process::Stdio,
     str::FromStr,
@@ -191,11 +190,13 @@ impl JournaldConfig {
         matches
     }
 
+    /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         let definition = Definition::new_with_default_metadata(
             Kind::object(
                 Collection::empty()
                     .with_unknown(Kind::bytes())
+                    // the MESSAGE field is most likely present in the journald Record, but may not be.
                     .with_known("message", Kind::bytes().or_undefined()),
             ),
             [log_namespace],
@@ -604,7 +605,18 @@ fn create_event(
     batch: &Option<BatchNotifier>,
     log_namespace: LogNamespace,
 ) -> LogEvent {
-    let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
+    let mut log = LogEvent::default().with_batch_notifier_option(batch);
+
+    // Add the fields from the Record to the log event.
+    record.iter().for_each(|(key, value)| {
+        log_namespace.insert_source_metadata(
+            JournaldConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(key))),
+            path!(key),
+            value.as_str(),
+        );
+    });
 
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(MESSAGE) {
