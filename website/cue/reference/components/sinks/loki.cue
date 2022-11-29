@@ -70,10 +70,18 @@ components: sinks: loki: {
 
 	configuration: {
 		endpoint: {
-			description: "The base URL of the Loki instance. Vector will append `/loki/api/v1/push` to this."
+			description: "The base URL of the Loki instance. Vector will append the value of `path` to this."
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]
+			}
+		}
+		path: {
+			description: "The path to use in the URL of the Loki instance."
+			required:    false
+			type: string: {
+				default: "/loki/api/v1/push"
+				examples: ["/loki/api/v1/push"]
 			}
 		}
 		auth: configuration._http_auth & {_args: {
