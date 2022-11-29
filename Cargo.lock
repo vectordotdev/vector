@@ -4368,7 +4368,7 @@ dependencies = [
  "bytes 1.3.0",
  "chrono",
  "prost 0.10.4",
- "prost-build 0.10.4",
+ "prost-build 0.11.3",
  "prost-types 0.10.1",
  "snap",
 ]
@@ -5272,7 +5272,7 @@ dependencies = [
  "hex",
  "ordered-float 3.4.0",
  "prost 0.11.2",
- "prost-build 0.11.2",
+ "prost-build 0.11.3",
  "tonic",
  "tonic-build",
  "value",
@@ -5846,7 +5846,7 @@ dependencies = [
  "nom",
  "num_enum",
  "prost 0.11.2",
- "prost-build 0.11.2",
+ "prost-build 0.11.3",
  "prost-types 0.11.2",
  "snafu",
  "value",
@@ -5929,9 +5929,9 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.11.2"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d8b442418ea0822409d9e7d047cbf1e7e9e1760b172bf9982cf29d517c93511"
+checksum = "e330bf1316db56b12c2bcfa399e8edddd4821965ea25ddb2c134b610b1c1c604"
 dependencies = [
  "bytes 1.3.0",
  "heck 0.4.0",
@@ -8075,7 +8075,7 @@ checksum = "48c6fd7c2581e36d63388a9e04c350c21beb7a8b059580b2e93993c526899ddc"
 dependencies = [
  "prettyplease",
  "proc-macro2",
- "prost-build 0.11.2",
+ "prost-build 0.11.3",
  "quote",
  "syn",
 ]
@@ -8858,7 +8858,7 @@ dependencies = [
  "prometheus-parser",
  "proptest",
  "prost 0.11.2",
- "prost-build 0.11.2",
+ "prost-build 0.11.3",
  "prost-types 0.11.2",
  "pulsar",
  "quickcheck",
@@ -9120,7 +9120,7 @@ dependencies = [
  "pin-project",
  "proptest",
  "prost 0.11.2",
- "prost-build 0.11.2",
+ "prost-build 0.11.3",
  "prost-types 0.11.2",
  "quanta",
  "quickcheck",
