@@ -83,6 +83,42 @@ base: components: sinks: pulsar: configuration: {
 			}
 		}
 	}
+	batch_size: {
+		description: """
+			Determines the batch size.
+
+			Defaults to 1000.
+			"""
+		required: false
+		type: uint: {}
+	}
+	compression: {
+		description: "Identifies the compression options that are available within Pulsar."
+		required:    false
+		type: string: enum: {
+			Lz4: """
+				[LZ4][lz4] compression.
+
+				[lz4]: https://lz4.github.io/lz4/
+				"""
+			None: "No compression."
+			Snappy: """
+				[Snappy][snappy] compression.
+
+				[snappy]: https://google.github.io/snappy/
+				"""
+			Zlib: """
+				[Zlib][zlib] compression.
+
+				[zlib]: https://www.zlib.net
+				"""
+			Zstd: """
+				[Zstd][zstd] compression.
+
+				[zstd]: https://zstd.net
+				"""
+		}
+	}
 	encoding: {
 		description: "Encoding configuration."
 		required:    true
@@ -149,10 +185,146 @@ base: components: sinks: pulsar: configuration: {
 		required:    true
 		type: string: syntax: "literal"
 	}
-	partition_key_field: {
-		description: "Log field to use as Pulsar message key"
-		required:    false
+	key_field: {
+		description: """
+			The log field name or tags key to use for the topic key.
+
+			If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent.
+
+			Pulsar uses a hash of the key to choose the topic-partition or uses round-robin if the record has no key.
+			"""
+		required: false
 		type: string: syntax: "literal"
+	}
+	properties_key: {
+		description: """
+			The log field name to use for the Pulsar properties.
+
+			If omitted, no properties will be written.
+			"""
+		required: false
+		type: string: syntax: "literal"
+	}
+	request: {
+		description: """
+			Middleware settings for outbound requests.
+
+			Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+			"""
+		required: false
+		type: object: options: {
+			adaptive_concurrency: {
+				description: """
+					Configuration of adaptive concurrency parameters.
+
+					These parameters typically do not require changes from the default, and incorrect values can lead to meta-stable or
+					unstable performance and sink behavior. Proceed with caution.
+					"""
+				required: false
+				type: object: {
+					default: {
+						decrease_ratio:      0.9
+						ewma_alpha:          0.4
+						rtt_deviation_scale: 2.5
+					}
+					options: {
+						decrease_ratio: {
+							description: """
+																The fraction of the current value to set the new concurrency limit when decreasing the limit.
+
+																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
+																when latency increases.
+
+																Note that the new limit is rounded down after applying this ratio.
+																"""
+							required: false
+							type: float: default: 0.9
+						}
+						ewma_alpha: {
+							description: """
+																The weighting of new measurements compared to older measurements.
+
+																Valid values are greater than `0` and less than `1`.
+
+																ARC uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with
+																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
+																unusually high response variability.
+																"""
+							required: false
+							type: float: default: 0.4
+						}
+						rtt_deviation_scale: {
+							description: """
+																Scale of RTT deviations which are not considered anomalous.
+
+																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
+
+																When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
+																those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
+																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
+																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
+																"""
+							required: false
+							type: float: default: 2.5
+						}
+					}
+				}
+			}
+			concurrency: {
+				description: "Configuration for outbound request concurrency."
+				required:    false
+				type: {
+					number: {}
+					string: {
+						const:   "adaptive"
+						default: "none"
+					}
+				}
+			}
+			rate_limit_duration_secs: {
+				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				required:    false
+				type: uint: default: 1
+			}
+			rate_limit_num: {
+				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
+				required:    false
+				type: uint: default: 9223372036854775807
+			}
+			retry_attempts: {
+				description: """
+					The maximum number of retries to make for failed requests.
+
+					The default, for all intents and purposes, represents an infinite number of retries.
+					"""
+				required: false
+				type: uint: default: 9223372036854775807
+			}
+			retry_initial_backoff_secs: {
+				description: """
+					The amount of time to wait before attempting the first retry for a failed request.
+
+					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					"""
+				required: false
+				type: uint: default: 1
+			}
+			retry_max_duration_secs: {
+				description: "The maximum amount of time, in seconds, to wait between retries."
+				required:    false
+				type: uint: default: 3600
+			}
+			timeout_secs: {
+				description: """
+					The maximum time a request can take before being aborted.
+
+					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					create orphaned requests, pile on retries, and result in duplicate data downstream.
+					"""
+				required: false
+				type: uint: default: 60
+			}
+		}
 	}
 	topic: {
 		description: "The Pulsar topic name to write events to."
