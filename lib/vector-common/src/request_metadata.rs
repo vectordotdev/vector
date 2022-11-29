@@ -1,7 +1,7 @@
 use std::ops::Add;
 
 /// Metadata for batch requests.
-#[derive(Clone, Debug, Default, Copy)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct RequestMetadata {
     /// Number of events represented by this batch request.
     event_count: usize,

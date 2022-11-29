@@ -12,11 +12,11 @@ futures = "0.3"
 k8s-openapi = { version = "0.16.0", default-features = false, features = ["v1_19"] }
 k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
 regex = "1"
-reqwest = { version = "0.11.12", features = ["json"] }
+reqwest = { version = "0.11.13", features = ["json"] }
 serde_json = "1"
-tokio = { version = "1.21.2", features = ["full"] }
+tokio = { version = "1.22.0", features = ["full"] }
 indoc = "1.0.7"
-env_logger = "0.9"
+env_logger = "0.10"
 tracing = { version = "0.1", features = ["log"] }
 rand = "0.8"
 

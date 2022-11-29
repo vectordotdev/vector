@@ -385,7 +385,12 @@ impl LokiSink {
 
         let service = tower::ServiceBuilder::new()
             .settings(request_limits, LokiRetryLogic)
-            .service(LokiService::new(client, config.endpoint, config.auth)?);
+            .service(LokiService::new(
+                client,
+                config.endpoint,
+                config.path,
+                config.auth,
+            )?);
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;

@@ -252,7 +252,7 @@ impl TagCardinalityLimit {
                 LimitExceededAction::DropEvent => {
                     // This needs to check all the tags, to ensure that the ordering of tag names
                     // doesn't change the behavior of the check.
-                    for (key, value) in &*tags_map {
+                    for (key, value) in tags_map.iter_single() {
                         if self.tag_limit_exceeded(key, value) {
                             emit!(TagCardinalityLimitRejectingEvent {
                                 tag_key: key,
@@ -261,7 +261,7 @@ impl TagCardinalityLimit {
                             return None;
                         }
                     }
-                    for (key, value) in &*tags_map {
+                    for (key, value) in tags_map.iter_single() {
                         self.record_tag_value(key, value);
                     }
                 }

@@ -100,7 +100,7 @@ impl Requirement {
                     // Get the kind at the path for the given semantic meaning.
                     let definition_kind = definition.event_kind().at_path(path);
 
-                    if !req_meaning.kind.is_superset(&definition_kind) {
+                    if req_meaning.kind.is_superset(&definition_kind).is_err() {
                         // The semantic meaning kind does not match the expected
                         // kind, so we can't use it in the sink.
                         errors.push(ValidationError::MeaningKind {

@@ -17,7 +17,7 @@ pub use self::tracing_allocator::GroupedTraceableAllocator;
 /// aggregating and processing the allocator events. While `GroupedTraceableAllocator` already
 /// avoids reentrantly tracing (de)allocations, this method provides a way to do so from _outside_
 /// of the `GlobalAlloc` codepath.
-#[allow(dead_code)]
+#[inline(always)]
 pub fn without_allocation_tracing<F>(f: F)
 where
     F: FnOnce(),

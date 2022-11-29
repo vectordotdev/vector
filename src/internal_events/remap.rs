@@ -3,7 +3,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+    error_stage, error_type, ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL,
 };
 
 #[derive(Debug)]
@@ -54,7 +54,7 @@ impl InternalEvent for RemapMappingAbort {
         );
 
         if self.event_dropped {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
                 reason: "Event mapping aborted.",
             });

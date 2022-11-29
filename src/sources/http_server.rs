@@ -8,23 +8,26 @@ use codecs::{
     NewlineDelimitedDecoderConfig,
 };
 use http::StatusCode;
-use lookup::event_path;
+use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use value::{kind::Collection, Kind};
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{DataType, LegacyKey, LogNamespace},
+    schema::Definition,
+};
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
     },
     event::{Event, Value},
     serde::{bool_or_struct, default_decoding},
     sources::util::{
-        add_query_parameters, http::HttpMethod, Encoding, ErrorMessage, HttpSource,
-        HttpSourceAuthConfig,
+        http::{add_query_parameters, HttpMethod},
+        Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
     },
     tls::TlsEnableableConfig,
 };
@@ -122,11 +125,60 @@ pub struct SimpleHttpConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
-impl GenerateConfig for SimpleHttpConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+impl SimpleHttpConfig {
+    /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
+    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+        let mut schema_definition = self
+            .decoding
+            .as_ref()
+            .unwrap_or(&default_decoding())
+            .schema_definition(log_namespace)
+            .with_source_metadata(
+                SimpleHttpConfig::NAME,
+                parse_value_path(&self.path_key)
+                    .ok()
+                    .map(LegacyKey::InsertIfEmpty),
+                &owned_value_path!("path"),
+                Kind::bytes(),
+                None,
+            )
+            // for metadata that is added to the events dynamically from the self.headers
+            .with_source_metadata(
+                SimpleHttpConfig::NAME,
+                None,
+                &owned_value_path!("headers"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            // for metadata that is added to the events dynamically from the self.query_parameters
+            .with_source_metadata(
+                SimpleHttpConfig::NAME,
+                None,
+                &owned_value_path!("query_parameters"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_standard_vector_source_metadata();
+
+        // for metadata that is added to the events dynamically from config options
+        if log_namespace == LogNamespace::Legacy {
+            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+        }
+
+        schema_definition
+    }
+}
+
+impl Default for SimpleHttpConfig {
+    fn default() -> Self {
+        Self {
             address: "0.0.0.0:8080".parse().unwrap(),
             encoding: None,
             headers: Vec::new(),
@@ -140,8 +192,14 @@ impl GenerateConfig for SimpleHttpConfig {
             framing: None,
             decoding: Some(default_decoding()),
             acknowledgements: SourceAcknowledgementsConfig::default(),
-        })
-        .unwrap()
+            log_namespace: None,
+        }
+    }
+}
+
+impl GenerateConfig for SimpleHttpConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(SimpleHttpConfig::default()).unwrap()
     }
 }
 
@@ -157,58 +215,25 @@ fn default_path_key() -> String {
     "path".to_string()
 }
 
-#[derive(Clone)]
-struct SimpleHttpSource {
-    headers: Vec<String>,
-    query_parameters: Vec<String>,
-    path_key: String,
-    decoder: Decoder,
-}
+/// Removes duplicates from the list, and logs a `warn!()` for each duplicate removed.
+fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
+    list.sort();
 
-impl HttpSource for SimpleHttpSource {
-    fn build_events(
-        &self,
-        body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
-        request_path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
-        let mut decoder = self.decoder.clone();
-        let mut events = Vec::new();
-        let mut bytes = BytesMut::new();
-        bytes.extend_from_slice(&body);
-
-        loop {
-            match decoder.decode_eof(&mut bytes) {
-                Ok(Some((next, _))) => {
-                    events.extend(next.into_iter());
-                }
-                Ok(None) => break,
-                Err(error) => {
-                    // Error is logged / emitted by `crate::codecs::Decoder`, no further
-                    // handling is needed here
-                    return Err(ErrorMessage::new(
-                        StatusCode::BAD_REQUEST,
-                        format!("Failed decoding body: {}", error),
-                    ));
-                }
-            }
+    let mut dedup = false;
+    for (idx, name) in list.iter().enumerate() {
+        if idx < list.len() - 1 && list[idx] == list[idx + 1] {
+            warn!(
+                "`{}` configuration contains duplicate entry for `{}`. Removing duplicate.",
+                list_name, name
+            );
+            dedup = true;
         }
-
-        add_headers(&mut events, &self.headers, header_map);
-        add_query_parameters(&mut events, &self.query_parameters, query_parameters);
-        add_path(&mut events, self.path_key.as_str(), request_path);
-
-        let now = Utc::now();
-        for event in &mut events {
-            let log = event.as_mut_log();
-
-            log.try_insert(log_schema().source_type_key(), Bytes::from("http"));
-            log.try_insert(log_schema().timestamp_key(), now);
-        }
-
-        Ok(events)
     }
+
+    if dedup {
+        list.dedup();
+    }
+    list
 }
 
 #[async_trait::async_trait]
@@ -247,11 +272,14 @@ impl SourceConfig for SimpleHttpConfig {
         };
 
         let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let source = SimpleHttpSource {
-            headers: self.headers.clone(),
-            query_parameters: self.query_parameters.clone(),
+            headers: remove_duplicates(self.headers.clone(), "headers"),
+            query_parameters: remove_duplicates(self.query_parameters.clone(), "query_parameters"),
             path_key: self.path_key.clone(),
             decoder,
+            log_namespace,
         };
         source.run(
             self.address,
@@ -265,13 +293,20 @@ impl SourceConfig for SimpleHttpConfig {
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // There is a global and per-source `log_namespace` config.
+        // The source config overrides the global setting and is merged here.
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        let schema_definition = self.schema_definition(log_namespace);
+
         vec![Output::default(
             self.decoding
                 .as_ref()
                 .map(|d| d.output_type())
                 .unwrap_or(DataType::Log),
-        )]
+        )
+        .with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -283,32 +318,118 @@ impl SourceConfig for SimpleHttpConfig {
     }
 }
 
-fn add_path(events: &mut [Event], key: &str, path: &str) {
-    for event in events.iter_mut() {
-        event
-            .as_mut_log()
-            .try_insert(key, Value::from(path.to_string()));
-    }
+#[derive(Clone)]
+struct SimpleHttpSource {
+    headers: Vec<String>,
+    query_parameters: Vec<String>,
+    path_key: String,
+    decoder: Decoder,
+    log_namespace: LogNamespace,
 }
 
-fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderMap) {
-    for header_name in headers_config {
-        let value = headers.get(header_name).map(HeaderValue::as_bytes);
-
+impl SimpleHttpSource {
+    /// Enriches the passed in events with metadata for the `request_path` and for each of the headers.
+    fn enrich_events(
+        &self,
+        events: &mut [Event],
+        request_path: &str,
+        headers_config: HeaderMap,
+        query_parameters: HashMap<String, String>,
+    ) {
         for event in events.iter_mut() {
-            event.as_mut_log().try_insert(
-                event_path!(header_name),
-                Value::from(value.map(Bytes::copy_from_slice)),
+            let log = event.as_mut_log();
+
+            // add request_path to each event
+            self.log_namespace.insert_source_metadata(
+                SimpleHttpConfig::NAME,
+                log,
+                Some(LegacyKey::InsertIfEmpty(path!(self.path_key.as_str()))),
+                path!("path"),
+                request_path.to_owned(),
+            );
+
+            // add each header to each event
+            for header_name in &self.headers {
+                let value = headers_config.get(header_name).map(HeaderValue::as_bytes);
+
+                self.log_namespace.insert_source_metadata(
+                    SimpleHttpConfig::NAME,
+                    log,
+                    Some(LegacyKey::InsertIfEmpty(path!(header_name))),
+                    path!("headers", header_name),
+                    Value::from(value.map(Bytes::copy_from_slice)),
+                );
+            }
+        }
+
+        add_query_parameters(
+            events,
+            &self.query_parameters,
+            query_parameters,
+            self.log_namespace,
+            SimpleHttpConfig::NAME,
+        );
+
+        let now = Utc::now();
+        for event in events {
+            let log = event.as_mut_log();
+
+            self.log_namespace.insert_standard_vector_source_metadata(
+                log,
+                SimpleHttpConfig::NAME,
+                now,
             );
         }
     }
 }
 
+impl HttpSource for SimpleHttpSource {
+    fn build_events(
+        &self,
+        body: Bytes,
+        header_map: HeaderMap,
+        query_parameters: HashMap<String, String>,
+        request_path: &str,
+    ) -> Result<Vec<Event>, ErrorMessage> {
+        let mut decoder = self.decoder.clone();
+        let mut events = Vec::new();
+        let mut bytes = BytesMut::new();
+        bytes.extend_from_slice(&body);
+
+        loop {
+            match decoder.decode_eof(&mut bytes) {
+                Ok(Some((next, _))) => {
+                    events.extend(next.into_iter());
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    // Error is logged / emitted by `crate::codecs::Decoder`, no further
+                    // handling is needed here
+                    return Err(ErrorMessage::new(
+                        StatusCode::BAD_REQUEST,
+                        format!("Failed decoding body: {}", error),
+                    ));
+                }
+            }
+        }
+
+        self.enrich_events(&mut events, request_path, header_map, query_parameters);
+
+        Ok(events)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use lookup::event_path;
+    use lookup::{event_path, owned_value_path, LookupBuf};
     use std::str::FromStr;
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
+    use value::kind::Collection;
+    use value::Kind;
+    use vector_config::NamedComponent;
+    use vector_core::config::LogNamespace;
+    use vector_core::event::LogEvent;
+    use vector_core::schema::Definition;
 
     use codecs::{
         decoding::{DeserializerConfig, FramingConfig},
@@ -322,7 +443,7 @@ mod tests {
     use http::{HeaderMap, Method};
     use similar_asserts::assert_eq;
 
-    use super::SimpleHttpConfig;
+    use super::{remove_duplicates, SimpleHttpConfig};
     use crate::sources::http_server::HttpMethod;
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
@@ -379,6 +500,7 @@ mod tests {
                 framing,
                 decoding,
                 acknowledgements: acknowledgements.into(),
+                log_namespace: None,
             }
             .build(context)
             .await
@@ -496,16 +618,18 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[log_schema().source_type_key()],
+                SimpleHttpConfig::NAME.into()
+            );
             assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body 2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
     }
 
@@ -534,17 +658,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body 2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
     }
 
@@ -576,9 +696,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "foo\nbar".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
     }
 
@@ -659,17 +777,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key"], "value".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
     }
 
@@ -762,34 +876,35 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
+    }
+
+    async fn assert_event_metadata(log: &LogEvent) {
+        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            log[log_schema().source_type_key()],
+            SimpleHttpConfig::NAME.into()
+        );
+        assert_eq!(log["http_path"], "/".into());
     }
 
     #[tokio::test]
@@ -833,9 +948,7 @@ mod tests {
             assert_eq!(log["\"User-Agent\""], "test_client".into());
             assert_eq!(log["\"Upgrade-Insecure-Requests\""], "false".into());
             assert_eq!(log["AbsentHeader"], Value::Null);
-            assert_eq!(log["http_path"], "/".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_event_metadata(log).await;
         }
     }
 
@@ -876,9 +989,7 @@ mod tests {
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_eq!(log["absent"], Value::Null);
-            assert_eq!(log["http_path"], "/".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_event_metadata(log).await;
         }
     }
 
@@ -920,9 +1031,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
+            assert_event_metadata(log).await;
         }
     }
 
@@ -958,7 +1067,10 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[log_schema().source_type_key()],
+                SimpleHttpConfig::NAME.into()
+            );
         }
     }
 
@@ -1003,7 +1115,10 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path1".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[log_schema().source_type_key()],
+                SimpleHttpConfig::NAME.into()
+            );
         }
         {
             let event = events.remove(0);
@@ -1011,7 +1126,10 @@ mod tests {
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["vector_http_path"], "/event/path2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[log_schema().source_type_key()],
+                SimpleHttpConfig::NAME.into()
+            );
         }
     }
 
@@ -1114,5 +1232,100 @@ mod tests {
         .await;
 
         assert_eq!(200, send_request(addr, "GET", "", "/").await);
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = SimpleHttpConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!(SimpleHttpConfig::NAME, "path"),
+                    Kind::bytes(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(SimpleHttpConfig::NAME, "headers"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(SimpleHttpConfig::NAME, "query_parameters"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                );
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = SimpleHttpConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("path"), Kind::bytes(), None)
+        .unknown_fields(Kind::bytes());
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn validate_remove_duplicates() {
+        let mut list = vec![
+            "a".to_owned(),
+            "b".to_owned(),
+            "c".to_owned(),
+            "d".to_owned(),
+        ];
+
+        // no duplicates should be identical
+        {
+            let list_dedup = remove_duplicates(list.clone(), "foo");
+
+            assert_eq!(list, list_dedup);
+        }
+
+        list.push("b".to_owned());
+
+        // remove duplicate "b"
+        {
+            let list_dedup = remove_duplicates(list.clone(), "foo");
+            assert_eq!(
+                vec![
+                    "a".to_owned(),
+                    "b".to_owned(),
+                    "c".to_owned(),
+                    "d".to_owned()
+                ],
+                list_dedup
+            );
+        }
     }
 }

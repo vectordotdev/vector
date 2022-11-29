@@ -105,11 +105,6 @@ base: components: sources: aws_s3: configuration: {
 		required:    false
 		type: string: syntax: "literal"
 	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global setting."
-		required:    false
-		type: bool: {}
-	}
 	multiline: {
 		description: """
 			Multiline aggregation configuration.
@@ -202,7 +197,7 @@ base: components: sources: aws_s3: configuration: {
 					consumption rate affects the S3 object retrieval rate.
 					"""
 				required: false
-				type: uint: default: 10
+				type: uint: {}
 			}
 			delete_message: {
 				description: """
