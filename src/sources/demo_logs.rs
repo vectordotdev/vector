@@ -54,7 +54,7 @@ pub struct DemoLogsConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    /// The namespace to use for logs. This overrides the global setting
+    /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,

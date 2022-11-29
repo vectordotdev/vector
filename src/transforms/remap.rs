@@ -207,7 +207,7 @@ impl TransformConfig for RemapConfig {
         Input::all()
     }
 
-    fn outputs(&self, input_definition: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, input_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
@@ -1294,10 +1294,13 @@ mod tests {
         .with_event_field(&owned_value_path!("tags"), Kind::any(), None);
 
         assert_eq!(
-            conf.outputs(&schema::Definition::new_with_default_metadata(
-                Kind::any_object(),
-                [LogNamespace::Legacy]
-            )),
+            conf.outputs(
+                &schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy]
+                ),
+                LogNamespace::Legacy
+            ),
             vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 
