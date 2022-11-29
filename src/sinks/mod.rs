@@ -294,7 +294,7 @@ pub enum Sinks {
 
     /// Apache Pulsar.
     #[cfg(feature = "sinks-pulsar")]
-    Pulsar(#[configurable(derived)] pulsar::PulsarSinkConfig),
+    Pulsar(#[configurable(derived)] pulsar::config::PulsarSinkConfig),
 
     /// Redis.
     #[cfg(feature = "sinks-redis")]

@@ -33,3 +33,26 @@ impl InternalEvent for PulsarSendingError {
         });
     }
 }
+
+pub struct PulsarPropertyExtractionError<'a> {
+    pub property_field: &'a str,
+}
+
+impl InternalEvent for PulsarPropertyExtractionError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed to extract properties. Value should be a map of String -> Bytes.",
+            error_code = "extracting_property",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::RECEIVING,
+            property_field = self.property_field,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "extracing_property",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+    }
+}
