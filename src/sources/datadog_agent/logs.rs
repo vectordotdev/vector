@@ -6,15 +6,17 @@ use codecs::StreamDecodingError;
 use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder;
-use vector_core::config::LegacyKey;
-use vector_core::ByteSizeOf;
+use vector_config::NamedComponent;
+use vector_core::{config::LegacyKey, ByteSizeOf};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{
     event::Event,
     internal_events::EventsReceived,
     sources::{
-        datadog_agent::{handle_request, ApiKeyQueryParams, DatadogAgentSource, LogMsg},
+        datadog_agent::{
+            handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
+        },
         util::ErrorMessage,
     },
     SourceSender,
@@ -152,16 +154,9 @@ pub(crate) fn decode_log_body(
                                 ddtags.clone(),
                             );
 
-                            namespace.insert_vector_metadata(
+                            namespace.insert_standard_vector_source_metadata(
                                 log,
-                                source.log_schema_source_type_key,
-                                path!("source_type"),
-                                Bytes::from("datadog_agent"),
-                            );
-                            namespace.insert_vector_metadata(
-                                log,
-                                source.log_schema_timestamp_key,
-                                path!("ingest_timestamp"),
+                                DatadogAgentConfig::NAME,
                                 now,
                             );
 

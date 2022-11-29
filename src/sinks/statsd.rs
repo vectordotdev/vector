@@ -168,7 +168,7 @@ impl SinkConfig for StatsdSinkConfig {
 
 fn encode_tags(tags: &MetricTags) -> String {
     let parts: Vec<_> = tags
-        .iter()
+        .iter_single()
         .map(|(name, value)| {
             if value == "true" {
                 name.to_string()

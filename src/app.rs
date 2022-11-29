@@ -117,13 +117,6 @@ impl Application {
         let mut rt_builder = runtime::Builder::new_multi_thread();
         rt_builder.enable_all().thread_name("vector-worker");
 
-        #[cfg(feature = "allocation-tracing")]
-        {
-            rt_builder.on_thread_start(|| {
-                crate::internal_telemetry::allocations::init_thread_id();
-            });
-        }
-
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
                 #[allow(clippy::print_stderr)]
@@ -147,6 +140,12 @@ impl Application {
             let require_healthy = root_opts.require_healthy;
 
             rt.block_on(async move {
+                #[cfg(feature = "allocation-tracing")]
+                if root_opts.allocation_tracing {
+                    use std::sync::atomic::Ordering;
+                    crate::internal_telemetry::allocations::TRACK_ALLOCATIONS
+                        .store(true, Ordering::Relaxed);
+                }
                 trace::init(color, json, &level, root_opts.internal_log_rate_limit);
                 info!(
                     message = "Internal log rate limit configured.",

@@ -7,10 +7,12 @@ use std::{
 };
 
 use num_traits::{Bounded, One, ToPrimitive, Zero};
+use schemars::schema::InstanceType;
 use serde_json::Number;
 use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
 
 /// The class of a numeric type.
+#[derive(Clone, Copy)]
 pub enum NumberClass {
     /// A signed integer.
     Signed,
@@ -20,6 +22,19 @@ pub enum NumberClass {
 
     /// A floating-point number.
     FloatingPoint,
+}
+
+impl NumberClass {
+    /// Gets the equivalent instance type of this number class.
+    ///
+    /// The "instance type" is the JSON Schema term for value type i.e. string, number, integer,
+    /// array, and so on.
+    pub fn as_instance_type(self) -> InstanceType {
+        match self {
+            Self::Signed | Self::Unsigned => InstanceType::Integer,
+            Self::FloatingPoint => InstanceType::Number,
+        }
+    }
 }
 
 impl fmt::Display for NumberClass {

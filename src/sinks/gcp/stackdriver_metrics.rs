@@ -210,7 +210,7 @@ impl HttpSink for HttpEventSink {
         let metric_labels = series
             .tags
             .unwrap_or_default()
-            .into_iter()
+            .into_iter_single()
             .collect::<std::collections::HashMap<_, _>>();
 
         let series = gcp::GcpSeries {

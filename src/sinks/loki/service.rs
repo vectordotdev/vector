@@ -98,8 +98,13 @@ pub struct LokiService {
 }
 
 impl LokiService {
-    pub fn new(client: HttpClient, endpoint: UriSerde, auth: Option<Auth>) -> crate::Result<Self> {
-        let endpoint = endpoint.append_path("loki/api/v1/push")?.with_auth(auth);
+    pub fn new(
+        client: HttpClient,
+        endpoint: UriSerde,
+        path: String,
+        auth: Option<Auth>,
+    ) -> crate::Result<Self> {
+        let endpoint = endpoint.append_path(&path)?.with_auth(auth);
 
         Ok(Self { client, endpoint })
     }
