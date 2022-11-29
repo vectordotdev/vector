@@ -192,7 +192,7 @@ impl JournaldConfig {
 
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
-        let definition = Definition::new_with_default_metadata(
+        Definition::new_with_default_metadata(
             Kind::object(
                 Collection::empty()
                     .with_unknown(Kind::bytes())
@@ -200,26 +200,24 @@ impl JournaldConfig {
                     .with_known("message", Kind::bytes().or_undefined()),
             ),
             [log_namespace],
-        );
-
-        definition
-            .with_standard_vector_source_metadata()
-            .with_source_metadata(
-                JournaldConfig::NAME,
-                None,
-                &owned_value_path!("timestamp"),
-                Kind::timestamp().or_undefined(),
-                Some("timestamp"),
-            )
-            .with_source_metadata(
-                JournaldConfig::NAME,
-                parse_value_path(log_schema().host_key())
-                    .ok()
-                    .map(LegacyKey::Overwrite),
-                &owned_value_path!("host"),
-                Kind::bytes().or_undefined(),
-                Some("host"),
-            )
+        )
+        .with_standard_vector_source_metadata()
+        .with_source_metadata(
+            JournaldConfig::NAME,
+            None,
+            &owned_value_path!("timestamp"),
+            Kind::timestamp().or_undefined(),
+            Some("timestamp"),
+        )
+        .with_source_metadata(
+            JournaldConfig::NAME,
+            parse_value_path(log_schema().host_key())
+                .ok()
+                .map(LegacyKey::Overwrite),
+            &owned_value_path!("host"),
+            Kind::bytes().or_undefined(),
+            Some("host"),
+        )
     }
 }
 
