@@ -85,13 +85,13 @@ base: components: sources: pulsar: configuration: {
 
             In Shared subscription type, the broker first dispatches messages to the max priority level consumers if they have permits. Otherwise, the broker considers next priority level consumers.
 			"""
-		required:    false
-		type: int
+		required: false
+		type:     int
 	}
 	batch_size: {
 		description: "Max count of messages in a batch."
 		required:    false
-		type: uint
+		type:        uint
 	}
 	dead_letter_queue_policy: {
 		description: "Dead Letter Queue policy configuration."
@@ -99,12 +99,12 @@ base: components: sources: pulsar: configuration: {
 		type: object: {
 			max_redeliver_count: {
 				description: "Maximum number of times that a message will be redelivered before being sent to the dead letter queue."
-				required: false
-				type: uint
+				required:    false
+				type:        uint
 			}
 			dead_letter_topic: {
 				description: "Name of the dead topic where the failing messages will be sent."
-				required: false
+				required:    false
 				type: string: syntax: "literal"
 			}
 		}
