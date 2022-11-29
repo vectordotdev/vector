@@ -215,7 +215,7 @@ resources of a component via their component-specific configuration trait, such 
 resource, which involves the directionality of the resource and the payloads flowing through it.
 
 Directionality here covers the fact that, for both sources and sinks, they may pull or push with
-regards to their external resource. A source could "pull" data an external resource
+regards to their external resource. A source could "pull" data from an external resource
 (`prometheus_scrape` source), or it could have that external resource "push" to it (`socket`
 source), whereas a sink might "push" data to the external resource (`elasticsearch` sink) or have
 the external resource "pull" data from it (`prometheus_exporter` sink). Sources and sinks, when
