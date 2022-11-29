@@ -318,14 +318,14 @@ impl SourceConfig for PubsubConfig {
             )
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("attributes"))),
+                Some(LegacyKey::Overwrite(owned_value_path!("attributes"))),
                 &owned_value_path!("attributes"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
             )
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("message_id"))),
+                Some(LegacyKey::Overwrite(owned_value_path!("message_id"))),
                 &owned_value_path!("message_id"),
                 Kind::bytes(),
                 None,
@@ -664,14 +664,14 @@ impl PubsubSource {
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::InsertIfEmpty("message_id")),
+                    Some(LegacyKey::Overwrite("message_id")),
                     "message_id",
                     message.message_id.clone(),
                 );
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::InsertIfEmpty("attributes")),
+                    Some(LegacyKey::Overwrite("attributes")),
                     "attributes",
                     attributes.clone(),
                 )
