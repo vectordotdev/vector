@@ -760,7 +760,7 @@ fn generate_object_key(key_prefix: Option<String>, partition_key: String) -> Str
     let filename = Uuid::new_v4().to_string();
 
     format!(
-        "{}/{}{}.{}",
+        "{}/{}/archive_{}.{}",
         key_prefix.unwrap_or_default(),
         partition_key,
         filename,

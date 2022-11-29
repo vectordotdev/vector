@@ -103,6 +103,7 @@ use crate::config::{
     unit_test::{UnitTestSinkConfig, UnitTestStreamSinkConfig},
     AcknowledgementsConfig, Resource, SinkConfig, SinkContext,
 };
+use crate::sinks::datadog_archives::DatadogArchivesSinkConfig;
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
 
@@ -189,6 +190,10 @@ pub enum Sinks {
     /// Console.
     #[cfg(feature = "sinks-console")]
     Console(#[configurable(derived)] console::ConsoleSinkConfig),
+
+    /// Datadog Archives.
+    #[cfg(feature = "sinks-datadog_archives")]
+    DatadogArchives(#[configurable(derived)] DatadogArchivesSinkConfig),
 
     /// Datadog Events.
     #[cfg(feature = "sinks-datadog_events")]
@@ -398,6 +403,8 @@ impl NamedComponent for Sinks {
             Self::Clickhouse(config) => config.get_component_name(),
             #[cfg(feature = "sinks-console")]
             Self::Console(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-datadog_archives")]
+            Self::DatadogArchives(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_events")]
             Self::DatadogEvents(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_logs")]
