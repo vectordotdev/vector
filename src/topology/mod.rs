@@ -77,8 +77,7 @@ pub async fn start_validated(
     mut pieces: Pieces,
 ) -> Option<(
     RunningTopology,
-    mpsc::UnboundedSender<()>,
-    mpsc::UnboundedReceiver<()>,
+    (mpsc::UnboundedSender<()>, mpsc::UnboundedReceiver<()>),
 )> {
     let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
