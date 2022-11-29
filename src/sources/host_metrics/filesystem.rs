@@ -89,7 +89,7 @@ impl HostMetrics {
                         "mountpoint" => partition.mount_point().to_string_lossy()
                     };
                     if let Some(device) = partition.device() {
-                        tags.insert("device".into(), device.to_string_lossy().into());
+                        tags.replace("device".into(), device.to_string_lossy().to_string());
                     }
                     output.gauge(
                         "filesystem_free_bytes",

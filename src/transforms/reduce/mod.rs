@@ -28,6 +28,7 @@ use crate::event::Value;
 pub use merge_strategy::*;
 use value::kind::Collection;
 use value::Kind;
+use vector_core::config::LogNamespace;
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
@@ -112,7 +113,7 @@ impl TransformConfig for ReduceConfig {
         Input::log()
     }
 
-    fn outputs(&self, input: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, input: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         let mut schema_definition = input.clone();
 
         for (key, merge_strategy) in self.merge_strategies.iter() {
@@ -490,7 +491,7 @@ group_by = [ "request_id" ]
                     None,
                 );
             let schema_definition = reduce_config
-                .outputs(&input_definition)
+                .outputs(&input_definition, LogNamespace::Legacy)
                 .first()
                 .unwrap()
                 .log_schema_definition
