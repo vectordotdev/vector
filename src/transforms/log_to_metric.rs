@@ -70,8 +70,9 @@ pub struct MetricConfig {
     pub metric: MetricTypeConfig,
 }
 
-/// Specification of the value of a created tag. This may be a single value, a `null` for a bare
-/// tag, or an array of either.
+/// Specification of the value of a created tag.
+///
+/// This may be a single value, a `null` for a bare tag, or an array of either.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(untagged)]
