@@ -368,7 +368,7 @@ This is where **validators** come into play.
 Validators are simple implementations of a new trait, `Validator`, that are able to collect
 information about the component before and after the validation run is completed, and be transformed
 into more human-friendly output to be shown at the conclusion of a component validation run, whether
-the component is in compliance or discrpeancies were observed.
+the component is in compliance or discrepancies were observed.
 
 Let's take a brief look at `Validator` trait:
 
