@@ -280,7 +280,7 @@ notify = { version = "5.0.0", default-features = false, features = ["macos_fseve
 once_cell = { version = "1.16", default-features = false }
 openssl = { version = "0.10.43", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
-openssl-src = { version = "111", default-features = false }
+openssl-src = { version = "111", default-features = false, features = ["force-engine"] }
 ordered-float = { version = "3.4.0", default-features = false }
 percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
