@@ -11,7 +11,7 @@ use std::{
 };
 
 use arr_macro::arr;
-use metrics::{counter, decrement_gauge, increment_gauge};
+use metrics::{decrement_gauge, increment_gauge};
 use rand_distr::num_traits::ToPrimitive;
 
 use self::allocator::Tracer;
@@ -130,15 +130,15 @@ pub fn init_allocation_tracing() {
                         }
                         let mem_used_diff = allocations_diff as i64 - deallocations_diff as i64;
                         let group_info = group.lock().unwrap();
-                        counter!(
+                        increment_gauge!(
                             "component_allocated_bytes_total",
-                            allocations_diff,
+                            allocations_diff.to_f64().expect("failed to convert allocations_diff from int to float"),
                             "component_kind" => group_info.component_kind.clone(),
                             "component_type" => group_info.component_type.clone(),
                             "component_id" => group_info.component_id.clone());
-                        counter!(
+                        increment_gauge!(
                             "component_deallocated_bytes_total",
-                            deallocations_diff,
+                            deallocations_diff.to_f64().expect("failed to convert deallocations_diff from int to float"),
                             "component_kind" => group_info.component_kind.clone(),
                             "component_type" => group_info.component_type.clone(),
                             "component_id" => group_info.component_id.clone());
