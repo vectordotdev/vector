@@ -18,6 +18,12 @@ pub enum TagValue {
     Value(#[configurable(transparent)] String),
 }
 
+impl From<String> for TagValue {
+    fn from(value: String) -> Self {
+        Self::Value(value)
+    }
+}
+
 impl From<Option<String>> for TagValue {
     fn from(value: Option<String>) -> Self {
         match value {
@@ -445,9 +451,16 @@ impl MetricTags {
         self.0.get(name).and_then(TagValueSet::as_single)
     }
 
-    pub fn insert(&mut self, name: String, value: String) -> Option<String> {
+    /// Add a value to a tag. This does not replace any existing tags unless the value is a
+    /// duplicate.
+    pub fn insert(&mut self, name: String, value: impl Into<TagValue>) {
+        self.0.entry(name).or_default().insert(value.into());
+    }
+
+    /// Replace all the values of a tag with a single value.
+    pub fn replace(&mut self, name: String, value: impl Into<TagValue>) -> Option<String> {
         self.0
-            .insert(name, TagValueSet::from([value]))
+            .insert(name, TagValueSet::from([value.into()]))
             .and_then(TagValueSet::into_single)
     }
 

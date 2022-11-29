@@ -190,7 +190,7 @@ base: components: sinks: loki: configuration: {
 		description: """
 			The base URL of the Loki instance.
 
-			Vector will append `/loki/api/v1/push` to this.
+			Vector will append the value of `path` to this.
 			"""
 		required: true
 		type: string: syntax: "literal"
@@ -253,6 +253,18 @@ base: components: sinks: loki: configuration: {
 				drop:              "Drop the event."
 				rewrite_timestamp: "Rewrite the timestamp of the event to the timestamp of the latest event seen by the sink."
 			}
+		}
+	}
+	path: {
+		description: """
+			The path to use in the URL of the Loki instance.
+
+			By default, `"/loki/api/v1/push"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "/loki/api/v1/push"
+			syntax:  "literal"
 		}
 	}
 	remove_label_fields: {
