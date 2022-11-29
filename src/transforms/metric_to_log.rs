@@ -182,7 +182,7 @@ impl TransformConfig for MetricToLogConfig {
 
         match log_namespace {
             LogNamespace::Vector => {
-                // from serializing the Metric (Legacy moves it to another field
+                // from serializing the Metric (Legacy moves it to another field)
                 schema_definition = schema_definition.with_event_field(
                     &owned_value_path!("timestamp"),
                     Kind::bytes().or_undefined(),
