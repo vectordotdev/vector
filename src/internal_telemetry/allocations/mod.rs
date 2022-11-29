@@ -11,7 +11,7 @@ use std::{
 };
 
 use arr_macro::arr;
-use metrics::gauge;
+use metrics::{counter, decrement_gauge, increment_gauge};
 use rand_distr::num_traits::ToPrimitive;
 
 use self::allocator::Tracer;
@@ -118,36 +118,45 @@ pub fn init_allocation_tracing() {
             if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
                 without_allocation_tracing(|| {
                     for (group_idx, group) in GROUP_INFO.iter().enumerate() {
-                        let mut allocations = 0;
-                        let mut deallocations = 0;
+                        let mut allocations_diff = 0;
+                        let mut deallocations_diff = 0;
                         let mutex = THREAD_LOCAL_REFS.lock().unwrap();
                         for idx in 0..mutex.len() {
-                            allocations += mutex[idx].allocations[group_idx].load(Ordering::Relaxed);
-                            deallocations += mutex[idx].deallocations[group_idx].load(Ordering::Relaxed);
+                            allocations_diff += mutex[idx].allocations[group_idx].swap(0,Ordering::Relaxed);
+                            deallocations_diff += mutex[idx].deallocations[group_idx].swap(0,Ordering::Relaxed);
                         }
-                        if allocations == 0 {
+                        if allocations_diff == 0 && deallocations_diff == 0 {
                             continue;
                         }
-                        let mem_used = allocations - deallocations;
+                        let mem_used_diff = allocations_diff as i64 - deallocations_diff as i64;
                         let group_info = group.lock().unwrap();
-                        gauge!(
+                        counter!(
                             "component_allocated_bytes_total",
-                            allocations.to_f64().expect("failed to convert allocations from int to float"),
+                            allocations_diff,
                             "component_kind" => group_info.component_kind.clone(),
                             "component_type" => group_info.component_type.clone(),
                             "component_id" => group_info.component_id.clone());
-                        gauge!(
+                        counter!(
                             "component_deallocated_bytes_total",
-                            deallocations.to_f64().expect("failed to convert deallocations from int to float"),
+                            deallocations_diff,
                             "component_kind" => group_info.component_kind.clone(),
                             "component_type" => group_info.component_type.clone(),
                             "component_id" => group_info.component_id.clone());
-                        gauge!(
-                            "component_allocated_bytes",
-                            mem_used.to_f64().expect("failed to convert mem_used from int to float"),
-                            "component_kind" => group_info.component_kind.clone(),
-                            "component_type" => group_info.component_type.clone(),
-                            "component_id" => group_info.component_id.clone());
+                        if mem_used_diff >= 0 {
+                            increment_gauge!(
+                                "component_allocated_bytes",
+                                mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
+                                "component_kind" => group_info.component_kind.clone(),
+                                "component_type" => group_info.component_type.clone(),
+                                "component_id" => group_info.component_id.clone());
+                        } else {
+                            decrement_gauge!(
+                                "component_allocated_bytes",
+                                -mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
+                                "component_kind" => group_info.component_kind.clone(),
+                                "component_type" => group_info.component_type.clone(),
+                                "component_id" => group_info.component_id.clone());
+                        }
                     }
                 });
             }
