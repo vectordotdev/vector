@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use async_trait::async_trait;
 use value::Value;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Input, Output},
     event::{
@@ -47,7 +48,7 @@ impl TransformConfig for BasicTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 }

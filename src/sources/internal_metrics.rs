@@ -20,7 +20,7 @@ use crate::{
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     /// The interval between metric gathering, in seconds.
-    #[derivative(Default(value = "2.0"))]
+    #[derivative(Default(value = "1.0"))]
     pub scrape_interval_secs: f64,
 
     #[configurable(derived)]
@@ -144,11 +144,11 @@ impl<'a> InternalMetrics<'a> {
 
                 if let Some(host_key) = &self.host_key {
                     if let Ok(hostname) = &hostname {
-                        metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+                        metric.replace_tag(host_key.to_owned(), hostname.to_owned());
                     }
                 }
                 if let Some(pid_key) = &self.pid_key {
-                    metric.insert_tag(pid_key.to_owned(), pid.clone());
+                    metric.replace_tag(pid_key.to_owned(), pid.clone());
                 }
                 metric
             });

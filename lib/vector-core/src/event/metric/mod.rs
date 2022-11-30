@@ -1,7 +1,6 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
-    collections::btree_map,
     convert::AsRef,
     fmt::{self, Display, Formatter},
     num::NonZeroU32,
@@ -343,15 +342,8 @@ impl Metric {
     /// containing the previous value of the tag.
     ///
     /// *Note:* This will create the tags map if it is not present.
-    pub fn insert_tag(&mut self, name: String, value: String) -> Option<String> {
-        self.series.insert_tag(name, value)
-    }
-
-    /// Gets the given tag's corresponding entry in this metric.
-    ///
-    /// *Note:* This will create the tags map if it is not present, even if nothing is later inserted.
-    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
-        self.series.tag_entry(key)
+    pub fn replace_tag(&mut self, name: String, value: String) -> Option<String> {
+        self.series.replace_tag(name, value)
     }
 
     /// Zeroes out the data in this metric.

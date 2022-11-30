@@ -1,5 +1,6 @@
 use std::{convert::TryFrom, iter, num::NonZeroU8};
 
+use chrono::{TimeZone, Utc};
 use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
@@ -9,6 +10,7 @@ use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 use crate::{
     codecs::EncodingConfig,
     config::{SinkConfig, SinkContext},
+    event::Value,
     sinks::{
         splunk_hec::{
             common::{
@@ -117,6 +119,7 @@ async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLog
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
         timestamp_key: Default::default(),
+        auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
     }
 }
@@ -387,4 +390,89 @@ async fn splunk_indexer_acknowledgements_disabled_on_server() {
     // acknowledged based on 200 OK
     assert_eq!(rx.try_recv(), Ok(BatchStatus::Delivered));
     assert!(find_entries(messages.as_slice()).await);
+}
+
+#[tokio::test]
+async fn splunk_auto_extracted_timestamp() {
+    // The auto_extract_timestamp setting only works on version 8 and above of splunk.
+    // If the splunk version is set to 7, we ignore this test.
+    // This environment variable is set by the integration test docker-compose file.
+    if std::env::var("SPLUNK_VERSION")
+        .map(|version| !version.starts_with("7."))
+        .unwrap_or(true)
+    {
+        let cx = SinkContext::new_test();
+
+        let config = HecLogsSinkConfig {
+            auto_extract_timestamp: Some(true),
+            timestamp_key: "timestamp".to_string(),
+            ..config(JsonSerializerConfig::new().into(), vec![]).await
+        };
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        // With auto_extract_timestamp switched the timestamp comes from the message.
+        let message = "this message is on 2017-10-01 03:00:00";
+        let mut event = LogEvent::from(message);
+
+        event.insert(
+            "timestamp",
+            Value::from(Utc.ymd(2020, 3, 5).and_hms(0, 0, 0)),
+        );
+
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
+
+        let entry = find_entry(message).await;
+
+        assert_eq!(
+            format!("{{\"message\":\"{}\"}}", message),
+            entry["_raw"].as_str().unwrap()
+        );
+        assert_eq!(
+            "2017-10-01T03:00:00.000+00:00",
+            entry["_time"].as_str().unwrap()
+        );
+    }
+}
+
+#[tokio::test]
+async fn splunk_non_auto_extracted_timestamp() {
+    // The auto_extract_timestamp setting only works on version 8 and above of splunk.
+    // If the splunk version is set to 7, we ignore this test.
+    // This environment variable is set by the integration test docker-compose file.
+    if std::env::var("SPLUNK_VERSION")
+        .map(|version| !version.starts_with("7."))
+        .unwrap_or(true)
+    {
+        let cx = SinkContext::new_test();
+
+        let config = HecLogsSinkConfig {
+            auto_extract_timestamp: Some(false),
+            timestamp_key: "timestamp".to_string(),
+            ..config(JsonSerializerConfig::new().into(), vec![]).await
+        };
+
+        let (sink, _) = config.build(cx).await.unwrap();
+        let message = "this message is on 2019-10-01 00:00:00";
+        let mut event = LogEvent::from(message);
+
+        // With auto_extract_timestamp switched off the timestamp comes from the event timestamp.
+        event.insert(
+            "timestamp",
+            Value::from(Utc.ymd(2020, 3, 5).and_hms(0, 0, 0)),
+        );
+
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
+
+        let entry = find_entry(message).await;
+
+        assert_eq!(
+            format!("{{\"message\":\"{}\"}}", message),
+            entry["_raw"].as_str().unwrap()
+        );
+        assert_eq!(
+            "2020-03-05T00:00:00.000+00:00",
+            entry["_time"].as_str().unwrap()
+        );
+    }
 }

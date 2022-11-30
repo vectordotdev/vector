@@ -5,7 +5,7 @@ use mlua::prelude::*;
 use super::util::{table_to_timestamp, timestamp_to_table};
 use crate::{
     event::{
-        metric::{self, MetricSketch, MetricTags},
+        metric::{self, MetricSketch, MetricTags, TagValueSet},
         Metric, MetricKind, MetricValue, StatisticKind,
     },
     metrics::AgentDDSketch,
@@ -61,6 +61,18 @@ impl<'a> FromLua<'a> for StatisticKind {
                 ),
             }),
         }
+    }
+}
+
+impl<'a> FromLua<'a> for TagValueSet {
+    fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
+        Ok(Self::from([String::from_lua(value, lua)?]))
+    }
+}
+
+impl<'a> ToLua<'a> for TagValueSet {
+    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+        self.into_single().to_lua(lua)
     }
 }
 

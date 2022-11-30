@@ -254,27 +254,20 @@ pub(crate) fn decode_ddseries_v2(
         .into_iter()
         .flat_map(|serie| {
             let (namespace, name) = namespace_name_from_dd_metric(&serie.metric);
-            let mut tags: MetricTags = serie
-                .tags
-                .iter()
-                .map(|tag| {
-                    let kv = tag.split_once(':').unwrap_or((tag, ""));
-                    (kv.0.trim().into(), kv.1.trim().into())
-                })
-                .collect();
+            let mut tags = into_metric_tags(serie.tags);
 
             serie.resources.into_iter().for_each(|r| {
                 // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
                 // the hostname can be found in MetricSeries::resources and that is the only value stored there.
                 if r.r#type.eq("host") {
-                    tags.insert(log_schema().host_key().to_string(), r.name);
+                    tags.replace(log_schema().host_key().to_string(), r.name);
                 } else {
                     // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
-                    tags.insert(format!("resource.{}", r.r#type), r.name);
+                    tags.replace(format!("resource.{}", r.r#type), r.name);
                 }
             });
             (!serie.source_type_name.is_empty())
-                .then(|| tags.insert("source_type_name".into(), serie.source_type_name));
+                .then(|| tags.replace("source_type_name".into(), serie.source_type_name));
             // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
             // serie.unit is omitted
             match metric_payload::MetricType::from_i32(serie.r#type) {
@@ -393,30 +386,31 @@ fn decode_datadog_series_v1(
     Ok(decoded_metrics)
 }
 
+fn into_metric_tags(tags: Vec<String>) -> MetricTags {
+    tags.iter()
+        .map(|tag| {
+            let kv = tag.split_once(':').unwrap_or((tag, ""));
+            (kv.0.trim().to_string(), kv.1.trim().to_string())
+        })
+        .collect()
+}
+
 fn into_vector_metric(
     dd_metric: DatadogSeriesMetric,
     api_key: Option<Arc<str>>,
     schema_definition: &Arc<schema::Definition>,
 ) -> Vec<Event> {
-    let mut tags: MetricTags = dd_metric
-        .tags
-        .unwrap_or_default()
-        .iter()
-        .map(|tag| {
-            let kv = tag.split_once(':').unwrap_or((tag, ""));
-            (kv.0.trim().into(), kv.1.trim().into())
-        })
-        .collect();
+    let mut tags = into_metric_tags(dd_metric.tags.unwrap_or_default());
 
     dd_metric
         .host
-        .and_then(|host| tags.insert(log_schema().host_key().to_owned(), host));
+        .and_then(|host| tags.replace(log_schema().host_key().to_owned(), host));
     dd_metric
         .source_type_name
-        .and_then(|source| tags.insert("source_type_name".into(), source));
+        .and_then(|source| tags.replace("source_type_name".into(), source));
     dd_metric
         .device
-        .and_then(|dev| tags.insert("device".into(), dev));
+        .and_then(|dev| tags.replace("device".into(), dev));
 
     let (namespace, name) = namespace_name_from_dd_metric(&dd_metric.metric);
 
@@ -508,16 +502,8 @@ pub(crate) fn decode_ddsketch(
         .into_iter()
         .flat_map(|sketch_series| {
             // sketch_series.distributions is also always empty from payload coming from dd agents
-            let mut tags: MetricTags = sketch_series
-                .tags
-                .iter()
-                .map(|tag| {
-                    let kv = tag.split_once(':').unwrap_or((tag, ""));
-                    (kv.0.trim().into(), kv.1.trim().into())
-                })
-                .collect();
-
-            tags.insert(
+            let mut tags = into_metric_tags(sketch_series.tags);
+            tags.replace(
                 log_schema().host_key().to_string(),
                 sketch_series.host.clone(),
             );
