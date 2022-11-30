@@ -11,19 +11,23 @@ use bollard::{
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
+use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use futures::{Stream, StreamExt};
-use lookup::lookup_v2::ValuePath;
-use lookup::path;
-use lookup::PathPrefix;
+use lookup::lookup_v2::parse_value_path;
+use lookup::{metadata_path, owned_value_path, path, PathPrefix};
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
+use value::kind::Collection;
+use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    ByteSizeOf,
+};
 
 use super::util::MultilineConfig;
 use crate::{
@@ -131,6 +135,11 @@ pub struct DockerLogsConfig {
 
     #[configurable(derived)]
     tls: Option<DockerTlsConfig>,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
+    pub log_namespace: Option<bool>,
 }
 
 impl Default for DockerLogsConfig {
@@ -147,6 +156,7 @@ impl Default for DockerLogsConfig {
             auto_partial_merge: true,
             multiline: None,
             retry_backoff_secs: 2,
+            log_namespace: None,
         }
     }
 }
@@ -196,10 +206,12 @@ impl_generate_config_from_default!(DockerLogsConfig);
 #[async_trait::async_trait]
 impl SourceConfig for DockerLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let source = DockerLogsSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
             cx.out,
             cx.shutdown.clone(),
+            log_namespace,
         )?;
 
         // Capture currently running containers, and do main future(run)
@@ -225,8 +237,86 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = BytesDeserializerConfig
+            .schema_definition(log_namespace)
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(self
+                    .host_key
+                    .as_str()))),
+                &owned_value_path!("host"),
+                Kind::bytes().or_undefined(),
+                Some("host"),
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(CONTAINER))),
+                &owned_value_path!(CONTAINER),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(IMAGE))),
+                &owned_value_path!(IMAGE),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(NAME))),
+                &owned_value_path!(NAME),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(CREATED_AT))),
+                &owned_value_path!(CREATED_AT),
+                Kind::timestamp(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("label"))),
+                &owned_value_path!("labels"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(STREAM))),
+                &owned_value_path!(STREAM),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                parse_value_path(log_schema().timestamp_key())
+                    .ok()
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_vector_metadata(
+                parse_value_path(log_schema().source_type_key())
+                    .ok()
+                    .as_ref(),
+                &owned_value_path!("source_type"),
+                Kind::bytes(),
+                None,
+            )
+            .with_vector_metadata(
+                None,
+                &owned_value_path!("ingest_timestamp"),
+                Kind::timestamp(),
+                None,
+            );
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -338,6 +428,7 @@ impl DockerLogsSource {
         config: DockerLogsConfig,
         out: SourceSender,
         shutdown: ShutdownSignal,
+        log_namespace: LogNamespace,
     ) -> crate::Result<DockerLogsSource> {
         let backoff_secs = config.retry_backoff_secs;
 
@@ -370,6 +461,7 @@ impl DockerLogsSource {
             out,
             main_send,
             shutdown,
+            log_namespace,
         };
 
         Ok(DockerLogsSource {
@@ -553,6 +645,7 @@ struct EventStreamBuilder {
     main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>>,
     /// Self and event streams will end on this.
     shutdown: ShutdownSignal,
+    log_namespace: LogNamespace,
 }
 
 impl EventStreamBuilder {
@@ -637,6 +730,7 @@ impl EventStreamBuilder {
                         core.config.auto_partial_merge,
                         &mut partial_event_merge_state,
                         &bytes_received,
+                        self.log_namespace,
                     )),
                     Err(error) => {
                         // On any error, restart connection
@@ -681,8 +775,8 @@ impl EventStreamBuilder {
         let host_key = self.host_key.clone();
         let hostname = self.hostname.clone();
         let result = {
-            let mut stream =
-                events_stream.map(move |event| add_hostname(event, &host_key, &hostname));
+            let mut stream = events_stream
+                .map(move |event| add_hostname(event, &host_key, &hostname, self.log_namespace));
             self.out
                 .send_event_stream(&mut stream)
                 .await
@@ -713,12 +807,23 @@ impl EventStreamBuilder {
     }
 }
 
-fn add_hostname(mut event: LogEvent, host_key: &str, hostname: &Option<String>) -> LogEvent {
+fn add_hostname(
+    mut log: LogEvent,
+    host_key: &str,
+    hostname: &Option<String>,
+    log_namespace: LogNamespace,
+) -> LogEvent {
     if let Some(hostname) = hostname {
-        event.insert(host_key, hostname.clone());
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(host_key)),
+            path!("host"),
+            hostname.clone(),
+        );
     }
 
-    event
+    log
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -839,6 +944,7 @@ impl ContainerLogInfo {
         auto_partial_merge: bool,
         partial_event_merge_state: &mut Option<LogEventMergeState>,
         bytes_received: &Registered<BytesReceived>,
+        log_namespace: LogNamespace,
     ) -> Option<LogEvent> {
         let (stream, mut bytes_message) = match log_output {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
@@ -919,55 +1025,94 @@ impl ContainerLogInfo {
             true
         };
 
-        // Prepare the log event.
-        let mut log_event = {
-            let mut log_event = LogEvent::default();
+        // Build the log.
+        let deserializer = BytesDeserializer::new();
+        let mut log = deserializer.parse_single(bytes_message, log_namespace);
 
-            // Source type
-            log_event.insert(log_schema().source_type_key(), Bytes::from("docker"));
-
-            // The log message.
-            log_event.insert(log_schema().message_key(), bytes_message);
-
-            // Stream we got the message from.
-            log_event.insert(STREAM, stream);
-
-            // Timestamp of the event.
-            if let Some(timestamp) = timestamp {
-                log_event.insert(log_schema().timestamp_key(), timestamp);
+        // Container ID
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(CONTAINER))),
+            path!(CONTAINER),
+            self.id.0.clone(),
+        );
+        // Container image
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(IMAGE))),
+            path!(IMAGE),
+            self.metadata.image.clone(),
+        );
+        // Container name
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(NAME))),
+            path!(NAME),
+            self.metadata.name.clone(),
+        );
+        // Created at timestamp
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(CREATED_AT))),
+            path!(CREATED_AT),
+            self.metadata.created_at,
+        );
+        // Labels
+        if !self.metadata.labels.is_empty() {
+            for (key, value) in self.metadata.labels.iter() {
+                log_namespace.insert_source_metadata(
+                    DockerLogsConfig::NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(path!("label", key))),
+                    path!("labels", key),
+                    value.clone(),
+                )
             }
+        }
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(STREAM))),
+            path!(STREAM),
+            stream,
+        );
 
-            // Container ID.
-            log_event.insert(CONTAINER, self.id.0.clone());
+        log_namespace.insert_vector_metadata(
+            &mut log,
+            path!(log_schema().source_type_key()),
+            path!("source_type"),
+            Bytes::from_static(DockerLogsConfig::NAME.as_bytes()),
+        );
 
-            // Labels.
-            if !self.metadata.labels.is_empty() {
-                for (key, value) in self.metadata.labels.iter() {
-                    log_event.insert(
-                        (PathPrefix::Event, path!("label").concat(path!(key))),
-                        value.clone(),
+        // This handles the transition from the original timestamp logic. Originally the
+        // `timestamp_key` was only populated when a timestamp was parsed from the event.
+        match log_namespace {
+            LogNamespace::Vector => {
+                if let Some(timestamp) = timestamp {
+                    log.insert(
+                        metadata_path!(DockerLogsConfig::NAME, "timestamp"),
+                        timestamp,
                     );
                 }
+
+                log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
-
-            // Container name.
-            log_event.insert(NAME, self.metadata.name.clone());
-
-            // Container image.
-            log_event.insert(IMAGE, self.metadata.image.clone());
-
-            // Timestamp of the container creation.
-            log_event.insert(CREATED_AT, self.metadata.created_at);
-
-            // Return the resulting log event.
-            log_event
+            LogNamespace::Legacy => {
+                if let Some(timestamp) = timestamp {
+                    log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+                }
+            }
         };
 
         // If automatic partial event merging is requested - perform the
         // merging.
         // Otherwise mark partial events and return all the events with no
         // merging.
-        let log_event = if auto_partial_merge {
+        let log = if auto_partial_merge {
             // Partial event events merging logic.
 
             // If event is partial, stash it and return `None`.
@@ -977,10 +1122,19 @@ impl ContainerLogInfo {
                 // Otherwise, create a new partial event merge state with the
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
-                    partial_event_merge_state
-                        .merge_in_next_event(log_event, &[log_schema().message_key().to_string()]);
+                    match log_namespace {
+                        LogNamespace::Vector => {
+                            partial_event_merge_state.merge_in_next_event(log, &["."]);
+                        }
+                        LogNamespace::Legacy => {
+                            partial_event_merge_state.merge_in_next_event(
+                                log,
+                                &[log_schema().message_key().to_string()],
+                            );
+                        }
+                    }
                 } else {
-                    *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
+                    *partial_event_merge_state = Some(LogEventMergeState::new(log));
                 };
                 return None;
             };
@@ -990,31 +1144,44 @@ impl ContainerLogInfo {
             // would give us a merged event we can return.
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
-                Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[log_schema().message_key().to_string()]),
-                None => log_event,
+                Some(partial_event_merge_state) => match log_namespace {
+                    LogNamespace::Vector => {
+                        partial_event_merge_state.merge_in_final_event(log, &["."])
+                    }
+                    LogNamespace::Legacy => partial_event_merge_state
+                        .merge_in_final_event(log, &[log_schema().message_key().to_string()]),
+                },
+                None => log,
             }
         } else {
             // If the event is partial, just set the partial event marker field.
             if is_partial {
                 // Only add partial event marker field if it's requested.
                 if let Some(partial_event_marker_field) = partial_event_marker_field {
-                    log_event.insert(partial_event_marker_field.as_str(), true);
+                    log_namespace.insert_source_metadata(
+                        DockerLogsConfig::NAME,
+                        &mut log,
+                        Some(LegacyKey::Overwrite(path!(
+                            partial_event_marker_field.as_str()
+                        ))),
+                        path!(event::PARTIAL),
+                        true,
+                    );
                 }
             }
             // Return the log event as is, partial or not. No merging here.
-            log_event
+            log
         };
 
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.
         emit!(DockerLogsEventsReceived {
-            byte_size: log_event.size_of(),
+            byte_size: log.size_of(),
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str
         });
 
-        Some(log_event)
+        Some(log)
     }
 }
 
@@ -1084,8 +1251,13 @@ mod tests {
     #[test]
     fn exclude_self() {
         let (tx, _rx) = SourceSender::new_test();
-        let mut source =
-            DockerLogsSource::new(DockerLogsConfig::default(), tx, ShutdownSignal::noop()).unwrap();
+        let mut source = DockerLogsSource::new(
+            DockerLogsConfig::default(),
+            tx,
+            ShutdownSignal::noop(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
         source.hostname = Some("451062c59603".to_owned());
         assert!(
             source.exclude_self("451062c59603a1cf0c6af3e74a31c0ae63d8275aa16a5fc78ef31b923baaffc3")
@@ -1407,7 +1579,7 @@ mod integration_tests {
             assert_eq!(events[0].as_log()[&super::NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key()],
-                "docker".into()
+                DockerLogsConfig::NAME.into()
             );
         })
         .await;
@@ -1566,7 +1738,7 @@ mod integration_tests {
             assert_eq!(events[0].as_log()[&super::NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key()],
-                "docker".into()
+                DockerLogsConfig::NAME.into()
             );
         })
         .await;
@@ -1689,7 +1861,7 @@ mod integration_tests {
             assert_eq!(events[0].as_log()[&super::NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key()],
-                "docker".into()
+                DockerLogsConfig::NAME.into()
             );
         })
         .await;
