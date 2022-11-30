@@ -512,20 +512,23 @@ impl ReceivedMessage {
     fn apply(&self, keys: &Keys<'_>, event: &mut Event, log_namespace: LogNamespace) {
         if let Event::Log(ref mut log) = event {
             if let LogNamespace::Vector = log_namespace {
-                // We only want an auto-generated timestamp in the Vector namespace.
+                // We'll only use this function in Vector namespaces because we don't want
+                // "timestamp" to be set automatically in legacy namespaces. In legacy namespaces,
+                // the "timestamp" field corresponds to the timestamp in the Kafka message, not the
+                // timestamp when the event was processed.
                 log_namespace.insert_standard_vector_source_metadata(
                     log,
                     KafkaSourceConfig::NAME,
                     Utc::now(),
                 );
             } else {
-                log.insert("source_type", KafkaSourceConfig::NAME);
+                log.insert(log_schema().source_type_key(), KafkaSourceConfig::NAME);
 
                 log_namespace.insert_source_metadata(
                     KafkaSourceConfig::NAME,
                     log,
                     Some(LegacyKey::Overwrite(keys.key_field)),
-                    path!(default_key_field().as_str()),
+                    path!("message_key"),
                     self.key.clone(),
                 );
             }
@@ -542,7 +545,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 Some(LegacyKey::Overwrite(keys.topic)),
-                path!(default_topic_key().as_str()),
+                path!("topic"),
                 self.topic.clone(),
             );
 
@@ -550,7 +553,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 Some(LegacyKey::Overwrite(keys.partition)),
-                path!(default_partition_key().as_str()),
+                path!("partition"),
                 self.partition,
             );
 
@@ -558,7 +561,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 Some(LegacyKey::Overwrite(keys.offset)),
-                path!(default_offset_key().as_str()),
+                path!("offset"),
                 self.offset,
             );
 
@@ -566,7 +569,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 Some(LegacyKey::Overwrite(keys.headers)),
-                path!(default_headers_key().as_str()),
+                path!("headers"),
                 self.headers.clone(),
             );
         }
