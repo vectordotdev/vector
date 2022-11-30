@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, stream, Stream, StreamExt};
@@ -7,12 +6,12 @@ use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
 };
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{GenerateConfig, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::StreamClosedError,
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
@@ -54,6 +53,11 @@ pub struct NatsSourceConfig {
     /// NATS Queue Group to join.
     queue: Option<String>,
 
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
+
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
@@ -86,25 +90,29 @@ impl GenerateConfig for NatsSourceConfig {
 #[async_trait::async_trait]
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let (connection, subscription) = create_subscription(self).await?;
-        let decoder = DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            LogNamespace::Legacy,
-        )
-        .build();
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
         Ok(Box::pin(nats_source(
             connection,
             subscription,
             decoder,
+            log_namespace,
             cx.shutdown,
             cx.out,
         )))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -140,6 +148,7 @@ async fn nats_source(
     _connection: nats::asynk::Connection,
     subscription: nats::asynk::Subscription,
     decoder: Decoder,
+    log_namespace: LogNamespace,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
@@ -162,8 +171,11 @@ async fn nats_source(
 
                     let events = events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
-                            log.try_insert(log_schema().source_type_key(), Bytes::from("nats"));
-                            log.try_insert(log_schema().timestamp_key(), now);
+                            log_namespace.insert_standard_vector_source_metadata(
+                                log,
+                                NatsSourceConfig::NAME,
+                                now,
+                            );
                         }
                         event
                     });
@@ -204,11 +216,63 @@ async fn create_subscription(
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
+    use lookup::{owned_value_path, LookupBuf};
+    use value::{kind::Collection, Kind};
+    use vector_core::schema::Definition;
+
     use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<NatsSourceConfig>();
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = NatsSourceConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                );
+
+        assert_eq!(definition, expected_definition);
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = NatsSourceConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None);
+
+        assert_eq!(definition, expected_definition);
     }
 }
 
@@ -216,6 +280,8 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
+
+    use vector_core::config::log_schema;
 
     use super::*;
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
@@ -240,7 +306,14 @@ mod integration_tests {
                 LogNamespace::Legacy,
             )
             .build();
-            tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
+            tokio::spawn(nats_source(
+                nc,
+                sub,
+                decoder,
+                LogNamespace::Legacy,
+                ShutdownSignal::noop(),
+                tx,
+            ));
             nc_pub.publish(&subject, msg).await.unwrap();
 
             collect_n(rx, 1).await
@@ -267,6 +340,7 @@ mod integration_tests {
             decoding: default_decoding(),
             tls: None,
             auth: None,
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -297,6 +371,7 @@ mod integration_tests {
                     password: "natspass".to_string().into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -327,6 +402,7 @@ mod integration_tests {
                     password: "wrongpass".to_string().into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -356,6 +432,7 @@ mod integration_tests {
                     value: "secret".to_string().into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -385,6 +462,7 @@ mod integration_tests {
                     value: "wrongsecret".to_string().into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -415,6 +493,7 @@ mod integration_tests {
                     seed: "SUANIRXEZUROTXNFN3TJYMT27K7ZZVMD46FRIHF6KXKS4KGNVBS57YAFGY".into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -445,6 +524,7 @@ mod integration_tests {
                     seed: "SBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -476,6 +556,7 @@ mod integration_tests {
                 },
             }),
             auth: None,
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -501,6 +582,7 @@ mod integration_tests {
             decoding: default_decoding(),
             tls: None,
             auth: None,
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -534,6 +616,7 @@ mod integration_tests {
                 },
             }),
             auth: None,
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -565,6 +648,7 @@ mod integration_tests {
                 },
             }),
             auth: None,
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -600,6 +684,7 @@ mod integration_tests {
                     path: "tests/data/nats/nats.creds".into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;
@@ -635,6 +720,7 @@ mod integration_tests {
                     path: "tests/data/nats/nats-bad.creds".into(),
                 },
             }),
+            log_namespace: None,
         };
 
         let r = publish_and_check(conf).await;

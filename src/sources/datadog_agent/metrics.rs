@@ -260,14 +260,14 @@ pub(crate) fn decode_ddseries_v2(
                 // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
                 // the hostname can be found in MetricSeries::resources and that is the only value stored there.
                 if r.r#type.eq("host") {
-                    tags.insert(log_schema().host_key().to_string(), r.name);
+                    tags.replace(log_schema().host_key().to_string(), r.name);
                 } else {
                     // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
-                    tags.insert(format!("resource.{}", r.r#type), r.name);
+                    tags.replace(format!("resource.{}", r.r#type), r.name);
                 }
             });
             (!serie.source_type_name.is_empty())
-                .then(|| tags.insert("source_type_name".into(), serie.source_type_name));
+                .then(|| tags.replace("source_type_name".into(), serie.source_type_name));
             // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
             // serie.unit is omitted
             match metric_payload::MetricType::from_i32(serie.r#type) {
@@ -404,13 +404,13 @@ fn into_vector_metric(
 
     dd_metric
         .host
-        .and_then(|host| tags.insert(log_schema().host_key().to_owned(), host));
+        .and_then(|host| tags.replace(log_schema().host_key().to_owned(), host));
     dd_metric
         .source_type_name
-        .and_then(|source| tags.insert("source_type_name".into(), source));
+        .and_then(|source| tags.replace("source_type_name".into(), source));
     dd_metric
         .device
-        .and_then(|dev| tags.insert("device".into(), dev));
+        .and_then(|dev| tags.replace("device".into(), dev));
 
     let (namespace, name) = namespace_name_from_dd_metric(&dd_metric.metric);
 
@@ -503,7 +503,7 @@ pub(crate) fn decode_ddsketch(
         .flat_map(|sketch_series| {
             // sketch_series.distributions is also always empty from payload coming from dd agents
             let mut tags = into_metric_tags(sketch_series.tags);
-            tags.insert(
+            tags.replace(
                 log_schema().host_key().to_string(),
                 sketch_series.host.clone(),
             );

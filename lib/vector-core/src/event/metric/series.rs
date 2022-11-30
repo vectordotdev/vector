@@ -42,8 +42,8 @@ impl MetricSeries {
     /// Sets or updates the string value of a tag.
     ///
     /// *Note:* This will create the tags map if it is not present.
-    pub fn insert_tag(&mut self, key: String, value: String) -> Option<String> {
-        (self.tags.get_or_insert_with(Default::default)).insert(key, value)
+    pub fn replace_tag(&mut self, key: String, value: impl Into<TagValue>) -> Option<String> {
+        (self.tags.get_or_insert_with(Default::default)).replace(key, value)
     }
 
     pub fn set_multi_value_tag(&mut self, key: String, values: impl IntoIterator<Item = TagValue>) {
