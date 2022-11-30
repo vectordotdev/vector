@@ -515,6 +515,14 @@ impl ReceivedMessage {
                 );
             } else {
                 log.insert("source_type", KafkaSourceConfig::NAME);
+
+                log_namespace.insert_source_metadata(
+                    KafkaSourceConfig::NAME,
+                    log,
+                    Some(LegacyKey::Overwrite(keys.key_field)),
+                    path!(default_key_field().as_str()),
+                    self.key.clone(),
+                );
             }
 
             log_namespace.insert_source_metadata(
@@ -523,14 +531,6 @@ impl ReceivedMessage {
                 Some(LegacyKey::Overwrite(keys.timestamp)),
                 path!("timestamp"),
                 self.timestamp,
-            );
-
-            log_namespace.insert_source_metadata(
-                KafkaSourceConfig::NAME,
-                log,
-                Some(LegacyKey::Overwrite(keys.key_field)),
-                path!(default_key_field().as_str()),
-                self.key.clone(),
             );
 
             log_namespace.insert_source_metadata(
@@ -660,7 +660,11 @@ mod test {
         crate::test_util::test_generate_config::<KafkaSourceConfig>();
     }
 
-    pub(super) fn make_config(topic: &str, group: &str) -> KafkaSourceConfig {
+    pub(super) fn make_config(
+        topic: &str,
+        group: &str,
+        log_namespace: LogNamespace,
+    ) -> KafkaSourceConfig {
         KafkaSourceConfig {
             bootstrap_servers: kafka_address(9091),
             topics: vec![topic.into()],
@@ -675,13 +679,14 @@ mod test {
             headers_key: "headers".to_string(),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
+            log_namespace: Some(log_namespace == LogNamespace::Vector),
             ..Default::default()
         }
     }
 
     #[tokio::test]
     async fn consumer_create_ok() {
-        let config = make_config("topic", "group");
+        let config = make_config("topic", "group", LogNamespace::Legacy);
         assert!(create_consumer(&config).is_ok());
     }
 
@@ -689,7 +694,7 @@ mod test {
     async fn consumer_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
-            ..make_config("topic", "group")
+            ..make_config("topic", "group", LogNamespace::Legacy)
         };
         assert!(create_consumer(&config).is_err());
     }
@@ -770,40 +775,47 @@ mod integration_test {
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {
-        send_receive(true, |_| false, 10).await;
+        send_receive(true, |_| false, 10, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_with_acknowledgements_vector_namespace() {
+        send_receive(true, |_| false, 10, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements() {
-        send_receive(false, |_| false, 10).await;
+        send_receive(false, |_| false, 10, LogNamespace::Legacy).await;
     }
 
     #[tokio::test]
     async fn handles_one_negative_acknowledgement() {
-        send_receive(true, |n| n == 2, 10).await;
+        send_receive(true, |n| n == 2, 10, LogNamespace::Legacy).await;
     }
 
     #[tokio::test]
     async fn handles_permanent_negative_acknowledgement() {
-        send_receive(true, |n| n >= 2, 2).await;
+        send_receive(true, |n| n >= 2, 2, LogNamespace::Legacy).await;
     }
 
     async fn send_receive(
         acknowledgements: bool,
         error_at: impl Fn(usize) -> bool,
         receive_count: usize,
+        log_namespace: LogNamespace,
     ) {
         const SEND_COUNT: usize = 10;
 
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let config = make_config(&topic, &group_id);
+        let config = make_config(&topic, &group_id, log_namespace);
 
         let now = send_events(topic.clone(), 10).await;
 
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
             let (tx, rx) = SourceSender::new_test_errors(error_at);
-            let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, acknowledgements);
+            let (trigger_shutdown, shutdown_done) =
+                spawn_kafka(tx, config, acknowledgements, log_namespace);
             let events = collect_n(rx, SEND_COUNT).await;
             // Yield to the finalization task to let it collect the
             // batch status receivers before signalling the shutdown.
@@ -820,35 +832,70 @@ mod integration_test {
 
         assert_eq!(events.len(), SEND_COUNT);
         for (i, event) in events.into_iter().enumerate() {
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                format!("{} {:03}", TEXT, i).into()
-            );
-            assert_eq!(
-                event.as_log()["message_key"],
-                format!("{} {}", KEY, i).into()
-            );
-            assert_eq!(
-                event.as_log()[log_schema().source_type_key()],
-                "kafka".into()
-            );
-            assert_eq!(
-                event.as_log()[log_schema().timestamp_key()],
-                now.trunc_subsecs(3).into()
-            );
-            assert_eq!(event.as_log()["topic"], topic.clone().into());
-            assert!(event.as_log().contains("partition"));
-            assert!(event.as_log().contains("offset"));
-            let mut expected_headers = BTreeMap::new();
-            expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
-            assert_eq!(event.as_log()["headers"], Value::from(expected_headers));
+            if let LogNamespace::Legacy = log_namespace {
+                assert_eq!(
+                    event.as_log()[log_schema().message_key()],
+                    format!("{} {:03}", TEXT, i).into()
+                );
+                assert_eq!(
+                    event.as_log()["message_key"],
+                    format!("{} {}", KEY, i).into()
+                );
+                assert_eq!(
+                    event.as_log()[log_schema().source_type_key()],
+                    "kafka".into()
+                );
+                assert_eq!(
+                    event.as_log()[log_schema().timestamp_key()],
+                    now.trunc_subsecs(3).into()
+                );
+                assert_eq!(event.as_log()["topic"], topic.clone().into());
+                assert!(event.as_log().contains("partition"));
+                assert!(event.as_log().contains("offset"));
+                let mut expected_headers = BTreeMap::new();
+                expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
+                assert_eq!(event.as_log()["headers"], Value::from(expected_headers));
+            } else {
+                let meta = event.as_log().metadata().value();
+
+                assert_eq!(
+                    meta.get(path!("vector", "source_type")).unwrap(),
+                    &vrl::value!(KafkaSourceConfig::NAME)
+                );
+                assert!(meta
+                    .get(path!("vector", "ingest_timestamp"))
+                    .unwrap()
+                    .is_timestamp());
+
+                assert_eq!(
+                    event.as_log().get("message").unwrap(),
+                    &vrl::value!(format!("{} {:03}", TEXT, i))
+                );
+                assert_eq!(
+                    meta.get(path!("kafka", "timestamp")).unwrap(),
+                    &vrl::value!(now.trunc_subsecs(3))
+                );
+                assert_eq!(
+                    meta.get(path!("kafka", "topic")).unwrap(),
+                    &vrl::value!(topic.clone())
+                );
+                assert!(meta.get(path!("kafka", "partition")).unwrap().is_integer(),);
+                assert!(meta.get(path!("kafka", "offset")).unwrap().is_integer(),);
+
+                let mut expected_headers = BTreeMap::new();
+                expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
+                assert_eq!(
+                    meta.get(path!("kafka", "headers")).unwrap(),
+                    &Value::from(expected_headers)
+                );
+            }
         }
     }
 
     fn make_rand_config() -> (String, String, KafkaSourceConfig) {
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let config = make_config(&topic, &group_id);
+        let config = make_config(&topic, &group_id, LogNamespace::Legacy);
         (topic, group_id, config)
     }
 
@@ -878,9 +925,11 @@ mod integration_test {
         tx: SourceSender,
         config: KafkaSourceConfig,
         acknowledgements: bool,
+        log_namespace: LogNamespace,
     ) -> (Trigger, Tripwire) {
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
         let consumer = create_consumer(&config).unwrap();
+
         tokio::spawn(kafka_source(
             config,
             consumer,
@@ -888,7 +937,7 @@ mod integration_test {
             shutdown,
             tx,
             acknowledgements,
-            LogNamespace::Legacy,
+            log_namespace,
         ));
         (trigger_shutdown, shutdown_done)
     }
@@ -960,13 +1009,15 @@ mod integration_test {
         let _send_start = send_events(topic.clone(), NEVENTS).await;
 
         let (tx, rx1) = delay_pipeline(1, Duration::from_millis(200), EventStatus::Delivered);
-        let (trigger_shutdown1, shutdown_done1) = spawn_kafka(tx, config.clone(), true);
+        let (trigger_shutdown1, shutdown_done1) =
+            spawn_kafka(tx, config.clone(), true, LogNamespace::Legacy);
         let events1 = tokio::spawn(collect_n(rx1, NEVENTS));
 
         sleep(Duration::from_secs(1)).await;
 
         let (tx, rx2) = delay_pipeline(2, Duration::from_millis(DELAY), EventStatus::Delivered);
-        let (trigger_shutdown2, shutdown_done2) = spawn_kafka(tx, config, true);
+        let (trigger_shutdown2, shutdown_done2) =
+            spawn_kafka(tx, config, true, LogNamespace::Legacy);
         let events2 = tokio::spawn(collect_n(rx2, NEVENTS));
 
         sleep(Duration::from_secs(5)).await;
