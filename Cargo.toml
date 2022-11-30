@@ -471,6 +471,7 @@ sources-logs = [
   "sources-kafka",
   "sources-kubernetes_logs",
   "sources-logstash",
+  "sources-loki",
   "sources-nats",
   "sources-opentelemetry",
   "sources-file-descriptor",
@@ -521,6 +522,7 @@ sources-journald = []
 sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
+sources-loki = []
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
