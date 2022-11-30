@@ -97,7 +97,7 @@ These components would be validated for compliance by being run automatically in
 validation harness called the "validation runner." This runner would construct an isolated Vector
 topology that ran the component, and provided all of the necessary inputs/outputs for it to be a
 valid topology. By controlling the input events sent to the topology, and collecting the output
-events and telemetry, we would ensure thhat the component could be tested in isolation and in a
+events and telemetry, we would ensure that the component could be tested in isolation and in a
 scenario that looked more like Vector running in a customer's environment than a simple unit test.
 
 This runner would run within a unit test itself, being fed a list of components to validate, as well
@@ -212,24 +212,25 @@ pub struct ExternalResource {
 As mentioned above, in many cases, external resources are simply the inverse of the declared
 resources of a component via their component-specific configuration trait, such as
 `SourceConfig::resources`. However, they need more detail for the runner to properly spawn such a
-resource, which involves the directionality of the resource and the payloads flowing through it.
+resource, which involves the "directionality" of the resource and the payloads flowing through it.
 
-Directionality here covers the fact that, for both sources and sinks, they may pull or push with
-regards to their external resource. A source could "pull" data from an external resource
-(`prometheus_scrape` source), or it could have that external resource "push" to it (`socket`
-source), whereas a sink might "push" data to the external resource (`elasticsearch` sink) or have
-the external resource "pull" data from it (`prometheus_exporter` sink). Sources and sinks, when
-defining their external resource, will define the direction that the external resource operates in
--- push or pull -- which is then further refined depending on whether or not the component is a
-source or sink.
+**Direction** describes the data flow from the perspective of the external resource. At a
+fundamental level, data enters Vector by coming into a source, and leaves Vector by exiting from a
+sink. Likewise, sources and sinks are always pair with some external resource to actually drive that
+flow of data. However, it is not always the external resource that is itself initiating the action
+to send data into a source, or the sink itself initiating the flow of data from Vector out to the
+resource. In some cases, the initiation of that data flow happens from the other side, from the
+external resource itself.
 
-As an example, for the `http_server` source, it defines an external HTTP resource with a direction
-of "push", which in the context of a source -- where the component gets its _input_ from the
-external resource -- means that the resource should "push" the input events to the component, which
-in this case, implies an HTTP client that sends inputs. In the case of the `elasticsearch` sink, it
-would also describe an external HTTP resource with a direction of "push", but when evaluated in the
-context of the component being a sink, this would dictate that we spin up an HTTP server to receive
-the output events, as the component is the one doing the "pushing."
+As an example, take the `http_server` source: it accepts data sent to it on an HTTP server that is
+spawns and listens for requests on. In this case, the external "resource" would be any HTTP client
+that sends a request to the source. From the perspective of the external resource, data flows in a
+"push" direction, as it has to "push" the data to the source by initiating an
+HTTP request. The source itself doesn't send a request to grab data from the HTTP clients.
+Conversely, if we look at the `kafka` source, the direction is flipped: the source has to "pull" the
+data by asking the brokers for the next batch of messages. We can apply the same logic to sinks, but
+in reverse: from the perspective of the external resource, it is being "pushed" to if the sink
+itself initiates the data flow, and it is "pulling" if it has to ask the sink for more data.
 
 Beyond direction, external resources also dictate the type of payload. Handling payloads is another
 tricky aspect of this design, as we need a generic way to specify the type of payload whether we're
