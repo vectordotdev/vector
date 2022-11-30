@@ -23,8 +23,8 @@ pub(crate) use self::allocator::{
 const NUM_GROUPS: usize = 128;
 pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
 
-// Delay in milliseconds.
-pub static REPORT_DELAY: AtomicU64 = AtomicU64::new(5000);
+// Reporting interval in milliseconds.
+pub static REPORTING_INTERVAL_MS: AtomicU64 = AtomicU64::new(5000);
 
 type GroupMemStatsArray = [AtomicI64; NUM_GROUPS];
 
@@ -132,7 +132,9 @@ pub fn init_allocation_tracing() {
                     }
                 });
             }
-            thread::sleep(Duration::from_millis(REPORT_DELAY.load(Ordering::Relaxed)));
+            thread::sleep(Duration::from_millis(
+                REPORTING_INTERVAL_MS.load(Ordering::Relaxed),
+            ));
         })
         .unwrap();
 }
