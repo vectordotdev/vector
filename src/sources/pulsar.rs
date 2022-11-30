@@ -359,7 +359,6 @@ mod integration_tests {
         })
         .await;
 
-        println!("Received event  {:?}", events[0].as_log());
         assert_eq!(events[0].as_log()[log_schema().message_key()], msg.into());
     }
 }
