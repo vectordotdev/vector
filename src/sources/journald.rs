@@ -1417,4 +1417,50 @@ mod tests {
 
         assert_eq!(definition, expected_definition)
     }
+
+    fn matches_schema(config: &JournaldConfig, namespace: LogNamespace) {
+        let record = r#"{
+            "PRIORITY":"6",
+            "SYSLOG_FACILITY":"3",
+            "SYSLOG_IDENTIFIER":"ntpd",
+            "_BOOT_ID":"124c781146e841ae8d9b4590df8b9231",
+            "_CAP_EFFECTIVE":"3fffffffff",
+            "_CMDLINE":"ntpd: [priv]",
+            "_COMM":"ntpd",
+            "_EXE":"/usr/sbin/ntpd",
+            "_GID":"0",
+            "_MACHINE_ID":"c36e9ea52800a19d214cb71b53263a28",
+            "_PID":"2156",
+            "_STREAM_ID":"92c79f4b45c4457490ebdefece29995e",
+            "_SYSTEMD_CGROUP":"/system.slice/ntpd.service",
+            "_SYSTEMD_INVOCATION_ID":"496ad5cd046d48e29f37f559a6d176f8",
+            "_SYSTEMD_SLICE":"system.slice",
+            "_SYSTEMD_UNIT":"ntpd.service",
+            "_TRANSPORT":"stdout",
+            "_UID":"0",
+            "__MONOTONIC_TIMESTAMP":"98694000446",
+            "__REALTIME_TIMESTAMP":"1564173027000443",
+            "host":"my-host.local",
+            "message":"reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
+            "source_type":"journald",
+            "timestamp":"2020-10-10T17:07:36.452332Z"
+        }"#;
+
+        let json: serde_json::Value = serde_json::from_str(record).unwrap();
+        let event = Event::from(LogEvent::from(value::Value::from(json)));
+
+        let definition = config.outputs(namespace)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        definition.assert_valid_for_event(&event)
+    }
+
+    #[test]
+    fn matches_schema_legacy() {
+        let config = JournaldConfig::default();
+
+        matches_schema(&config, LogNamespace::Legacy)
+    }
 }
