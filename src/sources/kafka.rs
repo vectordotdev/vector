@@ -247,35 +247,35 @@ impl SourceConfig for KafkaSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.timestamp))),
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.timestamp))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.topic))),
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.topic))),
                 &owned_value_path!(default_topic_key().as_str()),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.partition))),
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.partition))),
                 &owned_value_path!(default_partition_key().as_str()),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.offset))),
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.offset))),
                 &owned_value_path!(default_offset_key().as_str()),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.headers))),
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.headers))),
                 &owned_value_path!(default_headers_key().as_str()),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
@@ -284,7 +284,7 @@ impl SourceConfig for KafkaSourceConfig {
         let schema_definition = if let LogNamespace::Legacy = log_namespace {
             schema_definition.with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.key_field))),
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.key_field))),
                 &owned_value_path!(default_key_field().as_str()),
                 Kind::bytes(),
                 None,
