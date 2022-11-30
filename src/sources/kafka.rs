@@ -705,7 +705,6 @@ mod test {
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                 .with_meaning(LookupBuf::root(), "message")
                 .with_metadata_field(&owned_value_path!("kafka", "timestamp"), Kind::timestamp())
-                // .with_metadata_field(&owned_value_path!("kafka", "message_key"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("kafka", "partition"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes())
