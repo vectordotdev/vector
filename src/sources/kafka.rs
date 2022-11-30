@@ -12,7 +12,7 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{Stream, StreamExt};
-use lookup::path;
+use lookup::{owned_value_path, path};
 use once_cell::sync::OnceCell;
 use rdkafka::{
     consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
@@ -22,8 +22,9 @@ use rdkafka::{
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 
+use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace, NO_LEGACY_KEY};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 
@@ -163,6 +164,12 @@ pub struct KafkaSourceConfig {
     log_namespace: Option<bool>,
 }
 
+impl KafkaSourceConfig {
+    fn keys(&self) -> Keys {
+        Keys::from(log_schema(), self)
+    }
+}
+
 const fn default_session_timeout_ms() -> u64 {
     10000 // default in librdkafka
 }
@@ -230,8 +237,58 @@ impl SourceConfig for KafkaSourceConfig {
         )))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(Some(self.log_namespace.unwrap_or(false)));
+        let keys = self.keys();
+
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.timestamp))),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.key_field))),
+                &owned_value_path!(default_key_field().as_str()),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.topic))),
+                &owned_value_path!(default_topic_key().as_str()),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.partition))),
+                &owned_value_path!(default_partition_key().as_str()),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.offset))),
+                &owned_value_path!(default_offset_key().as_str()),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(keys.headers))),
+                &owned_value_path!(default_headers_key().as_str()),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                None,
+            );
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -261,7 +318,6 @@ async fn kafka_source(
     }
 
     let mut stream = consumer.stream();
-    let keys = Keys::from(log_schema(), &config);
 
     loop {
         tokio::select! {
@@ -286,7 +342,7 @@ async fn kafka_source(
                         partition: msg.partition(),
                     });
 
-                    parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer, log_namespace).await;
+                    parse_message(msg, decoder.clone(), config.keys(), &finalizer, &mut out, &consumer, log_namespace).await;
                 }
             },
         }
@@ -381,7 +437,7 @@ fn parse_stream<'a>(
     Some((count, stream))
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Keys<'a> {
     timestamp: &'a str,
     key_field: &'a str,
@@ -451,9 +507,7 @@ impl ReceivedMessage {
     fn apply(&self, keys: &Keys<'_>, event: &mut Event, log_namespace: LogNamespace) {
         if let Event::Log(ref mut log) = event {
             if let LogNamespace::Vector = log_namespace {
-                // Pre-log namespace behavior is to use the
-                // "timestamp" key, not "ingest_timestamp", so we
-                // won't use ingest_timestamp in legacy namespaces.
+                // We only want an auto-generated timestamp in the Vector namespace.
                 log_namespace.insert_standard_vector_source_metadata(
                     log,
                     KafkaSourceConfig::NAME,
