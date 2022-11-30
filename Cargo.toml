@@ -825,6 +825,9 @@ enterprise-tests = [
   "api",
 ]
 
+validation-runner = []
+validation-tests = ["validation-runner", "sources", "transforms", "sinks"]
+
 # Grouping together features for benchmarks. We exclude the API client due to it causing the build process to run out
 # of memory when those additional dependencies are built in CI.
 benches = [

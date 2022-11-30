@@ -67,6 +67,7 @@ impl VectorService for EventForwardService {
 }
 
 pub struct InputEdge {
+    #[allow(dead_code)]
     client: VectorClient<Channel>,
 }
 

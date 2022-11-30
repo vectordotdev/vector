@@ -16,10 +16,6 @@ use super::{
     telemetry::{Telemetry, TelemetryCollector},
 };
 
-const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
-const INTERNAL_METRICS_KEY: &str = "_telemetry_metrics";
-const VECTOR_SINK_KEY: &str = "_telemetry_out";
-
 pub struct TopologyBuilder {
     config_builder: ConfigBuilder,
     input_edge: Option<InputEdge>,
