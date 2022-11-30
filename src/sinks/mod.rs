@@ -190,6 +190,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-console")]
     Console(#[configurable(derived)] console::ConsoleSinkConfig),
 
+    /// Datadog Archives.
+    #[cfg(feature = "sinks-datadog_archives")]
+    DatadogArchives(#[configurable(derived)] datadog_archives::DatadogArchivesSinkConfig),
+
     /// Datadog Events.
     #[cfg(feature = "sinks-datadog_events")]
     DatadogEvents(#[configurable(derived)] datadog::events::DatadogEventsConfig),
@@ -398,6 +402,8 @@ impl NamedComponent for Sinks {
             Self::Clickhouse(config) => config.get_component_name(),
             #[cfg(feature = "sinks-console")]
             Self::Console(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-datadog_archives")]
+            Self::DatadogArchives(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_events")]
             Self::DatadogEvents(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_logs")]
