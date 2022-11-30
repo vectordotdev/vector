@@ -789,13 +789,28 @@ mod integration_test {
     }
 
     #[tokio::test]
+    async fn consumes_event_without_acknowledgements_vector_namespace() {
+        send_receive(false, |_| false, 10, LogNamespace::Vector).await;
+    }
+
+    #[tokio::test]
     async fn handles_one_negative_acknowledgement() {
         send_receive(true, |n| n == 2, 10, LogNamespace::Legacy).await;
     }
 
     #[tokio::test]
+    async fn handles_one_negative_acknowledgement_vector_namespace() {
+        send_receive(true, |n| n == 2, 10, LogNamespace::Vector).await;
+    }
+
+    #[tokio::test]
     async fn handles_permanent_negative_acknowledgement() {
         send_receive(true, |n| n >= 2, 2, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn handles_permanent_negative_acknowledgement_vector_namespace() {
+        send_receive(true, |n| n >= 2, 2, LogNamespace::Vector).await;
     }
 
     async fn send_receive(
