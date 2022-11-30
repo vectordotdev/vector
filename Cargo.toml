@@ -194,7 +194,7 @@ rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.11.2", default-features = false, features = ["std"] }
+prost = { version = "0.11.3", default-features = false, features = ["std"] }
 prost-types = { version = "0.11.2", default-features = false, optional = true }
 
 # GCP
@@ -328,7 +328,7 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.25.0", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.11.2", default-features = false, optional = true }
+prost-build = { version = "0.11.3", default-features = false, optional = true }
 tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
