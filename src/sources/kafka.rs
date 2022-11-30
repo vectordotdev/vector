@@ -279,19 +279,14 @@ impl SourceConfig for KafkaSourceConfig {
                 &owned_value_path!(default_headers_key().as_str()),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
-            );
-
-        let schema_definition = if let LogNamespace::Legacy = log_namespace {
-            schema_definition.with_source_metadata(
+            )
+            .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(keys.key_field))),
                 &owned_value_path!(default_key_field().as_str()),
                 Kind::bytes(),
                 None,
-            )
-        } else {
-            schema_definition
-        };
+            );
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
@@ -523,15 +518,15 @@ impl ReceivedMessage {
                 );
             } else {
                 log.insert(log_schema().source_type_key(), KafkaSourceConfig::NAME);
-
-                log_namespace.insert_source_metadata(
-                    KafkaSourceConfig::NAME,
-                    log,
-                    Some(LegacyKey::Overwrite(keys.key_field)),
-                    path!("message_key"),
-                    self.key.clone(),
-                );
             }
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.key_field)),
+                path!("message_key"),
+                self.key.clone(),
+            );
 
             log_namespace.insert_source_metadata(
                 KafkaSourceConfig::NAME,
@@ -708,6 +703,7 @@ mod test {
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                 .with_meaning(LookupBuf::root(), "message")
                 .with_metadata_field(&owned_value_path!("kafka", "timestamp"), Kind::timestamp())
+                .with_metadata_field(&owned_value_path!("kafka", "message_key"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("kafka", "partition"), Kind::bytes())
                 .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes())
@@ -956,6 +952,11 @@ mod integration_test {
                     event.as_log().get("message").unwrap(),
                     &vrl::value!(format!("{} {:03}", TEXT, i))
                 );
+                assert_eq!(
+                    meta.get(path!("kafka", "message_key")).unwrap(),
+                    &vrl::value!(format!("{} {}", KEY, i))
+                );
+
                 assert_eq!(
                     meta.get(path!("kafka", "timestamp")).unwrap(),
                     &vrl::value!(now.trunc_subsecs(3))
