@@ -185,15 +185,13 @@ pub struct TaskCoordinator<State> {
 impl TaskCoordinator<()> {
     /// Creates a new `TaskCoordinator`.
     pub fn new() -> TaskCoordinator<Configuring> {
-        let coordinator = TaskCoordinator {
+        TaskCoordinator {
             state: Configuring {
                 tasks_started: WaitGroup::new(),
                 tasks_completed: WaitGroup::new(),
                 shutdown_triggers: Mutex::new(Vec::new()),
             },
-        };
-
-        coordinator
+        }
     }
 }
 

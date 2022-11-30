@@ -17,7 +17,7 @@ impl GrpcAddress {
     ///
     /// This is typically used when actually binding a socket to use for listening for connections
     /// as a gRPC server.
-    pub fn as_socket_addr(&self) -> SocketAddr {
+    pub const fn as_socket_addr(&self) -> SocketAddr {
         self.addr
     }
 

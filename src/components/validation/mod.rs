@@ -26,7 +26,7 @@ pub enum ComponentType {
 
 impl ComponentType {
     /// Gets the name of this component type as a string.
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Source => "source",
             Self::Transform => "transform",
@@ -36,6 +36,7 @@ impl ComponentType {
 }
 
 /// Component type-specific configuration.
+#[allow(clippy::large_enum_variant)]
 pub enum ComponentConfiguration {
     /// A source component.
     Source(Sources),

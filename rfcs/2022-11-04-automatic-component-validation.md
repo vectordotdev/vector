@@ -135,9 +135,6 @@ pub trait ValidatableComponent: Send + Sync {
 
     /// Gets the external resource associated with this component.
     fn external_resource(&self) -> Option<ExternalResource>;
-
-    /// Gets the test cases to use for validating this component.
-    fn test_cases(&self) -> Vec<TestCase>;
 }
 ```
 
@@ -149,9 +146,6 @@ and validate the component, specifically:
 - the component's configuration (an actual object that can be passed to `ConfigBuilder`)
 - the external resource the component depends on, if any (transforms have no external dependency,
   but the `http_server` source, for example, depends on an "external" HTTP client to send it events)
-- the test cases to run for the component, which is a list of expectation/events tuples, where the
-  expectation dictates if the given inputs should all be processed successfully, partial success, or
-  all fail to be processed (this drives detection of relevant telemetry during validation)
 
 This trait overlaps heavily with the existing "component config" traits such as `SourceConfig`, in
 that they all roughly describe the high-level characteristics of the component, such as allowable
@@ -267,7 +261,26 @@ when processed, should lead to the expected outcome. This data is straightforwar
 we've layered an additional mechanism on top to help more easily define input events such that they
 can be mutated as necessary to achieve the intended outcome.
 
-Let's briefly look at some code:
+Test cases for a given component are defined via a YAML file, at a well-known location, that
+corresponding to this pattern: `tests/validation/components/<component type>/<component name>.yaml`.
+The component type is pluralized, so the value would be `sources` for a source, and so on. The
+component name is the value from `ValidatableComponent::component_name`, which is the name of the
+component as it is referenced in a Vector configuration. Here's a basic example of what such a test
+case file would look like:
+
+
+```yaml
+- name: happy path
+  expectation: success
+  events:
+    - simple message 1
+    - simple message 2
+    - simple message 3
+```
+
+Helper types are used to allow for more succinct and intuitive writing of test cases, such as
+treating any event that's just a string as a log message, and so on. Let's briefly look at some code
+to see more about test cases:
 
 ```rust
 // Expected outcome of a validation test case.
@@ -278,17 +291,22 @@ pub enum TestCaseExpectation {
     /// All events failed to be processed successfully.
     Failure,
 
-    /// Some events failed to be processed successfully.
-    PartialFailure,
+    /// Some events, but not all, were processed successfully.
+    PartialSuccess,
 }
 
 /// An event used in a test case.
 pub enum TestEvent {
     /// The event is used, as-is, without modification.
-    Passthrough(Event),
+    Passthrough(EventData),
 
     /// The event is potentially modified by the external resource.
-    Modified(Event),
+    Modified { modified: bool, event: EventData },
+}
+
+pub enum EventData {
+    /// A log event.
+    Log(String),
 }
 
 /// A validation test case.
@@ -296,69 +314,69 @@ pub struct TestCase {
     pub expectation: TestCaseExpectation,
     pub events: Vec<TestEvent>,
 }
-
 ```
 
-As described above, these types are simple in practice, but provide the means to articulate changes
-to the input events necessary for inducing failure. Let's walk through a simple example using the
+We have the basic definition of a test case, and test case expectation. You can also see a few of
+the aforementioned helper types, such as `TestEvent` and `EventData`. These helper types provide a
+few key benefits, such as allowing common event types to be encoded in the test case data very
+efficiently, as well as indicating to external resources that events should be modified to induce
+failure behavior, without the test case data needing to specify exactly _how_ to modify the event.
+We'll talk more about these below.
+
+`EventData` is provided to help reduce boilerplate in the test case data. As there is often a common
+pattern to certain event types, we can create niche patterns to deserialize against those patterns,
+in a way that reduces the amount of data necessary in the test case. For example, a common event
+type is a log event that is parsed from a raw log line. This generally results in an event with a
+`message` field that has the contents of the raw log line. By intentionally crafting `EventData` to
+do so, we can allow an event entry in the test case to be a simple string, which is deserialized to
+a log event in the shape described above. This allows skipping additional fields such as having to
+specify that the event is a log event, and that the string value should be added to the `message`
+field, and so on. We can take this pattern for all of the metric types, such as letting a
+distribution metric be created from two fields -- one to specify the `distribution` type and one
+with all the samples to add to it -- rather than having to mirror the entire structure of `Metric`
+with the various nested fields.
+
+Additionally, we've created `TestEvent`, which encapsulates events and provides a mechanism for
+indicating that the event should be modified to induce a failure outcome. In many cases, the event
+data itself is not able to be modified in a way that induces failure, instead requiring changes to
+the external resource itself, such as using an incorrect codec, and so on. While it is theoretically
+possible to allow this to be encoded in the test case data, it is difficult as it would have to
+account for the many different ways that an event might need to be modified to induce failure,
+across all of the components and external resources they require. Instead, we lean on the fact that
+all sources and sinks generally have a well-known way to induce failure, that is common to the
+external resource type. Let's walk through an example on using a modified event when validating the
 `http_server` source.
 
 In the most basic test case, we can trivially provide simple log events that will be encoded and
 processed by the source without issue. However, in order to exercise the failure path, we need to
-consider what causes the source to fail to process an event.
+consider what causes the source to fail to process an event. For the `http_server` source, the only
+real failure path is a payload that cannot be decoded. While we can obviously tweak the shape and
+contents of the test case events, it would involve a large amount of boilerplate to encode other
+details that should be changed when sending the event, such as how to encode it. However, in the
+"modified" event model, we can come up with just a single way that the external resource could
+modify, that we know would induce failure, such as using an encoding that is different than the one
+specified.
 
-For the `http_server` source, the only real failure path is a payload that cannot be decoded. From
-the definitions we've seen above, the only control that we really have is over the contents of the
-event itself. As components describe their own configuration, and the configuration of their
-external resource, in a fixed way, this means that we could, for example, only specify the external
-resource to create with a fixed codec, such as JSON. The HTTP resource code is configured with this
-information, and will dutifully take an `Event` and encode it to JSON before sending it along.
+Our goal is generally, in the case of inducing failure, simply to induce it period, and not induce
+it in a specific _way_. So long as there is at least one obvious way for an external resource, with
+a given configuration, to modify an event such that processing it will induce failure, then we can
+push that responsibility to the external resource, rather than the test case author. In turn, since
+we know it is provided by the external resource, we can reduce the boilerplate necessary to invoke
+this behavior in the test case data to the absolute minimum.
 
-To get around this, `TestEvent` is introduced and provides two modes: passthrough and modified. The
-passthrough mode is exactly what it sounds like: the event it holds is used as-is. When faced with a
-situation such as our example, where modifying the event itself cannot be used to induce a failure,
-we can utilize the modified mode to do so.
+We can craft a "modified" event which will instruct the HTTP client external resource to encode the
+event using an encoding that _isn't_ the one it was configured with.  Codifying this in the
+definition of the test cases for the `http_server` source would look something like this:
 
-The modified mode also wraps an `Event`, but it is used as a signal to an external resource that the
-external resource should modify the event in some context-specific way in order to go against the
-happy path. As you might surmise, this is generally only useful for sources, because transforms and
-sinks will always be given an `Event`, and so the event itself must be tailored to induce failure in
-thos cases.
-
-Going back to our example, we can craft a "modified" event which will instruct the HTTP client
-external resource to encode the event using an encoding that _isn't_ the one it was configured with.
-Codifying this in the definition of the test cases for the `http_server` source would look something
-like this:
-
-```rust
-impl ValidatableComponent for SimpleHttpConfig {
-    ...
-
-    fn test_cases(&self) -> Vec<TestCase> {
-        vec![
-          // This is a happy path test, and each event will be encoded according to the external resource definition.
-          TestCase::success(vec![
-            LogEvent::from_str_legacy("simple message 1"),
-            LogEvent::from_str_legacy("simple message 2"),
-            LogEvent::from_str_legacy("simple message 3"),
-          ]),
-
-          // This is a failure path test, where we've marked one event such that the external resource should modify
-          // it, which in this case will mean it gets encoded using a codec other than the one specified in the
-          // external resource definition.
-          TestCase::partial_failure(vec![
-            LogEvent::from_str_legacy("good message 1").into(),
-            TestEvent::modified(LogEvent::from_str_legacy("bad message 1")),
-            LogEvent::from_str_legacy("good message 2").into(),
-          ]),
-        ]
-    }
-}
+```yaml
+- name: one bad apple
+  expectation: partial_success
+  events:
+    - good message 1
+    - modified: true
+      event: bad message 1
+    - good message 2
 ```
-
-As you can see from the above, there are also many implicit conversions provided so that developers
-can write test cases with a minimal amount of type conversion boilerplate, focusing as much as
-possible on the content of the events, and their shape, needed to drive the intended outcome.
 
 #### Pluggable validators
 
@@ -608,5 +626,14 @@ over running the Vector topology:
   process to potentially uncover scenarios where valid inputs should have been processed but
   weren't, or a certain metric's value wasn't updated even though the component acknowledged
   processing an event, and so on.
+- Enhance the test case data to allow for specifying component configurations directly, rather than
+  having to specify them via `ValidatableComponent::component_configuration`, such that a default
+  could be provided or specific fields could be overridden identically to how they would be
+  configured in a normal Vector configuration.
+- Extract the component type/name portion of `ValidatableComponent` into a more generic trait that
+  could be derived automatically for any component using the
+  `#[configurable_component(component_type("component_name"))]` notation, as it could be provided
+  for free given the existing requirement to use `#[configurable_component(...)]` to register a
+  component at all.
 - Try and unify the distinct per-component configuration traits (i.e. `SourceConfig`) with
   `ValidatableComponent` into a more generic base trait.

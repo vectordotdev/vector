@@ -118,7 +118,7 @@ impl RunnerResults {
         &self.test_name
     }
 
-    pub fn expectation(&self) -> TestCaseExpectation {
+    pub const fn expectation(&self) -> TestCaseExpectation {
         self.expectation
     }
 
@@ -284,7 +284,7 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             // section has completed. We additionally wait for the input driver task to complete
             // first, and the output driver task to complete last, as those tasks are freerunning
             // and don't require special shutdown coordination.
-            let _ = input_driver
+            input_driver
                 .await
                 .expect("input driver task should not have panicked");
 
