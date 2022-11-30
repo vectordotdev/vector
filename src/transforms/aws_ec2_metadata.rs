@@ -16,6 +16,7 @@ use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
 use value::Kind;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
@@ -224,7 +225,7 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [
@@ -279,7 +280,8 @@ impl Ec2MetadataTransform {
             }
             Event::Metric(ref mut metric) => {
                 state.iter().for_each(|(k, v)| {
-                    metric.insert_tag(k.metric_tag.clone(), String::from_utf8_lossy(v).to_string());
+                    metric
+                        .replace_tag(k.metric_tag.clone(), String::from_utf8_lossy(v).to_string());
                 });
             }
             Event::Trace(_) => panic!("Traces are not supported."),
@@ -864,7 +866,7 @@ mod integration_tests {
             let metric = make_metric();
             let mut expected_metric = metric.clone();
             for (k, v) in expected_metric_fields().iter() {
-                expected_metric.insert_tag(k.to_string(), v.to_string());
+                expected_metric.replace_tag(k.to_string(), v.to_string());
             }
 
             tx.send(metric.into()).await.unwrap();
@@ -930,8 +932,8 @@ mod integration_tests {
 
             let metric = make_metric();
             let mut expected_metric = metric.clone();
-            expected_metric.insert_tag(PUBLIC_IPV4_KEY.to_string(), "192.1.1.1".to_string());
-            expected_metric.insert_tag(REGION_KEY.to_string(), "us-east-1".to_string());
+            expected_metric.replace_tag(PUBLIC_IPV4_KEY.to_string(), "192.1.1.1".to_string());
+            expected_metric.replace_tag(REGION_KEY.to_string(), "us-east-1".to_string());
 
             tx.send(metric.into()).await.unwrap();
 

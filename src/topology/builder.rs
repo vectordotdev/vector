@@ -17,6 +17,7 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_config::NamedComponent;
+use vector_core::config::LogNamespace;
 use vector_core::{
     buffers::{
         topology::{
@@ -345,7 +346,10 @@ pub async fn build_pieces(
         let merged_definition =
             schema::merged_definition(&transform.inputs, config, &mut definition_cache);
 
-        for output in transform.inner.outputs(&merged_definition) {
+        for output in transform
+            .inner
+            .outputs(&merged_definition, config.schema.log_namespace())
+        {
             let definition = match output.log_schema_definition {
                 Some(definition) => definition,
                 None => merged_definition.clone(),
@@ -360,9 +364,15 @@ pub async fn build_pieces(
             enrichment_tables: enrichment_tables.clone(),
             schema_definitions,
             merged_schema_definition: merged_definition.clone(),
+            schema: config.schema,
         };
 
-        let node = TransformNode::from_parts(key.clone(), transform, &merged_definition);
+        let node = TransformNode::from_parts(
+            key.clone(),
+            transform,
+            &merged_definition,
+            config.schema.log_namespace(),
+        );
 
         let transform = match transform.inner.build(&context).await {
             Err(error) => {
@@ -593,13 +603,16 @@ impl TransformNode {
         key: ComponentKey,
         transform: &TransformOuter<OutputId>,
         schema_definition: &Definition,
+        global_log_namespace: LogNamespace,
     ) -> Self {
         Self {
             key,
             typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(schema_definition),
+            outputs: transform
+                .inner
+                .outputs(schema_definition, global_log_namespace),
             enable_concurrency: transform.inner.enable_concurrency(),
         }
     }

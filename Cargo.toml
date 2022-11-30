@@ -368,7 +368,7 @@ h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094
 #    (see https://github.com/vectordotdev/vector/issues/13695)
 openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", branch  = "enable_engine" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
-tokio-util = { git = "https://github.com/vectordotdev/tokio", version = "0.7", rev = "3aa231cf6f33f74ca29077163879f0de9a207ad8" }
+tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
