@@ -66,20 +66,8 @@ base: components: transforms: reduce: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				A map of field names to custom merge strategies.
-
-				For each field specified, the given strategy will be used for combining events rather than
-				the default behavior.
-
-				The default behavior is as follows:
-
-				- The first value of a string field is kept, subsequent values are discarded.
-				- For timestamp fields the first is kept and a new field `[field-name]_end` is added with
-				  the last received timestamp value.
-				- Numeric values are summed.
-				"""
-			required: true
+			description: "Strategies for merging events."
+			required:    true
 			type: string: enum: {
 				array:          "Append each value to an array."
 				concat:         "Concatenate each string value, delimited with a space."

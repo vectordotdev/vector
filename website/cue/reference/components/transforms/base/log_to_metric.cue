@@ -61,8 +61,20 @@ base: components: transforms: log_to_metric: configuration: metrics: {
 			description: "Tags to apply to the metric."
 			required:    false
 			type: object: options: "*": {
-				description: "Tags to apply to the metric."
-				required:    true
+				description: """
+					A templated field.
+
+					In many cases, components can be configured in such a way where some portion of the component's functionality can be
+					customized on a per-event basis. An example of this might be a sink that writes events to a file, where we want to
+					provide the flexibility to specify which file an event should go to by using an event field itself as part of the
+					input to the filename we use.
+
+					By using `Template`, users can specify either fixed strings or "templated" strings, which use a common syntax to
+					refer to fields in an event that will serve as the input data when rendering the template.  While a fixed string may
+					look something like `my-file.log`, a template string could look something like `my-file-{{key}}.log`, and the `key`
+					field of the event being processed would serve as the value when rendering the template into a string.
+					"""
+				required: true
 				type: string: syntax: "template"
 			}
 		}

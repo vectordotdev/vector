@@ -194,10 +194,23 @@ base: components: sinks: aws_s3: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: false
+					description: "Compression algorithm."
+					required:    false
 					type: string: {
-						const:   "zlib"
 						default: "gzip"
+						enum: {
+							gzip: """
+															[Gzip][gzip] compression.
+
+															[gzip]: https://en.wikipedia.org/wiki/Gzip
+															"""
+							none: "No compression."
+							zlib: """
+															[Zlib]][zlib] compression.
+
+															[zlib]: https://en.wikipedia.org/wiki/Zlib
+															"""
+						}
 					}
 				}
 				level: {
@@ -215,7 +228,19 @@ base: components: sinks: aws_s3: configuration: {
 					}
 				}
 			}
-			string: enum: ["none", "gzip", "zlib"]
+			string: enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://en.wikipedia.org/wiki/Gzip
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://en.wikipedia.org/wiki/Zlib
+					"""
+			}
 		}
 	}
 	content_encoding: {
@@ -666,13 +691,12 @@ base: components: sinks: aws_s3: configuration: {
 		description: "The tag-set for the object."
 		required:    false
 		type: object: options: "*": {
-			description: "The tag-set for the object."
-			required:    true
+			required: true
 			type: string: syntax: "literal"
 		}
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

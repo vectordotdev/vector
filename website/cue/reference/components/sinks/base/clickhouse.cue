@@ -103,10 +103,23 @@ base: components: sinks: clickhouse: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: false
+					description: "Compression algorithm."
+					required:    false
 					type: string: {
-						const:   "zlib"
 						default: "gzip"
+						enum: {
+							gzip: """
+															[Gzip][gzip] compression.
+
+															[gzip]: https://en.wikipedia.org/wiki/Gzip
+															"""
+							none: "No compression."
+							zlib: """
+															[Zlib]][zlib] compression.
+
+															[zlib]: https://en.wikipedia.org/wiki/Zlib
+															"""
+						}
 					}
 				}
 				level: {
@@ -124,7 +137,19 @@ base: components: sinks: clickhouse: configuration: {
 					}
 				}
 			}
-			string: enum: ["none", "gzip", "zlib"]
+			string: enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://en.wikipedia.org/wiki/Gzip
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://en.wikipedia.org/wiki/Zlib
+					"""
+			}
 		}
 	}
 	database: {
@@ -132,7 +157,8 @@ base: components: sinks: clickhouse: configuration: {
 		required:    false
 		type: string: {
 			default: null
-			syntax:  "literal"
+			examples: ["mydatabase"]
+			syntax: "literal"
 		}
 	}
 	encoding: {
@@ -171,7 +197,10 @@ base: components: sinks: clickhouse: configuration: {
 	endpoint: {
 		description: "The endpoint of the Clickhouse server."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {
+			examples: ["http://localhost:8123"]
+			syntax: "literal"
+		}
 	}
 	request: {
 		description: """
@@ -302,10 +331,13 @@ base: components: sinks: clickhouse: configuration: {
 	table: {
 		description: "The table that data will be inserted into."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {
+			examples: ["mytable"]
+			syntax: "literal"
+		}
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

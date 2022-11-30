@@ -100,13 +100,6 @@ base: components: sources: prometheus_scrape: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Custom parameters for the scrape request query string.
-
-				One or more values for the same parameter key can be provided. The parameters provided in this option are
-				appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
-				scraping the `/federate` endpoint.
-				"""
 			required: true
 			type: array: items: type: string: syntax: "literal"
 		}
@@ -117,7 +110,7 @@ base: components: sources: prometheus_scrape: configuration: {
 		type: uint: default: 15
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

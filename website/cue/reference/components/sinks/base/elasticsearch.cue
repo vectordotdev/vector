@@ -194,10 +194,23 @@ base: components: sinks: elasticsearch: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: false
+					description: "Compression algorithm."
+					required:    false
 					type: string: {
-						const:   "zlib"
 						default: "none"
+						enum: {
+							gzip: """
+															[Gzip][gzip] compression.
+
+															[gzip]: https://en.wikipedia.org/wiki/Gzip
+															"""
+							none: "No compression."
+							zlib: """
+															[Zlib]][zlib] compression.
+
+															[zlib]: https://en.wikipedia.org/wiki/Zlib
+															"""
+						}
 					}
 				}
 				level: {
@@ -215,7 +228,19 @@ base: components: sinks: elasticsearch: configuration: {
 					}
 				}
 			}
-			string: enum: ["none", "gzip", "zlib"]
+			string: enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://en.wikipedia.org/wiki/Gzip
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://en.wikipedia.org/wiki/Zlib
+					"""
+			}
 		}
 	}
 	data_stream: {
@@ -440,8 +465,7 @@ base: components: sinks: elasticsearch: configuration: {
 		description: "Custom parameters to add to the query string of each request sent to Elasticsearch."
 		required:    false
 		type: object: options: "*": {
-			description: "Custom parameters to add to the query string of each request sent to Elasticsearch."
-			required:    true
+			required: true
 			type: string: syntax: "literal"
 		}
 	}
@@ -523,8 +547,7 @@ base: components: sinks: elasticsearch: configuration: {
 				type: object: {
 					default: {}
 					options: "*": {
-						description: "Additional HTTP headers to add to every HTTP request."
-						required:    true
+						required: true
 						type: string: syntax: "literal"
 					}
 				}
@@ -597,7 +620,7 @@ base: components: sinks: elasticsearch: configuration: {
 		type: bool: default: null
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

@@ -237,8 +237,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 		required:    true
 		type: object: options: {
 			"*": {
-				description: "Type-specific labels."
-				required:    true
+				required: true
 				type: string: syntax: "literal"
 			}
 			type: {
@@ -258,7 +257,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 		type: bool: default: false
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

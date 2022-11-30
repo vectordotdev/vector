@@ -59,8 +59,21 @@ base: components: sinks: datadog_logs: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
-					type: string: const: "zlib"
+					description: "Compression algorithm."
+					required:    true
+					type: string: enum: {
+						gzip: """
+															[Gzip][gzip] compression.
+
+															[gzip]: https://en.wikipedia.org/wiki/Gzip
+															"""
+						none: "No compression."
+						zlib: """
+															[Zlib]][zlib] compression.
+
+															[zlib]: https://en.wikipedia.org/wiki/Zlib
+															"""
+					}
 				}
 				level: {
 					description: "Compression level."
@@ -79,7 +92,19 @@ base: components: sinks: datadog_logs: configuration: {
 			}
 			string: {
 				default: null
-				enum: ["none", "gzip", "zlib"]
+				enum: {
+					gzip: """
+						[Gzip][gzip] compression.
+
+						[gzip]: https://en.wikipedia.org/wiki/Gzip
+						"""
+					none: "No compression."
+					zlib: """
+						[Zlib]][zlib] compression.
+
+						[zlib]: https://en.wikipedia.org/wiki/Zlib
+						"""
+				}
 			}
 		}
 	}

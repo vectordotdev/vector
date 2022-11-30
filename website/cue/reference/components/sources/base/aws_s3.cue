@@ -239,7 +239,7 @@ base: components: sources: aws_s3: configuration: {
 				type: string: syntax: "literal"
 			}
 			tls_options: {
-				description: "Standard TLS options."
+				description: "TLS configuration."
 				required:    false
 				type: object: options: {
 					alpn_protocols: {
@@ -365,7 +365,7 @@ base: components: sources: aws_s3: configuration: {
 		}
 	}
 	tls_options: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

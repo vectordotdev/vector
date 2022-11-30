@@ -267,13 +267,12 @@ base: components: sinks: influxdb_metrics: configuration: {
 		description: "A map of additional tags, in the form of key/value pairs, to add to each measurement."
 		required:    false
 		type: object: options: "*": {
-			description: "A map of additional tags, in the form of key/value pairs, to add to each measurement."
-			required:    true
+			required: true
 			type: string: syntax: "literal"
 		}
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

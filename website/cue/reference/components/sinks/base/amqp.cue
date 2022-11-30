@@ -47,7 +47,7 @@ base: components: sinks: amqp: configuration: {
 				}
 			}
 			tls: {
-				description: "Standard TLS options."
+				description: "TLS configuration."
 				required:    false
 				type: object: options: {
 					alpn_protocols: {

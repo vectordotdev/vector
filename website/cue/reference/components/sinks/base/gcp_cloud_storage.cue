@@ -139,10 +139,23 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: false
+					description: "Compression algorithm."
+					required:    false
 					type: string: {
-						const:   "zlib"
 						default: "none"
+						enum: {
+							gzip: """
+															[Gzip][gzip] compression.
+
+															[gzip]: https://en.wikipedia.org/wiki/Gzip
+															"""
+							none: "No compression."
+							zlib: """
+															[Zlib]][zlib] compression.
+
+															[zlib]: https://en.wikipedia.org/wiki/Zlib
+															"""
+						}
 					}
 				}
 				level: {
@@ -160,7 +173,19 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					}
 				}
 			}
-			string: enum: ["none", "gzip", "zlib"]
+			string: enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://en.wikipedia.org/wiki/Gzip
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://en.wikipedia.org/wiki/Zlib
+					"""
+			}
 		}
 	}
 	credentials_path: {
@@ -350,13 +375,6 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				The set of metadata `key:value` pairs for the created objects.
-
-				For more information, see [Custom metadata][custom_metadata].
-
-				[custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
-				"""
 			required: true
 			type: string: syntax: "literal"
 		}
@@ -511,7 +529,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 		}
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

@@ -103,10 +103,23 @@ base: components: sinks: http: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: false
+					description: "Compression algorithm."
+					required:    false
 					type: string: {
-						const:   "zlib"
 						default: "none"
+						enum: {
+							gzip: """
+															[Gzip][gzip] compression.
+
+															[gzip]: https://en.wikipedia.org/wiki/Gzip
+															"""
+							none: "No compression."
+							zlib: """
+															[Zlib]][zlib] compression.
+
+															[zlib]: https://en.wikipedia.org/wiki/Zlib
+															"""
+						}
 					}
 				}
 				level: {
@@ -124,7 +137,19 @@ base: components: sinks: http: configuration: {
 					}
 				}
 			}
-			string: enum: ["none", "gzip", "zlib"]
+			string: enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://en.wikipedia.org/wiki/Gzip
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://en.wikipedia.org/wiki/Zlib
+					"""
+			}
 		}
 	}
 	encoding: {
@@ -230,8 +255,7 @@ base: components: sinks: http: configuration: {
 		description: "A list of custom headers to add to each request."
 		required:    false
 		type: object: options: "*": {
-			description: "A list of custom headers to add to each request."
-			required:    true
+			required: true
 			type: string: syntax: "literal"
 		}
 	}
@@ -334,8 +358,7 @@ base: components: sinks: http: configuration: {
 				type: object: {
 					default: {}
 					options: "*": {
-						description: "Additional HTTP headers to add to every HTTP request."
-						required:    true
+						required: true
 						type: string: syntax: "literal"
 					}
 				}
@@ -386,7 +409,7 @@ base: components: sinks: http: configuration: {
 		}
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

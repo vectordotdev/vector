@@ -75,7 +75,7 @@ base: components: sources: nginx_metrics: configuration: {
 		type: uint: default: 15
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

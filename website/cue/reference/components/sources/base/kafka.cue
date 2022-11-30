@@ -202,11 +202,6 @@ base: components: sources: kafka: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Advanced options set directly on the underlying `librdkafka` client.
-
-				See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
-				"""
 			required: true
 			type: string: syntax: "literal"
 		}

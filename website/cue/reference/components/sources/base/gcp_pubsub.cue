@@ -240,7 +240,7 @@ base: components: sources: gcp_pubsub: configuration: {
 		type: string: syntax: "literal"
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

@@ -157,10 +157,6 @@ base: components: sources: http_client: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Headers to apply to the HTTP requests.
-				One or more values for the same header can be provided.
-				"""
 			required: true
 			type: array: items: type: string: syntax: "literal"
 		}
@@ -189,12 +185,6 @@ base: components: sources: http_client: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Custom parameters for the HTTP request query string.
-
-				One or more values for the same parameter key can be provided. The parameters provided in this option are
-				appended to any parameters manually provided in the `endpoint` option.
-				"""
 			required: true
 			type: array: items: type: string: syntax: "literal"
 		}

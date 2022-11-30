@@ -124,7 +124,7 @@ def mergeable?(value)
   value.is_a?(Hash) || value.is_a?(Array)
 end
 
-def nested_merge(base, override)
+def _nested_merge_impl(base, override, merger)
   # Handle some basic cases first.
   if base.nil?
     return override
@@ -134,6 +134,10 @@ def nested_merge(base, override)
     return override
   end
 
+  deep_copy(base).merge(override.to_h, &merger)
+end
+
+def nested_merge(base, override)
   merger = proc { |_, v1, v2|
     if v1.is_a?(Hash) && v2.is_a?(Hash)
       v1.merge(v2, &merger)
@@ -143,7 +147,32 @@ def nested_merge(base, override)
       [:undefined, nil, :nil].include?(v2) ? v1 : v2
     end
   }
-  deep_copy(base).merge(override.to_h, &merger)
+  _nested_merge_impl(base, override, merger)
+end
+
+def schema_aware_nested_merge(base, override)
+  merger = proc { |key, v1, v2|
+    if v1.is_a?(Hash) && v2.is_a?(Hash)
+      v1.merge(v2, &merger)
+    elsif v1.is_a?(Array) && v2.is_a?(Array)
+      v1 | v2
+    else
+      if key == 'const'
+        # When we're merging a 'const' field, we merge both values together as an _array_.
+        #
+        # This is specific to merging enum schemas in the mixed-mode fallback, where if we have
+        # overlapping schemas that have, say, a string field with a const value, the merging should
+        # actually turn it into an enum, with each const value present.
+        #
+        # We can't change the 'const' key to 'enum' here, so we'll handle that in reconciliation,
+        # since we have no const fields that have array values, only scalars.
+        [v1].flatten | [v2].flatten
+      else
+        [:undefined, nil, :nil].include?(v2) ? v1 : v2
+      end
+    end
+  }
+  _nested_merge_impl(base, override, merger)
 end
 
 def sort_hash_nested(input)
@@ -837,12 +866,22 @@ def resolve_bare_schema(root_schema, schema)
       if !additional_properties.nil?
         @logger.debug "Handling additional properties."
 
-        # If the schema has no other properties -- i.e. it's always just a free-form "whatever
-        # properties you want" object schema -- then copy the title/description of the schema to
-        # this free-form schema we're generating. Since it's still a property on an object schema at
-        # the end of the day, we need follow the rules of providing a description, and so on.
-        additional_properties['title'] = schema['title'] unless schema['title'].nil?
-        additional_properties['description'] = schema['description'] unless schema['description'].nil?
+        # Normally, we only get here if there's a hashmap field on a struct that can act as the
+        # catch-all for additional properties. That field, by definition, will be required to have a
+        # description, and maybe will have a title.
+        #
+        # That title/description makes sense for the field itself, but when we generate this new
+        # wildcard property, we generally want to have something short and simple, in the singular
+        # form. For example, if we have a field called "labels", the title/description might talk
+        # about what the labels are used for, any special requirements, and so on... and then for
+        # the wildcard property, we might want to have the description read as "A foobar label."
+        # just to make the UI look nice.
+        #
+        # Rather than try and derive this from the title/description on the field, we'll just allow
+        # for the possibility of specifying one for the wildcard property via the metadata attribute
+        # below. It's not technically required in the Cue schema, so it can indeed be optional.
+        singular_description = get_schema_metadata(schema, 'docs::additional_props_description')
+        additional_properties['description'] = singular_description unless singular_description.nil?
 
         resolved_additional_properties = resolve_schema(root_schema, additional_properties)
         resolved_additional_properties['required'] = true
@@ -1251,12 +1290,17 @@ def resolve_enum_schema(root_schema, schema)
   # have the `string` type with an `enum` of `"none"` and `"adaptive"`, and the uint type for the
   # integer side. This code mostly assumes the upstream schema is itself correct, in terms of not
   # providing a schema that is too ambiguous to properly validate against an input document.
-  type_defs = subschemas.filter_map { |subschema| resolve_schema(root_schema, subschema) }
-    .reduce { |acc, item| nested_merge(acc, item) }
-
   @logger.debug "Resolved as 'fallback mixed-mode' enum schema."
 
   @logger.debug "Tagging mode: #{enum_tagging}"
+  @logger.debug "Input subschemas: #{JSON.pretty_generate(subschemas)}"
+
+  resolved_subschemas = subschemas.filter_map { |subschema| resolve_schema(root_schema, subschema) }
+  @logger.debug "Resolved fallback schemas: #{JSON.pretty_generate(resolved_subschemas)}"
+
+  type_defs = resolved_subschemas.reduce { |acc, item| nested_merge(acc, item) }
+
+  @logger.debug "Schema-aware merged result: #{JSON.pretty_generate(type_defs)}"
 
   { '_resolved' => { 'type' => type_defs['type'] }, 'annotations' => 'mixed_mode' }
 end
@@ -1411,11 +1455,12 @@ end
 # function serves as a spot to do such reconcilation, as it is called right before returning a
 # resolved schema.
 def reconcile_resolved_schema!(resolved_schema)
-  @logger.debug "Reconciling resolved schema: #{JSON.pretty_generate(resolved_schema)}"
+  @logger.debug "Reconciling resolved schema..."
 
   # Only works if `type` is an object, which it won't be in some cases, such as a schema that maps
   # to a cycle entrypoint, or is hidden, and so on.
   if !resolved_schema['type'].is_a?(Hash)
+    @logger.debug "Schema was not an full resolved schema; reconciliation not applicable."
     return
   end
 
@@ -1442,13 +1487,45 @@ def reconcile_resolved_schema!(resolved_schema)
       resolved_schema['type'].keys.each { |type_field|
         type_field_default_value = resolved_schema['type'][type_field].fetch('default', :does_not_exist)
         if type_field_default_value.nil?
-          @logger.debug "Reconciling type field '#{type_field}'..."
+          @logger.debug "Removing null `default` field for type field '#{type_field}'..."
 
           resolved_schema['type'][type_field].delete('default')
         end
       }
     end
+
+    # Look for merge 'const' values that need to become an enum.
+    #
+    # As part of our enum schema resolving, we have a fallback mode where we resolve each subschema
+    # and merge them together in a nested fashion, under the assumption that they don't overlap in
+    # an invalid way i.e. same field in two schemas but with differing/incompatible types.
+    #
+    # This works, but one area it falls down is where a field is a `const` in different subschemas,
+    # where even if the value is the same type for all overlaps of `const`, the normal nested merge
+    # would result in a last-write-wins for that field. We compensate for this by using a
+    # schema-aware nested merge, where if we're merging a field called `const`, we turn it into an
+    # array of the values.
+    #
+    # The final step would be to change from `const` to `enum`, because Cue doesn't recognize the
+    # `const` type, regardless of whether it's a single value or an array of values. We cannot do
+    # that in the merge, however, because there's no way to specify a new resulting key to use, only
+    # how the values should be merged.
+    #
+    # Thus, we handle that here by looking for any `const` field that has an array value. Since no
+    # normal schema would have a `const` value that was an array to begin with, we can safely search
+    # for such instances and confidently know that the field can be renamed from `const` to `enum`.
+    resolved_schema['type'].keys.each { |type_field|
+      type_field_const_value = resolved_schema['type'][type_field].fetch('const', :does_not_exist)
+      if !type_field_const_value.nil? && type_field_const_value.is_a?(Array)
+        @logger.debug "Converting `const` values to `enum` for type field '#{type_field}'..."
+
+        enum_values = resolved_schema['type'][type_field].delete('const')
+        resolved_schema['type'][type_field]['enum'] = enum_values
+      end
+    }
   end
+
+  @logger.debug "Reconciled resolved schema."
 end
 
 def get_rendered_description_from_schema(schema)

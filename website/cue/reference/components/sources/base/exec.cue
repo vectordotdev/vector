@@ -4,7 +4,10 @@ base: components: sources: exec: configuration: {
 	command: {
 		description: "The command to be run, plus any arguments required."
 		required:    true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {
+			examples: ["echo", "Hello World!"]
+			syntax: "literal"
+		}
 	}
 	decoding: {
 		description: "Decoding configuration."

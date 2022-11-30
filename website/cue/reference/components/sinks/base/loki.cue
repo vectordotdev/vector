@@ -98,13 +98,26 @@ base: components: sinks: loki: configuration: {
 		}
 	}
 	compression: {
-		description: "Compose with basic compression and Loki-specific compression."
+		description: "Compression configuration."
 		required:    false
 		type: {
 			object: options: {
 				algorithm: {
-					required: true
-					type: string: const: "zlib"
+					description: "Compression algorithm."
+					required:    true
+					type: string: enum: {
+						gzip: """
+															[Gzip][gzip] compression.
+
+															[gzip]: https://en.wikipedia.org/wiki/Gzip
+															"""
+						none: "No compression."
+						zlib: """
+															[Zlib]][zlib] compression.
+
+															[zlib]: https://en.wikipedia.org/wiki/Zlib
+															"""
+					}
 				}
 				level: {
 					description: "Compression level."
@@ -123,11 +136,24 @@ base: components: sinks: loki: configuration: {
 			}
 			string: {
 				default: "snappy"
-				enum: snappy: """
-					Snappy compression.
+				enum: {
+					gzip: """
+						[Gzip][gzip] compression.
 
-					This implies sending push requests as Protocol Buffers.
-					"""
+						[gzip]: https://en.wikipedia.org/wiki/Gzip
+						"""
+					none: "No compression."
+					snappy: """
+						Snappy compression.
+
+						This implies sending push requests as Protocol Buffers.
+						"""
+					zlib: """
+						[Zlib]][zlib] compression.
+
+						[zlib]: https://en.wikipedia.org/wiki/Zlib
+						"""
+				}
 			}
 		}
 	}
@@ -208,7 +234,10 @@ base: components: sinks: loki: configuration: {
 			Vector will append the value of `path` to this.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {
+			examples: ["http://localhost:3100"]
+			syntax: "literal"
+		}
 	}
 	labels: {
 		description: """
@@ -224,21 +253,13 @@ base: components: sinks: loki: configuration: {
 			values.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: """
-				A set of labels that are attached to each batch of events.
-
-				Both keys and values are templateable, which enables you to attach dynamic labels to events.
-
-				Labels can be suffixed with a “*” to allow the expansion of objects into multiple labels,
-				see “How it works” for more information.
-
-				Note: If the set of labels has high cardinality, this can cause drastic performance issues
-				with Loki. To prevent this from happening, reduce the number of unique label keys and
-				values.
-				"""
-			required: true
-			type: string: syntax: "template"
+		type: object: {
+			examples: ["vector", "{{ event_field }}", "{{ kubernetes.pod_labels }}"]
+			options: "*": {
+				description: "A Loki label."
+				required:    true
+				type: string: syntax: "template"
+			}
 		}
 	}
 	out_of_order_action: {
@@ -271,12 +292,8 @@ base: components: sinks: loki: configuration: {
 		}
 	}
 	path: {
-		description: """
-			The path to use in the URL of the Loki instance.
-
-			By default, `"/loki/api/v1/push"` is used.
-			"""
-		required: false
+		description: "The path to use in the URL of the Loki instance."
+		required:    false
 		type: string: {
 			default: "/loki/api/v1/push"
 			syntax:  "literal"
@@ -419,20 +436,21 @@ base: components: sinks: loki: configuration: {
 	}
 	tenant_id: {
 		description: """
-			The tenant ID to send.
-
-			By default, this is not required since a proxy should set this header.
+			The [tenant ID][tenant_id] to specify in requests to Loki.
 
 			When running Loki locally, a tenant ID is not required.
+
+			[tenant_id]: https://grafana.com/docs/loki/latest/operations/multi-tenancy/
 			"""
 		required: false
 		type: string: {
 			default: null
-			syntax:  "template"
+			examples: ["some_tenant_id", "{{ event_field }}"]
+			syntax: "template"
 		}
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

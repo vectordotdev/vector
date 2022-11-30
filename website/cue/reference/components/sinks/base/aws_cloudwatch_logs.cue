@@ -111,10 +111,23 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		type: {
 			object: options: {
 				algorithm: {
-					required: false
+					description: "Compression algorithm."
+					required:    false
 					type: string: {
-						const:   "zlib"
 						default: "none"
+						enum: {
+							gzip: """
+															[Gzip][gzip] compression.
+
+															[gzip]: https://en.wikipedia.org/wiki/Gzip
+															"""
+							none: "No compression."
+							zlib: """
+															[Zlib]][zlib] compression.
+
+															[zlib]: https://en.wikipedia.org/wiki/Zlib
+															"""
+						}
 					}
 				}
 				level: {
@@ -132,7 +145,19 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					}
 				}
 			}
-			string: enum: ["none", "gzip", "zlib"]
+			string: enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://en.wikipedia.org/wiki/Gzip
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://en.wikipedia.org/wiki/Zlib
+					"""
+			}
 		}
 	}
 	create_missing_group: {
@@ -329,8 +354,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 				type: object: {
 					default: {}
 					options: "*": {
-						description: "Additional HTTP headers to add to every HTTP request."
-						required:    true
+						required: true
 						type: string: syntax: "literal"
 					}
 				}
@@ -396,7 +420,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		type: string: syntax: "template"
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
