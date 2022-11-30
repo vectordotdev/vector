@@ -8,11 +8,13 @@ use tokio::{runtime::Builder, select, sync::mpsc};
 use vector_core::event::Event;
 
 use crate::{
+    components::validation::TestCase,
     config::{ConfigBuilder, ConfigDiff},
     topology,
 };
 
 use super::{
+    load_component_test_cases,
     sync::{Configuring, TaskCoordinator},
     ComponentType, TestCaseExpectation, TestEvent, ValidatableComponent, Validator,
 };
@@ -104,6 +106,7 @@ impl RunnerOutput {
 }
 
 pub struct RunnerResults {
+    test_name: String,
     expectation: TestCaseExpectation,
     inputs: Vec<TestEvent>,
     outputs: Vec<Event>,
@@ -111,6 +114,10 @@ pub struct RunnerResults {
 }
 
 impl RunnerResults {
+    pub fn test_name(&self) -> &str {
+        &self.test_name
+    }
+
     pub fn expectation(&self) -> TestCaseExpectation {
         self.expectation
     }
@@ -170,7 +177,7 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
 
         let mut test_case_results = Vec::new();
 
-        let test_cases = self.component.test_cases();
+        let test_cases = load_component_test_cases(self.component)?;
         for test_case in test_cases {
             // Create a task coordinator for each relevant phase of the test.
             //
@@ -297,8 +304,11 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             // Run the relevant data -- inputs, outputs, telemetry, etc -- through each validator to
             // get the validation results for this test.
             let component_type = self.component.component_type();
-            let expectation = test_case.expectation;
-            let input_events = test_case.events;
+            let TestCase {
+                name: test_name,
+                expectation,
+                events: input_events,
+            } = test_case;
             let telemetry_events = telemetry_collector.collect().await;
 
             let validator_results = self
@@ -316,6 +326,7 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
                 .collect();
 
             let test_case_result = RunnerResults {
+                test_name,
                 expectation,
                 inputs: input_events,
                 outputs: output_events,

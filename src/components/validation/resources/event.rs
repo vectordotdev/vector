@@ -1,10 +1,12 @@
-use vector_core::event::{Event, LogEvent, Metric, TraceEvent};
+use serde::Deserialize;
+use vector_core::event::{Event, LogEvent};
 
 /// An event used in a test case.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
 pub enum TestEvent {
     /// The event is used, as-is, without modification.
-    Passthrough(Event),
+    Passthrough(EventData),
 
     /// The event is potentially modified by the external resource.
     ///
@@ -15,38 +17,21 @@ pub enum TestEvent {
     ///
     /// For transforms and sinks, generally, the only way to cause an error is if the event itself
     /// is malformed in some way, which can be achieved without this test event variant.
-    Modified(Event),
+    Modified { modified: bool, event: EventData },
 }
 
-impl TestEvent {
-    /// Creates a "modified" test event based on the given event.
-    ///
-    /// See `TestEvent::Modified` for more information.
-    pub fn modified<E: Into<Event>>(event: E) -> Self {
-        Self::Modified(event.into())
-    }
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+pub enum EventData {
+    /// A log event.
+    Log(String),
 }
 
-impl From<Event> for TestEvent {
-    fn from(e: Event) -> Self {
-        Self::Passthrough(e)
-    }
-}
-
-impl From<LogEvent> for TestEvent {
-    fn from(e: LogEvent) -> Self {
-        Self::Passthrough(Event::Log(e))
-    }
-}
-
-impl From<Metric> for TestEvent {
-    fn from(m: Metric) -> Self {
-        Self::Passthrough(Event::Metric(m))
-    }
-}
-
-impl From<TraceEvent> for TestEvent {
-    fn from(t: TraceEvent) -> Self {
-        Self::Passthrough(Event::Trace(t))
+impl EventData {
+    /// Converts this event data into an `Event`.
+    pub fn into_event(self) -> Event {
+        match self {
+            Self::Log(message) => Event::Log(LogEvent::from_bytes_legacy(&message.into())),
+        }
     }
 }

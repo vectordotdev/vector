@@ -1,16 +1,21 @@
+use serde::Deserialize;
+
 use super::TestEvent;
 
 /// Expected outcome of a validation test case.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Deserialize)]
 pub enum TestCaseExpectation {
     /// All events were processed successfully.
+    #[serde(rename = "success")]
     Success,
 
     /// All events failed to be processed successfully.
+    #[serde(rename = "failure")]
     Failure,
 
-    /// Some events failed to be processed successfully.
-    PartialFailure,
+    /// Some events, but not all, were processed successfully.
+    #[serde(rename = "partial_success")]
+    PartialSuccess,
 }
 
 /// A validation test case.
@@ -18,47 +23,9 @@ pub enum TestCaseExpectation {
 /// Test cases define both the events that should be given as input to the component being
 /// validated, as well as the "expectation" for the test case, in terms of if all the events should
 /// be processed successfully, or fail to be processed, and so on.
+#[derive(Deserialize)]
 pub struct TestCase {
+    pub name: String,
     pub expectation: TestCaseExpectation,
     pub events: Vec<TestEvent>,
-}
-
-impl TestCase {
-    /// Creates a test case where all events should be processed successfully.
-    pub fn success<I, E>(events: I) -> Self
-    where
-        I: IntoIterator<Item = E>,
-        E: Into<TestEvent>,
-    {
-        Self::from_events(TestCaseExpectation::Success, events)
-    }
-
-    /// Creates a test case where all events should fail to be processed successfully.
-    pub fn failure<I, E>(events: I) -> Self
-    where
-        I: IntoIterator<Item = E>,
-        E: Into<TestEvent>,
-    {
-        Self::from_events(TestCaseExpectation::Failure, events)
-    }
-
-    /// Creates a test case where some events should fail to be processed successfully.
-    pub fn partial_failure<I, E>(events: I) -> Self
-    where
-        I: IntoIterator<Item = E>,
-        E: Into<TestEvent>,
-    {
-        Self::from_events(TestCaseExpectation::PartialFailure, events)
-    }
-
-    fn from_events<I, E>(expectation: TestCaseExpectation, events: I) -> Self
-    where
-        I: IntoIterator<Item = E>,
-        E: Into<TestEvent>,
-    {
-        Self {
-            expectation,
-            events: events.into_iter().map(Into::into).collect(),
-        }
-    }
 }

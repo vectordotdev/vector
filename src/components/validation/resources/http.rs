@@ -155,13 +155,13 @@ fn encode_test_event(
         TestEvent::Passthrough(event) => {
             // Encode the event normally.
             encoder
-                .encode(event, buf)
+                .encode(event.into_event(), buf)
                 .expect("should not fail to encode input event");
         }
-        TestEvent::Modified(event) => {
+        TestEvent::Modified { event, .. } => {
             // TODO: Actually use a different encoder to encode this.
             encoder
-                .encode(event, buf)
+                .encode(event.into_event(), buf)
                 .expect("should not fail to encode input event");
         }
     }

@@ -15,7 +15,6 @@ use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{DataType, LegacyKey, LogNamespace},
-    event::LogEvent,
     schema::Definition,
 };
 use warp::http::{HeaderMap, HeaderValue};
@@ -23,7 +22,7 @@ use warp::http::{HeaderMap, HeaderValue};
 use crate::{
     codecs::{Decoder, DecodingConfig},
     components::validation::{
-        self, ComponentConfiguration, ComponentType, ExternalResource, ResourceDirection, TestCase,
+        self, ComponentConfiguration, ComponentType, ExternalResource, ResourceDirection,
         ValidatableComponent,
     },
     config::{
@@ -279,14 +278,6 @@ impl ValidatableComponent for SimpleHttpConfig {
             validation::HttpConfig::from_parts(uri, method),
             decoding_config,
         ))
-    }
-
-    fn test_cases(&self) -> Vec<TestCase> {
-        vec![TestCase::success(vec![
-            LogEvent::from_str_legacy("simple message 1"),
-            LogEvent::from_str_legacy("simple message 2"),
-            LogEvent::from_str_legacy("simple message 3"),
-        ])]
     }
 }
 

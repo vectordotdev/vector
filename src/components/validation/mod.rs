@@ -5,6 +5,8 @@ mod test_case;
 pub mod util;
 mod validators;
 
+use std::fs::File;
+
 use crate::{sinks::Sinks, sources::Sources, transforms::Transforms};
 
 pub use self::resources::*;
@@ -20,6 +22,17 @@ pub enum ComponentType {
     Source,
     Transform,
     Sink,
+}
+
+impl ComponentType {
+    /// Gets the name of this component type as a string.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Source => "source",
+            Self::Transform => "transform",
+            Self::Sink => "sink",
+        }
+    }
 }
 
 /// Component type-specific configuration.
@@ -69,18 +82,6 @@ pub trait ValidatableComponent: Send + Sync {
     // monitoring multiple files, but a component that both listens on a TCP socket _and_ opens a
     // specific file, etc.
     fn external_resource(&self) -> Option<ExternalResource>;
-
-    /// Gets the test cases to use for validating this component.
-    ///
-    /// Validation of a component can occur across multiple axes, such as validating the "happy"
-    /// path, where we might only expect to see metrics/events related to successfully processing
-    /// events, vs a failure path, where we would expect to see metrics/events related to failing to
-    /// process events.
-    ///
-    /// Each validation test case describes both the expected outcome (success, failure, etc) as
-    /// well as the events to send for each of those test cases. This allows components to ensure
-    /// the right data is sent to properly trigger certain code paths.
-    fn test_cases(&self) -> Vec<TestCase>;
 }
 
 impl<'a, T> ValidatableComponent for &'a T
@@ -102,10 +103,49 @@ where
     fn external_resource(&self) -> Option<ExternalResource> {
         (*self).external_resource()
     }
+}
 
-    fn test_cases(&self) -> Vec<TestCase> {
-        (*self).test_cases()
-    }
+/// Loads all of the test cases for the given component.
+///
+/// Test cases are searched for in a file that must be located at
+/// `tests/validation/components/<component type>/<component name>.yaml`, where the component type
+/// is the type of the component (either `sources`, `transforms`, or `sinks`) and the component name
+/// is the value given by `ValidatableComponent::component_name`.
+///
+/// As implied by the file path, the file is expected to be valid YAML, containing an array of test
+/// cases.
+///
+/// ## Errors
+///
+/// If an I/O error is encountered during the loading of the test case file, or any error occurs
+/// during deserialization of the test case file, whether the error is I/O related in nature or due
+/// to invalid YAML, or not representing valid serialized test cases, then an error variant will be
+/// returned explaining the cause.
+pub(self) fn load_component_test_cases<C: ValidatableComponent>(
+    component: C,
+) -> Result<Vec<TestCase>, String> {
+    let component_type = component.component_type().as_str();
+    let component_name = component.component_name();
+    let component_test_cases_path = format!(
+        "tests/validation/components/{}s/{}.yaml",
+        component_type, component_name
+    );
+
+    File::open(&component_test_cases_path)
+        .map_err(|e| {
+            format!(
+                "I/O error during open of component validation test cases file: {}",
+                e
+            )
+        })
+        .and_then(|file| {
+            serde_yaml::from_reader(file).map_err(|e| {
+                format!(
+                    "Deserialization error for component validation test cases file: {}",
+                    e
+                )
+            })
+        })
 }
 
 #[cfg(feature = "sources-http_server")]
@@ -153,12 +193,15 @@ mod tests {
                     let mut details = Vec::new();
                     let mut had_failures = false;
 
-                    for (idx, test_case_result) in test_case_results.into_iter().enumerate() {
+                    for test_case_result in test_case_results.into_iter() {
                         for validator_result in test_case_result.validator_results() {
                             match validator_result {
                                 Ok(success) => {
                                     if success.is_empty() {
-                                        details.push(format!("  test case #{}: passed", idx));
+                                        details.push(format!(
+                                            "  test case '{}': passed",
+                                            test_case_result.test_name()
+                                        ));
                                     } else {
                                         let formatted = success
                                             .iter()
@@ -166,8 +209,8 @@ mod tests {
                                             .collect::<Vec<_>>();
 
                                         details.push(format!(
-                                            "  test case #{}: passed\n{}",
-                                            idx,
+                                            "  test case '{}': passed\n{}",
+                                            test_case_result.test_name(),
                                             formatted.join("")
                                         ));
                                     }
@@ -176,7 +219,10 @@ mod tests {
                                     had_failures = true;
 
                                     if failure.is_empty() {
-                                        details.push(format!("  test case #{}: failed", idx));
+                                        details.push(format!(
+                                            "  test case '{}': failed",
+                                            test_case_result.test_name()
+                                        ));
                                     } else {
                                         let formatted = failure
                                             .iter()
@@ -184,8 +230,8 @@ mod tests {
                                             .collect::<Vec<_>>();
 
                                         details.push(format!(
-                                            "  test case #{}: failed\n{}",
-                                            idx,
+                                            "  test case '{}': failed\n{}",
+                                            test_case_result.test_name(),
                                             formatted.join("")
                                         ));
                                     }
