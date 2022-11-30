@@ -238,7 +238,7 @@ impl SourceConfig for KafkaSourceConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        let log_namespace = global_log_namespace.merge(Some(self.log_namespace.unwrap_or(false)));
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
         let keys = self.keys();
 
         let schema_definition = self
