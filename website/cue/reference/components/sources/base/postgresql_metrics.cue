@@ -65,7 +65,7 @@ base: components: sources: postgresql_metrics: configuration: {
 			description: """
 				Absolute path to an additional CA certificate file.
 
-				The certficate must be in the DER or PEM (X.509) format.
+				The certificate must be in the DER or PEM (X.509) format.
 				"""
 			required: true
 			type: string: syntax: "literal"

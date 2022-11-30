@@ -97,7 +97,7 @@ enum CollectError {
 struct PostgresqlMetricsTlsConfig {
     /// Absolute path to an additional CA certificate file.
     ///
-    /// The certficate must be in the DER or PEM (X.509) format.
+    /// The certificate must be in the DER or PEM (X.509) format.
     ca_file: PathBuf,
 }
 
