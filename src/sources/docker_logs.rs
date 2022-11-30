@@ -767,6 +767,7 @@ impl EventStreamBuilder {
                 Box::new(line_agg_adapter(
                     events_stream,
                     line_agg::Logic::new(line_agg_config.clone()),
+                    self.log_namespace,
                 ))
             } else {
                 Box::new(events_stream)
@@ -1219,23 +1220,33 @@ impl ContainerMetadata {
 fn line_agg_adapter(
     inner: impl Stream<Item = LogEvent> + Unpin,
     logic: line_agg::Logic<Bytes, LogEvent>,
+    log_namespace: LogNamespace,
 ) -> impl Stream<Item = LogEvent> {
-    let line_agg_in = inner.map(|mut log_event| {
-        let message_value = log_event
-            .remove(log_schema().message_key())
-            .expect("message must exist in the event");
-        let stream_value = log_event
-            .get(STREAM)
-            .expect("stream must exist in the event");
+    let line_agg_in = inner.map(move |mut log| {
+        let message_value = match log_namespace {
+            LogNamespace::Vector => log.remove(".").expect("`.` must exist in the event"),
+            LogNamespace::Legacy => log
+                .remove(log_schema().message_key())
+                .expect("`message` must exist in the event"),
+        };
+        let stream_value = match log_namespace {
+            LogNamespace::Vector => log
+                .get(metadata_path!(DockerLogsConfig::NAME, STREAM))
+                .expect("`docker_logs.stream` must exist in the metadata"),
+            LogNamespace::Legacy => log.get(STREAM).expect("stream must exist in the event"),
+        };
 
         let stream = stream_value.coerce_to_bytes();
         let message = message_value.coerce_to_bytes();
-        (stream, message, log_event)
+        (stream, message, log)
     });
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
-    line_agg_out.map(|(_, message, mut log_event)| {
-        log_event.insert(log_schema().message_key(), message);
-        log_event
+    line_agg_out.map(move |(_, message, mut log)| {
+        match log_namespace {
+            LogNamespace::Vector => log.insert(".", message),
+            LogNamespace::Legacy => log.insert(log_schema().message_key(), message),
+        };
+        log
     })
 }
 
@@ -1279,6 +1290,7 @@ mod integration_tests {
         image::{CreateImageOptions, ListImagesOptions},
     };
     use futures::{stream::TryStreamExt, FutureExt};
+    use similar_asserts::assert_eq;
 
     use super::*;
     use crate::{
@@ -1295,10 +1307,12 @@ mod integration_tests {
     async fn source_with<'a, L: Into<Option<&'a str>>>(
         names: &[&str],
         label: L,
+        log_namespace: Option<bool>,
     ) -> impl Stream<Item = Event> {
         source_with_config(DockerLogsConfig {
             include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
             include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
+            log_namespace,
             ..DockerLogsConfig::default()
         })
         .await
@@ -1506,7 +1520,7 @@ mod integration_tests {
         log: &'static str,
         docker: &Docker,
     ) -> String {
-        let out = source_with(&[name], None).await;
+        let out = source_with(&[name], None, None).await;
         let docker = docker.clone();
 
         let id = eternal_container(name, label, log, &docker).await;
@@ -1530,14 +1544,35 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn container_with_tty() {
+    async fn container_with_tty_vector_namespace() {
         trace_init();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "log container_with_tty";
             let name = "container_with_tty";
 
-            let out = source_with(&[name], None).await;
+            let out = source_with(&[name], None, Some(true)).await;
+
+            let docker = docker(None, None).unwrap();
+
+            let id = container_with_optional_tty_log_n(1, name, None, message, &docker, true).await;
+            let events = collect_n(out, 1).await;
+            container_remove(&id, &docker).await;
+
+            assert_eq!(events[0].as_log().get(".").unwrap(), &vrl::value!(message));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn container_with_tty_legacy_namespace() {
+        trace_init();
+
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let message = "log container_with_tty";
+            let name = "container_with_tty";
+
+            let out = source_with(&[name], None, None).await;
 
             let docker = docker(None, None).unwrap();
 
@@ -1554,7 +1589,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn newly_started() {
+    async fn newly_started_vector_namespace() {
         trace_init();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -1562,7 +1597,57 @@ mod integration_tests {
             let name = "vector_test_newly_started";
             let label = "vector_test_label_newly_started";
 
-            let out = source_with(&[name], None).await;
+            let out = source_with(&[name], None, Some(true)).await;
+
+            let docker = docker(None, None).unwrap();
+
+            let id = container_log_n(1, name, Some(label), message, &docker).await;
+            let events = collect_n(out, 1).await;
+            container_remove(&id, &docker).await;
+
+            let log = events[0].as_log();
+            let meta = log.metadata().value();
+            assert_eq!(log.get(".").unwrap(), &vrl::value!(message));
+            assert_eq!(
+                meta.get(path!(DockerLogsConfig::NAME, CONTAINER)).unwrap(),
+                &vrl::value!(id)
+            );
+            assert!(meta
+                .get(path!(DockerLogsConfig::NAME, CREATED_AT))
+                .is_some());
+            assert_eq!(
+                meta.get(path!(DockerLogsConfig::NAME, IMAGE)).unwrap(),
+                &vrl::value!("busybox")
+            );
+            assert!(meta
+                .get(path!(DockerLogsConfig::NAME, "labels", label))
+                .is_some());
+            assert_eq!(
+                meta.get(path!(DockerLogsConfig::NAME, NAME)).unwrap(),
+                &vrl::value!(name)
+            );
+            assert_eq!(
+                meta.get(path!("vector", "source_type")).unwrap(),
+                &vrl::value!(DockerLogsConfig::NAME)
+            );
+            assert!(meta
+                .get(path!("vector", "ingest_timestamp"))
+                .unwrap()
+                .is_timestamp())
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn newly_started_legacy_namespace() {
+        trace_init();
+
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let message = "9";
+            let name = "vector_test_newly_started";
+            let label = "vector_test_label_newly_started";
+
+            let out = source_with(&[name], None, None).await;
 
             let docker = docker(None, None).unwrap();
 
@@ -1586,14 +1671,14 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn restart() {
+    async fn restart_legacy_namespace() {
         trace_init();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "10";
             let name = "vector_test_restart";
 
-            let out = source_with(&[name], None).await;
+            let out = source_with(&[name], None, None).await;
 
             let docker = docker(None, None).unwrap();
 
@@ -1614,7 +1699,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn include_containers() {
+    async fn include_containers_legacy_namespace() {
         trace_init();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -1622,7 +1707,7 @@ mod integration_tests {
             let name0 = "vector_test_include_container_0";
             let name1 = "vector_test_include_container_1";
 
-            let out = source_with(&[name1], None).await;
+            let out = source_with(&[name1], None, None).await;
 
             let docker = docker(None, None).unwrap();
 
@@ -1641,7 +1726,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn exclude_containers() {
+    async fn exclude_containers_legacy_namespace() {
         trace_init();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -1685,7 +1770,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn include_labels() {
+    async fn include_labels_legacy_namespace() {
         trace_init();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -1694,7 +1779,7 @@ mod integration_tests {
             let name1 = "vector_test_include_labels_1";
             let label = "vector_test_include_label";
 
-            let out = source_with(&[name0, name1], label).await;
+            let out = source_with(&[name0, name1], label, None).await;
 
             let docker = docker(None, None).unwrap();
 
@@ -1713,7 +1798,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn currently_running() {
+    async fn currently_running_legacy_namespace() {
         trace_init();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -1723,7 +1808,7 @@ mod integration_tests {
 
             let docker = docker(None, None).unwrap();
             let id = running_container(name, Some(label), message, &docker).await;
-            let out = source_with(&[name], None).await;
+            let out = source_with(&[name], None, None).await;
 
             let events = collect_n(out, 1).await;
             let _ = container_kill(&id, &docker).await;
@@ -1745,7 +1830,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn include_image() {
+    async fn include_image_legacy_namespace() {
         trace_init();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -1774,7 +1859,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn not_include_image() {
+    async fn not_include_image_legacy_namespace() {
         trace_init();
 
         // No assert_source_compliance here since we aren't including the image
@@ -1798,7 +1883,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn not_include_running_image() {
+    async fn not_include_running_image_legacy_namespace() {
         trace_init();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -1830,7 +1915,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn flat_labels() {
+    async fn flat_labels_legacy_namespace() {
         trace_init();
 
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -1840,7 +1925,7 @@ mod integration_tests {
 
             let docker = docker(None, None).unwrap();
             let id = running_container(name, Some(label), message, &docker).await;
-            let out = source_with(&[name], None).await;
+            let out = source_with(&[name], None, None).await;
 
             let events = collect_n(out, 1).await;
             let _ = container_kill(&id, &docker).await;
@@ -1868,7 +1953,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn log_longer_than_16kb() {
+    async fn log_longer_than_16kb_legacy_namespace() {
         trace_init();
         assert_source_compliance(&SOURCE_TAGS, async {
             let mut message = String::with_capacity(20 * 1024);
@@ -1877,7 +1962,7 @@ mod integration_tests {
             }
             let name = "vector_test_log_longer_than_16kb";
 
-            let out = source_with(&[name], None).await;
+            let out = source_with(&[name], None, None).await;
 
             let docker = docker(None, None).unwrap();
 
@@ -1892,7 +1977,70 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn merge_multiline() {
+    async fn merge_multiline_vector_namespace() {
+        assert_source_compliance(&SOURCE_TAGS, async {
+            trace_init();
+
+            let emitted_messages = vec![
+                "java.lang.Exception",
+                "    at com.foo.bar(bar.java:123)",
+                "    at com.foo.baz(baz.java:456)",
+            ];
+            let expected_messages = vec![concat!(
+                "java.lang.Exception\n",
+                "    at com.foo.bar(bar.java:123)\n",
+                "    at com.foo.baz(baz.java:456)",
+            )];
+            let name = "vector_test_merge_multiline";
+            let config = DockerLogsConfig {
+                include_containers: Some(vec![name.to_owned()]),
+                include_images: Some(vec!["busybox".to_owned()]),
+                multiline: Some(MultilineConfig {
+                    start_pattern: "^[^\\s]".to_owned(),
+                    condition_pattern: "^[\\s]+at".to_owned(),
+                    mode: line_agg::Mode::ContinueThrough,
+                    timeout_ms: 10,
+                }),
+                log_namespace: Some(true),
+                ..DockerLogsConfig::default()
+            };
+
+            let out = source_with_config(config).await;
+
+            let docker = docker(None, None).unwrap();
+
+            let command = emitted_messages
+                .into_iter()
+                .map(|message| format!("echo {:?}", message))
+                .collect::<Box<_>>()
+                .join(" && ");
+
+            let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
+            if let Err(error) = container_run(&id, &docker).await {
+                container_remove(&id, &docker).await;
+                panic!("Container failed to start with error: {:?}", error);
+            }
+            let events = collect_n(out, expected_messages.len()).await;
+            container_remove(&id, &docker).await;
+
+            let actual_messages = events
+                .into_iter()
+                .map(|event| {
+                    event
+                        .into_log()
+                        .remove(".")
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(actual_messages, expected_messages);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn merge_multiline_legacy_namespace() {
         assert_source_compliance(&SOURCE_TAGS, async {
             trace_init();
 
