@@ -341,7 +341,7 @@ jobs:
           path: ${{ runner.temp }}/submission-metadata
 
       - name: Await job
-        timeout-minutes: 60
+        timeout-minutes: 120
         env:
           RUST_LOG: info
         run: |
@@ -354,7 +354,6 @@ jobs:
 
       - name: Handle cancellation if necessary
         if: ${{ cancelled() }}
-        timeout-minutes: 60
         env:
           RUST_LOG: info
         run: |
