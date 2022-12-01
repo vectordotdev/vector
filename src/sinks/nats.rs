@@ -6,16 +6,15 @@ use codecs::JsonSerializerConfig;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_common::{
-    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
-    internal_event::{ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol},
+use vector_common::internal_event::{
+    ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol,
 };
 use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
-    event::{Event, EventStatus, Finalizable},
+    event::{EstimatedJsonEncodedSizeOf, Event, EventStatus, Finalizable},
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::StreamSink,

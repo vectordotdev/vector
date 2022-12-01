@@ -23,7 +23,7 @@ use tokio_util::codec::FramedRead;
 use value::Kind;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{config::LegacyKey, ByteSizeOf};
+use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -484,7 +484,7 @@ async fn run_command(
                         emit!(ExecEventsReceived {
                             count,
                             command: config.command_line().as_str(),
-                            byte_size: events.size_of(),
+                            byte_size: events.estimated_json_encoded_size_of(),
                         });
 
                         for event in &mut events {

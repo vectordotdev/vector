@@ -24,16 +24,13 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{
-    config::{LegacyKey, LogNamespace},
-    ByteSizeOf,
-};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     docker::{docker, DockerTlsConfig},
-    event::{self, merge_state::LogEventMergeState, LogEvent, Value},
+    event::{self, merge_state::LogEventMergeState, EstimatedJsonEncodedSizeOf, LogEvent, Value},
     internal_events::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
@@ -1177,7 +1174,7 @@ impl ContainerLogInfo {
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.
         emit!(DockerLogsEventsReceived {
-            byte_size: log.size_of(),
+            byte_size: log.estimated_json_encoded_size_of(),
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str
         });

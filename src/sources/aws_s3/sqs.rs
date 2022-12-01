@@ -26,7 +26,7 @@ use vector_config::{configurable_component, NamedComponent};
 
 use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus},
+    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
@@ -40,10 +40,7 @@ use crate::{
     SourceSender,
 };
 use lookup::{metadata_path, path, PathPrefix};
-use vector_core::{
-    config::{log_schema, LegacyKey, LogNamespace},
-    ByteSizeOf,
-};
+use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -583,7 +580,7 @@ impl IngestorProcess {
 
             emit!(EventsReceived {
                 count: 1,
-                byte_size: log.size_of()
+                byte_size: log.estimated_json_encoded_size_of()
             });
 
             log
