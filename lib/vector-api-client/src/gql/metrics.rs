@@ -64,6 +64,16 @@ pub struct ComponentProcessedEventsThroughputsSubscription;
 )]
 pub struct ComponentProcessedEventsTotalsSubscription;
 
+/// ComponentAllocatedBytesSubscription contains metrics on the number of allocated bytes
+/// that have been processed by a Vector instance, against specific components.
+#[derive(GraphQLQuery, Debug, Copy, Clone)]
+#[graphql(
+    schema_path = "graphql/schema.json",
+    query_path = "graphql/subscriptions/component_allocated_bytes.graphql",
+    response_derives = "Debug"
+)]
+pub struct ComponentAllocatedBytesSubscription;
+
 /// ComponentProcessedBytesThroughputsSubscription contains metrics on the number of bytes
 /// that have been processed between `interval` samples, against specific components.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
@@ -171,6 +181,12 @@ pub struct ComponentErrorsTotalsSubscription;
 pub trait MetricsSubscriptionExt {
     /// Executes an uptime metrics subscription.
     fn uptime_subscription(&self) -> crate::BoxedSubscription<UptimeSubscription>;
+
+    /// Executes an all component allocated bytes subscription.
+    fn component_allocated_bytes_subscription(
+        &self,
+        interval: i64,
+    ) -> BoxedSubscription<ComponentAllocatedBytesSubscription>;
 
     /// Executes an events processed metrics subscription.
     fn processed_events_total_subscription(
@@ -336,6 +352,17 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentProcessedBytesThroughputsSubscription>(&request_body)
     }
 
+    /// Executes an all component allocated bytes subscription.
+    fn component_allocated_bytes_subscription(
+        &self,
+        interval: i64,
+    ) -> BoxedSubscription<ComponentAllocatedBytesSubscription> {
+        let request_body = ComponentAllocatedBytesSubscription::build_query(
+            component_allocated_bytes_subscription::Variables { interval },
+        );
+
+        self.start::<ComponentAllocatedBytesSubscription>(&request_body)
+    }
     /// Executes an all component received events totals subscription.
     fn component_received_events_totals_subscription(
         &self,
