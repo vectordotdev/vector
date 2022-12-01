@@ -334,9 +334,9 @@ impl TimeSeries {
         // label for the actual metric name. For convenience below, an
         // optional extra tag is added.
         let mut labels = tags.cloned().unwrap_or_default();
-        labels.insert(METRIC_NAME_LABEL.into(), [name, suffix].join(""));
+        labels.replace(METRIC_NAME_LABEL.into(), [name, suffix].join(""));
         if let Some((name, value)) = extra {
-            labels.insert(name.into(), value);
+            labels.replace(name.into(), value);
         }
 
         // Extract the labels into a vec and sort to produce a

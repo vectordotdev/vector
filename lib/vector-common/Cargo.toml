@@ -12,7 +12,6 @@ default = [
   "conversion",
   "tokenize",
   "encoding",
-  "estimated_json_encoded_size_of",
   "sensitive_string"
 ]
 
@@ -24,8 +23,6 @@ aws_cloudwatch_logs_subscription = [
 btreemap = []
 
 byte_size_of = ["dep:bytes", "dep:chrono"]
-
-estimated_json_encoded_size_of = ["serde", "dep:bytes", "dep:chrono"]
 
 conversion = [
   "dep:bytes",
@@ -63,7 +60,7 @@ ordered-float = { version = "3.4.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 ryu = { version = "1", default-features = false }
 serde_json = { version = "1.0.89", default-features = false, features = ["std", "raw_value"] }
-serde = { version = "1.0.147", optional = true, features = ["derive"] }
+serde = { version = "1.0.148", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.1", default-features = false }
