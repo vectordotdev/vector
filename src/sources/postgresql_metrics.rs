@@ -37,7 +37,7 @@ macro_rules! tags {
         {
             let mut tags = $tags.clone();
             $(
-                tags.insert($key.into(), $value.into());
+                tags.replace($key.into(), String::from($value));
             )*
             tags
         }
@@ -97,7 +97,7 @@ enum CollectError {
 struct PostgresqlMetricsTlsConfig {
     /// Absolute path to an additional CA certificate file.
     ///
-    /// The certficate must be in the DER or PEM (X.509) format.
+    /// The certificate must be in the DER or PEM (X.509) format.
     ca_file: PathBuf,
 }
 

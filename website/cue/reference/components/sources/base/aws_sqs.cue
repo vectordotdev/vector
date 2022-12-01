@@ -77,7 +77,7 @@ base: components: sources: aws_sqs: configuration: {
 			fetching the messages than processing them.
 			"""
 		required: false
-		type: uint: default: 24
+		type: uint: {}
 	}
 	decoding: {
 		description: "Configuration for building a `Deserializer`."
@@ -213,7 +213,7 @@ base: components: sources: aws_sqs: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

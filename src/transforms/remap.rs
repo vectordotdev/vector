@@ -207,7 +207,7 @@ impl TransformConfig for RemapConfig {
         Input::all()
     }
 
-    fn outputs(&self, input_definition: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, input_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
@@ -253,17 +253,18 @@ impl TransformConfig for RemapConfig {
             .log_namespaces()
             .contains(&LogNamespace::Legacy)
         {
-            dropped_definition = dropped_definition.merge(input_definition.clone().with_field(
-                &parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
-                Kind::object(BTreeMap::from([
-                    ("reason".into(), Kind::bytes()),
-                    ("message".into(), Kind::bytes()),
-                    ("component_id".into(), Kind::bytes()),
-                    ("component_type".into(), Kind::bytes()),
-                    ("component_kind".into(), Kind::bytes()),
-                ])),
-                Some("metadata"),
-            ));
+            dropped_definition =
+                dropped_definition.merge(input_definition.clone().with_event_field(
+                    &parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
+                    Kind::object(BTreeMap::from([
+                        ("reason".into(), Kind::bytes()),
+                        ("message".into(), Kind::bytes()),
+                        ("component_id".into(), Kind::bytes()),
+                        ("component_type".into(), Kind::bytes()),
+                        ("component_kind".into(), Kind::bytes()),
+                    ])),
+                    Some("metadata"),
+                ));
         }
 
         if input_definition
@@ -448,16 +449,16 @@ where
             },
             Event::Metric(ref mut metric) => {
                 let m = log_schema().metadata_key();
-                metric.insert_tag(format!("{}.dropped.reason", m), reason.into());
-                metric.insert_tag(
+                metric.replace_tag(format!("{}.dropped.reason", m), reason.into());
+                metric.replace_tag(
                     format!("{}.dropped.component_id", m),
                     self.component_key
                         .as_ref()
                         .map(ToString::to_string)
                         .unwrap_or_else(String::new),
                 );
-                metric.insert_tag(format!("{}.dropped.component_type", m), "remap".into());
-                metric.insert_tag(format!("{}.dropped.component_kind", m), "transform".into());
+                metric.replace_tag(format!("{}.dropped.component_type", m), "remap".into());
+                metric.replace_tag(format!("{}.dropped.component_kind", m), "transform".into());
             }
             Event::Trace(ref mut trace) => {
                 trace.insert(
@@ -608,7 +609,7 @@ mod tests {
     use tokio_stream::wrappers::ReceiverStream;
 
     fn test_default_schema_definition() -> schema::Definition {
-        schema::Definition::empty_legacy_namespace().with_field(
+        schema::Definition::empty_legacy_namespace().with_event_field(
             &owned_value_path!("a default field"),
             Kind::integer().or_bytes(),
             Some("default"),
@@ -616,7 +617,7 @@ mod tests {
     }
 
     fn test_dropped_schema_definition() -> schema::Definition {
-        schema::Definition::empty_legacy_namespace().with_field(
+        schema::Definition::empty_legacy_namespace().with_event_field(
             &owned_value_path!("a dropped field"),
             Kind::boolean().or_null(),
             Some("dropped"),
@@ -990,7 +991,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.insert_tag("hello".into(), "world".into());
+            metric.replace_tag("hello".into(), "world".into());
             Event::Metric(metric)
         };
 
@@ -1000,7 +1001,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.insert_tag("hello".into(), "goodbye".into());
+            metric.replace_tag("hello".into(), "goodbye".into());
             Event::Metric(metric)
         };
 
@@ -1010,7 +1011,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.insert_tag("not_hello".into(), "oops".into());
+            metric.replace_tag("not_hello".into(), "oops".into());
             Event::Metric(metric)
         };
 
@@ -1046,7 +1047,7 @@ mod tests {
                 Kind::any_object(),
                 [LogNamespace::Legacy],
             )
-            .with_field(&owned_value_path!("hello"), Kind::bytes(), None),
+            .with_event_field(&owned_value_path!("hello"), Kind::bytes(), None),
             ..Default::default()
         };
         let mut tform = Remap::new_ast(conf, &context).unwrap().0;
@@ -1289,14 +1290,17 @@ mod tests {
             Kind::any_object(),
             [LogNamespace::Legacy],
         )
-        .with_field(&owned_value_path!("foo"), Kind::any(), None)
-        .with_field(&owned_value_path!("tags"), Kind::any(), None);
+        .with_event_field(&owned_value_path!("foo"), Kind::any(), None)
+        .with_event_field(&owned_value_path!("tags"), Kind::any(), None);
 
         assert_eq!(
-            conf.outputs(&schema::Definition::new_with_default_metadata(
-                Kind::any_object(),
-                [LogNamespace::Legacy]
-            )),
+            conf.outputs(
+                &schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy]
+                ),
+                LogNamespace::Legacy
+            ),
             vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 

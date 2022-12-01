@@ -50,7 +50,7 @@ base: components: sources: amqp: configuration: {
 						description: """
 																Absolute path to an additional CA certificate file.
 
-																The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+																The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 																"""
 						required: false
 						type: string: syntax: "literal"
@@ -216,11 +216,6 @@ base: components: sources: amqp: configuration: {
 				}
 			}
 		}
-	}
-	log_namespace: {
-		description: "The namespace to use. This overrides the global setting."
-		required:    false
-		type: bool: {}
 	}
 	offset_key: {
 		description: "The `AMQP` offset key."

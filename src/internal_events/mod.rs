@@ -16,10 +16,13 @@ mod aws_cloudwatch_logs;
 mod aws_ec2_metadata;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 mod aws_ecs_metrics;
+#[cfg(any(
+    feature = "sinks-aws_kinesis_streams",
+    feature = "sinks-aws_kinesis_firehose"
+))]
+mod aws_kinesis;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-mod aws_kinesis_streams;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
 mod batch;
@@ -51,8 +54,6 @@ mod filter;
 mod fluent;
 #[cfg(feature = "sources-gcp_pubsub")]
 mod gcp_pubsub;
-#[cfg(feature = "transforms-geoip")]
-mod geoip;
 #[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
 mod grpc;
 mod heartbeat;
@@ -148,10 +149,13 @@ pub(crate) use self::aws_cloudwatch_logs::*;
 pub(crate) use self::aws_ec2_metadata::*;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 pub(crate) use self::aws_ecs_metrics::*;
+#[cfg(any(
+    feature = "sinks-aws_kinesis_streams",
+    feature = "sinks-aws_kinesis_firehose"
+))]
+pub(crate) use self::aws_kinesis::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub(crate) use self::aws_kinesis_firehose::*;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-pub(crate) use self::aws_kinesis_streams::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
 pub(crate) use self::codecs::*;
@@ -185,8 +189,6 @@ pub(crate) use self::filter::*;
 pub(crate) use self::fluent::*;
 #[cfg(feature = "sources-gcp_pubsub")]
 pub(crate) use self::gcp_pubsub::*;
-#[cfg(feature = "transforms-geoip")]
-pub(crate) use self::geoip::*;
 #[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
 pub(crate) use self::grpc::*;
 #[cfg(feature = "sources-host_metrics")]

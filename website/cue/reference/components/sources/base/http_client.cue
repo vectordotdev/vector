@@ -145,11 +145,6 @@ base: components: sources: http_client: configuration: {
 			type: array: items: type: string: syntax: "literal"
 		}
 	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global setting"
-		required:    false
-		type: bool: {}
-	}
 	method: {
 		description: "Specifies the action of the HTTP request."
 		required:    false
@@ -207,7 +202,7 @@ base: components: sources: http_client: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

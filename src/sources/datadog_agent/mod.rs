@@ -88,8 +88,9 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
-    /// The namespace to use for logs. This overrides the global settings
+    /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
 
     #[configurable(derived)]
@@ -196,42 +197,42 @@ impl SourceConfig for DatadogAgentConfig {
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("status"))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("status"))),
                 &owned_value_path!("status"),
                 Kind::bytes(),
                 Some("severity"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("timestamp"))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("hostname"))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
                 &owned_value_path!("hostname"),
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("service"))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
                 &owned_value_path!("service"),
                 Kind::bytes(),
                 Some("service"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("ddsource"))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddsource"))),
                 &owned_value_path!("ddsource"),
                 Kind::bytes(),
                 Some("source"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(&owned_value_path!("ddtags"))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
                 &owned_value_path!("ddtags"),
                 Kind::bytes(),
                 Some("tags"),
@@ -279,7 +280,6 @@ pub struct ApiKeyQueryParams {
 pub(crate) struct DatadogAgentSource {
     pub(crate) api_key_extractor: ApiKeyExtractor,
     pub(crate) log_schema_host_key: &'static str,
-    pub(crate) log_schema_timestamp_key: &'static str,
     pub(crate) log_schema_source_type_key: &'static str,
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
@@ -332,7 +332,6 @@ impl DatadogAgentSource {
             },
             log_schema_host_key: log_schema().host_key(),
             log_schema_source_type_key: log_schema().source_type_key(),
-            log_schema_timestamp_key: log_schema().timestamp_key(),
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),

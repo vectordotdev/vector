@@ -89,7 +89,18 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				type: string: enum: {
 					aws:   "Amazon Prometheus Service-specific authentication."
 					basic: "HTTP Basic Authentication."
+					bearer: """
+						Bearer authentication.
+
+						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						"""
 				}
+			}
+			token: {
+				description:   "The bearer token to send."
+				relevant_when: "strategy = \"bearer\""
+				required:      true
+				type: string: syntax: "literal"
 			}
 			user: {
 				description:   "Basic authentication username."
@@ -334,7 +345,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

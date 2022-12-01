@@ -318,9 +318,9 @@ impl MetricsBuffer {
     }
 
     fn tags(&self, mut tags: MetricTags) -> MetricTags {
-        tags.insert("collector".into(), self.name.into());
+        tags.replace("collector".into(), self.name.to_string());
         if let Some(host) = &self.host {
-            tags.insert("host".into(), host.clone());
+            tags.replace("host".into(), host.clone());
         }
         tags
     }

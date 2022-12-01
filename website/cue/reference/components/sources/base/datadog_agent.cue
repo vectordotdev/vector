@@ -125,11 +125,6 @@ base: components: sources: datadog_agent: configuration: {
 			}
 		}
 	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global settings"
-		required:    false
-		type: bool: {}
-	}
 	multiple_outputs: {
 		description: """
 			If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
@@ -166,7 +161,7 @@ base: components: sources: datadog_agent: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

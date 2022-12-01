@@ -266,14 +266,14 @@ fn encode_events(
 
         // Authentication in Sematext is by inserting the token as a tag.
         let mut tags = series.tags.unwrap_or_default();
-        tags.insert("token".into(), token.into());
+        tags.replace("token".into(), token.to_string());
         let (metric_type, fields) = match data.value {
             MetricValue::Counter { value } => ("counter", to_fields(label, value)),
             MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
             _ => unreachable!(), // handled by SematextMetricNormalize
         };
 
-        tags.insert("metric_type".into(), metric_type.into());
+        tags.replace("metric_type".into(), metric_type.to_string());
 
         if let Err(error) = influx_line_protocol(
             ProtocolVersion::V1,

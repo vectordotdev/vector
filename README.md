@@ -203,7 +203,6 @@ Vector is an end-to-end, unified, open data platform.
 [docs.sources]: https://vector.dev/docs/reference/configuration/sources/
 [docs.transforms.dedupe]: https://vector.dev/docs/reference/configuration/transforms/dedupe/
 [docs.transforms.filter]: https://vector.dev/docs/reference/configuration/transforms/filter/
-[docs.transforms.geoip]: https://vector.dev/docs/reference/configuration/transforms/geoip/
 [docs.transforms.log_to_metric]: https://vector.dev/docs/reference/configuration/transforms/log_to_metric/
 [docs.transforms.lua]: https://vector.dev/docs/reference/configuration/transforms/lua/
 [docs.transforms.remap]: https://vector.dev/docs/reference/configuration/transforms/remap/

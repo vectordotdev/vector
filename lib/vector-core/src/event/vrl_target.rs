@@ -193,7 +193,7 @@ impl vrl_lib::Target for VrlTarget {
 
                                 metric.remove_tags();
                                 for (field, value) in &value {
-                                    metric.insert_tag(
+                                    metric.replace_tag(
                                         field.as_str().to_owned(),
                                         value
                                             .try_bytes_utf8_lossy()
@@ -204,7 +204,7 @@ impl vrl_lib::Target for VrlTarget {
                             }
                             ["tags", field] => {
                                 let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
-                                metric.insert_tag(
+                                metric.replace_tag(
                                     (*field).to_owned(),
                                     String::from_utf8_lossy(&value).into_owned(),
                                 );
@@ -312,7 +312,7 @@ impl vrl_lib::Target for VrlTarget {
                             ["namespace"] => metric.series.name.namespace.take().map(Into::into),
                             ["timestamp"] => metric.data.time.timestamp.take().map(Into::into),
                             ["tags"] => metric.series.tags.take().map(|map| {
-                                map.into_iter()
+                                map.into_iter_single()
                                     .map(|(k, v)| (k, v.into()))
                                     .collect::<::value::Value>()
                             }),
@@ -478,7 +478,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                 if let Some(tags) = metric.tags().cloned() {
                     map.insert(
                         "tags".to_owned(),
-                        tags.into_iter()
+                        tags.into_iter_single()
                             .map(|(tag, value)| (tag, value.into()))
                             .collect::<BTreeMap<_, _>>()
                             .into(),
@@ -524,7 +524,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                             .tags()
                             .cloned()
                             .unwrap()
-                            .into_iter()
+                            .into_iter_single()
                             .map(|(tag, value)| (tag, value.into()))
                             .collect::<BTreeMap<_, _>>()
                             .into(),
@@ -1037,7 +1037,7 @@ mod test {
         match target {
             VrlTarget::Metric { metric, value: _ } => {
                 assert!(metric.tags().is_some());
-                assert_eq!(metric.tags().unwrap(), &metric_tags!("a" => "b"));
+                assert_eq!(metric.tags().unwrap(), &crate::metric_tags!("a" => "b"));
             }
             _ => panic!("must be a metric"),
         }

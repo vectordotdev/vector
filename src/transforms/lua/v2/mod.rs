@@ -6,6 +6,7 @@ use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
+use crate::schema::Definition;
 use crate::{
     config::{self, DataType, Input, Output, CONFIG_PATHS},
     event::Event,
@@ -165,8 +166,11 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Metric | DataType::Log)]
+    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        // Lua causes the type definition to be reset
+        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
+
+        vec![Output::default(DataType::Metric | DataType::Log).with_schema_definition(definition)]
     }
 }
 

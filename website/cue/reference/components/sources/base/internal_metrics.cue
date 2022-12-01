@@ -13,7 +13,7 @@ base: components: sources: internal_metrics: configuration: {
 	scrape_interval_secs: {
 		description: "The interval between metric gathering, in seconds."
 		required:    false
-		type: float: default: 2.0
+		type: float: default: 1.0
 	}
 	tags: {
 		description: "Tag configuration for the `internal_metrics` source."

@@ -4,6 +4,7 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{
@@ -97,6 +98,11 @@ fn default_cache_config() -> CacheConfig {
 // configuration schema _without_ actually changing how a field is populated during deserialization.
 //
 // See the comment in `fill_default_fields_match` for more information on why this is required.
+//
+// TODO: These values are used even for events with the new "Vector" log namespace.
+//   These aren't great defaults in that case, but hard-coding isn't much better since the
+//   structure can vary significantly. This should probably either become a required field
+//   in the future, or maybe the "semantic meaning" can be utilized here.
 fn default_match_fields() -> Vec<String> {
     vec![
         log_schema().timestamp_key().into(),
@@ -144,8 +150,8 @@ impl TransformConfig for DedupeConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::Log).with_schema_definition(merged_definition.clone())]
     }
 }
 

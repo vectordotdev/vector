@@ -1,5 +1,6 @@
-use crate::kind::collection::CollectionRemove;
+use crate::kind::collection::{CollectionKey, CollectionRemove};
 use crate::kind::Collection;
+use lookup::lookup_v2::OwnedSegment;
 
 /// A `field` type that can be used in `Collection<Field>`
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
@@ -8,6 +9,12 @@ pub struct Field(lookup::FieldBuf);
 impl std::fmt::Display for Field {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+impl CollectionKey for Field {
+    fn to_segment(&self) -> OwnedSegment {
+        OwnedSegment::Field(self.0.name.clone())
     }
 }
 
