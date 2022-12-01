@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::Input,
     event::{Event, EventArray, EventContainer},
@@ -80,7 +81,11 @@ impl TransformConfig for PipelineConfig {
         // in the future so, to avoid panics, we instead make building a
         // pipeline with such transforms an error.
         for transform in &self.transforms {
-            if transform.outputs(&ctx.merged_schema_definition).len() > 1 {
+            if transform
+                .outputs(&ctx.merged_schema_definition, ctx.schema.log_namespace())
+                .len()
+                > 1
+            {
                 return Err(format!(
                     "pipeline {} has transform of type {} with a named output, unsupported",
                     self.name,
@@ -121,9 +126,9 @@ impl TransformConfig for PipelineConfig {
         }
     }
 
-    fn outputs(&self, schema: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, schema: &schema::Definition, log_namespace: LogNamespace) -> Vec<Output> {
         if let Some(transform) = self.transforms.last() {
-            transform.outputs(schema)
+            transform.outputs(schema, log_namespace)
         } else {
             panic!("pipeline {} does not have transforms", self.name)
         }

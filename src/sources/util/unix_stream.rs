@@ -12,7 +12,7 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
 use tracing::{field, Instrument};
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use super::AfterReadExt;
 use crate::{
@@ -105,7 +105,7 @@ pub fn build_unix_stream_source(
                             Ok((mut events, _byte_size)) => {
                                 emit!(SocketEventsReceived {
                                     mode: SocketMode::Unix,
-                                    byte_size: events.size_of(),
+                                    byte_size: events.estimated_json_encoded_size_of(),
                                     count: events.len(),
                                 });
 

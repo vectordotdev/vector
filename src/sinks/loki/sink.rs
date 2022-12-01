@@ -6,14 +6,13 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
-use vector_buffers::EventCount;
 use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
     event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
     stream::BatcherSettings,
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    ByteSizeOf,
 };
 
 use super::{
@@ -103,41 +102,9 @@ impl From<std::io::Error> for RequestBuildError {
     }
 }
 
-pub(super) struct LokiRecords(pub Vec<LokiRecord>);
-
-impl ByteSizeOf for LokiRecords {
-    fn allocated_bytes(&self) -> usize {
-        self.0
-            .iter()
-            .fold(0, |res, item| res + item.allocated_bytes())
-    }
-}
-
-impl EventCount for LokiRecords {
-    fn event_count(&self) -> usize {
-        self.0.iter().fold(0, |res, item| res + item.event_count())
-    }
-}
-
-impl EstimatedJsonEncodedSizeOf for LokiRecords {
-    fn estimated_json_encoded_size_of(&self) -> usize {
-        self.0
-            .iter()
-            .fold(0, |res, item| res + item.estimated_json_encoded_size_of())
-    }
-}
-
-impl EstimatedJsonEncodedSizeOf for &LokiRecords {
-    fn estimated_json_encoded_size_of(&self) -> usize {
-        self.0
-            .iter()
-            .fold(0, |res, item| res + item.estimated_json_encoded_size_of())
-    }
-}
-
-impl RequestBuilder<(PartitionKey, LokiRecords)> for LokiRequestBuilder {
+impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Metadata = (Option<String>, EventFinalizers);
-    type Events = LokiRecords;
+    type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
     type Payload = Bytes;
     type Request = LokiRequest;
@@ -156,12 +123,12 @@ impl RequestBuilder<(PartitionKey, LokiRecords)> for LokiRequestBuilder {
 
     fn split_input(
         &self,
-        input: (PartitionKey, LokiRecords),
+        input: (PartitionKey, Vec<LokiRecord>),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (key, mut events) = input;
 
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
-        let finalizers = events.0.take_finalizers();
+        let finalizers = events.take_finalizers();
 
         ((key.tenant_id, finalizers), metadata_builder, events)
     }
@@ -461,7 +428,6 @@ impl LokiSink {
                     None
                 }
             })
-            .map(|(key, records)| (key, LokiRecords(records)))
             .request_builder(Some(request_builder_concurrency), self.request_builder)
             .filter_map(|request| async move {
                 match request {

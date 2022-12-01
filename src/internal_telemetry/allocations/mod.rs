@@ -3,7 +3,7 @@
 mod allocator;
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicI64, Ordering},
+        atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
         Mutex,
     },
     thread,
@@ -22,6 +22,9 @@ pub(crate) use self::allocator::{
 
 const NUM_GROUPS: usize = 128;
 pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
+
+// Reporting interval in milliseconds.
+pub static REPORTING_INTERVAL_MS: AtomicU64 = AtomicU64::new(5000);
 
 type GroupMemStatsArray = [AtomicI64; NUM_GROUPS];
 
@@ -129,7 +132,9 @@ pub fn init_allocation_tracing() {
                     }
                 });
             }
-            thread::sleep(Duration::from_millis(5000));
+            thread::sleep(Duration::from_millis(
+                REPORTING_INTERVAL_MS.load(Ordering::Relaxed),
+            ));
         })
         .unwrap();
 }

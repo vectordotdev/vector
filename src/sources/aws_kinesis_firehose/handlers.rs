@@ -16,7 +16,7 @@ use vector_config::NamedComponent;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::reject;
 
@@ -69,7 +69,7 @@ pub(super) async fn firehose(
                 Some(Ok((mut events, _byte_size))) => {
                     emit!(EventsReceived {
                         count: events.len(),
-                        byte_size: events.size_of(),
+                        byte_size: events.estimated_json_encoded_size_of(),
                     });
 
                     let (batch, receiver) = context

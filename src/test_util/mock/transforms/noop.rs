@@ -3,6 +3,7 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use futures_util::Stream;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Input, Output},
     event::{Event, EventContainer},
@@ -37,7 +38,7 @@ impl TransformConfig for NoopTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self, _: &Definition) -> Vec<Output> {
+    fn outputs(&self, _: &Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 
