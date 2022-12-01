@@ -28,7 +28,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use value::{kind::Collection, Kind};
+use value::{kind::Collection, Kind, Value};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
@@ -197,7 +197,7 @@ impl JournaldConfig {
                 Collection::empty()
                     .with_unknown(Kind::bytes())
                     // the MESSAGE field is most likely present in the journald Record, but may not be.
-                    .with_known("message", Kind::bytes().or_undefined()),
+                    .with_known("message", Kind::bytes().or_null()),
             ),
             [log_namespace],
         )
@@ -466,8 +466,15 @@ impl<'a> Batch<'a> {
                             &self.source.exclude_matches,
                         ) {
                             self.record_size += bytes.len();
-                            let event =
-                                create_event(record, &self.batch, self.source.log_namespace);
+
+                            let mut event = create_log_event_from_record(
+                                record,
+                                &self.batch,
+                                self.source.log_namespace,
+                            );
+
+                            enrich_log_event(&mut event, self.source.log_namespace);
+
                             self.events.push(event);
                         }
                     }
@@ -598,32 +605,11 @@ impl Drop for RunningJournalctl {
     }
 }
 
-fn create_event(
-    record: Record,
-    batch: &Option<BatchNotifier>,
-    log_namespace: LogNamespace,
-) -> LogEvent {
-    let mut log = LogEvent::default().with_batch_notifier_option(batch);
-
-    // Add the fields from the Record to the log event.
-    record.iter().for_each(|(key, value)| {
-        log_namespace.insert_source_metadata(
-            JournaldConfig::NAME,
-            &mut log,
-            Some(LegacyKey::Overwrite(path!(key))),
-            path!(key),
-            value.as_str(),
-        );
-    });
-
-    // Convert some journald-specific field names into Vector standard ones.
-    if let Some(message) = log.remove(MESSAGE) {
-        log.insert(log_schema().message_key(), message);
-    }
+fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     if let Some(host) = log.remove(HOSTNAME) {
         log_namespace.insert_source_metadata(
             JournaldConfig::NAME,
-            &mut log,
+            log,
             parse_value_path(log_schema().host_key())
                 .ok()
                 .as_ref()
@@ -663,13 +649,46 @@ fn create_event(
 
     // Add source type.
     log_namespace.insert_vector_metadata(
-        &mut log,
+        log,
         log_schema().source_type_key(),
         path!("source_type"),
         JournaldConfig::NAME,
     );
+}
 
-    log
+fn create_log_event_from_record(
+    mut record: Record,
+    batch: &Option<BatchNotifier>,
+    log_namespace: LogNamespace,
+) -> LogEvent {
+    match log_namespace {
+        LogNamespace::Vector => {
+            let message_value = record
+                .remove(MESSAGE)
+                .map(|msg| Value::Bytes(Bytes::from(msg)))
+                .unwrap_or(Value::Null);
+
+            let mut log = LogEvent::from(message_value).with_batch_notifier_option(batch);
+
+            // Add the remaining fields from the Record to the log event into an object to avoid collisions.
+            record.iter().for_each(|(key, value)| {
+                log.metadata_mut()
+                    .value_mut()
+                    .insert(path!(JournaldConfig::NAME, "metadata", key), value.as_str());
+            });
+
+            log
+        }
+        LogNamespace::Legacy => {
+            let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
+
+            if let Some(message) = log.remove(MESSAGE) {
+                log.insert(log_schema().message_key(), message);
+            }
+
+            log
+        }
+    }
 }
 
 /// Map the given unit name into a valid systemd unit
@@ -1365,7 +1384,7 @@ mod tests {
             Kind::object(
                 Collection::empty()
                     .with_unknown(Kind::bytes())
-                    .with_known("message", Kind::bytes().or_undefined()),
+                    .with_known("message", Kind::bytes().or_null()),
             ),
             [LogNamespace::Vector],
         )
@@ -1399,7 +1418,7 @@ mod tests {
             Kind::object(
                 Collection::empty()
                     .with_unknown(Kind::bytes())
-                    .with_known("message", Kind::bytes().or_undefined()),
+                    .with_known("message", Kind::bytes().or_null()),
             ),
             [LogNamespace::Legacy],
         )
