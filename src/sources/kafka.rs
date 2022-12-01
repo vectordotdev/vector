@@ -250,7 +250,7 @@ impl SourceConfig for KafkaSourceConfig {
                 Some(LegacyKey::Overwrite(owned_value_path!(keys.timestamp))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
-                None,
+                Some("timestamp"),
             )
             .with_source_metadata(
                 Self::NAME,
