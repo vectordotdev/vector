@@ -29,6 +29,9 @@ struct GroupMemStatsStorage {
     deallocations: [AtomicU64; NUM_GROUPS],
 }
 
+// Reporting interval in milliseconds.
+pub static REPORTING_INTERVAL_MS: AtomicU64 = AtomicU64::new(5000);
+
 /// A registry for tracking each thread's group memory statistics.
 static THREAD_LOCAL_REFS: Mutex<Vec<&'static GroupMemStatsStorage>> = Mutex::new(Vec::new());
 
@@ -165,7 +168,9 @@ pub fn init_allocation_tracing() {
                     }
                 });
             }
-            thread::sleep(Duration::from_millis(5000));
+            thread::sleep(Duration::from_millis(
+                REPORTING_INTERVAL_MS.load(Ordering::Relaxed),
+            ));
         })
         .unwrap();
 }
