@@ -694,7 +694,7 @@ mod test {
     }
 
     #[test]
-    fn test_output_schema_definition_json_vector_namespace() {
+    fn test_output_schema_definition_vector_namespace() {
         let definition = make_config("topic", "group", LogNamespace::Vector)
             .outputs(LogNamespace::Vector)[0]
             .clone()
@@ -723,7 +723,7 @@ mod test {
     }
 
     #[test]
-    fn test_output_schema_definition_json_legacy_namespace() {
+    fn test_output_schema_definition_legacy_namespace() {
         let definition = make_config("topic", "group", LogNamespace::Legacy)
             .outputs(LogNamespace::Legacy)[0]
             .clone()
