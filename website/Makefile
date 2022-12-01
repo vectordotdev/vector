@@ -52,7 +52,7 @@ preview-build:
 	--buildFuture \
 	--environment "preview" \
 	--minify
-	cp ./custom-headers/_preview ./dist/_headers
+	cp ./custom-headers/_preview ./public/_headers
 
 ci-preview-build: setup structured-data preview-build run-link-checker algolia
 
