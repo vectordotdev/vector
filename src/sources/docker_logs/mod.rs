@@ -43,6 +43,7 @@ use crate::{
     SourceSender,
 };
 
+#[cfg(test)]
 mod tests;
 
 const IMAGE: &str = "image";
