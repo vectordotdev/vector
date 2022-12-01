@@ -1,31 +1,26 @@
-#[cfg(test)]
-mod tests {
-    use crate::sources::docker_logs::*;
+use crate::sources::docker_logs::*;
 
-    #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<DockerLogsConfig>();
-    }
+#[test]
+fn generate_config() {
+    crate::test_util::test_generate_config::<DockerLogsConfig>();
+}
 
-    #[test]
-    fn exclude_self() {
-        let (tx, _rx) = SourceSender::new_test();
-        let mut source = DockerLogsSource::new(
-            DockerLogsConfig::default(),
-            tx,
-            ShutdownSignal::noop(),
-            LogNamespace::Legacy,
-        )
-        .unwrap();
-        source.hostname = Some("451062c59603".to_owned());
-        assert!(
-            source.exclude_self("451062c59603a1cf0c6af3e74a31c0ae63d8275aa16a5fc78ef31b923baaffc3")
-        );
+#[test]
+fn exclude_self() {
+    let (tx, _rx) = SourceSender::new_test();
+    let mut source = DockerLogsSource::new(
+        DockerLogsConfig::default(),
+        tx,
+        ShutdownSignal::noop(),
+        LogNamespace::Legacy,
+    )
+    .unwrap();
+    source.hostname = Some("451062c59603".to_owned());
+    assert!(source.exclude_self("451062c59603a1cf0c6af3e74a31c0ae63d8275aa16a5fc78ef31b923baaffc3"));
 
-        // hostname too short
-        source.hostname = Some("a".to_owned());
-        assert!(!source.exclude_self("a29d569bd46c"));
-    }
+    // hostname too short
+    source.hostname = Some("a".to_owned());
+    assert!(!source.exclude_self("a29d569bd46c"));
 }
 
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]

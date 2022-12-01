@@ -43,6 +43,7 @@ use crate::{
     SourceSender,
 };
 
+#[cfg(test)]
 mod tests;
 
 const IMAGE: &str = "image";
@@ -1122,6 +1123,8 @@ impl ContainerLogInfo {
                 // Otherwise, create a new partial event merge state with the
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
+                    // Depending on the log namespace the actual contents of the log "message" will be
+                    // found in either the root of the event ("."), or at the globally configured "message_key".
                     match log_namespace {
                         LogNamespace::Vector => {
                             partial_event_merge_state.merge_in_next_event(log, &["."]);
@@ -1144,6 +1147,8 @@ impl ContainerLogInfo {
             // would give us a merged event we can return.
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
+                // Depending on the log namespace the actual contents of the log "message" will be
+                // found in either the root of the event ("."), or at the globally configured "message_key".
                 Some(partial_event_merge_state) => match log_namespace {
                     LogNamespace::Vector => {
                         partial_event_merge_state.merge_in_final_event(log, &["."])
