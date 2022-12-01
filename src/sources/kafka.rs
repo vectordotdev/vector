@@ -736,7 +736,11 @@ mod test {
                     Kind::bytes(),
                     Some("message")
                 )
-                .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+                .with_event_field(
+                    &owned_value_path!("timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp")
+                )
                 .with_event_field(&owned_value_path!("message_key"), Kind::bytes(), None)
                 .with_event_field(&owned_value_path!("topic"), Kind::bytes(), None)
                 .with_event_field(&owned_value_path!("partition"), Kind::bytes(), None)
