@@ -1,18 +1,15 @@
 use std::collections::HashMap;
 
-use futures::future::FutureExt;
 use vector_config::configurable_component;
 use vector_core::config::{LogNamespace, Output};
+use vector_core::tls::TlsEnableableConfig;
 
-use super::{healthcheck::healthcheck, sink::LokiSink};
-use crate::{
-    codecs::EncodingConfig,
-    config::{DataType, GenerateConfig, Input, SourceContext},
-    http::{Auth, HttpClient, MaybeAuth},
-    template::Template,
-    tls::{TlsConfig, TlsSettings},
-};
 use crate::config::SourceConfig;
+use crate::{
+    config::{DataType, GenerateConfig, SourceContext},
+    http::Auth,
+    template::Template,
+};
 
 fn default_loki_path() -> String {
     "/loki/api/v1/tail".to_string()
@@ -60,7 +57,7 @@ pub struct LokiSourceConfig {
     pub auth: Option<Auth>,
 
     #[configurable(derived)]
-    pub tls: Option<TlsConfig>,
+    pub tls: Option<TlsEnableableConfig>,
 }
 
 impl GenerateConfig for LokiSourceConfig {
@@ -69,24 +66,21 @@ impl GenerateConfig for LokiSourceConfig {
             r#"endpoint = "ws://localhost:3100"
             labels = {}"#,
         )
-            .unwrap()
+        .unwrap()
     }
 }
 
 impl LokiSourceConfig {
-    pub(super) fn build_client(&self, cx: &SourceContext) -> crate::Result<HttpClient> {
-        let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls, &cx.proxy)?;
-        Ok(client)
-    }
+    //pub(super) fn build_client(&self, cx: &SourceContext) -> crate::Result<HttpClient> {
+    //    let tls = TlsSettings::from_options(&self.tls)?;
+    //    let client = HttpClient::new(tls, &cx.proxy)?;
+    //    Ok(client)
+    //}
 }
 
 #[async_trait::async_trait]
 impl SourceConfig for LokiSourceConfig {
-    async fn build(
-        &self,
-        cx: SourceContext,
-    ) -> crate::Result<vector_core::source::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<vector_core::source::Source> {
         if self.labels.is_empty() {
             return Err("`labels` must include at least one label.".into());
         }
@@ -97,13 +91,12 @@ impl SourceConfig for LokiSourceConfig {
             }
         }
 
-        let client = self.build_client(&cx)?;
+        //let client = self.build_client(&cx)?;
 
         //let healthcheck = healthcheck(config, client).boxed();
 
         Ok(Box::pin(super::source::loki_source(
-            &self,
-            client,
+            self.clone(),
             cx.shutdown,
             cx.out,
         )))

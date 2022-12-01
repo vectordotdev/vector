@@ -218,6 +218,10 @@ pub enum Sources {
     #[cfg(all(feature = "sources-logstash"))]
     Logstash(#[configurable(derived)] logstash::LogstashConfig),
 
+    /// Loki.
+    #[cfg(all(feature = "sources-loki"))]
+    Loki(#[configurable(derived)] loki::LokiSourceConfig),
+
     /// MongoDB Metrics.
     #[cfg(feature = "sources-mongodb_metrics")]
     MongodbMetrics(#[configurable(derived)] mongodb_metrics::MongoDbMetricsConfig),
@@ -363,6 +367,8 @@ impl NamedComponent for Sources {
             Self::KubernetesLogs(config) => config.get_component_name(),
             #[cfg(all(feature = "sources-logstash"))]
             Self::Logstash(config) => config.get_component_name(),
+            #[cfg(all(feature = "sources-loki"))]
+            Self::Loki(config) => config.get_component_name(),
             #[cfg(feature = "sources-mongodb_metrics")]
             Self::MongodbMetrics(config) => config.get_component_name(),
             #[cfg(all(feature = "sources-nats"))]
