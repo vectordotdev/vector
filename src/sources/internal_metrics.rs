@@ -3,7 +3,7 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
@@ -130,7 +130,7 @@ impl<'a> InternalMetrics<'a> {
 
             let metrics = self.controller.capture_metrics();
             let count = metrics.len();
-            let byte_size = metrics.size_of();
+            let byte_size = metrics.estimated_json_encoded_size_of();
 
             emit!(InternalMetricsBytesReceived { byte_size });
             emit!(EventsReceived { count, byte_size });

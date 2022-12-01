@@ -15,7 +15,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::{metric_tags, ByteSizeOf};
+use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{self, Output, SourceConfig, SourceContext},
@@ -257,7 +257,7 @@ impl MongoDbMetrics {
         metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
 
         emit!(MongoDbMetricsEventsReceived {
-            byte_size: metrics.size_of(),
+            byte_size: metrics.estimated_json_encoded_size_of(),
             count: metrics.len(),
             endpoint: &self.endpoint,
         });

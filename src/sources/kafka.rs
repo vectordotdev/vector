@@ -24,7 +24,8 @@ use tokio_util::codec::FramedRead;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
+use vector_common::finalizer::OrderedFinalizer;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -346,7 +347,7 @@ fn parse_stream<'a>(
                 Ok((events, _byte_size)) => {
                     emit!(KafkaEventsReceived {
                         count: events.len(),
-                        byte_size: events.size_of(),
+                        byte_size: events.estimated_json_encoded_size_of(),
                         topic: &rmsg.topic,
                         partition: rmsg.partition,
                     });
