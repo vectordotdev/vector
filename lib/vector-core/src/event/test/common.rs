@@ -477,7 +477,7 @@ impl Arbitrary for MetricSeries {
             for _ in 0..(usize::arbitrary(g) % MAX_MAP_SIZE) {
                 let key = String::from(Name::arbitrary(g));
                 let value = String::from(Name::arbitrary(g));
-                map.insert(key, value);
+                map.replace(key, value);
             }
             if map.is_empty() {
                 None

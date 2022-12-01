@@ -760,7 +760,7 @@ fn generate_object_key(key_prefix: Option<String>, partition_key: String) -> Str
     let filename = Uuid::new_v4().to_string();
 
     format!(
-        "{}/{}{}.{}",
+        "{}/{}/archive_{}.{}",
         key_prefix.unwrap_or_default(),
         partition_key,
         filename,
@@ -1084,7 +1084,7 @@ mod tests {
         let request_metadata = metadata_request_builder.build(&payload);
         let req = request_builder.build_request(metadata, request_metadata, payload);
 
-        let expected_key_prefix = "audit/dt=20210823/hour=16/";
+        let expected_key_prefix = "audit/dt=20210823/hour=16/archive_";
         let expected_key_ext = ".json.gz";
         println!("{}", req.metadata.s3_key);
         assert!(req.metadata.s3_key.starts_with(expected_key_prefix));
