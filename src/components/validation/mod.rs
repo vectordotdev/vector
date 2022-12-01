@@ -1,5 +1,5 @@
 mod resources;
-#[cfg(feature = "validation-runner")]
+#[cfg(feature = "component-validation-runner")]
 mod runner;
 mod sync;
 mod test_case;
@@ -9,7 +9,7 @@ mod validators;
 use crate::{sinks::Sinks, sources::Sources, transforms::Transforms};
 
 pub use self::resources::*;
-#[cfg(feature = "validation-runner")]
+#[cfg(feature = "component-validation-runner")]
 pub use self::runner::*;
 pub use self::test_case::{TestCase, TestCaseExpectation};
 pub use self::validators::*;
@@ -106,7 +106,7 @@ where
     }
 }
 
-#[cfg(all(test, feature = "validation-tests"))]
+#[cfg(all(test, feature = "component-validation-tests"))]
 mod tests {
     use crate::{
         components::validation::{Runner, StandardValidators},
@@ -127,49 +127,6 @@ mod tests {
         //
         // Yes, we're leaking an object. It's a test, who cares.
         vec![Box::leak(Box::new(SimpleHttpConfig::default()))]
-    }
-
-    /// Loads all of the test cases for the given component.
-    ///
-    /// Test cases are searched for in a file that must be located at
-    /// `tests/validation/components/<component type>/<component name>.yaml`, where the component type
-    /// is the type of the component (either `sources`, `transforms`, or `sinks`) and the component name
-    /// is the value given by `ValidatableComponent::component_name`.
-    ///
-    /// As implied by the file path, the file is expected to be valid YAML, containing an array of test
-    /// cases.
-    ///
-    /// ## Errors
-    ///
-    /// If an I/O error is encountered during the loading of the test case file, or any error occurs
-    /// during deserialization of the test case file, whether the error is I/O related in nature or due
-    /// to invalid YAML, or not representing valid serialized test cases, then an error variant will be
-    /// returned explaining the cause.
-    fn load_component_test_cases<C: ValidatableComponent>(
-        component: C,
-    ) -> Result<Vec<TestCase>, String> {
-        let component_type = component.component_type().as_str();
-        let component_name = component.component_name();
-        let component_test_cases_path = format!(
-            "tests/validation/components/{}s/{}.yaml",
-            component_type, component_name
-        );
-
-        std::fs::File::open(&component_test_cases_path)
-            .map_err(|e| {
-                format!(
-                    "I/O error during open of component validation test cases file: {}",
-                    e
-                )
-            })
-            .and_then(|file| {
-                serde_yaml::from_reader(file).map_err(|e| {
-                    format!(
-                        "Deserialization error for component validation test cases file: {}",
-                        e
-                    )
-                })
-            })
     }
 
     #[tokio::test]
