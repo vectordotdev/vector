@@ -15,7 +15,7 @@ use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle
 use vector_config::NamedComponent;
 use vector_core::config::{LegacyKey, LogNamespace, Output};
 use vector_core::event::Event;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -134,7 +134,7 @@ async fn process_stream(
                 Ok((events, byte_size)) => {
                     bytes_received.emit(ByteSize(byte_size));
                     emit!(EventsReceived {
-                        byte_size: events.size_of(),
+                        byte_size: events.estimated_json_encoded_size_of(),
                         count: events.len()
                     });
 

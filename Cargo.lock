@@ -7386,6 +7386,9 @@ name = "smallvec"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "smol"
@@ -9193,12 +9196,14 @@ dependencies = [
  "rand 0.8.5",
  "rand_distr",
  "regex",
+ "ryu",
  "schannel",
  "security-framework",
  "serde",
  "serde_json",
  "serde_with 2.1.0",
  "similar-asserts",
+ "smallvec",
  "snafu",
  "socket2",
  "tokio",

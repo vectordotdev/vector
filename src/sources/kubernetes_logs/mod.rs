@@ -27,7 +27,7 @@ use kube::{
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_common::TimeZone;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{transform::TaskTransform, ByteSizeOf};
+use vector_core::{transform::TaskTransform, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{
@@ -483,7 +483,7 @@ impl Source {
 
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
-                byte_size: event.size_of(),
+                byte_size: event.estimated_json_encoded_size_of(),
                 pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
                     name: info.pod_name.to_owned(),
                     namespace: info.pod_namespace.to_owned(),

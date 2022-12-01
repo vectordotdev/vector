@@ -5,7 +5,7 @@ use chrono::{TimeZone, Utc};
 use http::StatusCode;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use vector_core::{metrics::AgentDDSketch, ByteSizeOf};
+use vector_core::{metrics::AgentDDSketch, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
 use crate::{
@@ -207,7 +207,7 @@ fn decode_datadog_sketches(
     })?;
 
     emit!(EventsReceived {
-        byte_size: metrics.size_of(),
+        byte_size: metrics.estimated_json_encoded_size_of(),
         count: metrics.len(),
     });
 
@@ -236,7 +236,7 @@ fn decode_datadog_series_v2(
     })?;
 
     emit!(EventsReceived {
-        byte_size: metrics.size_of(),
+        byte_size: metrics.estimated_json_encoded_size_of(),
         count: metrics.len(),
     });
 
@@ -344,7 +344,7 @@ pub(crate) fn decode_ddseries_v2(
         .collect();
 
     emit!(EventsReceived {
-        byte_size: decoded_metrics.size_of(),
+        byte_size: decoded_metrics.estimated_json_encoded_size_of(),
         count: decoded_metrics.len(),
     });
 
@@ -379,7 +379,7 @@ fn decode_datadog_series_v1(
         .collect();
 
     emit!(EventsReceived {
-        byte_size: decoded_metrics.size_of(),
+        byte_size: decoded_metrics.estimated_json_encoded_size_of(),
         count: decoded_metrics.len(),
     });
 

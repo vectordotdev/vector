@@ -25,7 +25,7 @@ use tokio_tungstenite::{
 use tokio_util::codec::Encoder as _;
 use vector_core::{
     internal_event::{ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -288,7 +288,7 @@ impl WebSocketSink {
 
                     self.transformer.transform(&mut event);
 
-                    let event_byte_size = event.size_of();
+                    let event_byte_size = event.estimated_json_encoded_size_of();
 
                     let mut bytes = BytesMut::new();
                     let res = match self.encoder.encode(event, &mut bytes) {
