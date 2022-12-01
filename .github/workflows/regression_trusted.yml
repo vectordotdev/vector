@@ -419,7 +419,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1-node16
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
 
       - name: Download SMP binary
