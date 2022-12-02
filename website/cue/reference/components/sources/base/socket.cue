@@ -7,7 +7,7 @@ base: components: sources: socket: configuration: {
 		required:      true
 		type: {
 			number: {}
-			string: syntax: "literal"
+			string: {}
 		}
 	}
 	connection_limit: {
@@ -132,10 +132,7 @@ base: components: sources: socket: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
@@ -178,7 +175,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
 		required:      true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	port_key: {
 		description: """
@@ -190,10 +187,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	receive_buffer_bytes: {
 		description: """
@@ -237,7 +231,7 @@ base: components: sources: socket: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -247,18 +241,12 @@ base: components: sources: socket: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			client_metadata_key: {
 				description: "Event field for client certificate metadata."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -270,10 +258,7 @@ base: components: sources: socket: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			enabled: {
 				description: """
@@ -292,10 +277,7 @@ base: components: sources: socket: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -304,10 +286,7 @@ base: components: sources: socket: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

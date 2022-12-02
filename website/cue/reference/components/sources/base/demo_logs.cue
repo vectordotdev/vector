@@ -146,7 +146,7 @@ base: components: sources: demo_logs: configuration: {
 		description:   "The list of lines to output."
 		relevant_when: "format = \"shuffle\""
 		required:      true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	sequence: {
 		description:   "If `true`, each output line starts with an increasing sequence number, beginning with 0."

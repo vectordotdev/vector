@@ -4,7 +4,7 @@ base: components: sinks: new_relic: configuration: {
 	account_id: {
 		description: "The New Relic account ID."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	acknowledgements: {
 		description: """
@@ -131,7 +131,7 @@ base: components: sinks: new_relic: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -139,7 +139,7 @@ base: components: sinks: new_relic: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -158,7 +158,7 @@ base: components: sinks: new_relic: configuration: {
 	license_key: {
 		description: "A valid New Relic license key."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	region: {
 		description: "New Relic region."
@@ -240,11 +240,11 @@ base: components: sinks: new_relic: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {

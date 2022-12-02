@@ -60,7 +60,7 @@ base: components: sinks: kafka: configuration: {
 			Each value must be in the form of `<host>` or `<host>:<port>`, and separated by a comma.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	compression: {
 		description: "Supported compression types for Kafka."
@@ -87,7 +87,7 @@ base: components: sinks: kafka: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
@@ -122,7 +122,7 @@ base: components: sinks: kafka: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -130,7 +130,7 @@ base: components: sinks: kafka: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -153,10 +153,7 @@ base: components: sinks: kafka: configuration: {
 			If omitted, no headers will be written.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	key_field: {
 		description: """
@@ -167,10 +164,7 @@ base: components: sinks: kafka: configuration: {
 			Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	librdkafka_options: {
 		description: """
@@ -183,7 +177,7 @@ base: components: sinks: kafka: configuration: {
 		required: false
 		type: object: options: "*": {
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 	message_timeout_ms: {
@@ -213,26 +207,17 @@ base: components: sinks: kafka: configuration: {
 			mechanism: {
 				description: "The SASL mechanism to use."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			password: {
 				description: "The SASL password."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			username: {
 				description: "The SASL username."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 		}
 	}
@@ -255,7 +240,7 @@ base: components: sinks: kafka: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -265,10 +250,7 @@ base: components: sinks: kafka: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -280,10 +262,7 @@ base: components: sinks: kafka: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			enabled: {
 				description: """
@@ -302,10 +281,7 @@ base: components: sinks: kafka: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -314,10 +290,7 @@ base: components: sinks: kafka: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

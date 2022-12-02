@@ -40,7 +40,7 @@ base: components: sinks: loki: configuration: {
 				description:   "The password to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
 				required: true
@@ -61,13 +61,13 @@ base: components: sinks: loki: configuration: {
 				description:   "The bearer token to send."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
 				description:   "The username to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -168,7 +168,7 @@ base: components: sinks: loki: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
@@ -203,7 +203,7 @@ base: components: sinks: loki: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -211,7 +211,7 @@ base: components: sinks: loki: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -234,10 +234,7 @@ base: components: sinks: loki: configuration: {
 			Vector will append the value of `path` to this.
 			"""
 		required: true
-		type: string: {
-			examples: ["http://localhost:3100"]
-			syntax: "literal"
-		}
+		type: string: examples: ["http://localhost:3100"]
 	}
 	labels: {
 		description: """
@@ -253,12 +250,12 @@ base: components: sinks: loki: configuration: {
 			values.
 			"""
 		required: false
-		type: object: {
-			examples: ["vector", "{{ event_field }}", "{{ kubernetes.pod_labels }}"]
-			options: "*": {
-				description: "A Loki label."
-				required:    true
-				type: string: syntax: "template"
+		type: object: options: "*": {
+			description: "A Loki label."
+			required:    true
+			type: string: {
+				examples: ["vector", "{{ event_field }}", "{{ kubernetes.pod_labels }}"]
+				syntax: "template"
 			}
 		}
 	}
@@ -294,10 +291,7 @@ base: components: sinks: loki: configuration: {
 	path: {
 		description: "The path to use in the URL of the Loki instance."
 		required:    false
-		type: string: {
-			default: "/loki/api/v1/push"
-			syntax:  "literal"
-		}
+		type: string: default: "/loki/api/v1/push"
 	}
 	remove_label_fields: {
 		description: "Whether or not to delete fields from the event when they are used as labels."
@@ -382,11 +376,11 @@ base: components: sinks: loki: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -463,7 +457,7 @@ base: components: sinks: loki: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -473,10 +467,7 @@ base: components: sinks: loki: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -488,10 +479,7 @@ base: components: sinks: loki: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -500,10 +488,7 @@ base: components: sinks: loki: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -512,10 +497,7 @@ base: components: sinks: loki: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

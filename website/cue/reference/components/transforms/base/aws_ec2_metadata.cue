@@ -4,20 +4,14 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 	endpoint: {
 		description: "Overrides the default EC2 metadata endpoint."
 		required:    false
-		type: string: {
-			default: "http://169.254.169.254"
-			syntax:  "literal"
-		}
+		type: string: default: "http://169.254.169.254"
 	}
 	fields: {
 		description: "A list of metadata fields to include in each transformed event."
 		required:    false
 		type: array: {
 			default: ["ami-id", "availability-zone", "instance-id", "instance-type", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "region", "subnet-id", "vpc-id", "role-name"]
-			items: type: string: {
-				examples: ["instance-id", "local-hostname"]
-				syntax: "literal"
-			}
+			items: type: string: examples: ["instance-id", "local-hostname"]
 		}
 	}
 	namespace: {
@@ -26,7 +20,6 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 		type: string: {
 			default: null
 			examples: ["", "ec2", "aws.ec2"]
-			syntax: "literal"
 		}
 	}
 	proxy: {
@@ -54,7 +47,6 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 				type: string: {
 					default: null
 					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
 				}
 			}
 			https: {
@@ -67,7 +59,6 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 				type: string: {
 					default: null
 					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
 				}
 			}
 			no_proxy: {
@@ -89,7 +80,7 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 				required: false
 				type: array: {
 					default: []
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 		}

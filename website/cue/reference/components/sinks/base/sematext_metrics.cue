@@ -61,15 +61,12 @@ base: components: sinks: sematext_metrics: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	endpoint: {
 		description: "The endpoint to send data to."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	region: {
 		description: "Sematext region."
@@ -151,11 +148,11 @@ base: components: sinks: sematext_metrics: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -206,6 +203,6 @@ base: components: sinks: sematext_metrics: configuration: {
 	token: {
 		description: "The token that will be used to write to Sematext."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

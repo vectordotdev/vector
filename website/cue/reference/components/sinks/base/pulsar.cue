@@ -39,10 +39,7 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be `token`.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			oauth2: {
 				description: "OAuth2-specific authenticatgion configuration."
@@ -51,10 +48,7 @@ base: components: sinks: pulsar: configuration: {
 					audience: {
 						description: "The OAuth2 audience."
 						required:    false
-						type: string: {
-							default: null
-							syntax:  "literal"
-						}
+						type: string: default: null
 					}
 					credentials_url: {
 						description: """
@@ -63,20 +57,17 @@ base: components: sinks: pulsar: configuration: {
 																A data URL is also supported.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					issuer_url: {
 						description: "The issuer URL."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					scope: {
 						description: "The OAuth2 scope."
 						required:    false
-						type: string: {
-							default: null
-							syntax:  "literal"
-						}
+						type: string: default: null
 					}
 				}
 			}
@@ -88,10 +79,7 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be the signed JWT, in the compact representation.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 		}
 	}
@@ -106,7 +94,7 @@ base: components: sinks: pulsar: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
@@ -141,7 +129,7 @@ base: components: sinks: pulsar: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -149,7 +137,7 @@ base: components: sinks: pulsar: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -168,19 +156,16 @@ base: components: sinks: pulsar: configuration: {
 	endpoint: {
 		description: "The endpoint to which the Pulsar client should connect to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	partition_key_field: {
 		description: "Log field to use as Pulsar message key"
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	topic: {
 		description: "The Pulsar topic name to write events to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

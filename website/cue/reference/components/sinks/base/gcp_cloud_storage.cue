@@ -97,10 +97,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -131,7 +128,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 	bucket: {
 		description: "The GCS bucket name."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	compression: {
 		description: "Compression configuration."
@@ -200,10 +197,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	encoding: {
 		description: "Encoding configuration."
@@ -216,7 +210,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
@@ -251,7 +245,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -259,7 +253,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -292,10 +286,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 	filename_extension: {
 		description: "The filename extension to use in the object key."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	filename_time_format: {
 		description: """
@@ -317,10 +308,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	framing: {
 		description: "Framing configuration."
@@ -376,7 +364,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 		required: false
 		type: object: options: "*": {
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 	request: {
@@ -448,11 +436,11 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -542,7 +530,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -552,10 +540,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -567,10 +552,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -579,10 +561,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -591,10 +570,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

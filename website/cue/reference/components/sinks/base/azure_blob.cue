@@ -77,10 +77,7 @@ base: components: sinks: azure_blob: configuration: {
 			in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	blob_time_format: {
 		description: """
@@ -102,10 +99,7 @@ base: components: sinks: azure_blob: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	compression: {
 		description: "Compression configuration."
@@ -171,15 +165,12 @@ base: components: sinks: azure_blob: configuration: {
 			Either `storage_account`, or this field, must be specified.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	container_name: {
 		description: "The Azure Blob Storage Account container name."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	encoding: {
 		description: "Encoding configuration."
@@ -192,7 +183,7 @@ base: components: sinks: azure_blob: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
@@ -227,7 +218,7 @@ base: components: sinks: azure_blob: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -235,7 +226,7 @@ base: components: sinks: azure_blob: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -349,11 +340,11 @@ base: components: sinks: azure_blob: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -418,9 +409,6 @@ base: components: sinks: azure_blob: configuration: {
 			[az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 }

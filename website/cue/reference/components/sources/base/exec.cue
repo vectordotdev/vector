@@ -4,10 +4,7 @@ base: components: sources: exec: configuration: {
 	command: {
 		description: "The command to be run, plus any arguments required."
 		required:    true
-		type: array: items: type: string: {
-			examples: ["echo", "Hello World!"]
-			syntax: "literal"
-		}
+		type: array: items: type: string: examples: ["echo", "Hello World!"]
 	}
 	decoding: {
 		description: "Decoding configuration."
@@ -164,9 +161,6 @@ base: components: sources: exec: configuration: {
 	working_directory: {
 		description: "The directory in which to run the command."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 }

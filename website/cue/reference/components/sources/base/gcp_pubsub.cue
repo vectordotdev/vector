@@ -45,10 +45,7 @@ base: components: sources: gcp_pubsub: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	credentials_path: {
 		description: """
@@ -62,10 +59,7 @@ base: components: sources: gcp_pubsub: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	decoding: {
 		description: "Decoding configuration."
@@ -103,10 +97,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	endpoint: {
 		description: "The endpoint from which to pull data."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	framing: {
 		description: """
@@ -217,7 +208,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	project: {
 		description: "The project name from which to pull logs."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	retry_delay_seconds: {
 		description: "Deprecated, old name of `retry_delay_secs`."
@@ -237,7 +228,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	subscription: {
 		description: "The subscription within the project which is configured to receive logs."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -253,7 +244,7 @@ base: components: sources: gcp_pubsub: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -263,10 +254,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -278,10 +266,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -290,10 +275,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -302,10 +284,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

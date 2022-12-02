@@ -30,7 +30,7 @@ base: components: sinks: apex: configuration: {
 	api_token: {
 		description: "The API token to use to authenticate with Apex."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -61,7 +61,7 @@ base: components: sinks: apex: configuration: {
 	project_id: {
 		description: "The ID of the project to associate reported logs with."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	request: {
 		description: """
@@ -132,11 +132,11 @@ base: components: sinks: apex: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -191,6 +191,6 @@ base: components: sinks: apex: configuration: {
 			Vector will append `/add_events` to this.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

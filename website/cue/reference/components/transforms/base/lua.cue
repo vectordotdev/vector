@@ -26,7 +26,6 @@ base: components: transforms: lua: configuration: {
 						\t-- Custom Lua code here
 						end
 						""", "init"]
-					syntax: "literal"
 				}
 			}
 			process: {
@@ -40,18 +39,15 @@ base: components: transforms: lua: configuration: {
 					while the second parameter, `emit`, is a reference to a function for emitting events.
 					"""
 				required: true
-				type: string: {
-					examples: ["""
-						function (event, emit)
-						\tevent.log.field = "value" -- set value of a field
-						\tevent.log.another_field = nil -- remove field
-						\tevent.log.first, event.log.second = nil, event.log.first -- rename field
-						\t-- Very important! Emit the processed event.
-						\temit(event)
-						end
-						""", "process"]
-					syntax: "literal"
-				}
+				type: string: examples: ["""
+					function (event, emit)
+					\tevent.log.field = "value" -- set value of a field
+					\tevent.log.another_field = nil -- remove field
+					\tevent.log.first, event.log.second = nil, event.log.first -- rename field
+					\t-- Very important! Emit the processed event.
+					\temit(event)
+					end
+					""", "process"]
 			}
 			shutdown: {
 				description: """
@@ -70,7 +66,6 @@ base: components: transforms: lua: configuration: {
 						\t-- Custom Lua code here
 						end
 						""", "shutdown"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -84,10 +79,7 @@ base: components: transforms: lua: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {
-				examples: ["/etc/vector/lua"]
-				syntax: "literal"
-			}
+			items: type: string: examples: ["/etc/vector/lua"]
 		}
 	}
 	source: {
@@ -133,7 +125,6 @@ base: components: transforms: lua: configuration: {
 				-- external file with hooks and timers defined
 				require('custom_module')
 				"""]
-			syntax: "literal"
 		}
 	}
 	timers: {
@@ -153,10 +144,7 @@ base: components: transforms: lua: configuration: {
 						reference to a function for emitting events.
 						"""
 					required: true
-					type: string: {
-						examples: ["timer_handler"]
-						syntax: "literal"
-					}
+					type: string: examples: ["timer_handler"]
 				}
 				interval_seconds: {
 					description: "The interval to execute the handler, in seconds."

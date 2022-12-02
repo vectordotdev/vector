@@ -44,10 +44,7 @@ base: components: transforms: reduce: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {
-				examples: ["request_id", "user_id", "transaction_id"]
-				syntax: "literal"
-			}
+			items: type: string: examples: ["request_id", "user_id", "transaction_id"]
 		}
 	}
 	merge_strategies: {

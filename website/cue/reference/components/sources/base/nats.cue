@@ -12,7 +12,7 @@ base: components: sources: nats: configuration: {
 				type: object: options: path: {
 					description: "Path to credentials file."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			nkey: {
@@ -27,7 +27,7 @@ base: components: sources: nats: configuration: {
 																Conceptually, this is equivalent to a public key.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					seed: {
 						description: """
@@ -36,7 +36,7 @@ base: components: sources: nats: configuration: {
 																Conceptually, this is equivalent to a private key.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -68,7 +68,7 @@ base: components: sources: nats: configuration: {
 				type: object: options: value: {
 					description: "Token."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			user_password: {
@@ -79,12 +79,12 @@ base: components: sources: nats: configuration: {
 					password: {
 						description: "Password."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					user: {
 						description: "Username."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -93,7 +93,7 @@ base: components: sources: nats: configuration: {
 	connection_name: {
 		description: "A name assigned to the NATS connection."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	decoding: {
 		description: "Decoding configuration."
@@ -206,10 +206,7 @@ base: components: sources: nats: configuration: {
 	queue: {
 		description: "NATS Queue Group to join."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	subject: {
 		description: "The NATS subject to publish messages to."
@@ -230,7 +227,7 @@ base: components: sources: nats: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -240,10 +237,7 @@ base: components: sources: nats: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -255,10 +249,7 @@ base: components: sources: nats: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			enabled: {
 				description: """
@@ -277,10 +268,7 @@ base: components: sources: nats: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -289,10 +277,7 @@ base: components: sources: nats: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """
@@ -333,6 +318,6 @@ base: components: sources: nats: configuration: {
 			The URL must take the form of `nats://server:port`.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

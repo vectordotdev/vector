@@ -60,7 +60,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v2.x and above.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	consistency: {
 		description: """
@@ -69,10 +69,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	database: {
 		description: """
@@ -81,7 +78,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	default_namespace: {
 		description: """
@@ -91,15 +88,12 @@ base: components: sinks: influxdb_metrics: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	endpoint: {
 		description: "The endpoint to send data to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	org: {
 		description: """
@@ -108,7 +102,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v2.x and above.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	password: {
 		description: """
@@ -117,10 +111,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	quantiles: {
 		description: "The list of quantiles to calculate when sending distribution metrics."
@@ -199,11 +190,11 @@ base: components: sinks: influxdb_metrics: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -258,17 +249,14 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	tags: {
 		description: "A map of additional tags, in the form of key/value pairs, to add to each measurement."
 		required:    false
 		type: object: options: "*": {
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 	tls: {
@@ -285,7 +273,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -295,10 +283,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -310,10 +295,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -322,10 +304,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -334,10 +313,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """
@@ -380,7 +356,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 			[token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	username: {
 		description: """
@@ -389,9 +365,6 @@ base: components: sinks: influxdb_metrics: configuration: {
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 }

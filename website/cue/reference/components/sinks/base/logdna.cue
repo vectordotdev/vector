@@ -30,7 +30,7 @@ base: components: sinks: logdna: configuration: {
 	api_key: {
 		description: "The Ingestion API key."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -61,18 +61,12 @@ base: components: sinks: logdna: configuration: {
 	default_app: {
 		description: "The default app that will be set for events that do not contain a `file` or `app` field."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	default_env: {
 		description: "The default environment that will be set for events that do not contain an `env` field."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -83,7 +77,7 @@ base: components: sinks: logdna: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -91,7 +85,7 @@ base: components: sinks: logdna: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -110,10 +104,7 @@ base: components: sinks: logdna: configuration: {
 	endpoint: {
 		description: "The endpoint to send logs to."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	hostname: {
 		description: "The hostname that will be attached to each batch of events."
@@ -123,18 +114,12 @@ base: components: sinks: logdna: configuration: {
 	ip: {
 		description: "The IP address that will be attached to each batch of events."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	mac: {
 		description: "The MAC address that will be attached to each batch of events."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	request: {
 		description: """
@@ -205,11 +190,11 @@ base: components: sinks: logdna: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {

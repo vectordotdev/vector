@@ -19,7 +19,6 @@ base: components: transforms: sample: configuration: {
 		type: string: {
 			default: null
 			examples: ["message"]
-			syntax: "literal"
 		}
 	}
 	rate: {

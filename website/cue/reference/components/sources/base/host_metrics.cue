@@ -12,18 +12,12 @@ base: components: sources: host_metrics: configuration: {
 			base: {
 				description: "The base cgroup name to provide metrics for."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			base_dir: {
 				description: "Base cgroup directory, for testing use only"
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			groups: {
 				description: "Lists of group name patterns to include or exclude."
@@ -39,7 +33,7 @@ base: components: sources: host_metrics: configuration: {
 							required:    false
 							type: array: {
 								default: null
-								items: type: string: syntax: "literal"
+								items: type: string: {}
 							}
 						}
 						includes: {
@@ -47,7 +41,7 @@ base: components: sources: host_metrics: configuration: {
 							required:    false
 							type: array: {
 								default: null
-								items: type: string: syntax: "literal"
+								items: type: string: {}
 							}
 						}
 					}
@@ -102,7 +96,7 @@ base: components: sources: host_metrics: configuration: {
 						required:    false
 						type: array: {
 							default: null
-							items: type: string: syntax: "literal"
+							items: type: string: {}
 						}
 					}
 					includes: {
@@ -110,7 +104,7 @@ base: components: sources: host_metrics: configuration: {
 						required:    false
 						type: array: {
 							default: null
-							items: type: string: syntax: "literal"
+							items: type: string: {}
 						}
 					}
 				}
@@ -135,7 +129,7 @@ base: components: sources: host_metrics: configuration: {
 							required:    false
 							type: array: {
 								default: null
-								items: type: string: syntax: "literal"
+								items: type: string: {}
 							}
 						}
 						includes: {
@@ -143,7 +137,7 @@ base: components: sources: host_metrics: configuration: {
 							required:    false
 							type: array: {
 								default: null
-								items: type: string: syntax: "literal"
+								items: type: string: {}
 							}
 						}
 					}
@@ -163,7 +157,7 @@ base: components: sources: host_metrics: configuration: {
 							required:    false
 							type: array: {
 								default: null
-								items: type: string: syntax: "literal"
+								items: type: string: {}
 							}
 						}
 						includes: {
@@ -171,7 +165,7 @@ base: components: sources: host_metrics: configuration: {
 							required:    false
 							type: array: {
 								default: null
-								items: type: string: syntax: "literal"
+								items: type: string: {}
 							}
 						}
 					}
@@ -191,7 +185,7 @@ base: components: sources: host_metrics: configuration: {
 							required:    false
 							type: array: {
 								default: null
-								items: type: string: syntax: "literal"
+								items: type: string: {}
 							}
 						}
 						includes: {
@@ -199,7 +193,7 @@ base: components: sources: host_metrics: configuration: {
 							required:    false
 							type: array: {
 								default: null
-								items: type: string: syntax: "literal"
+								items: type: string: {}
 							}
 						}
 					}
@@ -214,10 +208,7 @@ base: components: sources: host_metrics: configuration: {
 			By default, `host` is used.
 			"""
 		required: false
-		type: string: {
-			default: "host"
-			syntax:  "literal"
-		}
+		type: string: default: "host"
 	}
 	network: {
 		description: "Options for the “network” metrics collector."
@@ -236,7 +227,7 @@ base: components: sources: host_metrics: configuration: {
 						required:    false
 						type: array: {
 							default: null
-							items: type: string: syntax: "literal"
+							items: type: string: {}
 						}
 					}
 					includes: {
@@ -244,7 +235,7 @@ base: components: sources: host_metrics: configuration: {
 						required:    false
 						type: array: {
 							default: null
-							items: type: string: syntax: "literal"
+							items: type: string: {}
 						}
 					}
 				}

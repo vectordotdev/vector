@@ -30,7 +30,7 @@ base: components: sinks: honeycomb: configuration: {
 	api_key: {
 		description: "The team key that will be used to authenticate against Honeycomb."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -61,7 +61,7 @@ base: components: sinks: honeycomb: configuration: {
 	dataset: {
 		description: "The dataset that Vector will send logs to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -72,7 +72,7 @@ base: components: sinks: honeycomb: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -80,7 +80,7 @@ base: components: sinks: honeycomb: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -165,11 +165,11 @@ base: components: sinks: honeycomb: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {

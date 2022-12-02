@@ -48,19 +48,19 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "The AWS access key ID."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			assume_role: {
 				description:   "The ARN of the role to assume."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			credentials_file: {
 				description:   "Path to the credentials file."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			load_timeout_secs: {
 				description:   "Timeout for successfully loading any credentials, in seconds."
@@ -72,16 +72,13 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "Basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			profile: {
 				description:   "The credentials profile to use."
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			region: {
 				description: """
@@ -92,16 +89,13 @@ base: components: sinks: elasticsearch: configuration: {
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			secret_access_key: {
 				description:   "The AWS secret access key."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
 				required: true
@@ -114,7 +108,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "Basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -125,18 +119,12 @@ base: components: sinks: elasticsearch: configuration: {
 			endpoint: {
 				description: "The API endpoint of the service."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			region: {
 				description: "The AWS region to use."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 		}
 	}
@@ -173,18 +161,12 @@ base: components: sinks: elasticsearch: configuration: {
 			action: {
 				description: "The bulk action to use."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			index: {
 				description: "The name of the index to use."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 		}
 	}
@@ -320,10 +302,7 @@ base: components: sinks: elasticsearch: configuration: {
 			set this option since Elasticsearch has removed it.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -334,7 +313,7 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -342,7 +321,7 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -365,10 +344,7 @@ base: components: sinks: elasticsearch: configuration: {
 			This should be the full URL as shown in the example.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	endpoints: {
 		description: """
@@ -379,7 +355,7 @@ base: components: sinks: elasticsearch: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	id_key: {
@@ -394,10 +370,7 @@ base: components: sinks: elasticsearch: configuration: {
 			[perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	metrics: {
 		description: "Configuration for the `metric_to_log` transform."
@@ -416,7 +389,6 @@ base: components: sinks: elasticsearch: configuration: {
 				type: string: {
 					default: null
 					examples: ["host", "hostname"]
-					syntax: "literal"
 				}
 			}
 			timezone: {
@@ -456,17 +428,14 @@ base: components: sinks: elasticsearch: configuration: {
 	pipeline: {
 		description: "The name of the pipeline to apply."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	query: {
 		description: "Custom parameters to add to the query string of each request sent to Elasticsearch."
 		required:    false
 		type: object: options: "*": {
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 	request: {
@@ -534,11 +503,11 @@ base: components: sinks: elasticsearch: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			headers: {
@@ -548,7 +517,7 @@ base: components: sinks: elasticsearch: configuration: {
 					default: {}
 					options: "*": {
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -633,7 +602,7 @@ base: components: sinks: elasticsearch: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -643,10 +612,7 @@ base: components: sinks: elasticsearch: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -658,10 +624,7 @@ base: components: sinks: elasticsearch: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -670,10 +633,7 @@ base: components: sinks: elasticsearch: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -682,10 +642,7 @@ base: components: sinks: elasticsearch: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

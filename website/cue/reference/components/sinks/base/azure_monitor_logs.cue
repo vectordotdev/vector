@@ -34,10 +34,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[resource_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -72,7 +69,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[uniq_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-uri-parameters
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -83,7 +80,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -91,7 +88,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -114,10 +111,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[alt_host]: https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure
 			"""
 		required: false
-		type: string: {
-			default: "ods.opinsights.azure.com"
-			syntax:  "literal"
-		}
+		type: string: default: "ods.opinsights.azure.com"
 	}
 	log_type: {
 		description: """
@@ -128,7 +122,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[record_type]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	request: {
 		description: """
@@ -199,11 +193,11 @@ base: components: sinks: azure_monitor_logs: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -258,7 +252,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 			[shared_key]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#authorization
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -274,7 +268,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -284,10 +278,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -299,10 +290,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -311,10 +299,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -323,10 +308,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

@@ -38,7 +38,7 @@ base: components: sinks: nats: configuration: {
 				type: object: options: path: {
 					description: "Path to credentials file."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			nkey: {
@@ -53,7 +53,7 @@ base: components: sinks: nats: configuration: {
 																Conceptually, this is equivalent to a public key.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					seed: {
 						description: """
@@ -62,7 +62,7 @@ base: components: sinks: nats: configuration: {
 																Conceptually, this is equivalent to a private key.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -94,7 +94,7 @@ base: components: sinks: nats: configuration: {
 				type: object: options: value: {
 					description: "Token."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			user_password: {
@@ -105,12 +105,12 @@ base: components: sinks: nats: configuration: {
 					password: {
 						description: "Password."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					user: {
 						description: "Username."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -119,10 +119,7 @@ base: components: sinks: nats: configuration: {
 	connection_name: {
 		description: "A name assigned to the NATS connection."
 		required:    false
-		type: string: {
-			default: "vector"
-			syntax:  "literal"
-		}
+		type: string: default: "vector"
 	}
 	encoding: {
 		description: "Encoding configuration."
@@ -135,7 +132,7 @@ base: components: sinks: nats: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
@@ -170,7 +167,7 @@ base: components: sinks: nats: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -178,7 +175,7 @@ base: components: sinks: nats: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -213,7 +210,7 @@ base: components: sinks: nats: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -223,10 +220,7 @@ base: components: sinks: nats: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -238,10 +232,7 @@ base: components: sinks: nats: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			enabled: {
 				description: """
@@ -260,10 +251,7 @@ base: components: sinks: nats: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -272,10 +260,7 @@ base: components: sinks: nats: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """
@@ -316,6 +301,6 @@ base: components: sinks: nats: configuration: {
 			The URL must take the form of `nats://server:port`.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

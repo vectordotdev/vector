@@ -108,17 +108,17 @@ base: components: sinks: aws_s3: configuration: {
 			access_key_id: {
 				description: "The AWS access key ID."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			assume_role: {
 				description: "The ARN of the role to assume."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			credentials_file: {
 				description: "Path to the credentials file."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			load_timeout_secs: {
 				description: "Timeout for successfully loading any credentials, in seconds."
@@ -128,10 +128,7 @@ base: components: sinks: aws_s3: configuration: {
 			profile: {
 				description: "The credentials profile to use."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			region: {
 				description: """
@@ -141,15 +138,12 @@ base: components: sinks: aws_s3: configuration: {
 					for the service itself.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -186,7 +180,7 @@ base: components: sinks: aws_s3: configuration: {
 			This must not include a leading `s3://` or a trailing `/`.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	compression: {
 		description: "Compression configuration."
@@ -252,10 +246,7 @@ base: components: sinks: aws_s3: configuration: {
 			By default, the compression scheme used dictates this value.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	content_type: {
 		description: """
@@ -266,10 +257,7 @@ base: components: sinks: aws_s3: configuration: {
 			By default, `text/x-log` is used.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	encoding: {
 		description: "Encoding configuration."
@@ -282,7 +270,7 @@ base: components: sinks: aws_s3: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
@@ -317,7 +305,7 @@ base: components: sinks: aws_s3: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -325,7 +313,7 @@ base: components: sinks: aws_s3: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -344,10 +332,7 @@ base: components: sinks: aws_s3: configuration: {
 	endpoint: {
 		description: "The API endpoint of the service."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	filename_append_uuid: {
 		description: """
@@ -366,10 +351,7 @@ base: components: sinks: aws_s3: configuration: {
 	filename_extension: {
 		description: "The filename extension to use in the object key."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	filename_time_format: {
 		description: """
@@ -391,10 +373,7 @@ base: components: sinks: aws_s3: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	framing: {
 		description: "Framing configuration."
@@ -435,10 +414,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	grant_read: {
 		description: """
@@ -449,10 +425,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	grant_read_acp: {
 		description: """
@@ -463,10 +436,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	grant_write_acp: {
 		description: """
@@ -477,10 +447,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	key_prefix: {
 		description: """
@@ -499,10 +466,7 @@ base: components: sinks: aws_s3: configuration: {
 	region: {
 		description: "The AWS region to use."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	request: {
 		description: """
@@ -573,11 +537,11 @@ base: components: sinks: aws_s3: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -692,7 +656,7 @@ base: components: sinks: aws_s3: configuration: {
 		required:    false
 		type: object: options: "*": {
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 	tls: {
@@ -709,7 +673,7 @@ base: components: sinks: aws_s3: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -719,10 +683,7 @@ base: components: sinks: aws_s3: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -734,10 +695,7 @@ base: components: sinks: aws_s3: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -746,10 +704,7 @@ base: components: sinks: aws_s3: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -758,10 +713,7 @@ base: components: sinks: aws_s3: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

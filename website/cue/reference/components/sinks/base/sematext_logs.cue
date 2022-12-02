@@ -62,7 +62,7 @@ base: components: sinks: sematext_logs: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -70,7 +70,7 @@ base: components: sinks: sematext_logs: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -89,10 +89,7 @@ base: components: sinks: sematext_logs: configuration: {
 	endpoint: {
 		description: "The endpoint to send data to."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	region: {
 		description: "Sematext region."
@@ -174,11 +171,11 @@ base: components: sinks: sematext_logs: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -229,6 +226,6 @@ base: components: sinks: sematext_logs: configuration: {
 	token: {
 		description: "The token that will be used to write to Sematext."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

@@ -35,19 +35,19 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "The AWS access key ID."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			assume_role: {
 				description:   "The ARN of the role to assume."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			credentials_file: {
 				description:   "Path to the credentials file."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			load_timeout_secs: {
 				description:   "Timeout for successfully loading any credentials, in seconds."
@@ -59,16 +59,13 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "Basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			profile: {
 				description:   "The credentials profile to use."
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			region: {
 				description: """
@@ -79,16 +76,13 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			secret_access_key: {
 				description:   "The AWS secret access key."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
 				required: true
@@ -106,13 +100,13 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "The bearer token to send."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
 				description:   "Basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -123,18 +117,12 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			endpoint: {
 				description: "The API endpoint of the service."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			region: {
 				description: "The AWS region to use."
 				required:    false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 		}
 	}
@@ -188,15 +176,12 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			[prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	endpoint: {
 		description: "The endpoint to send data to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	quantiles: {
 		description: """
@@ -279,11 +264,11 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -359,7 +344,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -369,10 +354,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -384,10 +366,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -396,10 +375,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -408,10 +384,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

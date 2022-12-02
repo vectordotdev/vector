@@ -85,7 +85,7 @@ base: components: sinks: axiom: configuration: {
 	dataset: {
 		description: "The Axiom dataset to write to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	org_id: {
 		description: """
@@ -94,10 +94,7 @@ base: components: sinks: axiom: configuration: {
 			Only required when using personal tokens.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	request: {
 		description: "Outbound HTTP request settings."
@@ -164,11 +161,11 @@ base: components: sinks: axiom: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			headers: {
@@ -178,7 +175,7 @@ base: components: sinks: axiom: configuration: {
 					default: {}
 					options: "*": {
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -241,7 +238,7 @@ base: components: sinks: axiom: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -251,10 +248,7 @@ base: components: sinks: axiom: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -266,10 +260,7 @@ base: components: sinks: axiom: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -278,10 +269,7 @@ base: components: sinks: axiom: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -290,10 +278,7 @@ base: components: sinks: axiom: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """
@@ -330,7 +315,7 @@ base: components: sinks: axiom: configuration: {
 	token: {
 		description: "The Axiom API token."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	url: {
 		description: """
@@ -339,9 +324,6 @@ base: components: sinks: axiom: configuration: {
 			Only required if not using Axiom Cloud.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 }

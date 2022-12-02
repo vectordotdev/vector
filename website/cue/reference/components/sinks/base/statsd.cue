@@ -35,7 +35,7 @@ base: components: sinks: statsd: configuration: {
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	batch: {
 		description:   "Event batching behavior."
@@ -72,10 +72,7 @@ base: components: sinks: statsd: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
@@ -103,7 +100,7 @@ base: components: sinks: statsd: configuration: {
 			"""
 		relevant_when: "mode = \"unix\""
 		required:      true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	send_buffer_bytes: {
 		description: """
@@ -130,7 +127,7 @@ base: components: sinks: statsd: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -140,10 +137,7 @@ base: components: sinks: statsd: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -155,10 +149,7 @@ base: components: sinks: statsd: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			enabled: {
 				description: """
@@ -177,10 +168,7 @@ base: components: sinks: statsd: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -189,10 +177,7 @@ base: components: sinks: statsd: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

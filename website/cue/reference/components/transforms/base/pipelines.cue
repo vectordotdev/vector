@@ -15,7 +15,7 @@ base: components: transforms: pipelines: configuration: {
 				name: {
 					description: "The name of the pipeline."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 				transforms: {
 					description: "A list of sequential transforms that will process any event that is passed to the pipeline."
@@ -39,7 +39,7 @@ base: components: transforms: pipelines: configuration: {
 				name: {
 					description: "The name of the pipeline."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 				transforms: {
 					description: "A list of sequential transforms that will process any event that is passed to the pipeline."
@@ -63,7 +63,7 @@ base: components: transforms: pipelines: configuration: {
 				name: {
 					description: "The name of the pipeline."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 				transforms: {
 					description: "A list of sequential transforms that will process any event that is passed to the pipeline."

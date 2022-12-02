@@ -39,10 +39,7 @@ base: components: sources: journald: configuration: {
 			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	exclude_matches: {
 		description: """
@@ -55,7 +52,7 @@ base: components: sources: journald: configuration: {
 			default: {}
 			options: "*": {
 				required: true
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 		}
 	}
@@ -68,7 +65,7 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	include_matches: {
@@ -82,7 +79,7 @@ base: components: sources: journald: configuration: {
 			default: {}
 			options: "*": {
 				required: true
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 		}
 	}
@@ -95,7 +92,7 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	journal_directory: {
@@ -105,10 +102,7 @@ base: components: sources: journald: configuration: {
 			If not set, `journalctl` will use the default system journal paths.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	journalctl_path: {
 		description: """
@@ -117,10 +111,7 @@ base: components: sources: journald: configuration: {
 			If not set, Vector will search the path for `journalctl`.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	remap_priority: {
 		description: """
@@ -145,7 +136,7 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 }

@@ -22,7 +22,7 @@ base: components: sources: heroku_logs: configuration: {
 	address: {
 		description: "The address to listen for connections on."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	auth: {
 		description: "HTTP Basic authentication configuration."
@@ -31,12 +31,12 @@ base: components: sources: heroku_logs: configuration: {
 			password: {
 				description: "The password for basic authentication."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			username: {
 				description: "The username for basic authentication."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -157,7 +157,7 @@ base: components: sources: heroku_logs: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	tls: {
@@ -174,7 +174,7 @@ base: components: sources: heroku_logs: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -184,10 +184,7 @@ base: components: sources: heroku_logs: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -199,10 +196,7 @@ base: components: sources: heroku_logs: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			enabled: {
 				description: """
@@ -221,10 +215,7 @@ base: components: sources: heroku_logs: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -233,10 +224,7 @@ base: components: sources: heroku_logs: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

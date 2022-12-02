@@ -150,7 +150,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			If an event has a token set in its metadata, it will prevail over the one set here.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	encoding: {
 		description: "Encoding configuration."
@@ -163,7 +163,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
@@ -198,7 +198,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -206,7 +206,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -225,7 +225,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 	endpoint: {
 		description: "The base URL of the Splunk instance."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	endpoint_target: {
 		description: "Splunk HEC endpoint configuration."
@@ -263,10 +263,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {
-			default: "host"
-			syntax:  "literal"
-		}
+		type: string: default: "host"
 	}
 	index: {
 		description: """
@@ -289,7 +286,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	request: {
@@ -361,11 +358,11 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -448,10 +445,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			[global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
 			"""
 		required: false
-		type: string: {
-			default: "timestamp"
-			syntax:  "literal"
-		}
+		type: string: default: "timestamp"
 	}
 	tls: {
 		description: "TLS configuration."
@@ -467,7 +461,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -477,10 +471,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -492,10 +483,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -504,10 +492,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -516,10 +501,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

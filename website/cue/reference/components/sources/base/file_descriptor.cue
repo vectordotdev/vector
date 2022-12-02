@@ -120,10 +120,7 @@ base: components: sources: file_descriptor: configuration: {
 			By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	max_length: {
 		description: """

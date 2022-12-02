@@ -25,7 +25,6 @@ base: components: sources: configuration: proxy: {
 			type: string: {
 				default: null
 				examples: ["http://foo.bar:3128"]
-				syntax: "literal"
 			}
 		}
 		https: {
@@ -38,7 +37,6 @@ base: components: sources: configuration: proxy: {
 			type: string: {
 				default: null
 				examples: ["http://foo.bar:3128"]
-				syntax: "literal"
 			}
 		}
 		no_proxy: {
@@ -60,7 +58,7 @@ base: components: sources: configuration: proxy: {
 			required: false
 			type: array: {
 				default: []
-				items: type: string: syntax: "literal"
+				items: type: string: {}
 			}
 		}
 	}

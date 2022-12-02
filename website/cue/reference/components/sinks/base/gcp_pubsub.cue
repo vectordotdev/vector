@@ -39,10 +39,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -82,10 +79,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	encoding: {
 		description: "Encoding configuration."
@@ -98,7 +92,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
@@ -133,7 +127,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			only_fields: {
@@ -141,7 +135,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 				required:    false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			timestamp_format: {
@@ -160,15 +154,12 @@ base: components: sinks: gcp_pubsub: configuration: {
 	endpoint: {
 		description: "The endpoint to which to publish events."
 		required:    false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	project: {
 		description: "The project name to which to publish events."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	request: {
 		description: """
@@ -239,11 +230,11 @@ base: components: sinks: gcp_pubsub: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -310,7 +301,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -320,10 +311,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -335,10 +323,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -347,10 +332,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -359,10 +341,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """
@@ -399,6 +378,6 @@ base: components: sinks: gcp_pubsub: configuration: {
 	topic: {
 		description: "The topic within the project to which to publish events."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

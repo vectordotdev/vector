@@ -13,10 +13,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	delay_deletion_ms: {
 		description: """
@@ -31,32 +28,23 @@ base: components: sources: kubernetes_logs: configuration: {
 		required:    false
 		type: array: {
 			default: ["**/*.gz", "**/*.tmp"]
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	extra_field_selector: {
 		description: "Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in `Node` filter."
 		required:    false
-		type: string: {
-			default: ""
-			syntax:  "literal"
-		}
+		type: string: default: ""
 	}
 	extra_label_selector: {
 		description: "Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in `vector.dev/exclude` filter."
 		required:    false
-		type: string: {
-			default: ""
-			syntax:  "literal"
-		}
+		type: string: default: ""
 	}
 	extra_namespace_label_selector: {
 		description: "Specifies the label selector to filter `Namespace`s with, to be used in  addition to the built-in `vector.dev/exclude` filter."
 		required:    false
-		type: string: {
-			default: ""
-			syntax:  "literal"
-		}
+		type: string: default: ""
 	}
 	fingerprint_lines: {
 		description: "How many first lines in a file are used for fingerprinting."
@@ -83,10 +71,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			processed by the `kubernetes_logs` source.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	kube_config_file: {
 		description: """
@@ -94,10 +79,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			Vector will try to connect to Kubernetes using in-cluster configuration.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	max_line_bytes: {
 		description: """
@@ -125,10 +107,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			options: namespace_labels: {
 				description: "Event field for Namespace labels."
 				required:    false
-				type: string: {
-					default: ".kubernetes.namespace_labels"
-					syntax:  "literal"
-				}
+				type: string: default: ".kubernetes.namespace_labels"
 			}
 		}
 	}
@@ -140,10 +119,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			options: node_labels: {
 				description: "Event field for Node labels."
 				required:    false
-				type: string: {
-					default: ".kubernetes.node_labels"
-					syntax:  "literal"
-				}
+				type: string: default: ".kubernetes.node_labels"
 			}
 		}
 	}
@@ -169,98 +145,62 @@ base: components: sources: kubernetes_logs: configuration: {
 				container_id: {
 					description: "Event field for container ID."
 					required:    false
-					type: string: {
-						default: ".kubernetes.container_id"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.container_id"
 				}
 				container_image: {
 					description: "Event field for container image."
 					required:    false
-					type: string: {
-						default: ".kubernetes.container_image"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.container_image"
 				}
 				container_name: {
 					description: "Event field for container name."
 					required:    false
-					type: string: {
-						default: ".kubernetes.container_name"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.container_name"
 				}
 				pod_annotations: {
 					description: "Event field for Pod annotations."
 					required:    false
-					type: string: {
-						default: ".kubernetes.pod_annotations"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.pod_annotations"
 				}
 				pod_ip: {
 					description: "Event field for Pod IPv4 address."
 					required:    false
-					type: string: {
-						default: ".kubernetes.pod_ip"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.pod_ip"
 				}
 				pod_ips: {
 					description: "Event field for Pod IPv4 and IPv6 addresses."
 					required:    false
-					type: string: {
-						default: ".kubernetes.pod_ips"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.pod_ips"
 				}
 				pod_labels: {
 					description: "Event field for Pod labels."
 					required:    false
-					type: string: {
-						default: ".kubernetes.pod_labels"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.pod_labels"
 				}
 				pod_name: {
 					description: "Event field for Pod name."
 					required:    false
-					type: string: {
-						default: ".kubernetes.pod_name"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.pod_name"
 				}
 				pod_namespace: {
 					description: "Event field for Pod namespace."
 					required:    false
-					type: string: {
-						default: ".kubernetes.pod_namespace"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.pod_namespace"
 				}
 				pod_node_name: {
 					description: "Event field for Pod node_name."
 					required:    false
-					type: string: {
-						default: ".kubernetes.pod_node_name"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.pod_node_name"
 				}
 				pod_owner: {
 					description: "Event field for Pod owner reference."
 					required:    false
-					type: string: {
-						default: ".kubernetes.pod_owner"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.pod_owner"
 				}
 				pod_uid: {
 					description: "Event field for Pod uid."
 					required:    false
-					type: string: {
-						default: ".kubernetes.pod_uid"
-						syntax:  "literal"
-					}
+					type: string: default: ".kubernetes.pod_uid"
 				}
 			}
 		}
@@ -272,10 +212,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			Configured to use an environment var by default, to be evaluated to a value provided by Kubernetes at `Pod` deploy time.
 			"""
 		required: false
-		type: string: {
-			default: "${VECTOR_SELF_NODE_NAME}"
-			syntax:  "literal"
-		}
+		type: string: default: "${VECTOR_SELF_NODE_NAME}"
 	}
 	timezone: {
 		description: "The default time zone for timestamps without an explicit zone."

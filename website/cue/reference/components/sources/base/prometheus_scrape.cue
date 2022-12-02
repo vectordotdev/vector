@@ -14,7 +14,7 @@ base: components: sources: prometheus_scrape: configuration: {
 				description:   "The password to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
 				required: true
@@ -35,13 +35,13 @@ base: components: sources: prometheus_scrape: configuration: {
 				description:   "The bearer token to send."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
 				description:   "The username to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -54,15 +54,12 @@ base: components: sources: prometheus_scrape: configuration: {
 			By default, `"endpoint"` is used.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	endpoints: {
 		description: "Endpoints to scrape metrics from."
 		required:    true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	honor_labels: {
 		description: """
@@ -85,10 +82,7 @@ base: components: sources: prometheus_scrape: configuration: {
 			By default, `"instance"` is used.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	query: {
 		description: """
@@ -101,7 +95,7 @@ base: components: sources: prometheus_scrape: configuration: {
 		required: false
 		type: object: options: "*": {
 			required: true
-			type: array: items: type: string: syntax: "literal"
+			type: array: items: type: string: {}
 		}
 	}
 	scrape_interval_secs: {
@@ -123,7 +117,7 @@ base: components: sources: prometheus_scrape: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -133,10 +127,7 @@ base: components: sources: prometheus_scrape: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -148,10 +139,7 @@ base: components: sources: prometheus_scrape: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -160,10 +148,7 @@ base: components: sources: prometheus_scrape: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -172,10 +157,7 @@ base: components: sources: prometheus_scrape: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

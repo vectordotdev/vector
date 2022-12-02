@@ -49,7 +49,6 @@ base: components: transforms: remap: configuration: {
 		type: string: {
 			default: null
 			examples: ["./my/program.vrl"]
-			syntax: "literal"
 		}
 	}
 	reroute_dropped: {

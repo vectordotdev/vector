@@ -115,10 +115,7 @@ base: components: sinks: configuration: {
 					components -- port, path, etc -- are allowed as well.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 		}
 	}
@@ -135,10 +132,7 @@ base: components: sinks: configuration: {
 			[configuration]: https://vector.dev/docs/reference/configuration/
 			"""
 		required: true
-		type: array: items: type: string: {
-			examples: ["my-source-or-transform-id", "prefix-*"]
-			syntax: "literal"
-		}
+		type: array: items: type: string: examples: ["my-source-or-transform-id", "prefix-*"]
 	}
 	proxy: {
 		description: """
@@ -165,7 +159,6 @@ base: components: sinks: configuration: {
 				type: string: {
 					default: null
 					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
 				}
 			}
 			https: {
@@ -178,7 +171,6 @@ base: components: sinks: configuration: {
 				type: string: {
 					default: null
 					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
 				}
 			}
 			no_proxy: {
@@ -200,7 +192,7 @@ base: components: sinks: configuration: {
 				required: false
 				type: array: {
 					default: []
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 		}

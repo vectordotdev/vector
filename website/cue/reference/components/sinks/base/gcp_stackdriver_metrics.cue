@@ -39,10 +39,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -82,10 +79,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	default_namespace: {
 		description: """
@@ -95,10 +89,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 			metrics have their own namespace.
 			"""
 		required: false
-		type: string: {
-			default: "namespace"
-			syntax:  "literal"
-		}
+		type: string: default: "namespace"
 	}
 	project_id: {
 		description: """
@@ -109,7 +100,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 			[project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	request: {
 		description: """
@@ -180,11 +171,11 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: ["none", "adaptive"]
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -238,7 +229,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 		type: object: options: {
 			"*": {
 				required: true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			type: {
 				description: """
@@ -247,7 +238,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					For example, the type of a Compute Engine VM instance is `gce_instance`.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -270,7 +261,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -280,10 +271,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -295,10 +283,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -307,10 +292,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -319,10 +301,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """

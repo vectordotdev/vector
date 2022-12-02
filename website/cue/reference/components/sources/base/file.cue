@@ -26,10 +26,7 @@ base: components: sources: file: configuration: {
 			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	encoding: {
 		description: "Character set encoding."
@@ -49,7 +46,7 @@ base: components: sources: file: configuration: {
 				logged.
 				"""
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 	exclude: {
@@ -63,7 +60,7 @@ base: components: sources: file: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	file_key: {
@@ -75,10 +72,7 @@ base: components: sources: file: configuration: {
 			By default, `file` is used.
 			"""
 		required: false
-		type: string: {
-			default: "file"
-			syntax:  "literal"
-		}
+		type: string: default: "file"
 	}
 	fingerprint: {
 		description: """
@@ -153,10 +147,7 @@ base: components: sources: file: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	ignore_checkpoints: {
 		description: """
@@ -184,15 +175,12 @@ base: components: sources: file: configuration: {
 	include: {
 		description: "Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported."
 		required:    true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	line_delimiter: {
 		description: "String sequence used to separate one file line from another."
 		required:    false
-		type: string: {
-			default: "\n"
-			syntax:  "literal"
-		}
+		type: string: default: "\n"
 	}
 	max_line_bytes: {
 		description: """
@@ -215,10 +203,7 @@ base: components: sources: file: configuration: {
 			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	multi_line_timeout: {
 		description: """
@@ -244,7 +229,7 @@ base: components: sources: file: configuration: {
 					This setting must be configured in conjunction with `mode`.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			mode: {
 				description: """
@@ -283,7 +268,7 @@ base: components: sources: file: configuration: {
 			start_pattern: {
 				description: "Regular expression pattern that is used to match the start of a new message."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			timeout_ms: {
 				description: """
@@ -305,10 +290,7 @@ base: components: sources: file: configuration: {
 			Off by default, the offset is only added to the event if this is set.
 			"""
 		required: false
-		type: string: {
-			default: null
-			syntax:  "literal"
-		}
+		type: string: default: null
 	}
 	oldest_first: {
 		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."

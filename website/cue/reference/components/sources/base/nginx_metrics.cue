@@ -14,7 +14,7 @@ base: components: sources: nginx_metrics: configuration: {
 				description:   "The password to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
 				required: true
@@ -35,13 +35,13 @@ base: components: sources: nginx_metrics: configuration: {
 				description:   "The bearer token to send."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
 				description:   "The username to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -53,7 +53,7 @@ base: components: sources: nginx_metrics: configuration: {
 			`ngx_http_stub_status_module` module enabled.
 			"""
 		required: true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	namespace: {
 		description: """
@@ -64,10 +64,7 @@ base: components: sources: nginx_metrics: configuration: {
 			By default, `nginx` is used.
 			"""
 		required: false
-		type: string: {
-			default: "nginx"
-			syntax:  "literal"
-		}
+		type: string: default: "nginx"
 	}
 	scrape_interval_secs: {
 		description: "The interval between scrapes, in seconds."
@@ -88,7 +85,7 @@ base: components: sources: nginx_metrics: configuration: {
 				required: false
 				type: array: {
 					default: null
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 			ca_file: {
@@ -98,10 +95,7 @@ base: components: sources: nginx_metrics: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			crt_file: {
 				description: """
@@ -113,10 +107,7 @@ base: components: sources: nginx_metrics: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_file: {
 				description: """
@@ -125,10 +116,7 @@ base: components: sources: nginx_metrics: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			key_pass: {
 				description: """
@@ -137,10 +125,7 @@ base: components: sources: nginx_metrics: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {
-					default: null
-					syntax:  "literal"
-				}
+				type: string: default: null
 			}
 			verify_certificate: {
 				description: """
