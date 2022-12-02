@@ -17,12 +17,12 @@ mod tag_value_set;
 mod tests;
 
 pub use config::TagCardinalityLimitConfig;
-use tag_value_set::TagValueSet;
+use tag_value_set::AcceptedTagValueSet;
 
 #[derive(Debug)]
 pub struct TagCardinalityLimit {
     config: TagCardinalityLimitConfig,
-    accepted_tags: HashMap<String, TagValueSet>,
+    accepted_tags: HashMap<String, AcceptedTagValueSet>,
 }
 
 impl TagCardinalityLimit {
@@ -42,10 +42,9 @@ impl TagCardinalityLimit {
     /// value indicates to the caller that the value is not accepted for this
     /// key, and the configured limit_exceeded_action should be taken.
     fn try_accept_tag(&mut self, key: &str, value: &str) -> bool {
-        let tag_value_set = self
-            .accepted_tags
-            .entry_ref(key)
-            .or_insert_with(|| TagValueSet::new(self.config.value_limit, &self.config.mode));
+        let tag_value_set = self.accepted_tags.entry_ref(key).or_insert_with(|| {
+            AcceptedTagValueSet::new(self.config.value_limit, &self.config.mode)
+        });
 
         if tag_value_set.contains(value) {
             // Tag value has already been accepted, nothing more to do.
@@ -83,7 +82,7 @@ impl TagCardinalityLimit {
     fn record_tag_value(&mut self, key: &str, value: &str) {
         self.accepted_tags
             .entry_ref(key)
-            .or_insert_with(|| TagValueSet::new(self.config.value_limit, &self.config.mode))
+            .or_insert_with(|| AcceptedTagValueSet::new(self.config.value_limit, &self.config.mode))
             .insert(value);
     }
 

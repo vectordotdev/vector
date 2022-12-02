@@ -5,7 +5,7 @@ use std::fmt;
 
 /// Container for storing the set of accepted values for a given tag key.
 #[derive(Debug)]
-pub struct TagValueSet {
+pub struct AcceptedTagValueSet {
     storage: TagValueSetStorage,
     num_elements: usize,
 }
@@ -24,7 +24,7 @@ impl fmt::Debug for TagValueSetStorage {
     }
 }
 
-impl TagValueSet {
+impl AcceptedTagValueSet {
     pub fn new(value_limit: u32, mode: &Mode) -> Self {
         let storage = match &mode {
             Mode::Exact => TagValueSetStorage::Set(HashSet::with_capacity(value_limit as usize)),
