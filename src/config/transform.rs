@@ -5,6 +5,7 @@ use enum_dispatch::enum_dispatch;
 use indexmap::IndexMap;
 use serde::Serialize;
 use vector_config::{configurable_component, Configurable, NamedComponent};
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{GlobalOptions, Input, Output},
     schema,
@@ -13,19 +14,21 @@ use vector_core::{
 
 use crate::transforms::Transforms;
 
-use super::ComponentKey;
+use super::schema::Options as SchemaOptions;
+use super::{id::Inputs, ComponentKey};
 
 /// Fully resolved transform component.
 #[configurable_component]
+#[configurable(metadata(docs::component_base_type = "transform"))]
 #[derive(Clone, Debug)]
 pub struct TransformOuter<T>
 where
     T: Configurable + Serialize,
 {
-    /// Inputs to the transforms.
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
-    pub inputs: Vec<T>,
+    #[configurable(derived)]
+    pub inputs: Inputs<T>,
 
+    #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
     pub inner: Transforms,
 }
@@ -34,9 +37,13 @@ impl<T> TransformOuter<T>
 where
     T: Configurable + Serialize,
 {
-    pub(crate) fn new<I: Into<Transforms>>(inputs: Vec<T>, inner: I) -> Self {
+    pub(crate) fn new<I, IT>(inputs: I, inner: IT) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        IT: Into<Transforms>,
+    {
         TransformOuter {
-            inputs,
+            inputs: Inputs::from_iter(inputs),
             inner: inner.into(),
         }
     }
@@ -45,16 +52,17 @@ where
     where
         U: Configurable + Serialize,
     {
-        let inputs = self.inputs.iter().map(f).collect();
+        let inputs = self.inputs.iter().map(f).collect::<Vec<_>>();
         self.with_inputs(inputs)
     }
 
-    pub(crate) fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U>
+    pub(crate) fn with_inputs<I, U>(self, inputs: I) -> TransformOuter<U>
     where
+        I: IntoIterator<Item = U>,
         U: Configurable + Serialize,
     {
         TransformOuter {
-            inputs,
+            inputs: Inputs::from_iter(inputs),
             inner: self.inner,
         }
     }
@@ -134,6 +142,8 @@ pub struct TransformContext {
     /// information, such as the `remap` transform, which passes this information along to the VRL
     /// compiler such that type coercion becomes less of a need for operators writing VRL programs.
     pub merged_schema_definition: schema::Definition,
+
+    pub schema: SchemaOptions,
 }
 
 impl Default for TransformContext {
@@ -144,6 +154,7 @@ impl Default for TransformContext {
             enrichment_tables: Default::default(),
             schema_definitions: HashMap::from([(None, schema::Definition::any())]),
             merged_schema_definition: schema::Definition::any(),
+            schema: SchemaOptions::default(),
         }
     }
 }
@@ -165,6 +176,18 @@ impl TransformContext {
             schema_definitions,
             ..Default::default()
         }
+    }
+
+    /// Gets the log namespacing to use. The passed in value is from the transform itself
+    /// and will override any global default if it's set.
+    ///
+    /// This should only be used for transforms that don't originate from a log (eg: `metric_to_log`)
+    /// Most transforms will keep the log_namespace value that already exists on the event.
+    pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
+        namespace
+            .or(self.schema.log_namespace)
+            .unwrap_or(false)
+            .into()
     }
 }
 
@@ -189,7 +212,11 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     ///
     /// The provided `merged_definition` can be used by transforms to understand the expected shape
     /// of events flowing through the transform.
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output>;
+    fn outputs(
+        &self,
+        merged_definition: &schema::Definition,
+        global_log_namespace: LogNamespace,
+    ) -> Vec<Output>;
 
     /// Validates that the configuration of the transform is valid.
     ///
@@ -252,7 +279,7 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
 
 #[derive(Debug, Serialize)]
 pub struct InnerTopologyTransform {
-    pub inputs: Vec<String>,
+    pub inputs: Inputs<String>,
     pub inner: Transforms,
 }
 

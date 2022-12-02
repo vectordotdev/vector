@@ -13,7 +13,7 @@ use vector_core::{
     internal_event::{
         self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
     },
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 mod errors;
@@ -263,7 +263,7 @@ impl Inner {
         events
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
-        let byte_size = events.size_of();
+        let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
         self.inner.send(events).await.map_err(|_| ClosedError)?;
         self.events_sent.emit(CountByteSize(count, byte_size));
@@ -301,7 +301,7 @@ impl Inner {
                 .iter_events()
                 .for_each(|event| self.emit_lag_time(event, reference));
             let this_count = events.len();
-            let this_size = events.size_of();
+            let this_size = events.estimated_json_encoded_size_of();
             match self.inner.send(events).await {
                 Ok(()) => {
                     count += this_count;

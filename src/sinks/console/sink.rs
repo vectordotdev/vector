@@ -8,7 +8,7 @@ use vector_core::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -32,7 +32,7 @@ where
         let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
         let events_sent = register!(EventsSent::from(Output(None)));
         while let Some(mut event) = input.next().await {
-            let event_byte_size = event.size_of();
+            let event_byte_size = event.estimated_json_encoded_size_of();
             self.transformer.transform(&mut event);
 
             let finalizers = event.take_finalizers();

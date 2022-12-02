@@ -8,7 +8,9 @@ use vector_common::EventDataEq;
 
 use crate::{
     config,
-    event::{into_event_stream, Event, EventArray, EventContainer, EventRef},
+    event::{
+        into_event_stream, EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef,
+    },
     fanout::{self, Fanout},
     ByteSizeOf,
 };
@@ -286,7 +288,10 @@ impl TransformOutputs {
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         if let Some(primary) = self.primary_output.as_mut() {
             let count = buf.primary_buffer.as_ref().map_or(0, OutputBuffer::len);
-            let byte_size = buf.primary_buffer.as_ref().map_or(0, ByteSizeOf::size_of);
+            let byte_size = buf.primary_buffer.as_ref().map_or(
+                0,
+                EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of,
+            );
             buf.primary_buffer
                 .as_mut()
                 .expect("mismatched outputs")
@@ -297,7 +302,7 @@ impl TransformOutputs {
 
         for (key, buf) in &mut buf.named_buffers {
             let count = buf.len();
-            let byte_size = buf.size_of();
+            let byte_size = buf.estimated_json_encoded_size_of();
             let output = self.named_outputs.get_mut(key).expect("unknown output");
             buf.send(&mut output.fanout).await?;
             output.events_sent.emit(CountByteSize(count, byte_size));
@@ -516,6 +521,15 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
         }
 
         self.iter_events().map(Comparator).eq(other.iter())
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for OutputBuffer {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0
+            .iter()
+            .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
+            .sum()
     }
 }
 

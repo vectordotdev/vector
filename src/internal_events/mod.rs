@@ -16,6 +16,11 @@ mod aws_cloudwatch_logs;
 mod aws_ec2_metadata;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 mod aws_ecs_metrics;
+#[cfg(any(
+    feature = "sinks-aws_kinesis_streams",
+    feature = "sinks-aws_kinesis_firehose"
+))]
+mod aws_kinesis;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
@@ -49,8 +54,6 @@ mod filter;
 mod fluent;
 #[cfg(feature = "sources-gcp_pubsub")]
 mod gcp_pubsub;
-#[cfg(feature = "transforms-geoip")]
-mod geoip;
 #[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
 mod grpc;
 mod heartbeat;
@@ -108,10 +111,6 @@ mod socket;
 mod splunk_hec;
 #[cfg(feature = "sinks-statsd")]
 mod statsd_sink;
-#[cfg(feature = "sources-statsd")]
-mod statsd_source;
-#[cfg(feature = "sources-syslog")]
-mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
 mod tcp;
@@ -150,6 +149,11 @@ pub(crate) use self::aws_cloudwatch_logs::*;
 pub(crate) use self::aws_ec2_metadata::*;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 pub(crate) use self::aws_ecs_metrics::*;
+#[cfg(any(
+    feature = "sinks-aws_kinesis_streams",
+    feature = "sinks-aws_kinesis_firehose"
+))]
+pub(crate) use self::aws_kinesis::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub(crate) use self::aws_kinesis_firehose::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
@@ -185,8 +189,6 @@ pub(crate) use self::filter::*;
 pub(crate) use self::fluent::*;
 #[cfg(feature = "sources-gcp_pubsub")]
 pub(crate) use self::gcp_pubsub::*;
-#[cfg(feature = "transforms-geoip")]
-pub(crate) use self::geoip::*;
 #[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
 pub(crate) use self::grpc::*;
 #[cfg(feature = "sources-host_metrics")]
@@ -246,10 +248,6 @@ pub(crate) use self::sematext_metrics::*;
 pub(crate) use self::splunk_hec::*;
 #[cfg(feature = "sinks-statsd")]
 pub(crate) use self::statsd_sink::*;
-#[cfg(feature = "sources-statsd")]
-pub(crate) use self::statsd_source::*;
-#[cfg(feature = "sources-syslog")]
-pub(crate) use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]

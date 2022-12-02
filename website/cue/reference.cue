@@ -332,7 +332,7 @@ _values: {
 		// `common` specifes that the option is commonly used. It will bring the
 		// option to the top of the documents, surfacing it from other
 		// less common, options.
-		common: bool
+		common?: bool
 	}
 
 	// `sort` sorts the option, otherwise options will be sorted alphabetically.
@@ -522,7 +522,7 @@ _values: {
 
 	// `unit` clarifies the value's unit. While this should be included
 	// as the suffix in the name, this helps to explicitly clarify that.
-	unit: #Unit | *null
+	unit?: #Unit | null
 }
 
 #TypeObject: {
@@ -541,7 +541,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: string | null
+		default: string | null | *""
 	}
 
 	// `enum` restricts the value to a set of values.
@@ -610,7 +610,7 @@ _values: {
 
 	// `unit` clarifies the value's unit. While this should be included
 	// as the suffix in the name, this helps to explicitly clarify that.
-	unit: #Unit | null
+	unit?: #Unit | null
 }
 
 #Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency"

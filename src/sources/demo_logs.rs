@@ -11,13 +11,12 @@ use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext},
+    config::{Output, SourceConfig, SourceContext},
     internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -55,8 +54,9 @@ pub struct DemoLogsConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    /// The namespace to use for logs. This overrides the global setting
+    /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
 }
 
@@ -207,22 +207,15 @@ async fn demo_logs_source(
                     let count = events.len();
                     emit!(EventsReceived {
                         count,
-                        byte_size: events.size_of()
+                        byte_size: events.estimated_json_encoded_size_of()
                     });
                     let now = Utc::now();
 
                     let events = events.into_iter().map(|mut event| {
                         let log = event.as_mut_log();
-                        log_namespace.insert_vector_metadata(
+                        log_namespace.insert_standard_vector_source_metadata(
                             log,
-                            log_schema().source_type_key(),
-                            "source_type",
-                            "demo_logs",
-                        );
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            log_schema().timestamp_key(),
-                            "ingest_timestamp",
+                            DemoLogsConfig::NAME,
                             now,
                         );
 

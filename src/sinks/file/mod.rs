@@ -20,7 +20,7 @@ use tokio_util::codec::Encoder as _;
 use vector_config::configurable_component;
 use vector_core::{
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -43,7 +43,6 @@ use bytes_path::BytesPath;
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
     /// File name to write events to.
-    #[configurable(metadata(templateable))]
     pub path: Template,
 
     /// The amount of time, in seconds, that a file can be idle and stay open.
@@ -338,7 +337,7 @@ impl FileSink {
         };
 
         trace!(message = "Writing an event to file.", path = ?path);
-        let event_size = event.size_of();
+        let event_size = event.estimated_json_encoded_size_of();
         let finalizers = event.take_finalizers();
         match write_event_to_file(file, event, &self.transformer, &mut self.encoder).await {
             Ok(byte_size) => {
@@ -408,7 +407,7 @@ mod tests {
     use std::convert::TryInto;
 
     use futures::{stream, SinkExt};
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use vector_core::{event::LogEvent, sink::VectorSink};
 
     use super::*;

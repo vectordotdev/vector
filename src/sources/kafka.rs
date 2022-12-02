@@ -12,28 +12,34 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{Stream, StreamExt};
+use lookup::{owned_value_path, path};
+use once_cell::sync::OnceCell;
 use rdkafka::{
-    config::ClientConfig,
-    consumer::{Consumer, StreamConsumer},
-    message::{BorrowedMessage, Headers, Message},
+    consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
+    message::{BorrowedMessage, Headers as _, Message},
+    ClientConfig, ClientContext, Statistics,
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use value::{kind::Collection, Kind};
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace};
 
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
+use vector_common::finalizer::OrderedFinalizer;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext},
+    config::{
+        log_schema, LogSchema, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+    },
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
         KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
         StreamClosedError,
     },
-    kafka::{KafkaAuthConfig, KafkaStatisticsContext},
+    kafka,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -137,7 +143,7 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
 
     #[serde(flatten)]
-    auth: KafkaAuthConfig,
+    auth: kafka::KafkaAuthConfig,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -151,7 +157,18 @@ pub struct KafkaSourceConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
+}
+
+impl KafkaSourceConfig {
+    fn keys(&self) -> Keys {
+        Keys::from(log_schema(), self)
+    }
 }
 
 const fn default_session_timeout_ms() -> u64 {
@@ -199,6 +216,8 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 #[async_trait::async_trait]
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let consumer = create_consumer(self)?;
         let decoder = DecodingConfig::new(
             self.framing.clone(),
@@ -206,7 +225,7 @@ impl SourceConfig for KafkaSourceConfig {
             LogNamespace::Legacy,
         )
         .build();
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
             self.clone(),
@@ -215,11 +234,62 @@ impl SourceConfig for KafkaSourceConfig {
             cx.shutdown,
             cx.out,
             acknowledgements,
+            log_namespace,
         )))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let keys = self.keys();
+
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.timestamp))),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.topic))),
+                &owned_value_path!(default_topic_key().as_str()),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.partition))),
+                &owned_value_path!(default_partition_key().as_str()),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.offset))),
+                &owned_value_path!(default_offset_key().as_str()),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.headers))),
+                &owned_value_path!(default_headers_key().as_str()),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(keys.key_field))),
+                &owned_value_path!(default_key_field().as_str()),
+                Kind::bytes(),
+                None,
+            );
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -229,17 +299,26 @@ impl SourceConfig for KafkaSourceConfig {
 
 async fn kafka_source(
     config: KafkaSourceConfig,
-    consumer: StreamConsumer<KafkaStatisticsContext>,
+    consumer: StreamConsumer<CustomContext>,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let (finalizer, mut ack_stream) =
         OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+    let finalizer = finalizer.map(Arc::new);
+    if let Some(finalizer) = &finalizer {
+        consumer
+            .context()
+            .finalizer
+            .set(Arc::clone(finalizer))
+            .expect("Finalizer is only set once");
+    }
+
     let mut stream = consumer.stream();
-    let keys = Keys::from(log_schema(), &config);
 
     loop {
         tokio::select! {
@@ -264,7 +343,7 @@ async fn kafka_source(
                         partition: msg.partition(),
                     });
 
-                    parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer).await;
+                    parse_message(msg, decoder.clone(), config.keys(), &finalizer, &mut out, &consumer, log_namespace).await;
                 }
             },
         }
@@ -277,11 +356,12 @@ async fn parse_message(
     msg: BorrowedMessage<'_>,
     decoder: Decoder,
     keys: Keys<'_>,
-    finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
+    finalizer: &Option<Arc<OrderedFinalizer<FinalizerEntry>>>,
     out: &mut SourceSender,
-    consumer: &Arc<StreamConsumer<KafkaStatisticsContext>>,
+    consumer: &Arc<StreamConsumer<CustomContext>>,
+    log_namespace: LogNamespace,
 ) {
-    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys) {
+    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys, log_namespace) {
         match finalizer {
             Some(finalizer) => {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -319,6 +399,7 @@ fn parse_stream<'a>(
     msg: &BorrowedMessage<'a>,
     decoder: Decoder,
     keys: Keys<'a>,
+    log_namespace: LogNamespace,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
     let payload = msg.payload()?; // skip messages with empty payload
 
@@ -334,12 +415,12 @@ fn parse_stream<'a>(
                 Ok((events, _byte_size)) => {
                     emit!(KafkaEventsReceived {
                         count: events.len(),
-                        byte_size: events.size_of(),
+                        byte_size: events.estimated_json_encoded_size_of(),
                         topic: &rmsg.topic,
                         partition: rmsg.partition,
                     });
                     for mut event in events {
-                        rmsg.apply(&keys, &mut event);
+                        rmsg.apply(&keys, &mut event, log_namespace);
                         yield event;
                     }
                 },
@@ -357,9 +438,8 @@ fn parse_stream<'a>(
     Some((count, stream))
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Keys<'a> {
-    source_type: &'a str,
     timestamp: &'a str,
     key_field: &'a str,
     topic: &'a str,
@@ -371,7 +451,6 @@ struct Keys<'a> {
 impl<'a> Keys<'a> {
     fn from(schema: &'a LogSchema, config: &'a KafkaSourceConfig) -> Self {
         Self {
-            source_type: schema.source_type_key(),
             timestamp: schema.timestamp_key(),
             key_field: config.key_field.as_str(),
             topic: config.topic_key.as_str(),
@@ -383,7 +462,7 @@ impl<'a> Keys<'a> {
 }
 
 struct ReceivedMessage {
-    timestamp: DateTime<Utc>,
+    timestamp: Option<DateTime<Utc>>,
     key: Value,
     headers: BTreeMap<String, Value>,
     topic: String,
@@ -397,8 +476,7 @@ impl ReceivedMessage {
         let timestamp = msg
             .timestamp()
             .to_millis()
-            .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
-            .unwrap_or_else(Utc::now);
+            .and_then(|millis| Utc.timestamp_millis_opt(millis).latest());
 
         let key = msg
             .key()
@@ -407,13 +485,11 @@ impl ReceivedMessage {
 
         let mut headers_map = BTreeMap::new();
         if let Some(headers) = msg.headers() {
-            // Using index-based for loop because rdkafka's `Headers` trait
-            // does not provide Iterator-based API
-            for i in 0..headers.count() {
-                if let Some(header) = headers.get(i) {
+            for header in headers.iter() {
+                if let Some(value) = header.value {
                     headers_map.insert(
-                        header.0.to_string(),
-                        Bytes::from(header.1.to_owned()).into(),
+                        header.key.to_string(),
+                        Value::from(Bytes::from(value.to_owned())),
                     );
                 }
             }
@@ -429,15 +505,72 @@ impl ReceivedMessage {
         }
     }
 
-    fn apply(&self, keys: &Keys<'_>, event: &mut Event) {
+    fn apply(&self, keys: &Keys<'_>, event: &mut Event, log_namespace: LogNamespace) {
         if let Event::Log(ref mut log) = event {
-            log.insert(keys.source_type, Bytes::from("kafka"));
-            log.insert(keys.timestamp, self.timestamp);
-            log.insert(keys.key_field, self.key.clone());
-            log.insert(keys.topic, Value::from(self.topic.clone()));
-            log.insert(keys.partition, Value::from(self.partition));
-            log.insert(keys.offset, Value::from(self.offset));
-            log.insert(keys.headers, Value::from(self.headers.clone()));
+            match log_namespace {
+                LogNamespace::Vector => {
+                    // We'll only use this function in Vector namespaces because we don't want
+                    // "timestamp" to be set automatically in legacy namespaces. In legacy
+                    // namespaces, the "timestamp" field corresponds to the Kafka message, not the
+                    // timestamp when the event was processed.
+                    log_namespace.insert_standard_vector_source_metadata(
+                        log,
+                        KafkaSourceConfig::NAME,
+                        Utc::now(),
+                    );
+                }
+                LogNamespace::Legacy => {
+                    log.insert(log_schema().source_type_key(), KafkaSourceConfig::NAME);
+                }
+            }
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.key_field)),
+                path!("message_key"),
+                self.key.clone(),
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.timestamp)),
+                path!("timestamp"),
+                self.timestamp,
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.topic)),
+                path!("topic"),
+                self.topic.clone(),
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.partition)),
+                path!("partition"),
+                self.partition,
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.offset)),
+                path!("offset"),
+                self.offset,
+            );
+
+            log_namespace.insert_source_metadata(
+                KafkaSourceConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(keys.headers)),
+                path!("headers"),
+                self.headers.clone(),
+            );
         }
     }
 }
@@ -459,9 +592,7 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
     }
 }
 
-fn create_consumer(
-    config: &KafkaSourceConfig,
-) -> crate::Result<StreamConsumer<KafkaStatisticsContext>> {
+fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<CustomContext>> {
     let mut client_config = ClientConfig::new();
     client_config
         .set("group.id", &config.group_id)
@@ -489,7 +620,7 @@ fn create_consumer(
     }
 
     let consumer = client_config
-        .create_with_context::<_, StreamConsumer<_>>(KafkaStatisticsContext)
+        .create_with_context::<_, StreamConsumer<_>>(CustomContext::default())
         .context(KafkaCreateSnafu)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     consumer.subscribe(&topics).context(KafkaSubscribeSnafu)?;
@@ -497,8 +628,33 @@ fn create_consumer(
     Ok(consumer)
 }
 
+#[derive(Default)]
+struct CustomContext {
+    stats: kafka::KafkaStatisticsContext,
+    finalizer: OnceCell<Arc<OrderedFinalizer<FinalizerEntry>>>,
+}
+
+impl ClientContext for CustomContext {
+    fn stats(&self, statistics: Statistics) {
+        self.stats.stats(statistics)
+    }
+}
+
+impl ConsumerContext for CustomContext {
+    fn post_rebalance(&self, rebalance: &Rebalance) {
+        if matches!(rebalance, Rebalance::Revoke(_)) {
+            if let Some(finalizer) = self.finalizer.get() {
+                finalizer.flush();
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use lookup::LookupBuf;
+    use vector_core::schema::Definition;
+
     use super::*;
 
     pub fn kafka_host() -> String {
@@ -514,14 +670,18 @@ mod test {
         crate::test_util::test_generate_config::<KafkaSourceConfig>();
     }
 
-    pub(super) fn make_config(topic: &str, group: &str) -> KafkaSourceConfig {
+    pub(super) fn make_config(
+        topic: &str,
+        group: &str,
+        log_namespace: LogNamespace,
+    ) -> KafkaSourceConfig {
         KafkaSourceConfig {
             bootstrap_servers: kafka_address(9091),
             topics: vec![topic.into()],
             group_id: group.into(),
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: 6000,
-            commit_interval_ms: 5000,
+            commit_interval_ms: 1,
             key_field: "message_key".to_string(),
             topic_key: "topic".to_string(),
             partition_key: "partition".to_string(),
@@ -529,13 +689,78 @@ mod test {
             headers_key: "headers".to_string(),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
+            log_namespace: Some(log_namespace == LogNamespace::Vector),
             ..Default::default()
         }
     }
 
+    #[test]
+    fn test_output_schema_definition_vector_namespace() {
+        let definition = make_config("topic", "group", LogNamespace::Vector)
+            .outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        assert_eq!(
+            definition,
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("kafka", "timestamp"), Kind::timestamp())
+                .with_metadata_field(&owned_value_path!("kafka", "message_key"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("kafka", "partition"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("kafka", "offset"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("kafka", "headers"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp()
+                )
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+        )
+    }
+
+    #[test]
+    fn test_output_schema_definition_legacy_namespace() {
+        let definition = make_config("topic", "group", LogNamespace::Legacy)
+            .outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        assert_eq!(
+            definition,
+            Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Legacy])
+                .unknown_fields(Kind::undefined())
+                .with_event_field(
+                    &owned_value_path!("message"),
+                    Kind::bytes(),
+                    Some("message")
+                )
+                .with_event_field(
+                    &owned_value_path!("timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp")
+                )
+                .with_event_field(&owned_value_path!("message_key"), Kind::bytes(), None)
+                .with_event_field(&owned_value_path!("topic"), Kind::bytes(), None)
+                .with_event_field(&owned_value_path!("partition"), Kind::bytes(), None)
+                .with_event_field(&owned_value_path!("offset"), Kind::bytes(), None)
+                .with_event_field(
+                    &owned_value_path!("headers"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    None
+                )
+                .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        )
+    }
+
     #[tokio::test]
     async fn consumer_create_ok() {
-        let config = make_config("topic", "group");
+        let config = make_config("topic", "group", LogNamespace::Legacy);
         assert!(create_consumer(&config).is_ok());
     }
 
@@ -543,7 +768,7 @@ mod test {
     async fn consumer_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
-            ..make_config("topic", "group")
+            ..make_config("topic", "group", LogNamespace::Legacy)
         };
         assert!(create_consumer(&config).is_err());
     }
@@ -554,22 +779,35 @@ mod test {
 mod integration_test {
     use std::time::Duration;
 
-    use chrono::{SubsecRound, Utc};
+    use chrono::{DateTime, SubsecRound, Utc};
+    use futures::Stream;
     use rdkafka::{
+        admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
+        client::DefaultClientContext,
         config::{ClientConfig, FromClientConfig},
         consumer::BaseConsumer,
-        message::OwnedHeaders,
+        message::{Header, OwnedHeaders},
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
         Offset, TopicPartitionList,
     };
+    use stream_cancel::{Trigger, Tripwire};
+    use tokio::time::sleep;
+    use vector_buffers::topology::channel::BufferReceiver;
+    use vector_core::event::EventStatus;
 
     use super::{test::*, *};
     use crate::{
+        event::{EventArray, EventContainer},
         shutdown::ShutdownSignal,
         test_util::{collect_n, components::assert_source_compliance, random_string},
         SourceSender,
     };
+
+    const KEY: &str = "my key";
+    const TEXT: &str = "my message";
+    const HEADER_KEY: &str = "my header";
+    const HEADER_VALUE: &str = "my header value";
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();
@@ -583,87 +821,90 @@ mod integration_test {
         client.create().expect("Producer creation error")
     }
 
-    async fn send_events(
-        topic: &str,
-        count: usize,
-        key: &str,
-        text: &str,
-        timestamp: i64,
-        header_key: &str,
-        header_value: &str,
-    ) {
+    async fn send_events(topic: String, count: usize) -> DateTime<Utc> {
+        let now = Utc::now();
+        let timestamp = now.timestamp_millis();
+
         let producer: FutureProducer = client_config(None);
 
         for i in 0..count {
-            let text = format!("{} {}", text, i);
-            let record = FutureRecord::to(topic)
+            let text = format!("{} {:03}", TEXT, i);
+            let key = format!("{} {}", KEY, i);
+            let record = FutureRecord::to(&topic)
                 .payload(&text)
-                .key(key)
+                .key(&key)
                 .timestamp(timestamp)
-                .headers(OwnedHeaders::new().add(header_key, header_value));
+                .headers(OwnedHeaders::new().insert(Header {
+                    key: HEADER_KEY,
+                    value: Some(HEADER_VALUE),
+                }));
 
             if let Err(error) = producer.send(record, Timeout::Never).await {
                 panic!("Cannot send event to Kafka: {:?}", error);
             }
         }
+
+        now
     }
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {
-        send_receive(true, |_| false, 10).await;
+        send_receive(true, |_| false, 10, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_with_acknowledgements_vector_namespace() {
+        send_receive(true, |_| false, 10, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements() {
-        send_receive(false, |_| false, 10).await;
+        send_receive(false, |_| false, 10, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_without_acknowledgements_vector_namespace() {
+        send_receive(false, |_| false, 10, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
     async fn handles_one_negative_acknowledgement() {
-        send_receive(true, |n| n == 2, 10).await;
+        send_receive(true, |n| n == 2, 10, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn handles_one_negative_acknowledgement_vector_namespace() {
+        send_receive(true, |n| n == 2, 10, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
     async fn handles_permanent_negative_acknowledgement() {
-        send_receive(true, |n| n >= 2, 2).await;
+        send_receive(true, |n| n >= 2, 2, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn handles_permanent_negative_acknowledgement_vector_namespace() {
+        send_receive(true, |n| n >= 2, 2, LogNamespace::Vector).await;
     }
 
     async fn send_receive(
         acknowledgements: bool,
         error_at: impl Fn(usize) -> bool,
         receive_count: usize,
+        log_namespace: LogNamespace,
     ) {
         const SEND_COUNT: usize = 10;
 
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let now = Utc::now();
+        let config = make_config(&topic, &group_id, log_namespace);
 
-        let config = make_config(&topic, &group_id);
-
-        send_events(
-            &topic,
-            SEND_COUNT,
-            "my key",
-            "my message",
-            now.timestamp_millis(),
-            "my header",
-            "my header value",
-        )
-        .await;
+        let now = send_events(topic.clone(), 10).await;
 
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
-            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
             let (tx, rx) = SourceSender::new_test_errors(error_at);
-            let consumer = create_consumer(&config).unwrap();
-            tokio::spawn(kafka_source(
-                config,
-                consumer,
-                crate::codecs::Decoder::default(),
-                shutdown,
-                tx,
-                acknowledgements,
-            ));
+            let (trigger_shutdown, shutdown_done) =
+                spawn_kafka(tx, config, acknowledgements, log_namespace);
             let events = collect_n(rx, SEND_COUNT).await;
             // Yield to the finalization task to let it collect the
             // batch status receivers before signalling the shutdown.
@@ -675,42 +916,255 @@ mod integration_test {
         })
         .await;
 
-        let client: BaseConsumer = client_config(Some(&group_id));
-        client.subscribe(&[&topic]).expect("Subscribing failed");
-
-        let mut tpl = TopicPartitionList::new();
-        tpl.add_partition(&topic, 0);
-        let tpl = client
-            .committed_offsets(tpl, Duration::from_secs(1))
-            .expect("Getting committed offsets failed");
-        assert_eq!(
-            tpl.find_partition(&topic, 0)
-                .expect("TPL is missing topic")
-                .offset(),
-            Offset::from_raw(receive_count as i64)
-        );
+        let offset = fetch_tpl_offset(&group_id, &topic, 0);
+        assert_eq!(offset, Offset::from_raw(receive_count as i64));
 
         assert_eq!(events.len(), SEND_COUNT);
         for (i, event) in events.into_iter().enumerate() {
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                format!("my message {}", i).into()
-            );
-            assert_eq!(event.as_log()["message_key"], "my key".into());
-            assert_eq!(
-                event.as_log()[log_schema().source_type_key()],
-                "kafka".into()
-            );
-            assert_eq!(
-                event.as_log()[log_schema().timestamp_key()],
-                now.trunc_subsecs(3).into()
-            );
-            assert_eq!(event.as_log()["topic"], topic.clone().into());
-            assert!(event.as_log().contains("partition"));
-            assert!(event.as_log().contains("offset"));
-            let mut expected_headers = BTreeMap::new();
-            expected_headers.insert("my header".to_string(), Value::from("my header value"));
-            assert_eq!(event.as_log()["headers"], Value::from(expected_headers));
+            if let LogNamespace::Legacy = log_namespace {
+                assert_eq!(
+                    event.as_log()[log_schema().message_key()],
+                    format!("{} {:03}", TEXT, i).into()
+                );
+                assert_eq!(
+                    event.as_log()["message_key"],
+                    format!("{} {}", KEY, i).into()
+                );
+                assert_eq!(
+                    event.as_log()[log_schema().source_type_key()],
+                    "kafka".into()
+                );
+                assert_eq!(
+                    event.as_log()[log_schema().timestamp_key()],
+                    now.trunc_subsecs(3).into()
+                );
+                assert_eq!(event.as_log()["topic"], topic.clone().into());
+                assert!(event.as_log().contains("partition"));
+                assert!(event.as_log().contains("offset"));
+                let mut expected_headers = BTreeMap::new();
+                expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
+                assert_eq!(event.as_log()["headers"], Value::from(expected_headers));
+            } else {
+                let meta = event.as_log().metadata().value();
+
+                assert_eq!(
+                    meta.get(path!("vector", "source_type")).unwrap(),
+                    &vrl::value!(KafkaSourceConfig::NAME)
+                );
+                assert!(meta
+                    .get(path!("vector", "ingest_timestamp"))
+                    .unwrap()
+                    .is_timestamp());
+
+                assert_eq!(
+                    event.as_log().get("message").unwrap(),
+                    &vrl::value!(format!("{} {:03}", TEXT, i))
+                );
+                assert_eq!(
+                    meta.get(path!("kafka", "message_key")).unwrap(),
+                    &vrl::value!(format!("{} {}", KEY, i))
+                );
+
+                assert_eq!(
+                    meta.get(path!("kafka", "timestamp")).unwrap(),
+                    &vrl::value!(now.trunc_subsecs(3))
+                );
+                assert_eq!(
+                    meta.get(path!("kafka", "topic")).unwrap(),
+                    &vrl::value!(topic.clone())
+                );
+                assert!(meta.get(path!("kafka", "partition")).unwrap().is_integer(),);
+                assert!(meta.get(path!("kafka", "offset")).unwrap().is_integer(),);
+
+                let mut expected_headers = BTreeMap::new();
+                expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
+                assert_eq!(
+                    meta.get(path!("kafka", "headers")).unwrap(),
+                    &Value::from(expected_headers)
+                );
+            }
         }
+    }
+
+    fn make_rand_config() -> (String, String, KafkaSourceConfig) {
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+        let config = make_config(&topic, &group_id, LogNamespace::Legacy);
+        (topic, group_id, config)
+    }
+
+    fn delay_pipeline(
+        id: usize,
+        delay: Duration,
+        status: EventStatus,
+    ) -> (SourceSender, impl Stream<Item = EventArray> + Unpin) {
+        let (pipe, recv) = SourceSender::new_with_buffer(100);
+        let recv = BufferReceiver::new(recv.into()).into_stream();
+        let recv = recv.then(move |mut events| async move {
+            events.iter_logs_mut().for_each(|log| {
+                log.insert("pipeline_id", id.to_string());
+            });
+            sleep(delay).await;
+            events.iter_events_mut().for_each(|mut event| {
+                let metadata = event.metadata_mut();
+                metadata.update_status(status);
+                metadata.update_sources();
+            });
+            events
+        });
+        (pipe, Box::pin(recv))
+    }
+
+    fn spawn_kafka(
+        tx: SourceSender,
+        config: KafkaSourceConfig,
+        acknowledgements: bool,
+        log_namespace: LogNamespace,
+    ) -> (Trigger, Tripwire) {
+        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+        let consumer = create_consumer(&config).unwrap();
+
+        tokio::spawn(kafka_source(
+            config,
+            consumer,
+            Decoder::default(),
+            shutdown,
+            tx,
+            acknowledgements,
+            log_namespace,
+        ));
+        (trigger_shutdown, shutdown_done)
+    }
+
+    fn fetch_tpl_offset(group_id: &str, topic: &str, partition: i32) -> Offset {
+        let client: BaseConsumer = client_config(Some(group_id));
+        client.subscribe(&[topic]).expect("Subscribing failed");
+
+        let mut tpl = TopicPartitionList::new();
+        tpl.add_partition(topic, partition);
+        client
+            .committed_offsets(tpl, Duration::from_secs(1))
+            .expect("Getting committed offsets failed")
+            .find_partition(topic, partition)
+            .expect("Missing topic/partition")
+            .offset()
+    }
+
+    async fn create_topic(group_id: &str, topic: &str, partitions: i32) {
+        let client: AdminClient<DefaultClientContext> = client_config(Some(group_id));
+        for result in client
+            .create_topics(
+                [&NewTopic {
+                    name: topic,
+                    num_partitions: partitions,
+                    replication: TopicReplication::Fixed(1),
+                    config: vec![],
+                }],
+                &AdminOptions::default(),
+            )
+            .await
+            .expect("create_topics failed")
+        {
+            result.expect("Creating a topic failed");
+        }
+    }
+
+    // Failure timeline:
+    // - Topic exists on multiple partitions
+    // - Consumer A connects to topic, is assigned both partitions
+    // - Consumer A receives some messages
+    // - Consumer B connects to topic
+    // - Consumer A has one partition revoked (rebalance)
+    // - Consumer B is assigned a partition
+    // - Consumer A stores an order on the revoked partition
+    // - Consumer B skips receiving messages?
+    #[ignore]
+    #[tokio::test]
+    async fn handles_rebalance() {
+        // The test plan here is to:
+        // - Set up one source instance, feeding into a pipeline that delays acks.
+        // - Wait a bit, and set up a second source instance. This should cause a rebalance.
+        // - Wait further until all events will have been pulled down.
+        // - Verify that all events are captured by the two sources, and that offsets are set right, etc.
+
+        // However this test, as written, does not actually cause the
+        // conditions required to test this. We have had external
+        // validation that the sink behaves properly on rebalance
+        // events.  This test also requires the insertion of a small
+        // delay into the source to guarantee the timing, which is not
+        // suitable for production code.
+
+        const NEVENTS: usize = 200;
+        const DELAY: u64 = 100;
+
+        let (topic, group_id, config) = make_rand_config();
+        create_topic(&group_id, &topic, 2).await;
+
+        let _send_start = send_events(topic.clone(), NEVENTS).await;
+
+        let (tx, rx1) = delay_pipeline(1, Duration::from_millis(200), EventStatus::Delivered);
+        let (trigger_shutdown1, shutdown_done1) =
+            spawn_kafka(tx, config.clone(), true, LogNamespace::Legacy);
+        let events1 = tokio::spawn(collect_n(rx1, NEVENTS));
+
+        sleep(Duration::from_secs(1)).await;
+
+        let (tx, rx2) = delay_pipeline(2, Duration::from_millis(DELAY), EventStatus::Delivered);
+        let (trigger_shutdown2, shutdown_done2) =
+            spawn_kafka(tx, config, true, LogNamespace::Legacy);
+        let events2 = tokio::spawn(collect_n(rx2, NEVENTS));
+
+        sleep(Duration::from_secs(5)).await;
+
+        drop(trigger_shutdown1);
+        let events1 = events1.await.unwrap();
+        shutdown_done1.await;
+
+        sleep(Duration::from_secs(5)).await;
+
+        drop(trigger_shutdown2);
+        let events2 = events2.await.unwrap();
+        shutdown_done2.await;
+
+        sleep(Duration::from_secs(1)).await;
+
+        assert!(!events1.is_empty());
+        assert!(!events2.is_empty());
+
+        match fetch_tpl_offset(&group_id, &topic, 0) {
+            Offset::Offset(offset) => {
+                assert!((offset as isize - events1.len() as isize).abs() <= 1)
+            }
+            o => panic!("Invalid offset for partition 0 {:?}", o),
+        }
+
+        match fetch_tpl_offset(&group_id, &topic, 1) {
+            Offset::Offset(offset) => {
+                assert!((offset as isize - events2.len() as isize).abs() <= 1)
+            }
+            o => panic!("Invalid offset for partition 0 {:?}", o),
+        }
+
+        let mut all_events = events1
+            .into_iter()
+            .chain(events2.into_iter())
+            .flat_map(map_logs)
+            .collect::<Vec<String>>();
+        all_events.sort();
+
+        // Assert they are all in sequential order and no dupes, TODO
+    }
+
+    fn map_logs(events: EventArray) -> impl Iterator<Item = String> {
+        events.into_events().map(|event| {
+            let log = event.into_log();
+            format!(
+                "{} {} {} {}",
+                log["message"].to_string_lossy(),
+                log["topic"].to_string_lossy(),
+                log["partition"].to_string_lossy(),
+                log["offset"].to_string_lossy(),
+            )
+        })
     }
 }

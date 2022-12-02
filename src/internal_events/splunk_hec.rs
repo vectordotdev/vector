@@ -14,10 +14,11 @@ mod sink {
     use crate::{
         emit,
         event::metric::{MetricKind, MetricValue},
-        internal_events::{ComponentEventsDropped, UNINTENTIONAL},
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
     };
-    use vector_common::internal_event::{error_stage, error_type};
+    use vector_common::internal_event::{
+        error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+    };
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {

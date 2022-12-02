@@ -20,8 +20,8 @@ use crate::{
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
-            BatchActionTemplateSnafu, ElasticsearchAuth, ElasticsearchCommon,
-            ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
+            BatchActionTemplateSnafu, ElasticsearchApiVersion, ElasticsearchAuth,
+            ElasticsearchCommon, ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
         },
         util::{
             http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
@@ -61,13 +61,25 @@ pub struct ElasticsearchConfig {
     /// set this option since Elasticsearch has removed it.
     pub doc_type: Option<String>,
 
+    /// The API version of Elasticsearch.
+    #[serde(default)]
+    pub api_version: ElasticsearchApiVersion,
+
     /// Whether or not to send the `type` field to Elasticsearch.
     ///
     /// `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
     ///
     /// If enabled, the `doc_type` option will be ignored.
+    ///
+    /// This option has been deprecated, the `api_version` option should be used instead.
+    #[configurable(deprecated)]
+    pub suppress_type_name: Option<bool>,
+
+    /// Whether or not to retry successful requests containing partial failures.
+    ///
+    /// To avoid duplicates in Elasticsearch, please use option `id_key`.
     #[serde(default)]
-    pub suppress_type_name: bool,
+    pub request_retry_partial: bool,
 
     /// The name of the event key that should map to Elasticsearch’s [`_id` field][es_id].
     ///
@@ -200,17 +212,14 @@ impl BulkConfig {
 #[serde(rename_all = "snake_case")]
 pub struct DataStreamConfig {
     /// The data stream type used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
     pub dtype: Template,
 
     /// The data stream dataset used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(default = "DataStreamConfig::default_dataset")]
     pub dataset: Template,
 
     /// The data stream namespace used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(default = "DataStreamConfig::default_namespace")]
     pub namespace: Template,
 
@@ -359,15 +368,15 @@ impl DataStreamConfig {
             let data_stream = log.get("data_stream").and_then(|ds| ds.as_object());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.dtype(log))?;
             let dataset = data_stream
                 .and_then(|ds| ds.get("dataset"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.dataset(log))?;
             let namespace = data_stream
                 .and_then(|ds| ds.get("namespace"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.namespace(log))?;
             (dtype, dataset, namespace)
         };
@@ -378,7 +387,7 @@ impl DataStreamConfig {
 #[async_trait::async_trait]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let commons = ElasticsearchCommon::parse_many(self).await?;
+        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
@@ -404,7 +413,9 @@ impl SinkConfig for ElasticsearchConfig {
             .collect::<Vec<_>>();
 
         let service = request_limits.distributed_service(
-            ElasticsearchRetryLogic,
+            ElasticsearchRetryLogic {
+                retry_partial: self.request_retry_partial,
+            },
             services,
             health_config,
             ElasticsearchHealthLogic,
@@ -485,5 +496,29 @@ mod tests {
         "#,
         )
         .unwrap();
+    }
+
+    #[test]
+    fn parse_version() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            api_version = "v7"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.api_version, ElasticsearchApiVersion::V7);
+    }
+
+    #[test]
+    fn parse_version_auto() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            api_version = "auto"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
     }
 }

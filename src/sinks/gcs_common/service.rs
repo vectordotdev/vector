@@ -8,13 +8,13 @@ use http::{
 };
 use hyper::Body;
 use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpAuthenticator,
     http::{get_http_scheme_from_uri, HttpClient, HttpError},
-    sinks::util::metadata::RequestMetadata,
 };
 
 #[derive(Debug, Clone)]
@@ -46,6 +46,12 @@ pub struct GcsRequest {
 impl Finalizable for GcsRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for GcsRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -82,7 +88,7 @@ impl DriverResponse for GcsResponse {
     fn events_sent(&self) -> CountByteSize {
         CountByteSize(
             self.metadata.event_count(),
-            self.metadata.events_byte_size(),
+            self.metadata.events_estimated_json_encoded_byte_size(),
         )
     }
 

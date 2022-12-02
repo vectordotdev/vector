@@ -65,7 +65,7 @@ pub enum WhenFull {
     /// potentially be able to buffer the event, but it may also block or drop the event.
     ///
     /// This mode can only be used when two or more buffer stages are configured.
-    #[configurable(metadata(hidden))]
+    #[configurable(metadata(docs::hidden))]
     Overflow,
 }
 

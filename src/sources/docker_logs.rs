@@ -12,7 +12,8 @@ use bollard::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
-use lookup::lookup_v2::{parse_value_path, OwnedSegment};
+use lookup::lookup_v2::ValuePath;
+use lookup::path;
 use lookup::PathPrefix;
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc;
@@ -22,13 +23,12 @@ use vector_common::internal_event::{
 };
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
 
 use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     docker::{docker, DockerTlsConfig},
-    event::{self, merge_state::LogEventMergeState, LogEvent, Value},
+    event::{self, merge_state::LogEventMergeState, EstimatedJsonEncodedSizeOf, LogEvent, Value},
     internal_events::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
@@ -941,11 +941,11 @@ impl ContainerLogInfo {
 
             // Labels.
             if !self.metadata.labels.is_empty() {
-                let prefix_path = parse_value_path("label");
                 for (key, value) in self.metadata.labels.iter() {
-                    let mut path = prefix_path.clone().segments;
-                    path.push(OwnedSegment::Field(key.clone()));
-                    log_event.insert((PathPrefix::Event, &path), value.clone());
+                    log_event.insert(
+                        (PathPrefix::Event, path!("label").concat(path!(key))),
+                        value.clone(),
+                    );
                 }
             }
 
@@ -1008,7 +1008,7 @@ impl ContainerLogInfo {
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.
         emit!(DockerLogsEventsReceived {
-            byte_size: log_event.size_of(),
+            byte_size: log_event.estimated_json_encoded_size_of(),
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str
         });
@@ -1772,6 +1772,7 @@ mod integration_tests {
                         .remove(crate::config::log_schema().message_key())
                         .unwrap()
                         .to_string_lossy()
+                        .into_owned()
                 })
                 .collect::<Vec<_>>();
             assert_eq!(actual_messages, expected_messages);

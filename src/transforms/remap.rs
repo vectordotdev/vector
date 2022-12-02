@@ -6,8 +6,8 @@ use std::{
     path::PathBuf,
 };
 
-use lookup::lookup_v2::ValuePath;
-use lookup::{metadata_path, path, PathPrefix};
+use lookup::lookup_v2::{parse_value_path, ValuePath};
+use lookup::{metadata_path, owned_value_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
@@ -40,7 +40,7 @@ const DROPPED: &str = "dropped";
 /// Configuration for the `remap` transform.
 #[configurable_component(transform("remap"))]
 #[derive(Clone, Debug, Derivative)]
-#[serde(deny_unknown_fields, default)]
+#[serde(deny_unknown_fields)]
 #[derivative(Default)]
 pub struct RemapConfig {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
@@ -48,6 +48,10 @@ pub struct RemapConfig {
     /// Required if `file` is missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
+    #[configurable(metadata(
+        docs::examples = ". = parse_json!(.message)\n.new_field = \"new value\"\n.status = to_int!(.status)\n.duration = parse_duration!(.duration, \"s\")\n.new_name = del(.old_name)",
+        docs::syntax_override = "remap_program"
+    ))]
     pub source: Option<String>,
 
     /// File path to the [Vector Remap Language][vrl] (VRL) program to execute for each event.
@@ -57,6 +61,7 @@ pub struct RemapConfig {
     /// Required if `source` is missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
+    #[configurable(metadata(docs::examples = "./my/program.vrl",))]
     pub file: Option<PathBuf>,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
@@ -80,6 +85,7 @@ pub struct RemapConfig {
     ///
     /// Additionally, dropped events can potentially be diverted to a specially named output for
     /// further logging and analysis by setting `reroute_dropped`.
+    #[serde(default = "crate::serde::default_false")]
     pub drop_on_error: bool,
 
     /// Drops any event that is manually aborted during processing.
@@ -106,6 +112,7 @@ pub struct RemapConfig {
     /// In these cases, `reroute_dropped` can be set to `true` which will forward the original event
     /// to a specially-named output, `dropped`. The original event will be annotated with additional
     /// fields describing why the event was dropped.
+    #[serde(default = "crate::serde::default_false")]
     pub reroute_dropped: bool,
 
     #[configurable(derived)]
@@ -200,7 +207,7 @@ impl TransformConfig for RemapConfig {
         Input::all()
     }
 
-    fn outputs(&self, input_definition: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, input_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
@@ -246,17 +253,18 @@ impl TransformConfig for RemapConfig {
             .log_namespaces()
             .contains(&LogNamespace::Legacy)
         {
-            dropped_definition = dropped_definition.merge(input_definition.clone().with_field(
-                log_schema().metadata_key(),
-                Kind::object(BTreeMap::from([
-                    ("reason".into(), Kind::bytes()),
-                    ("message".into(), Kind::bytes()),
-                    ("component_id".into(), Kind::bytes()),
-                    ("component_type".into(), Kind::bytes()),
-                    ("component_kind".into(), Kind::bytes()),
-                ])),
-                Some("metadata"),
-            ));
+            dropped_definition =
+                dropped_definition.merge(input_definition.clone().with_event_field(
+                    &parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
+                    Kind::object(BTreeMap::from([
+                        ("reason".into(), Kind::bytes()),
+                        ("message".into(), Kind::bytes()),
+                        ("component_id".into(), Kind::bytes()),
+                        ("component_type".into(), Kind::bytes()),
+                        ("component_kind".into(), Kind::bytes()),
+                    ])),
+                    Some("metadata"),
+                ));
         }
 
         if input_definition
@@ -266,11 +274,11 @@ impl TransformConfig for RemapConfig {
             dropped_definition = dropped_definition.merge(
                 input_definition
                     .clone()
-                    .with_metadata_field("reason", Kind::bytes())
-                    .with_metadata_field("message", Kind::bytes())
-                    .with_metadata_field("component_id", Kind::bytes())
-                    .with_metadata_field("component_type", Kind::bytes())
-                    .with_metadata_field("component_kind", Kind::bytes()),
+                    .with_metadata_field(&owned_value_path!("reason"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("message"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("component_id"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("component_type"), Kind::bytes())
+                    .with_metadata_field(&owned_value_path!("component_kind"), Kind::bytes()),
             );
         }
 
@@ -441,16 +449,16 @@ where
             },
             Event::Metric(ref mut metric) => {
                 let m = log_schema().metadata_key();
-                metric.insert_tag(format!("{}.dropped.reason", m), reason.into());
-                metric.insert_tag(
+                metric.replace_tag(format!("{}.dropped.reason", m), reason.into());
+                metric.replace_tag(
                     format!("{}.dropped.component_id", m),
                     self.component_key
                         .as_ref()
                         .map(ToString::to_string)
                         .unwrap_or_else(String::new),
                 );
-                metric.insert_tag(format!("{}.dropped.component_type", m), "remap".into());
-                metric.insert_tag(format!("{}.dropped.component_kind", m), "transform".into());
+                metric.replace_tag(format!("{}.dropped.component_type", m), "remap".into());
+                metric.replace_tag(format!("{}.dropped.component_kind", m), "transform".into());
             }
             Event::Trace(ref mut trace) => {
                 trace.insert(
@@ -577,11 +585,11 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::HashMap;
 
     use indoc::{formatdoc, indoc};
     use vector_common::btreemap;
-    use vector_core::event::EventMetadata;
+    use vector_core::{event::EventMetadata, metric_tags};
 
     use super::*;
     use crate::{
@@ -591,21 +599,26 @@ mod tests {
             LogEvent, Metric, Value,
         },
         schema,
-        test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+        test_util::components::{
+            assert_transform_compliance, init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS,
+        },
+        transforms::test::create_topology,
         transforms::OutputBuffer,
     };
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     fn test_default_schema_definition() -> schema::Definition {
-        schema::Definition::empty_legacy_namespace().with_field(
-            "a default field",
+        schema::Definition::empty_legacy_namespace().with_event_field(
+            &owned_value_path!("a default field"),
             Kind::integer().or_bytes(),
             Some("default"),
         )
     }
 
     fn test_dropped_schema_definition() -> schema::Definition {
-        schema::Definition::empty_legacy_namespace().with_field(
-            "a dropped field",
+        schema::Definition::empty_legacy_namespace().with_event_field(
+            &owned_value_path!("a dropped field"),
             Kind::boolean().or_null(),
             Some("dropped"),
         )
@@ -657,7 +670,12 @@ mod tests {
     }
 
     fn get_field_string(event: &Event, field: &str) -> String {
-        event.as_log().get(field).unwrap().to_string_lossy()
+        event
+            .as_log()
+            .get(field)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned()
     }
 
     #[test]
@@ -954,10 +972,8 @@ mod tests {
                     metadata.with_schema_definition(&Arc::new(test_default_schema_definition())),
                 )
                 .with_namespace(Some("zerk"))
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("host".into(), "zoobub".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "host" => "zoobub",
                 }))
             )
         );
@@ -975,7 +991,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.insert_tag("hello".into(), "world".into());
+            metric.replace_tag("hello".into(), "world".into());
             Event::Metric(metric)
         };
 
@@ -985,7 +1001,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.insert_tag("hello".into(), "goodbye".into());
+            metric.replace_tag("hello".into(), "goodbye".into());
             Event::Metric(metric)
         };
 
@@ -995,7 +1011,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.insert_tag("not_hello".into(), "oops".into());
+            metric.replace_tag("not_hello".into(), "oops".into());
             Event::Metric(metric)
         };
 
@@ -1031,7 +1047,7 @@ mod tests {
                 Kind::any_object(),
                 [LogNamespace::Legacy],
             )
-            .with_field("hello", Kind::bytes(), None),
+            .with_event_field(&owned_value_path!("hello"), Kind::bytes(), None),
             ..Default::default()
         };
         let mut tform = Remap::new_ast(conf, &context).unwrap().0;
@@ -1081,7 +1097,7 @@ mod tests {
         );
 
         let output = transform_one_fallible(&mut tform, happy_metric).unwrap();
-        pretty_assertions::assert_eq!(
+        similar_asserts::assert_eq!(
             output,
             Event::Metric(
                 Metric::new_with_metadata(
@@ -1091,17 +1107,15 @@ mod tests {
                     EventMetadata::default()
                         .with_schema_definition(&Arc::new(test_default_schema_definition())),
                 )
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("hello".into(), "world".into());
-                    tags.insert("foo".into(), "bar".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "hello" => "world",
+                    "foo" => "bar",
                 }))
             )
         );
 
         let output = transform_one_fallible(&mut tform, abort_metric).unwrap_err();
-        pretty_assertions::assert_eq!(
+        similar_asserts::assert_eq!(
             output,
             Event::Metric(
                 Metric::new_with_metadata(
@@ -1111,20 +1125,18 @@ mod tests {
                     EventMetadata::default()
                         .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
                 )
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("hello".into(), "goodbye".into());
-                    tags.insert("metadata.dropped.reason".into(), "abort".into());
-                    tags.insert("metadata.dropped.component_id".into(), "remapper".into());
-                    tags.insert("metadata.dropped.component_type".into(), "remap".into());
-                    tags.insert("metadata.dropped.component_kind".into(), "transform".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "hello" => "goodbye",
+                    "metadata.dropped.reason" => "abort",
+                    "metadata.dropped.component_id" => "remapper",
+                    "metadata.dropped.component_type" => "remap",
+                    "metadata.dropped.component_kind" => "transform",
                 }))
             )
         );
 
         let output = transform_one_fallible(&mut tform, error_metric).unwrap_err();
-        pretty_assertions::assert_eq!(
+        similar_asserts::assert_eq!(
             output,
             Event::Metric(
                 Metric::new_with_metadata(
@@ -1134,14 +1146,12 @@ mod tests {
                     EventMetadata::default()
                         .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
                 )
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("not_hello".into(), "oops".into());
-                    tags.insert("metadata.dropped.reason".into(), "error".into());
-                    tags.insert("metadata.dropped.component_id".into(), "remapper".into());
-                    tags.insert("metadata.dropped.component_type".into(), "remap".into());
-                    tags.insert("metadata.dropped.component_kind".into(), "transform".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "not_hello" => "oops",
+                    "metadata.dropped.reason" => "error",
+                    "metadata.dropped.component_id" => "remapper",
+                    "metadata.dropped.component_type" => "remap",
+                    "metadata.dropped.component_kind" => "transform",
                 }))
             )
         );
@@ -1280,14 +1290,17 @@ mod tests {
             Kind::any_object(),
             [LogNamespace::Legacy],
         )
-        .with_field("foo", Kind::any(), None)
-        .with_field("tags", Kind::any(), None);
+        .with_event_field(&owned_value_path!("foo"), Kind::any(), None)
+        .with_event_field(&owned_value_path!("tags"), Kind::any(), None);
 
         assert_eq!(
-            conf.outputs(&schema::Definition::new_with_default_metadata(
-                Kind::any_object(),
-                [LogNamespace::Legacy]
-            )),
+            conf.outputs(
+                &schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Legacy]
+                ),
+                LogNamespace::Legacy
+            ),
             vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 
@@ -1398,5 +1411,27 @@ mod tests {
             (None, Some(bad)) => Err(bad),
             (a, b) => panic!("expected output xor error output, got {:?} and {:?}", a, b),
         }
+    }
+
+    #[tokio::test]
+    async fn emits_internal_events() {
+        assert_transform_compliance(async move {
+            let config = RemapConfig {
+                source: Some("abort".to_owned()),
+                drop_on_abort: true,
+                ..Default::default()
+            };
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let log = LogEvent::from("hello world");
+            tx.send(log.into()).await.unwrap();
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 }

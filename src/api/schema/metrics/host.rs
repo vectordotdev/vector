@@ -110,7 +110,7 @@ impl SwapMetrics {
 
     /// Swapped in bytes total (not available on Windows)
     async fn swapped_in_bytes_total(&self) -> Option<f64> {
-        if cfg!(not(target_os = "windows")) {
+        if cfg!(not(windows)) {
             Some(filter_host_metric(&self.0, "memory_swapped_in_bytes_total"))
         } else {
             None
@@ -119,7 +119,7 @@ impl SwapMetrics {
 
     /// Swapped out bytes total (not available on Windows)
     async fn swapped_out_bytes_total(&self) -> Option<f64> {
-        if cfg!(not(target_os = "windows")) {
+        if cfg!(not(windows)) {
             Some(filter_host_metric(
                 &self.0,
                 "memory_swapped_out_bytes_total",
@@ -191,7 +191,7 @@ impl NetworkMetrics {
 
     /// Total transmission packets dropped (Linux/Windows only)
     async fn transmit_packets_drop_total(&self) -> Option<f64> {
-        if cfg!(any(target_os = "linux", target_os = "windows")) {
+        if cfg!(any(target_os = "linux", windows)) {
             Some(filter_host_metric(
                 &self.0,
                 "network_transmit_packets_drop_total",
@@ -203,7 +203,7 @@ impl NetworkMetrics {
 
     /// Total transmission packets (Linux/Windows only)
     async fn transmit_packets_total(&self) -> Option<f64> {
-        if cfg!(any(target_os = "linux", target_os = "windows")) {
+        if cfg!(any(target_os = "linux", windows)) {
             Some(filter_host_metric(
                 &self.0,
                 "network_transmit_packets_total",

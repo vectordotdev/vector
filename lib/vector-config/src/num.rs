@@ -1,11 +1,51 @@
-use std::num::{
-    NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8,
-    NonZeroUsize,
+use std::{
+    fmt,
+    num::{
+        NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64,
+        NonZeroU8, NonZeroUsize,
+    },
 };
 
 use num_traits::{Bounded, One, ToPrimitive, Zero};
+use schemars::schema::InstanceType;
 use serde_json::Number;
 use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
+
+/// The class of a numeric type.
+#[derive(Clone, Copy)]
+pub enum NumberClass {
+    /// A signed integer.
+    Signed,
+
+    /// An unsigned integer.
+    Unsigned,
+
+    /// A floating-point number.
+    FloatingPoint,
+}
+
+impl NumberClass {
+    /// Gets the equivalent instance type of this number class.
+    ///
+    /// The "instance type" is the JSON Schema term for value type i.e. string, number, integer,
+    /// array, and so on.
+    pub fn as_instance_type(self) -> InstanceType {
+        match self {
+            Self::Signed | Self::Unsigned => InstanceType::Integer,
+            Self::FloatingPoint => InstanceType::Number,
+        }
+    }
+}
+
+impl fmt::Display for NumberClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Signed => f.write_str("int"),
+            Self::Unsigned => f.write_str("uint"),
+            Self::FloatingPoint => f.write_str("float"),
+        }
+    }
+}
 
 /// A numeric type that can be represented correctly in a JSON Schema document.
 pub trait ConfigurableNumber {
@@ -15,6 +55,9 @@ pub trait ConfigurableNumber {
     /// `NonZeroU64`, where the overall type must be represented as `NonZeroU64` but the integeral numeric type that
     /// we're constraining against is `u64`.
     type Numeric: Bounded + ToPrimitive + Zero + One;
+
+    /// Gets the class of this numeric type.
+    fn class() -> NumberClass;
 
     /// Whether or not this numeric type disallows nonzero values.
     fn is_nonzero() -> bool {
@@ -79,17 +122,21 @@ pub trait ConfigurableNumber {
 }
 
 macro_rules! impl_configuable_number {
-	($($ty:ty),+) => {
+	([$class:expr] $($ty:ty),+) => {
 		$(
 			impl ConfigurableNumber for $ty {
 				type Numeric = $ty;
+
+                fn class() -> NumberClass {
+                    $class
+                }
 			}
 		)+
 	};
 }
 
 macro_rules! impl_configuable_number_nonzero {
-	($($aty:ty => $ity:ty),+) => {
+	([$class:expr] $($aty:ty => $ity:ty),+) => {
 		$(
 			impl ConfigurableNumber for $aty {
 				type Numeric = $ity;
@@ -97,11 +144,15 @@ macro_rules! impl_configuable_number_nonzero {
 				fn is_nonzero() -> bool {
 					true
 				}
+
+                fn class() -> NumberClass {
+                    $class
+                }
 			}
 		)+
 	};
 
-	(with_exclusion, $($aty:ty => $ity:ty),+) => {
+	(with_exclusion, [$class:expr] $($aty:ty => $ity:ty),+) => {
 		$(
 			impl ConfigurableNumber for $aty {
 				type Numeric = $ity;
@@ -113,11 +164,17 @@ macro_rules! impl_configuable_number_nonzero {
 				fn requires_nonzero_exclusion() -> bool {
 					true
 				}
+
+                fn class() -> NumberClass {
+                    $class
+                }
 			}
 		)+
 	};
 }
 
-impl_configuable_number!(u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64);
-impl_configuable_number_nonzero!(NonZeroU8 => u8, NonZeroU16 => u16, NonZeroU32 => u32, NonZeroU64 => u64, NonZeroUsize => usize);
-impl_configuable_number_nonzero!(with_exclusion, NonZeroI8 => i8, NonZeroI16 => i16, NonZeroI32 => i32, NonZeroI64 => i64);
+impl_configuable_number!([NumberClass::Unsigned] u8, u16, u32, u64, usize);
+impl_configuable_number!([NumberClass::Signed] i8, i16, i32, i64, isize);
+impl_configuable_number!([NumberClass::FloatingPoint] f32, f64);
+impl_configuable_number_nonzero!([NumberClass::Unsigned] NonZeroU8 => u8, NonZeroU16 => u16, NonZeroU32 => u32, NonZeroU64 => u64, NonZeroUsize => usize);
+impl_configuable_number_nonzero!(with_exclusion, [NumberClass::Signed] NonZeroI8 => i8, NonZeroI16 => i16, NonZeroI32 => i32, NonZeroI64 => i64);

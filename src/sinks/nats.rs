@@ -10,12 +10,11 @@ use vector_common::internal_event::{
     ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
 };
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
-    event::{Event, EventStatus, Finalizable},
+    event::{EstimatedJsonEncodedSizeOf, Event, EventStatus, Finalizable},
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::StreamSink,
@@ -62,7 +61,7 @@ pub struct NatsSinkConfig {
     connection_name: String,
 
     /// The NATS subject to publish messages to.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::templateable))]
     subject: String,
 
     /// The NATS URL to connect to.
@@ -183,7 +182,7 @@ impl StreamSink<Event> for NatsSink {
 
             self.transformer.transform(&mut event);
 
-            let event_byte_size = event.size_of();
+            let event_byte_size = event.estimated_json_encoded_size_of();
 
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {

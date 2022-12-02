@@ -5,7 +5,7 @@ use mlua::prelude::*;
 use super::util::{table_to_timestamp, timestamp_to_table};
 use crate::{
     event::{
-        metric::{self, MetricSketch},
+        metric::{self, MetricSketch, MetricTags, TagValueSet},
         Metric, MetricKind, MetricValue, StatisticKind,
     },
     metrics::AgentDDSketch,
@@ -61,6 +61,30 @@ impl<'a> FromLua<'a> for StatisticKind {
                 ),
             }),
         }
+    }
+}
+
+impl<'a> FromLua<'a> for TagValueSet {
+    fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
+        Ok(Self::from([String::from_lua(value, lua)?]))
+    }
+}
+
+impl<'a> ToLua<'a> for TagValueSet {
+    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+        self.into_single().to_lua(lua)
+    }
+}
+
+impl<'a> FromLua<'a> for MetricTags {
+    fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
+        Ok(Self(BTreeMap::from_lua(value, lua)?))
+    }
+}
+
+impl<'a> ToLua<'a> for MetricTags {
+    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+        self.0.to_lua(lua)
     }
 }
 
@@ -184,7 +208,7 @@ impl<'a> FromLua<'a> for Metric {
             .transpose()?;
         let interval_ms: Option<u32> = table.raw_get("interval_ms")?;
         let namespace: Option<String> = table.raw_get("namespace")?;
-        let tags: Option<BTreeMap<String, String>> = table.raw_get("tags")?;
+        let tags: Option<MetricTags> = table.raw_get("tags")?;
         let kind = table
             .raw_get::<_, Option<MetricKind>>("kind")?
             .unwrap_or(MetricKind::Absolute);
@@ -304,11 +328,7 @@ mod test {
             MetricValue::Counter { value: 1.0 },
         )
         .with_namespace(Some("namespace_example"))
-        .with_tags(Some(
-            vec![("example tag".to_string(), "example value".to_string())]
-                .into_iter()
-                .collect(),
-        ))
+        .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
         .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)));
         let assertions = vec![
             "type(metric) == 'table'",
@@ -497,11 +517,7 @@ mod test {
             MetricValue::Counter { value: 1.0 },
         )
         .with_namespace(Some("example_namespace"))
-        .with_tags(Some(
-            vec![("example tag".to_string(), "example value".to_string())]
-                .into_iter()
-                .collect(),
-        ))
+        .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
         .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }

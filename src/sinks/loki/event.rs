@@ -5,7 +5,7 @@ use serde::{ser::SerializeSeq, Serialize};
 use vector_buffers::EventCount;
 use vector_core::{
     event::{EventFinalizers, Finalizable},
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use crate::sinks::util::encoding::{write_all, Encoder};
@@ -89,6 +89,21 @@ impl ByteSizeOf for LokiEvent {
     }
 }
 
+/// This implementation approximates the `Serialize` implementation below, without any allocations.
+impl EstimatedJsonEncodedSizeOf for LokiEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        static BRACKETS_SIZE: usize = 2;
+        static COLON_SIZE: usize = 1;
+        static QUOTES_SIZE: usize = 2;
+
+        BRACKETS_SIZE
+            + QUOTES_SIZE
+            + self.timestamp.estimated_json_encoded_size_of()
+            + COLON_SIZE
+            + self.event.estimated_json_encoded_size_of()
+    }
+}
+
 impl Serialize for LokiEvent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -117,6 +132,12 @@ impl ByteSizeOf for LokiRecord {
                 res + item.0.allocated_bytes() + item.1.allocated_bytes()
             })
             + self.event.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for LokiRecord {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.event.estimated_json_encoded_size_of()
     }
 }
 

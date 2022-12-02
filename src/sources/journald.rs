@@ -28,15 +28,18 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
+use vector_common::finalizer::OrderedFinalizer;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
+    config::{
+        log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+    },
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
     internal_events::{
         EventsReceived, JournaldCheckpointFileOpenError, JournaldCheckpointSetError,
@@ -142,7 +145,7 @@ pub struct JournaldConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 
     /// Enables remapping the `PRIORITY` field from an integer to string value.
     ///
@@ -228,7 +231,7 @@ impl SourceConfig for JournaldConfig {
         );
 
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(
             JournaldSource {
@@ -450,7 +453,7 @@ impl<'a> Batch<'a> {
             let count = self.events.len();
             emit!(EventsReceived {
                 count,
-                byte_size: self.events.size_of(),
+                byte_size: self.events.estimated_json_encoded_size_of(),
             });
 
             match self.source.out.send_batch(self.events).await {

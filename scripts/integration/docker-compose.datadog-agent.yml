@@ -15,6 +15,7 @@ services:
       - DD_HEALTH_PORT=8182
       - DD_CMD_PORT=5001
       - DD_USE_DOGSTATSD=false
+      - DD_HOSTNAME=datadog-agent
     volumes:
       - ${PWD}/tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
   datadog-trace-agent:
@@ -29,6 +30,7 @@ services:
       - DD_HEALTH_PORT=8183
       - DD_CMD_PORT=5002
       - DD_USE_DOGSTATSD=false
+      - DD_HOSTNAME=datadog-trace-agent
   runner:
     build:
       context: ${PWD}

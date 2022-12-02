@@ -9,7 +9,7 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     internal_events::PulsarSendingError,
-    sinks::util::metadata::RequestMetadata,
+    sinks::util::metadata::RequestMetadataBuilder,
 };
 use bytes::BytesMut;
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
@@ -28,6 +28,7 @@ use vector_common::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
         Registered,
     },
+    request_metadata::RequestMetadata,
     sensitive_string::SensitiveString,
 };
 use vector_config::configurable_component;
@@ -317,7 +318,7 @@ impl Sink<Event> for PulsarSink {
             .map(|ts| ts.timestamp_millis())
             .map(|i| i as u64);
 
-        let metadata_builder = RequestMetadata::builder(&event);
+        let metadata_builder = RequestMetadataBuilder::from_events(&event);
         self.transformer.transform(&mut event);
 
         let finalizers = event.take_finalizers();
@@ -373,7 +374,7 @@ impl Sink<Event> for PulsarSink {
 
                     this.events_sent.emit(CountByteSize(
                         metadata.event_count(),
-                        metadata.events_byte_size(),
+                        metadata.events_estimated_json_encoded_byte_size(),
                     ));
                     this.bytes_sent
                         .emit(ByteSize(metadata.request_encoded_size()));
@@ -382,7 +383,7 @@ impl Sink<Event> for PulsarSink {
                     finalizers.update_status(EventStatus::Errored);
                     emit!(PulsarSendingError {
                         error: Box::new(error),
-                        count: metadata.event_count() as u64,
+                        count: metadata.event_count(),
                     });
                     return Poll::Ready(Err(()));
                 }

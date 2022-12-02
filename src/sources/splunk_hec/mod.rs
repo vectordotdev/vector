@@ -17,7 +17,7 @@ use tracing::Span;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::{event::BatchNotifier, ByteSizeOf};
+use vector_core::{event::BatchNotifier, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
@@ -184,7 +184,7 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
-        let acknowledgements = cx.do_acknowledgements(&config.acknowledgements.inner);
+        let acknowledgements = cx.do_acknowledgements(config.acknowledgements.enabled.into());
         let shutdown = cx.shutdown;
         let valid_tokens = config
             .valid_tokens
@@ -302,7 +302,7 @@ impl SplunkSource {
                         if !events.is_empty() {
                             emit!(EventsReceived {
                                 count: events.len(),
-                                byte_size: events.size_of(),
+                                byte_size: events.estimated_json_encoded_size_of(),
                             });
 
                             if let Err(ClosedError) = out.send_batch(events).await {
@@ -820,7 +820,7 @@ fn raw_event(
     let event = Event::from(log);
     emit!(EventsReceived {
         count: 1,
-        byte_size: event.size_of(),
+        byte_size: event.estimated_json_encoded_size_of(),
     });
 
     Ok(event)
@@ -1085,6 +1085,7 @@ mod tests {
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
             timestamp_key: timestamp_key(),
+            auto_extract_timestamp: None,
             endpoint_target: Default::default(),
         }
         .build(SinkContext::new_test())
@@ -1862,7 +1863,7 @@ mod tests {
     #[tokio::test]
     async fn ack_json_event() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (source, address) = source(Some(ack_config)).await;
@@ -1907,7 +1908,7 @@ mod tests {
     #[tokio::test]
     async fn ack_raw_event() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (source, address) = source(Some(ack_config)).await;
@@ -1952,7 +1953,7 @@ mod tests {
     #[tokio::test]
     async fn ack_repeat_ack_query() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (source, address) = source(Some(ack_config)).await;
@@ -2008,7 +2009,7 @@ mod tests {
     #[tokio::test]
     async fn ack_exceed_max_number_of_ack_channels() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -2044,7 +2045,7 @@ mod tests {
     #[tokio::test]
     async fn ack_exceed_max_pending_acks_per_channel() {
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_pending_acks_per_channel: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -2119,7 +2120,7 @@ mod tests {
     async fn event_service_acknowledgements_enabled_channel_required() {
         let message = r#"{"event":"first", "color": "blue"}"#;
         let ack_config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let (_, address) = source(Some(ack_config)).await;

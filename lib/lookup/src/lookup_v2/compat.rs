@@ -34,7 +34,6 @@ impl From<LookupBuf> for OwnedValuePath {
     }
 }
 
-// This should only be used if the `OwnedPath` has already been verified to be valid.
 impl From<OwnedValuePath> for LookupBuf {
     fn from(path: OwnedValuePath) -> Self {
         let segments = path
@@ -46,14 +45,6 @@ impl From<OwnedValuePath> for LookupBuf {
                 OwnedSegment::Coalesce(fields) => {
                     let fields = fields.into_iter().map(FieldBuf::from).collect();
                     SegmentBuf::Coalesce(fields)
-                }
-                OwnedSegment::Invalid => {
-                    // eventually "Invalid" will be removed from `OwnedPath`, but until then
-                    // this compatibility layer should only be used where OwnedPath can never be Invalid
-                    // (such as after being converted directly from a LookupBuf)
-                    unreachable!(
-                        "compatibility layer shouldn't be used if OwnedPath can be invalid!"
-                    )
                 }
             })
             .collect();

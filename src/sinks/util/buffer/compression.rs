@@ -204,8 +204,11 @@ impl Configurable for Compression {
         Some(std::any::type_name::<Self>())
     }
 
-    fn description() -> Option<&'static str> {
-        Some("Compression configuration.")
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Compression configuration.");
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
+        metadata
     }
 
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
@@ -404,8 +407,10 @@ impl Configurable for CompressionLevel {
         Some(std::any::type_name::<Self>())
     }
 
-    fn description() -> Option<&'static str> {
-        Some("Compression level.")
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Compression level.");
+        metadata
     }
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {

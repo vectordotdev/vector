@@ -47,7 +47,6 @@ pub struct StackdriverConfig {
     /// The log ID to which to publish logs.
     ///
     /// This is a name you create to identify this log stream.
-    #[configurable(metadata(templateable))]
     pub log_id: Template,
 
     /// The monitored resource to associate the logs with.

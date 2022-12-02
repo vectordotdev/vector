@@ -14,7 +14,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use indexmap::IndexMap;
+use indexmap::{map::Entry, IndexMap};
 use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
@@ -25,7 +25,7 @@ use vector_core::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
         Registered,
     },
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use super::collector::{MetricCollector, StringCollector};
@@ -49,6 +49,8 @@ use crate::{
 };
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
+
+const LOCK_FAILED: &str = "Prometheus exporter data lock is poisoned";
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -235,7 +237,7 @@ impl MetricMetadata {
 
     /// Whether or not the referenced metric has expired yet.
     pub fn has_expired(&self, now: Instant) -> bool {
-        self.expires_at >= now
+        now >= self.expires_at
     }
 }
 
@@ -369,52 +371,76 @@ fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
     false
 }
 
-fn handle(
-    req: Request<Body>,
-    auth: &Option<Auth>,
-    default_namespace: Option<&str>,
-    buckets: &[f64],
-    quantiles: &[f64],
-    metrics: &IndexMap<MetricRef, (Metric, MetricMetadata)>,
-    bytes_sent: &Registered<BytesSent>,
-) -> Response<Body> {
-    let mut response = Response::new(Body::empty());
+#[derive(Clone)]
+struct Handler {
+    auth: Option<Auth>,
+    default_namespace: Option<String>,
+    buckets: Box<[f64]>,
+    quantiles: Box<[f64]>,
+    bytes_sent: Registered<BytesSent>,
+    events_sent: Registered<EventsSent>,
+}
 
-    if !authorized(&req, auth) {
-        *response.status_mut() = StatusCode::UNAUTHORIZED;
-        response.headers_mut().insert(
-            http::header::WWW_AUTHENTICATE,
-            HeaderValue::from_static("Basic, Bearer"),
-        );
-        return response;
-    }
+impl Handler {
+    fn handle(
+        &self,
+        req: Request<Body>,
+        metrics: &RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>,
+    ) -> Response<Body> {
+        let mut response = Response::new(Body::empty());
 
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/metrics") => {
-            let mut collector = StringCollector::new();
-
-            for (_, (metric, _)) in metrics {
-                collector.encode_metric(default_namespace, buckets, quantiles, metric);
+        match (authorized(&req, &self.auth), req.method(), req.uri().path()) {
+            (false, _, _) => {
+                *response.status_mut() = StatusCode::UNAUTHORIZED;
+                response.headers_mut().insert(
+                    http::header::WWW_AUTHENTICATE,
+                    HeaderValue::from_static("Basic, Bearer"),
+                );
             }
 
-            let body = collector.finish();
-            let body_size = body.size_of();
+            (true, &Method::GET, "/metrics") => {
+                let metrics = metrics.read().expect(LOCK_FAILED);
 
-            *response.body_mut() = body.into();
+                let count = metrics.len();
+                let byte_size = metrics
+                    .iter()
+                    .map(|(_, (metric, _))| metric.estimated_json_encoded_size_of())
+                    .sum();
 
-            response.headers_mut().insert(
-                "Content-Type",
-                HeaderValue::from_static("text/plain; version=0.0.4"),
-            );
+                let mut collector = StringCollector::new();
 
-            bytes_sent.emit(ByteSize(body_size));
+                for (_, (metric, _)) in metrics.iter() {
+                    collector.encode_metric(
+                        self.default_namespace.as_deref(),
+                        &self.buckets,
+                        &self.quantiles,
+                        metric,
+                    );
+                }
+
+                drop(metrics);
+
+                let body = collector.finish();
+                let body_size = body.size_of();
+
+                *response.body_mut() = body.into();
+
+                response.headers_mut().insert(
+                    "Content-Type",
+                    HeaderValue::from_static("text/plain; version=0.0.4"),
+                );
+
+                self.events_sent.emit(CountByteSize(count, byte_size));
+                self.bytes_sent.emit(ByteSize(body_size));
+            }
+
+            (true, _, _) => {
+                *response.status_mut() = StatusCode::NOT_FOUND;
+            }
         }
-        _ => {
-            *response.status_mut() = StatusCode::NOT_FOUND;
-        }
+
+        response
     }
-
-    response
 }
 
 impl PrometheusExporter {
@@ -431,46 +457,27 @@ impl PrometheusExporter {
             return;
         }
 
+        let handler = Handler {
+            bytes_sent: register!(BytesSent::from(Protocol::HTTP)),
+            events_sent: register!(EventsSent::from(Output(None))),
+            default_namespace: self.config.default_namespace.clone(),
+            buckets: self.config.buckets.clone().into(),
+            quantiles: self.config.quantiles.clone().into(),
+            auth: self.config.auth.clone(),
+        };
+
         let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
-        let default_namespace = self.config.default_namespace.clone();
-        let buckets = self.config.buckets.clone();
-        let quantiles = self.config.quantiles.clone();
-        let auth = self.config.auth.clone();
 
         let new_service = make_service_fn(move |_| {
             let span = Span::current();
             let metrics = Arc::clone(&metrics);
-            let default_namespace = default_namespace.clone();
-            let buckets = buckets.clone();
-            let quantiles = quantiles.clone();
-            let auth = auth.clone();
-
-            let bytes_sent = register!(BytesSent::from(Protocol::HTTP));
-            let events_sent = register!(EventsSent::from(Output(None)));
+            let handler = handler.clone();
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
                     span.in_scope(|| {
-                        let metrics = metrics.read().unwrap();
-
-                        let count = metrics.len();
-                        let byte_size = metrics
-                            .iter()
-                            .map(|(_, (metric, _))| metric.size_of())
-                            .sum();
-
-                        let response = handle(
-                            req,
-                            &auth,
-                            default_namespace.as_deref(),
-                            &buckets,
-                            &quantiles,
-                            &metrics,
-                            &bytes_sent,
-                        );
-
-                        events_sent.emit(CountByteSize(count, byte_size));
+                        let response = handler.handle(req, &metrics);
 
                         emit!(PrometheusServerRequestComplete {
                             status_code: response.status(),
@@ -535,18 +542,17 @@ impl StreamSink<Event> for PrometheusExporter {
             if last_flush.elapsed() > self.config.flush_period_secs {
                 last_flush = Instant::now();
 
-                let mut metrics = self.metrics.write().unwrap();
+                let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
-                let metrics_to_expire = metrics
-                    .iter()
-                    .filter(|(_, (_, metadata))| !metadata.has_expired(last_flush))
-                    .map(|(metric_ref, _)| metric_ref.clone())
-                    .collect::<Vec<_>>();
-
-                for metric_ref in metrics_to_expire {
-                    metrics.remove(&metric_ref);
-                    normalizer.get_state_mut().remove(&metric_ref.series);
-                }
+                let normalizer_mut = normalizer.get_state_mut();
+                metrics.retain(|metric_ref, (_, metadata)| {
+                    if metadata.has_expired(last_flush) {
+                        normalizer_mut.remove(&metric_ref.series);
+                        false
+                    } else {
+                        true
+                    }
+                });
             }
 
             // Now process the metric we got.
@@ -562,16 +568,16 @@ impl StreamSink<Event> for PrometheusExporter {
 
                 // We have a normalized metric, in absolute form.  If we're already aware of this
                 // metric, update its expiration deadline, otherwise, start tracking it.
-                let mut metrics = self.metrics.write().unwrap();
+                let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
-                let metric_ref = MetricRef::from_metric(&normalized);
-                match metrics.get_mut(&metric_ref) {
-                    Some((data, metadata)) => {
+                match metrics.entry(MetricRef::from_metric(&normalized)) {
+                    Entry::Occupied(mut entry) => {
+                        let (data, metadata) = entry.get_mut();
                         *data = normalized;
                         metadata.refresh();
                     }
-                    None => {
-                        metrics.insert(metric_ref, (normalized, MetricMetadata::new(flush_period)));
+                    Entry::Vacant(entry) => {
+                        entry.insert((normalized, MetricMetadata::new(flush_period)));
                     }
                 }
                 finalizers.update_status(EventStatus::Delivered);
@@ -590,13 +596,13 @@ mod tests {
     use chrono::{Duration, Utc};
     use futures::stream;
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::{sync::oneshot::error::TryRecvError, time};
     use vector_common::{
         finalization::{BatchNotifier, BatchStatus},
         sensitive_string::SensitiveString,
     };
-    use vector_core::{event::StatisticKind, samples};
+    use vector_core::{event::StatisticKind, metric_tags, samples};
 
     use super::*;
     use crate::{
@@ -996,11 +1002,7 @@ mod tests {
     pub(self) fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
         let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
         let event = Metric::new(name.clone(), MetricKind::Incremental, value)
-            .with_tags(Some(
-                vec![("some_tag".to_owned(), "some_value".to_owned())]
-                    .into_iter()
-                    .collect(),
-            ))
+            .with_tags(Some(metric_tags!("some_tag" => "some_value")))
             .into();
         (name, event)
     }
@@ -1020,17 +1022,9 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 32. },
         )
-        .with_tags(Some(
-            vec![("tag1".to_owned(), "value1".to_owned())]
-                .into_iter()
-                .collect(),
-        ));
+        .with_tags(Some(metric_tags!("tag1" => "value1")));
 
-        let m2 = m1.clone().with_tags(Some(
-            vec![("tag1".to_owned(), "value2".to_owned())]
-                .into_iter()
-                .collect(),
-        ));
+        let m2 = m1.clone().with_tags(Some(metric_tags!("tag1" => "value2")));
 
         let events = vec![
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 32. })),

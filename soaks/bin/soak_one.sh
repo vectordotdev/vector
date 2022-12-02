@@ -129,8 +129,8 @@ do
     touch "${SOAK_CAPTURE_FILE}"
     # shellcheck disable=SC2140
     DOCKER_BUILDKIT=1 docker run --cpus "${SOAK_CPUS}" --memory "${SOAK_MEMORY}" --network "host" --privileged --env RUST_LOG="info" \
-                   --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/lading.yaml",target="/etc/lading/lading.yaml",readonly \
-                   --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/vector.toml",target="/etc/vector/vector.toml",readonly \
+                   --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/lading/",target="/etc/lading/",readonly \
+                   --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/vector/",target="/etc/vector/",readonly \
                    --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/data",target="/data",readonly \
                    --mount type=bind,source="${SOAK_CAPTURE_DIR}",target="/tmp/captures" \
                    --user "$(id -u):$(id -g)" \
@@ -138,12 +138,12 @@ do
                    --config-path "/etc/lading/lading.yaml" \
                    --global-labels "variant=${VARIANT},target=vector,experiment=${SOAK_NAME}" \
                    --capture-path "/tmp/captures/${VARIANT}.captures" \
-                   --target-environment-variables "VECTOR_THREADS=${VECTOR_CPUS},VECTOR_REQUIRE_HEALTHY=true,DD_API_KEY=DD_API_KEY,DD_CONFIGURATION_KEY=DD_CONFIGURATION_KEY" \
+                   --target-environment-variables "VECTOR_THREADS=${VECTOR_CPUS},VECTOR_REQUIRE_HEALTHY=true" \
                    --target-stderr-path /tmp/captures/vector.stderr.log \
                    --target-stdout-path /tmp/captures/vector.stdout.log \
                    --experiment-duration-seconds "${TOTAL_SAMPLES}" \
                    --warmup-duration-seconds "${WARMUP_SECONDS}" \
-                   /usr/bin/vector
+                   --target-path /usr/bin/vector
     echo "::group::Vector stdout"
     cat "${SOAK_CAPTURE_DIR}/vector.stdout.log"
     echo "::endgroup::"

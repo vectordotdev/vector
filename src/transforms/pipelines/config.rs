@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::Input,
     event::{Event, EventArray, EventContainer},
@@ -11,8 +12,8 @@ use vector_core::{
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        ComponentKey, DataType, InnerTopology, InnerTopologyTransform, Output, TransformConfig,
-        TransformContext,
+        ComponentKey, DataType, InnerTopology, InnerTopologyTransform, Inputs, Output,
+        TransformConfig, TransformContext,
     },
     transforms::Transforms,
 };
@@ -33,6 +34,7 @@ pub struct PipelineConfig {
 
     /// A list of sequential transforms that will process any event that is passed to the pipeline.
     #[serde(default)]
+    #[configurable(metadata(docs::cycle_entrypoint))]
     transforms: Vec<Transforms>,
 }
 
@@ -79,7 +81,11 @@ impl TransformConfig for PipelineConfig {
         // in the future so, to avoid panics, we instead make building a
         // pipeline with such transforms an error.
         for transform in &self.transforms {
-            if transform.outputs(&ctx.merged_schema_definition).len() > 1 {
+            if transform
+                .outputs(&ctx.merged_schema_definition, ctx.schema.log_namespace())
+                .len()
+                > 1
+            {
                 return Err(format!(
                     "pipeline {} has transform of type {} with a named output, unsupported",
                     self.name,
@@ -120,9 +126,9 @@ impl TransformConfig for PipelineConfig {
         }
     }
 
-    fn outputs(&self, schema: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, schema: &schema::Definition, log_namespace: LogNamespace) -> Vec<Output> {
         if let Some(transform) = self.transforms.last() {
-            transform.outputs(schema)
+            transform.outputs(schema, log_namespace)
         } else {
             panic!("pipeline {} does not have transforms", self.name)
         }
@@ -144,7 +150,7 @@ impl PipelineConfig {
         result.inner.insert(
             name.clone(),
             InnerTopologyTransform {
-                inputs: inputs.to_vec(),
+                inputs: Inputs::from_iter(inputs.iter().cloned()),
                 inner: self.clone().into(),
             },
         );

@@ -293,7 +293,10 @@ pub fn update_config(config: &Config) {
                 inputs: transform.inputs.clone(),
                 outputs: transform
                     .inner
-                    .outputs(&merged_definition(&transform.inputs, config, &mut cache))
+                    .outputs(
+                        &merged_definition(&transform.inputs, config, &mut cache),
+                        config.schema.log_namespace(),
+                    )
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),
@@ -375,13 +378,13 @@ mod tests {
             Component::Transform(transform::Transform(transform::Data {
                 component_key: ComponentKey::from("parse_json"),
                 component_type: "json".to_string(),
-                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
+                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")].into(),
                 outputs: vec![],
             })),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("devnull"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")].into(),
             })),
         ]
     }
@@ -505,17 +508,17 @@ mod tests {
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("a"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")].into(),
             })),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("b"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")].into(),
             })),
             Component::Transform(transform::Transform(transform::Data {
                 component_key: ComponentKey::from("c"),
                 component_type: "json".to_string(),
-                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
+                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")].into(),
                 outputs: vec![],
             })),
             Component::Source(source::Source(source::Data {

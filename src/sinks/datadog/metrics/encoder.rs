@@ -1,6 +1,5 @@
 use std::{
     cmp,
-    collections::BTreeMap,
     io::{self, Write},
     mem,
     sync::Arc,
@@ -12,7 +11,7 @@ use prost::Message;
 use snafu::{ResultExt, Snafu};
 use vector_core::{
     config::{log_schema, LogSchema},
-    event::{metric::MetricSketch, Metric, MetricValue},
+    event::{metric::MetricSketch, Metric, MetricTags, MetricValue},
 };
 
 use super::config::{
@@ -392,10 +391,13 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
     )
 }
 
-fn encode_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
+fn encode_tags(tags: &MetricTags) -> Vec<String> {
     let mut pairs: Vec<_> = tags
-        .iter()
-        .map(|(name, value)| format!("{}:{}", name, value))
+        .iter_all()
+        .map(|(name, value)| match value {
+            Some(value) => format!("{}:{}", name, value),
+            None => name.into(),
+        })
         .collect();
     pairs.sort();
     pairs
@@ -655,7 +657,6 @@ fn write_payload_footer(
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::BTreeMap,
         io::{self, copy},
         num::NonZeroU32,
     };
@@ -669,7 +670,8 @@ mod tests {
     };
     use vector_core::{
         config::log_schema,
-        event::{Metric, MetricKind, MetricValue},
+        event::{Metric, MetricKind, MetricTags, MetricValue},
+        metric_tags,
         metrics::AgentDDSketch,
     };
 
@@ -723,14 +725,12 @@ mod tests {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn tags() -> BTreeMap<String, String> {
-        vec![
-            ("normal_tag".to_owned(), "value".to_owned()),
-            ("true_tag".to_owned(), "true".to_owned()),
-            ("empty_tag".to_owned(), "".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+    fn tags() -> MetricTags {
+        metric_tags! {
+            "normal_tag" => "value",
+            "true_tag" => "true",
+            "empty_tag" => "",
+        }
     }
 
     #[test]
@@ -960,7 +960,7 @@ mod tests {
             any::<u64>().prop_map(|v| v.to_string()),
             0..64,
         )
-        .prop_map(|tags| if tags.is_empty() { None } else { Some(tags) });
+        .prop_map(|tags| (!tags.is_empty()).then(|| MetricTags::from(tags)));
 
         (name, value, tags).prop_map(|(metric_name, metric_value, metric_tags)| {
             let metric_value = MetricValue::Counter {
