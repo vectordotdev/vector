@@ -29,6 +29,9 @@ pub mod azure_blob;
 pub mod azure_common;
 #[cfg(feature = "sinks-azure_monitor_logs")]
 pub mod azure_monitor_logs;
+
+pub mod basic;
+
 #[cfg(feature = "sinks-blackhole")]
 pub mod blackhole;
 #[cfg(feature = "sinks-clickhouse")]
@@ -177,6 +180,9 @@ pub enum Sinks {
     /// Azure Monitor Logs.
     #[cfg(feature = "sinks-azure_monitor_logs")]
     AzureMonitorLogs(#[configurable(derived)] azure_monitor_logs::AzureMonitorLogsConfig),
+
+    /// Basic
+    Basic(#[configurable(derived)] basic::BasicConfig),
 
     /// Blackhole.
     #[cfg(feature = "sinks-blackhole")]
@@ -396,6 +402,9 @@ impl NamedComponent for Sinks {
             Self::AzureBlob(config) => config.get_component_name(),
             #[cfg(feature = "sinks-azure_monitor_logs")]
             Self::AzureMonitorLogs(config) => config.get_component_name(),
+
+            Self::Basic(config) => config.get_component_name(),
+
             #[cfg(feature = "sinks-blackhole")]
             Self::Blackhole(config) => config.get_component_name(),
             #[cfg(feature = "sinks-clickhouse")]
