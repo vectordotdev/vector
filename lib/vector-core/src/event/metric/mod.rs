@@ -443,7 +443,9 @@ impl ByteSizeOf for Metric {
 
 impl EstimatedJsonEncodedSizeOf for Metric {
     fn estimated_json_encoded_size_of(&self) -> usize {
-        0 // The JSON encoded size of a metric is unspecified.
+        // TODO: For now we're using the in-memory representation of the metric, but we'll convert
+        // this to actually calculate the JSON encoded size in the near future.
+        self.size_of()
     }
 }
 
