@@ -48,13 +48,13 @@ impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
 unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
     #[inline]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
-        let (group_id_ptr, object_ptr, _wrapped_layout) =
-            self.get_wrapped_allocation(object_layout);
-        let object_size = object_layout.size();
-        // Group id value of zero implies allocations tracking was disabled
-        // during this allocation. We override this if allocations were in fact enabled.
-        group_id_ptr.write(0);
         if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+            let (group_id_ptr, object_ptr, _wrapped_layout) =
+                self.get_wrapped_allocation(object_layout);
+            let object_size = object_layout.size();
+            // Group id value of zero implies allocations tracking was disabled
+            // during this allocation. We override this if allocations were in fact enabled.
+            group_id_ptr.write(0);
             try_with_suspended_allocation_group(
                 #[inline(always)]
                 |group_id| {
@@ -62,29 +62,28 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
                     self.tracer.trace_allocation(object_size, group_id);
                 },
             );
+            object_ptr
+        } else {
+            self.allocator.alloc(object_layout)
         }
-
-        object_ptr
     }
 
     #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
+        if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+            // We do leak memory for startup allocations due to them being allocated with
+            // a wrapped layout.
+            self.allocator.dealloc(object_ptr, object_layout);
+            return;
+        }
         // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
         // requested layout, not the wrapped layout that was actually allocated.
         let (wrapped_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
 
-        // SAFETY: We know that `object_ptr` with offset is at least aligned enough for casting it to `*mut u8` as the layout for
-        // the allocation backing this pointer ensures the last field in the layout is `u8.
-        #[allow(clippy::cast_ptr_alignment)]
         let raw_group_id = object_ptr.add(offset_to_group_id).cast::<u8>().read();
 
         // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
         self.allocator.dealloc(object_ptr, wrapped_layout);
-
-        // Do not track deallocations when allocations weren't tracked.
-        if raw_group_id == 0 {
-            return;
-        }
 
         let object_size = object_layout.size();
         let source_group_id = AllocationGroupId::from_raw(raw_group_id);
@@ -95,6 +94,17 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
                 self.tracer.trace_deallocation(object_size, source_group_id);
             },
         );
+    }
+
+    #[inline]
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        let new_layout = Layout::from_size_align_unchecked(new_size, layout.align());
+        let new_ptr = self.alloc(new_layout);
+
+        std::ptr::copy_nonoverlapping(ptr, new_ptr, std::cmp::min(layout.size(), new_size));
+        self.dealloc(ptr, layout);
+
+        new_ptr
     }
 }
 
