@@ -211,12 +211,7 @@ impl JournaldConfig {
                 JournaldConfig::NAME,
                 None,
                 &owned_value_path!("metadata"),
-                Kind::object(
-                    Collection::empty()
-                        .with_unknown(Kind::bytes())
-                        .with_known("message", Kind::bytes().or_null()),
-                )
-                .or_undefined(),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
             .with_source_metadata(
@@ -1413,12 +1408,7 @@ mod tests {
                 )
                 .with_metadata_field(
                     &owned_value_path!(JournaldConfig::NAME, "metadata"),
-                    Kind::object(
-                        Collection::empty()
-                            .with_unknown(Kind::bytes())
-                            .with_known("message", Kind::bytes().or_null()),
-                    )
-                    .or_undefined(),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 )
                 .with_metadata_field(
                     &owned_value_path!(JournaldConfig::NAME, "timestamp"),
