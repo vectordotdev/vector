@@ -1,12 +1,14 @@
 use std::{
     collections::HashMap,
+    io::{BufReader, Read},
     sync::Arc,
     task::{Context, Poll},
 };
 
 use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
+use flate2::bufread::GzDecoder;
 use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
@@ -33,6 +35,7 @@ pub struct ElasticsearchRequest {
     pub batch_size: usize,
     pub events_byte_size: usize,
     pub metadata: RequestMetadata,
+    pub compression: Compression,
 }
 
 impl ByteSizeOf for ElasticsearchRequest {
@@ -118,6 +121,10 @@ impl HttpRequestBuilder {
             builder = builder.header("Content-Encoding", ce);
         }
 
+        if let Some(ae) = self.compression.accept_encoding() {
+            builder = builder.header("Accept-Encoding", ae);
+        }
+
         for (header, value) in &self.http_request_config.headers {
             builder = builder.header(&header[..], &value[..]);
         }
@@ -170,9 +177,23 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
+            let compression = req.compression;
             let batch_size = req.batch_size;
             let events_byte_size = req.events_byte_size;
             let http_response = http_service.call(req).await?;
+
+            let http_response = if let Compression::Gzip(_) = compression {
+                let (parts, body) = http_response.into_parts();
+
+                let mut bytes = Vec::new();
+                let mut reader = BufReader::new(GzDecoder::new(BufReader::new(body.reader())));
+                reader.read_to_end(&mut bytes)?;
+
+                Response::from_parts(parts, bytes.into())
+            } else {
+                http_response
+            };
+
             let event_status = get_event_status(&http_response);
             Ok(ElasticsearchResponse {
                 event_status,

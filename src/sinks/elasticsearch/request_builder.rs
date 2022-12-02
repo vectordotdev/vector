@@ -75,6 +75,7 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
             finalizers: es_metadata.finalizers,
             batch_size: es_metadata.batch_size,
             events_byte_size: es_metadata.events_byte_size,
+            compression: self.compression,
             metadata,
         }
     }

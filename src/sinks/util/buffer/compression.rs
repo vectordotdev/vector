@@ -61,6 +61,14 @@ impl Compression {
         }
     }
 
+    pub const fn accept_encoding(self) -> Option<&'static str> {
+        match self {
+            Self::None => None,
+            Self::Gzip(_) => Some("gzip"),
+            _ => None,
+        }
+    }
+
     pub const fn extension(self) -> &'static str {
         match self {
             Self::None => "log",
