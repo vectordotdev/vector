@@ -3,7 +3,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crate::internal_telemetry::allocations::TRACK_ALLOCATIONS;
+use crate::internal_telemetry::allocations::{STARTUP, TRACK_ALLOCATIONS};
 
 use super::{
     token::{try_with_suspended_allocation_group, AllocationGroupId},
@@ -55,6 +55,10 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
             // Group id value of zero implies allocations tracking was disabled
             // during this allocation. We override this if allocations were in fact enabled.
             group_id_ptr.write(0);
+            // Don't trace during startup
+            if STARTUP.load(Ordering::Relaxed) {
+                return object_ptr;
+            }
             try_with_suspended_allocation_group(
                 #[inline(always)]
                 |group_id| {
@@ -73,6 +77,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
         if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
             // We do leak memory for startup allocations due to them being allocated with
             // a wrapped layout.
+            self.allocator.dealloc(object_ptr, object_layout);
             return;
         }
         // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
@@ -83,6 +88,11 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
         // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
         self.allocator.dealloc(object_ptr, wrapped_layout);
+
+        // Don't trace during startup
+        if raw_group_id == 0 {
+            return;
+        }
 
         let object_size = object_layout.size();
         let source_group_id = AllocationGroupId::from_raw(raw_group_id);

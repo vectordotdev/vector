@@ -143,10 +143,11 @@ impl Application {
                 #[cfg(feature = "allocation-tracing")]
                 if root_opts.allocation_tracing {
                     use crate::internal_telemetry::allocations::{
-                        REPORTING_INTERVAL_MS, TRACK_ALLOCATIONS,
+                        REPORTING_INTERVAL_MS, STARTUP, TRACK_ALLOCATIONS,
                     };
                     use std::sync::atomic::Ordering;
                     TRACK_ALLOCATIONS.store(true, Ordering::Relaxed);
+                    STARTUP.store(false, Ordering::Relaxed);
                     REPORTING_INTERVAL_MS.store(
                         root_opts.allocation_tracing_reporting_interval_ms,
                         Ordering::Relaxed,
