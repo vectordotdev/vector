@@ -7,7 +7,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
 };
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{config::LogNamespace, ByteSizeOf};
+use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -164,7 +164,7 @@ async fn nats_source(
                     let count = events.len();
                     emit!(EventsReceived {
                         count,
-                        byte_size: events.size_of()
+                        byte_size: events.estimated_json_encoded_size_of()
                     });
 
                     let now = Utc::now();

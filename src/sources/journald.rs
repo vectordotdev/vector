@@ -29,14 +29,15 @@ use tokio::{
 };
 use tokio_util::codec::FramedRead;
 use value::{kind::Collection, Kind, Value};
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+use vector_common::{
+    finalizer::OrderedFinalizer,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered},
 };
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -505,7 +506,7 @@ impl<'a> Batch<'a> {
             let count = self.events.len();
             emit!(EventsReceived {
                 count,
-                byte_size: self.events.size_of(),
+                byte_size: self.events.estimated_json_encoded_size_of(),
             });
 
             match self.source.out.send_batch(self.events).await {

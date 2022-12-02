@@ -7,7 +7,7 @@ use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder;
 use vector_config::NamedComponent;
-use vector_core::{config::LegacyKey, ByteSizeOf};
+use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{
@@ -184,7 +184,7 @@ pub(crate) fn decode_log_body(
     }
 
     emit!(EventsReceived {
-        byte_size: decoded.size_of(),
+        byte_size: decoded.estimated_json_encoded_size_of(),
         count: decoded.len(),
     });
 
