@@ -1454,10 +1454,6 @@ mod tests {
         )
         .unknown_fields(Kind::bytes());
 
-        println!("{:?}", definition.event_kind().debug_info());
-        println!("");
-        println!("{:?}", expected_definition.event_kind().debug_info());
-
         assert_eq!(definition, expected_definition)
     }
 
