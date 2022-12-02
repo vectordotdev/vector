@@ -11,18 +11,20 @@ use bollard::{
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
+use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use futures::{Stream, StreamExt};
-use lookup::lookup_v2::ValuePath;
-use lookup::path;
-use lookup::PathPrefix;
+use lookup::lookup_v2::parse_value_path;
+use lookup::{metadata_path, owned_value_path, path, PathPrefix};
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
+use value::kind::Collection;
+use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
 use crate::{
@@ -40,6 +42,9 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
+
+#[cfg(test)]
+mod tests;
 
 const IMAGE: &str = "image";
 const CREATED_AT: &str = "container_created_at";
@@ -130,6 +135,11 @@ pub struct DockerLogsConfig {
 
     #[configurable(derived)]
     tls: Option<DockerTlsConfig>,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
+    pub log_namespace: Option<bool>,
 }
 
 impl Default for DockerLogsConfig {
@@ -146,6 +156,7 @@ impl Default for DockerLogsConfig {
             auto_partial_merge: true,
             multiline: None,
             retry_backoff_secs: 2,
+            log_namespace: None,
         }
     }
 }
@@ -195,10 +206,12 @@ impl_generate_config_from_default!(DockerLogsConfig);
 #[async_trait::async_trait]
 impl SourceConfig for DockerLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let source = DockerLogsSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
             cx.out,
             cx.shutdown.clone(),
+            log_namespace,
         )?;
 
         // Capture currently running containers, and do main future(run)
@@ -224,8 +237,86 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = BytesDeserializerConfig
+            .schema_definition(log_namespace)
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(self
+                    .host_key
+                    .as_str()))),
+                &owned_value_path!("host"),
+                Kind::bytes().or_undefined(),
+                Some("host"),
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(CONTAINER))),
+                &owned_value_path!(CONTAINER),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(IMAGE))),
+                &owned_value_path!(IMAGE),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(NAME))),
+                &owned_value_path!(NAME),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(CREATED_AT))),
+                &owned_value_path!(CREATED_AT),
+                Kind::timestamp(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("label"))),
+                &owned_value_path!("labels"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(STREAM))),
+                &owned_value_path!(STREAM),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                parse_value_path(log_schema().timestamp_key())
+                    .ok()
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_vector_metadata(
+                parse_value_path(log_schema().source_type_key())
+                    .ok()
+                    .as_ref(),
+                &owned_value_path!("source_type"),
+                Kind::bytes(),
+                None,
+            )
+            .with_vector_metadata(
+                None,
+                &owned_value_path!("ingest_timestamp"),
+                Kind::timestamp(),
+                None,
+            );
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -337,6 +428,7 @@ impl DockerLogsSource {
         config: DockerLogsConfig,
         out: SourceSender,
         shutdown: ShutdownSignal,
+        log_namespace: LogNamespace,
     ) -> crate::Result<DockerLogsSource> {
         let backoff_secs = config.retry_backoff_secs;
 
@@ -369,6 +461,7 @@ impl DockerLogsSource {
             out,
             main_send,
             shutdown,
+            log_namespace,
         };
 
         Ok(DockerLogsSource {
@@ -552,6 +645,7 @@ struct EventStreamBuilder {
     main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>>,
     /// Self and event streams will end on this.
     shutdown: ShutdownSignal,
+    log_namespace: LogNamespace,
 }
 
 impl EventStreamBuilder {
@@ -636,6 +730,7 @@ impl EventStreamBuilder {
                         core.config.auto_partial_merge,
                         &mut partial_event_merge_state,
                         &bytes_received,
+                        self.log_namespace,
                     )),
                     Err(error) => {
                         // On any error, restart connection
@@ -672,6 +767,7 @@ impl EventStreamBuilder {
                 Box::new(line_agg_adapter(
                     events_stream,
                     line_agg::Logic::new(line_agg_config.clone()),
+                    self.log_namespace,
                 ))
             } else {
                 Box::new(events_stream)
@@ -680,8 +776,8 @@ impl EventStreamBuilder {
         let host_key = self.host_key.clone();
         let hostname = self.hostname.clone();
         let result = {
-            let mut stream =
-                events_stream.map(move |event| add_hostname(event, &host_key, &hostname));
+            let mut stream = events_stream
+                .map(move |event| add_hostname(event, &host_key, &hostname, self.log_namespace));
             self.out
                 .send_event_stream(&mut stream)
                 .await
@@ -712,12 +808,23 @@ impl EventStreamBuilder {
     }
 }
 
-fn add_hostname(mut event: LogEvent, host_key: &str, hostname: &Option<String>) -> LogEvent {
+fn add_hostname(
+    mut log: LogEvent,
+    host_key: &str,
+    hostname: &Option<String>,
+    log_namespace: LogNamespace,
+) -> LogEvent {
     if let Some(hostname) = hostname {
-        event.insert(host_key, hostname.clone());
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(host_key)),
+            path!("host"),
+            hostname.clone(),
+        );
     }
 
-    event
+    log
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -838,6 +945,7 @@ impl ContainerLogInfo {
         auto_partial_merge: bool,
         partial_event_merge_state: &mut Option<LogEventMergeState>,
         bytes_received: &Registered<BytesReceived>,
+        log_namespace: LogNamespace,
     ) -> Option<LogEvent> {
         let (stream, mut bytes_message) = match log_output {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
@@ -918,55 +1026,94 @@ impl ContainerLogInfo {
             true
         };
 
-        // Prepare the log event.
-        let mut log_event = {
-            let mut log_event = LogEvent::default();
+        // Build the log.
+        let deserializer = BytesDeserializer::new();
+        let mut log = deserializer.parse_single(bytes_message, log_namespace);
 
-            // Source type
-            log_event.insert(log_schema().source_type_key(), Bytes::from("docker"));
-
-            // The log message.
-            log_event.insert(log_schema().message_key(), bytes_message);
-
-            // Stream we got the message from.
-            log_event.insert(STREAM, stream);
-
-            // Timestamp of the event.
-            if let Some(timestamp) = timestamp {
-                log_event.insert(log_schema().timestamp_key(), timestamp);
+        // Container ID
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(CONTAINER))),
+            path!(CONTAINER),
+            self.id.0.clone(),
+        );
+        // Container image
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(IMAGE))),
+            path!(IMAGE),
+            self.metadata.image.clone(),
+        );
+        // Container name
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(NAME))),
+            path!(NAME),
+            self.metadata.name.clone(),
+        );
+        // Created at timestamp
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(CREATED_AT))),
+            path!(CREATED_AT),
+            self.metadata.created_at,
+        );
+        // Labels
+        if !self.metadata.labels.is_empty() {
+            for (key, value) in self.metadata.labels.iter() {
+                log_namespace.insert_source_metadata(
+                    DockerLogsConfig::NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(path!("label", key))),
+                    path!("labels", key),
+                    value.clone(),
+                )
             }
+        }
+        log_namespace.insert_source_metadata(
+            DockerLogsConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(STREAM))),
+            path!(STREAM),
+            stream,
+        );
 
-            // Container ID.
-            log_event.insert(CONTAINER, self.id.0.clone());
+        log_namespace.insert_vector_metadata(
+            &mut log,
+            path!(log_schema().source_type_key()),
+            path!("source_type"),
+            Bytes::from_static(DockerLogsConfig::NAME.as_bytes()),
+        );
 
-            // Labels.
-            if !self.metadata.labels.is_empty() {
-                for (key, value) in self.metadata.labels.iter() {
-                    log_event.insert(
-                        (PathPrefix::Event, path!("label").concat(path!(key))),
-                        value.clone(),
+        // This handles the transition from the original timestamp logic. Originally the
+        // `timestamp_key` was only populated when a timestamp was parsed from the event.
+        match log_namespace {
+            LogNamespace::Vector => {
+                if let Some(timestamp) = timestamp {
+                    log.insert(
+                        metadata_path!(DockerLogsConfig::NAME, "timestamp"),
+                        timestamp,
                     );
                 }
+
+                log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
-
-            // Container name.
-            log_event.insert(NAME, self.metadata.name.clone());
-
-            // Container image.
-            log_event.insert(IMAGE, self.metadata.image.clone());
-
-            // Timestamp of the container creation.
-            log_event.insert(CREATED_AT, self.metadata.created_at);
-
-            // Return the resulting log event.
-            log_event
+            LogNamespace::Legacy => {
+                if let Some(timestamp) = timestamp {
+                    log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+                }
+            }
         };
 
         // If automatic partial event merging is requested - perform the
         // merging.
         // Otherwise mark partial events and return all the events with no
         // merging.
-        let log_event = if auto_partial_merge {
+        let log = if auto_partial_merge {
             // Partial event events merging logic.
 
             // If event is partial, stash it and return `None`.
@@ -976,10 +1123,21 @@ impl ContainerLogInfo {
                 // Otherwise, create a new partial event merge state with the
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
-                    partial_event_merge_state
-                        .merge_in_next_event(log_event, &[log_schema().message_key().to_string()]);
+                    // Depending on the log namespace the actual contents of the log "message" will be
+                    // found in either the root of the event ("."), or at the globally configured "message_key".
+                    match log_namespace {
+                        LogNamespace::Vector => {
+                            partial_event_merge_state.merge_in_next_event(log, &["."]);
+                        }
+                        LogNamespace::Legacy => {
+                            partial_event_merge_state.merge_in_next_event(
+                                log,
+                                &[log_schema().message_key().to_string()],
+                            );
+                        }
+                    }
                 } else {
-                    *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
+                    *partial_event_merge_state = Some(LogEventMergeState::new(log));
                 };
                 return None;
             };
@@ -989,31 +1147,46 @@ impl ContainerLogInfo {
             // would give us a merged event we can return.
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
-                Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[log_schema().message_key().to_string()]),
-                None => log_event,
+                // Depending on the log namespace the actual contents of the log "message" will be
+                // found in either the root of the event ("."), or at the globally configured "message_key".
+                Some(partial_event_merge_state) => match log_namespace {
+                    LogNamespace::Vector => {
+                        partial_event_merge_state.merge_in_final_event(log, &["."])
+                    }
+                    LogNamespace::Legacy => partial_event_merge_state
+                        .merge_in_final_event(log, &[log_schema().message_key().to_string()]),
+                },
+                None => log,
             }
         } else {
             // If the event is partial, just set the partial event marker field.
             if is_partial {
                 // Only add partial event marker field if it's requested.
                 if let Some(partial_event_marker_field) = partial_event_marker_field {
-                    log_event.insert(partial_event_marker_field.as_str(), true);
+                    log_namespace.insert_source_metadata(
+                        DockerLogsConfig::NAME,
+                        &mut log,
+                        Some(LegacyKey::Overwrite(path!(
+                            partial_event_marker_field.as_str()
+                        ))),
+                        path!(event::PARTIAL),
+                        true,
+                    );
                 }
             }
             // Return the log event as is, partial or not. No merging here.
-            log_event
+            log
         };
 
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.
         emit!(DockerLogsEventsReceived {
-            byte_size: log_event.estimated_json_encoded_size_of(),
+            byte_size: log.estimated_json_encoded_size_of(),
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str
         });
 
-        Some(log_event)
+        Some(log)
     }
 }
 
@@ -1051,732 +1224,32 @@ impl ContainerMetadata {
 fn line_agg_adapter(
     inner: impl Stream<Item = LogEvent> + Unpin,
     logic: line_agg::Logic<Bytes, LogEvent>,
+    log_namespace: LogNamespace,
 ) -> impl Stream<Item = LogEvent> {
-    let line_agg_in = inner.map(|mut log_event| {
-        let message_value = log_event
-            .remove(log_schema().message_key())
-            .expect("message must exist in the event");
-        let stream_value = log_event
-            .get(STREAM)
-            .expect("stream must exist in the event");
+    let line_agg_in = inner.map(move |mut log| {
+        let message_value = match log_namespace {
+            LogNamespace::Vector => log.remove(".").expect("`.` must exist in the event"),
+            LogNamespace::Legacy => log
+                .remove(log_schema().message_key())
+                .expect("`message` must exist in the event"),
+        };
+        let stream_value = match log_namespace {
+            LogNamespace::Vector => log
+                .get(metadata_path!(DockerLogsConfig::NAME, STREAM))
+                .expect("`docker_logs.stream` must exist in the metadata"),
+            LogNamespace::Legacy => log.get(STREAM).expect("stream must exist in the event"),
+        };
 
         let stream = stream_value.coerce_to_bytes();
         let message = message_value.coerce_to_bytes();
-        (stream, message, log_event)
+        (stream, message, log)
     });
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
-    line_agg_out.map(|(_, message, mut log_event)| {
-        log_event.insert(log_schema().message_key(), message);
-        log_event
+    line_agg_out.map(move |(_, message, mut log)| {
+        match log_namespace {
+            LogNamespace::Vector => log.insert(".", message),
+            LogNamespace::Legacy => log.insert(log_schema().message_key(), message),
+        };
+        log
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<DockerLogsConfig>();
-    }
-
-    #[test]
-    fn exclude_self() {
-        let (tx, _rx) = SourceSender::new_test();
-        let mut source =
-            DockerLogsSource::new(DockerLogsConfig::default(), tx, ShutdownSignal::noop()).unwrap();
-        source.hostname = Some("451062c59603".to_owned());
-        assert!(
-            source.exclude_self("451062c59603a1cf0c6af3e74a31c0ae63d8275aa16a5fc78ef31b923baaffc3")
-        );
-
-        // hostname too short
-        source.hostname = Some("a".to_owned());
-        assert!(!source.exclude_self("a29d569bd46c"));
-    }
-}
-
-#[cfg(all(test, feature = "docker-logs-integration-tests"))]
-mod integration_tests {
-    use bollard::{
-        container::{
-            Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
-            RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
-        },
-        image::{CreateImageOptions, ListImagesOptions},
-    };
-    use futures::{stream::TryStreamExt, FutureExt};
-
-    use super::*;
-    use crate::{
-        event::Event,
-        test_util::{
-            collect_n, collect_ready,
-            components::{assert_source_compliance, SOURCE_TAGS},
-            trace_init,
-        },
-        SourceSender,
-    };
-
-    /// None if docker is not present on the system
-    async fn source_with<'a, L: Into<Option<&'a str>>>(
-        names: &[&str],
-        label: L,
-    ) -> impl Stream<Item = Event> {
-        source_with_config(DockerLogsConfig {
-            include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
-            include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
-            ..DockerLogsConfig::default()
-        })
-        .await
-    }
-
-    async fn source_with_config(config: DockerLogsConfig) -> impl Stream<Item = Event> + Unpin {
-        let (sender, recv) = SourceSender::new_test();
-        let source = config
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-
-        tokio::spawn(async move { source.await.unwrap() });
-
-        recv
-    }
-
-    /// Users should ensure to remove container before exiting.
-    async fn log_container(
-        name: &str,
-        label: Option<&str>,
-        log: &str,
-        docker: &Docker,
-        tty: bool,
-    ) -> String {
-        cmd_container(name, label, vec!["echo", log], docker, tty).await
-    }
-
-    /// Users should ensure to remove container before exiting.
-    /// Will resend message every so often.
-    async fn eternal_container(
-        name: &str,
-        label: Option<&str>,
-        log: &str,
-        docker: &Docker,
-    ) -> String {
-        cmd_container(
-            name,
-            label,
-            vec![
-                "sh",
-                "-c",
-                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log).as_str(),
-            ],
-            docker,
-            false
-        ).await
-    }
-
-    /// Users should ensure to remove container before exiting.
-    async fn cmd_container(
-        name: &str,
-        label: Option<&str>,
-        cmd: Vec<&str>,
-        docker: &Docker,
-        tty: bool,
-    ) -> String {
-        if let Some(id) = cmd_container_for_real(name, label, cmd, docker, tty).await {
-            id
-        } else {
-            // Maybe a before created container is present
-            info!(
-                message = "Assumes that named container remained from previous tests.",
-                name = name
-            );
-            name.to_owned()
-        }
-    }
-
-    /// Users should ensure to remove container before exiting.
-    async fn cmd_container_for_real(
-        name: &str,
-        label: Option<&str>,
-        cmd: Vec<&str>,
-        docker: &Docker,
-        tty: bool,
-    ) -> Option<String> {
-        pull_busybox(docker).await;
-
-        trace!("Creating container.");
-
-        let options = Some(CreateContainerOptions { name });
-        let config = ContainerConfig {
-            image: Some("busybox"),
-            cmd: Some(cmd),
-            labels: label.map(|label| vec![(label, "")].into_iter().collect()),
-            tty: Some(tty),
-            ..Default::default()
-        };
-
-        let container = docker.create_container(options, config).await;
-        container.ok().map(|c| c.id)
-    }
-
-    async fn pull_busybox(docker: &Docker) {
-        let mut filters = HashMap::new();
-        filters.insert("reference", vec!["busybox:latest"]);
-
-        let options = Some(ListImagesOptions {
-            filters,
-            ..Default::default()
-        });
-
-        let images = docker.list_images(options).await.unwrap();
-        if images.is_empty() {
-            // If `busybox:latest` not found, pull it
-            let options = Some(CreateImageOptions {
-                from_image: "busybox",
-                tag: "latest",
-                ..Default::default()
-            });
-
-            docker
-                .create_image(options, None, None)
-                .for_each(|item| async move {
-                    let info = item.unwrap();
-                    if let Some(error) = info.error {
-                        panic!("{:?}", error);
-                    }
-                })
-                .await
-        }
-    }
-
-    /// Returns once container has started
-    async fn container_start(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Starting container.");
-
-        let options = None::<StartContainerOptions<&str>>;
-        docker.start_container(id, options).await
-    }
-
-    /// Returns once container is done running
-    async fn container_wait(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Waiting for container.");
-
-        docker
-            .wait_container(id, None::<WaitContainerOptions<&str>>)
-            .try_for_each(|exit| async move {
-                info!(message = "Container exited with status code.", status_code = ?exit.status_code);
-                Ok(())
-            })
-            .await
-    }
-
-    /// Returns once container is killed
-    async fn container_kill(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Waiting for container to be killed.");
-
-        docker
-            .kill_container(id, None::<KillContainerOptions<&str>>)
-            .await
-    }
-
-    /// Returns once container is done running
-    async fn container_run(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        container_start(id, docker).await?;
-        container_wait(id, docker).await
-    }
-
-    async fn container_remove(id: &str, docker: &Docker) {
-        trace!("Removing container.");
-
-        // Don't panic, as this is unrelated to the test, and there are possibly other containers that need to be removed
-        let _ = docker
-            .remove_container(id, None::<RemoveContainerOptions>)
-            .await
-            .map_err(|e| error!(%e));
-    }
-
-    /// Returns once it's certain that log has been made
-    /// Expects that this is the only one with a container
-    async fn container_log_n(
-        n: usize,
-        name: &str,
-        label: Option<&str>,
-        log: &str,
-        docker: &Docker,
-    ) -> String {
-        container_with_optional_tty_log_n(n, name, label, log, docker, false).await
-    }
-    async fn container_with_optional_tty_log_n(
-        n: usize,
-        name: &str,
-        label: Option<&str>,
-        log: &str,
-        docker: &Docker,
-        tty: bool,
-    ) -> String {
-        let id = log_container(name, label, log, docker, tty).await;
-        for _ in 0..n {
-            if let Err(error) = container_run(&id, docker).await {
-                container_remove(&id, docker).await;
-                panic!("Container failed to start with error: {:?}", error);
-            }
-        }
-        id
-    }
-
-    /// Once function returns, the container has entered into running state.
-    /// Container must be killed before removed.
-    async fn running_container(
-        name: &'static str,
-        label: Option<&'static str>,
-        log: &'static str,
-        docker: &Docker,
-    ) -> String {
-        let out = source_with(&[name], None).await;
-        let docker = docker.clone();
-
-        let id = eternal_container(name, label, log, &docker).await;
-        if let Err(error) = container_start(&id, &docker).await {
-            container_remove(&id, &docker).await;
-            panic!("Container start failed with error: {:?}", error);
-        }
-
-        // Wait for before message
-        let events = collect_n(out, 1).await;
-        assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "before".into()
-        );
-
-        id
-    }
-
-    fn is_empty<T>(mut rx: impl Stream<Item = T> + Unpin) -> bool {
-        rx.next().now_or_never().is_none()
-    }
-
-    #[tokio::test]
-    async fn container_with_tty() {
-        trace_init();
-
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let message = "log container_with_tty";
-            let name = "container_with_tty";
-
-            let out = source_with(&[name], None).await;
-
-            let docker = docker(None, None).unwrap();
-
-            let id = container_with_optional_tty_log_n(1, name, None, message, &docker, true).await;
-            let events = collect_n(out, 1).await;
-            container_remove(&id, &docker).await;
-
-            assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                message.into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn newly_started() {
-        trace_init();
-
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let message = "9";
-            let name = "vector_test_newly_started";
-            let label = "vector_test_label_newly_started";
-
-            let out = source_with(&[name], None).await;
-
-            let docker = docker(None, None).unwrap();
-
-            let id = container_log_n(1, name, Some(label), message, &docker).await;
-            let events = collect_n(out, 1).await;
-            container_remove(&id, &docker).await;
-
-            let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
-            assert_eq!(log[super::CONTAINER], id.into());
-            assert!(log.get(super::CREATED_AT).is_some());
-            assert_eq!(log[super::IMAGE], "busybox".into());
-            assert!(log.get(format!("label.{}", label).as_str()).is_some());
-            assert_eq!(events[0].as_log()[&super::NAME], name.into());
-            assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
-                "docker".into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn restart() {
-        trace_init();
-
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let message = "10";
-            let name = "vector_test_restart";
-
-            let out = source_with(&[name], None).await;
-
-            let docker = docker(None, None).unwrap();
-
-            let id = container_log_n(2, name, None, message, &docker).await;
-            let events = collect_n(out, 2).await;
-            container_remove(&id, &docker).await;
-
-            assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                message.into()
-            );
-            assert_eq!(
-                events[1].as_log()[log_schema().message_key()],
-                message.into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn include_containers() {
-        trace_init();
-
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let message = "11";
-            let name0 = "vector_test_include_container_0";
-            let name1 = "vector_test_include_container_1";
-
-            let out = source_with(&[name1], None).await;
-
-            let docker = docker(None, None).unwrap();
-
-            let id0 = container_log_n(1, name0, None, "11", &docker).await;
-            let id1 = container_log_n(1, name1, None, message, &docker).await;
-            let events = collect_n(out, 1).await;
-            container_remove(&id0, &docker).await;
-            container_remove(&id1, &docker).await;
-
-            assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                message.into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn exclude_containers() {
-        trace_init();
-
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let will_be_read = "12";
-
-            let prefix = "vector_test_exclude_containers";
-            let included0 = format!("{}_{}", prefix, "include0");
-            let included1 = format!("{}_{}", prefix, "include1");
-            let excluded0 = format!("{}_{}", prefix, "excluded0");
-
-            let docker = docker(None, None).unwrap();
-
-            let out = source_with_config(DockerLogsConfig {
-                include_containers: Some(vec![prefix.to_owned()]),
-                exclude_containers: Some(vec![excluded0.to_owned()]),
-                ..DockerLogsConfig::default()
-            })
-            .await;
-
-            let id0 = container_log_n(1, &excluded0, None, "will not be read", &docker).await;
-            let id1 = container_log_n(1, &included0, None, will_be_read, &docker).await;
-            let id2 = container_log_n(1, &included1, None, will_be_read, &docker).await;
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let events = collect_ready(out).await;
-            container_remove(&id0, &docker).await;
-            container_remove(&id1, &docker).await;
-            container_remove(&id2, &docker).await;
-
-            assert_eq!(events.len(), 2);
-            assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                will_be_read.into()
-            );
-
-            assert_eq!(
-                events[1].as_log()[log_schema().message_key()],
-                will_be_read.into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn include_labels() {
-        trace_init();
-
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let message = "13";
-            let name0 = "vector_test_include_labels_0";
-            let name1 = "vector_test_include_labels_1";
-            let label = "vector_test_include_label";
-
-            let out = source_with(&[name0, name1], label).await;
-
-            let docker = docker(None, None).unwrap();
-
-            let id0 = container_log_n(1, name0, None, "13", &docker).await;
-            let id1 = container_log_n(1, name1, Some(label), message, &docker).await;
-            let events = collect_n(out, 1).await;
-            container_remove(&id0, &docker).await;
-            container_remove(&id1, &docker).await;
-
-            assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                message.into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn currently_running() {
-        trace_init();
-
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let message = "14";
-            let name = "vector_test_currently_running";
-            let label = "vector_test_label_currently_running";
-
-            let docker = docker(None, None).unwrap();
-            let id = running_container(name, Some(label), message, &docker).await;
-            let out = source_with(&[name], None).await;
-
-            let events = collect_n(out, 1).await;
-            let _ = container_kill(&id, &docker).await;
-            container_remove(&id, &docker).await;
-
-            let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
-            assert_eq!(log[super::CONTAINER], id.into());
-            assert!(log.get(super::CREATED_AT).is_some());
-            assert_eq!(log[super::IMAGE], "busybox".into());
-            assert!(log.get(format!("label.{}", label).as_str()).is_some());
-            assert_eq!(events[0].as_log()[&super::NAME], name.into());
-            assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
-                "docker".into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn include_image() {
-        trace_init();
-
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let message = "15";
-            let name = "vector_test_include_image";
-            let config = DockerLogsConfig {
-                include_containers: Some(vec![name.to_owned()]),
-                include_images: Some(vec!["busybox".to_owned()]),
-                ..DockerLogsConfig::default()
-            };
-
-            let out = source_with_config(config).await;
-
-            let docker = docker(None, None).unwrap();
-
-            let id = container_log_n(1, name, None, message, &docker).await;
-            let events = collect_n(out, 1).await;
-            container_remove(&id, &docker).await;
-
-            assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                message.into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn not_include_image() {
-        trace_init();
-
-        // No assert_source_compliance here since we aren't including the image
-        // no events are collected.
-
-        let message = "16";
-        let name = "vector_test_not_include_image";
-        let config_ex = DockerLogsConfig {
-            include_images: Some(vec!["some_image".to_owned()]),
-            ..DockerLogsConfig::default()
-        };
-
-        let exclude_out = source_with_config(config_ex).await;
-
-        let docker = docker(None, None).unwrap();
-
-        let id = container_log_n(1, name, None, message, &docker).await;
-        container_remove(&id, &docker).await;
-
-        assert!(is_empty(exclude_out));
-    }
-
-    #[tokio::test]
-    async fn not_include_running_image() {
-        trace_init();
-
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let message = "17";
-            let name = "vector_test_not_include_running_image";
-            let config_ex = DockerLogsConfig {
-                include_images: Some(vec!["some_image".to_owned()]),
-                ..DockerLogsConfig::default()
-            };
-            let config_in = DockerLogsConfig {
-                include_containers: Some(vec![name.to_owned()]),
-                include_images: Some(vec!["busybox".to_owned()]),
-                ..DockerLogsConfig::default()
-            };
-
-            let docker = docker(None, None).unwrap();
-
-            let id = running_container(name, None, message, &docker).await;
-            let exclude_out = source_with_config(config_ex).await;
-            let include_out = source_with_config(config_in).await;
-
-            let _ = collect_n(include_out, 1).await;
-            let _ = container_kill(&id, &docker).await;
-            container_remove(&id, &docker).await;
-
-            assert!(is_empty(exclude_out));
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn flat_labels() {
-        trace_init();
-
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let message = "18";
-            let name = "vector_test_flat_labels";
-            let label = "vector.test.label.flat.labels";
-
-            let docker = docker(None, None).unwrap();
-            let id = running_container(name, Some(label), message, &docker).await;
-            let out = source_with(&[name], None).await;
-
-            let events = collect_n(out, 1).await;
-            let _ = container_kill(&id, &docker).await;
-            container_remove(&id, &docker).await;
-
-            let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
-            assert_eq!(log[super::CONTAINER], id.into());
-            assert!(log.get(super::CREATED_AT).is_some());
-            assert_eq!(log[super::IMAGE], "busybox".into());
-            assert!(log
-                .get("label")
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .get(label)
-                .is_some());
-            assert_eq!(events[0].as_log()[&super::NAME], name.into());
-            assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
-                "docker".into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn log_longer_than_16kb() {
-        trace_init();
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let mut message = String::with_capacity(20 * 1024);
-            for _ in 0..message.capacity() {
-                message.push('0');
-            }
-            let name = "vector_test_log_longer_than_16kb";
-
-            let out = source_with(&[name], None).await;
-
-            let docker = docker(None, None).unwrap();
-
-            let id = container_log_n(1, name, None, message.as_str(), &docker).await;
-            let events = collect_n(out, 1).await;
-            container_remove(&id, &docker).await;
-
-            let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn merge_multiline() {
-        assert_source_compliance(&SOURCE_TAGS, async {
-            trace_init();
-
-            let emitted_messages = vec![
-                "java.lang.Exception",
-                "    at com.foo.bar(bar.java:123)",
-                "    at com.foo.baz(baz.java:456)",
-            ];
-            let expected_messages = vec![concat!(
-                "java.lang.Exception\n",
-                "    at com.foo.bar(bar.java:123)\n",
-                "    at com.foo.baz(baz.java:456)",
-            )];
-            let name = "vector_test_merge_multiline";
-            let config = DockerLogsConfig {
-                include_containers: Some(vec![name.to_owned()]),
-                include_images: Some(vec!["busybox".to_owned()]),
-                multiline: Some(MultilineConfig {
-                    start_pattern: "^[^\\s]".to_owned(),
-                    condition_pattern: "^[\\s]+at".to_owned(),
-                    mode: line_agg::Mode::ContinueThrough,
-                    timeout_ms: 10,
-                }),
-                ..DockerLogsConfig::default()
-            };
-
-            let out = source_with_config(config).await;
-
-            let docker = docker(None, None).unwrap();
-
-            let command = emitted_messages
-                .into_iter()
-                .map(|message| format!("echo {:?}", message))
-                .collect::<Box<_>>()
-                .join(" && ");
-
-            let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
-            if let Err(error) = container_run(&id, &docker).await {
-                container_remove(&id, &docker).await;
-                panic!("Container failed to start with error: {:?}", error);
-            }
-            let events = collect_n(out, expected_messages.len()).await;
-            container_remove(&id, &docker).await;
-
-            let actual_messages = events
-                .into_iter()
-                .map(|event| {
-                    event
-                        .into_log()
-                        .remove(crate::config::log_schema().message_key())
-                        .unwrap()
-                        .to_string_lossy()
-                        .into_owned()
-                })
-                .collect::<Vec<_>>();
-            assert_eq!(actual_messages, expected_messages);
-        })
-        .await;
-    }
 }
