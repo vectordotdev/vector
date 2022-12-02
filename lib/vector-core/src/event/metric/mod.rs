@@ -13,7 +13,10 @@ use vector_config::configurable_component;
 use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
-    event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
+    event::{
+        estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
+        EventFinalizers, EventMetadata, Finalizable,
+    },
     ByteSizeOf,
 };
 
@@ -342,8 +345,8 @@ impl Metric {
     /// containing the previous value of the tag.
     ///
     /// *Note:* This will create the tags map if it is not present.
-    pub fn insert_tag(&mut self, name: String, value: String) -> Option<String> {
-        self.series.insert_tag(name, value)
+    pub fn replace_tag(&mut self, name: String, value: String) -> Option<String> {
+        self.series.replace_tag(name, value)
     }
 
     /// Zeroes out the data in this metric.
@@ -435,6 +438,12 @@ impl ByteSizeOf for Metric {
         self.series.allocated_bytes()
             + self.data.allocated_bytes()
             + self.metadata.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for Metric {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        0 // The JSON encoded size of a metric is unspecified.
     }
 }
 

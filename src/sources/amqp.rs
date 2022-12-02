@@ -30,7 +30,7 @@ use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 #[derive(Debug, Snafu)]
@@ -323,7 +323,7 @@ async fn receive_event(
                     });
 
                     emit!(EventsReceived {
-                        byte_size: events.size_of(),
+                        byte_size: events.estimated_json_encoded_size_of(),
                         count: events.len(),
                     });
 

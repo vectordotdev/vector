@@ -193,7 +193,7 @@ impl vrl_lib::Target for VrlTarget {
 
                                 metric.remove_tags();
                                 for (field, value) in &value {
-                                    metric.insert_tag(
+                                    metric.replace_tag(
                                         field.as_str().to_owned(),
                                         value
                                             .try_bytes_utf8_lossy()
@@ -204,7 +204,7 @@ impl vrl_lib::Target for VrlTarget {
                             }
                             ["tags", field] => {
                                 let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
-                                metric.insert_tag(
+                                metric.replace_tag(
                                     (*field).to_owned(),
                                     String::from_utf8_lossy(&value).into_owned(),
                                 );

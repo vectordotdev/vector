@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::transform::SyncTransform;
 
 use crate::{
@@ -102,7 +103,7 @@ impl TransformConfig for RouteConfig {
         }
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         let mut result: Vec<Output> = self
             .route
             .keys()

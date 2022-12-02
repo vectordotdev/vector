@@ -5,6 +5,7 @@ use enum_dispatch::enum_dispatch;
 use indexmap::IndexMap;
 use serde::Serialize;
 use vector_config::{configurable_component, Configurable, NamedComponent};
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{GlobalOptions, Input, Output},
     schema,
@@ -13,6 +14,7 @@ use vector_core::{
 
 use crate::transforms::Transforms;
 
+use super::schema::Options as SchemaOptions;
 use super::{id::Inputs, ComponentKey};
 
 /// Fully resolved transform component.
@@ -140,6 +142,8 @@ pub struct TransformContext {
     /// information, such as the `remap` transform, which passes this information along to the VRL
     /// compiler such that type coercion becomes less of a need for operators writing VRL programs.
     pub merged_schema_definition: schema::Definition,
+
+    pub schema: SchemaOptions,
 }
 
 impl Default for TransformContext {
@@ -150,6 +154,7 @@ impl Default for TransformContext {
             enrichment_tables: Default::default(),
             schema_definitions: HashMap::from([(None, schema::Definition::any())]),
             merged_schema_definition: schema::Definition::any(),
+            schema: SchemaOptions::default(),
         }
     }
 }
@@ -171,6 +176,18 @@ impl TransformContext {
             schema_definitions,
             ..Default::default()
         }
+    }
+
+    /// Gets the log namespacing to use. The passed in value is from the transform itself
+    /// and will override any global default if it's set.
+    ///
+    /// This should only be used for transforms that don't originate from a log (eg: `metric_to_log`)
+    /// Most transforms will keep the log_namespace value that already exists on the event.
+    pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
+        namespace
+            .or(self.schema.log_namespace)
+            .unwrap_or(false)
+            .into()
     }
 }
 
@@ -195,7 +212,11 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     ///
     /// The provided `merged_definition` can be used by transforms to understand the expected shape
     /// of events flowing through the transform.
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output>;
+    fn outputs(
+        &self,
+        merged_definition: &schema::Definition,
+        global_log_namespace: LogNamespace,
+    ) -> Vec<Output>;
 
     /// Validates that the configuration of the transform is valid.
     ///

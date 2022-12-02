@@ -1,36 +1,48 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use lookup::path;
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
+use vector_config::NamedComponent;
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
     config::log_schema,
     event::{self, Event, LogEvent, Value},
     internal_events::KubernetesLogsDockerFormatParseError,
+    sources::kubernetes_logs::Config,
     transforms::{FunctionTransform, OutputBuffer},
 };
-use lookup::event_path;
 
-pub const TIME: &str = "time";
-pub const LOG: &str = "log";
+pub const MESSAGE_KEY: &str = "log";
+pub const STREAM_KEY: &str = "stream";
+pub const TIMESTAMP_KEY: &str = "time";
 
 /// Parser for the Docker log format.
 ///
 /// Expects logs to arrive in a JSONLines format with the fields names and
-/// contents specific to the implementation of the Docker `json` log driver.
+/// contents specific to the implementation of the Docker `json-file` log driver.
 ///
 /// Normalizes parsed data for consistency.
 #[derive(Clone, Debug)]
-pub struct Docker;
+pub(super) struct Docker {
+    log_namespace: LogNamespace,
+}
+
+impl Docker {
+    pub const fn new(log_namespace: LogNamespace) -> Self {
+        Self { log_namespace }
+    }
+}
 
 impl FunctionTransform for Docker {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        if let Err(err) = parse_json(log) {
+        if let Err(err) = parse_json(log, self.log_namespace) {
             emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
-        if let Err(err) = normalize_event(log) {
+        if let Err(err) = normalize_event(log, self.log_namespace) {
             emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
@@ -39,12 +51,17 @@ impl FunctionTransform for Docker {
 }
 
 /// Parses `message` as json object and removes it.
-fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
-    let message = log
-        .remove(log_schema().message_key())
+fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), ParsingError> {
+    let message_field = match log_namespace {
+        LogNamespace::Vector => ".",
+        LogNamespace::Legacy => log_schema().message_key(),
+    };
+
+    let value = log
+        .remove(message_field)
         .ok_or(ParsingError::NoMessageField)?;
 
-    let bytes = match message {
+    let bytes = match value {
         Value::Bytes(bytes) => bytes,
         _ => return Err(ParsingError::MessageFieldNotInBytes),
     };
@@ -52,7 +69,24 @@ fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
     match serde_json::from_slice(bytes.as_ref()) {
         Ok(JsonValue::Object(object)) => {
             for (key, value) in object {
-                log.insert(event_path!(&key), value);
+                match key.as_str() {
+                    MESSAGE_KEY => drop(log.insert(message_field, value)),
+                    STREAM_KEY => log_namespace.insert_source_metadata(
+                        Config::NAME,
+                        log,
+                        Some(LegacyKey::Overwrite(path!(STREAM_KEY))),
+                        path!(STREAM_KEY),
+                        value,
+                    ),
+                    TIMESTAMP_KEY => log_namespace.insert_source_metadata(
+                        Config::NAME,
+                        log,
+                        Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+                        path!("timestamp"),
+                        value,
+                    ),
+                    _ => unreachable!("all json-file keys should be matched"),
+                };
             }
             Ok(())
         }
@@ -66,19 +100,38 @@ fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
 
 const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
-fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
-    // Parse and rename timestamp.
-    let time = log.remove(TIME).context(TimeFieldMissingSnafu)?;
+fn normalize_event(
+    log: &mut LogEvent,
+    log_namespace: LogNamespace,
+) -> Result<(), NormalizationError> {
+    // Parse timestamp.
+    let timestamp_key = match log_namespace {
+        LogNamespace::Vector => "%kubernetes_logs.timestamp",
+        LogNamespace::Legacy => log_schema().timestamp_key(),
+    };
+    let time = log.remove(timestamp_key).context(TimeFieldMissingSnafu)?;
+
     let time = match time {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::TimeValueUnexpectedType),
     };
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
         .context(TimeParsingSnafu)?;
-    log.insert(log_schema().timestamp_key(), time.with_timezone(&Utc));
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        log,
+        Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+        path!("timestamp"),
+        time.with_timezone(&Utc),
+    );
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message = log.remove(LOG).context(LogFieldMissingSnafu)?;
+    let message_key = match log_namespace {
+        LogNamespace::Vector => ".",
+        LogNamespace::Legacy => log_schema().message_key(),
+    };
+    let message = log.remove(message_key).context(LogFieldMissingSnafu)?;
+
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),
@@ -99,11 +152,17 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
         message.truncate(message.len() - 1);
         is_partial = false;
     };
-    log.insert(log_schema().message_key(), message);
+    log.insert(message_key, message);
 
     // For partial messages add a partial event indicator.
     if is_partial {
-        log.insert(event::PARTIAL, true);
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            Some(LegacyKey::Overwrite(path!(event::PARTIAL))),
+            path!(event::PARTIAL),
+            true,
+        );
     }
 
     Ok(())
@@ -147,105 +206,160 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn cases() -> Vec<(String, Vec<Event>)> {
+    pub fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
         vec![
             (
-                r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
+                Bytes::from(
+                    r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                ),
                 vec![test_util::make_log_event(
-                    "The actual log line",
+                    vrl::value!("The actual log line"),
                     "2016-10-05T00:00:30.082640485Z",
                     "stderr",
                     false,
+                    log_namespace,
                 )],
             ),
             (
-                r#"{"log": "A line without newline chan at the end", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
+                Bytes::from(
+                    r#"{"log": "A line without newline char at the end", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                ),
                 vec![test_util::make_log_event(
-                    "A line without newline chan at the end",
+                    vrl::value!("A line without newline char at the end"),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     false,
+                    log_namespace,
                 )],
             ),
             // Partial message due to message length.
             (
-                [
-                    r#"{"log": ""#,
-                    make_long_string("partial ", 16 * 1024).as_str(),
-                    r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
-                ]
-                .join(""),
+                Bytes::from(
+                    [
+                        r#"{"log": ""#,
+                        make_long_string("partial ", 16 * 1024).as_str(),
+                        r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                    ]
+                    .join(""),
+                ),
                 vec![test_util::make_log_event(
-                    make_long_string("partial ",16 * 1024).as_str(),
+                    vrl::value!(make_long_string("partial ", 16 * 1024)),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     true,
+                    log_namespace,
                 )],
             ),
             // Non-partial message, because message length matches but
             // the message also ends with newline.
             (
-                [
-                    r#"{"log": ""#,
-                    make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
-                    r"\n",
-                    r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
-                ]
-                .join(""),
+                Bytes::from(
+                    [
+                        r#"{"log": ""#,
+                        make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
+                        r"\n",
+                        r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                    ]
+                    .join(""),
+                ),
                 vec![test_util::make_log_event(
-                    make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
+                    vrl::value!(make_long_string("non-partial ", 16 * 1024 - 1)),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     false,
+                    log_namespace,
                 )],
             ),
         ]
     }
 
+    pub fn invalid_cases() -> Vec<Bytes> {
+        vec![
+            // Empty string.
+            Bytes::from(""),
+            // Incomplete.
+            Bytes::from("{"),
+            // Random non-JSON text.
+            Bytes::from("hello world"),
+            // Random JSON non-object.
+            Bytes::from("123"),
+            // Empty JSON object.
+            Bytes::from("{}"),
+            // No timestamp.
+            Bytes::from(r#"{"log": "Hello world", "stream": "stdout"}"#),
+            // Timestamp not a string.
+            Bytes::from(r#"{"log": "Hello world", "stream": "stdout", "time": 123}"#),
+            // Empty timestamp.
+            Bytes::from(r#"{"log": "Hello world", "stream": "stdout", "time": ""}"#),
+            // Invalid timestamp.
+            Bytes::from(r#"{"log": "Hello world", "stream": "stdout", "time": "qwerty"}"#),
+            // No log field.
+            Bytes::from(r#"{"stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#),
+            // Log is not a string.
+            Bytes::from(
+                r#"{"log": 123, "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+            ),
+        ]
+    }
+
     #[test]
-    fn test_parsing() {
+    fn test_parsing_valid_vector_namespace() {
         trace_init();
 
         test_util::test_parser(
-            || Transform::function(Docker),
-            |s| Event::Log(LogEvent::from(s)),
-            cases(),
+            || {
+                Transform::function(Docker {
+                    log_namespace: LogNamespace::Vector,
+                })
+            },
+            |bytes| Event::Log(LogEvent::from(vrl::value!(bytes))),
+            valid_cases(LogNamespace::Vector),
         );
     }
 
     #[test]
-    fn test_parsing_invalid() {
+    fn test_parsing_valid_legacy_namespace() {
         trace_init();
 
-        let cases = vec![
-            // Empty string.
-            r#""#,
-            // Incomplete.
-            r#"{"#,
-            // Random non-JSON text.
-            r#"hello world"#,
-            // Random JSON non-object.
-            r#"123"#,
-            // Empty JSON object.
-            r#"{}"#,
-            // No timestamp.
-            r#"{"log": "Hello world", "stream": "stdout"}"#,
-            // Timestamp not a string.
-            r#"{"log": "Hello world", "stream": "stdout", "time": 123}"#,
-            // Empty timestamp.
-            r#"{"log": "Hello world", "stream": "stdout", "time": ""}"#,
-            // Invalid timestamp.
-            r#"{"log": "Hello world", "stream": "stdout", "time": "qwerty"}"#,
-            // No log field.
-            r#"{"stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
-            // Log is not a string.
-            r#"{"log": 123, "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
-        ];
+        test_util::test_parser(
+            || {
+                Transform::function(Docker {
+                    log_namespace: LogNamespace::Legacy,
+                })
+            },
+            |bytes| Event::Log(LogEvent::from(bytes)),
+            valid_cases(LogNamespace::Legacy),
+        );
+    }
 
-        for message in cases {
-            let input = LogEvent::from(message);
+    #[test]
+    fn test_parsing_invalid_vector_namespace() {
+        trace_init();
+
+        let cases = invalid_cases();
+
+        for bytes in cases {
+            let mut parser = Docker::new(LogNamespace::Vector);
+            let input = LogEvent::from(vrl::value!(bytes));
             let mut output = OutputBuffer::default();
-            Docker.transform(&mut output, input.into());
+            parser.transform(&mut output, input.into());
+
+            assert!(output.is_empty(), "Expected no events: {:?}", output);
+        }
+    }
+
+    #[test]
+    fn test_parsing_invalid_legacy_namespace() {
+        trace_init();
+
+        let cases = invalid_cases();
+
+        for bytes in cases {
+            let mut parser = Docker::new(LogNamespace::Legacy);
+            let input = LogEvent::from(bytes);
+            let mut output = OutputBuffer::default();
+            parser.transform(&mut output, input.into());
+
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
     }
