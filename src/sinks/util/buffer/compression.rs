@@ -63,8 +63,8 @@ impl Compression {
 
     pub const fn accept_encoding(self) -> Option<&'static str> {
         match self {
-            Self::None => None,
             Self::Gzip(_) => Some("gzip"),
+            Self::Zlib => Some("deflate"),
             _ => None,
         }
     }
