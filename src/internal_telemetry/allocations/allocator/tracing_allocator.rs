@@ -73,7 +73,6 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
         if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
             // We do leak memory for startup allocations due to them being allocated with
             // a wrapped layout.
-            self.allocator.dealloc(object_ptr, object_layout);
             return;
         }
         // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
