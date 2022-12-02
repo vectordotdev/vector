@@ -5,7 +5,6 @@ use futures::{Stream, StreamExt};
 use metrics::{register_histogram, Histogram};
 use value::Value;
 use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
-use vector_common::config::ComponentKey;
 #[cfg(test)]
 use vector_core::event::{into_event_stream, EventStatus};
 use vector_core::{
@@ -260,10 +259,10 @@ impl Inner {
         )
     }
 
-    async fn send(&mut self, events: EventArray, source_id: usize) -> Result<(), ClosedError> {
+    async fn send(&mut self, mut events: EventArray, source_id: usize) -> Result<(), ClosedError> {
         let reference = Utc::now().timestamp_millis();
-        events.iter_events_mut().for_each(|event| {
-            self.emit_lag_time(event, reference);
+        events.iter_events_mut().for_each(|mut event| {
+            self.emit_lag_time(event.as_event_ref(), reference);
             event.metadata_mut().set_source_id(source_id);
         });
         let byte_size = events.estimated_json_encoded_size_of();

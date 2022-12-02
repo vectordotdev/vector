@@ -118,6 +118,15 @@ pub enum EventMutRef<'a> {
 }
 
 impl<'a> EventMutRef<'a> {
+    /// Convert an `EventMutRef` to an `EventRef`.
+    pub fn as_event_ref(&'a self) -> EventRef<'a> {
+        match self {
+            EventMutRef::Log(v) => EventRef::Log(v),
+            EventMutRef::Metric(v) => EventRef::Metric(v),
+            EventMutRef::Trace(v) => EventRef::Trace(v),
+        }
+    }
+
     /// Extract the `LogEvent` reference in this.
     ///
     /// # Panics
