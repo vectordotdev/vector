@@ -142,9 +142,15 @@ impl Application {
             rt.block_on(async move {
                 #[cfg(feature = "allocation-tracing")]
                 if root_opts.allocation_tracing {
+                    use crate::internal_telemetry::allocations::{
+                        REPORTING_INTERVAL_MS, TRACK_ALLOCATIONS,
+                    };
                     use std::sync::atomic::Ordering;
-                    crate::internal_telemetry::allocations::TRACK_ALLOCATIONS
-                        .store(true, Ordering::Relaxed);
+                    TRACK_ALLOCATIONS.store(true, Ordering::Relaxed);
+                    REPORTING_INTERVAL_MS.store(
+                        root_opts.allocation_tracing_reporting_interval_ms,
+                        Ordering::Relaxed,
+                    );
                 }
                 trace::init(color, json, &level, root_opts.internal_log_rate_limit);
                 info!(

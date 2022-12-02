@@ -5,7 +5,9 @@ use chrono::{DateTime, Utc};
 use codecs::StreamDecodingError;
 use lookup::{metadata_path, path};
 use tokio_util::codec::Decoder as _;
-use vector_core::{config::LogNamespace, internal_event::EventsReceived, ByteSizeOf};
+use vector_core::{
+    config::LogNamespace, internal_event::EventsReceived, EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{codecs::Decoder, config::log_schema, event::BatchNotifier, event::Event};
 
@@ -63,7 +65,7 @@ pub fn decode_message<'a>(
                         })
                         .fold_finally(
                             0,
-                            |size, event: &Event| size + event.size_of(),
+                            |size, event: &Event| size + event.estimated_json_encoded_size_of(),
                             move |byte_size| emit!(EventsReceived { byte_size, count }),
                         ),
                 )

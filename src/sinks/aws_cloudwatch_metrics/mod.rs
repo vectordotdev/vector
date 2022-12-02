@@ -13,7 +13,7 @@ use futures_util::{future, future::BoxFuture};
 use std::task::{Context, Poll};
 use tower::Service;
 use vector_config::configurable_component;
-use vector_core::{sink::VectorSink, ByteSizeOf};
+use vector_core::{sink::VectorSink, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     aws::{
@@ -230,7 +230,7 @@ impl CloudWatchMetricsSvc {
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter({
-                    let byte_size = event.size_of();
+                    let byte_size = event.estimated_json_encoded_size_of();
                     normalizer.normalize(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
