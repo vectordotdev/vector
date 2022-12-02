@@ -3,6 +3,8 @@ use std::{
     sync::atomic::Ordering,
 };
 
+use nix::libc::c_void;
+
 use crate::internal_telemetry::allocations::{STARTUP, TRACK_ALLOCATIONS};
 
 use super::{
@@ -75,9 +77,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
     #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
         if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-            // We do leak memory for startup allocations due to them being allocated with
-            // a wrapped layout.
-            self.allocator.dealloc(object_ptr, object_layout);
+            tikv_jemalloc_sys::free(object_ptr as *mut c_void);
             return;
         }
         // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
