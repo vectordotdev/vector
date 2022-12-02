@@ -193,32 +193,55 @@ impl JournaldConfig {
 
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
-        Definition::new_with_default_metadata(
-            Kind::object(
-                Collection::empty()
-                    .with_unknown(Kind::bytes())
-                    // the MESSAGE field is most likely present in the journald Record, but may not be.
-                    .with_known("message", Kind::bytes().or_null()),
+        let schema_definition = match log_namespace {
+            LogNamespace::Vector => Definition::new_with_default_metadata(
+                Kind::bytes().or_null(),
+                [LogNamespace::Vector],
             ),
-            [log_namespace],
-        )
-        .with_standard_vector_source_metadata()
-        .with_source_metadata(
-            JournaldConfig::NAME,
-            None,
-            &owned_value_path!("timestamp"),
-            Kind::timestamp().or_undefined(),
-            Some("timestamp"),
-        )
-        .with_source_metadata(
-            JournaldConfig::NAME,
-            parse_value_path(log_schema().host_key())
-                .ok()
-                .map(LegacyKey::Overwrite),
-            &owned_value_path!("host"),
-            Kind::bytes().or_undefined(),
-            Some("host"),
-        )
+            LogNamespace::Legacy => Definition::new_with_default_metadata(
+                Kind::object(Collection::empty()),
+                [LogNamespace::Legacy],
+            ),
+        };
+
+        let mut schema_definition = schema_definition
+            .with_standard_vector_source_metadata()
+            // for metadata that is added to the events dynamically through the Record
+            .with_source_metadata(
+                JournaldConfig::NAME,
+                None,
+                &owned_value_path!("metadata"),
+                Kind::object(
+                    Collection::empty()
+                        .with_unknown(Kind::bytes())
+                        .with_known("message", Kind::bytes().or_null()),
+                )
+                .or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                JournaldConfig::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp().or_undefined(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                JournaldConfig::NAME,
+                parse_value_path(log_schema().host_key())
+                    .ok()
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("host"),
+                Kind::bytes().or_undefined(),
+                Some("host"),
+            );
+
+        // for metadata that is added to the events dynamically through the Record
+        if log_namespace == LogNamespace::Legacy {
+            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+        }
+
+        schema_definition
     }
 }
 
@@ -1381,27 +1404,30 @@ mod tests {
             .log_schema_definition
             .unwrap();
 
-        let expected_definition = Definition::new_with_default_metadata(
-            Kind::object(
-                Collection::empty()
-                    .with_unknown(Kind::bytes())
-                    .with_known("message", Kind::bytes().or_null()),
-            ),
-            [LogNamespace::Vector],
-        )
-        .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
-        .with_metadata_field(
-            &owned_value_path!("vector", "ingest_timestamp"),
-            Kind::timestamp(),
-        )
-        .with_metadata_field(
-            &owned_value_path!(JournaldConfig::NAME, "timestamp"),
-            Kind::timestamp().or_undefined(),
-        )
-        .with_metadata_field(
-            &owned_value_path!(JournaldConfig::NAME, "host"),
-            Kind::bytes().or_undefined(),
-        );
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes().or_null(), [LogNamespace::Vector])
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(JournaldConfig::NAME, "metadata"),
+                    Kind::object(
+                        Collection::empty()
+                            .with_unknown(Kind::bytes())
+                            .with_known("message", Kind::bytes().or_null()),
+                    )
+                    .or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(JournaldConfig::NAME, "timestamp"),
+                    Kind::timestamp().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(JournaldConfig::NAME, "host"),
+                    Kind::bytes().or_undefined(),
+                );
 
         assert_eq!(definition, expected_definition)
     }
@@ -1416,24 +1442,21 @@ mod tests {
             .unwrap();
 
         let expected_definition = Definition::new_with_default_metadata(
-            Kind::object(
-                Collection::empty()
-                    .with_unknown(Kind::bytes())
-                    .with_known("message", Kind::bytes().or_null()),
-            ),
+            Kind::object(Collection::empty()),
             [LogNamespace::Legacy],
         )
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-        .with_event_field(
-            &owned_value_path!("timestamp"),
-            Kind::timestamp().or_bytes(),
-            None,
-        )
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(
             &owned_value_path!("host"),
             Kind::bytes().or_undefined(),
             Some("host"),
-        );
+        )
+        .unknown_fields(Kind::bytes());
+
+        println!("{:?}", definition.event_kind().debug_info());
+        println!("");
+        println!("{:?}", expected_definition.event_kind().debug_info());
 
         assert_eq!(definition, expected_definition)
     }
@@ -1462,12 +1485,13 @@ mod tests {
             "__REALTIME_TIMESTAMP":"1564173027000443",
             "host":"my-host.local",
             "message":"reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
-            "source_type":"journald",
-            "timestamp":"2020-10-10T17:07:36.452332Z"
+            "source_type":"journald"
         }"#;
 
         let json: serde_json::Value = serde_json::from_str(record).unwrap();
-        let event = Event::from(LogEvent::from(value::Value::from(json)));
+        let mut event = Event::from(LogEvent::from(value::Value::from(json)));
+
+        event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
         let definition = config.outputs(namespace)[0]
             .clone()
