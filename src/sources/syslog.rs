@@ -124,9 +124,9 @@ impl SyslogConfig {
     }
 }
 
-impl GenerateConfig for SyslogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+impl Default for SyslogConfig {
+    fn default() -> Self {
+        Self {
             mode: Mode::Tcp {
                 address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
                 keepalive: None,
@@ -137,8 +137,13 @@ impl GenerateConfig for SyslogConfig {
             host_key: None,
             max_length: crate::serde::default_max_length(),
             log_namespace: None,
-        })
-        .unwrap()
+        }
+    }
+}
+
+impl GenerateConfig for SyslogConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(SyslogConfig::default()).unwrap()
     }
 }
 
@@ -202,7 +207,9 @@ impl SourceConfig for SyslogConfig {
                     Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
                         self.max_length,
                     )),
-                    Deserializer::Syslog(SyslogDeserializer),
+                    Deserializer::Syslog(SyslogDeserializer {
+                        source: Some(SyslogConfig::NAME),
+                    }),
                 );
 
                 build_unix_stream_source(
@@ -219,7 +226,7 @@ impl SourceConfig for SyslogConfig {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
-        let schema_definition = SyslogDeserializerConfig
+        let schema_definition = SyslogDeserializerConfig::from_source(SyslogConfig::NAME)
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
@@ -256,7 +263,9 @@ impl TcpSource for SyslogTcpSource {
     fn decoder(&self) -> Self::Decoder {
         Decoder::new(
             Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(self.max_length)),
-            Deserializer::Syslog(SyslogDeserializer),
+            Deserializer::Syslog(SyslogDeserializer {
+                source: Some(SyslogConfig::NAME),
+            }),
         )
     }
 
@@ -308,7 +317,9 @@ pub fn udp(
             socket,
             Decoder::new(
                 Framer::Bytes(BytesDecoder::new()),
-                Deserializer::Syslog(SyslogDeserializer),
+                Deserializer::Syslog(SyslogDeserializer {
+                    source: Some(SyslogConfig::NAME),
+                }),
             ),
         )
         .take_until(shutdown)
@@ -406,7 +417,7 @@ fn enrich_syslog_event(
 
 #[cfg(test)]
 mod test {
-    use lookup::event_path;
+    use lookup::{event_path, owned_value_path, LookupBuf};
     use std::{
         collections::{BTreeMap, HashMap},
         fmt,
@@ -419,9 +430,9 @@ mod test {
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
-    use value::Value;
+    use value::{kind::Collection, Kind, Value};
     use vector_common::assert_event_data_eq;
-    use vector_core::config::ComponentKey;
+    use vector_core::{config::ComponentKey, schema::Definition};
 
     use super::*;
     use crate::{
@@ -440,7 +451,9 @@ mod test {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> Option<Event> {
-        let parser = SyslogDeserializer;
+        let parser = SyslogDeserializer {
+            source: Some(SyslogConfig::NAME),
+        };
         let mut events = parser.parse(bytes, LogNamespace::Legacy).ok()?;
         handle_events(&mut events, host_key, default_host, log_namespace);
         Some(events.remove(0))
@@ -449,6 +462,117 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SyslogConfig>();
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = SyslogConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                )
+                .with_metadata_field(&owned_value_path!("syslog", "timestamp"), Kind::timestamp())
+                .with_metadata_field(&owned_value_path!("syslog", "hostname"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("syslog", "severity"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("syslog", "facility"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("syslog", "version"), Kind::integer())
+                .with_metadata_field(&owned_value_path!("syslog", "appname"), Kind::bytes())
+                .with_metadata_field(&owned_value_path!("syslog", "msgid"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("syslog", "procid"),
+                    Kind::integer().or_bytes(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("syslog", "structured_data"),
+                    Kind::object(Collection::from_unknown(Kind::object(
+                        Collection::from_unknown(Kind::bytes()),
+                    ))),
+                );
+
+        assert_eq!(definition, expected_definition);
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = SyslogConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(
+            &owned_value_path!("timestamp"),
+            Kind::timestamp().or_undefined(),
+            Some("timestamp"),
+        )
+        .with_event_field(
+            &owned_value_path!("hostname"),
+            Kind::bytes().or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("severity"),
+            Kind::bytes().or_undefined(),
+            Some("severity"),
+        )
+        .with_event_field(
+            &owned_value_path!("facility"),
+            Kind::bytes().or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("version"),
+            Kind::integer().or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("appname"),
+            Kind::bytes().or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("msgid"),
+            Kind::bytes().or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("procid"),
+            Kind::integer().or_bytes().or_undefined(),
+            None,
+        )
+        .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None);
+
+        println!("{:?}", definition.event_kind().debug_info());
+        println!("{:?}", definition.metadata_kind().debug_info());
+
+        println!("{:?}", expected_definition.event_kind().debug_info());
+        println!("{:?}", expected_definition.metadata_kind().debug_info());
+
+        assert_eq!(definition, expected_definition);
     }
 
     #[test]
