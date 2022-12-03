@@ -13,12 +13,12 @@ base: components: sources: demo_logs: configuration: {
 	decoding: {
 		description: "Decoding configuration."
 		required:    false
-		type: object: {
-			default: codec: "bytes"
-			options: codec: {
-				description: "The decoding method."
-				required:    true
-				type: string: enum: {
+		type: object: options: codec: {
+			description: "The decoding method."
+			required:    false
+			type: string: {
+				default: "bytes"
+				enum: {
 					bytes: "Events containing the byte frame as-is."
 					gelf: """
 						Events being parsed from a [GELF][gelf] message.
@@ -66,34 +66,34 @@ base: components: sources: demo_logs: configuration: {
 			ends within the byte stream.
 			"""
 		required: false
-		type: object: {
-			default: method: "bytes"
-			options: {
-				character_delimited: {
-					description:   "Options for the character delimited decoder."
-					relevant_when: "method = \"character_delimited\""
-					required:      true
-					type: object: options: {
-						delimiter: {
-							description: "The character that delimits byte sequences."
-							required:    true
-							type: uint: {}
-						}
-						max_length: {
-							description: """
+		type: object: options: {
+			character_delimited: {
+				description:   "Options for the character delimited decoder."
+				relevant_when: "method = \"character_delimited\""
+				required:      true
+				type: object: options: {
+					delimiter: {
+						description: "The character that delimits byte sequences."
+						required:    true
+						type: uint: {}
+					}
+					max_length: {
+						description: """
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
 																"""
-							required: false
-							type: uint: default: null
-						}
+						required: false
+						type: uint: default: null
 					}
 				}
-				method: {
-					description: "The framing method."
-					required:    true
-					type: string: enum: {
+			}
+			method: {
+				description: "The framing method."
+				required:    false
+				type: string: {
+					default: "bytes"
+					enum: {
 						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
 						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
@@ -105,29 +105,29 @@ base: components: sources: demo_logs: configuration: {
 															"""
 					}
 				}
-				newline_delimited: {
-					description:   "Options for the newline delimited decoder."
-					relevant_when: "method = \"newline_delimited\""
-					required:      false
-					type: object: options: max_length: {
-						description: """
-																The maximum length of the byte buffer.
+			}
+			newline_delimited: {
+				description:   "Options for the newline delimited decoder."
+				relevant_when: "method = \"newline_delimited\""
+				required:      false
+				type: object: options: max_length: {
+					description: """
+						The maximum length of the byte buffer.
 
-																This length does *not* include the trailing delimiter.
-																"""
-						required: false
-						type: uint: default: null
-					}
+						This length does *not* include the trailing delimiter.
+						"""
+					required: false
+					type: uint: default: null
 				}
-				octet_counting: {
-					description:   "Options for the octet counting decoder."
-					relevant_when: "method = \"octet_counting\""
-					required:      false
-					type: object: options: max_length: {
-						description: "The maximum length of the byte buffer."
-						required:    false
-						type: uint: default: null
-					}
+			}
+			octet_counting: {
+				description:   "Options for the octet counting decoder."
+				relevant_when: "method = \"octet_counting\""
+				required:      false
+				type: object: options: max_length: {
+					description: "The maximum length of the byte buffer."
+					required:    false
+					type: uint: default: null
 				}
 			}
 		}

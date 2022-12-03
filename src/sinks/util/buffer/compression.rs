@@ -169,31 +169,31 @@ impl ser::Serialize for Compression {
     {
         use ser::SerializeMap;
 
-        let mut map = serializer.serialize_map(None)?;
-        let mut level = None;
+        let default_level = CompressionLevel::const_default();
+
         match self {
-            Compression::None => map.serialize_entry("algorithm", "none")?,
+            Compression::None => serializer.serialize_str("none"),
             Compression::Gzip(gzip_level) => {
-                map.serialize_entry("algorithm", "gzip")?;
-                level = Some(*gzip_level);
+                if *gzip_level != default_level {
+                    let mut map = serializer.serialize_map(None)?;
+                    map.serialize_entry("algorithm", "gzip")?;
+                    map.serialize_entry("level", &gzip_level)?;
+                    map.end()
+                } else {
+                    serializer.serialize_str("gzip")
+                }
             }
             Compression::Zlib(zlib_level) => {
-                map.serialize_entry("algorithm", "zlib")?;
-                level = Some(*zlib_level);
+                if *zlib_level != default_level {
+                    let mut map = serializer.serialize_map(None)?;
+                    map.serialize_entry("algorithm", "zlib")?;
+                    map.serialize_entry("level", &zlib_level)?;
+                    map.end()
+                } else {
+                    serializer.serialize_str("zlib")
+                }
             }
         }
-
-        // If there's a level present, and it's _not_ the default compression level, then serialize it. We already
-        // handle deserializing as the default level when the level isn't explicitly specified (but `algorithm` is) so
-        // serializing the default would just clutter the serialized output.
-        if let Some(level) = level {
-            let default = CompressionLevel::const_default();
-            if level != default {
-                map.serialize_entry("level", &level)?
-            }
-        }
-
-        map.end()
     }
 }
 
@@ -205,7 +205,8 @@ impl Configurable for Compression {
 
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        metadata.set_description("Compression configuration.");
+        metadata.set_title("Compression configuration.");
+        metadata.set_description("All compression algorithms use the default compression level unless otherwise specified.");
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
         metadata
     }
@@ -216,31 +217,11 @@ impl Configurable for Compression {
         const LOGICAL_NAME: &str = "logical_name";
         const ENUM_TAGGING_MODE: &str = "docs::enum_tagging";
 
-        // Define our algorithms: value when configured, logical name (enum variant ident), whether
-        // or not the "full" version of the algorithm's schema has a `level` field, and title and
-        // description of algorithm, if present, respectively.
-        let none_algorithm = ("none", "None", false, None, "No compression.");
-        let gzip_algorithm = (
-            "gzip",
-            "Gzip",
-            true,
-            Some("[Gzip][gzip] compression."),
-            "[gzip]: https://en.wikipedia.org/wiki/Gzip",
-        );
-        let zlib_algorithm = (
-            "zlib",
-            "Zlib",
-            true,
-            Some("[Zlib]][zlib] compression."),
-            "[zlib]: https://en.wikipedia.org/wiki/Zlib",
-        );
-
-        let generate_string_schema = |algorithm: &str,
-                                      logical_name: &str,
+        let generate_string_schema = |logical_name: &str,
                                       title: Option<&'static str>,
                                       description: &'static str|
          -> SchemaObject {
-            let mut const_schema = generate_const_string_schema(algorithm.to_string());
+            let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
             let mut const_metadata = Metadata::<()>::with_description(description);
             if let Some(title) = title {
                 const_metadata.set_title(title);
@@ -255,29 +236,22 @@ impl Configurable for Compression {
         let mut string_metadata = Metadata::<()>::with_description("Compression algorithm.");
         string_metadata.add_custom_attribute(CustomAttribute::kv(ENUM_TAGGING_MODE, "external"));
 
-        let none_string_subschema = generate_string_schema(
-            none_algorithm.0,
-            none_algorithm.1,
-            none_algorithm.3,
-            none_algorithm.4,
-        );
+        let none_string_subschema = generate_string_schema("None", None, "No compression.");
         let gzip_string_subschema = generate_string_schema(
-            gzip_algorithm.0,
-            gzip_algorithm.1,
-            gzip_algorithm.3,
-            gzip_algorithm.4,
+            "Gzip",
+            Some("[Gzip][gzip] compression."),
+            "[gzip]: https://en.wikipedia.org/wiki/Gzip",
         );
         let zlib_string_subschema = generate_string_schema(
-            zlib_algorithm.0,
-            zlib_algorithm.1,
-            zlib_algorithm.3,
-            zlib_algorithm.4,
+            "Zlib",
+            Some("[Zlib]][zlib] compression."),
+            "[zlib]: https://en.wikipedia.org/wiki/Zlib",
         );
 
         let mut all_string_oneof_subschema = generate_one_of_schema(&[
-            none_string_subschema.clone(),
-            gzip_string_subschema.clone(),
-            zlib_string_subschema.clone(),
+            none_string_subschema,
+            gzip_string_subschema,
+            zlib_string_subschema,
         ]);
         apply_metadata(&mut all_string_oneof_subschema, string_metadata.clone());
 
@@ -310,7 +284,8 @@ impl Configurable for Compression {
         properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
 
         let mut full_subschema = generate_struct_schema(properties, required, None);
-        let full_metadata = Metadata::<()>::with_description("");
+        let mut full_metadata = Metadata::<()>::with_description("");
+        full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
         apply_metadata(&mut full_subschema, full_metadata);
 
         // Finally, we zip both schemas together.

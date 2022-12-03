@@ -4,35 +4,32 @@ base: components: sources: stdin: configuration: {
 	decoding: {
 		description: "Decoding configuration."
 		required:    false
-		type: object: {
-			default: codec: "bytes"
-			options: codec: {
-				description: "The decoding method."
-				required:    false
-				type: string: {
-					default: "bytes"
-					enum: {
-						bytes: "Events containing the byte frame as-is."
-						gelf: """
-															Events being parsed from a [GELF][gelf] message.
+		type: object: options: codec: {
+			description: "The decoding method."
+			required:    false
+			type: string: {
+				default: "bytes"
+				enum: {
+					bytes: "Events containing the byte frame as-is."
+					gelf: """
+						Events being parsed from a [GELF][gelf] message.
 
-															[gelf]: https://docs.graylog.org/docs/gelf
-															"""
-						json: "Events being parsed from a JSON string."
-						native: """
-															Events being parsed from Vector’s [native protobuf format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: "Events being parsed from a JSON string."
+					native: """
+						Events being parsed from Vector’s [native protobuf format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
 
-															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
-															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
-															"""
-						native_json: """
-															Events being parsed from Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Events being parsed from Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
 
-															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
-															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
-															"""
-						syslog: "Events being parsed from a Syslog message."
-					}
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					syslog: "Events being parsed from a Syslog message."
 				}
 			}
 		}

@@ -13,13 +13,10 @@ base: components: sources: journald: configuration: {
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: {
-			default: enabled: null
-			options: enabled: {
-				description: "Whether or not end-to-end acknowledgements are enabled for this source."
-				required:    false
-				type: bool: default: null
-			}
+		type: object: options: enabled: {
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
+			required:    false
+			type: bool: default: null
 		}
 	}
 	batch_size: {
@@ -48,12 +45,9 @@ base: components: sources: journald: configuration: {
 			If `exclude_units` is specified, it will be merged into this list.
 			"""
 		required: false
-		type: object: {
-			default: {}
-			options: "*": {
-				required: true
-				type: array: items: type: string: {}
-			}
+		type: object: options: "*": {
+			required: true
+			type: array: items: type: string: {}
 		}
 	}
 	exclude_units: {
@@ -75,12 +69,9 @@ base: components: sources: journald: configuration: {
 			If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
 			"""
 		required: false
-		type: object: {
-			default: {}
-			options: "*": {
-				required: true
-				type: array: items: type: string: {}
-			}
+		type: object: options: "*": {
+			required: true
+			type: array: items: type: string: {}
 		}
 	}
 	include_units: {

@@ -153,23 +153,16 @@ end
 def schema_aware_nested_merge(base, override)
   merger = proc { |key, v1, v2|
     if v1.is_a?(Hash) && v2.is_a?(Hash)
-      v1.merge(v2, &merger)
+      # Special behavior for merging const schemas together so they can be properly enum-ified.
+      if key == 'const' && v1.has_key?('value') && v2.has_key?('value')
+        [v1].flatten | [v2].flatten
+      else
+        v1.merge(v2, &merger)
+      end
     elsif v1.is_a?(Array) && v2.is_a?(Array)
       v1 | v2
     else
-      if key == 'const'
-        # When we're merging a 'const' field, we merge both values together as an _array_.
-        #
-        # This is specific to merging enum schemas in the mixed-mode fallback, where if we have
-        # overlapping schemas that have, say, a string field with a const value, the merging should
-        # actually turn it into an enum, with each const value present.
-        #
-        # We can't change the 'const' key to 'enum' here, so we'll handle that in reconciliation,
-        # since we have no const fields that have array values, only scalars.
-        [v1].flatten | [v2].flatten
-      else
-        [:undefined, nil, :nil].include?(v2) ? v1 : v2
-      end
+      [:undefined, nil, :nil].include?(v2) ? v1 : v2
     end
   }
   _nested_merge_impl(base, override, merger)
@@ -920,7 +913,7 @@ def resolve_bare_schema(root_schema, schema)
       # resolved output.
       const_value = schema['const']
       const_type = get_docs_type_for_value(schema, const_value)
-      { const_type => { 'const' => const_value } }
+      { const_type => { 'const' => { 'value' => const_value } } }
     when 'enum'
       @logger.debug 'Resolving enum const schema.'
 
@@ -1049,7 +1042,7 @@ def resolve_enum_schema(root_schema, schema)
         tag_value = nil
 
         %w[string number integer boolean].each do |allowed_type|
-          maybe_tag_value = tag_subschema.dig('type', allowed_type, 'const')
+          maybe_tag_value = tag_subschema.dig('type', allowed_type, 'const', 'value')
           unless maybe_tag_value.nil?
             tag_value = maybe_tag_value
             break
@@ -1318,21 +1311,13 @@ def apply_schema_default_value!(source_schema, resolved_schema)
     if resolved_schema_type_field.nil?
       @logger.error "Schema has default value declared that does not match type of resolved schema: \
       \
-      Source schema: #{source_schema} \
-      Default value: #{default_value} (type: #{default_value_type}) \
-      Resolved schema: #{resolved_schema}"
+      Source schema: #{JSON.pretty_generate(source_schema)} \
+      Default value: #{JSON.pretty_generate(default_value)} (type: #{default_value_type}) \
+      Resolved schema: #{JSON.pretty_generate(resolved_schema)}"
       exit
     end
 
     case default_value_type
-    when 'array'
-      # We blindly set the default values without verifying that they match the type of the schema
-      # described by `items`. This might need to be more rigid in the future, but we're just going
-      # with it for now.
-
-      # TODO: It should technically be as easy as just verifying that every item in `default_value`
-      # matches the schema type of whatever is under `items`, I believe?
-      resolved_schema_type_field['default'] = default_value
     when 'object'
       # For objects, we set the default values on a per-property basis by trying to extract the
       # value for each property from the object set as the default value. This is because of how we
@@ -1364,17 +1349,27 @@ def apply_schema_default_value!(source_schema, resolved_schema)
         property_default_value = default_value[property_name]
         if !property_default_value.nil?
           source_property = find_nested_object_property_schema(source_schema, property_name)
-          property_type_field = get_schema_type_field_for_value(source_property, resolved_property, property_default_value)
-          if property_type_field.nil?
-            @logger.debug "Could not find correct property type field to apply default value to."
-          end
+          if !source_property.nil?
+            # If we found the source schema for the property itself, use that to cleanly apply
+            # default values to the property.
+            source_property_with_default = deep_copy(source_property)
+            source_property_with_default['default'] = property_default_value
+            apply_schema_default_value!(source_property_with_default, resolved_property)
 
-          property_type_field['default'] = property_default_value unless property_type_field.nil?
-          resolved_property['required'] = false unless property_type_field.nil?
+            resolved_property['required'] = false
+          else
+            # We don't have a source for the property itself, presumably because we're dealing with
+            # a complex subschema, so just go based off of the type of the default value itself.
+            property_type_field = get_schema_type_field_for_value(source_property, resolved_property, property_default_value)
+            if !property_type_field.nil?
+              property_type_field['default'] = property_default_value
+              resolved_property['required'] = false
+            end
+          end
         end
       end
     else
-      # We're dealing with a normal scalar or whatever, so just apply the default directly.
+      # We're dealing with an array or normal scalar or whatever, so just apply the default directly.
       resolved_schema_type_field['default'] = default_value
     end
 
@@ -1518,7 +1513,7 @@ def reconcile_resolved_schema!(resolved_schema)
       }
     end
 
-    # Look for merge 'const' values that need to become an enum.
+    # Look for merged string const values that need to become an enum.
     #
     # As part of our enum schema resolving, we have a fallback mode where we resolve each subschema
     # and merge them together in a nested fashion, under the assumption that they don't overlap in
@@ -1527,24 +1522,49 @@ def reconcile_resolved_schema!(resolved_schema)
     # This works, but one area it falls down is where a field is a `const` in different subschemas,
     # where even if the value is the same type for all overlaps of `const`, the normal nested merge
     # would result in a last-write-wins for that field. We compensate for this by using a
-    # schema-aware nested merge, where if we're merging a field called `const`, we turn it into an
-    # array of the values.
+    # schema-aware nested merge, where if we're merging a field called `const`, we turn it into a
+    # array of the const data, which includes the const value itself and the description of the enum
+    # variant.
     #
     # The final step would be to change from `const` to `enum`, because Cue doesn't recognize the
-    # `const` type, regardless of whether it's a single value or an array of values. We cannot do
-    # that in the merge, however, because there's no way to specify a new resulting key to use, only
-    # how the values should be merged.
+    # `const` type, regardless of whether it's a single value or a map of key/value pairs. We cannot
+    # do that in the merge, however, because there's no way to specify a new resulting key to use,
+    # only how the values should be merged.
     #
-    # Thus, we handle that here by looking for any `const` field that has an array value. Since no
-    # normal schema would have a `const` value that was an array to begin with, we can safely search
-    # for such instances and confidently know that the field can be renamed from `const` to `enum`.
+    # Thus, we handle that here by looking for any `const` field that has an array value, turning it
+    # into a map of const value to enum variant description. Since no normal schema would have a
+    # `const` value that was an array value to begin with, we can safely search for such instances
+    # and confidently know that the field can be renamed from `const` to `enum`.
     resolved_schema['type'].keys.each { |type_field|
-      type_field_const_value = resolved_schema['type'][type_field].fetch('const', :does_not_exist)
-      if !type_field_const_value.nil? && type_field_const_value.is_a?(Array)
+      const_type_field = resolved_schema.dig('type', type_field, 'const')
+      if !const_type_field.nil? && const_type_field.is_a?(Array)
         @logger.debug "Converting `const` values to `enum` for type field '#{type_field}'..."
 
-        enum_values = resolved_schema['type'][type_field].delete('const')
+        enum_values = const_type_field
+          .map { |const| [const['value'], const['description']] }
+          .to_h
+
+        resolved_schema['type'][type_field].delete('const')
         resolved_schema['type'][type_field]['enum'] = enum_values
+      end
+    }
+
+    # Push the schema description into the type field for string consts.
+    #
+    # As part of resolving const schemas, we need to use their descriptions when eventually
+    # converting them to an enum schema that is supported on the Cue side. This implies the const
+    # value becoming a key in a map, whose value is the description of the const schema.
+    #
+    # We do that here because it's simpler to not have to special case the addition of the
+    # description when resolving a const schema, as we do so uniformly as part of the final steps of
+    # resolving a schema in general, but before reconciliation is triggered.
+    resolved_schema['type'].keys.each { |type_field|
+      const_type_field = resolved_schema.dig('type', type_field, 'const')
+      if !const_type_field.nil? && !const_type_field.is_a?(Array)
+        @logger.debug "Adding schema description to `const` type field '#{type_field}'..."
+
+        schema_description = resolved_schema['description']
+        const_type_field['description'] = schema_description unless schema_description.nil?
       end
     }
   end

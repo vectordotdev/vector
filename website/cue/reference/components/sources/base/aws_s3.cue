@@ -13,13 +13,10 @@ base: components: sources: aws_s3: configuration: {
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: {
-			default: enabled: null
-			options: enabled: {
-				description: "Whether or not end-to-end acknowledgements are enabled for this source."
-				required:    false
-				type: bool: default: null
-			}
+		type: object: options: enabled: {
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
+			required:    false
+			type: bool: default: null
 		}
 	}
 	assume_role: {
@@ -34,49 +31,46 @@ base: components: sources: aws_s3: configuration: {
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
 		required:    false
-		type: object: {
-			default: load_timeout_secs: null
-			options: {
-				access_key_id: {
-					description: "The AWS access key ID."
-					required:    true
-					type: string: {}
-				}
-				assume_role: {
-					description: "The ARN of the role to assume."
-					required:    true
-					type: string: {}
-				}
-				credentials_file: {
-					description: "Path to the credentials file."
-					required:    true
-					type: string: {}
-				}
-				load_timeout_secs: {
-					description: "Timeout for successfully loading any credentials, in seconds."
-					required:    false
-					type: uint: default: null
-				}
-				profile: {
-					description: "The credentials profile to use."
-					required:    false
-					type: string: default: null
-				}
-				region: {
-					description: """
-						The AWS region to send STS requests to.
+		type: object: options: {
+			access_key_id: {
+				description: "The AWS access key ID."
+				required:    true
+				type: string: {}
+			}
+			assume_role: {
+				description: "The ARN of the role to assume."
+				required:    true
+				type: string: {}
+			}
+			credentials_file: {
+				description: "Path to the credentials file."
+				required:    true
+				type: string: {}
+			}
+			load_timeout_secs: {
+				description: "Timeout for successfully loading any credentials, in seconds."
+				required:    false
+				type: uint: default: null
+			}
+			profile: {
+				description: "The credentials profile to use."
+				required:    false
+				type: string: default: null
+			}
+			region: {
+				description: """
+					The AWS region to send STS requests to.
 
-						If not set, this will default to the configured region
-						for the service itself.
-						"""
-					required: false
-					type: string: default: null
-				}
-				secret_access_key: {
-					description: "The AWS secret access key."
-					required:    true
-					type: string: {}
-				}
+					If not set, this will default to the configured region
+					for the service itself.
+					"""
+				required: false
+				type: string: default: null
+			}
+			secret_access_key: {
+				description: "The AWS secret access key."
+				required:    true
+				type: string: {}
 			}
 		}
 	}
