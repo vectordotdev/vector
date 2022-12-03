@@ -33,9 +33,7 @@ fn redis_value_to_string(value: &Value) -> String {
     match value {
         redis::Value::Nil => {}
         redis::Value::Int(number) => result_string.push_str(&number.to_string()),
-        redis::Value::Data(byte_array) => {
-            result_string.push_str(&from_utf8(byte_array).unwrap().to_string())
-        }
+        redis::Value::Data(byte_array) => result_string.push_str(from_utf8(byte_array).unwrap()),
         redis::Value::Bulk(values) => {
             for val in values.iter() {
                 result_string.push_str(redis_value_to_string(val).as_str());
