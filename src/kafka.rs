@@ -7,6 +7,8 @@ use vector_config::configurable_component;
 
 use crate::{internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig};
 
+const PEM_START_MARKER: &str = "-----BEGIN ";
+
 #[derive(Debug, Snafu)]
 enum KafkaError {
     #[snafu(display("invalid path: {:?}", path))]
@@ -100,15 +102,34 @@ impl KafkaAuthConfig {
 
         if tls_enabled {
             let tls = self.tls.as_ref().unwrap();
+
             if let Some(path) = &tls.options.ca_file {
-                client.set("ssl.ca.location", pathbuf_to_string(path)?);
+                let text = pathbuf_to_string(path)?;
+                if text.contains(PEM_START_MARKER) {
+                    client.set("ssl.ca.pem", text);
+                } else {
+                    client.set("ssl.ca.location", text);
+                }
             }
+
             if let Some(path) = &tls.options.crt_file {
-                client.set("ssl.certificate.location", pathbuf_to_string(path)?);
+                let text = pathbuf_to_string(path)?;
+                if text.contains(PEM_START_MARKER) {
+                    client.set("ssl.certificate.pem", text);
+                } else {
+                    client.set("ssl.certificate.location", text);
+                }
             }
+
             if let Some(path) = &tls.options.key_file {
-                client.set("ssl.key.location", pathbuf_to_string(path)?);
+                let text = pathbuf_to_string(path)?;
+                if text.contains(PEM_START_MARKER) {
+                    client.set("ssl.key.pem", text);
+                } else {
+                    client.set("ssl.key.location", text);
+                }
             }
+
             if let Some(pass) = &tls.options.key_pass {
                 client.set("ssl.key.password", pass);
             }
