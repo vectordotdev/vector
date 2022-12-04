@@ -7,7 +7,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
 };
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_core::{config::{LogNamespace, LegacyKey}, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -73,6 +73,11 @@ pub struct NatsSourceConfig {
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
+
+    /// The `NATS` subject key.
+    #[serde(default = "default_subject_key_field")]
+    subject_key_field: String,
+
 }
 
 impl GenerateConfig for NatsSourceConfig {
@@ -96,6 +101,7 @@ impl SourceConfig for NatsSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
         Ok(Box::pin(nats_source(
+            self.clone(),
             connection,
             subscription,
             decoder,
@@ -144,6 +150,7 @@ fn get_subscription_stream(
 }
 
 async fn nats_source(
+    config: NatsSourceConfig,
     // Take ownership of the connection so it doesn't get dropped.
     _connection: nats::asynk::Connection,
     subscription: nats::asynk::Subscription,
@@ -176,6 +183,16 @@ async fn nats_source(
                                 NatsSourceConfig::NAME,
                                 now,
                             );
+
+                            log_namespace.insert_source_metadata(
+                                NatsSourceConfig::NAME,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(
+                                    config.subject_key_field.as_str(),
+                                )),
+                                "subject",
+                                msg.subject.as_str(),
+                            )
                         }
                         event
                     });
@@ -307,6 +324,7 @@ mod integration_tests {
             )
             .build();
             tokio::spawn(nats_source(
+                conf.clone(),
                 nc,
                 sub,
                 decoder,
@@ -730,4 +748,8 @@ mod integration_tests {
             r
         );
     }
+}
+
+fn default_subject_key_field() -> String {
+    "subject".into()
 }

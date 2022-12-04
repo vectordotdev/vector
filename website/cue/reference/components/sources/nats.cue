@@ -60,6 +60,13 @@ components: sources: nats: {
 					examples: ["nats"]
 				}
 			}
+			subject: {
+				description: "The NATS subject current message was retrieved from."
+				required:    true
+				type: string: {
+					examples: ["nats.subject"]
+				}
+			}
 		}
 	}
 
