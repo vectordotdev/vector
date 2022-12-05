@@ -1,14 +1,12 @@
 use std::{
     collections::HashMap,
-    io::{BufReader, Read},
     sync::Arc,
     task::{Context, Poll},
 };
 
 use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
-use bytes::{Buf, Bytes};
-use flate2::bufread::GzDecoder;
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
@@ -28,7 +26,7 @@ use crate::{
 
 use super::{ElasticsearchCommon, ElasticsearchConfig};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ElasticsearchRequest {
     pub payload: Bytes,
     pub finalizers: EventFinalizers,
@@ -177,22 +175,9 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
-            let compression = req.compression;
             let batch_size = req.batch_size;
             let events_byte_size = req.events_byte_size;
             let http_response = http_service.call(req).await?;
-
-            let http_response = if let Compression::Gzip(_) = compression {
-                let (parts, body) = http_response.into_parts();
-
-                let mut bytes = Vec::new();
-                let mut reader = BufReader::new(GzDecoder::new(BufReader::new(body.reader())));
-                reader.read_to_end(&mut bytes)?;
-
-                Response::from_parts(parts, bytes.into())
-            } else {
-                http_response
-            };
 
             let event_status = get_event_status(&http_response);
             Ok(ElasticsearchResponse {
