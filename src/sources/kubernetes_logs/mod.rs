@@ -27,14 +27,14 @@ use kube::{
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_common::TimeZone;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{transform::TaskTransform, EstimatedJsonEncodedSizeOf};
+use vector_core::{config::LegacyKey, transform::TaskTransform, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, SourceConfig,
         SourceContext,
     },
-    event::{Event, LogEvent},
+    event::Event,
     internal_events::{
         FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
@@ -63,9 +63,12 @@ use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use self::node_metadata_annotator::NodeMetadataAnnotator;
 use self::parser::Parser;
 use self::pod_metadata_annotator::PodMetadataAnnotator;
+use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
+use lookup::{owned_value_path, path, PathPrefix};
+use value::{kind::Collection, Kind};
 use vector_core::config::LogNamespace;
 
 /// The key we use for `file` field.
@@ -151,6 +154,11 @@ pub struct Config {
     /// How long to delay removing entries from our map when we receive a deletion
     /// event from the watched stream.
     delay_deletion_ms: usize,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl GenerateConfig for Config {
@@ -185,6 +193,7 @@ impl Default for Config {
             timezone: None,
             kube_config_file: None,
             delay_deletion_ms: default_delay_deletion_ms(),
+            log_namespace: None,
         }
     }
 }
@@ -192,16 +201,215 @@ impl Default for Config {
 #[async_trait::async_trait]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let source = Source::new(self, &cx.globals, &cx.key).await?;
-        Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
-            result.map_err(|error| {
-                error!(message = "Source future failed.", %error);
-            })
-        })))
+
+        Ok(Box::pin(
+            source
+                .run(cx.out, cx.shutdown, log_namespace)
+                .map(|result| {
+                    result.map_err(|error| {
+                        error!(message = "Source future failed.", %error);
+                    })
+                }),
+        ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = BytesDeserializerConfig
+            .schema_definition(log_namespace)
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("file"))),
+                &owned_value_path!("file"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .container_id
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("container_id"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .container_image
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("container_image"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .container_name
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("container_name"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(
+                    self.namespace_annotation_fields
+                        .namespace_labels
+                        .path
+                        .clone(),
+                )),
+                &owned_value_path!("namespace_labels"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(
+                    self.node_annotation_fields.node_labels.path.clone(),
+                )),
+                &owned_value_path!("node_labels"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_annotations
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_annotations"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_ip
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_ip"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_ips
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_ips"),
+                Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_labels
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_labels"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_name
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_name"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_namespace
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_namespace"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_node_name
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_node_name"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_owner
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_owner"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_uid
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_uid"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("stream"))),
+                &owned_value_path!("stream"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(
+                    log_schema().timestamp_key()
+                ))),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_standard_vector_source_metadata();
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -313,6 +521,7 @@ impl Source {
         self,
         mut out: SourceSender,
         global_shutdown: ShutdownSignal,
+        log_namespace: LogNamespace,
     ) -> crate::Result<()> {
         let Self {
             client,
@@ -402,9 +611,10 @@ impl Source {
 
         let paths_provider =
             K8sPathsProvider::new(pod_state.clone(), ns_state.clone(), exclude_paths);
-        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec);
-        let ns_annotator = NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec);
-        let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec);
+        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace);
+        let ns_annotator =
+            NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec, log_namespace);
+        let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec, log_namespace);
 
         // TODO: maybe more of the parameters have to be configurable.
 
@@ -464,8 +674,11 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
-        let mut parser = Parser::new();
-        let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
+        let mut parser = Parser::new(log_namespace);
+        let partial_events_merger = Box::new(partial_events_merger::build(
+            auto_partial_merge,
+            log_namespace,
+        ));
 
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
@@ -478,6 +691,7 @@ impl Source {
                 line.text,
                 &line.filename,
                 ingestion_timestamp_field.as_deref(),
+                log_namespace,
             );
             let file_info = annotator.annotate(&mut event, &line.filename);
 
@@ -571,26 +785,45 @@ impl Source {
     }
 }
 
-fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
-    let mut event = LogEvent::from_bytes_legacy(&line);
+fn create_event(
+    line: Bytes,
+    file: &str,
+    ingestion_timestamp_field: Option<&str>,
+    log_namespace: LogNamespace,
+) -> Event {
+    let deserializer = BytesDeserializer::new();
+    let mut log = deserializer.parse_single(line, log_namespace);
 
-    // Add source type.
-    event.insert(
-        log_schema().source_type_key(),
-        Bytes::from_static(Config::NAME.as_bytes()),
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        &mut log,
+        Some(LegacyKey::Overwrite(path!("file"))),
+        path!("file"),
+        file,
     );
 
-    // Add file.
-    event.insert(FILE_KEY, file.to_owned());
+    log_namespace.insert_vector_metadata(
+        &mut log,
+        path!(log_schema().source_type_key()),
+        path!("source_type"),
+        Bytes::from(Config::NAME),
+    );
+    match (log_namespace, ingestion_timestamp_field) {
+        // When using LogNamespace::Vector always set the ingest_timestamp.
+        (LogNamespace::Vector, _) => {
+            log.metadata_mut()
+                .value_mut()
+                .insert(path!("vector", "ingest_timestamp"), Utc::now());
+        }
+        // When LogNamespace::Legacy, only set when the `ingestion_timestamp_field` is configured.
+        (LogNamespace::Legacy, Some(ingestion_timestamp_field)) => {
+            log.try_insert((PathPrefix::Event, ingestion_timestamp_field), Utc::now())
+        }
+        // The CRI/Docker parsers handle inserting the `log_schema().timestamp_key()` value.
+        (LogNamespace::Legacy, None) => (),
+    };
 
-    // Add ingestion timestamp if requested.
-    if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
-        event.insert(ingestion_timestamp_field, Utc::now());
-    }
-
-    event.try_insert(log_schema().timestamp_key(), Utc::now());
-
-    event.into()
+    log.into()
 }
 
 /// This function returns the default value for `self_node_name` variable
@@ -696,6 +929,13 @@ fn prepare_label_selector(selector: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use lookup::{owned_value_path, LookupBuf};
+    use similar_asserts::assert_eq;
+    use value::{kind::Collection, Kind};
+    use vector_core::{config::LogNamespace, schema::Definition};
+
+    use crate::config::SourceConfig;
+
     use super::Config;
 
     #[test]
@@ -830,5 +1070,192 @@ mod tests {
             let output = super::prepare_label_selector(&input);
             assert_eq!(expected, output, "expected left, actual right");
         }
+    }
+
+    #[test]
+    fn test_output_schema_definition_vector_namespace() {
+        let definition = toml::from_str::<Config>("")
+            .unwrap()
+            .outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        assert_eq!(
+            definition,
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_metadata_field(&owned_value_path!("kubernetes_logs", "file"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "container_id"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "container_image"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "container_name"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "namespace_labels"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "node_labels"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "pod_annotations"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "pod_ip"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "pod_ips"),
+                    Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "pod_labels"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "pod_name"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "pod_namespace"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "pod_node_name"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "pod_owner"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "pod_uid"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "stream"),
+                    Kind::bytes()
+                )
+                .with_metadata_field(
+                    &owned_value_path!("kubernetes_logs", "timestamp"),
+                    Kind::timestamp()
+                )
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp()
+                )
+                .with_meaning(LookupBuf::root(), "message")
+        )
+    }
+
+    #[test]
+    fn test_output_schema_definition_legacy_namespace() {
+        let definition = toml::from_str::<Config>("")
+            .unwrap()
+            .outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        assert_eq!(
+            definition,
+            Definition::new_with_default_metadata(
+                Kind::object(Collection::empty()),
+                [LogNamespace::Legacy]
+            )
+            .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
+            .with_event_field(
+                &owned_value_path!("message"),
+                Kind::bytes(),
+                Some("message")
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "container_id"),
+                Kind::bytes().or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "container_image"),
+                Kind::bytes().or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "container_name"),
+                Kind::bytes().or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "namespace_labels"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "node_labels"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "pod_annotations"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "pod_ip"),
+                Kind::bytes().or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "pod_ips"),
+                Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "pod_labels"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "pod_name"),
+                Kind::bytes().or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "pod_namespace"),
+                Kind::bytes().or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "pod_node_name"),
+                Kind::bytes().or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "pod_owner"),
+                Kind::bytes().or_undefined(),
+                None
+            )
+            .with_event_field(
+                &owned_value_path!("kubernetes", "pod_uid"),
+                Kind::bytes().or_undefined(),
+                None
+            )
+            .with_event_field(&owned_value_path!("stream"), Kind::bytes(), None)
+            .with_event_field(
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp")
+            )
+            .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        )
     }
 }
