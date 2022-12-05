@@ -291,30 +291,22 @@ impl Inner {
         E: Into<Event> + ByteSizeOf,
         I: IntoIterator<Item = E>,
     {
-        let mut count = 0;
-        let mut byte_size = 0;
-
         let reference = Utc::now().timestamp_millis();
         let events = events.into_iter().map(Into::into);
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             events
                 .iter_events()
                 .for_each(|event| self.emit_lag_time(event, reference));
-            let this_count = events.len();
-            let this_size = events.estimated_json_encoded_size_of();
+            let cbs = CountByteSize(events.len(), events.estimated_json_encoded_size_of());
             match self.inner.send(events).await {
                 Ok(()) => {
-                    count += this_count;
-                    byte_size += this_size;
+                    self.events_sent.emit(cbs);
                 }
                 Err(error) => {
-                    self.events_sent.emit(CountByteSize(count, byte_size));
                     return Err(error.into());
                 }
             }
         }
-
-        self.events_sent.emit(CountByteSize(count, byte_size));
 
         Ok(())
     }
