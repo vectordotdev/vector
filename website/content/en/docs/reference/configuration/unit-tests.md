@@ -348,12 +348,12 @@ id = "38c5b0d0-5e7e-42aa-ae86-2b642ad2d1b8"
 If there are hyphens in the field name, you will need to quote this part (at least in YAML):
 
 ```
-  - name: hypens
+  - name: hyphens
     inputs:
-      - insert_at: hypens
+      - insert_at: hyphens
         type: log
         log_fields:
-          labels."this-has-hypens": "this is a test"
+          labels."this-has-hyphens": "this is a test"
 ```
 
 ##### Raw string value
