@@ -486,7 +486,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: [...] | null | *[]
+		default: [...] | *null
 	}
 
 	examples?: [...[...Type.items.type]]
