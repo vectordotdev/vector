@@ -45,7 +45,7 @@ source = '''
 [transforms.apache_sampler]
 inputs = ["apache_parser"]
 type   = "sampler"
-rate   = 50                   # only keep 50%
+rate   = 2                    # only keep 50% (1/`rate`)
 
 # Send structured data to a short-term storage
 [sinks.es_cluster]
@@ -339,7 +339,7 @@ source = '''
 # Sample the data to save on cost
 inputs = ["apache_parser"]
 type   = "sample"
-rate   = 50                   # only keep 50%
+rate   = 2                    # only keep 50% (1/`rate`)
 . = parse_apache_log(.message)
 ```
 

@@ -24,7 +24,7 @@ use vector_core::{
     internal_event::{
         ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
     },
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use super::collector::{MetricCollector, StringCollector};
@@ -396,7 +396,7 @@ fn handle(
             let count = metrics.len();
             let byte_size = metrics
                 .iter()
-                .map(|(_, (metric, _))| metric.size_of())
+                .map(|(_, (metric, _))| metric.estimated_json_encoded_size_of())
                 .sum();
 
             let mut collector = StringCollector::new();

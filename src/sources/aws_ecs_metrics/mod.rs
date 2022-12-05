@@ -7,7 +7,7 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
@@ -191,7 +191,7 @@ async fn aws_ecs_metrics(
                             Ok(metrics) => {
                                 let count = metrics.len();
                                 emit!(AwsEcsMetricsEventsReceived {
-                                    byte_size: metrics.size_of(),
+                                    byte_size: metrics.estimated_json_encoded_size_of(),
                                     count,
                                     endpoint: uri.path(),
                                 });

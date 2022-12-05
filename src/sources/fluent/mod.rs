@@ -120,6 +120,7 @@ impl SourceConfig for FluentConfig {
 }
 
 impl FluentConfig {
+    /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         // `host_key` is only inserted if not present already.
         let host_key = parse_value_path(log_schema().host_key())

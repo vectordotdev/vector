@@ -88,7 +88,7 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
-    /// The namespace to use for logs. This overrides the global settings
+    /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
