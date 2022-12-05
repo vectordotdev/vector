@@ -43,7 +43,8 @@ base: components: sinks: loki: configuration: {
 				type: string: {}
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					basic: """
 						Basic authentication.
@@ -280,6 +281,56 @@ base: components: sinks: loki: configuration: {
 			"""
 		required: false
 		type: object: options: {
+			adaptive_concurrency: {
+				description: """
+					Configuration of adaptive concurrency parameters.
+
+					These parameters typically do not require changes from the default, and incorrect values can lead to meta-stable or
+					unstable performance and sink behavior. Proceed with caution.
+					"""
+				required: false
+				type: object: options: {
+					decrease_ratio: {
+						description: """
+																The fraction of the current value to set the new concurrency limit when decreasing the limit.
+
+																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
+																when latency increases.
+
+																Note that the new limit is rounded down after applying this ratio.
+																"""
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
+																The weighting of new measurements compared to older measurements.
+
+																Valid values are greater than `0` and less than `1`.
+
+																ARC uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with
+																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
+																unusually high response variability.
+																"""
+						required: false
+						type: float: default: 0.4
+					}
+					rtt_deviation_scale: {
+						description: """
+																Scale of RTT deviations which are not considered anomalous.
+
+																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
+
+																When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
+																those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
+																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
+																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
+																"""
+						required: false
+						type: float: default: 2.5
+					}
+				}
+			}
 			concurrency: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
@@ -299,6 +350,7 @@ base: components: sinks: loki: configuration: {
 															"""
 						}
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {

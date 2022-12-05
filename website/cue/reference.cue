@@ -468,14 +468,14 @@ _values: {
 	//
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
-	{"*": {}} |
-	{"bool": #TypeBool & {_args: required: Args.required}} |
-	{"float": #TypeFloat & {_args: required: Args.required}} |
-	{"object": #TypeObject & {_args: required: Args.required}} |
-	{"string": #TypeString & {_args: required: Args.required}} |
-	{"ascii_char": #TypeAsciiChar & {_args: required: Args.required}} |
-	{"timestamp": #TypeTimestamp & {_args: required: Args.required}} |
-	{"uint": #TypeUint & {_args: required: Args.required}}
+    "*"?: {}
+	"bool"?: #TypeBool & {_args: required: Args.required}
+	"float"?: #TypeFloat & {_args: required: Args.required}
+	"object"?: #TypeObject & {_args: required: Args.required}
+	"string"?: #TypeString & {_args: required: Args.required}
+	"ascii_char"?: #TypeAsciiChar & {_args: required: Args.required}
+	"timestamp"?: #TypeTimestamp & {_args: required: Args.required}
+	"uint"?: #TypeUint & {_args: required: Args.required}
 }
 
 #TypeArray: {

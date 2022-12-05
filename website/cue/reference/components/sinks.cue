@@ -15,8 +15,10 @@ components: sinks: [Name=string]: {
 				enabled: base.components.sinks.configuration.healthcheck.type.object.options.enabled
 
 				if features.healthcheck != _|_ {
-					if features.healthcheck.uses_uri {
-						uri: base.components.sinks.configuration.healthcheck.type.object.options.uri
+					if features.healthcheck.uses_uri != _|_ {
+						if features.healthcheck.uses_uri {
+							uri: base.components.sinks.configuration.healthcheck.type.object.options.uri
+						}
 					}
 				}
 			}

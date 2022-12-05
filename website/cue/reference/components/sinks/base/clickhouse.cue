@@ -43,7 +43,8 @@ base: components: sinks: clickhouse: configuration: {
 				type: string: {}
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					basic: """
 						Basic authentication.

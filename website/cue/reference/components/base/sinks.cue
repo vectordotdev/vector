@@ -36,7 +36,8 @@ base: components: sinks: configuration: {
 				type: uint: {}
 			}
 			type: {
-				required: false
+				description: "The type of buffer to use."
+				required:    false
 				type: string: {
 					default: "memory"
 					enum: {
