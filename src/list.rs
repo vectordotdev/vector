@@ -1,7 +1,9 @@
 use clap::Parser;
 use serde::Serialize;
 
-use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
+use vector_config::component::{
+    EnrichmentTableDescription, SinkDescription, SourceDescription, TransformDescription,
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -23,12 +25,14 @@ pub struct EncodedList {
     sources: Vec<&'static str>,
     transforms: Vec<&'static str>,
     sinks: Vec<&'static str>,
+    enrichment_tables: Vec<&'static str>,
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let sources = SourceDescription::types();
     let transforms = TransformDescription::types();
     let sinks = SinkDescription::types();
+    let enrichment_tables = EnrichmentTableDescription::types();
 
     #[allow(clippy::print_stdout)]
     match opts.format {
@@ -47,12 +51,18 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             for name in sinks {
                 println!("- {}", name);
             }
+
+            println!("\nEnrichment tables:");
+            for name in enrichment_tables {
+                println!("- {}", name);
+            }
         }
         Format::Json => {
             let list = EncodedList {
                 sources,
                 transforms,
                 sinks,
+                enrichment_tables,
             };
             println!("{}", serde_json::to_string(&list).unwrap());
         }
@@ -61,6 +71,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 sources,
                 transforms,
                 sinks,
+                enrichment_tables,
             };
             println!("{}", serde_json::to_string(&list).unwrap());
         }

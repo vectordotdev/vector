@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::Read,
+    io::{Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -13,8 +13,8 @@ use similar_asserts::assert_eq;
 use vector_core::{config::LogNamespace, event::Event};
 
 #[test]
-fn pre_v23_fixtures_match() {
-    fixtures_match("pre-v23");
+fn pre_v24_fixtures_match() {
+    fixtures_match("pre-v24");
 }
 
 #[test]
@@ -44,13 +44,13 @@ fn roundtrip_current_native_proto_fixtures() {
     );
 }
 
-/// The event proto file was changed in v23. This test ensures we can still load the old version
+/// The event proto file was changed in v0.24. This test ensures we can still load the old version
 /// binary and that when serialized and deserialized in the new format we still get the same event.
 #[test]
-fn reserialize_pre_v23_native_json_fixtures() {
+fn reserialize_pre_v24_native_json_fixtures() {
     roundtrip_fixtures(
         "json",
-        "pre-v23",
+        "pre-v24",
         &NativeJsonDeserializerConfig.build(),
         &mut NativeJsonSerializerConfig.build(),
         true,
@@ -58,10 +58,24 @@ fn reserialize_pre_v23_native_json_fixtures() {
 }
 
 #[test]
-fn reserialize_pre_v23_native_proto_fixtures() {
+fn reserialize_pre_v24_native_proto_fixtures() {
     roundtrip_fixtures(
         "proto",
-        "pre-v23",
+        "pre-v24",
+        &NativeDeserializerConfig.build(),
+        &mut NativeSerializerConfig.build(),
+        true,
+    );
+}
+
+/// The event proto format was changed in v26 to include support for enhanced metric tags. This test
+/// ensures we can still load the old version binary and that when serialized and deserialized in
+/// the new format we still get the same event.
+#[test]
+fn reserialize_pre_v26_native_proto_fixtures() {
+    roundtrip_fixtures(
+        "proto",
+        "pre-v26",
         &NativeDeserializerConfig.build(),
         &mut NativeSerializerConfig.build(),
         true,
@@ -74,8 +88,34 @@ fn current_native_decoding_matches() {
 }
 
 #[test]
-fn pre_v23_native_decoding_matches() {
-    decoding_matches("pre-v23");
+fn pre_v24_native_decoding_matches() {
+    decoding_matches("pre-v24");
+}
+
+/// This "test" can be used to build new protobuf fixture files when the protocol changes. Remove
+/// the `#[ignore]` only when this is needed for such changes. You will need to manually create a
+/// `tests/data/native_encoding/json/rebuilt` subdirectory for the files to be written to.
+#[test]
+#[ignore]
+fn rebuild_json_fixtures() {
+    rebuild_fixtures(
+        "json",
+        &NativeJsonDeserializerConfig.build(),
+        &mut NativeJsonSerializerConfig.build(),
+    );
+}
+
+/// This "test" can be used to build new protobuf fixture files when the protocol changes. Remove
+/// the `#[ignore]` only when this is needed for such changes. You will need to manually create a
+/// `tests/data/native_encoding/proto/rebuilt` subdirectory for the files to be written to.
+#[test]
+#[ignore]
+fn rebuild_proto_fixtures() {
+    rebuild_fixtures(
+        "proto",
+        &NativeDeserializerConfig.build(),
+        &mut NativeSerializerConfig.build(),
+    );
 }
 
 /// This test ensures that the different sets of protocol fixture names match.
@@ -118,7 +158,7 @@ fn decoding_matches(suffix: &str) {
 }
 
 fn list_fixtures(proto: &str, suffix: &str) -> Vec<PathBuf> {
-    let path = format!("tests/data/native_encoding/{proto}/{suffix}");
+    let path = fixtures_path(proto, suffix);
     let mut entries = fs::read_dir(path)
         .unwrap()
         .map(Result::unwrap)
@@ -127,6 +167,12 @@ fn list_fixtures(proto: &str, suffix: &str) -> Vec<PathBuf> {
         .collect::<Vec<_>>();
     entries.sort();
     entries
+}
+
+fn fixtures_path(proto: &str, suffix: &str) -> PathBuf {
+    ["tests/data/native_encoding", proto, suffix]
+        .into_iter()
+        .collect()
 }
 
 fn roundtrip_fixtures(
@@ -172,4 +218,27 @@ fn load_deserialize(path: &Path, deserializer: &dyn Deserializer) -> (Bytes, Eve
         .unwrap();
     assert_eq!(events.len(), 1);
     (buf, events.pop().unwrap())
+}
+
+fn rebuild_fixtures(proto: &str, deserializer: &dyn Deserializer, serializer: &mut dyn Serializer) {
+    for path in list_fixtures(proto, "") {
+        let (_, event) = load_deserialize(&path, deserializer);
+
+        let mut buf = BytesMut::new();
+        serializer
+            .encode(event, &mut buf)
+            .expect("Serializing failed");
+
+        let new_path: PathBuf = [
+            fixtures_path(proto, "rebuilt"),
+            path.file_name().unwrap().into(),
+        ]
+        .into_iter()
+        .collect();
+        let mut out = File::create(&new_path).unwrap_or_else(|error| {
+            panic!("Could not create rebuilt file {:?}: {:?}", new_path, error)
+        });
+        out.write_all(&buf).expect("Could not write rebuilt data");
+        out.flush().expect("Could not write rebuilt data");
+    }
 }

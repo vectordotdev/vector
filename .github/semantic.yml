@@ -164,6 +164,7 @@ scopes:
   - vector source # Anything `vector` source related
 
   # transforms
+  - aggregate transform # Anything `aggregate` transform related
   - aws_ec2_metadata transform # Anything `aws_ec2_metadata` transform related
   - dedupe transform # Anything `dedupe` transform related
   - filter transform # Anything `filter` transform related

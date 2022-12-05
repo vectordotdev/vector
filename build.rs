@@ -111,6 +111,7 @@ fn main() {
         prost_build.btree_map(&["."]);
 
         tonic_build::configure()
+            .protoc_arg("--experimental_allow_proto3_optional")
             .compile_with_config(
                 prost_build,
                 &[

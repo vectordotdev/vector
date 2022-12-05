@@ -15,7 +15,7 @@ use tokio::{
 };
 use vector_core::{
     internal_event::{BytesSent, EventsSent},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -85,7 +85,7 @@ impl StreamSink<EventArray> for BlackholeSink {
                 self.last = Some(until);
             }
 
-            let message_len = events.size_of();
+            let message_len = events.estimated_json_encoded_size_of();
 
             let _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
             let _ = self
