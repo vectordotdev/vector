@@ -1,8 +1,10 @@
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, stream, Stream, StreamExt};
+use lookup::owned_value_path;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
 };
@@ -116,7 +118,14 @@ impl SourceConfig for NatsSourceConfig {
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                NatsSourceConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(&self.subject_key_field))),
+                &owned_value_path!("subject"),
+                Kind::bytes(),
+                None,
+            );
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
