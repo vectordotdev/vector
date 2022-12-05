@@ -223,14 +223,15 @@ mod tests {
     // `start_source` helper) panics when called more than once.
     #[tokio::test]
     async fn receives_logs() {
+        trace::init(false, false, "debug", 10);
+        trace::reset_early_buffer();
+
         assert_source_compliance(&SOURCE_TAGS, run_test()).await;
     }
 
     async fn run_test() {
         let test_id: u8 = rand::random();
         let start = chrono::Utc::now();
-        trace::init(false, false, "debug", 10);
-        trace::reset_early_buffer();
 
         error!(message = "Before source started without span.", %test_id);
 
