@@ -3,8 +3,6 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use nix::libc::c_void;
-
 use crate::internal_telemetry::allocations::{STARTUP, TRACK_ALLOCATIONS};
 
 use super::{
