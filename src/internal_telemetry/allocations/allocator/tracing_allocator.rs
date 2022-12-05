@@ -77,7 +77,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
     #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
         if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-            tikv_jemalloc_sys::free(object_ptr as *mut c_void);
+            self.allocator.dealloc(object_ptr, object_layout);
             return;
         }
         // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the

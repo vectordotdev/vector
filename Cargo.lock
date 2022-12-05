@@ -8958,7 +8958,6 @@ dependencies = [
  "strip-ansi-escapes",
  "syslog",
  "tempfile",
- "tikv-jemalloc-sys",
  "tikv-jemallocator",
  "tokio",
  "tokio-openssl",

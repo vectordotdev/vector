@@ -61,6 +61,34 @@ pub struct Application {
 
 impl Application {
     pub fn prepare() -> Result<Self, exitcode::ExitCode> {
+        #[cfg(feature = "allocation-tracing")]
+        {
+            use crate::internal_telemetry::allocations::{
+                init_allocation_tracing, REPORTING_INTERVAL_MS, STARTUP, TRACK_ALLOCATIONS,
+            };
+            let opts = Opts::get_matches().map_err(|error| {
+                // Printing to stdout/err can itself fail; ignore it.
+                let _ = error.print();
+                exitcode::USAGE
+            })?;
+            let allocation_tracing = opts.root.allocation_tracing;
+            REPORTING_INTERVAL_MS.store(
+                opts.root.allocation_tracing_reporting_interval_ms,
+                Ordering::Relaxed,
+            );
+            drop(opts);
+            use std::sync::atomic::Ordering;
+            STARTUP.store(false, Ordering::Relaxed);
+            if allocation_tracing {
+                // Configure our tracking allocator.
+                init_allocation_tracing();
+                TRACK_ALLOCATIONS.store(true, Ordering::Relaxed);
+            } else {
+                // We assume nothing is allocated on the heap at this point.
+                TRACK_ALLOCATIONS.store(false, Ordering::Relaxed);
+            }
+        }
+
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
             let _ = error.print();
@@ -140,23 +168,6 @@ impl Application {
             let require_healthy = root_opts.require_healthy;
 
             rt.block_on(async move {
-                #[cfg(feature = "allocation-tracing")]
-                {
-                    use crate::internal_telemetry::allocations::{
-                        REPORTING_INTERVAL_MS, STARTUP, TRACK_ALLOCATIONS,
-                    };
-                    use std::sync::atomic::Ordering;
-                    STARTUP.store(false, Ordering::Relaxed);
-                    if root_opts.allocation_tracing {
-                        TRACK_ALLOCATIONS.store(true, Ordering::Relaxed);
-                    } else {
-                        TRACK_ALLOCATIONS.store(false, Ordering::Relaxed);
-                    }
-                    REPORTING_INTERVAL_MS.store(
-                        root_opts.allocation_tracing_reporting_interval_ms,
-                        Ordering::Relaxed,
-                    );
-                }
                 trace::init(color, json, &level, root_opts.internal_log_rate_limit);
                 info!(
                     message = "Internal log rate limit configured.",
