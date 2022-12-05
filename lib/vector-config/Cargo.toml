@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 chrono = { version = "0.4.19", default-features = false }
-chrono-tz = { version = "0.8.0", default-features = false }
+chrono-tz = { version = "0.8.1", default-features = false }
 encoding_rs = { version = "0.8", default-features = false, features = ["alloc", "serde"] }
 indexmap = { version = "1.9", default-features = false }
 inventory = { version = "0.3" }
