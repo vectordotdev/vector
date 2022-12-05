@@ -101,7 +101,8 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for serializing event."
+				required:    true
 				type: string: enum: {
 					avro:        "Apache Avro serialization."
 					gelf:        "GELF serialization."

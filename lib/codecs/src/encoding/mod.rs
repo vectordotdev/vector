@@ -186,6 +186,7 @@ impl tokio_util::codec::Encoder<()> for Framer {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The codec to use for serializing event."))]
 pub enum SerializerConfig {
     /// Apache Avro serialization.
     Avro {

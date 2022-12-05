@@ -1286,14 +1286,14 @@ def resolve_enum_schema(root_schema, schema)
   @logger.debug "Resolved as 'fallback mixed-mode' enum schema."
 
   @logger.debug "Tagging mode: #{enum_tagging}"
-  @logger.debug "Input subschemas: #{JSON.pretty_generate(subschemas)}"
+  @logger.debug "Input subschemas: #{subschemas}"
 
   resolved_subschemas = subschemas.filter_map { |subschema| resolve_schema(root_schema, subschema) }
-  @logger.debug "Resolved fallback schemas: #{JSON.pretty_generate(resolved_subschemas)}"
+  @logger.debug "Resolved fallback schemas: #{resolved_subschemas}"
 
   type_defs = resolved_subschemas.reduce { |acc, item| schema_aware_nested_merge(acc, item) }
 
-  @logger.debug "Schema-aware merged result: #{JSON.pretty_generate(type_defs)}"
+  @logger.debug "Schema-aware merged result: #{type_defs}"
 
   { '_resolved' => { 'type' => type_defs['type'] }, 'annotations' => 'mixed_mode' }
 end

@@ -486,7 +486,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: [...] | null
+		default: [...] | null | *[]
 	}
 
 	examples?: [...[...Type.items.type]]
@@ -502,7 +502,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: bool | null
+		default: bool | *null
 	}
 }
 
@@ -512,7 +512,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: float | null
+		default: float | *null
 	}
 
 	// `examples` clarify values through examples. This should be used
@@ -541,7 +541,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: string | null
+		default: string | *null
 	}
 
 	// `enum` restricts the value to a set of values.
@@ -573,7 +573,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: string | null
+		default: string | *null
 	}
 
 	examples?: [string, ...string]
@@ -585,7 +585,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: #Timestamp | null
+		default: #Timestamp | *null
 	}
 
 	// `examples` clarify values through examples. This should be used
@@ -600,7 +600,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: uint | null
+		default: uint | *null
 	}
 
 	// `examples` clarify values through examples. This should be used
