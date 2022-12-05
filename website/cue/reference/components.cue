@@ -212,7 +212,7 @@ components: {
 
 			// `healthcheck` notes if a component offers a healthcheck on boot.
 			healthcheck: {
-				enabled: bool
+				enabled:   bool
 				uses_uri?: bool
 			}
 

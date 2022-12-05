@@ -10,7 +10,7 @@ components: sinks: [Name=string]: {
 		buffer: base.components.sinks.configuration.buffer
 		healthcheck: {
 			description: base.components.sinks.configuration.healthcheck.description
-			required: base.components.sinks.configuration.healthcheck.required
+			required:    base.components.sinks.configuration.healthcheck.required
 			type: object: options: {
 				enabled: base.components.sinks.configuration.healthcheck.type.object.options.enabled
 

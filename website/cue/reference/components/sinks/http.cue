@@ -15,7 +15,7 @@ components: sinks: http: {
 	features: {
 		acknowledgements: true
 		healthcheck: {
-			enabled: true
+			enabled:  true
 			uses_uri: true
 		}
 		send: {
