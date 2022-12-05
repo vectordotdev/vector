@@ -1,13 +1,18 @@
 use std::{
     fmt,
+    io::{BufReader, Error, Read},
     task::{Context, Poll},
 };
 
+use bytes::Buf;
+use flate2::bufread::GzDecoder;
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
-use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Uri};
+use http::{
+    header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Response, Uri,
+};
 use hyper::{
-    body::{Body, HttpBody},
+    body::{to_bytes, Body, HttpBody},
     client,
     client::{Client, HttpConnector},
 };
@@ -38,6 +43,12 @@ pub enum HttpError {
     CallRequest { source: hyper::Error },
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
+
+    #[snafu(display("Failed to build HTTP request: {}", source))]
+    Compression { source: hyper::Error },
+
+    #[snafu(display("Failed to build HTTP request: {}", source))]
+    IO { source: Error },
 }
 
 impl HttpError {
@@ -47,6 +58,7 @@ impl HttpError {
             HttpError::CallRequest { .. }
             | HttpError::BuildTlsConnector { .. }
             | HttpError::MakeHttpsConnector { .. } => true,
+            HttpError::Compression { .. } | HttpError::IO { .. } => false,
         }
     }
 }
@@ -123,6 +135,8 @@ where
                 })
                 .context(CallRequestSnafu)?;
 
+            let response = expand_response(response).await?;
+
             // Emit the response into the internal events system.
             emit!(http_client::GotHttpResponse {
                 response: &response,
@@ -133,6 +147,33 @@ where
         .instrument(span.clone().or_current());
 
         Box::pin(fut)
+    }
+}
+
+async fn expand_response(response: Response<Body>) -> Result<Response<Body>, HttpError> {
+    let encoding = response
+        .headers()
+        .get("content-encoding")
+        .map(|c| c.to_str())
+        .map(|c| c.unwrap_or(""));
+
+    match encoding {
+        Some("gzip") => {
+            let (parts, body) = response.into_parts();
+            let mut bytes = Vec::new();
+
+            let body_buf = to_bytes(body)
+                .await
+                .map_err(|source| HttpError::Compression { source })?;
+
+            let mut reader = BufReader::new(GzDecoder::new(BufReader::new(body_buf.reader())));
+            reader
+                .read_to_end(&mut bytes)
+                .map_err(|source| HttpError::IO { source })?;
+
+            Ok(Response::from_parts(parts, bytes.into()))
+        }
+        _ => Ok(response),
     }
 }
 
@@ -182,12 +223,11 @@ fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue
             .insert("User-Agent", user_agent.clone());
     }
 
+    // Default to request gzip encoded responses.
     if !request.headers().contains_key("Accept-Encoding") {
-        // hardcoding until we support compressed responses:
-        // https://github.com/vectordotdev/vector/issues/5440
         request
             .headers_mut()
-            .insert("Accept-Encoding", HeaderValue::from_static("identity"));
+            .insert("Accept-Encoding", HeaderValue::from_static("gzip"));
     }
 }
 
@@ -321,7 +361,7 @@ mod tests {
         default_request_headers(&mut request, &user_agent);
         assert_eq!(
             request.headers().get("Accept-Encoding"),
-            Some(&HeaderValue::from_static("identity")),
+            Some(&HeaderValue::from_static("gzip")),
         );
         assert_eq!(request.headers().get("User-Agent"), Some(&user_agent));
     }
