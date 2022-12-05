@@ -1,9 +1,6 @@
 use std::{
     alloc::{handle_alloc_error, GlobalAlloc, Layout},
-    sync::atomic::Ordering,
 };
-
-use crate::internal_telemetry::allocations::TRACK_ALLOCATIONS;
 
 use super::{
     token::{try_with_suspended_allocation_group, AllocationGroupId},
@@ -48,21 +45,16 @@ impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
 unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
     #[inline]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
-        let (group_id_ptr, object_ptr, _wrapped_layout) =
-            self.get_wrapped_allocation(object_layout);
+        let (group_id_ptr, object_ptr, _) = self.get_wrapped_allocation(object_layout);
         let object_size = object_layout.size();
-        // Group id value of zero implies allocations tracking was disabled
-        // during this allocation. We override this if allocations were in fact enabled.
-        group_id_ptr.write(0);
-        if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-            try_with_suspended_allocation_group(
-                #[inline(always)]
-                |group_id| {
-                    group_id_ptr.write(group_id.as_raw());
-                    self.tracer.trace_allocation(object_size, group_id);
-                },
-            );
-        }
+
+        try_with_suspended_allocation_group(
+            #[inline(always)]
+            |group_id| {
+                group_id_ptr.write(group_id.as_raw());
+                self.tracer.trace_allocation(object_size, group_id);
+            },
+        );
 
         object_ptr
     }
@@ -80,11 +72,6 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
         // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
         self.allocator.dealloc(object_ptr, wrapped_layout);
-
-        // Do not track deallocations when allocations weren't tracked.
-        if raw_group_id == 0 {
-            return;
-        }
 
         let object_size = object_layout.size();
         let source_group_id = AllocationGroupId::from_raw(raw_group_id);

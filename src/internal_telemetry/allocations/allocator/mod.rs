@@ -1,12 +1,13 @@
-use self::token::with_suspended_allocation_group;
 mod stack;
-mod token;
+mod id;
 mod tracer;
 mod tracing;
 mod tracing_allocator;
+mod storage;
 
-pub use self::token::AllocationGroupId;
-pub use self::token::AllocationGroupToken;
+pub use self::id::AllocationGroupId;
+pub use self::id::AllocationGroupToken;
+pub use self::storage::*;
 pub use self::tracer::Tracer;
 pub use self::tracing::AllocationLayer;
 pub use self::tracing_allocator::GroupedTraceableAllocator;
