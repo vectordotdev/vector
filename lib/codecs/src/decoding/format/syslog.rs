@@ -124,49 +124,49 @@ impl SyslogDeserializerConfig {
                         source,
                         None,
                         &owned_value_path!("hostname"),
-                        Kind::bytes(),
+                        Kind::bytes().or_undefined(),
                         None,
                     )
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("severity"),
-                        Kind::bytes(),
+                        Kind::bytes().or_undefined(),
                         Some("severity"),
                     )
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("facility"),
-                        Kind::bytes(),
+                        Kind::bytes().or_undefined(),
                         None,
                     )
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("version"),
-                        Kind::integer(),
+                        Kind::integer().or_undefined(),
                         None,
                     )
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("appname"),
-                        Kind::bytes(),
+                        Kind::bytes().or_undefined(),
                         None,
                     )
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("msgid"),
-                        Kind::bytes(),
+                        Kind::bytes().or_undefined(),
                         None,
                     )
                     .with_source_metadata(
                         source,
                         None,
                         &owned_value_path!("procid"),
-                        Kind::integer().or_bytes(),
+                        Kind::integer().or_bytes().or_undefined(),
                         None,
                     )
                     .with_source_metadata(

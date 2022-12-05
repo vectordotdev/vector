@@ -10,11 +10,11 @@ use codecs::{
 };
 use futures::StreamExt;
 use listenfd::ListenFd;
-use lookup::PathPrefix;
+use lookup::{path, PathPrefix};
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_core::config::{LegacyKey, LogNamespace};
 
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
@@ -378,7 +378,13 @@ fn enrich_syslog_event(
     let log = event.as_mut_log();
 
     if let Some(default_host) = &default_host {
-        log.insert("source_ip", default_host.clone());
+        log_namespace.insert_source_metadata(
+            SyslogConfig::NAME,
+            log,
+            Some(LegacyKey::Overwrite("source_id")),
+            path!("source_id"),
+            default_host.clone(),
+        );
     }
 
     let parsed_hostname = log
@@ -386,28 +392,24 @@ fn enrich_syslog_event(
         .map(|hostname| hostname.coerce_to_bytes());
 
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
-        log.insert(host_key, parsed_host);
+        log_namespace.insert_source_metadata(
+            SyslogConfig::NAME,
+            log,
+            Some(LegacyKey::Overwrite(host_key)),
+            path!("host"),
+            parsed_host,
+        );
     }
 
     log_namespace.insert_standard_vector_source_metadata(log, SyslogConfig::NAME, Utc::now());
 
-    // For the Vector namespace, if the timestamp exists in the message it in the metadata.
-    // For Legacy we insert it in the message - and default to Now if it doesn't exist.
-    let timestamp = log
-        .get("timestamp")
-        .and_then(|timestamp| timestamp.as_timestamp().cloned());
-
-    match log_namespace {
-        LogNamespace::Vector => {
-            if let Some(timestamp) = timestamp {
-                log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
-            }
-        }
-        LogNamespace::Legacy => {
-            let timestamp = timestamp.unwrap_or_else(Utc::now);
-            log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
-        }
-    };
+    if log_namespace == LogNamespace::Legacy {
+        let timestamp = log
+            .get("timestamp")
+            .and_then(|timestamp| timestamp.as_timestamp().cloned());
+        let timestamp = timestamp.unwrap_or_else(Utc::now);
+        log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
+    }
 
     trace!(
         message = "Processing one event.",
@@ -485,15 +487,33 @@ mod test {
                     Kind::timestamp(),
                 )
                 .with_metadata_field(&owned_value_path!("syslog", "timestamp"), Kind::timestamp())
-                .with_metadata_field(&owned_value_path!("syslog", "hostname"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("syslog", "severity"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("syslog", "facility"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("syslog", "version"), Kind::integer())
-                .with_metadata_field(&owned_value_path!("syslog", "appname"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("syslog", "msgid"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("syslog", "hostname"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("syslog", "severity"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("syslog", "facility"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("syslog", "version"),
+                    Kind::integer().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("syslog", "appname"),
+                    Kind::bytes().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("syslog", "msgid"),
+                    Kind::bytes().or_undefined(),
+                )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "procid"),
-                    Kind::integer().or_bytes(),
+                    Kind::integer().or_bytes().or_undefined(),
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "structured_data"),
@@ -525,7 +545,7 @@ mod test {
         )
         .with_event_field(
             &owned_value_path!("timestamp"),
-            Kind::timestamp().or_undefined(),
+            Kind::timestamp(),
             Some("timestamp"),
         )
         .with_event_field(
@@ -564,7 +584,8 @@ mod test {
             None,
         )
         .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
-        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None);
+        .with_standard_vector_source_metadata();
+        // .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None);
 
         println!("{:?}", definition.event_kind().debug_info());
         println!("{:?}", definition.metadata_kind().debug_info());
@@ -1256,6 +1277,7 @@ mod test {
         fn from(e: Event) -> Self {
             let (value, _) = e.into_log().into_parts();
             let mut fields = value.into_object().unwrap();
+            fields.remove("source_id");
 
             Self {
                 msgid: fields.remove("msgid").map(value_to_string).unwrap(),
