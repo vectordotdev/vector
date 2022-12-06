@@ -424,7 +424,7 @@ impl LogEvent {
         }
     }
 
-    /// Fetches the "host" path of the event. This is either from the "host" semantic meaning (Vector namespace)
+    /// Fetches the `host` path of the event. This is either from the "host" semantic meaning (Vector namespace)
     /// or from the host key set on the "Global Log Schema" (Legacy namespace).
     // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
     //   "Global Log Schema" are updated to the new path lookup code
@@ -435,8 +435,8 @@ impl LogEvent {
         }
     }
 
-    /// Fetches the "source_type" path of the event. This is either from the "source_type" Vector metadata field (Vector namespace)
-    /// or from the source_type key set on the "Global Log Schema" (Legacy namespace).
+    /// Fetches the `source_type` path of the event. This is either from the `source_type` Vector metadata field (Vector namespace)
+    /// or from the `source_type` key set on the "Global Log Schema" (Legacy namespace).
     // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
     //   "Global Log Schema" are updated to the new path lookup code
     pub fn source_type_path(&self) -> Option<String> {
@@ -446,7 +446,7 @@ impl LogEvent {
         }
     }
 
-    /// Fetches the "message" of the event. This is either from the "message" semantic meaning (Vector namespace)
+    /// Fetches the `message` of the event. This is either from the "message" semantic meaning (Vector namespace)
     /// or from the message key set on the "Global Log Schema" (Legacy namespace).
     pub fn get_message(&self) -> Option<&Value> {
         match self.namespace() {
@@ -455,7 +455,7 @@ impl LogEvent {
         }
     }
 
-    /// Fetches the "timestamp" of the event. This is either from the "timestamp" semantic meaning (Vector namespace)
+    /// Fetches the `timestamp` of the event. This is either from the "timestamp" semantic meaning (Vector namespace)
     /// or from the timestamp key set on the "Global Log Schema" (Legacy namespace).
     pub fn get_timestamp(&self) -> Option<&Value> {
         match self.namespace() {
@@ -464,7 +464,7 @@ impl LogEvent {
         }
     }
 
-    /// Fetches the "timestamp" of the event. This is either from the "host" semantic meaning (Vector namespace)
+    /// Fetches the `timestamp` of the event. This is either from the "host" semantic meaning (Vector namespace)
     /// or from the host key set on the "Global Log Schema" (Legacy namespace).
     pub fn get_host(&self) -> Option<&Value> {
         match self.namespace() {
@@ -473,8 +473,8 @@ impl LogEvent {
         }
     }
 
-    /// Fetches the "source_type" of the event. This is either from the "source_type" Vector metadata field (Vector namespace)
-    /// or from the source_type key set on the "Global Log Schema" (Legacy namespace).
+    /// Fetches the `source_type` of the event. This is either from the `source_type` Vector metadata field (Vector namespace)
+    /// or from the `source_type` key set on the "Global Log Schema" (Legacy namespace).
     pub fn get_source_type(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get(metadata_path!("vector", "source_type")),
