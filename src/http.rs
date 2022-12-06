@@ -43,9 +43,9 @@ pub enum HttpError {
     CallRequest { source: hyper::Error },
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
-    #[snafu(display("Failed to build HTTP request: {}", source))]
+    #[snafu(display("Failed to decompress HTTP request: {}", source))]
     Compression { source: hyper::Error },
-    #[snafu(display("Failed to build HTTP request: {}", source))]
+    #[snafu(display("Failed to read HTTP request: {}", source))]
     IO { source: Error },
 }
 
