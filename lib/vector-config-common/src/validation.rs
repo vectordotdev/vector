@@ -169,7 +169,7 @@ impl Validation {
             // Plainly, we limit the logical bounds of all number inputs to be below 2^53, regardless of sign, in order to
             // ensure that JavaScript's usage of float64 to represent numbers -- whether they're actually an integer or a
             // floating point -- stays within a range that allows us to losslessly convert integers to floating point, and
-            // vise versa.
+            // vice versa.
             //
             // Practically, 2^53 is 9.0071993e+15, which is so absurdly large in the context of what a numerical input might
             // expect to be given: 2^53 nanoseconds is over 100 days, 2^53 bytes is 9 petabytes, and so on.  Even though the

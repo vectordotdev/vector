@@ -1,8 +1,6 @@
 mod integration_tests;
 mod tests;
 
-use std::collections::BTreeMap;
-
 use aws_sdk_cloudwatch::{
     error::PutMetricDataError,
     model::{Dimension, MetricDatum},
@@ -15,7 +13,7 @@ use futures_util::{future, future::BoxFuture};
 use std::task::{Context, Poll};
 use tower::Service;
 use vector_config::configurable_component;
-use vector_core::{sink::VectorSink, ByteSizeOf};
+use vector_core::{sink::VectorSink, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     aws::{
@@ -23,7 +21,7 @@ use crate::{
     },
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     event::{
-        metric::{Metric, MetricValue},
+        metric::{Metric, MetricTags, MetricValue},
         Event,
     },
     sinks::util::{
@@ -197,9 +195,9 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
     }
 }
 
-fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
+fn tags_to_dimensions(tags: &MetricTags) -> Vec<Dimension> {
     // according to the API, up to 10 dimensions per metric can be provided
-    tags.iter()
+    tags.iter_single()
         .take(10)
         .map(|(k, v)| Dimension::builder().name(k).value(v).build())
         .collect()
@@ -232,7 +230,7 @@ impl CloudWatchMetricsSvc {
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter({
-                    let byte_size = event.size_of();
+                    let byte_size = event.estimated_json_encoded_size_of();
                     normalizer.normalize(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()

@@ -134,8 +134,12 @@ async fn collected_metrics_native_json() {
     // panics if not metric event
     let metric = events[0].as_metric();
     assert_eq!(
-        metric.tags().unwrap()[log_schema().source_type_key()],
-        HttpClientConfig::NAME.to_string()
+        metric
+            .tags()
+            .unwrap()
+            .get(log_schema().source_type_key())
+            .map(AsRef::as_ref),
+        Some(HttpClientConfig::NAME)
     );
 }
 

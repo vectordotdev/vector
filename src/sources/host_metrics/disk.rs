@@ -1,8 +1,8 @@
 use crate::internal_events::HostMetricsScrapeDetailError;
 use futures::StreamExt;
 use heim::units::information::byte;
-use vector_common::btreemap;
 use vector_config::configurable_component;
+use vector_core::metric_tags;
 
 use super::{filter_result, FilterList, HostMetrics};
 
@@ -34,7 +34,7 @@ impl HostMetrics {
                     .collect::<Vec<_>>()
                     .await
                 {
-                    let tags = btreemap! {
+                    let tags = metric_tags! {
                         "device" => counter.device_name().to_string_lossy()
                     };
                     output.name = "disk";
@@ -89,7 +89,7 @@ mod tests {
         let metrics = buffer.metrics;
 
         // The Windows test runner doesn't generate any disk metrics on the VM.
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(not(windows))]
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 4 == 0);
         assert!(all_counters(&metrics));

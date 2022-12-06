@@ -3,6 +3,10 @@ package metadata
 urls: {
 	apex:                                       "https://apex.sh/logs/"
 	azure_blob_storage:                         "https://azure.microsoft.com/en-us/services/storage/blobs/"
+	azure_event_hubs:                           "https://learn.microsoft.com/en-us/azure/event-hubs/"
+	azure_event_hubs_kafka:                     "https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-for-kafka-ecosystem-overview"
+	azure_event_hubs_connection_string:         "https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-get-connection-string"
+	azure_event_hubs_tiers:                     "https://learn.microsoft.com/en-us/azure/event-hubs/compare-tiers"
 	affine_type_system:                         "\(wikipedia)/wiki/Substructural_type_system#Affine_type_systems"
 	adaptive_request_concurrency_post:          "/blog/adaptive-request-concurrency/"
 	amazon_linux:                               "https://aws.amazon.com/amazon-linux-ami/"
@@ -173,6 +177,7 @@ urls: {
 	elasticsearch_id_field:                     "https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html"
 	elasticsearch_id_performance:               "https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids"
 	elasticsearch_ignore_malformed:             "https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-malformed.html"
+	encoded_word:                               "https://datatracker.ietf.org/doc/html/rfc2047#section-2"
 	encoding_charset_labels:                    "https://encoding.spec.whatwg.org/#concept-encoding-get"
 	encoding_standard:                          "https://encoding.spec.whatwg.org/"
 	endler_dev:                                 "https://endler.dev/"

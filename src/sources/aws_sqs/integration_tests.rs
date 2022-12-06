@@ -115,7 +115,7 @@ pub(crate) async fn test() {
                 .get(log_schema().message_key())
                 .unwrap()
                 .to_string_lossy();
-            if !expected_messages.remove(&message) {
+            if !expected_messages.remove(message.as_ref()) {
                 panic!("Received unexpected message: {:?}", message);
             }
         }

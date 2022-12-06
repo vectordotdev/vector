@@ -5,13 +5,14 @@ use crate::{
     event::{LogEvent, Metric, MetricKind, MetricValue, Value},
     sinks::{
         elasticsearch::{
-            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchCommon,
-            ElasticsearchConfig, ElasticsearchMode,
+            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
+            ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
         },
         util::encoding::Encoder,
     },
     template::Template,
 };
+use lookup::owned_value_path;
 
 #[tokio::test]
 async fn sets_create_action_when_configured() {
@@ -25,6 +26,7 @@ async fn sets_create_action_when_configured() {
             index: Some(String::from("vector")),
         }),
         endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -73,6 +75,7 @@ async fn encode_datastream_mode() {
         }),
         endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -119,6 +122,7 @@ async fn encode_datastream_mode_no_routing() {
             namespace: Template::try_from("something").unwrap(),
             ..Default::default()
         }),
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -154,6 +158,7 @@ async fn handle_metrics() {
             index: Some(String::from("vector")),
         }),
         endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -195,6 +200,7 @@ async fn decode_bulk_action_error() {
             index: Some(String::from("vector")),
         }),
         endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -214,6 +220,7 @@ async fn decode_bulk_action() {
             index: Some(String::from("vector")),
         }),
         endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -241,6 +248,7 @@ async fn encode_datastream_mode_no_sync() {
             sync_fields: false,
             ..Default::default()
         }),
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
 
@@ -284,6 +292,7 @@ async fn allows_using_except_fields() {
         )
         .unwrap(),
         endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -316,8 +325,9 @@ async fn allows_using_only_fields() {
             action: None,
             index: Some(String::from("{{ idx }}")),
         }),
-        encoding: Transformer::new(Some(vec!["foo".to_string().into()]), None, None).unwrap(),
+        encoding: Transformer::new(Some(vec![owned_value_path!("foo")]), None, None).unwrap(),
         endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();

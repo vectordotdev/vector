@@ -129,8 +129,11 @@ impl Configurable for Concurrency {
         Some(std::any::type_name::<Self>())
     }
 
-    fn description() -> Option<&'static str> {
-        Some("Configuration for outbound request concurrency.")
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Configuration for outbound request concurrency.");
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
+        metadata
     }
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {

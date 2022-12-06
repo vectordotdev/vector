@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
@@ -9,7 +9,7 @@ use vector_config::configurable_component;
 use crate::{
     codecs::Transformer,
     config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    event::{Event, Value},
+    event::{Event, MetricTags, Value},
     http::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
@@ -120,9 +120,9 @@ impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let measurement = self.get_measurement()?;
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
-        tags.insert(log_schema().host_key().to_string());
-        tags.insert(log_schema().source_type_key().to_string());
-        tags.insert("metric_type".to_string());
+        tags.replace(log_schema().host_key().to_string());
+        tags.replace(log_schema().source_type_key().to_string());
+        tags.replace("metric_type".to_string());
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
@@ -200,11 +200,11 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         });
 
         // Tags + Fields
-        let mut tags: BTreeMap<String, String> = BTreeMap::new();
+        let mut tags = MetricTags::default();
         let mut fields: HashMap<String, Field> = HashMap::new();
         log.convert_to_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
-                tags.insert(key, value.to_string_lossy());
+                tags.replace(key, value.to_string_lossy().into_owned());
             } else {
                 fields.insert(key, to_field(value));
             }
@@ -293,7 +293,7 @@ fn to_field(value: &Value) -> Field {
         Value::Integer(num) => Field::Int(*num),
         Value::Float(num) => Field::Float(num.into_inner()),
         Value::Boolean(b) => Field::Bool(*b),
-        _ => Field::String(value.to_string_lossy()),
+        _ => Field::String(value.to_string_lossy().into_owned()),
     }
 }
 

@@ -42,7 +42,7 @@ pub struct TcpSocketConnectionShutdown;
 
 impl InternalEvent for TcpSocketConnectionShutdown {
     fn emit(self) {
-        debug!(message = "Received EOF from the server, shutdown.");
+        warn!(message = "Received EOF from the server, shutdown.");
         counter!("connection_shutdown_total", 1, "mode" => "tcp");
     }
 }

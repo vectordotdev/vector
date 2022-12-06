@@ -279,6 +279,20 @@ bench_function! {
 }
 
 bench_function! {
+    decode_mime_q => vrl_stdlib::DecodeMimeQ;
+
+    base_64 {
+        args: func_args![value: "=?utf-8?b?SGVsbG8sIFdvcmxkIQ==?="],
+        want: Ok("Hello, World!"),
+    }
+
+    quoted_printable {
+        args: func_args![value: "Subject: =?iso-8859-1?Q?=A1Hola,_se=F1or!?="],
+        want: Ok("Subject: ¡Hola, señor!"),
+    }
+}
+
+bench_function! {
     downcase => vrl_stdlib::Downcase;
 
     literal {

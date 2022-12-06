@@ -94,7 +94,6 @@ pub struct RemoteWriteConfig {
     /// If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the value of this setting.
     ///
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
-    #[configurable(metadata(templateable))]
     #[serde(default)]
     pub tenant_id: Option<Template>,
 
@@ -139,6 +138,13 @@ impl SinkConfig for RemoteWriteConfig {
                 Some(Auth::Basic {
                     user: user.clone(),
                     password: password.clone().into(),
+                }),
+                None,
+                None,
+            ),
+            Some(PrometheusRemoteWriteAuth::Bearer { token }) => (
+                Some(Auth::Bearer {
+                    token: token.clone(),
                 }),
                 None,
                 None,
@@ -381,6 +387,7 @@ mod tests {
     use http::HeaderMap;
     use indoc::indoc;
     use prometheus_parser::proto;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -584,14 +591,10 @@ mod tests {
 
     pub(super) fn create_event(name: String, value: f64) -> Event {
         Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west-1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west-1",
+                "production" => "true",
+            )))
             .with_timestamp(Some(chrono::Utc::now()))
             .into()
     }
@@ -677,8 +680,8 @@ mod integration_tests {
                     }
                     _ => panic!("Unhandled metric value, fix the test"),
                 }
-                for (tag, value) in metric.tags().unwrap() {
-                    assert_eq!(output[&tag[..]], Value::String(value.to_string()));
+                for (tag, value) in metric.tags().unwrap().iter_single() {
+                    assert_eq!(output[tag], Value::String(value.to_string()));
                 }
                 let timestamp =
                     format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);

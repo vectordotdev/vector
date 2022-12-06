@@ -5,6 +5,7 @@ use futures_util::{
     stream::{self, BoxStream},
     StreamExt,
 };
+use tokio::sync::oneshot::{channel, Sender};
 use tower::Service;
 use vector_core::{
     config::log_schema,
@@ -49,11 +50,19 @@ impl Partitioner for EventPartitioner {
             }
             Event::Trace(t) => PartitionKey {
                 api_key: item.metadata().datadog_api_key(),
-                env: t.get("env").map(|s| s.to_string_lossy()),
-                hostname: t.get(log_schema().host_key()).map(|s| s.to_string_lossy()),
-                agent_version: t.get("agent_version").map(|s| s.to_string_lossy()),
-                target_tps: t.get("target_tps").and_then(|tps| tps.as_integer()),
-                error_tps: t.get("error_tps").and_then(|tps| tps.as_integer()),
+                env: t.get("env").map(|s| s.to_string_lossy().into_owned()),
+                hostname: t
+                    .get(log_schema().host_key())
+                    .map(|s| s.to_string_lossy().into_owned()),
+                agent_version: t
+                    .get("agent_version")
+                    .map(|s| s.to_string_lossy().into_owned()),
+                target_tps: t
+                    .get("target_tps")
+                    .and_then(|tps| tps.as_integer().map(Into::into)),
+                error_tps: t
+                    .get("error_tps")
+                    .and_then(|tps| tps.as_integer().map(Into::into)),
             },
         }
     }
@@ -63,6 +72,7 @@ pub struct TracesSink<S> {
     service: S,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
+    shutdown: Sender<Sender<()>>,
 }
 
 impl<S> TracesSink<S>
@@ -76,11 +86,13 @@ where
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
+        shutdown: Sender<Sender<()>>,
     ) -> Self {
         TracesSink {
             service,
             request_builder,
             batch_settings,
+            shutdown,
         }
     }
 
@@ -96,7 +108,7 @@ where
                         emit!(DatadogTracesEncodingError {
                             error_message,
                             error_reason,
-                            dropped_events,
+                            dropped_events: dropped_events as usize,
                         });
                         None
                     }
@@ -105,7 +117,20 @@ where
             })
             .into_driver(self.service);
 
-        sink.run().await
+        sink.run().await?;
+
+        // Create a channel for the stats flushing thread to communicate back that it has flushed
+        // remaining stats. This is necessary so that we do not terminate the process while the
+        // stats flushing thread is trying to complete the HTTP request.
+        let (sender, receiver) = channel();
+
+        // Signal the stats thread task to flush remaining payloads and shutdown.
+        let _ = self.shutdown.send(sender);
+
+        // The stats flushing thread has until the component shutdown grace period to end
+        // gracefully. Otherwise the sink + stats flushing thread will be killed and an error
+        // reported upstream.
+        receiver.await.map_err(|_| ())
     }
 }
 

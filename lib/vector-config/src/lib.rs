@@ -1,86 +1,87 @@
 // High-level list of TODOS.
 //
-// TODO: `serde` supports defining a default at the struct level to fill in fields when no value is present during
-// serialization, but it also supports defaults on a per-field basis, which override any defaults that would be applied
-// by virtue of the struct-level default.
+// TODO: `serde` supports defining a default at the struct level to fill in fields when no value is
+// present during serialization, but it also supports defaults on a per-field basis, which override
+// any defaults that would be applied by virtue of the struct-level default.
 //
-// Thus, we should mark a struct optional if it has a struct-level default _or_ if all fields are optional: either
-// literal `Option<T>` fields or if they all have defaults.
+// Thus, we should mark a struct optional if it has a struct-level default _or_ if all fields are
+// optional: either literal `Option<T>` fields or if they all have defaults.
 //
-// This could clean up some of the required properties where we have a field-level/struct-level default that we can
-// check by looking at the metadata for the type implementing `T`, maybe even such that the default impl of
-// `Configurable::is_optional` could just use that.
+// This could clean up some of the required properties where we have a field-level/struct-level
+// default that we can check by looking at the metadata for the type implementing `T`, maybe even
+// such that the default impl of `Configurable::is_optional` could just use that.
 //
-// TODO: What happens if we try to stick in a field that has a struct with a lifetime attached to it? How does the name
-// of that get generated in terms of what ends up in the schema? Do we even have fields with lifetime bounds in any of
-// our configuration types in `vector`? :thinking:
+// TODO: What happens if we try to stick in a field that has a struct with a lifetime attached to
+// it? How does the name of that get generated in terms of what ends up in the schema? Do we even
+// have fields with lifetime bounds in any of our configuration types in `vector`? :thinking:
 //
-// TODO: Is there a way that we could attempt to brute force detect the types of fields being used with a validation to
-// give a compile-time error when validators are used incorrectly? For example, we throw a runtime error if you use a
-// negative `min` range bound on an unsigned integer field, but it's a bit opaque and hard to decipher.  Could we simply
-// brute force match the qualified path field to see if there's any known unsigned integer type in it -- i.e. `u8`,
-// `u64`, etc -- and then throw a compile-error from the macro? We would still end up throwing an error at runtime if
-// our heuristic to detect unsigned integers failed, but we might be able to give a meaningful error closer to the
-// problem, which would be much better.
+// TODO: Is there a way that we could attempt to brute force detect the types of fields being used
+// with a validation to give a compile-time error when validators are used incorrectly? For example,
+// we throw a runtime error if you use a negative `min` range bound on an unsigned integer field,
+// but it's a bit opaque and hard to decipher.  Could we simply brute force match the qualified path
+// field to see if there's any known unsigned integer type in it -- i.e. `u8`, `u64`, etc -- and
+// then throw a compile-error from the macro? We would still end up throwing an error at runtime if
+// our heuristic to detect unsigned integers failed, but we might be able to give a meaningful error
+// closer to the problem, which would be much better.
 //
-// TODO: If we want to deny unknown fields on structs, JSON Schema supports that by setting `additionalProperties` to
-// `false` on a schema, which turns it into a "closed" schema. However, this is at odds with types used in enums, which
-// is all of our component configuration types. This is because applying `additionalProperties` to the configuration
-// type's schema itself would consider something like an internal enum tag (i.e. `"type": "aws_s3"`) as an additional
-// property, even if `type` was already accounted for in another subschema that was validated against.
+// TODO: If we want to deny unknown fields on structs, JSON Schema supports that by setting
+// `additionalProperties` to `false` on a schema, which turns it into a "closed" schema. However,
+// this is at odds with types used in enums, which is all of our component configuration types. This
+// is because applying `additionalProperties` to the configuration type's schema itself would
+// consider something like an internal enum tag (i.e. `"type": "aws_s3"`) as an additional property,
+// even if `type` was already accounted for in another subschema that was validated against.
 //
-// JSON Schema draft 2019-09 has a solution for this -- `unevaluatedProperties` -- which forces the validator to track
-// what properties have been "accounted" for, so far, during subschema validation during things like validating against
-// all subschemas in `allOf`.
+// JSON Schema draft 2019-09 has a solution for this -- `unevaluatedProperties` -- which forces the
+// validator to track what properties have been "accounted" for, so far, during subschema validation
+// during things like validating against all subschemas in `allOf`.
 //
-// Essentially, we should force all structs to generate a schema that sets `additionalProperties` to `false`, but if it
-// gets used in a way that will place it into `allOf` (which is the case for internally tagged enum variants aka all
-// component configuration types) then we need to update the schema codegen to unset that field, and re-apply it as
+// Essentially, we should force all structs to generate a schema that sets `additionalProperties` to
+// `false`, if it wasn't set already, but if it gets used in a way that will place it into `allOf`
+// (which is the case for internally tagged enum variants aka all component configuration types)
+// then we need to update the schema codegen to unset that field, and re-apply it as
 // `unevaluatedProperties` on the schema which is using `allOf`.
 //
-// Logically, this makes sense because we're only creating a new wrapper schema B around some schema A such that we can
-// use it as a tagged enum variant, so rules like "no additional properties" should apply to the wrapper, since schema A
-// and B should effectively represent the same exact thing.
+// Logically, this makes sense because we're only creating a new wrapper schema B around some schema
+// A such that we can use it as a tagged enum variant, so rules like "no additional properties"
+// should apply to the wrapper, since schema A and B should effectively represent the same exact
+// thing.
 //
-// TODO: We may want to simply switch from using `description` as the baseline descriptive field to using `title`.
-// While, by itself, I think `description` makes a little more sense than `title`, it makes it hard to do split-location
-// documentation.
+// TODO: We may want to simply switch from using `description` as the baseline descriptive field to
+// using `title`.  While, by itself, I think `description` makes a little more sense than `title`,
+// it makes it hard to do split-location documentation.
 //
-// For example, it would be nice to have helper types (i.e. `BatchConfig`, `MultilineConfig`, etc) define their own
-// titles, and then allow other structs that have theor types as fields specify a description. This would be very useful
-// in cases where fields are optional, such that you want the field's title to be the title of the underlying type (e.g.
-// "Multi-line parsing configuration.") but you want the field's description to say something like "If not specified,
-// then multiline parsing is disabled". Including that description on `MultilineConfig` itself is kind of weird because
-// it forces that on everyone else using it, where, in some cases, it may not be optional at all.
+// For example, it would be nice to have helper types (i.e. `BatchConfig`, `MultilineConfig`, etc)
+// define their own titles, and then allow other structs that have theor types as fields specify a
+// description. This would be very useful in cases where fields are optional, such that you want the
+// field's title to be the title of the underlying type (e.g.  "Multi-line parsing configuration.")
+// but you want the field's description to say something like "If not specified, then multiline
+// parsing is disabled". Including that description on `MultilineConfig` itself is kind of weird
+// because it forces that on everyone else using it, where, in some cases, it may not be optional at
+// all.
 //
-// TODO: Right now, we're manually generating a referenceable name where it makes sense by appending the module path to
-// the ident for structs/enums, and by crafting the name by hand for anything like stdlib impls, or impls on external
-// types.
+// TODO: Right now, we're manually generating a referenceable name where it makes sense by appending
+// the module path to the ident for structs/enums, and by crafting the name by hand for anything
+// like stdlib impls, or impls on external types.
 //
-// We do this because technically `std::any::type_name` says that it doesn't provide a stable interface for getting the
-// fully-qualified path of a type, which we would need (in general, regardless of whether or not we used that function)
-// because we don't want definition types totally changing name between compiler versions, etc.
+// We do this because technically `std::any::type_name` says that it doesn't provide a stable
+// interface for getting the fully-qualified path of a type, which we would need (in general,
+// regardless of whether or not we used that function) because we don't want definition types
+// totally changing name between compiler versions, etc.
 //
-// This is obviously also tricky from a re-export standpoint i.e. what is the referenceable name of a type that uses the
-// derive macros for `Configurable` but is exporter somewhere entirely different? The path would refer to the source nol
-// matter what, as it's based on how `std::module_path!()` works. Technically speaking, that's still correct from a "we
-// shouldn't create duplicate schemas for T" standpoint, but could manifest as a non-obvious divergence.
+// This is obviously also tricky from a re-export standpoint i.e. what is the referenceable name of
+// a type that uses the derive macros for `Configurable` but is exported somewhere entirely
+// different? The path would refer to the source no matter what, as it's based on how
+// `std::module_path!()` works. Technically speaking, that's still correct from a "we shouldn't
+// create duplicate schemas for T" standpoint, but could manifest as a non-obvious divergence.
 //
-// TODO: We need to figure out how to handle aliases. Looking previously, it seemed like we might need to do some very
-// ugly combinatorial explosion stuff to define a schema per perumtation of all aliased fields in a config. We might be
-// able to get away with using a combination of `allOf` and `oneOf` where we define a subschema for the non-aliased
-// fields, and then a subschema using `oneOf`for each aliased field -- allowing it to match any of the possible field
-// names for that specific field -- and then combine them all with `allOf`, which keeps the schema as compact as
-// possible, I think, short of a new version of the specification coming out that adds native alias support for
-// properties.
-//
-// TODO: Add support for defining metadata on fields, since each field is defined as a schema unto itself, so we can
-// stash metadata in the extensions for each field the same as we do for structs.
-//
-// TODO: Add support for single value metadata entries, in addition to key/value, such that for things like field metadata, we
-// can essentially define flags i.e. `docs:templateable` as a metadata value for marking a field as working with
-// Vector's template syntax, since doing `templateable = true` is weird given that we never otherwise specifically
-// disable it. In other words, we want a way to define feature flags in metadata.
+// TODO: We need to figure out how to handle aliases. Looking previously, it seemed like we might
+// need to do some very ugly combinatorial explosion stuff to define a schema per perumtation of all
+// aliased fields in a config. We might be able to get away with using a combination of `allOf` and
+// `oneOf` where we define a subschema for the non-aliased fields, and then a subschema using
+// `oneOf`for each aliased field -- allowing it to match any of the possible field names for that
+// specific field -- and then combine them all with `allOf`, which keeps the schema as compact as
+// possible, I think, short of a new version of the specification coming out that adds native alias
+// support for properties.
 //
 // TODO: Should we add a way, and/or make it the default, that if you only supply a description of a
 // field, it concats the description of the type of the field? for example, you have:
@@ -88,25 +89,35 @@
 // /// Predefined ACLs.
 // ///
 // /// For more information, see this link.
-// pub enum PredefinedAcl { ... }
+// pub enum PredefinedAcl { ...
+// }
 //
 // and then somewhere else, you use it like this:
 //
-// /// The Predefined ACL to apply to newly created objects.
-// field: PredefinedAcl,
+// struct Foo {
+// ...
+//     /// The Predefined ACL to apply to newly created objects.
+//     field: PredefinedAcl,
+// ...
+// }
 //
-// the resulting docs for `field` should look as if we wrote this:
+// the resulting docs for `field` should look as if we wrote this directly:
 //
 // /// The Predefined ACL to apply to newly created objects.
 // ///
 // /// For more information, see this link.
 //
-// basically, we're always documenting these shared types fully, but sometimes their title is
+// Basically, we're always documenting these shared types fully, but sometimes their title is
 // written in an intentionally generic way, and we may want to spice up the wording so it's
 // context-specific i.e. we're using predefined ACLs for new objects, or using it for new firewall
 // rules, or ... so on and so forth. and by concating the existing description on the shared type,
 // we can continue to include high-quality doc comments with contextual links, examples, etc and
 // avoid duplication.
+//
+// One question there would be: do we concat the description of the field _and_ the field's type
+// together? We would probably have to, since the unwritten rule is to use link references, which
+// are shoved at the end of the description like a footnote, and if we have a link reference in our
+// field's title, then we need the field's description to be concatenated so that it can be resolved.
 //
 // TODO: Should we always apply the transparent marker to fields when they're the only field in a
 // tuple struct/tuple variant? There's also some potential interplay with using the `derived` helper

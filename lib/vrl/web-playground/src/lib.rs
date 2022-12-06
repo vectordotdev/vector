@@ -2,16 +2,11 @@ use ::value::Value;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
 use value::Secrets;
+use vrl::diagnostic::DiagnosticList;
 use vrl::state::TypeState;
 use vrl::{diagnostic::Formatter, prelude::BTreeMap, CompileConfig, Runtime};
-use vrl::{TargetValue, TimeZone};
+use vrl::{TargetValue, Terminate, TimeZone};
 use wasm_bindgen::prelude::*;
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct Input {
@@ -42,7 +37,40 @@ impl VrlCompileResult {
     }
 }
 
-fn compile(mut input: Input) -> Result<VrlCompileResult, String> {
+#[derive(Deserialize, Serialize, Default)]
+pub struct VrlDiagnosticResult {
+    pub list: Vec<String>,
+    pub msg: String,
+    pub msg_colorized: String,
+}
+
+impl VrlDiagnosticResult {
+    fn new(program: &str, diagnostic_list: DiagnosticList) -> Self {
+        Self {
+            list: diagnostic_list
+                .clone()
+                .into_iter()
+                .map(|diag| String::from(diag.message()))
+                .collect(),
+            msg: Formatter::new(program, diagnostic_list.clone()).to_string(),
+            msg_colorized: Formatter::new(program, diagnostic_list)
+                .colored()
+                .to_string(),
+        }
+    }
+
+    fn new_runtime_error(program: &str, terminate: Terminate) -> Self {
+        Self {
+            list: Vec::with_capacity(1),
+            msg: Formatter::new(program, terminate.clone().get_expression_error()).to_string(),
+            msg_colorized: Formatter::new(program, terminate.get_expression_error())
+                .colored()
+                .to_string(),
+        }
+    }
+}
+
+fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
     let event = &mut input.event;
     let functions = stdlib::all();
     let state = TypeState::default();
@@ -58,17 +86,12 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, String> {
 
     let program = match vrl::compile_with_state(&input.program, &functions, &state, config) {
         Ok(program) => program,
-        Err(diagnostics) => {
-            let msg = Formatter::new(&input.program, diagnostics)
-                .colored()
-                .to_string();
-            return Err(msg);
-        }
+        Err(diagnostics) => return Err(VrlDiagnosticResult::new(&input.program, diagnostics)),
     };
 
     match runtime.resolve(&mut target_value, &program.program, &timezone) {
         Ok(result) => Ok(VrlCompileResult::new(result, target_value.value)),
-        Err(err) => Err(err.to_string()),
+        Err(err) => Err(VrlDiagnosticResult::new_runtime_error(&input.program, err)),
     }
 }
 
@@ -79,9 +102,6 @@ pub fn run_vrl(incoming: &JsValue) -> JsValue {
 
     match compile(input) {
         Ok(res) => JsValue::from_serde(&res).unwrap(),
-        Err(err) => {
-            log(&err);
-            JsValue::from_serde("invalid vrl").unwrap()
-        }
+        Err(err) => JsValue::from_serde(&err).unwrap(),
     }
 }

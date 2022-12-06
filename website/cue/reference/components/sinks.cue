@@ -236,7 +236,7 @@ components: sinks: [Name=string]: {
 													type: string: {
 														examples: [
 															"""
-															["{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"]
+															[{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }]
 															""",
 														]
 													}

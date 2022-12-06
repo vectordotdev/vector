@@ -1,10 +1,12 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
+use crate::schema::Definition;
 use crate::{
     config::{self, DataType, Input, Output, CONFIG_PATHS},
     event::Event,
@@ -52,12 +54,17 @@ pub struct LuaConfig {
     /// The program can be used to to import external dependencies, as well as define the functions
     /// used for the various lifecycle hooks. However, it's not strictly required, as the lifecycle
     /// hooks can be configured directly with inline Lua source for each respective hook.
+    #[configurable(metadata(
+        docs::examples = "function init()\n\tcount = 0\nend\n\nfunction process()\n\tcount = count + 1\nend\n\nfunction timer_handler(emit)\n\temit(make_counter(counter))\n\tcounter = 0\nend\n\nfunction shutdown(emit)\n\temit(make_counter(counter))\nend\n\nfunction make_counter(value)\n\treturn metric = {\n\t\tname = \"event_counter\",\n\t\tkind = \"incremental\",\n\t\ttimestamp = os.date(\"!*t\"),\n\t\tcounter = {\n\t\t\tvalue = value\n\t\t}\n \t}\nend",
+        docs::examples = "-- external file with hooks and timers defined\nrequire('custom_module')",
+    ))]
     source: Option<String>,
 
     /// A list of directories to search when loading a Lua file via the `require` function.
     ///
     /// If not specified, the modules are looked up in the directories of Vector’s configs.
     #[serde(default = "default_config_paths")]
+    #[configurable(metadata(docs::examples = "/etc/vector/lua"))]
     search_dirs: Vec<PathBuf>,
 
     #[configurable(derived)]
@@ -98,6 +105,10 @@ struct HooksConfig {
     ///
     /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
     /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
+    #[configurable(metadata(
+        docs::examples = "function (emit)\n\t-- Custom Lua code here\nend",
+        docs::examples = "init",
+    ))]
     init: Option<String>,
 
     /// A function which is called for each incoming event.
@@ -107,6 +118,10 @@ struct HooksConfig {
     /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
     /// cases, the closure/function takes two parameters. The first parameter, `event`, is the event being processed,
     /// while the second parameter, `emit`, is a reference to a function for emitting events.
+    #[configurable(metadata(
+        docs::examples = "function (event, emit)\n\tevent.log.field = \"value\" -- set value of a field\n\tevent.log.another_field = nil -- remove field\n\tevent.log.first, event.log.second = nil, event.log.first -- rename field\n\t-- Very important! Emit the processed event.\n\temit(event)\nend",
+        docs::examples = "process",
+    ))]
     process: String,
 
     /// A function which is called when Vector is stopped.
@@ -115,22 +130,30 @@ struct HooksConfig {
     ///
     /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
     /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
+    #[configurable(metadata(
+        docs::examples = "function (emit)\n\t-- Custom Lua code here\nend",
+        docs::examples = "shutdown",
+    ))]
     shutdown: Option<String>,
 }
 
 /// A Lua timer.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug)]
 struct TimerConfig {
     /// The interval to execute the handler, in seconds.
-    interval_seconds: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    interval_seconds: Duration,
 
     /// The handler function which is called when the timer ticks.
     ///
     /// It can produce new events using the `emit` function.
     ///
-    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
-    /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function
+    /// to call. In both cases, the closure/function takes a single parameter, `emit`, which is a
+    /// reference to a function for emitting events.
+    #[configurable(metadata(docs::examples = "timer_handler"))]
     handler: String,
 }
 
@@ -143,8 +166,11 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Metric | DataType::Log)]
+    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        // Lua causes the type definition to be reset
+        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
+
+        vec![Output::default(DataType::Metric | DataType::Log).with_schema_definition(definition)]
     }
 }
 
@@ -226,7 +252,7 @@ impl Lua {
 
             let timer = Timer {
                 id: id as u32,
-                interval_seconds: timer.interval_seconds,
+                interval: timer.interval_seconds,
             };
             timers.push((timer, handler_key));
         }

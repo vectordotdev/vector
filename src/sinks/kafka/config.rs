@@ -30,7 +30,7 @@ pub struct KafkaSinkConfig {
     pub bootstrap_servers: String,
 
     /// The Kafka topic name to write events to.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::templateable))]
     pub topic: String,
 
     /// The log field name or tags key to use for the topic key.

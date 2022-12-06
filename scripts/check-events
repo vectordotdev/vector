@@ -378,7 +378,7 @@ Find.find('./src', './lib') do |path|
         # trailing period, respectively.
         has_message = !message_param.nil?
         message = if has_message then message_param["value"].gsub(/^"|"$/, '') else nil end
-        is_capitalized = !has_message || (message[0] == "{" || message.match(/^[[:upper:]]/))
+        is_capitalized = !has_message || (message[0] == "{" || !message.match(/^[a-zA-Z]/) || message.match(/^[[:upper:]]/))
         has_trailing_period = !has_message || (message[-1, 1] == "}" || message.match(/\.$/))
 
         match_reports = []

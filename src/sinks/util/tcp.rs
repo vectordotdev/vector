@@ -272,6 +272,8 @@ where
             let finalizers = event.metadata_mut().take_finalizers();
             self.transformer.transform(&mut event);
             let mut bytes = BytesMut::new();
+
+            // Errors are handled by `Encoder`.
             if encoder.encode(event, &mut bytes).is_ok() {
                 let item = bytes.freeze();
                 EncodedEvent {
@@ -295,15 +297,19 @@ where
                 Err(error) => Err(error),
             };
 
+            // TODO we can consider retrying once in the Error case. This sink is a "best effort"
+            // delivery due to the nature of the underlying protocol.
+            // For now, if an error occurs we cannot assume that the events succeeded in delivery
+            // so we will emit `Error` / `EventsDropped` internal events regarless of if the server
+            // responded with Ok(0).
             if let Err(error) = result {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
                     emit!(TcpSocketConnectionShutdown {});
-                } else {
-                    emit!(SocketSendError {
-                        mode: SocketMode::Tcp,
-                        error
-                    });
                 }
+                emit!(SocketSendError {
+                    mode: SocketMode::Tcp,
+                    error
+                });
             }
         }
 

@@ -7,7 +7,7 @@ use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::Decoder,
@@ -18,6 +18,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::util::change_socket_permissions,
+    sources::util::unix::UNNAMED_SOCKET_HOST,
     sources::Source,
     SourceSender,
 };
@@ -78,18 +79,26 @@ async fn listen(
                     })
                 })?;
 
+                let span = info_span!("datagram");
+                let received_from = if !address.is_unnamed() {
+                    let path = address.as_pathname().map(|e| e.to_owned()).map(|path| {
+                        span.record("peer_path", &field::debug(&path));
+                        path
+                    });
+
+                    path.map(|p| p.to_string_lossy().into_owned().into())
+                } else {
+                    // In most cases, we'll be connecting to this
+                    // socket from an unnamed socket (a socket not
+                    // bound to a file). Instead of a filename, we'll
+                    // surface a specific host value.
+                    span.record("peer_path", &field::debug(UNNAMED_SOCKET_HOST));
+                    Some(UNNAMED_SOCKET_HOST.into())
+                };
+
                 bytes_received.emit(ByteSize(byte_size));
 
                 let payload = buf.split_to(byte_size);
-
-                let span = info_span!("datagram");
-                let path = address.as_pathname().map(|e| e.to_owned()).map(|path| {
-                    span.record("peer_path", &field::debug(&path));
-                    path
-                });
-
-                let received_from: Option<Bytes> =
-                    path.map(|p| p.to_string_lossy().into_owned().into());
 
                 let mut stream = FramedRead::new(payload.as_ref(), decoder.clone());
 
@@ -98,7 +107,7 @@ async fn listen(
                         Some(Ok((mut events, _byte_size))) => {
                             emit!(SocketEventsReceived {
                                 mode: SocketMode::Unix,
-                                byte_size: events.size_of(),
+                                byte_size: events.estimated_json_encoded_size_of(),
                                 count: events.len()
                             });
 

@@ -16,7 +16,7 @@ use vector_common::internal_event::{
     ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
 };
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use super::SinkBuildError;
 use crate::{
@@ -292,12 +292,14 @@ where
         while Pin::new(&mut input).peek().await.is_some() {
             let mut socket = self.connector.connect_backoff().await;
             while let Some(mut event) = input.next().await {
-                let byte_size = event.size_of();
+                let byte_size = event.estimated_json_encoded_size_of();
 
                 self.transformer.transform(&mut event);
 
                 let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
+
+                // Errors are handled by `Encoder`.
                 if encoder.encode(event, &mut bytes).is_err() {
                     continue;
                 }

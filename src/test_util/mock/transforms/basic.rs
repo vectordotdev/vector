@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use async_trait::async_trait;
 use value::Value;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Input, Output},
     event::{
@@ -47,7 +48,7 @@ impl TransformConfig for BasicTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 }
@@ -65,7 +66,8 @@ impl FunctionTransform for BasicTransform {
                 let mut v = log
                     .get(crate::config::log_schema().message_key())
                     .unwrap()
-                    .to_string_lossy();
+                    .to_string_lossy()
+                    .into_owned();
                 v.push_str(&self.suffix);
                 log.insert(crate::config::log_schema().message_key(), Value::from(v));
             }
@@ -107,7 +109,8 @@ impl FunctionTransform for BasicTransform {
                 let mut v = trace
                     .get(crate::config::log_schema().message_key())
                     .unwrap()
-                    .to_string_lossy();
+                    .to_string_lossy()
+                    .into_owned();
                 v.push_str(&self.suffix);
                 trace.insert(crate::config::log_schema().message_key(), Value::from(v));
             }

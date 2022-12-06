@@ -5,14 +5,18 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::{parse_value_path, OwnedValuePath};
-use lookup::PathPrefix;
+use lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
+use lookup::owned_value_path;
+use lookup::OwnedTargetPath;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
+use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
+use value::Kind;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
@@ -52,45 +56,59 @@ static ROLE_NAME: Lazy<PathAndQuery> =
 static MAC: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/mac"));
 static DYNAMIC_DOCUMENT: Lazy<PathAndQuery> =
     Lazy::new(|| PathAndQuery::from_static("/latest/dynamic/instance-identity/document"));
-static DEFAULT_FIELD_WHITELIST: Lazy<Vec<String>> = Lazy::new(|| {
-    vec![
-        AMI_ID_KEY.to_string(),
-        AVAILABILITY_ZONE_KEY.to_string(),
-        INSTANCE_ID_KEY.to_string(),
-        INSTANCE_TYPE_KEY.to_string(),
-        LOCAL_HOSTNAME_KEY.to_string(),
-        LOCAL_IPV4_KEY.to_string(),
-        PUBLIC_HOSTNAME_KEY.to_string(),
-        PUBLIC_IPV4_KEY.to_string(),
-        REGION_KEY.to_string(),
-        SUBNET_ID_KEY.to_string(),
-        VPC_ID_KEY.to_string(),
-        ROLE_NAME_KEY.to_string(),
-    ]
-});
+static DEFAULT_FIELD_ALLOWLIST: &[&str] = &[
+    AMI_ID_KEY,
+    AVAILABILITY_ZONE_KEY,
+    INSTANCE_ID_KEY,
+    INSTANCE_TYPE_KEY,
+    LOCAL_HOSTNAME_KEY,
+    LOCAL_IPV4_KEY,
+    PUBLIC_HOSTNAME_KEY,
+    PUBLIC_IPV4_KEY,
+    REGION_KEY,
+    SUBNET_ID_KEY,
+    VPC_ID_KEY,
+    ROLE_NAME_KEY,
+];
 static API_TOKEN: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/api/token"));
 static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-token"));
-static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("http://169.254.169.254"));
 
 /// Configuration for the `aws_ec2_metadata` transform.
+#[serde_as]
 #[configurable_component(transform("aws_ec2_metadata"))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 pub struct Ec2Metadata {
     /// Overrides the default EC2 metadata endpoint.
-    #[serde(alias = "host")]
-    endpoint: Option<String>,
+    #[serde(alias = "host", default = "default_endpoint")]
+    #[derivative(Default(value = "default_endpoint()"))]
+    endpoint: String,
 
     /// Sets a prefix for all event fields added by the transform.
-    namespace: Option<String>,
+    #[configurable(metadata(
+        docs::examples = "",
+        docs::examples = "ec2",
+        docs::examples = "aws.ec2",
+    ))]
+    namespace: Option<OptionalTargetPath>,
 
     /// The interval between querying for updated metadata, in seconds.
-    refresh_interval_secs: Option<u64>,
+    #[serde(default = "default_refresh_interval_secs")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[derivative(Default(value = "default_refresh_interval_secs()"))]
+    refresh_interval_secs: Duration,
 
     /// A list of metadata fields to include in each transformed event.
-    fields: Option<Vec<String>>,
+    #[serde(default = "default_fields")]
+    #[derivative(Default(value = "default_fields()"))]
+    #[configurable(metadata(docs::examples = "instance-id", docs::examples = "local-hostname",))]
+    fields: Vec<String>,
 
     /// The timeout for querying the EC2 metadata endpoint, in seconds.
-    refresh_timeout_secs: Option<u64>,
+    #[serde(default = "default_refresh_timeout_secs")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[derivative(Default(value = "default_refresh_timeout_secs()"))]
+    refresh_timeout_secs: Duration,
 
     #[configurable(derived)]
     #[serde(
@@ -100,7 +118,32 @@ pub struct Ec2Metadata {
     proxy: ProxyConfig,
 
     /// Requires the transform to be able to successfully query the EC2 metadata before Vector can start.
-    required: Option<bool>,
+    #[serde(default = "default_required")]
+    #[derivative(Default(value = "default_required()"))]
+    required: bool,
+}
+
+fn default_endpoint() -> String {
+    String::from("http://169.254.169.254")
+}
+
+const fn default_refresh_interval_secs() -> Duration {
+    Duration::from_secs(10)
+}
+
+const fn default_refresh_timeout_secs() -> Duration {
+    Duration::from_secs(1)
+}
+
+fn default_fields() -> Vec<String> {
+    DEFAULT_FIELD_ALLOWLIST
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+const fn default_required() -> bool {
+    true
 }
 
 #[derive(Clone, Debug)]
@@ -110,7 +153,7 @@ pub struct Ec2MetadataTransform {
 
 #[derive(Debug, Clone)]
 struct MetadataKey {
-    log_path: OwnedValuePath,
+    log_path: OwnedTargetPath,
     metric_tag: String,
 }
 
@@ -138,37 +181,12 @@ impl TransformConfig for Ec2Metadata {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let state = Arc::new(ArcSwap::new(Arc::new(vec![])));
 
-        // Check if the namespace is set to `""` which should mean that we do
-        // not want a prefixed namespace.
-        let namespace = self.namespace.clone().and_then(|namespace| {
-            if namespace.is_empty() {
-                None
-            } else {
-                Some(namespace)
-            }
-        });
-
-        let keys = Keys::new(&namespace);
-
-        let host = self
-            .endpoint
-            .clone()
-            .map(|s| Uri::from_maybe_shared(s).unwrap())
-            .unwrap_or_else(|| HOST.clone());
-
-        let refresh_interval = self
-            .refresh_interval_secs
-            .map(Duration::from_secs)
-            .unwrap_or_else(|| Duration::from_secs(10));
-        let fields = self
-            .fields
-            .clone()
-            .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
-        let refresh_timeout = self
-            .refresh_timeout_secs
-            .map(Duration::from_secs)
-            .unwrap_or_else(|| Duration::from_secs(1));
-        let required = self.required.unwrap_or(true);
+        let keys = Keys::new(self.namespace.clone());
+        let host = Uri::from_maybe_shared(self.endpoint.clone()).unwrap();
+        let refresh_interval = self.refresh_interval_secs;
+        let fields = self.fields.clone();
+        let refresh_timeout = self.refresh_timeout_secs;
+        let required = self.required;
 
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
         let http_client = HttpClient::new(None, &proxy)?;
@@ -207,8 +225,34 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Metric | DataType::Log)]
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+        let added_keys = Keys::new(self.namespace.clone());
+
+        let paths = [
+            &added_keys.account_id_key.log_path,
+            &added_keys.ami_id_key.log_path,
+            &added_keys.availability_zone_key.log_path,
+            &added_keys.instance_id_key.log_path,
+            &added_keys.instance_type_key.log_path,
+            &added_keys.local_hostname_key.log_path,
+            &added_keys.local_ipv4_key.log_path,
+            &added_keys.public_hostname_key.log_path,
+            &added_keys.public_ipv4_key.log_path,
+            &added_keys.region_key.log_path,
+            &added_keys.subnet_id_key.log_path,
+            &added_keys.vpc_id_key.log_path,
+            &added_keys.role_name_key.log_path,
+        ];
+
+        let mut schema_definition = merged_definition.clone();
+
+        for path in paths {
+            schema_definition =
+                schema_definition.with_field(path, Kind::bytes().or_undefined(), None);
+        }
+
+        vec![Output::default(DataType::Metric | DataType::Log)
+            .with_schema_definition(schema_definition)]
     }
 }
 
@@ -231,12 +275,13 @@ impl Ec2MetadataTransform {
         match event {
             Event::Log(ref mut log) => {
                 state.iter().for_each(|(k, v)| {
-                    log.insert((PathPrefix::Event, &k.log_path), v.clone());
+                    log.insert(&k.log_path, v.clone());
                 });
             }
             Event::Metric(ref mut metric) => {
                 state.iter().for_each(|(k, v)| {
-                    metric.insert_tag(k.metric_tag.clone(), String::from_utf8_lossy(v).to_string());
+                    metric
+                        .replace_tag(k.metric_tag.clone(), String::from_utf8_lossy(v).to_string());
                 });
             }
             Event::Trace(_) => panic!("Traces are not supported."),
@@ -517,36 +562,65 @@ impl MetadataClient {
     }
 }
 
-fn create_key(namespace: &Option<String>, key: &str) -> MetadataKey {
+// This creates a simplified string from the namespace. Since the namespace is technically
+// a target path, it can contain syntax that is undesirable for a metric tag (such as prefix, quotes, etc)
+// This is mainly used for backwards compatibility.
+// see: https://github.com/vectordotdev/vector/issues/14931
+fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
+    let mut output = String::new();
+    for segment in &namespace.path.segments {
+        if !output.is_empty() {
+            output += ".";
+        }
+        match segment {
+            OwnedSegment::Field(field) => {
+                output += field;
+            }
+            OwnedSegment::Index(i) => {
+                output += &i.to_string();
+            }
+            OwnedSegment::Coalesce(fields) => {
+                if let Some(first) = fields.first() {
+                    output += first;
+                }
+            }
+        }
+    }
+    output
+}
+
+fn create_key(namespace: &Option<OwnedTargetPath>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
-            log_path: parse_value_path(namespace).with_field_appended(key),
-            metric_tag: format!("{}.{}", namespace, key),
+            log_path: namespace.with_field_appended(key),
+            metric_tag: format!("{}.{}", create_metric_namespace(namespace), key),
         }
     } else {
         MetadataKey {
-            log_path: OwnedValuePath::single_field(key),
+            log_path: OwnedTargetPath::event(owned_value_path!(key)),
             metric_tag: key.to_owned(),
         }
     }
 }
 
 impl Keys {
-    pub fn new(namespace: &Option<String>) -> Self {
+    pub fn new(namespace: Option<OptionalTargetPath>) -> Self {
+        let namespace = namespace.and_then(|namespace| namespace.path);
+
         Keys {
-            account_id_key: create_key(namespace, ACCOUNT_ID_KEY),
-            ami_id_key: create_key(namespace, AMI_ID_KEY),
-            availability_zone_key: create_key(namespace, AVAILABILITY_ZONE_KEY),
-            instance_id_key: create_key(namespace, INSTANCE_ID_KEY),
-            instance_type_key: create_key(namespace, INSTANCE_TYPE_KEY),
-            local_hostname_key: create_key(namespace, LOCAL_HOSTNAME_KEY),
-            local_ipv4_key: create_key(namespace, LOCAL_IPV4_KEY),
-            public_hostname_key: create_key(namespace, PUBLIC_HOSTNAME_KEY),
-            public_ipv4_key: create_key(namespace, PUBLIC_IPV4_KEY),
-            region_key: create_key(namespace, REGION_KEY),
-            subnet_id_key: create_key(namespace, SUBNET_ID_KEY),
-            vpc_id_key: create_key(namespace, VPC_ID_KEY),
-            role_name_key: create_key(namespace, ROLE_NAME_KEY),
+            account_id_key: create_key(&namespace, ACCOUNT_ID_KEY),
+            ami_id_key: create_key(&namespace, AMI_ID_KEY),
+            availability_zone_key: create_key(&namespace, AVAILABILITY_ZONE_KEY),
+            instance_id_key: create_key(&namespace, INSTANCE_ID_KEY),
+            instance_type_key: create_key(&namespace, INSTANCE_TYPE_KEY),
+            local_hostname_key: create_key(&namespace, LOCAL_HOSTNAME_KEY),
+            local_ipv4_key: create_key(&namespace, LOCAL_IPV4_KEY),
+            public_hostname_key: create_key(&namespace, PUBLIC_HOSTNAME_KEY),
+            public_ipv4_key: create_key(&namespace, PUBLIC_IPV4_KEY),
+            region_key: create_key(&namespace, REGION_KEY),
+            subnet_id_key: create_key(&namespace, SUBNET_ID_KEY),
+            vpc_id_key: create_key(&namespace, VPC_ID_KEY),
+            role_name_key: create_key(&namespace, ROLE_NAME_KEY),
         }
     }
 }
@@ -580,8 +654,8 @@ enum Ec2MetadataError {
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use lookup::event_path;
-    use lookup::lookup_v2::{parse_value_path, OwnedSegment, OwnedValuePath};
+    use lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
+    use lookup::{event_path, PathPrefix};
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
 
@@ -641,7 +715,7 @@ mod integration_tests {
                 vec![OwnedSegment::field(SUBNET_ID_KEY)].into(),
                 "mock-subnet-id",
             ),
-            (parse_value_path("\"role-name\"[0]"), "mock-user"),
+            (owned_value_path!("role-name", 0), "mock-user"),
         ]
     }
 
@@ -679,12 +753,12 @@ mod integration_tests {
     #[tokio::test]
     async fn enrich_log() {
         assert_transform_compliance(async {
-            let mut fields = DEFAULT_FIELD_WHITELIST.clone();
+            let mut fields = default_fields();
             fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
             let transform_config = Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                fields: Some(fields),
+                endpoint: ec2_metadata_address(),
+                fields,
                 ..Default::default()
             };
 
@@ -727,8 +801,8 @@ mod integration_tests {
         let _server = tokio::spawn(server);
 
         let config = Ec2Metadata {
-            endpoint: Some(format!("http://{}", addr)),
-            refresh_timeout_secs: Some(1),
+            endpoint: format!("http://{}", addr),
+            refresh_timeout_secs: Duration::from_secs(1),
             ..Default::default()
         };
 
@@ -758,9 +832,9 @@ mod integration_tests {
         let _server = tokio::spawn(server);
 
         let config = Ec2Metadata {
-            endpoint: Some(format!("http://{}", addr)),
-            refresh_timeout_secs: Some(1),
-            required: Some(false),
+            endpoint: format!("http://{}", addr),
+            refresh_timeout_secs: Duration::from_secs(1),
+            required: false,
             ..Default::default()
         };
 
@@ -773,12 +847,12 @@ mod integration_tests {
     #[tokio::test]
     async fn enrich_metric() {
         assert_transform_compliance(async {
-            let mut fields = DEFAULT_FIELD_WHITELIST.clone();
+            let mut fields = default_fields();
             fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
             let transform_config = Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                fields: Some(fields),
+                endpoint: ec2_metadata_address(),
+                fields,
                 ..Default::default()
             };
 
@@ -792,7 +866,7 @@ mod integration_tests {
             let metric = make_metric();
             let mut expected_metric = metric.clone();
             for (k, v) in expected_metric_fields().iter() {
-                expected_metric.insert_tag(k.to_string(), v.to_string());
+                expected_metric.replace_tag(k.to_string(), v.to_string());
             }
 
             tx.send(metric.into()).await.unwrap();
@@ -811,8 +885,8 @@ mod integration_tests {
     async fn fields_log() {
         assert_transform_compliance(async {
             let transform_config = Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
+                endpoint: ec2_metadata_address(),
+                fields: vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()],
                 ..Default::default()
             };
 
@@ -844,8 +918,8 @@ mod integration_tests {
     async fn fields_metric() {
         assert_transform_compliance(async {
             let transform_config = Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
+                endpoint: ec2_metadata_address(),
+                fields: vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()],
                 ..Default::default()
             };
 
@@ -858,8 +932,8 @@ mod integration_tests {
 
             let metric = make_metric();
             let mut expected_metric = metric.clone();
-            expected_metric.insert_tag(PUBLIC_IPV4_KEY.to_string(), "192.1.1.1".to_string());
-            expected_metric.insert_tag(REGION_KEY.to_string(), "us-east-1".to_string());
+            expected_metric.replace_tag(PUBLIC_IPV4_KEY.to_string(), "192.1.1.1".to_string());
+            expected_metric.replace_tag(REGION_KEY.to_string(), "us-east-1".to_string());
 
             tx.send(metric.into()).await.unwrap();
 
@@ -878,8 +952,10 @@ mod integration_tests {
         {
             assert_transform_compliance(async {
                 let transform_config = Ec2Metadata {
-                    endpoint: Some(ec2_metadata_address()),
-                    namespace: Some("ec2.metadata".into()),
+                    endpoint: ec2_metadata_address(),
+                    namespace: Some(
+                        OwnedTargetPath::event(owned_value_path!("ec2", "metadata")).into(),
+                    ),
                     ..Default::default()
                 };
 
@@ -912,8 +988,8 @@ mod integration_tests {
             assert_transform_compliance(async {
                 // Set an empty namespace to ensure we don't prepend one.
                 let transform_config = Ec2Metadata {
-                    endpoint: Some(ec2_metadata_address()),
-                    namespace: Some("".into()),
+                    endpoint: ec2_metadata_address(),
+                    namespace: Some(OptionalTargetPath::none()),
                     ..Default::default()
                 };
 
@@ -947,8 +1023,10 @@ mod integration_tests {
         {
             assert_transform_compliance(async {
                 let transform_config = Ec2Metadata {
-                    endpoint: Some(ec2_metadata_address()),
-                    namespace: Some("ec2.metadata".into()),
+                    endpoint: ec2_metadata_address(),
+                    namespace: Some(
+                        OwnedTargetPath::event(owned_value_path!("ec2", "metadata")).into(),
+                    ),
                     ..Default::default()
                 };
 
@@ -982,8 +1060,8 @@ mod integration_tests {
             assert_transform_compliance(async {
                 // Set an empty namespace to ensure we don't prepend one.
                 let transform_config = Ec2Metadata {
-                    endpoint: Some(ec2_metadata_address()),
-                    namespace: Some("".into()),
+                    endpoint: ec2_metadata_address(),
+                    namespace: Some(OptionalTargetPath::none()),
                     ..Default::default()
                 };
 
