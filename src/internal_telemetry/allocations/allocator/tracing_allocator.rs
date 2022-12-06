@@ -3,7 +3,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crate::internal_telemetry::allocations::{STARTUP, TRACK_ALLOCATIONS};
+use crate::internal_telemetry::allocations::TRACK_ALLOCATIONS;
 
 use super::{
     token::{try_with_suspended_allocation_group, AllocationGroupId},
@@ -29,7 +29,7 @@ impl<A, T> GroupedTraceableAllocator<A, T> {
 unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
     #[inline]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
-        if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+        if !TRACK_ALLOCATIONS.load(Ordering::Acquire) {
             return self.allocator.alloc(object_layout);
         }
 
@@ -43,13 +43,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
         let group_id_ptr = actual_ptr.add(offset_to_group_id).cast::<u8>();
 
         let object_size = object_layout.size();
-        // Group id value of zero implies we are in startup phase.
-        // We override this if allocations were in fact not in startup phase.
-        group_id_ptr.write(0);
-        // Don't trace during startup
-        if STARTUP.load(Ordering::Relaxed) {
-            return actual_ptr;
-        }
+
         try_with_suspended_allocation_group(
             #[inline(always)]
             |group_id| {
@@ -62,7 +56,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
     #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
-        if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+        if !TRACK_ALLOCATIONS.load(Ordering::Acquire) {
             self.allocator.dealloc(object_ptr, object_layout);
             return;
         }
@@ -74,11 +68,6 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
         // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
         self.allocator.dealloc(object_ptr, wrapped_layout);
-
-        // Don't trace during startup
-        if raw_group_id == 0 {
-            return;
-        }
 
         let object_size = object_layout.size();
         let source_group_id = AllocationGroupId::from_raw(raw_group_id);

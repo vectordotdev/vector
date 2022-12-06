@@ -8,8 +8,9 @@ fn main() {
     #[cfg(feature = "allocation-tracing")]
     {
         use crate::vector::internal_telemetry::allocations::{
-            init_allocation_tracing, REPORTING_INTERVAL_MS, STARTUP, TRACK_ALLOCATIONS,
+            init_allocation_tracing, REPORTING_INTERVAL_MS, TRACK_ALLOCATIONS,
         };
+        use std::sync::atomic::Ordering;
         let opts = vector::cli::Opts::get_matches()
             .map_err(|error| {
                 // Printing to stdout/err can itself fail; ignore it.
@@ -25,14 +26,10 @@ fn main() {
             Ordering::Relaxed,
         );
         drop(opts);
-        use std::sync::atomic::Ordering;
-        STARTUP.store(false, Ordering::Relaxed);
         if allocation_tracing {
             // Configure our tracking allocator.
+            TRACK_ALLOCATIONS.store(true, Ordering::Release);
             init_allocation_tracing();
-        } else {
-            // We assume nothing is allocated on the heap at this point.
-            TRACK_ALLOCATIONS.store(false, Ordering::Relaxed);
         }
     }
 

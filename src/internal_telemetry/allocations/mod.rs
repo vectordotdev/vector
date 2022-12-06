@@ -21,9 +21,8 @@ pub(crate) use self::allocator::{
 };
 
 const NUM_GROUPS: usize = 128;
-// Allocations are tracked during startup.
-pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(true);
-pub static STARTUP: AtomicBool = AtomicBool::new(true);
+// Allocations are not tracked during startup.
+pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
 
 /// Track allocations and deallocations separately.
 struct GroupMemStatsStorage {
