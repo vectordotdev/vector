@@ -5,9 +5,7 @@ use snafu::Snafu;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
-use crate::{internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig};
-
-const PEM_START_MARKER: &str = "-----BEGIN ";
+use crate::{internal_events::KafkaStatisticsReceived, tls::PEM_START_MARKER, tls::TlsEnableableConfig};
 
 #[derive(Debug, Snafu)]
 enum KafkaError {
