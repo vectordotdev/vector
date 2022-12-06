@@ -9,7 +9,10 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
 };
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{config::{LogNamespace, LegacyKey}, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -79,7 +82,6 @@ pub struct NatsSourceConfig {
     /// The `NATS` subject key.
     #[serde(default = "default_subject_key_field")]
     subject_key_field: String,
-
 }
 
 impl GenerateConfig for NatsSourceConfig {
@@ -121,7 +123,9 @@ impl SourceConfig for NatsSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 NatsSourceConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(&self.subject_key_field))),
+                Some(LegacyKey::Overwrite(owned_value_path!(
+                    &self.subject_key_field
+                ))),
                 &owned_value_path!("subject"),
                 Kind::bytes(),
                 None,
@@ -196,9 +200,7 @@ async fn nats_source(
                             log_namespace.insert_source_metadata(
                                 NatsSourceConfig::NAME,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(
-                                    config.subject_key_field.as_str(),
-                                )),
+                                Some(LegacyKey::InsertIfEmpty(config.subject_key_field.as_str())),
                                 "subject",
                                 msg.subject.as_str(),
                             )
