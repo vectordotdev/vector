@@ -67,12 +67,12 @@ base: components: sinks: socket: configuration: {
 					json: """
 						Encodes an event as [JSON][json].
 
-						[json]: https://en.wikipedia.org/wiki/JSON
+						[json]: https://www.json.org/
 						"""
 					logfmt: """
 						Encodes an event as a [logfmt][logfmt] message.
 
-						[logfmt]:
+						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
 						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf]([EXPERIMENTAL][experimental]).

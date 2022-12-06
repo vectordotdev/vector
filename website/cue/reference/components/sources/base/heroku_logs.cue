@@ -57,7 +57,7 @@ base: components: sources: heroku_logs: configuration: {
 					json: """
 						Decodes the raw bytes as [JSON][json].
 
-						[json]: https://en.wikipedia.org/wiki/JSON
+						[json]: https://www.json.org/
 						"""
 					native: """
 						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
@@ -72,9 +72,13 @@ base: components: sources: heroku_logs: configuration: {
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					syslog: """
-						Decodes the raw bytes as a [Syslog][syslog] message.
+						Decodes the raw bytes as a Syslog message.
 
-						[syslog]: https://en.wikipedia.org/wiki/Syslog
+						Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
+						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+
+						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
 						"""
 				}
 			}
