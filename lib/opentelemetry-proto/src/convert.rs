@@ -1,18 +1,21 @@
+use bytes::Bytes;
+use chrono::{DateTime, TimeZone, Utc};
+use lookup::path;
+use ordered_float::NotNan;
+use std::collections::BTreeMap;
+use value::Value;
+use vector_core::{
+    config::{log_schema, LegacyKey, LogNamespace},
+    event::{Event, LogEvent},
+};
+
 use super::proto::{
     common::v1::{any_value::Value as PBValue, KeyValue},
     logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
     resource::v1::Resource,
 };
-use bytes::Bytes;
-use chrono::{TimeZone, Utc};
-use ordered_float::NotNan;
-use std::collections::BTreeMap;
-use value::Value;
-use vector_core::config::LogNamespace;
-use vector_core::{
-    config::log_schema,
-    event::{Event, LogEvent},
-};
+
+const SOURCE_NAME: &str = "opentelemetry";
 
 const RESOURCE_KEY: &str = "resources";
 const ATTRIBUTES_KEY: &str = "attributes";
@@ -27,6 +30,8 @@ const FLAGS_KEY: &str = "flags";
 impl ResourceLogs {
     pub fn into_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
         let resource = self.resource;
+        let now = Utc::now();
+
         self.scope_logs
             .into_iter()
             .flat_map(|scope_log| scope_log.log_records)
@@ -35,7 +40,7 @@ impl ResourceLogs {
                     resource: resource.clone(),
                     log_record,
                 }
-                .into(log_namespace)
+                .into(log_namespace, now)
             })
     }
 }
@@ -76,79 +81,135 @@ fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
 }
 
 impl ResourceLog {
-    fn into(self, log_namespace: LogNamespace) -> Event {
-        let mut log = LogEvent::default();
-
-        match log_namespace {
-            LogNamespace::Vector => log_namespace.insert_standard_vector_source_metadata(
-                &mut log,
-                "opentelemetry",
-                Utc::now(),
-            ),
+    fn into(self, log_namespace: LogNamespace, now: DateTime<Utc>) -> Event {
+        let mut log = match log_namespace {
+            LogNamespace::Vector => {
+                if let Some(v) = self.log_record.body.and_then(|av| av.value) {
+                    LogEvent::from(<PBValue as Into<Value>>::into(v))
+                } else {
+                    LogEvent::from(Value::Null)
+                }
+            }
             LogNamespace::Legacy => {
-                // optional fields
-                if let Some(resource) = self.resource {
-                    if !resource.attributes.is_empty() {
-                        log.insert(RESOURCE_KEY, kv_list_into_value(resource.attributes));
-                    }
-                }
-                if !self.log_record.attributes.is_empty() {
-                    log.insert(
-                        ATTRIBUTES_KEY,
-                        kv_list_into_value(self.log_record.attributes),
-                    );
-                }
+                let mut log = LogEvent::default();
                 if let Some(v) = self.log_record.body.and_then(|av| av.value) {
                     log.insert(log_schema().message_key(), v);
                 }
-                if !self.log_record.trace_id.is_empty() {
-                    log.insert(
-                        TRACE_ID_KEY,
-                        Value::Bytes(Bytes::from(hex::encode(self.log_record.trace_id))),
-                    );
-                }
-                if !self.log_record.span_id.is_empty() {
-                    log.insert(
-                        SPAN_ID_KEY,
-                        Value::Bytes(Bytes::from(hex::encode(self.log_record.span_id))),
-                    );
-                }
-                if !self.log_record.severity_text.is_empty() {
-                    log.insert(SEVERITY_TEXT_KEY, self.log_record.severity_text);
-                }
-                if self.log_record.severity_number != SeverityNumber::Unspecified as i32 {
-                    log.insert(SEVERITY_NUMBER_KEY, self.log_record.severity_number);
-                }
-                if self.log_record.flags > 0 {
-                    log.insert(FLAGS_KEY, self.log_record.flags);
-                }
+                log
+            }
+        };
 
-                // according to proto, if observed_time_unix_nano is missing, collector should set it
-                let observed_timestamp = if self.log_record.observed_time_unix_nano > 0 {
-                    Utc.timestamp_nanos(self.log_record.observed_time_unix_nano as i64)
-                        .into()
-                } else {
-                    Value::Timestamp(Utc::now())
-                };
-                log.insert(OBSERVED_TIMESTAMP_KEY, observed_timestamp.clone());
-
-                // If time_unix_nano is not present (0 represents missing or unknown timestamp) use observed time
-                let timestamp = if self.log_record.time_unix_nano > 0 {
-                    Utc.timestamp_nanos(self.log_record.time_unix_nano as i64)
-                        .into()
-                } else {
-                    observed_timestamp
-                };
-                log.insert(log_schema().timestamp_key(), timestamp);
-
-                log.insert(
-                    DROPPED_ATTRIBUTES_COUNT_KEY,
-                    self.log_record.dropped_attributes_count,
+        // Optional fields
+        if let Some(resource) = self.resource {
+            if !resource.attributes.is_empty() {
+                log_namespace.insert_source_metadata(
+                    SOURCE_NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(path!(RESOURCE_KEY))),
+                    path!(RESOURCE_KEY),
+                    kv_list_into_value(resource.attributes),
                 );
-
-                log.insert(log_schema().source_type_key(), Bytes::from("opentelemetry"));
             }
         }
+        if !self.log_record.attributes.is_empty() {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(ATTRIBUTES_KEY))),
+                path!(ATTRIBUTES_KEY),
+                kv_list_into_value(self.log_record.attributes),
+            );
+        }
+        if !self.log_record.trace_id.is_empty() {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(TRACE_ID_KEY))),
+                path!(TRACE_ID_KEY),
+                Bytes::from(hex::encode(self.log_record.trace_id)),
+            );
+        }
+        if !self.log_record.span_id.is_empty() {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(SPAN_ID_KEY))),
+                path!(SPAN_ID_KEY),
+                Bytes::from(hex::encode(self.log_record.span_id)),
+            );
+        }
+        if !self.log_record.severity_text.is_empty() {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(SEVERITY_TEXT_KEY))),
+                path!(SEVERITY_TEXT_KEY),
+                self.log_record.severity_text,
+            );
+        }
+        if self.log_record.severity_number != SeverityNumber::Unspecified as i32 {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(SEVERITY_NUMBER_KEY))),
+                path!(SEVERITY_NUMBER_KEY),
+                self.log_record.severity_number,
+            );
+        }
+        if self.log_record.flags > 0 {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(FLAGS_KEY))),
+                path!(FLAGS_KEY),
+                self.log_record.flags,
+            );
+        }
+
+        log_namespace.insert_source_metadata(
+            SOURCE_NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(DROPPED_ATTRIBUTES_COUNT_KEY))),
+            path!(DROPPED_ATTRIBUTES_COUNT_KEY),
+            self.log_record.dropped_attributes_count,
+        );
+
+        // according to proto, if observed_time_unix_nano is missing, collector should set it
+        let observed_timestamp = if self.log_record.observed_time_unix_nano > 0 {
+            Utc.timestamp_nanos(self.log_record.observed_time_unix_nano as i64)
+                .into()
+        } else {
+            Value::Timestamp(now)
+        };
+        log_namespace.insert_source_metadata(
+            SOURCE_NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!(OBSERVED_TIMESTAMP_KEY))),
+            path!(OBSERVED_TIMESTAMP_KEY),
+            observed_timestamp.clone(),
+        );
+
+        // If time_unix_nano is not present (0 represents missing or unknown timestamp) use observed time
+        let timestamp = if self.log_record.time_unix_nano > 0 {
+            Utc.timestamp_nanos(self.log_record.time_unix_nano as i64)
+                .into()
+        } else {
+            observed_timestamp
+        };
+        log_namespace.insert_vector_metadata(
+            &mut log,
+            path!(log_schema().timestamp_key()),
+            path!("ingest_timestamp"),
+            timestamp,
+        );
+
+        log_namespace.insert_vector_metadata(
+            &mut log,
+            path!(log_schema().source_type_key()),
+            path!("source_type"),
+            Bytes::from_static(SOURCE_NAME.as_bytes()),
+        );
+
         log.into()
     }
 }
