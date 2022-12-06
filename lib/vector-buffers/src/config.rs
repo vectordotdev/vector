@@ -193,6 +193,7 @@ impl DiskUsage {
 #[configurable_component(no_deser)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", tag = "type")]
+#[configurable(metadata(docs::enum_tag_description = "The type of buffer to use."))]
 pub enum BufferType {
     /// A buffer stage backed by an in-memory channel provided by `tokio`.
     ///

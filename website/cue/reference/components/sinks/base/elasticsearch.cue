@@ -548,7 +548,7 @@ base: components: sinks: elasticsearch: configuration: {
 		type: bool: {}
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

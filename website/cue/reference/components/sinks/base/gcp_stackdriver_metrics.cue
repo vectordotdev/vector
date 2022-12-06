@@ -252,7 +252,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 		type: bool: default: false
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
