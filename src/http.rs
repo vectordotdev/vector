@@ -135,7 +135,7 @@ where
                 })
                 .context(CallRequestSnafu)?;
 
-            let response = expand_response(response).await?;
+            let response = decompress_response(response).await?;
 
             // Emit the response into the internal events system.
             emit!(http_client::GotHttpResponse {
@@ -150,7 +150,7 @@ where
     }
 }
 
-async fn expand_response(response: Response<Body>) -> Result<Response<Body>, HttpError> {
+async fn decompress_response(response: Response<Body>) -> Result<Response<Body>, HttpError> {
     let encoding = response
         .headers()
         .get("content-encoding")
@@ -160,12 +160,12 @@ async fn expand_response(response: Response<Body>) -> Result<Response<Body>, Htt
     match encoding {
         Some("gzip") => {
             let (parts, body) = response.into_parts();
-            let mut bytes = Vec::new();
 
             let body_buf = to_bytes(body)
                 .await
                 .map_err(|source| HttpError::Compression { source })?;
 
+            let mut bytes = Vec::new();
             let mut reader = BufReader::new(GzDecoder::new(BufReader::new(body_buf.reader())));
             reader
                 .read_to_end(&mut bytes)
@@ -352,6 +352,8 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use super::*;
 
     #[test]
@@ -382,5 +384,26 @@ mod tests {
             request.headers().get("User-Agent"),
             Some(&HeaderValue::from_static("foo"))
         );
+    }
+
+    #[tokio::test]
+    async fn test_decompress_response() {
+        let response = Response::new("hello world");
+        let (parts, body) = response.into_parts();
+
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        encoder.write_all(body.as_bytes()).unwrap();
+
+        let body = encoder.finish().unwrap();
+        let mut response = Response::from_parts(parts, body.into());
+
+        response
+            .headers_mut()
+            .insert("Content-Encoding", HeaderValue::from_static("gzip"));
+
+        let decompressed_response = decompress_response(response).await.unwrap();
+        let (_, body) = decompressed_response.into_parts();
+
+        assert_eq!(to_bytes(body).await.unwrap(), "hello world");
     }
 }
