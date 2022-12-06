@@ -43,10 +43,8 @@ pub enum HttpError {
     CallRequest { source: hyper::Error },
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
-
     #[snafu(display("Failed to build HTTP request: {}", source))]
     Compression { source: hyper::Error },
-
     #[snafu(display("Failed to build HTTP request: {}", source))]
     IO { source: Error },
 }
@@ -57,8 +55,9 @@ impl HttpError {
             HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
             HttpError::CallRequest { .. }
             | HttpError::BuildTlsConnector { .. }
-            | HttpError::MakeHttpsConnector { .. } => true,
-            HttpError::Compression { .. } | HttpError::IO { .. } => false,
+            | HttpError::MakeHttpsConnector { .. }
+            | HttpError::Compression { .. }
+            | HttpError::IO => true,
         }
     }
 }
