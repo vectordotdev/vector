@@ -134,9 +134,17 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
-            log.rename_key(self.log_schema.message_key(), event_path!("message"));
-            log.rename_key(self.log_schema.host_key(), event_path!("host"));
-            if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema.timestamp_key()) {
+            if let Some(message_path) = log.message_path() {
+                log.rename_key(message_path.as_str(), event_path!("message"));
+            }
+            if let Some(host_path) = log.host_path() {
+                log.rename_key(host_path.as_str(), event_path!("host"));
+            }
+
+            if let Some(Value::Timestamp(ts)) = log
+                .timestamp_path()
+                .and_then(|path| log.remove(path.as_str()))
+            {
                 log.insert(
                     event_path!("timestamp"),
                     Value::Integer(ts.timestamp_millis()),
