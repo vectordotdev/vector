@@ -196,7 +196,7 @@ fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue
     if !request.headers().contains_key("Accept-Encoding") {
         request
             .headers_mut()
-            .insert("Accept-Encoding", HeaderValue::from_static("gzip"));
+            .insert("Accept-Encoding", HeaderValue::from_static("identity"));
     }
 }
 
@@ -330,7 +330,7 @@ mod tests {
         default_request_headers(&mut request, &user_agent);
         assert_eq!(
             request.headers().get("Accept-Encoding"),
-            Some(&HeaderValue::from_static("gzip")),
+            Some(&HeaderValue::from_static("identity")),
         );
         assert_eq!(request.headers().get("User-Agent"), Some(&user_agent));
     }
