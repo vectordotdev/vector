@@ -33,7 +33,6 @@ pub struct ElasticsearchRequest {
     pub batch_size: usize,
     pub events_byte_size: usize,
     pub metadata: RequestMetadata,
-    pub compression: Compression,
 }
 
 impl ByteSizeOf for ElasticsearchRequest {
