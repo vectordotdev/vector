@@ -296,7 +296,7 @@ base: components: sinks: humio_metrics: configuration: {
 		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
