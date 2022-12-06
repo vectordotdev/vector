@@ -24,7 +24,9 @@ use tokio_tungstenite::{
 };
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    internal_event::{ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol},
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+    },
     EstimatedJsonEncodedSizeOf,
 };
 
@@ -255,6 +257,7 @@ impl WebSocketSink {
         let mut last_pong = Instant::now();
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
+        let events_sent = register!(EventsSent::from(Output(None)));
 
         loop {
             let result = tokio::select! {
@@ -299,11 +302,7 @@ impl WebSocketSink {
                             let message_len = message.len();
 
                             ws_sink.send(message).await.map(|_| {
-                                emit!(EventsSent {
-                                    count: 1,
-                                    byte_size: event_byte_size,
-                                    output: None
-                                });
+                                events_sent.emit(CountByteSize(1, event_byte_size));
                                 bytes_sent.emit(ByteSize(message_len));
                             })
                         },

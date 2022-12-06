@@ -7,7 +7,7 @@ use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_common::internal_event::{
-    ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol,
+    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
 };
 use vector_config::configurable_component;
 
@@ -162,6 +162,7 @@ impl NatsSink {
 impl StreamSink<Event> for NatsSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let bytes_sent = register!(BytesSent::from(Protocol::TCP));
+        let events_sent = register!(EventsSent::from(Output(None)));
 
         while let Some(mut event) = input.next().await {
             let finalizers = event.take_finalizers();
@@ -199,11 +200,7 @@ impl StreamSink<Event> for NatsSink {
                 Ok(_) => {
                     finalizers.update_status(EventStatus::Delivered);
 
-                    emit!(EventsSent {
-                        byte_size: event_byte_size,
-                        count: 1,
-                        output: None
-                    });
+                    events_sent.emit(CountByteSize(1, event_byte_size));
                     bytes_sent.emit(ByteSize(bytes.len()));
                 }
             }

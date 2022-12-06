@@ -98,6 +98,8 @@ pub fn register<E: RegisterInternalEvent>(event: E) -> E::Handle {
 
 pub type Registered<T> = <T as RegisterInternalEvent>::Handle;
 
+// Wrapper types used to hold data emitted by registered events
+
 #[derive(Clone, Copy)]
 pub struct ByteSize(pub usize);
 
@@ -106,6 +108,10 @@ pub struct Count(pub usize);
 
 #[derive(Clone, Copy)]
 pub struct CountByteSize(pub usize, pub usize);
+
+// Wrapper types used to hold parameters for registering events
+
+pub struct Output(pub Option<SharedString>);
 
 pub struct Protocol(pub SharedString);
 
