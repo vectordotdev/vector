@@ -44,7 +44,7 @@ pub enum HttpError {
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
     #[snafu(display("Failed to decompress HTTP request: {}", source))]
-    Compression { source: hyper::Error },
+    Decompression { source: hyper::Error },
     #[snafu(display("Failed to read HTTP request: {}", source))]
     IO { source: Error },
 }
@@ -56,7 +56,7 @@ impl HttpError {
             HttpError::CallRequest { .. }
             | HttpError::BuildTlsConnector { .. }
             | HttpError::MakeHttpsConnector { .. }
-            | HttpError::Compression { .. }
+            | HttpError::Decompression { .. }
             | HttpError::IO { .. } => true,
         }
     }
@@ -162,7 +162,7 @@ async fn decompress_response(response: Response<Body>) -> Result<Response<Body>,
 
             let body_buf = to_bytes(body)
                 .await
-                .map_err(|source| HttpError::Compression { source })?;
+                .map_err(|source| HttpError::Decompression { source })?;
 
             let mut bytes = Vec::new();
             let mut reader = BufReader::new(GzDecoder::new(BufReader::new(body_buf.reader())));
