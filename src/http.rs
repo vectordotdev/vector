@@ -57,7 +57,7 @@ impl HttpError {
             | HttpError::BuildTlsConnector { .. }
             | HttpError::MakeHttpsConnector { .. }
             | HttpError::Compression { .. }
-            | HttpError::IO => true,
+            | HttpError::IO { .. } => true,
         }
     }
 }
