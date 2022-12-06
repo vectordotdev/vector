@@ -25,6 +25,7 @@ EVENT_CLASSES = {
 METRIC_NAME_EVENTS_DROPPED = 'component_discarded_events_total'
 METRIC_NAME_ERROR = 'component_errors_total'
 
+SKIP_CHECK = [ 'DefaultName' ]
 
 def hash_array_add(hash, key, item)
   arr = hash.fetch(key, Array::new)
@@ -160,8 +161,6 @@ class Event
   end
 
   def valid_with_handle?(handle)
-    @reports.clear
-
     if @uses == 0
       append('Event has no uses.')
     end
@@ -438,6 +437,9 @@ Find.find('./src', './lib') do |path|
             event.scan_component_dropped_events(block)
           end
         elsif trait == 'RegisterInternalEvent'
+          # This is just a dummy name and will cause spurious errors, but it will at least surface
+          # the issue of using the macro.
+          event.impl_register_event = event_name
           event.append("Do not implement RegisterInternalEvent manually. Use the registered_event! macro instead.")
         elsif trait == 'InternalEventHandle'
           event.impl_event_handle = true
@@ -459,6 +461,10 @@ end
 $duplicates = Hash::new { |hash, key| hash[key] = [] }
 
 $all_events.each do |name, event|
+  if SKIP_CHECK.include? name
+    next
+  end
+
   # Check for duplicated signatures
   if !event.skip_duplicate_check and (event.impl_internal_event or event.impl_event_handle)
     signature = event.signature
