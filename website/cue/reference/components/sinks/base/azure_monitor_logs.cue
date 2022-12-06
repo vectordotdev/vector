@@ -249,7 +249,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 		type: string: syntax: "literal"
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

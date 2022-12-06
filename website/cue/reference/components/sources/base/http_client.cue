@@ -17,12 +17,14 @@ base: components: sources: http_client: configuration: {
 					basic: """
 						Basic authentication.
 
-						The username and password are concatenated and encoded via base64.
+						The username and password are concatenated and encoded via [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
 						"""
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc) is passed as-is.
 						"""
 				}
 			}
@@ -48,12 +50,34 @@ base: components: sources: http_client: configuration: {
 			type: string: {
 				default: "bytes"
 				enum: {
-					bytes:       "Configures the `BytesDeserializer`."
-					gelf:        "Configures the `GelfDeserializer`."
-					json:        "Configures the `JsonDeserializer`."
-					native:      "Configures the `NativeDeserializer`."
-					native_json: "Configures the `NativeJsonDeserializer`."
-					syslog:      "Configures the `SyslogDeserializer`."
+					bytes: "Uses the raw bytes as-is."
+					gelf: """
+						Decodes the raw bytes as a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: """
+						Decodes the raw bytes as [JSON][json].
+
+						[json]: https://en.wikipedia.org/wiki/JSON
+						"""
+					native: """
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					syslog: """
+						Decodes the raw bytes as a [Syslog][syslog] message.
+
+						[syslog]: https://en.wikipedia.org/wiki/Syslog
+						"""
 				}
 			}
 		}
@@ -96,11 +120,15 @@ base: components: sources: http_client: configuration: {
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Configures the `BytesDecoder`."
-						character_delimited: "Configures the `CharacterDelimitedDecoder`."
-						length_delimited:    "Configures the `LengthDelimitedDecoder`."
-						newline_delimited:   "Configures the `NewlineDelimitedDecoder`."
-						octet_counting:      "Configures the `OctetCountingDecoder`."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+						character_delimited: "Byte frames which are delimited by a chosen character."
+						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited:   "Byte frames which are delimited by a newline character."
+						octet_counting: """
+															Byte frames according to the [octet counting][octet_counting] format.
+
+															[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+															"""
 					}
 				}
 			}
