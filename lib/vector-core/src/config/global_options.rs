@@ -179,6 +179,13 @@ impl GlobalOptions {
             errors.push("conflicting values for 'timezone' found".to_owned());
         }
 
+        if conflicts(
+            &self.acknowledgements.enabled,
+            &with.acknowledgements.enabled,
+        ) {
+            errors.push("conflicting values for 'acknowledgements' found".to_owned());
+        }
+
         let data_dir = if self.data_dir.is_none() || self.data_dir == default_data_dir() {
             with.data_dir
         } else if with.data_dir != default_data_dir() && self.data_dir != with.data_dir {
@@ -280,7 +287,11 @@ mod tests {
         assert_eq!(merge(Some("test1"), None), Ok(Some("test1".into())));
         assert_eq!(merge(None, Some("test2")), Ok(Some("test2".into())));
         assert_eq!(
-            merge(Some("test3"), Some("test4")),
+            merge(Some("test3"), Some("test3")),
+            Ok(Some("test3".into()))
+        );
+        assert_eq!(
+            merge(Some("test4"), Some("test5")),
             Err(vec!["conflicting values for 'proxy.http' found".into()])
         );
     }
@@ -296,8 +307,18 @@ mod tests {
         assert_eq!(merge(None, Some(true)), Ok(true.into()));
         assert_eq!(merge(Some(false), Some(false)), Ok(false.into()));
         assert_eq!(merge(Some(true), Some(true)), Ok(true.into()));
-        assert_eq!(merge(Some(false), Some(true)), Ok(false.into()));
-        assert_eq!(merge(Some(true), Some(false)), Ok(true.into()));
+        assert_eq!(
+            merge(Some(false), Some(true)),
+            Err(vec![
+                "conflicting values for 'acknowledgements' found".into()
+            ])
+        );
+        assert_eq!(
+            merge(Some(true), Some(false)),
+            Err(vec![
+                "conflicting values for 'acknowledgements' found".into()
+            ])
+        );
     }
 
     #[test]
