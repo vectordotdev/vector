@@ -1,24 +1,25 @@
-use crate::{
-    internal_events::{EventsReceived, StreamClosedError},
-    sources::opentelemetry::LOGS,
-    SourceSender,
-};
 use futures::TryFutureExt;
-
-use tonic::{Request, Response, Status};
-
 use opentelemetry_proto::proto::collector::logs::v1::{
     logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
+use tonic::{Request, Response, Status};
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     EstimatedJsonEncodedSizeOf,
 };
 
-#[derive(Debug, Clone)]
-pub(crate) struct Service {
-    pub(crate) pipeline: SourceSender,
-    pub(crate) acknowledgements: bool,
+use crate::{
+    internal_events::{EventsReceived, StreamClosedError},
+    sources::opentelemetry::LOGS,
+    SourceSender,
+};
+
+#[derive(Clone)]
+pub(super) struct Service {
+    pub pipeline: SourceSender,
+    pub acknowledgements: bool,
+    pub events_received: Registered<EventsReceived>,
 }
 
 #[tonic::async_trait]
@@ -36,8 +37,7 @@ impl LogsService for Service {
 
         let count = events.len();
         let byte_size = events.estimated_json_encoded_size_of();
-
-        emit!(EventsReceived { count, byte_size });
+        self.events_received.emit(CountByteSize(count, byte_size));
 
         let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
 

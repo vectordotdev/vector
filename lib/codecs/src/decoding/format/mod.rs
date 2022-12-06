@@ -18,7 +18,6 @@ pub use json::{JsonDeserializer, JsonDeserializerConfig};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{NativeJsonDeserializer, NativeJsonDeserializerConfig};
 use smallvec::SmallVec;
-use std::fmt::Debug;
 use vector_core::config::LogNamespace;
 use vector_core::event::Event;
 
@@ -27,7 +26,7 @@ pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
 pub use self::syslog::{SyslogDeserializer, SyslogDeserializerConfig};
 
 /// Parse structured events from bytes.
-pub trait Deserializer: DynClone + Debug + Send + Sync {
+pub trait Deserializer: DynClone + Send + Sync {
     /// Parses structured events from bytes.
     ///
     /// It returns a `SmallVec` rather than an `Event` directly, since one byte

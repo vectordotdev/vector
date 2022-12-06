@@ -11,7 +11,9 @@ use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use lookup::{owned_value_path, path};
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use value::Kind;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
 use vector_config::NamedComponent;
 use vector_core::config::{LegacyKey, LogNamespace, Output};
 use vector_core::event::Event;
@@ -121,6 +123,7 @@ async fn process_stream(
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+    let events_received = register!(EventsReceived);
     let stream = receiver.inspect(|result| {
         if let Err(error) = result {
             emit!(FileDescriptorReadError { error: &error });
@@ -133,10 +136,10 @@ async fn process_stream(
             match result {
                 Ok((events, byte_size)) => {
                     bytes_received.emit(ByteSize(byte_size));
-                    emit!(EventsReceived {
-                        byte_size: events.estimated_json_encoded_size_of(),
-                        count: events.len()
-                    });
+                    events_received.emit(CountByteSize(
+                         events.len(),
+                        events.estimated_json_encoded_size_of(),
+                    ));
 
                     let now = Utc::now();
 

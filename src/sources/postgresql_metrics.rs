@@ -18,6 +18,7 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
@@ -448,13 +449,13 @@ impl DatnameFilter {
     }
 }
 
-#[derive(Debug)]
 struct PostgresqlMetrics {
     client: PostgresqlClient,
     endpoint: String,
     namespace: Option<String>,
     tags: MetricTags,
     datname_filter: DatnameFilter,
+    events_received: Registered<EventsReceived>,
 }
 
 impl PostgresqlMetrics {
@@ -495,6 +496,7 @@ impl PostgresqlMetrics {
             namespace,
             tags,
             datname_filter,
+            events_received: register!(EventsReceived),
         })
     }
 
@@ -546,7 +548,7 @@ impl PostgresqlMetrics {
                     protocol: "tcp",
                     endpoint: &self.endpoint,
                 });
-                emit!(EventsReceived { count, byte_size });
+                self.events_received.emit(CountByteSize(count, byte_size));
                 self.client.set((client, client_version));
                 Ok(result.into_iter().flat_map(|(metrics, _)| metrics))
             }

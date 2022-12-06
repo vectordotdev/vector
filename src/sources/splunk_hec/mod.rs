@@ -14,6 +14,7 @@ use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
@@ -180,6 +181,7 @@ struct SplunkSource {
     protocol: &'static str,
     idx_ack: Option<Arc<IndexerAcknowledgement>>,
     store_hec_token: bool,
+    events_received: Registered<EventsReceived>,
 }
 
 impl SplunkSource {
@@ -206,6 +208,7 @@ impl SplunkSource {
             protocol,
             idx_ack,
             store_hec_token: config.store_hec_token,
+            events_received: register!(EventsReceived),
         }
     }
 
@@ -221,6 +224,7 @@ impl SplunkSource {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
+        let events_received = self.events_received.clone();
 
         warp::post()
             .and(
@@ -246,6 +250,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
+                    let events_received = events_received.clone();
                     emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
@@ -300,10 +305,10 @@ impl SplunkSource {
                         }
 
                         if !events.is_empty() {
-                            emit!(EventsReceived {
-                                count: events.len(),
-                                byte_size: events.estimated_json_encoded_size_of(),
-                            });
+                            events_received.emit(CountByteSize(
+                                events.len(),
+                                events.estimated_json_encoded_size_of(),
+                            ));
 
                             if let Err(ClosedError) = out.send_batch(events).await {
                                 return Err(Rejection::from(ApiError::ServerShutdown));
@@ -326,6 +331,7 @@ impl SplunkSource {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
+        let events_received = self.events_received.clone();
 
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
@@ -347,6 +353,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
+                    let events_received = events_received.clone();
                     emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
@@ -364,7 +371,15 @@ impl SplunkSource {
                             ),
                             _ => None,
                         };
-                        let mut event = raw_event(body, gzip, channel_id, remote, xff, batch)?;
+                        let mut event = raw_event(
+                            body,
+                            gzip,
+                            channel_id,
+                            remote,
+                            xff,
+                            batch,
+                            &events_received,
+                        )?;
                         if let Some(token) = token.filter(|_| store_hec_token) {
                             event.metadata_mut().set_splunk_hec_token(token.into());
                         }
@@ -774,6 +789,7 @@ fn raw_event(
     remote: Option<SocketAddr>,
     xff: Option<String>,
     batch: Option<BatchNotifier>,
+    events_received: &Registered<EventsReceived>,
 ) -> Result<Event, Rejection> {
     // Process gzip
     let message: Value = if gzip {
@@ -818,10 +834,7 @@ fn raw_event(
     }
 
     let event = Event::from(log);
-    emit!(EventsReceived {
-        count: 1,
-        byte_size: event.estimated_json_encoded_size_of(),
-    });
+    events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
 
     Ok(event)
 }
