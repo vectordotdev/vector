@@ -282,6 +282,7 @@ openssl = { version = "0.10.43", default-features = false, features = ["vendored
 openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.4.0", default-features = false }
+paste = "1.0.9"
 percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
