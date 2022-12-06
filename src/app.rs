@@ -61,34 +61,6 @@ pub struct Application {
 
 impl Application {
     pub fn prepare() -> Result<Self, exitcode::ExitCode> {
-        #[cfg(feature = "allocation-tracing")]
-        {
-            use crate::internal_telemetry::allocations::{
-                init_allocation_tracing, REPORTING_INTERVAL_MS, STARTUP, TRACK_ALLOCATIONS,
-            };
-            let opts = Opts::get_matches().map_err(|error| {
-                // Printing to stdout/err can itself fail; ignore it.
-                let _ = error.print();
-                exitcode::USAGE
-            })?;
-            let allocation_tracing = opts.root.allocation_tracing;
-            REPORTING_INTERVAL_MS.store(
-                opts.root.allocation_tracing_reporting_interval_ms,
-                Ordering::Relaxed,
-            );
-            drop(opts);
-            use std::sync::atomic::Ordering;
-            STARTUP.store(false, Ordering::Relaxed);
-            if allocation_tracing {
-                // Configure our tracking allocator.
-                init_allocation_tracing();
-                TRACK_ALLOCATIONS.store(true, Ordering::Relaxed);
-            } else {
-                // We assume nothing is allocated on the heap at this point.
-                TRACK_ALLOCATIONS.store(false, Ordering::Relaxed);
-            }
-        }
-
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
             let _ = error.print();

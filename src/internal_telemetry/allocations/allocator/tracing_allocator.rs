@@ -1,5 +1,5 @@
 use std::{
-    alloc::{handle_alloc_error, GlobalAlloc, Layout},
+    alloc::{GlobalAlloc, Layout},
     sync::atomic::Ordering,
 };
 
@@ -26,50 +26,38 @@ impl<A, T> GroupedTraceableAllocator<A, T> {
     }
 }
 
-impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
-    #[inline(always)]
-    unsafe fn get_wrapped_allocation(&self, object_layout: Layout) -> (*mut u8, *mut u8, Layout) {
+unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
+    #[inline]
+    unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
+        if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+            return self.allocator.alloc(object_layout);
+        }
+
         // Allocate our wrapped layout and make sure the allocation succeeded.
         let (actual_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
         let actual_ptr = self.allocator.alloc(actual_layout);
         if actual_ptr.is_null() {
-            handle_alloc_error(actual_layout);
+            return actual_ptr;
         }
 
-        // SAFETY: We know that `actual_ptr` with offset is at least aligned enough for casting it to `*mut u8` as the layout for
-        // the allocation backing this pointer ensures the last field in the layout is `u8.
-        #[allow(clippy::cast_ptr_alignment)]
         let group_id_ptr = actual_ptr.add(offset_to_group_id).cast::<u8>();
 
-        (group_id_ptr, actual_ptr, actual_layout)
-    }
-}
-
-unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
-    #[inline]
-    unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
-        if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-            let (group_id_ptr, object_ptr, _wrapped_layout) =
-                self.get_wrapped_allocation(object_layout);
-            let object_size = object_layout.size();
-            // Group id value of zero implies allocations tracking was disabled
-            // during this allocation. We override this if allocations were in fact enabled.
-            group_id_ptr.write(0);
-            // Don't trace during startup
-            if STARTUP.load(Ordering::Relaxed) {
-                return object_ptr;
-            }
-            try_with_suspended_allocation_group(
-                #[inline(always)]
-                |group_id| {
-                    group_id_ptr.write(group_id.as_raw());
-                    self.tracer.trace_allocation(object_size, group_id);
-                },
-            );
-            object_ptr
-        } else {
-            self.allocator.alloc(object_layout)
+        let object_size = object_layout.size();
+        // Group id value of zero implies we are in startup phase.
+        // We override this if allocations were in fact not in startup phase.
+        group_id_ptr.write(0);
+        // Don't trace during startup
+        if STARTUP.load(Ordering::Relaxed) {
+            return actual_ptr;
         }
+        try_with_suspended_allocation_group(
+            #[inline(always)]
+            |group_id| {
+                group_id_ptr.write(group_id.as_raw());
+                self.tracer.trace_allocation(object_size, group_id);
+            },
+        );
+        actual_ptr
     }
 
     #[inline]
@@ -107,9 +95,10 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
         let new_layout = Layout::from_size_align_unchecked(new_size, layout.align());
         let new_ptr = self.alloc(new_layout);
-
-        std::ptr::copy_nonoverlapping(ptr, new_ptr, std::cmp::min(layout.size(), new_size));
-        self.dealloc(ptr, layout);
+        if !new_ptr.is_null() {
+            std::ptr::copy_nonoverlapping(ptr, new_ptr, std::cmp::min(layout.size(), new_size));
+            self.dealloc(ptr, layout);
+        }
 
         new_ptr
     }

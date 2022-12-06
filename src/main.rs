@@ -5,6 +5,37 @@ use vector::app::Application;
 
 #[cfg(unix)]
 fn main() {
+    #[cfg(feature = "allocation-tracing")]
+    {
+        use crate::vector::internal_telemetry::allocations::{
+            init_allocation_tracing, REPORTING_INTERVAL_MS, STARTUP, TRACK_ALLOCATIONS,
+        };
+        let opts = vector::cli::Opts::get_matches()
+            .map_err(|error| {
+                // Printing to stdout/err can itself fail; ignore it.
+                let _ = error.print();
+                exitcode::USAGE
+            })
+            .unwrap_or_else(|code| {
+                std::process::exit(code);
+            });
+        let allocation_tracing = opts.root.allocation_tracing;
+        REPORTING_INTERVAL_MS.store(
+            opts.root.allocation_tracing_reporting_interval_ms,
+            Ordering::Relaxed,
+        );
+        drop(opts);
+        use std::sync::atomic::Ordering;
+        STARTUP.store(false, Ordering::Relaxed);
+        if allocation_tracing {
+            // Configure our tracking allocator.
+            init_allocation_tracing();
+        } else {
+            // We assume nothing is allocated on the heap at this point.
+            TRACK_ALLOCATIONS.store(false, Ordering::Relaxed);
+        }
+    }
+
     let app = Application::prepare().unwrap_or_else(|code| {
         std::process::exit(code);
     });
