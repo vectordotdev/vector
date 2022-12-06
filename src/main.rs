@@ -28,7 +28,7 @@ fn main() {
         drop(opts);
         if allocation_tracing {
             // Configure our tracking allocator.
-            TRACK_ALLOCATIONS.store(true, Ordering::Release);
+            TRACK_ALLOCATIONS.store(true, Ordering::Relaxed);
             init_allocation_tracing();
         }
     }

@@ -29,7 +29,7 @@ impl<A, T> GroupedTraceableAllocator<A, T> {
 unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
     #[inline]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
-        if !TRACK_ALLOCATIONS.load(Ordering::Acquire) {
+        if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
             return self.allocator.alloc(object_layout);
         }
 
@@ -56,7 +56,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
     #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
-        if !TRACK_ALLOCATIONS.load(Ordering::Acquire) {
+        if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
             self.allocator.dealloc(object_ptr, object_layout);
             return;
         }

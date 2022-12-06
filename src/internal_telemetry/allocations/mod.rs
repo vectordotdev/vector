@@ -22,6 +22,9 @@ pub(crate) use self::allocator::{
 
 const NUM_GROUPS: usize = 128;
 // Allocations are not tracked during startup.
+// We use the Relaxed ordering for both stores and loads of this atomic as no other threads exist when
+// this code is running, and all future threads will have a happens-after relationship with
+// this thread -- the main thread -- ensuring that they see the latest value of TRACK_ALLOCATIONS.
 pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
 
 /// Track allocations and deallocations separately.
