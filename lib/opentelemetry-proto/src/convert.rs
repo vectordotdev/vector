@@ -37,7 +37,6 @@ impl ResourceLogs {
                 }
                 .into(log_namespace)
             })
-            .into_iter()
     }
 }
 
@@ -77,7 +76,7 @@ fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
 }
 
 impl ResourceLog {
-    fn into(self: Self, log_namespace: LogNamespace) -> Event {
+    fn into(self, log_namespace: LogNamespace) -> Event {
         let mut log = LogEvent::default();
 
         match log_namespace {
