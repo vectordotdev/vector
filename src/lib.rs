@@ -4,7 +4,6 @@
 #![deny(unused_allocation)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
-#![deny(warnings)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]

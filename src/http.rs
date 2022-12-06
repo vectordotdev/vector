@@ -134,7 +134,7 @@ where
                 })
                 .context(CallRequestSnafu)?;
 
-            let response = decompress_response(response).await?;
+            // let response = decompress_response(response).await?;
 
             // Emit the response into the internal events system.
             emit!(http_client::GotHttpResponse {
