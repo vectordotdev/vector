@@ -18,7 +18,10 @@ use tokio::{
 };
 use tokio_util::codec::Encoder as _;
 use vector_config::configurable_component;
-use vector_core::{internal_event::EventsSent, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
@@ -170,7 +173,6 @@ impl SinkConfig for FileSinkConfig {
     }
 }
 
-#[derive(Debug)]
 pub struct FileSink {
     path: Template,
     transformer: Transformer,
@@ -178,6 +180,7 @@ pub struct FileSink {
     idle_timeout: Duration,
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
+    events_sent: Registered<EventsSent>,
 }
 
 impl FileSink {
@@ -193,6 +196,7 @@ impl FileSink {
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
             files: ExpiringHashMap::default(),
             compression: config.compression,
+            events_sent: register!(EventsSent::from(Output(None))),
         })
     }
 
@@ -338,11 +342,7 @@ impl FileSink {
         match write_event_to_file(file, event, &self.transformer, &mut self.encoder).await {
             Ok(byte_size) => {
                 finalizers.update_status(EventStatus::Delivered);
-                emit!(EventsSent {
-                    count: 1,
-                    byte_size: event_size,
-                    output: None,
-                });
+                self.events_sent.emit(CountByteSize(1, event_size));
                 emit!(FileBytesSent {
                     byte_size,
                     file: String::from_utf8_lossy(&path),
@@ -414,7 +414,7 @@ mod tests {
     use crate::{
         config::log_schema,
         test_util::{
-            components::{run_and_assert_sink_compliance, FILE_SINK_TAGS},
+            components::{assert_sink_compliance, FILE_SINK_TAGS},
             lines_from_file, lines_from_gzip_file, lines_from_zstd_file, random_events_with_stream,
             random_lines_with_stream, temp_dir, temp_file, trace_init,
         },
@@ -427,8 +427,6 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition() {
-        trace_init();
-
         let template = temp_file();
 
         let config = FileSinkConfig {
@@ -439,21 +437,9 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config).unwrap();
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
-        let events = Box::pin(stream::iter(
-            input
-                .clone()
-                .into_iter()
-                .map(|e| Event::Log(LogEvent::from(e))),
-        ));
-        run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
-            events,
-            &FILE_SINK_TAGS,
-        )
-        .await;
+        run_assert_log_sink(config, input.clone()).await;
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -463,8 +449,6 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition_gzip() {
-        trace_init();
-
         let template = temp_file();
 
         let config = FileSinkConfig {
@@ -475,21 +459,9 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config).unwrap();
         let (input, _) = random_lines_with_stream(100, 64, None);
 
-        let events = Box::pin(stream::iter(
-            input
-                .clone()
-                .into_iter()
-                .map(|e| Event::Log(LogEvent::from(e))),
-        ));
-        run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
-            events,
-            &FILE_SINK_TAGS,
-        )
-        .await;
+        run_assert_log_sink(config, input.clone()).await;
 
         let output = lines_from_gzip_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -499,8 +471,6 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition_zstd() {
-        trace_init();
-
         let template = temp_file();
 
         let config = FileSinkConfig {
@@ -511,21 +481,9 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config).unwrap();
         let (input, _) = random_lines_with_stream(100, 64, None);
 
-        let events = Box::pin(stream::iter(
-            input
-                .clone()
-                .into_iter()
-                .map(|e| Event::Log(LogEvent::from(e))),
-        ));
-        run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
-            events,
-            &FILE_SINK_TAGS,
-        )
-        .await;
+        run_assert_log_sink(config, input.clone()).await;
 
         let output = lines_from_zstd_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -535,8 +493,6 @@ mod tests {
 
     #[tokio::test]
     async fn many_partitions() {
-        trace_init();
-
         let directory = temp_dir();
 
         let mut template = directory.to_string_lossy().to_string();
@@ -551,8 +507,6 @@ mod tests {
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
-
-        let sink = FileSink::new(&config).unwrap();
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -572,13 +526,7 @@ mod tests {
         input[7].as_mut_log().insert("date", "2019-29-07");
         input[7].as_mut_log().insert("level", "error");
 
-        let events = Box::pin(stream::iter(input.clone().into_iter()));
-        run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
-            events,
-            &FILE_SINK_TAGS,
-        )
-        .await;
+        run_assert_sink(config, input.clone().into_iter()).await;
 
         let output = vec![
             lines_from_file(&directory.join("warnings-2019-26-07.log")),
@@ -637,17 +585,18 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config).unwrap();
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);
 
         let sink_handle = tokio::spawn(async move {
-            run_and_assert_sink_compliance(
-                VectorSink::from_event_streamsink(sink),
-                Box::pin(rx),
-                &FILE_SINK_TAGS,
-            )
+            assert_sink_compliance(&FILE_SINK_TAGS, async move {
+                let sink = FileSink::new(&config).unwrap();
+                VectorSink::from_event_streamsink(sink)
+                    .run(Box::pin(rx.map(Into::into)))
+                    .await
+                    .expect("Running sink failed");
+            })
             .await
         });
 
@@ -674,5 +623,24 @@ mod tests {
         // make sure sink stops and that it did not panic
         drop(tx);
         sink_handle.await.unwrap();
+    }
+
+    async fn run_assert_log_sink(config: FileSinkConfig, events: Vec<String>) {
+        run_assert_sink(
+            config,
+            events.into_iter().map(LogEvent::from).map(Event::Log),
+        )
+        .await;
+    }
+
+    async fn run_assert_sink(config: FileSinkConfig, events: impl Iterator<Item = Event> + Send) {
+        assert_sink_compliance(&FILE_SINK_TAGS, async move {
+            let sink = FileSink::new(&config).unwrap();
+            VectorSink::from_event_streamsink(sink)
+                .run(Box::pin(stream::iter(events.map(Into::into))))
+                .await
+                .expect("Running sink failed")
+        })
+        .await;
     }
 }

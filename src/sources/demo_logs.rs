@@ -299,16 +299,15 @@ mod tests {
     }
 
     async fn runit(config: &str) -> impl Stream<Item = Event> {
-        let (tx, rx) = SourceSender::new_test();
-        let config: DemoLogsConfig = toml::from_str(config).unwrap();
-        let decoder = DecodingConfig::new(
-            default_framing_message_based(),
-            default_decoding(),
-            LogNamespace::Legacy,
-        )
-        .build();
-
         assert_source_compliance(&SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let config: DemoLogsConfig = toml::from_str(config).unwrap();
+            let decoder = DecodingConfig::new(
+                default_framing_message_based(),
+                default_decoding(),
+                LogNamespace::Legacy,
+            )
+            .build();
             demo_logs_source(
                 config.interval,
                 config.count,
@@ -320,9 +319,10 @@ mod tests {
             )
             .await
             .unwrap();
+
+            rx
         })
-        .await;
-        rx
+        .await
     }
 
     #[test]
