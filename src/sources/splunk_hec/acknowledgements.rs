@@ -17,15 +17,15 @@ use vector_config::configurable_component;
 use warp::Rejection;
 
 use super::ApiError;
-use crate::{config::AcknowledgementsConfig, event::BatchStatus, shutdown::ShutdownSignal};
+use crate::{event::BatchStatus, shutdown::ShutdownSignal};
 
 /// Acknowledgement configuration for the `splunk_hec` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(default)]
 pub struct HecAcknowledgementsConfig {
-    #[serde(flatten)]
-    pub inner: AcknowledgementsConfig,
+    /// Enables end-to-end acknowledgements.
+    pub enabled: Option<bool>,
 
     /// The maximum number of ack statuses pending query across all channels.
     ///
@@ -62,7 +62,7 @@ pub struct HecAcknowledgementsConfig {
 impl Default for HecAcknowledgementsConfig {
     fn default() -> Self {
         Self {
-            inner: AcknowledgementsConfig::default(),
+            enabled: None,
             max_pending_acks: NonZeroU64::new(10_000_000).unwrap(),
             max_number_of_ack_channels: NonZeroU64::new(1_000_000).unwrap(),
             max_pending_acks_per_channel: NonZeroU64::new(1_000_000).unwrap(),
@@ -75,7 +75,7 @@ impl Default for HecAcknowledgementsConfig {
 impl From<bool> for HecAcknowledgementsConfig {
     fn from(enabled: bool) -> Self {
         Self {
-            inner: enabled.into(),
+            enabled: Some(enabled),
             ..Default::default()
         }
     }
@@ -368,7 +368,7 @@ mod tests {
     async fn test_indexer_ack_exceed_max_pending_acks_drop_acks() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_pending_acks: NonZeroU64::new(10).unwrap(),
             ..Default::default()
         };
@@ -411,7 +411,7 @@ mod tests {
     async fn test_indexer_ack_exceed_max_pending_acks_server_busy() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_pending_acks: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -435,7 +435,7 @@ mod tests {
     async fn test_indexer_ack_create_channels() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let idx_ack = IndexerAcknowledgement::new(config, shutdown);
@@ -464,7 +464,7 @@ mod tests {
     async fn test_indexer_ack_create_channels_exceed_max_number_of_ack_channels() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -485,7 +485,7 @@ mod tests {
     async fn test_indexer_ack_channel_idle_expiration() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
             ack_idle_cleanup: true,
             max_idle_time: NonZeroU64::new(1).unwrap(),
@@ -508,7 +508,7 @@ mod tests {
     async fn test_indexer_ack_channel_active_does_not_expire() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ack_idle_cleanup: true,
             max_idle_time: NonZeroU64::new(2).unwrap(),
             ..Default::default()

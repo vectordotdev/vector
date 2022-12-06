@@ -18,13 +18,13 @@ use tokio::{
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
 use vector_common::finalization::AddBatchNotifier;
-use vector_core::ByteSizeOf;
+use vector_core::{config::SourceAcknowledgementsConfig, EstimatedJsonEncodedSizeOf};
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
 use crate::{
     codecs::ReadyFrames,
-    config::{AcknowledgementsConfig, SourceContext},
+    config::SourceContext,
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
         ConnectionOpen, DecoderFramingError, OpenGauge, SocketBindError, SocketEventsReceived,
@@ -111,10 +111,10 @@ where
         tls_client_metadata_key: Option<String>,
         receive_buffer_bytes: Option<usize>,
         cx: SourceContext,
-        acknowledgements: AcknowledgementsConfig,
+        acknowledgements: SourceAcknowledgementsConfig,
         max_connections: Option<u32>,
     ) -> crate::Result<crate::sources::Source> {
-        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(acknowledgements);
 
         Ok(Box::pin(async move {
             let listenfd = ListenFd::from_env();
@@ -320,7 +320,7 @@ async fn handle_stream<T>(
 
                         emit!(SocketEventsReceived {
                             mode: SocketMode::Tcp,
-                            byte_size: events.size_of(),
+                            byte_size: events.estimated_json_encoded_size_of(),
                             count,
                         });
 
@@ -347,6 +347,7 @@ async fn handle_stream<T>(
                                 }
                             }
                         }
+
 
                         source.handle_events(&mut events, peer_addr);
                         match out.send_batch(events).await {

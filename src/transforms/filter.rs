@@ -1,5 +1,6 @@
 use vector_common::internal_event::{Count, InternalEventHandle as _, Registered};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -46,8 +47,8 @@ impl TransformConfig for FilterConfig {
         Input::all()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::all()).with_schema_definition(merged_definition.clone())]
     }
 
     fn enable_concurrency(&self) -> bool {

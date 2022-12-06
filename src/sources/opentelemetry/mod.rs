@@ -19,7 +19,7 @@ use vector_core::config::LogNamespace;
 
 use crate::{
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
+        DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext,
     },
     serde::bool_or_struct,
@@ -47,7 +47,7 @@ pub struct OpentelemetryConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 /// Configuration for the `opentelemetry` gRPC server.
@@ -100,7 +100,7 @@ impl GenerateConfig for OpentelemetryConfig {
 #[async_trait::async_trait]
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(&self.grpc.tls, true)?;
         let grpc_service = LogsServiceServer::new(Service {

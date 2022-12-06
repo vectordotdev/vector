@@ -2,7 +2,7 @@
 use heim::memory::os::linux::MemoryExt;
 #[cfg(target_os = "macos")]
 use heim::memory::os::macos::MemoryExt;
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(windows))]
 use heim::memory::os::SwapExt;
 use heim::units::information::byte;
 use vector_core::event::MetricTags;
@@ -102,13 +102,13 @@ impl HostMetrics {
                     swap.used().get::<byte>() as f64,
                     MetricTags::default(),
                 );
-                #[cfg(not(target_os = "windows"))]
+                #[cfg(not(windows))]
                 output.counter(
                     "memory_swapped_in_bytes_total",
                     swap.sin().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
                     MetricTags::default(),
                 );
-                #[cfg(not(target_os = "windows"))]
+                #[cfg(not(windows))]
                 output.counter(
                     "memory_swapped_out_bytes_total",
                     swap.sout().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,

@@ -11,6 +11,7 @@ use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf};
 
 use crate::sinks::elasticsearch::sign_request;
@@ -31,6 +32,7 @@ pub struct ElasticsearchRequest {
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
     pub events_byte_size: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl ByteSizeOf for ElasticsearchRequest {
@@ -48,6 +50,12 @@ impl ElementCount for ElasticsearchRequest {
 impl Finalizable for ElasticsearchRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for ElasticsearchRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

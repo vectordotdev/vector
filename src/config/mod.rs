@@ -9,7 +9,9 @@ use std::{
 use indexmap::IndexMap;
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 use vector_config::configurable_component;
-pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
+pub use vector_core::config::{
+    AcknowledgementsConfig, DataType, GlobalOptions, Input, Output, SourceAcknowledgementsConfig,
+};
 
 use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 
@@ -24,7 +26,7 @@ pub mod enterprise;
 pub mod format;
 mod graph;
 mod id;
-pub(crate) mod loading;
+mod loading;
 pub mod provider;
 mod schema;
 mod secret;
@@ -32,7 +34,6 @@ mod sink;
 mod source;
 mod transform;
 pub mod unit_test;
-pub(crate) mod util;
 mod validation;
 mod vars;
 pub mod watcher;

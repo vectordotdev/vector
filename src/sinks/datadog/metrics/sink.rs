@@ -124,7 +124,7 @@ where
                         emit!(DatadogMetricsEncodingError {
                             error_message,
                             error_code,
-                            dropped_events,
+                            dropped_events: dropped_events as usize,
                         });
                         None
                     }

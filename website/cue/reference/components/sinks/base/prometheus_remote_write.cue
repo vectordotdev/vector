@@ -2,11 +2,28 @@ package metadata
 
 base: components: sinks: prometheus_remote_write: configuration: {
 	acknowledgements: {
-		description: "Configuration of acknowledgement behavior."
-		required:    false
+		description: """
+			Controls how acknowledgements are handled for this sink.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
 		type: object: options: enabled: {
-			description: "Enables end-to-end acknowledgements."
-			required:    false
+			description: """
+				Whether or not end-to-end acknowledgements are enabled.
+
+				When enabled for a sink, any source connected to that sink, where the source supports
+				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				before acknowledging them at the source.
+
+				Enabling or disabling acknowledgements at the sink level takes precedence over any global
+				[`acknowledgements`][global_acks] configuration.
+
+				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+				"""
+			required: false
 			type: bool: {}
 		}
 	}
@@ -72,7 +89,18 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				type: string: enum: {
 					aws:   "Amazon Prometheus Service-specific authentication."
 					basic: "HTTP Basic Authentication."
+					bearer: """
+						Bearer authentication.
+
+						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						"""
 				}
+			}
+			token: {
+				description:   "The bearer token to send."
+				relevant_when: "strategy = \"bearer\""
+				required:      true
+				type: string: syntax: "literal"
 			}
 			user: {
 				description:   "Basic authentication username."
@@ -317,7 +345,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

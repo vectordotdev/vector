@@ -118,6 +118,11 @@ base: components: sources: socket: configuration: {
 			type: uint: {}
 		}
 	}
+	log_namespace: {
+		description: "The namespace to use for logs. This overrides the global setting."
+		required:    false
+		type: bool: {}
+	}
 	max_length: {
 		description: """
 			The maximum buffer size, in bytes, of incoming messages.
@@ -204,7 +209,7 @@ base: components: sources: socket: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

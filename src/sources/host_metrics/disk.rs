@@ -89,7 +89,7 @@ mod tests {
         let metrics = buffer.metrics;
 
         // The Windows test runner doesn't generate any disk metrics on the VM.
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(not(windows))]
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 4 == 0);
         assert!(all_counters(&metrics));

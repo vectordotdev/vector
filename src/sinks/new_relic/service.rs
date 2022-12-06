@@ -13,6 +13,7 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -22,7 +23,7 @@ use vector_core::{
 use super::{NewRelicCredentials, NewRelicSinkError};
 use crate::{
     http::{get_http_scheme_from_uri, HttpClient},
-    sinks::util::{metadata::RequestMetadata, Compression},
+    sinks::util::Compression,
 };
 
 #[derive(Debug, Clone)]
@@ -37,6 +38,12 @@ pub struct NewRelicApiRequest {
 impl Finalizable for NewRelicApiRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for NewRelicApiRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -95,7 +102,7 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
         };
 
         let payload_len = request.payload.len();
-        let metadata = request.metadata;
+        let metadata = request.get_metadata();
         let http_request = http_request
             .header(CONTENT_LENGTH, payload_len)
             .body(Body::from(request.payload))

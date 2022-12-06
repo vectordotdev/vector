@@ -9,13 +9,11 @@ use futures_util::future::BoxFuture;
 use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use tokio::sync::{
-    mpsc::{self},
-    oneshot, OwnedSemaphorePermit, Semaphore,
-};
+use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
+use vector_common::request_metadata::MetaDescriptive;
 use vector_core::event::EventStatus;
 
 use super::{
@@ -115,8 +113,8 @@ where
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
         let ack_slot = self.current_ack_slot.take();
 
-        let events_count = req.events_count;
-        let events_byte_size = req.events_byte_size;
+        let events_count = req.get_metadata().event_count();
+        let events_byte_size = req.get_metadata().events_byte_size();
         let response = self.inner.call(req);
 
         Box::pin(async move {
@@ -220,9 +218,12 @@ impl HttpRequestBuilder {
         path: &str,
         passthrough_token: Option<Arc<str>>,
         metadata_fields: MetadataFields,
+        auto_extract_timestamp: bool,
     ) -> Result<Request<Bytes>, crate::Error> {
         let uri = match self.endpoint_target {
             EndpointTarget::Raw => {
+                // `auto_extract_timestamp` doesn't apply to the raw endpoint since the raw endpoint
+                // always does this anyway.
                 let metadata = [
                     (super::SOURCE_FIELD, metadata_fields.source),
                     (super::SOURCETYPE_FIELD, metadata_fields.sourcetype),
@@ -233,9 +234,16 @@ impl HttpRequestBuilder {
                 .filter_map(|(key, value)| value.map(|value| (key, value)));
                 build_uri(self.endpoint.as_str(), path, metadata).context(UriParseSnafu)?
             }
-            EndpointTarget::Event => {
-                build_uri(self.endpoint.as_str(), path, None).context(UriParseSnafu)?
-            }
+            EndpointTarget::Event => build_uri(
+                self.endpoint.as_str(),
+                path,
+                if auto_extract_timestamp {
+                    Some((super::AUTO_EXTRACT_TIMESTAMP_FIELD, "true".to_string()))
+                } else {
+                    None
+                },
+            )
+            .context(UriParseSnafu)?,
         };
 
         let mut builder = Request::post(uri)
@@ -262,7 +270,7 @@ mod tests {
     use std::{
         collections::HashMap,
         future::poll_fn,
-        num::{NonZeroU64, NonZeroU8},
+        num::{NonZeroU64, NonZeroU8, NonZeroUsize},
         sync::{
             atomic::{AtomicU64, Ordering},
             Arc,
@@ -294,7 +302,7 @@ mod tests {
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
                 EndpointTarget,
             },
-            util::Compression,
+            util::{metadata::RequestMetadataBuilder, Compression},
         },
     };
 
@@ -316,6 +324,7 @@ mod tests {
             client.clone(),
             Arc::clone(&http_request_builder),
             EndpointTarget::Event,
+            false,
         );
         HecService::new(
             BoxService::new(http_service),
@@ -328,10 +337,15 @@ mod tests {
     fn get_hec_request() -> HecRequest {
         let body = Bytes::from("test-message");
         let events_byte_size = body.len();
+
+        let builder = RequestMetadataBuilder::new(1, events_byte_size, events_byte_size);
+        let bytes_len =
+            NonZeroUsize::new(events_byte_size).expect("payload should never be zero length");
+        let metadata = builder.with_request_size(bytes_len);
+
         HecRequest {
             body,
-            events_count: 1,
-            events_byte_size,
+            metadata,
             finalizers: EventFinalizers::default(),
             passthrough_token: None,
             index: None,

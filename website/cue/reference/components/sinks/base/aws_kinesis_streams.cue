@@ -2,11 +2,28 @@ package metadata
 
 base: components: sinks: aws_kinesis_streams: configuration: {
 	acknowledgements: {
-		description: "Configuration of acknowledgement behavior."
-		required:    false
+		description: """
+			Controls how acknowledgements are handled for this sink.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
 		type: object: options: enabled: {
-			description: "Enables end-to-end acknowledgements."
-			required:    false
+			description: """
+				Whether or not end-to-end acknowledgements are enabled.
+
+				When enabled for a sink, any source connected to that sink, where the source supports
+				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				before acknowledging them at the source.
+
+				Enabling or disabling acknowledgements at the sink level takes precedence over any global
+				[`acknowledgements`][global_acks] configuration.
+
+				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+				"""
+			required: false
 			type: bool: {}
 		}
 	}
@@ -98,8 +115,8 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					description: "Compression level."
 					required:    false
 					type: {
-						number: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 						string: enum: ["none", "fast", "best", "default"]
+						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 					}
 				}
 			}
@@ -309,7 +326,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 	}
 	stream_name: {
 		description: """
-			The [stream name][stream_name] of the target Kinesis Logs stream.
+			The [stream name][stream_name] of the target Kinesis Firehose delivery stream.
 
 			[stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
@@ -334,7 +351,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

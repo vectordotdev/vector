@@ -91,12 +91,11 @@ pub mod source {
 
 #[cfg(feature = "sinks-amqp")]
 pub mod sink {
-    use crate::{
-        emit,
-        internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-    };
+    use crate::emit;
     use metrics::counter;
-    use vector_common::internal_event::{error_stage, error_type};
+    use vector_common::internal_event::{
+        error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+    };
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]

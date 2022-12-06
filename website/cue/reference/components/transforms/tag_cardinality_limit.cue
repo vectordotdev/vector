@@ -7,6 +7,12 @@ components: transforms: tag_cardinality_limit: {
 		Limits the cardinality of tags on metric events, protecting against
 		accidental high cardinality usage that can commonly disrupt the stability
 		of metrics storages.
+
+		The default behavior is to drop the tag from incoming metrics when the configured
+		limit would be exceeded. Note that this is usually only useful when applied to
+		incremental counter metrics and can have unindended effects when applied to other
+		metric types. The default action to take can be modified with the
+		`limit_exceeded_action` option.
 		"""
 
 	classes: {

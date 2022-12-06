@@ -3,7 +3,7 @@ use std::path::Path;
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use glob::{Pattern, PatternError};
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(windows))]
 use heim::units::ratio::ratio;
 use heim::units::time::second;
 use tokio::time;
@@ -11,7 +11,7 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
@@ -234,7 +234,7 @@ impl HostMetrics {
         let metrics = buffer.metrics;
         emit!(EventsReceived {
             count: metrics.len(),
-            byte_size: metrics.size_of(),
+            byte_size: metrics.estimated_json_encoded_size_of(),
         });
         metrics
     }
@@ -318,9 +318,9 @@ impl MetricsBuffer {
     }
 
     fn tags(&self, mut tags: MetricTags) -> MetricTags {
-        tags.insert("collector".into(), self.name.into());
+        tags.replace("collector".into(), self.name.to_string());
         if let Some(host) = &self.host {
-            tags.insert("host".into(), host.clone());
+            tags.replace("host".into(), host.clone());
         }
         tags
     }
@@ -623,7 +623,7 @@ pub(self) mod tests {
     }
 
     // Windows does not produce load average metrics.
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(windows))]
     #[tokio::test]
     async fn generates_loadavg_metrics() {
         let mut buffer = MetricsBuffer::new(None);

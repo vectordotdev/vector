@@ -1,10 +1,7 @@
 use metrics::{register_counter, Counter};
-use vector_common::internal_event::{Count, Registered};
+use vector_common::internal_event::{ComponentEventsDropped, Count, Registered, INTENTIONAL};
 
-use crate::{
-    internal_events::{ComponentEventsDropped, INTENTIONAL},
-    register,
-};
+use crate::register;
 
 vector_common::registered_event! (
     FilterEventsDropped => {

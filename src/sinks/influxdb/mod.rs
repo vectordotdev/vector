@@ -246,13 +246,13 @@ pub(in crate::sinks) fn influx_line_protocol(
 fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
     let original_len = output.len();
     // `tags` is already sorted
-    for (key, value) in tags {
+    for (key, value) in tags.iter_single() {
         if key.is_empty() || value.is_empty() {
             continue;
         }
-        encode_string(&key, output);
+        encode_string(key, output);
         output.put_u8(b'=');
-        encode_string(&value, output);
+        encode_string(value, output);
         output.put_u8(b',');
     }
 
@@ -360,6 +360,7 @@ pub mod test_util {
     use std::{fs::File, io::Read};
 
     use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::tls;
@@ -377,13 +378,11 @@ pub mod test_util {
     }
 
     pub(crate) fn tags() -> MetricTags {
-        vec![
-            ("normal_tag".to_owned(), "value".to_owned()),
-            ("true_tag".to_owned(), "true".to_owned()),
-            ("empty_tag".to_owned(), "".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+        metric_tags!(
+            "normal_tag" => "value",
+            "true_tag" => "true",
+            "empty_tag" => "",
+        )
     }
 
     pub(crate) fn assert_fields(value: String, fields: Vec<&str>) {

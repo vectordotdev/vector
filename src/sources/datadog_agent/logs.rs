@@ -6,14 +6,17 @@ use codecs::StreamDecodingError;
 use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder;
-use vector_core::ByteSizeOf;
+use vector_config::NamedComponent;
+use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{
     event::Event,
     internal_events::EventsReceived,
     sources::{
-        datadog_agent::{handle_request, ApiKeyQueryParams, DatadogAgentSource, LogMsg},
+        datadog_agent::{
+            handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
+        },
         util::ErrorMessage,
     },
     SourceSender,
@@ -111,56 +114,49 @@ pub(crate) fn decode_log_body(
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("status"),
+                                Some(LegacyKey::InsertIfEmpty(path!("status"))),
                                 path!("status"),
                                 status.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("timestamp"),
+                                Some(LegacyKey::InsertIfEmpty(path!("timestamp"))),
                                 path!("timestamp"),
                                 timestamp,
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("hostname"),
+                                Some(LegacyKey::InsertIfEmpty(path!("hostname"))),
                                 path!("hostname"),
                                 hostname.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("service"),
+                                Some(LegacyKey::InsertIfEmpty(path!("service"))),
                                 path!("service"),
                                 service.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("ddsource"),
+                                Some(LegacyKey::InsertIfEmpty(path!("ddsource"))),
                                 path!("ddsource"),
                                 ddsource.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                path!("ddtags"),
+                                Some(LegacyKey::InsertIfEmpty(path!("ddtags"))),
                                 path!("ddtags"),
                                 ddtags.clone(),
                             );
 
-                            namespace.insert_vector_metadata(
+                            namespace.insert_standard_vector_source_metadata(
                                 log,
-                                path!(source.log_schema_source_type_key),
-                                path!("source_type"),
-                                Bytes::from("datadog_agent"),
-                            );
-                            namespace.insert_vector_metadata(
-                                log,
-                                path!(source.log_schema_timestamp_key),
-                                path!("ingest_timestamp"),
+                                DatadogAgentConfig::NAME,
                                 now,
                             );
 
@@ -188,7 +184,7 @@ pub(crate) fn decode_log_body(
     }
 
     emit!(EventsReceived {
-        byte_size: decoded.size_of(),
+        byte_size: decoded.estimated_json_encoded_size_of(),
         count: decoded.len(),
     });
 

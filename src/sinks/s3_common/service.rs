@@ -10,6 +10,7 @@ use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -24,6 +25,7 @@ pub struct S3Request {
     pub body: Bytes,
     pub bucket: String,
     pub metadata: S3Metadata,
+    pub request_metadata: RequestMetadata,
     pub content_encoding: Option<&'static str>,
     pub options: S3Options,
 }
@@ -34,12 +36,16 @@ impl Finalizable for S3Request {
     }
 }
 
+impl MetaDescriptive for S3Request {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct S3Metadata {
     pub partition_key: S3PartitionKey,
     pub s3_key: String,
-    pub count: usize,
-    pub byte_size: usize,
     pub finalizers: EventFinalizers,
 }
 
@@ -92,6 +98,9 @@ impl Service<S3Request> for S3Service {
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: S3Request) -> Self::Future {
+        let count = request.get_metadata().event_count();
+        let events_byte_size = request.get_metadata().events_byte_size();
+
         let options = request.options;
 
         let content_encoding = request.content_encoding;
@@ -106,13 +115,11 @@ impl Service<S3Request> for S3Service {
 
         let tagging = options.tags.map(|tags| {
             let mut tagging = url::form_urlencoded::Serializer::new(String::new());
-            for (p, v) in tags {
-                tagging.append_pair(&p, &v);
+            for (p, v) in &tags {
+                tagging.append_pair(p, v);
             }
             tagging.finish()
         });
-        let count = request.metadata.count;
-        let events_byte_size = request.metadata.byte_size;
 
         let client = self.client.clone();
 

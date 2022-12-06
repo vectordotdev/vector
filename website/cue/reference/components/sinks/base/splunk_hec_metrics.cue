@@ -6,8 +6,19 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		required:    false
 		type: object: options: {
 			enabled: {
-				description: "Enables end-to-end acknowledgements."
-				required:    false
+				description: """
+					Whether or not end-to-end acknowledgements are enabled.
+
+					When enabled for a sink, any source connected to that sink, where the source supports
+					end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+					before acknowledging them at the source.
+
+					Enabling or disabling acknowledgements at the sink level takes precedence over any global
+					[`acknowledgements`][global_acks] configuration.
+
+					[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+					"""
+				required: false
 				type: bool: {}
 			}
 			indexer_acknowledgements_enabled: {
@@ -82,8 +93,8 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					description: "Compression level."
 					required:    false
 					type: {
-						number: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 						string: enum: ["none", "fast", "best", "default"]
+						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 					}
 				}
 			}
@@ -296,7 +307,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

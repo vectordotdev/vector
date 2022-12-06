@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
@@ -11,8 +12,7 @@ use crate::sinks::util::ElementCount;
 #[derive(Clone, Debug)]
 pub struct HecRequest {
     pub body: Bytes,
-    pub events_count: usize,
-    pub events_byte_size: usize,
+    pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
     pub passthrough_token: Option<Arc<str>>,
     pub index: Option<String>,
@@ -29,12 +29,18 @@ impl ByteSizeOf for HecRequest {
 
 impl ElementCount for HecRequest {
     fn element_count(&self) -> usize {
-        self.events_count
+        self.metadata.event_count()
     }
 }
 
 impl Finalizable for HecRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for HecRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }

@@ -293,7 +293,10 @@ pub fn update_config(config: &Config) {
                 inputs: transform.inputs.clone(),
                 outputs: transform
                     .inner
-                    .outputs(&merged_definition(&transform.inputs, config, &mut cache))
+                    .outputs(
+                        &merged_definition(&transform.inputs, config, &mut cache),
+                        config.schema.log_namespace(),
+                    )
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),

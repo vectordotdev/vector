@@ -2,11 +2,28 @@ package metadata
 
 base: components: sinks: loki: configuration: {
 	acknowledgements: {
-		description: "Configuration of acknowledgement behavior."
-		required:    false
+		description: """
+			Controls how acknowledgements are handled for this sink.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
 		type: object: options: enabled: {
-			description: "Enables end-to-end acknowledgements."
-			required:    false
+			description: """
+				Whether or not end-to-end acknowledgements are enabled.
+
+				When enabled for a sink, any source connected to that sink, where the source supports
+				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				before acknowledging them at the source.
+
+				Enabling or disabling acknowledgements at the sink level takes precedence over any global
+				[`acknowledgements`][global_acks] configuration.
+
+				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+				"""
+			required: false
 			type: bool: {}
 		}
 	}
@@ -93,8 +110,8 @@ base: components: sinks: loki: configuration: {
 					description: "Compression level."
 					required:    false
 					type: {
-						number: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 						string: enum: ["none", "fast", "best", "default"]
+						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 					}
 				}
 			}
@@ -173,7 +190,7 @@ base: components: sinks: loki: configuration: {
 		description: """
 			The base URL of the Loki instance.
 
-			Vector will append `/loki/api/v1/push` to this.
+			Vector will append the value of `path` to this.
 			"""
 		required: true
 		type: string: syntax: "literal"
@@ -236,6 +253,18 @@ base: components: sinks: loki: configuration: {
 				drop:              "Drop the event."
 				rewrite_timestamp: "Rewrite the timestamp of the event to the timestamp of the latest event seen by the sink."
 			}
+		}
+	}
+	path: {
+		description: """
+			The path to use in the URL of the Loki instance.
+
+			By default, `"/loki/api/v1/push"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "/loki/api/v1/push"
+			syntax:  "literal"
 		}
 	}
 	remove_label_fields: {
@@ -402,7 +431,7 @@ base: components: sinks: loki: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

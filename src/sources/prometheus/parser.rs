@@ -225,14 +225,10 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.23 },
                 )
-                .with_tags(Some(
-                    vec![
-                        ("labelname".into(), "val2".into()),
-                        ("basename".into(), "base\"v\\al\nue".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "labelname" => "val2",
+                    "basename" => "base\"v\\al\nue",
+                )))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "name2",
@@ -241,14 +237,10 @@ mod test {
                         value: std::f64::INFINITY
                     },
                 )
-                .with_tags(Some(
-                    vec![
-                        ("labelname".into(), "val2".into()),
-                        ("basename".into(), "basevalue2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "labelname" => "val2",
+                    "basename" => "basevalue2",
+                )))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "name2",
@@ -257,11 +249,7 @@ mod test {
                         value: std::f64::NEG_INFINITY
                     },
                 )
-                .with_tags(Some(
-                    vec![("labelname".into(), "val1".into()),]
-                        .into_iter()
-                        .collect()
-                ))
+                .with_tags(Some(metric_tags!("labelname" => "val1")))
                 .with_timestamp(Some(*TIMESTAMP)),
             ]),
         );
@@ -285,28 +273,20 @@ mod test {
                     MetricValue::Counter { value: 1027.0 },
                 )
                 .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
-                .with_tags(Some(
-                    vec![
-                        ("method".into(), "post".into()),
-                        ("code".into(), "200".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                )),
+                .with_tags(Some(metric_tags!(
+                    "method" => "post",
+                    "code" => "200",
+                ))),
                 Metric::new(
                     "http_requests_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 3.0 },
                 )
                 .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
-                .with_tags(Some(
-                    vec![
-                        ("method".into(), "post".into()),
-                        ("code".into(), "400".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "method" => "post",
+                    "code" => "400"
+                )))
             ]),
         );
     }
@@ -379,14 +359,10 @@ mod test {
                     value: 1458255915.0
                 },
             )
-            .with_tags(Some(
-                vec![
-                    ("path".into(), "C:\\DIR\\FILE.TXT".into()),
-                    ("error".into(), "Cannot find file:\n\"FILE.TXT\"".into())
-                ]
-                .into_iter()
-                .collect()
-            ))
+            .with_tags(Some(metric_tags!(
+                "path" => "C:\\DIR\\FILE.TXT",
+                "error" => "Cannot find file:\n\"FILE.TXT\"",
+            )))
             .with_timestamp(Some(*TIMESTAMP))]),
         );
     }
@@ -480,14 +456,8 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 1890.0 },
             )
-            .with_tags(Some(
-                vec![
-                    ("registry".into(), "default".into()),
-                    ("content_type".into(), "text/plain; version=0.0.4".into())
-                ]
-                .into_iter()
-                .collect()
-            ))
+            .with_tags(Some(metric_tags!( "registry" => "default",
+                    "content_type" => "text/plain; version=0.0.4" )))
             .with_timestamp(Some(*TIMESTAMP))]),
         );
     }
@@ -527,9 +497,7 @@ mod test {
             )
             .with_timestamp(Utc.timestamp_opt(-3982045, 0).latest())
             .with_tags(Some(
-                vec![("problem".into(), "division by zero".into())]
-                    .into_iter()
-                    .collect()
+                metric_tags!("problem" => "division by zero")
             ))]),
         );
     }
@@ -551,20 +519,14 @@ mod test {
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
-                .with_tags(Some(
-                    vec![("env".into(), "production".into())]
-                        .into_iter()
-                        .collect()
-                )),
+                .with_tags(Some(metric_tags!("env" => "production"))),
                 Metric::new(
                     "latency",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 2.0 },
                 )
                 .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
-                .with_tags(Some(
-                    vec![("env".into(), "testing".into())].into_iter().collect()
-                ))
+                .with_tags(Some(metric_tags!("env" => "testing")))
             ]),
         );
     }
@@ -819,7 +781,7 @@ mod test {
                         sum: 19690.129384881966,
                     },
                 )
-                    .with_tags(Some(vec![("runner".into(), "z".into())].into_iter().collect()))
+                    .with_tags(Some(metric_tags!("runner" => "z")))
                     .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
@@ -839,7 +801,7 @@ mod test {
                         sum: 28.975436316,
                     },
                 )
-                    .with_tags(Some(vec![("runner".into(), "x".into())].into_iter().collect()))
+                    .with_tags(Some(metric_tags!("runner" => "x")))
                     .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
@@ -851,7 +813,7 @@ mod test {
                         sum: 381111.7498891335,
                     },
                 )
-                    .with_tags(Some(vec![("runner".into(), "y".into())].into_iter().collect()))
+                    .with_tags(Some(metric_tags!("runner" => "y")))
                     .with_timestamp(Some(*TIMESTAMP))
             ]),
         );
@@ -898,9 +860,7 @@ mod test {
                         sum: 1.7560473e+07,
                     },
                 )
-                .with_tags(Some(
-                    vec![("service".into(), "a".into())].into_iter().collect()
-                ))
+                .with_tags(Some(metric_tags!("service" => "a")))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "go_gc_duration_seconds",

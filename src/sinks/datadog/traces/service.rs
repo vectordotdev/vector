@@ -9,6 +9,7 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -55,12 +56,12 @@ impl RetryLogic for TraceApiRetry {
 
 #[derive(Debug, Clone)]
 pub struct TraceApiRequest {
-    pub batch_size: usize,
     pub body: Bytes,
     pub headers: BTreeMap<String, String>,
     pub finalizers: EventFinalizers,
     pub uri: Uri,
     pub uncompressed_size: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl TraceApiRequest {
@@ -76,6 +77,12 @@ impl TraceApiRequest {
 impl Finalizable for TraceApiRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for TraceApiRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -141,8 +148,8 @@ impl Service<TraceApiRequest> for TraceApiService {
         let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
 
         Box::pin(async move {
-            let byte_size = request.body.len();
-            let batch_size = request.batch_size;
+            let byte_size = request.get_metadata().events_byte_size();
+            let batch_size = request.get_metadata().event_count();
             let uncompressed_size = request.uncompressed_size;
             let http_request = request.into_http_request().context(BuildRequestSnafu)?;
 

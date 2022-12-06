@@ -1,9 +1,6 @@
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 
 use vector_common::internal_event::{error_stage, error_type};
 
