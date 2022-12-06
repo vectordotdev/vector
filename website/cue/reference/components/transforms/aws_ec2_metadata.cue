@@ -170,7 +170,7 @@ components: transforms: aws_ec2_metadata: {
 						{
 							"Name":          "InstanceName"
 							"ApplicationId": "12345678"
-						}
+						},
 					]
 				}
 			}
