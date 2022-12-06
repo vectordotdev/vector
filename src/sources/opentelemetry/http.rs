@@ -12,6 +12,7 @@ use tracing::Span;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Registered,
 };
+use vector_core::config::LogNamespace;
 use vector_core::{
     event::{BatchNotifier, BatchStatus},
     EstimatedJsonEncodedSizeOf,
@@ -93,7 +94,7 @@ fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
     let events: Vec<Event> = request
         .resource_logs
         .into_iter()
-        .flat_map(|v| v.into_iter())
+        .flat_map(|v| v.into_iter(LogNamespace::Legacy))
         .collect();
 
     emit!(EventsReceived {

@@ -10,6 +10,7 @@ use tonic::{Request, Response, Status};
 use opentelemetry_proto::proto::collector::logs::v1::{
     logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
+use vector_core::config::LogNamespace;
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     EstimatedJsonEncodedSizeOf,
@@ -31,7 +32,7 @@ impl LogsService for Service {
             .into_inner()
             .resource_logs
             .into_iter()
-            .flat_map(|v| v.into_iter())
+            .flat_map(|v| v.into_iter(LogNamespace::Legacy))
             .collect();
 
         let count = events.len();
