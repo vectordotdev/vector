@@ -1,6 +1,5 @@
 use std::{
     fmt,
-    io::Error,
     task::{Context, Poll},
 };
 
@@ -8,10 +7,9 @@ use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Uri};
 use hyper::{
-    body::HttpBody,
+    body::{Body, HttpBody},
     client,
     client::{Client, HttpConnector},
-    Body,
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
@@ -40,10 +38,6 @@ pub enum HttpError {
     CallRequest { source: hyper::Error },
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
-    #[snafu(display("Failed to decompress HTTP request: {}", source))]
-    Decompression { source: hyper::Error },
-    #[snafu(display("Failed to read HTTP request: {}", source))]
-    IO { source: Error },
 }
 
 impl HttpError {
@@ -52,9 +46,7 @@ impl HttpError {
             HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
             HttpError::CallRequest { .. }
             | HttpError::BuildTlsConnector { .. }
-            | HttpError::MakeHttpsConnector { .. }
-            | HttpError::Decompression { .. }
-            | HttpError::IO { .. } => true,
+            | HttpError::MakeHttpsConnector { .. } => true,
         }
     }
 }
@@ -131,8 +123,6 @@ where
                 })
                 .context(CallRequestSnafu)?;
 
-            // let response = decompress_response(response).await?;
-
             // Emit the response into the internal events system.
             emit!(http_client::GotHttpResponse {
                 response: &response,
@@ -192,8 +182,9 @@ fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue
             .insert("User-Agent", user_agent.clone());
     }
 
-    // Default to request gzip encoded responses.
     if !request.headers().contains_key("Accept-Encoding") {
+        // hardcoding until we support compressed responses:
+        // https://github.com/vectordotdev/vector/issues/5440
         request
             .headers_mut()
             .insert("Accept-Encoding", HeaderValue::from_static("identity"));
