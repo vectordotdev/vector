@@ -16,6 +16,7 @@ mod config;
 mod tag_value_set;
 mod tests;
 
+use crate::event::metric::TagValueSet;
 pub use config::TagCardinalityLimitConfig;
 use tag_value_set::AcceptedTagValueSet;
 
@@ -41,7 +42,7 @@ impl TagCardinalityLimit {
     /// for the key and returns true, otherwise returns false.  A false return
     /// value indicates to the caller that the value is not accepted for this
     /// key, and the configured limit_exceeded_action should be taken.
-    fn try_accept_tag(&mut self, key: &str, value: &str) -> bool {
+    fn try_accept_tag(&mut self, key: &str, value: &TagValueSet) -> bool {
         let tag_value_set = self.accepted_tags.entry_ref(key).or_insert_with(|| {
             AcceptedTagValueSet::new(self.config.value_limit, &self.config.mode)
         });
@@ -54,7 +55,7 @@ impl TagCardinalityLimit {
         // Tag value not yet part of the accepted set.
         if tag_value_set.len() < self.config.value_limit as usize {
             // accept the new value
-            tag_value_set.insert(value);
+            tag_value_set.insert(value.clone());
 
             if tag_value_set.len() == self.config.value_limit as usize {
                 emit!(TagCardinalityValueLimitReached { key });
@@ -69,7 +70,7 @@ impl TagCardinalityLimit {
 
     /// Checks if recording a key and value corresponding to a tag on an incoming Metric would
     /// exceed the cardinality limit.
-    fn tag_limit_exceeded(&self, key: &str, value: &str) -> bool {
+    fn tag_limit_exceeded(&self, key: &str, value: &TagValueSet) -> bool {
         self.accepted_tags
             .get(key)
             .map(|value_set| {
@@ -79,11 +80,11 @@ impl TagCardinalityLimit {
     }
 
     /// Record a key and value corresponding to a tag on an incoming Metric.
-    fn record_tag_value(&mut self, key: &str, value: &str) {
+    fn record_tag_value(&mut self, key: &str, value: &TagValueSet) {
         self.accepted_tags
             .entry_ref(key)
             .or_insert_with(|| AcceptedTagValueSet::new(self.config.value_limit, &self.config.mode))
-            .insert(value);
+            .insert(value.clone());
     }
 
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
@@ -93,16 +94,17 @@ impl TagCardinalityLimit {
                 LimitExceededAction::DropEvent => {
                     // This needs to check all the tags, to ensure that the ordering of tag names
                     // doesn't change the behavior of the check.
-                    for (key, value) in tags_map.iter_single() {
+
+                    for (key, value) in tags_map.iter_sets() {
                         if self.tag_limit_exceeded(key, value) {
                             emit!(TagCardinalityLimitRejectingEvent {
                                 tag_key: key,
-                                tag_value: value,
+                                tag_value: &value.to_string(),
                             });
                             return None;
                         }
                     }
-                    for (key, value) in tags_map.iter_single() {
+                    for (key, value) in tags_map.iter_sets() {
                         self.record_tag_value(key, value);
                     }
                 }
@@ -113,7 +115,7 @@ impl TagCardinalityLimit {
                         } else {
                             emit!(TagCardinalityLimitRejectingTag {
                                 tag_key: key,
-                                tag_value: value,
+                                tag_value: &value.to_string(),
                             });
                             false
                         }
