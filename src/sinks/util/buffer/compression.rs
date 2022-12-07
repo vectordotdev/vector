@@ -22,12 +22,12 @@ pub enum Compression {
 
     /// [Gzip][gzip] compression.
     ///
-    /// [gzip]: https://en.wikipedia.org/wiki/Gzip
+    /// [gzip]: https://www.gzip.org/
     Gzip(CompressionLevel),
 
     /// [Zlib][zlib] compression.
     ///
-    /// [zlib]: https://en.wikipedia.org/wiki/Zlib
+    /// [zlib]: https://zlib.net/
     Zlib(CompressionLevel),
 }
 
@@ -240,12 +240,12 @@ impl Configurable for Compression {
         let gzip_string_subschema = generate_string_schema(
             "Gzip",
             Some("[Gzip][gzip] compression."),
-            "[gzip]: https://en.wikipedia.org/wiki/Gzip",
+            "[gzip]: https://www.gzip.org/",
         );
         let zlib_string_subschema = generate_string_schema(
             "Zlib",
             Some("[Zlib]][zlib] compression."),
-            "[zlib]: https://en.wikipedia.org/wiki/Zlib",
+            "[zlib]: https://zlib.net/",
         );
 
         let mut all_string_oneof_subschema = generate_one_of_schema(&[
