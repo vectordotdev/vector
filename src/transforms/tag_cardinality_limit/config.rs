@@ -66,25 +66,26 @@ pub enum LimitExceededAction {
     DropEvent,
 }
 
-/// Different possible ways to treat tag values. If tags only ever have a single values, these all behave the same.
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum TagValueMode {
-    /// Individual tag values are tracked separately. If `limit_exceeded_action` is set to `drop_event`, the
-    /// entire event is dropped if any tag values exceed the limit. If `limit_exceeded_action` is set to `drop_tag`,
-    /// only the specific tag values that exceeded the limit will be dropped.
-    Individual,
-
-    /// Individual tag values are tracked separately. If `limit_exceeded_action` is set to `drop_event`, the
-    /// entire event is dropped if any tag values exceed the limit. If `limit_exceeded_action` is set to `drop_tag`,
-    /// if a single tag value exceeds the limit, all values for that specific tag are dropped.
-    IndividualAllOrNothing,
-
-    /// Tag values are treated as a set. Each unique set of tag values is tracked. If `limit_exceeded_action` is set to `drop_tag`,
-    /// all values of a tag will be dropped if the limit is exceeded.
-    Set,
-}
+// TODO: delete this, not going to use it in the first iteration
+// /// Different possible ways to treat tag values. If tags only ever have a single values, these all behave the same.
+// #[configurable_component]
+// #[derive(Clone, Debug)]
+// #[serde(rename_all = "snake_case")]
+// pub enum TagValueMode {
+//     /// Individual tag values are tracked separately. If `limit_exceeded_action` is set to `drop_event`, the
+//     /// entire event is dropped if any tag values exceed the limit. If `limit_exceeded_action` is set to `drop_tag`,
+//     /// only the specific tag values that exceeded the limit will be dropped.
+//     Individual,
+//
+//     /// Individual tag values are tracked separately. If `limit_exceeded_action` is set to `drop_event`, the
+//     /// entire event is dropped if any tag values exceed the limit. If `limit_exceeded_action` is set to `drop_tag`,
+//     /// if a single tag value exceeds the limit, all values for that specific tag are dropped.
+//     IndividualAllOrNothing,
+//
+//     /// Tag values are treated as a set. Each unique set of tag values is tracked. If `limit_exceeded_action` is set to `drop_tag`,
+//     /// all values of a tag will be dropped if the limit is exceeded.
+//     Set,
+// }
 
 const fn default_limit_exceeded_action() -> LimitExceededAction {
     LimitExceededAction::DropTag

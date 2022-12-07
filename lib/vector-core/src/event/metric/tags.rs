@@ -76,7 +76,7 @@ type TagValueRef<'a> = Option<&'a str>;
 
 /// Tag values for a metric series.  This may be empty, a single value, or a set of values. This is
 /// used to provide the storage for `TagValueSet`.
-#[derive(Clone, Configurable, Debug, Eq, PartialEq)]
+#[derive(Clone, Configurable, Debug, Eq, PartialEq, Hash)]
 pub enum TagValueSet {
     /// This represents a set containing no value.
     Empty,

@@ -1,3 +1,4 @@
+use crate::event::metric::TagValueSet;
 use crate::transforms::tag_cardinality_limit::config::Mode;
 use bloom::{BloomFilter, ASMS};
 use std::collections::HashSet;
@@ -11,7 +12,7 @@ pub struct AcceptedTagValueSet {
 }
 
 enum TagValueSetStorage {
-    Set(HashSet<String>),
+    Set(HashSet<TagValueSet>),
     Bloom(BloomFilter),
 }
 
@@ -40,7 +41,7 @@ impl AcceptedTagValueSet {
         }
     }
 
-    pub fn contains(&self, value: &str) -> bool {
+    pub fn contains(&self, value: &TagValueSet) -> bool {
         match &self.storage {
             TagValueSetStorage::Set(set) => set.contains(value),
             TagValueSetStorage::Bloom(bloom) => bloom.contains(&value),
@@ -51,9 +52,9 @@ impl AcceptedTagValueSet {
         self.num_elements
     }
 
-    pub fn insert(&mut self, value: &str) -> bool {
+    pub fn insert(&mut self, value: TagValueSet) -> bool {
         let inserted = match &mut self.storage {
-            TagValueSetStorage::Set(set) => set.insert(value.to_string()),
+            TagValueSetStorage::Set(set) => set.insert(value),
             TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
         };
         if inserted {
