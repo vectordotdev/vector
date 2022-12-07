@@ -11,11 +11,19 @@ mod status;
 use std::net::SocketAddr;
 
 use futures::{future::join, FutureExt, TryFutureExt};
+use lookup::owned_value_path;
+use opentelemetry_proto::convert::{
+    ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY,
+    SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
+};
 
 use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
+use value::kind::Collection;
+use value::Kind;
 use vector_common::internal_event::{BytesReceived, Protocol};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::LegacyKey;
+use vector_core::{config::LogNamespace, schema::Definition};
 
 use crate::{
     config::{
@@ -48,6 +56,11 @@ pub struct OpentelemetryConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 /// Configuration for the `opentelemetry` gRPC server.
@@ -92,6 +105,7 @@ impl GenerateConfig for OpentelemetryConfig {
                 tls: Default::default(),
             },
             acknowledgements: Default::default(),
+            log_namespace: None,
         })
         .unwrap()
     }
@@ -101,11 +115,13 @@ impl GenerateConfig for OpentelemetryConfig {
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let log_namespace = cx.log_namespace(self.log_namespace);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(&self.grpc.tls, true)?;
         let grpc_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
+            log_namespace,
         })
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
         let grpc_source = run_grpc_server(
@@ -121,15 +137,90 @@ impl SourceConfig for OpentelemetryConfig {
         let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
         let protocol = http_tls_settings.http_protocol_name();
         let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
-        let filters = build_warp_filter(acknowledgements, cx.out, bytes_received);
+        let filters = build_warp_filter(acknowledgements, log_namespace, cx.out, bytes_received);
         let http_source =
             run_http_server(self.http.address, http_tls_settings, filters, cx.shutdown);
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log).with_port(LOGS)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        log_namespace = global_log_namespace.merge(self.log_namespace);
+        schema_definition =
+            Definition::new_with_default_metadata(Kind::any().without_undefined(), [log_namespace])
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::Overwrite(owned_value_path!(RESOURCE_KEY))),
+                    &owned_value_path!(RESOURCE_KEY),
+                    Kind::object(Collection::from_unknown(Kind::any())).or_undefined(),
+                    None,
+                )
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::Overwrite(owned_value_path!(ATTRIBUTES_KEY))),
+                    &owned_value_path!(ATTRIBUTES_KEY),
+                    Kind::object(Collection::from_unknown(Kind::any())).or_undefined(),
+                    None,
+                )
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::Overwrite(owned_value_path!(TRACE_ID_KEY))),
+                    &owned_value_path!(TRACE_ID_KEY),
+                    Kind::bytes().or_undefined(),
+                    None,
+                )
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::Overwrite(owned_value_path!(SPAN_ID_KEY))),
+                    &owned_value_path!(SPAN_ID_KEY),
+                    Kind::bytes().or_undefined(),
+                    None,
+                )
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::Overwrite(owned_value_path!(SEVERITY_TEXT_KEY))),
+                    &owned_value_path!(SEVERITY_TEXT_KEY),
+                    Kind::bytes().or_undefined(),
+                    None,
+                )
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::Overwrite(owned_value_path!(SEVERITY_NUMBER_KEY))),
+                    &owned_value_path!(SEVERITY_NUMBER_KEY),
+                    Kind::integer().or_undefined(),
+                    None,
+                )
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::Overwrite(owned_value_path!(FLAGS_KEY))),
+                    &owned_value_path!(FLAGS_KEY),
+                    Kind::integer().or_undefined(),
+                    None,
+                )
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::Overwrite(owned_value_path!(
+                        DROPPED_ATTRIBUTES_COUNT_KEY
+                    ))),
+                    &owned_value_path!(DROPPED_ATTRIBUTES_COUNT_KEY),
+                    Kind::integer(),
+                    None,
+                )
+                // TODO This is probably wrong, mixed up with the std vector metadata
+                .with_source_metadata(
+                    Self::NAME,
+                    Some(LegacyKey::Overwrite(owned_value_path!(
+                        OBSERVED_TIMESTAMP_KEY
+                    ))),
+                    &owned_value_path!(OBSERVED_TIMESTAMP_KEY),
+                    Kind::timestamp(),
+                    None,
+                )
+                .with_standard_vector_source_metadata();
+
+        vec![Output::default(DataType::Log)
+            .with_port(LOGS)
+            .with_schema_definition(schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {

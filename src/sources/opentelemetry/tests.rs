@@ -27,7 +27,7 @@ fn generate_config() {
 }
 
 #[tokio::test]
-async fn receive_grpc_logs() {
+async fn receive_grpc_logs_legacy_namespace() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let grpc_addr = next_addr();
         let http_addr = next_addr();
@@ -42,6 +42,7 @@ async fn receive_grpc_logs() {
                 tls: Default::default(),
             },
             acknowledgements: Default::default(),
+            log_namespace: Default::default(),
         };
         let (sender, logs_output, _) = new_source(EventStatus::Delivered);
         let server = source
@@ -124,7 +125,7 @@ async fn receive_grpc_logs() {
     .await;
 }
 
-fn new_source(
+pub fn new_source(
     status: EventStatus,
 ) -> (
     SourceSender,

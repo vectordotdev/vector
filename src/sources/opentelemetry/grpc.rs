@@ -20,6 +20,7 @@ use vector_core::{
 pub(crate) struct Service {
     pub(crate) pipeline: SourceSender,
     pub(crate) acknowledgements: bool,
+    pub(crate) log_namespace: LogNamespace,
 }
 
 #[tonic::async_trait]
@@ -32,7 +33,7 @@ impl LogsService for Service {
             .into_inner()
             .resource_logs
             .into_iter()
-            .flat_map(|v| v.into_iter(LogNamespace::Legacy))
+            .flat_map(|v| v.into_iter(self.log_namespace))
             .collect();
 
         let count = events.len();

@@ -61,6 +61,7 @@ pub(crate) async fn run_http_server(
 
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
+    log_namespace: LogNamespace,
     out: SourceSender,
     bytes_received: Registered<BytesReceived>,
 ) -> BoxedFilter<(Response,)> {
@@ -75,7 +76,7 @@ pub(crate) fn build_warp_filter(
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
             let events = decode(&encoding_header, body).and_then(|body| {
                 bytes_received.emit(ByteSize(body.len()));
-                decode_body(body)
+                decode_body(body, log_namespace)
             });
 
             handle_request(events, acknowledgements, out.clone(), super::LOGS)
@@ -83,7 +84,7 @@ pub(crate) fn build_warp_filter(
         .boxed()
 }
 
-fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
+fn decode_body(body: Bytes, log_namespace: LogNamespace) -> Result<Vec<Event>, ErrorMessage> {
     let request = ExportLogsServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
@@ -94,7 +95,7 @@ fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
     let events: Vec<Event> = request
         .resource_logs
         .into_iter()
-        .flat_map(|v| v.into_iter(LogNamespace::Legacy))
+        .flat_map(|v| v.into_iter(log_namespace))
         .collect();
 
     emit!(EventsReceived {

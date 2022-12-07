@@ -17,15 +17,15 @@ use super::proto::{
 
 const SOURCE_NAME: &str = "opentelemetry";
 
-const RESOURCE_KEY: &str = "resources";
-const ATTRIBUTES_KEY: &str = "attributes";
-const TRACE_ID_KEY: &str = "trace_id";
-const SPAN_ID_KEY: &str = "span_id";
-const SEVERITY_TEXT_KEY: &str = "severity_text";
-const SEVERITY_NUMBER_KEY: &str = "severity_number";
-const OBSERVED_TIMESTAMP_KEY: &str = "observed_timestamp";
-const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
-const FLAGS_KEY: &str = "flags";
+pub const RESOURCE_KEY: &str = "resources";
+pub const ATTRIBUTES_KEY: &str = "attributes";
+pub const TRACE_ID_KEY: &str = "trace_id";
+pub const SPAN_ID_KEY: &str = "span_id";
+pub const SEVERITY_TEXT_KEY: &str = "severity_text";
+pub const SEVERITY_NUMBER_KEY: &str = "severity_number";
+pub const OBSERVED_TIMESTAMP_KEY: &str = "observed_timestamp";
+pub const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
+pub const FLAGS_KEY: &str = "flags";
 
 impl ResourceLogs {
     pub fn into_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
@@ -174,6 +174,7 @@ impl ResourceLog {
             self.log_record.dropped_attributes_count,
         );
 
+        // TODO Double check timestamp handling
         // according to proto, if observed_time_unix_nano is missing, collector should set it
         let observed_timestamp = if self.log_record.observed_time_unix_nano > 0 {
             Utc.timestamp_nanos(self.log_record.observed_time_unix_nano as i64)
