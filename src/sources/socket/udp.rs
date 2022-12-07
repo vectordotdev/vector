@@ -12,7 +12,7 @@ use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{LegacyKey, LogNamespace},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -210,7 +210,7 @@ pub(super) fn udp(
                                 let count = events.len();
                                 emit!(SocketEventsReceived {
                                     mode: SocketMode::Udp,
-                                    byte_size: events.size_of(),
+                                    byte_size: events.estimated_json_encoded_size_of(),
                                     count,
                                 });
 

@@ -7,11 +7,17 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::lookup_v2::{OptionalTargetPath, ValuePath};
-use lookup::{owned_value_path, path, OwnedTargetPath, PathPrefix};
-use vector_config::configurable_component;
+use lookup::{
+    lookup_v2::{OptionalTargetPath, ValuePath},
+    owned_value_path, path, OwnedTargetPath,
+};
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace};
 
-use super::path_helpers::{parse_log_file_path, LogFileInfo};
+use super::{
+    path_helpers::{parse_log_file_path, LogFileInfo},
+    Config,
+};
 use crate::event::{Event, LogEvent};
 
 /// Configuration for how the events are annotated with `Pod` metadata.
@@ -95,14 +101,20 @@ impl Default for FieldsSpec {
 pub struct PodMetadataAnnotator {
     pods_state_reader: Store<Pod>,
     fields_spec: FieldsSpec,
+    log_namespace: LogNamespace,
 }
 
 impl PodMetadataAnnotator {
     /// Create a new [`PodMetadataAnnotator`].
-    pub const fn new(pods_state_reader: Store<Pod>, fields_spec: FieldsSpec) -> Self {
+    pub const fn new(
+        pods_state_reader: Store<Pod>,
+        fields_spec: FieldsSpec,
+        log_namespace: LogNamespace,
+    ) -> Self {
         Self {
             pods_state_reader,
             fields_spec,
+            log_namespace,
         }
     }
 }
@@ -118,30 +130,35 @@ impl PodMetadataAnnotator {
         let resource = self.pods_state_reader.get(&obj)?;
         let pod: &Pod = resource.as_ref();
 
-        annotate_from_file_info(log, &self.fields_spec, &file_info);
-        annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
+        annotate_from_file_info(log, &self.fields_spec, &file_info, self.log_namespace);
+        annotate_from_metadata(log, &self.fields_spec, &pod.metadata, self.log_namespace);
 
         let container;
         if let Some(ref pod_spec) = pod.spec {
-            annotate_from_pod_spec(log, &self.fields_spec, pod_spec);
+            annotate_from_pod_spec(log, &self.fields_spec, pod_spec, self.log_namespace);
 
             container = pod_spec
                 .containers
                 .iter()
                 .find(|c| c.name == file_info.container_name);
             if let Some(container) = container {
-                annotate_from_container(log, &self.fields_spec, container);
+                annotate_from_container(log, &self.fields_spec, container, self.log_namespace);
             }
         }
 
         if let Some(ref pod_status) = pod.status {
-            annotate_from_pod_status(log, &self.fields_spec, pod_status);
+            annotate_from_pod_status(log, &self.fields_spec, pod_status, self.log_namespace);
             if let Some(ref container_statuses) = pod_status.container_statuses {
                 let container_status = container_statuses
                     .iter()
                     .find(|c| c.name == file_info.container_name);
                 if let Some(container_status) = container_status {
-                    annotate_from_container_status(log, &self.fields_spec, container_status)
+                    annotate_from_container_status(
+                        log,
+                        &self.fields_spec,
+                        container_status,
+                        self.log_namespace,
+                    )
                 }
             }
         }
@@ -153,85 +170,175 @@ fn annotate_from_file_info(
     log: &mut LogEvent,
     fields_spec: &FieldsSpec,
     file_info: &LogFileInfo<'_>,
+    log_namespace: LogNamespace,
 ) {
-    if let Some(path) = &fields_spec.container_name.path {
-        log.insert(path, file_info.container_name.to_owned());
-    }
+    let legacy_key = fields_spec
+        .container_name
+        .path
+        .as_ref()
+        .map(|k| &k.path)
+        .map(LegacyKey::Overwrite);
+
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        log,
+        legacy_key,
+        path!("container_name"),
+        file_info.container_name.to_owned(),
+    );
 }
 
-fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
-    for (key, val) in [
-        (&fields_spec.pod_name, &metadata.name),
-        (&fields_spec.pod_namespace, &metadata.namespace),
-        (&fields_spec.pod_uid, &metadata.uid),
+fn annotate_from_metadata(
+    log: &mut LogEvent,
+    fields_spec: &FieldsSpec,
+    metadata: &ObjectMeta,
+    log_namespace: LogNamespace,
+) {
+    for (legacy_key, metadata_key, value) in [
+        (&fields_spec.pod_name, path!("pod_name"), &metadata.name),
+        (
+            &fields_spec.pod_namespace,
+            path!("pod_namespace"),
+            &metadata.namespace,
+        ),
+        (&fields_spec.pod_uid, path!("pod_uid"), &metadata.uid),
     ]
     .iter()
     {
-        if let (Some(key), Some(val)) = (&key.path, val) {
-            log.insert(key, val.to_owned());
+        if let Some(value) = value {
+            let legacy_key = legacy_key
+                .path
+                .as_ref()
+                .map(|k| &k.path)
+                .map(LegacyKey::Overwrite);
+
+            log_namespace.insert_source_metadata(
+                Config::NAME,
+                log,
+                legacy_key,
+                *metadata_key,
+                value.to_owned(),
+            );
         }
     }
 
-    if let (Some(key), Some(owner_references)) =
-        (&fields_spec.pod_owner.path, &metadata.owner_references)
-    {
-        log.insert(
-            key,
+    if let Some(owner_references) = &metadata.owner_references {
+        let legacy_key = fields_spec
+            .pod_owner
+            .path
+            .as_ref()
+            .map(|k| &k.path)
+            .map(LegacyKey::Overwrite);
+
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            legacy_key,
+            path!("pod_owner"),
             format!("{}/{}", owner_references[0].kind, owner_references[0].name),
-        );
+        )
     }
 
     if let Some(labels) = &metadata.labels {
-        if let Some(pod_label_prefix) = &fields_spec.pod_labels.path {
-            for (key, val) in labels.iter() {
-                let key_path = path!(key);
-                log.insert(
-                    (PathPrefix::Event, (&pod_label_prefix.path).concat(key_path)),
-                    val.to_owned(),
-                );
-            }
+        let legacy_key_prefix = fields_spec.pod_labels.path.as_ref().map(|k| &k.path);
+
+        for (key, value) in labels.iter() {
+            let key_path = path!(key);
+            let legacy_key = legacy_key_prefix
+                .map(|k| k.concat(key_path))
+                .map(LegacyKey::Overwrite);
+
+            log_namespace.insert_source_metadata(
+                Config::NAME,
+                log,
+                legacy_key,
+                path!("pod_labels", key),
+                value.to_owned(),
+            )
         }
     }
 
     if let Some(annotations) = &metadata.annotations {
-        if let Some(pod_annotations_prefix) = &fields_spec.pod_annotations.path {
-            for (key, val) in annotations.iter() {
-                let key_path = path!(key);
-                log.insert(
-                    (
-                        PathPrefix::Event,
-                        (&pod_annotations_prefix.path).concat(key_path),
-                    ),
-                    val.to_owned(),
-                );
-            }
+        let legacy_key_prefix = fields_spec.pod_annotations.path.as_ref().map(|k| &k.path);
+
+        for (key, value) in annotations.iter() {
+            let key_path = path!(key);
+            let legacy_key = legacy_key_prefix
+                .map(|k| k.concat(key_path))
+                .map(LegacyKey::Overwrite);
+
+            log_namespace.insert_source_metadata(
+                Config::NAME,
+                log,
+                legacy_key,
+                path!("pod_annotations", key),
+                value.to_owned(),
+            )
         }
     }
 }
 
-fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec: &PodSpec) {
-    for (key, val) in [(&fields_spec.pod_node_name, &pod_spec.node_name)].iter() {
-        if let (Some(key), Some(val)) = (&key.path, val) {
-            log.insert(key, val.to_owned());
-        }
+fn annotate_from_pod_spec(
+    log: &mut LogEvent,
+    fields_spec: &FieldsSpec,
+    pod_spec: &PodSpec,
+    log_namespace: LogNamespace,
+) {
+    if let Some(value) = &pod_spec.node_name {
+        let legacy_key = fields_spec
+            .pod_node_name
+            .path
+            .as_ref()
+            .map(|k| &k.path)
+            .map(LegacyKey::Overwrite);
+
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            legacy_key,
+            path!("pod_node_name"),
+            value.to_owned(),
+        )
     }
 }
 
-fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_status: &PodStatus) {
-    for (key, val) in [(&fields_spec.pod_ip, &pod_status.pod_ip)].iter() {
-        if let (Some(key), Some(val)) = (&key.path, val) {
-            log.insert(key, val.to_owned());
-        }
+fn annotate_from_pod_status(
+    log: &mut LogEvent,
+    fields_spec: &FieldsSpec,
+    pod_status: &PodStatus,
+    log_namespace: LogNamespace,
+) {
+    if let Some(value) = &pod_status.pod_ip {
+        let legacy_key = fields_spec
+            .pod_ip
+            .path
+            .as_ref()
+            .map(|k| &k.path)
+            .map(LegacyKey::Overwrite);
+
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            legacy_key,
+            path!("pod_ip"),
+            value.to_owned(),
+        )
     }
 
-    for (key, val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
-        if let (Some(key), Some(val)) = (&key.path, val) {
-            let inner: Vec<String> = val
-                .iter()
-                .filter_map(|v| v.ip.clone())
-                .collect::<Vec<String>>();
-            log.insert(key, inner);
-        }
+    if let Some(value) = &pod_status.pod_ips {
+        let legacy_key = fields_spec
+            .pod_ips
+            .path
+            .as_ref()
+            .map(|k| &k.path)
+            .map(LegacyKey::Overwrite);
+
+        let value = value
+            .iter()
+            .filter_map(|k| k.ip.clone())
+            .collect::<Vec<String>>();
+
+        log_namespace.insert_source_metadata(Config::NAME, log, legacy_key, path!("pod_ips"), value)
     }
 }
 
@@ -239,26 +346,55 @@ fn annotate_from_container_status(
     log: &mut LogEvent,
     fields_spec: &FieldsSpec,
     container_status: &ContainerStatus,
+    log_namespace: LogNamespace,
 ) {
-    for (key, val) in [(&fields_spec.container_id, &container_status.container_id)].iter() {
-        if let (Some(key), Some(val)) = (&key.path, val) {
-            log.insert(key, val.to_owned());
-        }
+    if let Some(value) = &container_status.container_id {
+        let legacy_key = fields_spec
+            .container_id
+            .path
+            .as_ref()
+            .map(|k| &k.path)
+            .map(LegacyKey::Overwrite);
+
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            legacy_key,
+            path!("container_id"),
+            value.to_owned(),
+        )
     }
 }
 
-fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, container: &Container) {
-    for (key, val) in [(&fields_spec.container_image, &container.image)].iter() {
-        if let (Some(key), Some(val)) = (&key.path, val) {
-            log.insert(key, val.to_owned());
-        }
+fn annotate_from_container(
+    log: &mut LogEvent,
+    fields_spec: &FieldsSpec,
+    container: &Container,
+    log_namespace: LogNamespace,
+) {
+    if let Some(value) = &container.image {
+        let legacy_key = fields_spec
+            .container_image
+            .path
+            .as_ref()
+            .map(|k| &k.path)
+            .map(LegacyKey::Overwrite);
+
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            legacy_key,
+            path!("container_image"),
+            value.to_owned(),
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use k8s_openapi::api::core::v1::PodIP;
-    use vector_common::assert_event_data_eq;
+    use lookup::{event_path, metadata_path};
+    use similar_asserts::assert_eq;
 
     use super::*;
 
@@ -269,6 +405,7 @@ mod tests {
                 FieldsSpec::default(),
                 ObjectMeta::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -296,21 +433,91 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_name", "sandbox0-name");
-                    log.insert("kubernetes.pod_namespace", "sandbox0-ns");
-                    log.insert("kubernetes.pod_uid", "sandbox0-uid");
-                    log.insert("kubernetes.pod_labels.\"sandbox0-label0\"", "val0");
-                    log.insert("kubernetes.pod_labels.\"sandbox0-label1\"", "val1");
                     log.insert(
-                        "kubernetes.pod_annotations.\"sandbox0-annotation0\"",
+                        metadata_path!("kubernetes_logs", "pod_name"),
+                        "sandbox0-name",
+                    );
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "pod_namespace"),
+                        "sandbox0-ns",
+                    );
+                    log.insert(metadata_path!("kubernetes_logs", "pod_uid"), "sandbox0-uid");
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "pod_labels", "sandbox0-label0"),
                         "val0",
                     );
                     log.insert(
-                        "kubernetes.pod_annotations.\"sandbox0-annotation1\"",
+                        metadata_path!("kubernetes_logs", "pod_labels", "sandbox0-label1"),
+                        "val1",
+                    );
+                    log.insert(
+                        metadata_path!(
+                            "kubernetes_logs",
+                            "pod_annotations",
+                            "sandbox0-annotation0"
+                        ),
+                        "val0",
+                    );
+                    log.insert(
+                        metadata_path!(
+                            "kubernetes_logs",
+                            "pod_annotations",
+                            "sandbox0-annotation1"
+                        ),
                         "val1",
                     );
                     log
                 },
+                LogNamespace::Vector,
+            ),
+            (
+                FieldsSpec::default(),
+                ObjectMeta {
+                    name: Some("sandbox0-name".to_owned()),
+                    namespace: Some("sandbox0-ns".to_owned()),
+                    uid: Some("sandbox0-uid".to_owned()),
+                    labels: Some(
+                        vec![
+                            ("sandbox0-label0".to_owned(), "val0".to_owned()),
+                            ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
+                    annotations: Some(
+                        vec![
+                            ("sandbox0-annotation0".to_owned(), "val0".to_owned()),
+                            ("sandbox0-annotation1".to_owned(), "val1".to_owned()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
+                    ..ObjectMeta::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(event_path!("kubernetes", "pod_name"), "sandbox0-name");
+                    log.insert(event_path!("kubernetes", "pod_namespace"), "sandbox0-ns");
+                    log.insert(event_path!("kubernetes", "pod_uid"), "sandbox0-uid");
+                    log.insert(
+                        event_path!("kubernetes", "pod_labels", "sandbox0-label0"),
+                        "val0",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_labels", "sandbox0-label1"),
+                        "val1",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_annotations", "sandbox0-annotation0"),
+                        "val0",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_annotations", "sandbox0-annotation1"),
+                        "val1",
+                    );
+                    log
+                },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -346,13 +553,14 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("name", "sandbox0-name");
-                    log.insert("ns", "sandbox0-ns");
-                    log.insert("uid", "sandbox0-uid");
-                    log.insert("labels.\"sandbox0-label0\"", "val0");
-                    log.insert("labels.\"sandbox0-label1\"", "val1");
+                    log.insert(event_path!("name"), "sandbox0-name");
+                    log.insert(event_path!("ns"), "sandbox0-ns");
+                    log.insert(event_path!("uid"), "sandbox0-uid");
+                    log.insert(event_path!("labels", "sandbox0-label0"), "val0");
+                    log.insert(event_path!("labels", "sandbox0-label1"), "val1");
                     log
                 },
+                LogNamespace::Legacy,
             ),
             // Ensure we properly handle labels with `.` as flat fields.
             (
@@ -375,22 +583,84 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_name", "sandbox0-name");
-                    log.insert("kubernetes.pod_namespace", "sandbox0-ns");
-                    log.insert("kubernetes.pod_uid", "sandbox0-uid");
-                    log.insert(r#"kubernetes.pod_labels."nested0.label0""#, "val0");
-                    log.insert(r#"kubernetes.pod_labels."nested0.label1""#, "val1");
-                    log.insert(r#"kubernetes.pod_labels."nested1.label0""#, "val2");
-                    log.insert(r#"kubernetes.pod_labels."nested2.label0.deep0""#, "val3");
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "pod_name"),
+                        "sandbox0-name",
+                    );
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "pod_namespace"),
+                        "sandbox0-ns",
+                    );
+                    log.insert(metadata_path!("kubernetes_logs", "pod_uid"), "sandbox0-uid");
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "pod_labels", "nested0.label0"),
+                        "val0",
+                    );
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "pod_labels", "nested0.label1"),
+                        "val1",
+                    );
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "pod_labels", "nested1.label0"),
+                        "val2",
+                    );
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "pod_labels", "nested2.label0.deep0"),
+                        "val3",
+                    );
                     log
                 },
+                LogNamespace::Vector,
+            ),
+            (
+                FieldsSpec::default(),
+                ObjectMeta {
+                    name: Some("sandbox0-name".to_owned()),
+                    namespace: Some("sandbox0-ns".to_owned()),
+                    uid: Some("sandbox0-uid".to_owned()),
+                    labels: Some(
+                        vec![
+                            ("nested0.label0".to_owned(), "val0".to_owned()),
+                            ("nested0.label1".to_owned(), "val1".to_owned()),
+                            ("nested1.label0".to_owned(), "val2".to_owned()),
+                            ("nested2.label0.deep0".to_owned(), "val3".to_owned()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
+                    ..ObjectMeta::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(event_path!("kubernetes", "pod_name"), "sandbox0-name");
+                    log.insert(event_path!("kubernetes", "pod_namespace"), "sandbox0-ns");
+                    log.insert(event_path!("kubernetes", "pod_uid"), "sandbox0-uid");
+                    log.insert(
+                        event_path!("kubernetes", "pod_labels", "nested0.label0"),
+                        "val0",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_labels", "nested0.label1"),
+                        "val1",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_labels", "nested1.label0"),
+                        "val2",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "pod_labels", "nested2.label0.deep0"),
+                        "val3",
+                    );
+                    log
+                },
+                LogNamespace::Legacy,
             ),
         ];
 
-        for (fields_spec, metadata, expected) in cases.into_iter() {
+        for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_metadata(&mut log, &fields_spec, &metadata);
-            assert_event_data_eq!(log, expected);
+            annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace);
+            assert_eq!(log, expected);
         }
     }
 
@@ -401,9 +671,10 @@ mod tests {
             "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
             {
                 let mut log = LogEvent::default();
-                log.insert("kubernetes.container_name", "sandbox0-container0-name");
+                log.insert(event_path!("kubernetes", "container_name"), "sandbox0-container0-name");
                 log
             },
+            LogNamespace::Legacy,
         ),(
             FieldsSpec{
                 container_name: OwnedTargetPath::event(owned_value_path!("container_name")).into(),
@@ -412,16 +683,17 @@ mod tests {
             "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
             {
                 let mut log = LogEvent::default();
-                log.insert("container_name", "sandbox0-container0-name");
+                log.insert(event_path!("container_name"), "sandbox0-container0-name");
                 log
             },
+            LogNamespace::Legacy,
         )];
 
-        for (fields_spec, file, expected) in cases.into_iter() {
+        for (fields_spec, file, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
             let file_info = parse_log_file_path(file).unwrap();
-            annotate_from_file_info(&mut log, &fields_spec, &file_info);
-            assert_event_data_eq!(log, expected);
+            annotate_from_file_info(&mut log, &fields_spec, &file_info, log_namespace);
+            assert_eq!(log, expected);
         }
     }
 
@@ -432,6 +704,7 @@ mod tests {
                 FieldsSpec::default(),
                 PodSpec::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -441,9 +714,13 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_node_name", "sandbox0-node-name");
+                    log.insert(
+                        event_path!("kubernetes", "pod_node_name"),
+                        "sandbox0-node-name",
+                    );
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -456,16 +733,17 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("node_name", "sandbox0-node-name");
+                    log.insert(event_path!("node_name"), "sandbox0-node-name");
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
 
-        for (fields_spec, pod_spec, expected) in cases.into_iter() {
+        for (fields_spec, pod_spec, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_pod_spec(&mut log, &fields_spec, &pod_spec);
-            assert_event_data_eq!(log, expected);
+            annotate_from_pod_spec(&mut log, &fields_spec, &pod_spec, log_namespace);
+            assert_eq!(log, expected);
         }
     }
 
@@ -476,6 +754,7 @@ mod tests {
                 FieldsSpec::default(),
                 PodStatus::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -485,9 +764,10 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_ip", "192.168.1.2");
+                    log.insert(event_path!("kubernetes", "pod_ip"), "192.168.1.2");
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -500,9 +780,10 @@ mod tests {
                 {
                     let mut log = LogEvent::default();
                     let ips_vec = vec!["192.168.1.2"];
-                    log.insert("kubernetes.pod_ips", ips_vec);
+                    log.insert(event_path!("kubernetes", "pod_ips"), ips_vec);
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -532,11 +813,12 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.custom_pod_ip", "192.168.1.2");
+                    log.insert(event_path!("kubernetes", "custom_pod_ip"), "192.168.1.2");
                     let ips_vec = vec!["192.168.1.2", "192.168.1.3"];
-                    log.insert("kubernetes.custom_pod_ips", ips_vec);
+                    log.insert(event_path!("kubernetes", "custom_pod_ips"), ips_vec);
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -557,18 +839,19 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_ip", "192.168.1.2");
+                    log.insert(event_path!("kubernetes", "pod_ip"), "192.168.1.2");
                     let ips_vec = vec!["192.168.1.2", "192.168.1.3"];
-                    log.insert("kubernetes.pod_ips", ips_vec);
+                    log.insert(event_path!("kubernetes", "pod_ips"), ips_vec);
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
 
-        for (fields_spec, pod_status, expected) in cases.into_iter() {
+        for (fields_spec, pod_status, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_pod_status(&mut log, &fields_spec, &pod_status);
-            assert_event_data_eq!(log, expected);
+            annotate_from_pod_status(&mut log, &fields_spec, &pod_status, log_namespace);
+            assert_eq!(log, expected);
         }
     }
 
@@ -579,6 +862,7 @@ mod tests {
                 FieldsSpec::default(),
                 ContainerStatus::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -590,15 +874,24 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.container_id", "container_id_foo");
+                    log.insert(
+                        event_path!("kubernetes", "container_id"),
+                        "container_id_foo",
+                    );
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
-        for (fields_spec, container_status, expected) in cases.into_iter() {
+        for (fields_spec, container_status, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_container_status(&mut log, &fields_spec, &container_status);
-            assert_event_data_eq!(log, expected);
+            annotate_from_container_status(
+                &mut log,
+                &fields_spec,
+                &container_status,
+                log_namespace,
+            );
+            assert_eq!(log, expected);
         }
     }
 
@@ -609,6 +902,7 @@ mod tests {
                 FieldsSpec::default(),
                 Container::default(),
                 LogEvent::default(),
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec::default(),
@@ -618,9 +912,13 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.container_image", "sandbox0-container-image");
+                    log.insert(
+                        event_path!("kubernetes", "container_image"),
+                        "sandbox0-container-image",
+                    );
                     log
                 },
+                LogNamespace::Legacy,
             ),
             (
                 FieldsSpec {
@@ -634,16 +932,17 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("container_image", "sandbox0-container-image");
+                    log.insert(event_path!("container_image"), "sandbox0-container-image");
                     log
                 },
+                LogNamespace::Legacy,
             ),
         ];
 
-        for (fields_spec, container, expected) in cases.into_iter() {
+        for (fields_spec, container, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();
-            annotate_from_container(&mut log, &fields_spec, &container);
-            assert_event_data_eq!(log, expected);
+            annotate_from_container(&mut log, &fields_spec, &container, log_namespace);
+            assert_eq!(log, expected);
         }
     }
 }
