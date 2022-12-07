@@ -176,9 +176,21 @@ impl SourceConfig for SplunkConfig {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = match log_namespace {
-            LogNamespace::Legacy => vector_core::schema::Definition::empty_legacy_namespace(),
+            LogNamespace::Legacy => vector_core::schema::Definition::empty_legacy_namespace()
+                .with_event_field(
+                    &owned_value_path!(log_schema().message_key()),
+                    Kind::bytes().or_undefined(),
+                    Some("message"),
+                )
+                .with_event_field(
+                    &owned_value_path!("line"),
+                    Kind::object(Collection::empty())
+                        .or_array(Collection::empty())
+                        .or_undefined(),
+                    None,
+                ),
             LogNamespace::Vector => vector_core::schema::Definition::new_with_default_metadata(
-                Kind::object(Collection::empty()),
+                Kind::bytes().or_object(Collection::empty()),
                 [log_namespace],
             ),
         }
@@ -190,7 +202,7 @@ impl SourceConfig for SplunkConfig {
             ))),
             &owned_value_path!("host"),
             Kind::bytes(),
-            None,
+            Some("host"),
         )
         .with_source_metadata(
             SplunkConfig::NAME,
@@ -219,18 +231,6 @@ impl SourceConfig for SplunkConfig {
             Some(LegacyKey::Overwrite(owned_value_path!(SOURCETYPE))),
             &owned_value_path!("sourcetype"),
             Kind::bytes(),
-            None,
-        )
-        .with_event_field(
-            &owned_value_path!(log_schema().message_key()),
-            Kind::bytes().or_undefined(),
-            Some("message"),
-        )
-        .with_event_field(
-            &owned_value_path!("line"),
-            Kind::object(Collection::empty())
-                .or_array(Collection::empty())
-                .or_undefined(),
             None,
         );
 
@@ -403,6 +403,7 @@ impl SplunkSource {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
+        let log_namespace = self.log_namespace;
 
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
@@ -441,7 +442,8 @@ impl SplunkSource {
                             ),
                             _ => None,
                         };
-                        let mut event = raw_event(body, gzip, channel_id, remote, xff, batch)?;
+                        let mut event =
+                            raw_event(body, gzip, channel_id, remote, xff, batch, log_namespace)?;
                         if let Some(token) = token.filter(|_| store_hec_token) {
                             event.metadata_mut().set_splunk_hec_token(token.into());
                         }
@@ -634,7 +636,10 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
     fn build_event(&mut self, mut json: JsonValue) -> Result<Event, Rejection> {
         // Construct Event from parsed json event
-        let mut log = LogEvent::default();
+        let mut log = match self.log_namespace {
+            LogNamespace::Vector => self.build_log_vector(&mut json)?,
+            LogNamespace::Legacy => self.build_log_legacy(&mut json)?,
+        };
 
         // Add source type
         self.log_namespace.insert_vector_metadata(
@@ -644,17 +649,127 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             SplunkConfig::NAME,
         );
 
-        if self.log_namespace == LogNamespace::Vector {
-            // The timestamp is extracted from the message for the Legacy namespace.
-            self.log_namespace.insert_vector_metadata(
+        // Process channel field
+        if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
+            self.log_namespace.insert_source_metadata(
+                SplunkConfig::NAME,
                 &mut log,
-                lookup::path!(log_schema().timestamp_key()),
-                lookup::path!("ingest_timestamp"),
-                chrono::Utc::now(),
+                Some(LegacyKey::Overwrite(CHANNEL)),
+                CHANNEL,
+                guid,
+            );
+        } else if let Some(guid) = self.channel.as_ref() {
+            self.log_namespace.insert_source_metadata(
+                SplunkConfig::NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(CHANNEL)),
+                CHANNEL,
+                guid.clone(),
             );
         }
 
-        // Process event field
+        // Process fields field
+        if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
+            for (key, value) in object {
+                self.log_namespace.insert_source_metadata(
+                    SplunkConfig::NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(key.as_str())),
+                    key.as_str(),
+                    value,
+                );
+            }
+        }
+
+        // Process time field
+        let parsed_time = match json.get_mut("time").map(JsonValue::take) {
+            Some(JsonValue::Number(time)) => Some(Some(time)),
+            Some(JsonValue::String(time)) => Some(time.parse::<serde_json::Number>().ok()),
+            _ => None,
+        };
+
+        match parsed_time {
+            None => (),
+            Some(Some(t)) => {
+                if let Some(t) = t.as_u64() {
+                    let time = parse_timestamp(t as i64)
+                        .ok_or(ApiError::InvalidDataFormat { event: self.events })?;
+
+                    self.time = Time::Provided(time);
+                } else if let Some(t) = t.as_f64() {
+                    self.time = Time::Provided(Utc.timestamp(
+                        t.floor() as i64,
+                        (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
+                    ));
+                } else {
+                    return Err(ApiError::InvalidDataFormat { event: self.events }.into());
+                }
+            }
+            Some(None) => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
+        }
+
+        // Add time field
+        let timestamp = match self.time.clone() {
+            Time::Provided(time) => time,
+            Time::Now(time) => time,
+        };
+
+        self.log_namespace.insert_source_metadata(
+            SplunkConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(log_schema().timestamp_key())),
+            "timestamp",
+            timestamp,
+        );
+
+        // Extract default extracted fields
+        for de in self.extractors.iter_mut() {
+            de.extract(&mut log, &mut json);
+        }
+
+        // Add passthrough token if present
+        if let Some(token) = &self.token {
+            log.metadata_mut().set_splunk_hec_token(Arc::clone(token));
+        }
+
+        if let Some(batch) = self.batch.clone() {
+            log = log.with_batch_notifier(&batch);
+        }
+
+        self.events += 1;
+
+        Ok(log.into())
+    }
+
+    /// Build the log event for the vector namespace.
+    /// In this namespace the log event is created entirely from the event field.
+    /// No renaming of the `line` field is done.
+    fn build_log_vector(&mut self, json: &mut JsonValue) -> Result<LogEvent, Rejection> {
+        match json.get("event") {
+            Some(event) => {
+                let event: Value = event.into();
+                let mut log = LogEvent::from(event);
+
+                // The timestamp is extracted from the message for the Legacy namespace.
+                self.log_namespace.insert_vector_metadata(
+                    &mut log,
+                    lookup::path!(log_schema().timestamp_key()),
+                    lookup::path!("ingest_timestamp"),
+                    chrono::Utc::now(),
+                );
+
+                Ok(log)
+            }
+            None => Err(ApiError::MissingEventField { event: self.events }.into()),
+        }
+    }
+
+    /// Build the log event for the legacy namespace.
+    /// If the event is a string, or the event contains a field called `line` that is a string
+    /// (the docker splunk logger places the message in the event.line field) that string
+    /// is placed in the message field.
+    fn build_log_legacy(&mut self, json: &mut JsonValue) -> Result<LogEvent, Rejection> {
+        let mut log = LogEvent::default();
         match json.get_mut("event") {
             Some(event) => match event.take() {
                 JsonValue::String(string) => {
@@ -688,83 +803,8 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
             },
             None => return Err(ApiError::MissingEventField { event: self.events }.into()),
-        }
-
-        // Process channel field
-        if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
-            self.log_namespace.insert_source_metadata(
-                SplunkConfig::NAME,
-                &mut log,
-                Some(LegacyKey::InsertIfEmpty(CHANNEL)),
-                CHANNEL,
-                guid,
-            );
-        } else if let Some(guid) = self.channel.as_ref() {
-            self.log_namespace.insert_source_metadata(
-                SplunkConfig::NAME,
-                &mut log,
-                Some(LegacyKey::InsertIfEmpty(CHANNEL)),
-                CHANNEL,
-                guid.clone(),
-            );
-        }
-
-        // Process fields field
-        if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
-            for (key, value) in object {
-                log.insert(key.as_str(), value);
-            }
-        }
-
-        // Process time field
-        let parsed_time = match json.get_mut("time").map(JsonValue::take) {
-            Some(JsonValue::Number(time)) => Some(Some(time)),
-            Some(JsonValue::String(time)) => Some(time.parse::<serde_json::Number>().ok()),
-            _ => None,
         };
-        match parsed_time {
-            None => (),
-            Some(Some(t)) => {
-                if let Some(t) = t.as_u64() {
-                    let time = parse_timestamp(t as i64)
-                        .ok_or(ApiError::InvalidDataFormat { event: self.events })?;
-
-                    self.time = Time::Provided(time);
-                } else if let Some(t) = t.as_f64() {
-                    self.time = Time::Provided(Utc.timestamp(
-                        t.floor() as i64,
-                        (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
-                    ));
-                } else {
-                    return Err(ApiError::InvalidDataFormat { event: self.events }.into());
-                }
-            }
-            Some(None) => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
-        }
-
-        // Add time field
-        match self.time.clone() {
-            Time::Provided(time) => log.insert(log_schema().timestamp_key(), time),
-            Time::Now(time) => log.insert(log_schema().timestamp_key(), time),
-        };
-
-        // Extract default extracted fields
-        for de in self.extractors.iter_mut() {
-            de.extract(&mut log, &mut json);
-        }
-
-        // Add passthrough token if present
-        if let Some(token) = &self.token {
-            log.metadata_mut().set_splunk_hec_token(Arc::clone(token));
-        }
-
-        if let Some(batch) = self.batch.clone() {
-            log = log.with_batch_notifier(&batch);
-        }
-
-        self.events += 1;
-
-        Ok(log.into())
+        Ok(log)
     }
 }
 
@@ -893,6 +933,7 @@ fn raw_event(
     remote: Option<SocketAddr>,
     xff: Option<String>,
     batch: Option<BatchNotifier>,
+    log_namespace: LogNamespace,
 ) -> Result<Event, Rejection> {
     // Process gzip
     let message: Value = if gzip {
@@ -910,28 +951,49 @@ fn raw_event(
     };
 
     // Construct event
-    let mut log = LogEvent::default();
+    let mut log = match log_namespace {
+        LogNamespace::Vector => LogEvent::from(message),
+        LogNamespace::Legacy => {
+            let mut log = LogEvent::default();
 
-    // Add message
-    log.insert(log_schema().message_key(), message);
+            // Add message
+            log.insert(log_schema().message_key(), message);
+            log
+        }
+    };
 
     // Add channel
-    log.insert(CHANNEL, channel);
+    log_namespace.insert_source_metadata(
+        SplunkConfig::NAME,
+        &mut log,
+        Some(LegacyKey::Overwrite(CHANNEL)),
+        CHANNEL,
+        channel,
+    );
 
     // host-field priority for raw endpoint:
     // - x-forwarded-for is set to `host` field first, if present. If not present:
     // - set remote addr to host field
-    if let Some(remote_address) = xff {
-        log.insert(log_schema().host_key(), remote_address);
+    let host = if let Some(remote_address) = xff {
+        Some(remote_address)
     } else if let Some(remote) = remote {
-        log.insert(log_schema().host_key(), remote.to_string());
+        Some(remote.to_string())
+    } else {
+        None
+    };
+
+    if let Some(host) = host {
+        log_namespace.insert_source_metadata(
+            SplunkConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(log_schema().host_key())),
+            "host",
+            host,
+        );
     }
 
-    // Add timestamp
-    log.insert(log_schema().timestamp_key(), Utc::now());
+    log_namespace.insert_standard_vector_source_metadata(&mut log, SplunkConfig::NAME, Utc::now());
 
-    // Add source type
-    log.try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
     if let Some(batch) = batch {
         log = log.with_batch_notifier(&batch);
     }
@@ -2285,20 +2347,8 @@ mod tests {
             .unwrap();
 
         let expected_definition = Definition::new_with_default_metadata(
-            Kind::object(Collection::empty()),
+            Kind::object(Collection::empty()).or_bytes(),
             [LogNamespace::Vector],
-        )
-        .with_event_field(
-            &owned_value_path!("line"),
-            Kind::array(Collection::empty())
-                .or_object(Collection::empty())
-                .or_undefined(),
-            None,
-        )
-        .with_event_field(
-            &owned_value_path!("message"),
-            Kind::bytes().or_undefined(),
-            Some("message"),
         )
         .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
         .with_metadata_field(
@@ -2329,7 +2379,7 @@ mod tests {
             Kind::object(Collection::empty()),
             [LogNamespace::Legacy],
         )
-        .with_event_field(&owned_value_path!("host"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
         .with_event_field(
             &owned_value_path!("message"),
             Kind::bytes().or_undefined(),
