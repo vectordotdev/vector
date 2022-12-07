@@ -310,8 +310,6 @@ data_dir = "/var/lib/vector"
 [api]
 enabled = false
 # address = "127.0.0.1:8686"
-
-'''
 ```
 
 {{< /tab >}}
@@ -343,7 +341,6 @@ source = '''
 inputs = ["apache_parser"]
 type   = "sample"
 rate   = 2                    # only keep 50% (1/`rate`)
-. = parse_apache_log(.message)
 ```
 
 {{< /tab >}}
