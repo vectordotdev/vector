@@ -64,13 +64,13 @@ base: components: sinks: datadog_logs: configuration: {
 			gzip: """
 				[Gzip][gzip] compression.
 
-				[gzip]: https://en.wikipedia.org/wiki/Gzip
+				[gzip]: https://www.gzip.org/
 				"""
 			none: "No compression."
 			zlib: """
 				[Zlib]][zlib] compression.
 
-				[zlib]: https://en.wikipedia.org/wiki/Zlib
+				[zlib]: https://zlib.net/
 				"""
 		}
 	}
