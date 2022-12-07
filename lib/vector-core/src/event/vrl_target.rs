@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::lookup_v2::OwnedSegment;
@@ -7,6 +8,7 @@ use vrl_lib::{prelude::VrlValueConvert, ProgramInfo, SecretTarget};
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
 use crate::config::log_schema;
+use crate::event::metric::TagValue;
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
@@ -26,7 +28,11 @@ pub enum VrlTarget {
     // `LogEvent` is essentially just a destructured `event::LogEvent`, but without the semantics
     // that `fields` must always be a `Map` variant.
     LogEvent(Value, EventMetadata),
-    Metric { metric: Metric, value: Value },
+    Metric {
+        metric: Metric,
+        value: Value,
+        multi_value_tags: bool,
+    },
     Trace(Value, EventMetadata),
 }
 
@@ -81,7 +87,7 @@ impl Iterator for TargetIter<TraceEvent> {
 }
 
 impl VrlTarget {
-    pub fn new(event: Event, info: &ProgramInfo) -> Self {
+    pub fn new(event: Event, info: &ProgramInfo, multi_value_metric_tags: bool) -> Self {
         match event {
             Event::Log(event) => {
                 let (value, metadata) = event.into_parts();
@@ -93,7 +99,11 @@ impl VrlTarget {
                 // values, even if the field is accessed more than once.
                 let value = precompute_metric_value(&metric, info);
 
-                VrlTarget::Metric { metric, value }
+                VrlTarget::Metric {
+                    metric,
+                    value,
+                    multi_value_tags: multi_value_metric_tags,
+                }
             }
             Event::Trace(event) => {
                 let (fields, metadata) = event.into_parts();
@@ -162,6 +172,32 @@ impl VrlTarget {
     }
 }
 
+fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi_value_tags: bool) {
+    if multi_value_tags {
+        let tag_values = value
+            .as_array()
+            .unwrap_or(&[])
+            .iter()
+            .filter_map(|value| match value {
+                Value::Bytes(bytes) => {
+                    Some(TagValue::Value(String::from_utf8_lossy(bytes).to_string()))
+                }
+                Value::Null => Some(TagValue::Bare),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        metric.set_multi_value_tag(name, tag_values);
+    } else {
+        // set a single tag value
+        if let Ok(tag_value) = value.try_bytes_utf8_lossy().map(Cow::into_owned) {
+            metric.replace_tag(name, tag_value);
+        } else if value.is_null() {
+            metric.set_multi_value_tag(name, vec![TagValue::Bare]);
+        }
+    }
+}
+
 impl vrl_lib::Target for VrlTarget {
     fn target_insert(
         &mut self,
@@ -178,6 +214,7 @@ impl vrl_lib::Target for VrlTarget {
                 VrlTarget::Metric {
                     ref mut metric,
                     value: metric_value,
+                    multi_value_tags,
                 } => {
                     if path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -193,20 +230,20 @@ impl vrl_lib::Target for VrlTarget {
 
                                 metric.remove_tags();
                                 for (field, value) in &value {
-                                    metric.replace_tag(
+                                    set_metric_tag_values(
                                         field.as_str().to_owned(),
-                                        value
-                                            .try_bytes_utf8_lossy()
-                                            .map_err(|e| e.to_string())?
-                                            .into_owned(),
+                                        value,
+                                        metric,
+                                        *multi_value_tags,
                                     );
                                 }
                             }
                             ["tags", field] => {
-                                let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
-                                metric.replace_tag(
+                                set_metric_tag_values(
                                     (*field).to_owned(),
-                                    String::from_utf8_lossy(&value).into_owned(),
+                                    &value,
+                                    metric,
+                                    *multi_value_tags,
                                 );
                             }
                             ["name"] => {
@@ -298,6 +335,7 @@ impl vrl_lib::Target for VrlTarget {
                 VrlTarget::Metric {
                     ref mut metric,
                     value,
+                    multi_value_tags: _,
                 } => {
                     if target_path.path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -604,7 +642,7 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info);
+            let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info, false);
             let path = OwnedTargetPath::event(path);
 
             assert_eq!(
@@ -710,7 +748,7 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
+            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
             let expect = LogEvent::from(expect);
             let value: ::value::Value = value;
             let path = OwnedTargetPath::event(path);
@@ -809,7 +847,7 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
+            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
             let path = OwnedTargetPath::event(path);
             let removed = vrl_lib::Target::target_get(&target, &path)
                 .unwrap()
@@ -872,6 +910,7 @@ mod test {
             let mut target = VrlTarget::new(
                 Event::Log(LogEvent::new_with_metadata(metadata.clone())),
                 &info,
+                false,
             );
 
             ::vrl_lib::Target::target_insert(&mut target, &OwnedTargetPath::event_root(), value)
@@ -915,7 +954,7 @@ mod test {
             ],
             target_assignments: vec![],
         };
-        let target = VrlTarget::new(Event::Metric(metric), &info);
+        let target = VrlTarget::new(Event::Metric(metric), &info, false);
 
         assert_eq!(
             Ok(Some(
@@ -988,7 +1027,7 @@ mod test {
             ],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
 
         for (path, current, new, delete) in cases {
             let path = OwnedTargetPath::event(path);
@@ -1028,14 +1067,18 @@ mod test {
             target_queries: vec![],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
         let _result = target.target_insert(
             &OwnedTargetPath::event(owned_value_path!("tags")),
             Value::Object(BTreeMap::from([("a".into(), "b".into())])),
         );
 
         match target {
-            VrlTarget::Metric { metric, value: _ } => {
+            VrlTarget::Metric {
+                metric,
+                value: _,
+                multi_value_tags: _,
+            } => {
                 assert!(metric.tags().is_some());
                 assert_eq!(metric.tags().unwrap(), &crate::metric_tags!("a" => "b"));
             }
@@ -1068,7 +1111,7 @@ mod test {
             target_queries: vec![],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
 
         assert_eq!(
             Err(format!(
@@ -1106,5 +1149,51 @@ mod test {
                 "tags", "foo", "flork"
             )))
         );
+    }
+
+    #[test]
+    fn test_metric_insert_get_multi_value_tag() {
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.23 },
+        );
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, true);
+
+        let value = Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()]);
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "foo")),
+                value,
+            )
+            .unwrap();
+
+        let vrl_tags_value = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            vrl_tags_value,
+            &Value::Object(BTreeMap::from([(
+                "foo".into(),
+                Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()])
+            )]))
+        );
+
+        let metric = match target {
+            VrlTarget::Metric { metric, .. } => metric,
+            _ => unreachable!(),
+        };
+
+        // get single value (should be the last one)
+        assert_eq!(metric.tag_value("foo"), Some("b".into()));
     }
 }
