@@ -187,7 +187,7 @@ pub struct HostMetrics {
 
 impl HostMetrics {
     #[cfg(not(target_os = "linux"))]
-    pub const fn new(config: HostMetricsConfig) -> Self {
+    pub fn new(config: HostMetricsConfig) -> Self {
         Self {
             config,
             events_received: register!(EventsReceived),
