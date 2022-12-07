@@ -115,7 +115,7 @@ where
             })
             .into_driver(self.service);
 
-        sink.run().await
+        sink.run(None).await
     }
 }
 

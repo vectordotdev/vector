@@ -22,6 +22,7 @@ pub struct GcsSink<Svc, RB> {
     request_builder: RB,
     partitioner: KeyPartitioner,
     batcher_settings: BatcherSettings,
+    protocol: &'static str,
 }
 
 impl<Svc, RB> GcsSink<Svc, RB> {
@@ -30,12 +31,14 @@ impl<Svc, RB> GcsSink<Svc, RB> {
         request_builder: RB,
         partitioner: KeyPartitioner,
         batcher_settings: BatcherSettings,
+        protocol: &'static str,
     ) -> Self {
         Self {
             service,
             request_builder,
             partitioner,
             batcher_settings,
+            protocol,
         }
     }
 }
@@ -76,7 +79,7 @@ where
             })
             .into_driver(self.service);
 
-        sink.run().await
+        sink.run(Some(self.protocol.into())).await
     }
 }
 

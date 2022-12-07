@@ -90,7 +90,7 @@ impl KafkaSink {
                 // `Error` and `DroppedEvent` internal events appropriately so no need to here.
                 future::ready(request_builder.build_request(event)))
             .into_driver(service);
-        sink.run().await
+        sink.run(None).await
     }
 }
 

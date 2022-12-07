@@ -60,7 +60,7 @@ impl SqsSink {
             })
             .into_driver(service);
 
-        sink.run().await
+        sink.run(None).await
     }
 }
 

@@ -147,7 +147,7 @@ impl AmqpSink {
             })
             .into_driver(service);
 
-        sink.run().await
+        sink.run(Some("amqp_0_9_1".into())).await
     }
 }
 

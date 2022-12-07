@@ -17,6 +17,7 @@ use super::{
 use crate::{
     codecs::Transformer,
     event::Event,
+    http::get_http_scheme_from_uri,
     internal_events::SinkRequestBuildError,
     sinks::util::{
         builder::SinkBuilderExt, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
@@ -173,7 +174,8 @@ where
             )
             .into_driver(self.service);
 
-        sink.run().await
+        let protocol = get_http_scheme_from_uri(&self.credentials.get_uri());
+        sink.run(Some(protocol.into())).await
     }
 }
 

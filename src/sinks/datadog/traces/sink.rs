@@ -73,6 +73,7 @@ pub struct TracesSink<S> {
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
     shutdown: Sender<Sender<()>>,
+    protocol: String,
 }
 
 impl<S> TracesSink<S>
@@ -87,12 +88,14 @@ where
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
         shutdown: Sender<Sender<()>>,
+        protocol: String,
     ) -> Self {
         TracesSink {
             service,
             request_builder,
             batch_settings,
             shutdown,
+            protocol,
         }
     }
 
@@ -117,7 +120,7 @@ where
             })
             .into_driver(self.service);
 
-        sink.run().await?;
+        sink.run(Some(self.protocol.into())).await?;
 
         // Create a channel for the stats flushing thread to communicate back that it has flushed
         // remaining stats. This is necessary so that we do not terminate the process while the

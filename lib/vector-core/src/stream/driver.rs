@@ -6,7 +6,7 @@ use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::{
     register, ByteSize, BytesSent, CallError, CountByteSize, EventsSent, InternalEventHandle as _,
-    Output, PollReadyError, Registered,
+    Output, PollReadyError, Registered, SharedString,
 };
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 
@@ -20,12 +20,10 @@ pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> CountByteSize;
 
-    /// Return a tuple containing the number of bytes that were sent in the
-    /// request that returned this response together with the protocol the
-    /// bytes were sent over.
+    /// Return the number of bytes that were sent in the request that returned this response.
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
+    fn bytes_sent(&self) -> Option<usize> {
         None
     }
 }
@@ -67,14 +65,22 @@ where
     ///
     /// All in-flight calls to the provided `service` will also be completed before `run` returns.
     ///
+    /// # Parameters
+    ///
+    /// - `protocol` is the name of the protocol to use in the `BytesSent` event. If this is `None`,
+    /// no `BytesSent` event will be emitted, and the `bytes_sent` value from the response will not
+    /// be used.
+    ///
     /// # Errors
     ///
     /// The return type is mostly to simplify caller code.
     /// An error is currently only returned if a service returns an error from `poll_ready`
-    pub async fn run(self) -> Result<(), ()> {
+    pub async fn run(self, protocol: Option<SharedString>) -> Result<(), ()> {
         let mut in_flight = FuturesUnorderedCount::new();
         let mut next_batch: Option<VecDeque<St::Item>> = None;
         let mut seq_num = 0usize;
+
+        let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
 
         let Self { input, mut service } = self;
 
@@ -147,6 +153,7 @@ where
                             request_id,
                         );
                         let finalizers = req.take_finalizers();
+                        let bytes_sent = bytes_sent.clone();
                         let events_sent = events_sent.clone();
 
                         let metadata = req.get_metadata();
@@ -158,6 +165,7 @@ where
                                 request_id,
                                 finalizers,
                                 &metadata,
+                                &bytes_sent,
                                 &events_sent,
                             ))
                             .instrument(info_span!("request", request_id).or_current());
@@ -183,6 +191,7 @@ where
         request_id: usize,
         finalizers: EventFinalizers,
         metadata: &RequestMetadata,
+        bytes_sent: &Option<Registered<BytesSent>>,
         events_sent: &Registered<EventsSent>,
     ) {
         match result {
@@ -194,10 +203,10 @@ where
                 trace!(message = "Service call succeeded.", request_id);
                 finalizers.update_status(response.event_status());
                 if response.event_status() == EventStatus::Delivered {
-                    if let Some((byte_size, protocol)) = response.bytes_sent() {
-                        let protocol = protocol.to_string().into();
-                        let bytes_sent = register(BytesSent { protocol });
-                        bytes_sent.emit(ByteSize(byte_size));
+                    if let Some(bytes_sent) = bytes_sent {
+                        if let Some(byte_size) = response.bytes_sent() {
+                            bytes_sent.emit(ByteSize(byte_size));
+                        }
                     }
                     events_sent.emit(response.events_sent());
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
@@ -412,7 +421,7 @@ mod tests {
         let driver = Driver::new(input_stream, service);
 
         // Now actually run the driver, consuming all of the input.
-        assert_eq!(driver.run().await, Ok(()));
+        assert_eq!(driver.run(None).await, Ok(()));
         // Make sure the final finalizer task runs.
         tokio::task::yield_now().await;
         assert_eq!(input_total, counter.load(Ordering::SeqCst));

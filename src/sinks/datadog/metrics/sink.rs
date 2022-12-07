@@ -58,6 +58,7 @@ pub(crate) struct DatadogMetricsSink<S> {
     service: S,
     request_builder: DatadogMetricsRequestBuilder,
     batch_settings: BatcherSettings,
+    protocol: String,
 }
 
 impl<S> DatadogMetricsSink<S>
@@ -72,11 +73,13 @@ where
         service: S,
         request_builder: DatadogMetricsRequestBuilder,
         batch_settings: BatcherSettings,
+        protocol: String,
     ) -> Self {
         DatadogMetricsSink {
             service,
             request_builder,
             batch_settings,
+            protocol,
         }
     }
 
@@ -135,7 +138,7 @@ where
             // finalization of the events, and logging/metrics, as the requests are responded to.
             .into_driver(self.service);
 
-        sink.run().await
+        sink.run(Some(self.protocol.into())).await
     }
 }
 
