@@ -17,6 +17,10 @@ name = "vector"
 test = false
 bench = false
 
+[[test]]
+name = "integration"
+path = "tests/integration/lib.rs"
+
 [[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"

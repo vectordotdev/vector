@@ -1,5 +1,3 @@
-#![cfg(feature = "shutdown-tests")]
-
 use std::{
     fs::read_dir,
     io::Write,
@@ -19,8 +17,7 @@ use serde_json::{json, Value};
 use similar_asserts::assert_eq;
 use vector::test_util::{next_addr, temp_file};
 
-mod support;
-use crate::support::{create_directory, create_file, overwrite_file};
+use crate::{create_directory, create_file, overwrite_file};
 
 const STARTUP_TIME: Duration = Duration::from_secs(2);
 const SHUTDOWN_TIME: Duration = Duration::from_secs(4);
