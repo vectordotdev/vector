@@ -8,6 +8,13 @@ components: sources: nats: {
 		collect: {
 			checkpoint: enabled: false
 			from: components._nats.features.collect.from
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+				enabled_by_scheme:      true
+			}
 		}
 		multiline: enabled: false
 		codecs: {

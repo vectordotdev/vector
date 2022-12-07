@@ -11,7 +11,7 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
@@ -234,7 +234,7 @@ impl HostMetrics {
         let metrics = buffer.metrics;
         emit!(EventsReceived {
             count: metrics.len(),
-            byte_size: metrics.size_of(),
+            byte_size: metrics.estimated_json_encoded_size_of(),
         });
         metrics
     }
@@ -318,9 +318,9 @@ impl MetricsBuffer {
     }
 
     fn tags(&self, mut tags: MetricTags) -> MetricTags {
-        tags.insert("collector".into(), self.name.into());
+        tags.replace("collector".into(), self.name.to_string());
         if let Some(host) = &self.host {
-            tags.insert("host".into(), host.clone());
+            tags.replace("host".into(), host.clone());
         }
         tags
     }

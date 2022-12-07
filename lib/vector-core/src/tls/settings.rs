@@ -45,6 +45,7 @@ pub struct TlsEnableableConfig {
     /// When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
     /// more information.
     pub enabled: Option<bool>,
+
     #[serde(flatten)]
     pub options: TlsConfig,
 }
@@ -71,11 +72,12 @@ impl TlsEnableableConfig {
 pub struct TlsSourceConfig {
     /// Event field for client certificate metadata.
     pub client_metadata_key: Option<String>,
+
     #[serde(flatten)]
     pub tls_config: TlsEnableableConfig,
 }
 
-/// Standard TLS options.
+/// TLS configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -110,7 +112,7 @@ pub struct TlsConfig {
 
     /// Absolute path to an additional CA certificate file.
     ///
-    /// The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+    /// The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
     #[serde(alias = "ca_path")]
     pub ca_file: Option<PathBuf>,
 
