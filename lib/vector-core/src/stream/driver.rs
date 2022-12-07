@@ -5,8 +5,8 @@ use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::{
-    register, BytesSent, CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
-    PollReadyError, Registered,
+    register, ByteSize, BytesSent, CallError, CountByteSize, EventsSent, InternalEventHandle as _,
+    Output, PollReadyError, Registered,
 };
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 
@@ -195,10 +195,9 @@ where
                 finalizers.update_status(response.event_status());
                 if response.event_status() == EventStatus::Delivered {
                     if let Some((byte_size, protocol)) = response.bytes_sent() {
-                        emit(BytesSent {
-                            byte_size,
-                            protocol: protocol.to_string().into(),
-                        });
+                        let protocol = protocol.to_string().into();
+                        let bytes_sent = register(BytesSent { protocol });
+                        bytes_sent.emit(ByteSize(byte_size));
                     }
                     events_sent.emit(response.events_sent());
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
