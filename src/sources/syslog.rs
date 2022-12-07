@@ -406,8 +406,8 @@ fn enrich_syslog_event(
     if log_namespace == LogNamespace::Legacy {
         let timestamp = log
             .get("timestamp")
-            .and_then(|timestamp| timestamp.as_timestamp().cloned());
-        let timestamp = timestamp.unwrap_or_else(Utc::now);
+            .and_then(|timestamp| timestamp.as_timestamp().cloned())
+            .unwrap_or_else(Utc::now);
         log.insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
     }
 
@@ -551,7 +551,7 @@ mod test {
         .with_event_field(
             &owned_value_path!("hostname"),
             Kind::bytes().or_undefined(),
-            None,
+            Some("host"),
         )
         .with_event_field(
             &owned_value_path!("severity"),
