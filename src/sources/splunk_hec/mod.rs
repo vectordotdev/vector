@@ -17,7 +17,7 @@ use tracing::Span;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::{event::BatchNotifier, ByteSizeOf};
+use vector_core::{event::BatchNotifier, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
@@ -302,7 +302,7 @@ impl SplunkSource {
                         if !events.is_empty() {
                             emit!(EventsReceived {
                                 count: events.len(),
-                                byte_size: events.size_of(),
+                                byte_size: events.estimated_json_encoded_size_of(),
                             });
 
                             if let Err(ClosedError) = out.send_batch(events).await {
@@ -820,7 +820,7 @@ fn raw_event(
     let event = Event::from(log);
     emit!(EventsReceived {
         count: 1,
-        byte_size: event.size_of(),
+        byte_size: event.estimated_json_encoded_size_of(),
     });
 
     Ok(event)

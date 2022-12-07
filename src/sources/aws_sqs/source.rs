@@ -37,6 +37,7 @@ pub struct SqsSource {
     pub delete_message: bool,
     pub concurrency: usize,
     pub(super) acknowledgements: bool,
+    pub(super) log_namespace: LogNamespace,
 }
 
 impl SqsSource {
@@ -144,8 +145,7 @@ impl SqsSource {
                         body.as_bytes(),
                         timestamp,
                         &batch,
-                        // TODO: Update this when updating the source to use log_namespaces.
-                        LogNamespace::Legacy,
+                        self.log_namespace,
                     );
                     events.extend(decoded);
                 }
@@ -206,17 +206,86 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
 
 #[cfg(test)]
 mod tests {
+    use crate::codecs::DecodingConfig;
     use chrono::SecondsFormat;
+    use lookup::path;
+    use vector_config::NamedComponent;
 
     use super::*;
-    use crate::config::log_schema;
+    use crate::config::{log_schema, SourceConfig};
+    use crate::sources::aws_sqs::AwsSqsConfig;
 
     #[tokio::test]
-    async fn test_decode() {
+    async fn test_decode_vector_namespace() {
+        let config = AwsSqsConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
         let message = "test";
         let now = Utc::now();
         let events: Vec<_> = util::decode_message(
-            Decoder::default(),
+            DecodingConfig::new(
+                config.framing.clone(),
+                config.decoding,
+                LogNamespace::Vector,
+            )
+            .build(),
+            "aws_sqs",
+            b"test",
+            Some(now),
+            &None,
+            LogNamespace::Vector,
+        )
+        .collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0]
+                .clone()
+                .as_log()
+                .get(".")
+                .unwrap()
+                .to_string_lossy(),
+            message
+        );
+        assert_eq!(
+            events[0]
+                .clone()
+                .as_log()
+                .metadata()
+                .value()
+                .get(path!(AwsSqsConfig::NAME, "timestamp"))
+                .unwrap()
+                .to_string_lossy(),
+            now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
+        );
+        definition.assert_valid_for_event(&events[0]);
+    }
+
+    #[tokio::test]
+    async fn test_decode_legacy_namespace() {
+        let config = AwsSqsConfig {
+            log_namespace: None,
+            ..Default::default()
+        };
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let message = "test";
+        let now = Utc::now();
+        let events: Vec<_> = util::decode_message(
+            DecodingConfig::new(
+                config.framing.clone(),
+                config.decoding,
+                LogNamespace::Legacy,
+            )
+            .build(),
             "aws_sqs",
             b"test",
             Some(now),
@@ -243,6 +312,7 @@ mod tests {
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
+        definition.assert_valid_for_event(&events[0]);
     }
 
     #[test]

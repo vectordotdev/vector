@@ -72,7 +72,7 @@ pub struct RemapConfig {
     /// When set to `full`, all metric tags will be exposed as arrays of either string or null
     /// values.
     #[serde(default)]
-    pub metric_tags_values: MetricTagsValues,
+    pub metric_tag_values: MetricTagsValues,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
     /// time zone.
@@ -326,7 +326,7 @@ where
     default_schema_definition: Arc<schema::Definition>,
     dropped_schema_definition: Arc<schema::Definition>,
     runner: Runner,
-    metric_tags_values: MetricTagsValues,
+    metric_tag_values: MetricTagsValues,
 }
 
 pub trait VrlRunner {
@@ -414,7 +414,7 @@ where
             default_schema_definition: Arc::new(default_schema_definition),
             dropped_schema_definition: Arc::new(dropped_schema_definition),
             runner,
-            metric_tags_values: config.metric_tags_values,
+            metric_tag_values: config.metric_tag_values,
         })
     }
 
@@ -514,7 +514,7 @@ where
         let mut target = VrlTarget::new(
             event,
             self.program.info(),
-            match self.metric_tags_values {
+            match self.metric_tag_values {
                 MetricTagsValues::Single => false,
                 MetricTagsValues::Full => true,
             },
