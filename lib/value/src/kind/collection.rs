@@ -210,7 +210,11 @@ impl<T: Ord + Clone> Collection<T> {
                 }
             } else if other.unknown_kind().contains_any_defined() {
                 if overwrite {
-                    *self_kind = other.unknown_kind();
+                    // the specific field being merged isn't guaranteed to exist, so merge it with the known type of self
+                    *self_kind = other
+                        .unknown_kind()
+                        .without_undefined()
+                        .union(self_kind.clone());
                 } else {
                     self_kind.merge_keep(other.unknown_kind(), overwrite);
                 }
@@ -677,9 +681,18 @@ mod tests {
                     want: Collection::from_unknown(Kind::bytes().or_integer()),
                 },
             ),
+            (
+                "merge known with specific unknown",
+                TestCase {
+                    this: Collection::from(BTreeMap::from([("a", Kind::integer())])),
+                    other: Collection::from_unknown(Kind::float()),
+                    overwrite: true,
+                    want: Collection::from(BTreeMap::from([("a", Kind::integer().or_float())]))
+                        .with_unknown(Kind::float().or_undefined()),
+                },
+            ),
         ] {
             this.merge(other, strategy);
-
             assert_eq!(this, want, "{}", title);
         }
     }

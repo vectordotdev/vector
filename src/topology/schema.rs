@@ -325,8 +325,11 @@ impl ComponentContainer for Config {
         key: &ComponentKey,
         merged_definition: &Definition,
     ) -> Option<Vec<Output>> {
-        self.transform(key)
-            .map(|source| source.inner.outputs(merged_definition))
+        self.transform(key).map(|source| {
+            source
+                .inner
+                .outputs(merged_definition, self.schema.log_namespace())
+        })
     }
 }
 

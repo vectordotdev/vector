@@ -12,7 +12,7 @@ use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::{config::LogNamespace, ByteSizeOf};
+use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -54,7 +54,7 @@ pub struct DemoLogsConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    /// The namespace to use for logs. This overrides the global setting
+    /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
@@ -207,7 +207,7 @@ async fn demo_logs_source(
                     let count = events.len();
                     emit!(EventsReceived {
                         count,
-                        byte_size: events.size_of()
+                        byte_size: events.estimated_json_encoded_size_of()
                     });
                     let now = Utc::now();
 
@@ -299,16 +299,15 @@ mod tests {
     }
 
     async fn runit(config: &str) -> impl Stream<Item = Event> {
-        let (tx, rx) = SourceSender::new_test();
-        let config: DemoLogsConfig = toml::from_str(config).unwrap();
-        let decoder = DecodingConfig::new(
-            default_framing_message_based(),
-            default_decoding(),
-            LogNamespace::Legacy,
-        )
-        .build();
-
         assert_source_compliance(&SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let config: DemoLogsConfig = toml::from_str(config).unwrap();
+            let decoder = DecodingConfig::new(
+                default_framing_message_based(),
+                default_decoding(),
+                LogNamespace::Legacy,
+            )
+            .build();
             demo_logs_source(
                 config.interval,
                 config.count,
@@ -320,9 +319,10 @@ mod tests {
             )
             .await
             .unwrap();
+
+            rx
         })
-        .await;
-        rx
+        .await
     }
 
     #[test]

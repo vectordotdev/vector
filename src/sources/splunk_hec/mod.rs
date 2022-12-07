@@ -21,7 +21,7 @@ use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -379,7 +379,7 @@ impl SplunkSource {
                         if !events.is_empty() {
                             emit!(EventsReceived {
                                 count: events.len(),
-                                byte_size: events.size_of(),
+                                byte_size: events.estimated_json_encoded_size_of(),
                             });
 
                             if let Err(ClosedError) = out.send_batch(events).await {
@@ -1001,7 +1001,7 @@ fn raw_event(
     let event = Event::from(log);
     emit!(EventsReceived {
         count: 1,
-        byte_size: event.size_of(),
+        byte_size: event.estimated_json_encoded_size_of(),
     });
 
     Ok(event)
