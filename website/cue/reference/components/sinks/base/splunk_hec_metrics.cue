@@ -290,7 +290,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		type: string: syntax: "template"
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

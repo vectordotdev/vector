@@ -1,9 +1,10 @@
 use core::fmt;
 
+use crate::event::metric::TagValue;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
-use super::{write_list, write_word, MetricTags, TagValue};
+use super::{write_list, write_word, MetricTags};
 
 /// Metrics series.
 #[configurable_component]
@@ -43,6 +44,10 @@ impl MetricSeries {
     /// *Note:* This will create the tags map if it is not present.
     pub fn replace_tag(&mut self, key: String, value: impl Into<TagValue>) -> Option<String> {
         (self.tags.get_or_insert_with(Default::default)).replace(key, value)
+    }
+
+    pub fn set_multi_value_tag(&mut self, key: String, values: impl IntoIterator<Item = TagValue>) {
+        (self.tags.get_or_insert_with(Default::default)).set_multi_value(key, values);
     }
 
     /// Removes all the tags.

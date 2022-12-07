@@ -349,6 +349,14 @@ impl Metric {
         self.series.replace_tag(name, value)
     }
 
+    pub fn set_multi_value_tag(
+        &mut self,
+        name: String,
+        values: impl IntoIterator<Item = TagValue>,
+    ) {
+        self.series.set_multi_value_tag(name, values);
+    }
+
     /// Zeroes out the data in this metric.
     pub fn zero(&mut self) {
         self.data.zero();

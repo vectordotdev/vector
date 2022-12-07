@@ -23,7 +23,7 @@ use super::{
     TlsIdentitySnafu, X509ParseSnafu,
 };
 
-const PEM_START_MARKER: &str = "-----BEGIN ";
+pub const PEM_START_MARKER: &str = "-----BEGIN ";
 
 pub const TEST_PEM_CA_PATH: &str = "tests/data/ca/certs/ca.cert.pem";
 pub const TEST_PEM_INTERMEDIATE_CA_PATH: &str =
@@ -45,6 +45,7 @@ pub struct TlsEnableableConfig {
     /// When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
     /// more information.
     pub enabled: Option<bool>,
+
     #[serde(flatten)]
     pub options: TlsConfig,
 }
@@ -71,11 +72,12 @@ impl TlsEnableableConfig {
 pub struct TlsSourceConfig {
     /// Event field for client certificate metadata.
     pub client_metadata_key: Option<String>,
+
     #[serde(flatten)]
     pub tls_config: TlsEnableableConfig,
 }
 
-/// Standard TLS options.
+/// TLS configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
