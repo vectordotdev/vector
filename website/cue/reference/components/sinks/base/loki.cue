@@ -102,27 +102,24 @@ base: components: sinks: loki: configuration: {
 	compression: {
 		description: "Compose with basic compression and Loki-specific compression."
 		required:    false
-		type: {
-			object: options: {
-				algorithm: {
-					required: true
-					type: string: const: "zlib"
-				}
-				level: {
-					description: "Compression level."
-					required:    false
-					type: {
-						string: enum: ["none", "fast", "best", "default"]
-						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-					}
-				}
-			}
-			string: {
-				default: "snappy"
-				enum: snappy: """
+		type: string: {
+			default: "snappy"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				snappy: """
 					Snappy compression.
 
 					This implies sending push requests as Protocol Buffers.
+					"""
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://zlib.net/
 					"""
 			}
 		}
@@ -380,11 +377,11 @@ base: components: sinks: loki: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
 						const:   "adaptive"
 						default: "none"
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
