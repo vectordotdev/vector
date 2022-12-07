@@ -585,13 +585,6 @@ mod test {
         )
         .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
         .with_standard_vector_source_metadata();
-        // .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None);
-
-        println!("{:?}", definition.event_kind().debug_info());
-        println!("{:?}", definition.metadata_kind().debug_info());
-
-        println!("{:?}", expected_definition.event_kind().debug_info());
-        println!("{:?}", expected_definition.metadata_kind().debug_info());
 
         assert_eq!(definition, expected_definition);
     }
