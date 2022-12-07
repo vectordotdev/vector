@@ -21,7 +21,7 @@ use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
