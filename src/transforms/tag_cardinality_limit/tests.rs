@@ -1,6 +1,7 @@
 use vector_core::metric_tags;
 
 use super::*;
+use crate::event::metric::TagValue;
 use crate::event::{metric, Event, Metric, MetricTags};
 use crate::test_util::components::assert_transform_compliance;
 use crate::transforms::tag_cardinality_limit::config::{
@@ -135,6 +136,77 @@ async fn drop_tag(config: TagCardinalityLimitConfig) {
             "val1",
             new_event3.as_metric().tags().unwrap().get("tag2").unwrap()
         );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn tag_cardinality_limit_drop_tag_hashset_multi_value() {
+    drop_tag_multi_value(make_transform_hashset(2, LimitExceededAction::DropTag)).await;
+}
+
+#[tokio::test]
+async fn tag_cardinality_limit_drop_tag_bloom_multi_value() {
+    drop_tag_multi_value(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
+}
+
+async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
+    assert_transform_compliance(async move {
+        let mut tags1 = MetricTags::default();
+        tags1.set_multi_value(
+            "tag1".to_string(),
+            vec![
+                TagValue::Value("val1.a".to_string()),
+                TagValue::Value("val1.b".to_string()),
+            ],
+        );
+        let event1 = make_metric(tags1);
+
+        let mut tags2 = MetricTags::default();
+        tags2.set_multi_value(
+            "tag1".to_string(),
+            vec![
+                TagValue::Value("val1.a".to_string()),
+                TagValue::Value("val1.c".to_string()),
+            ],
+        );
+        let event2 = make_metric(tags2);
+
+        let mut tags3 = MetricTags::default();
+        tags3.set_multi_value(
+            "tag1".to_string(),
+            vec![
+                TagValue::Value("val1.b".to_string()),
+                TagValue::Value("val1.c".to_string()),
+            ],
+        );
+        let event3 = make_metric(tags3);
+
+        let (tx, rx) = mpsc::channel(1);
+        let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+        tx.send(event1.clone()).await.unwrap();
+        tx.send(event2.clone()).await.unwrap();
+        tx.send(event3.clone()).await.unwrap();
+
+        let new_event1 = out.recv().await;
+        let new_event2 = out.recv().await;
+        let new_event3 = out.recv().await;
+
+        drop(tx);
+        topology.stop().await;
+
+        assert_eq!(new_event1, Some(event1));
+        assert_eq!(new_event2, Some(event2));
+        // The third event should have been modified to remove "tag1"
+        assert_ne!(new_event3, Some(event3));
+
+        // let new_event3 = new_event3.unwrap();
+        // assert!(!new_event3.as_metric().tags().unwrap().contains_key("tag1"));
+        // assert_eq!(
+        //     "val1",
+        //     new_event3.as_metric().tags().unwrap().get("tag2").unwrap()
+        // );
     })
     .await;
 }
