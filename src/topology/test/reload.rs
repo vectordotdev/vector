@@ -63,7 +63,7 @@ async fn topology_reuse_old_port() {
     new_config.add_source("in2", prom_remote_write_source(address));
     new_config.add_sink("out", &["in2"], basic_sink(1).1);
 
-    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
         .reload_config_and_respawn(new_config.build().unwrap())
         .await
@@ -88,7 +88,7 @@ async fn topology_rebuild_old() {
     // Will cause the new_config to fail on build
     let _bind = TcpListener::bind(address_1).unwrap();
 
-    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(!topology
         .reload_config_and_respawn(new_config.build().unwrap())
         .await
@@ -105,7 +105,7 @@ async fn topology_old() {
     old_config.add_source("in", prom_remote_write_source(address));
     old_config.add_sink("out", &["in"], basic_sink(1).1);
 
-    let (mut topology, _crash) = start_topology(old_config.clone().build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(old_config.clone().build().unwrap(), false).await;
     assert!(topology
         .reload_config_and_respawn(old_config.build().unwrap())
         .await
@@ -250,7 +250,7 @@ async fn topology_readd_input() {
     old_config.add_source("in1", internal_metrics_source());
     old_config.add_source("in2", internal_metrics_source());
     old_config.add_sink("out", &["in1", "in2"], prom_exporter_sink(address_0, 1));
-    let (mut topology, crash) = start_topology(old_config.build().unwrap(), false).await;
+    let (mut topology, (_, crash)) = start_topology(old_config.build().unwrap(), false).await;
 
     // remove in2
     let mut new_config = Config::builder();
@@ -289,7 +289,7 @@ async fn reload_sink_test(
     new_address: SocketAddr,
 ) {
     // Start a topology from the "old" configuration, which should result in a component listening on `old_address`.
-    let (mut topology, crash) = start_topology(old_config, false).await;
+    let (mut topology, (_, crash)) = start_topology(old_config, false).await;
     let mut crash_stream = UnboundedReceiverStream::new(crash);
 
     wait_for_tcp(old_address).await;

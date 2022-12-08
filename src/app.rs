@@ -44,7 +44,8 @@ use tokio::sync::broadcast::error::RecvError;
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
-    pub graceful_crash: mpsc::UnboundedReceiver<()>,
+    pub graceful_crash_sender: mpsc::UnboundedSender<()>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
@@ -244,12 +245,14 @@ impl Application {
                 let api = config.api;
 
                 let result = topology::start_validated(config, diff, pieces).await;
-                let (topology, graceful_crash) = result.ok_or(exitcode::CONFIG)?;
+                let (topology, (graceful_crash_sender, graceful_crash_receiver)) =
+                    result.ok_or(exitcode::CONFIG)?;
 
                 Ok(ApplicationConfig {
                     config_paths,
                     topology,
-                    graceful_crash,
+                    graceful_crash_sender,
+                    graceful_crash_receiver,
                     #[cfg(feature = "api")]
                     api,
                     #[cfg(feature = "enterprise")]
@@ -270,7 +273,7 @@ impl Application {
     pub fn run(self) {
         let rt = self.runtime;
 
-        let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash);
+        let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash_receiver);
         let mut topology = self.config.topology;
 
         let mut config_paths = self.config.config_paths;
@@ -299,12 +302,24 @@ impl Application {
             // Assigned to prevent the API terminating when falling out of scope.
             let api_server = if api_config.enabled {
                 use std::sync::{Arc, atomic::AtomicBool};
-                emit!(ApiStarted {
-                    addr: api_config.address.unwrap(),
-                    playground: api_config.playground
-                });
 
-                Some(api::Server::start(topology.config(), topology.watch(), Arc::<AtomicBool>::clone(&topology.running)))
+                let api_server = api::Server::start(topology.config(), topology.watch(), Arc::<AtomicBool>::clone(&topology.running));
+
+                match api_server {
+                    Ok(api_server) => {
+                        emit!(ApiStarted {
+                            addr: api_config.address.unwrap(),
+                            playground: api_config.playground
+                        });
+
+                        Some(api_server)
+                    }
+                    Err(e) => {
+                        error!("An error occurred that Vector couldn't handle: {}.", e);
+                        let _ = self.config.graceful_crash_sender.send(());
+                        None
+                    }
+                }
             } else {
                 info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None
