@@ -14,7 +14,7 @@ use vector_common::internal_event::{
 };
 use vector_core::{
     event::{BatchNotifier, BatchStatus},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -97,7 +97,7 @@ fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
         .collect();
 
     emit!(EventsReceived {
-        byte_size: events.size_of(),
+        byte_size: events.estimated_json_encoded_size_of(),
         count: events.len(),
     });
 

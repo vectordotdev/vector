@@ -214,7 +214,7 @@ impl HttpClientContext {
                     );
                 }
                 Event::Metric(ref mut metric) => {
-                    metric.insert_tag(
+                    metric.replace_tag(
                         log_schema().source_type_key().to_string(),
                         HttpClientConfig::NAME.to_string(),
                     );

@@ -8,12 +8,11 @@ use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
-    ByteSizeOf,
 };
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
-    event::Event,
+    event::{EstimatedJsonEncodedSizeOf, Event},
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace::TraceSubscription,
@@ -150,7 +149,7 @@ async fn run(
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
-        let byte_size = log.size_of();
+        let byte_size = log.estimated_json_encoded_size_of();
         // This event doesn't emit any log
         emit!(InternalLogsBytesReceived { byte_size });
         emit!(InternalLogsEventsReceived {
@@ -224,14 +223,15 @@ mod tests {
     // `start_source` helper) panics when called more than once.
     #[tokio::test]
     async fn receives_logs() {
+        trace::init(false, false, "debug", 10);
+        trace::reset_early_buffer();
+
         assert_source_compliance(&SOURCE_TAGS, run_test()).await;
     }
 
     async fn run_test() {
         let test_id: u8 = rand::random();
         let start = chrono::Utc::now();
-        trace::init(false, false, "debug", 10);
-        trace::reset_early_buffer();
 
         error!(message = "Before source started without span.", %test_id);
 
