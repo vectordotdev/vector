@@ -96,6 +96,18 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
             },
         );
     }
+
+    #[inline]
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        let new_layout = Layout::from_size_align_unchecked(new_size, layout.align());
+        let new_ptr = self.alloc(new_layout);
+        if !new_ptr.is_null() {
+            std::ptr::copy_nonoverlapping(ptr, new_ptr, std::cmp::min(layout.size(), new_size));
+            self.dealloc(ptr, layout);
+        }
+
+        new_ptr
+    }
 }
 
 #[inline(always)]
