@@ -976,10 +976,8 @@ fn raw_event(
     // - set remote addr to host field
     let host = if let Some(remote_address) = xff {
         Some(remote_address)
-    } else if let Some(remote) = remote {
-        Some(remote.to_string())
     } else {
-        None
+        remote.map(|remote| remote.to_string())
     };
 
     if let Some(host) = host {
