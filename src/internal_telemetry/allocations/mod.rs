@@ -2,9 +2,8 @@
 
 mod allocator;
 use std::{
-    cell::Cell,
     sync::{
-        atomic::{AtomicI64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex,
     },
     thread,
@@ -12,7 +11,7 @@ use std::{
 };
 
 use arr_macro::arr;
-use metrics::gauge;
+use metrics::{counter, decrement_gauge, increment_gauge};
 use rand_distr::num_traits::ToPrimitive;
 
 use self::allocator::Tracer;
@@ -21,49 +20,57 @@ pub(crate) use self::allocator::{
     without_allocation_tracing, AllocationGroupId, AllocationLayer, GroupedTraceableAllocator,
 };
 
-use crossbeam_utils::CachePadded;
-
 const NUM_GROUPS: usize = 128;
-const NUM_BUCKETS: usize = 8;
-/// These arrays represent the memory usage for each group per thread.
-///
-/// Each thread is meant to update it's own group statistics, which significantly reduces atomic contention.
-/// We pad each Atomic to reduce false sharing effects.
-///
-/// TODO:
-///
-/// Currently, we reach atomic contention once the number of threads exceeds 8. One potential solution
-/// involves using thread locals to track memory stats.
-static GROUP_MEM_STATS: [[CachePadded<AtomicI64>; NUM_GROUPS]; NUM_BUCKETS] = [
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-    arr![CachePadded::new(AtomicI64::new(0)); 128],
-];
+pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
 
-// TODO: Replace this with [`std::thread::ThreadId::as_u64`] once it is stabilized.
-static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
+/// Track allocations and deallocations separately.
+struct GroupMemStatsStorage {
+    allocations: [AtomicU64; NUM_GROUPS],
+    deallocations: [AtomicU64; NUM_GROUPS],
+}
+
+// Reporting interval in milliseconds.
+pub static REPORTING_INTERVAL_MS: AtomicU64 = AtomicU64::new(5000);
+
+/// A registry for tracking each thread's group memory statistics.
+static THREAD_LOCAL_REFS: Mutex<Vec<&'static GroupMemStatsStorage>> = Mutex::new(Vec::new());
+
+/// Group memory statistics per thread.
+struct GroupMemStats {
+    stats: &'static GroupMemStatsStorage,
+}
+
+impl GroupMemStats {
+    /// Allocates a [`GroupMemStatsStorage`], and updates the global [`THREAD_LOCAL_REFS`] registry
+    /// with a reference to this newly allocated memory.
+    pub fn new() -> Self {
+        let mut mutex = THREAD_LOCAL_REFS.lock().unwrap();
+        let stats_ref: &'static GroupMemStatsStorage = Box::leak(Box::new(GroupMemStatsStorage {
+            allocations: arr![AtomicU64::new(0) ; 128],
+            deallocations: arr![AtomicU64::new(0) ; 128],
+        }));
+        let group_mem_stats = GroupMemStats { stats: stats_ref };
+        mutex.push(stats_ref);
+        group_mem_stats
+    }
+}
 
 thread_local! {
-    static THREAD_ID: Cell<usize> = const { Cell::new(0) };
+    static GROUP_MEM_STATS: GroupMemStats = GroupMemStats::new();
 }
-// By using the Option type, we can do statics w/o the need of other creates such as lazy_static
+
 struct GroupInfo {
-    component_kind: Option<String>,
-    component_type: Option<String>,
-    component_id: Option<String>,
+    component_kind: String,
+    component_type: String,
+    component_id: String,
 }
 
 impl GroupInfo {
     const fn new() -> Self {
         Self {
-            component_id: None,
-            component_kind: None,
-            component_type: None,
+            component_id: String::new(),
+            component_kind: String::new(),
+            component_type: String::new(),
         }
     }
 }
@@ -81,48 +88,91 @@ pub struct MainTracer;
 impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
-        GROUP_MEM_STATS[THREAD_ID.with(|t| t.get()) % 8][group_id.as_raw()]
-            .fetch_add(object_size as i64, Ordering::Relaxed);
+        // Handle the case when thread local destructor is ran.
+        let _ = GROUP_MEM_STATS.try_with(|t| {
+            t.stats.allocations[group_id.as_raw() as usize]
+                .fetch_add(object_size as u64, Ordering::Relaxed)
+        });
     }
 
     #[inline(always)]
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
-        GROUP_MEM_STATS[THREAD_ID.with(|t| t.get()) % 8][source_group_id.as_raw()]
-            .fetch_sub(object_size as i64, Ordering::Relaxed);
+        // Handle the case when thread local destructor is ran.
+        let _ = GROUP_MEM_STATS.try_with(|t| {
+            t.stats.deallocations[source_group_id.as_raw() as usize]
+                .fetch_add(object_size as u64, Ordering::Relaxed)
+        });
     }
 }
 
 /// Initializes allocation tracing.
 pub fn init_allocation_tracing() {
+    for group in &GROUP_INFO {
+        let mut writer = group.lock().unwrap();
+        *writer = GroupInfo {
+            component_id: "root".to_string(),
+            component_kind: "root".to_string(),
+            component_type: "root".to_string(),
+        };
+    }
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
-        .spawn(|| {
-            without_allocation_tracing(|| loop {
-                for group_idx in 0..NUM_GROUPS {
-                    let mut mem_used = 0;
-                    for bucket in &GROUP_MEM_STATS {
-                        mem_used += bucket[group_idx].load(Ordering::Relaxed);
+        .spawn(|| loop {
+            if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+                without_allocation_tracing(|| {
+                    for (group_idx, group) in GROUP_INFO.iter().enumerate() {
+                        let mut allocations_diff = 0;
+                        let mut deallocations_diff = 0;
+                        let mutex = THREAD_LOCAL_REFS.lock().unwrap();
+                        for idx in 0..mutex.len() {
+                            allocations_diff += mutex[idx].allocations[group_idx].swap(0,Ordering::Relaxed);
+                            deallocations_diff += mutex[idx].deallocations[group_idx].swap(0,Ordering::Relaxed);
+                        }
+                        if allocations_diff == 0 && deallocations_diff == 0 {
+                            continue;
+                        }
+                        let mem_used_diff = allocations_diff as i64 - deallocations_diff as i64;
+                        let group_info = group.lock().unwrap();
+                        if allocations_diff > 0 {
+                            counter!(
+                                "component_allocated_bytes_total",
+                                allocations_diff,
+                                "component_kind" => group_info.component_kind.clone(),
+                                "component_type" => group_info.component_type.clone(),
+                                "component_id" => group_info.component_id.clone());
+                        }
+                        if deallocations_diff > 0 {
+                            counter!(
+                                "component_deallocated_bytes_total",
+                                deallocations_diff,
+                                "component_kind" => group_info.component_kind.clone(),
+                                "component_type" => group_info.component_type.clone(),
+                                "component_id" => group_info.component_id.clone());
+                        }
+                        if mem_used_diff > 0 {
+                            increment_gauge!(
+                                "component_allocated_bytes",
+                                mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
+                                "component_kind" => group_info.component_kind.clone(),
+                                "component_type" => group_info.component_type.clone(),
+                                "component_id" => group_info.component_id.clone());
+                            }
+                        if mem_used_diff < 0 {
+                            decrement_gauge!(
+                                "component_allocated_bytes",
+                                -mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
+                                "component_kind" => group_info.component_kind.clone(),
+                                "component_type" => group_info.component_type.clone(),
+                                "component_id" => group_info.component_id.clone());
+                        }
                     }
-                    if mem_used == 0 {
-                        continue;
-                    }
-                    let group_info = GROUP_INFO[group_idx].lock().unwrap();
-                    gauge!(
-                        "component_allocated_bytes",
-                        mem_used.to_f64().expect("failed to convert group_id from int to float"),
-                        "component_kind" => group_info.component_kind.clone().unwrap_or_else(|| "root".to_string()),
-                        "component_type" => group_info.component_type.clone().unwrap_or_else(|| "root".to_string()),
-                        "component_id" => group_info.component_id.clone().unwrap_or_else(|| "root".to_string()));
-                }
-                thread::sleep(Duration::from_millis(5000));
-            })
+                });
+            }
+            thread::sleep(Duration::from_millis(
+                REPORTING_INTERVAL_MS.load(Ordering::Relaxed),
+            ));
         })
         .unwrap();
-}
-
-/// Initializes the thread local ID.
-pub fn init_thread_id() {
-    THREAD_ID.with(|t| t.replace(THREAD_COUNTER.fetch_add(1, Ordering::Relaxed)));
 }
 
 /// Acquires an allocation group ID.
@@ -140,13 +190,13 @@ pub fn acquire_allocation_group_id(
     let group_id =
         AllocationGroupId::register().expect("failed to register allocation group token");
     let idx = group_id.as_raw();
-    match GROUP_INFO.get(idx) {
+    match GROUP_INFO.get(idx as usize) {
         Some(mutex) => {
             let mut writer = mutex.lock().unwrap();
             *writer = GroupInfo {
-                component_id: Some(component_id),
-                component_kind: Some(component_kind),
-                component_type: Some(component_type),
+                component_id,
+                component_kind,
+                component_type,
             };
             group_id
         }

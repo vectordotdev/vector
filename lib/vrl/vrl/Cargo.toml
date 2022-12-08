@@ -28,7 +28,7 @@ expr-unary = ["compiler/expr-unary"]
 test = ["compiler/test"]
 
 [dependencies]
-bytes = "1.2.1"
+bytes = "1.3.0"
 compiler = { package = "vrl-compiler", path = "../compiler", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 indoc = "1"

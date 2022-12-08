@@ -166,6 +166,18 @@ components: sinks: splunk_hec_logs: {
 				examples: ["timestamp", ""]
 			}
 		}
+		auto_extract_timestamp: {
+			common: false
+			description: """
+				    Passes the auto_extract_timestamp option to Splunk.
+				    Note this option is only used by Version 8 and above of Splunk.
+				    This will cause Splunk to extract the timestamp from the message text rather than use
+				    the timestamp embedded in the event. The timestamp must be in the format yyyy-mm-dd hh:mm:ss.
+				    This option only applies for the `Event` endpoint target.
+				"""
+			required: false
+			type: bool: default: false
+		}
 	}
 	input: {
 		logs:    true

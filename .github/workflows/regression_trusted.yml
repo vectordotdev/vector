@@ -16,6 +16,7 @@ jobs:
     outputs:
       cpus: ${{ steps.system.outputs.CPUS }}
       memory: ${{ steps.system.outputs.MEMORY }}
+      vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
 
       comparison-sha: ${{ steps.metadata.outputs.COMPARISON_SHA }}
       comparison-tag: ${{ steps.metadata.outputs.COMPARISON_TAG }}
@@ -30,6 +31,7 @@ jobs:
       total-samples: ${{ steps.experimental-meta.outputs.TOTAL_SAMPLES }}
       p-value: ${{ steps.experimental-meta.outputs.P_VALUE }}
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
+      lading-version: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
 
     steps:
       - name: Setup experimental metadata
@@ -39,31 +41,37 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.5.0"
+          export SMP_CRATE_VERSION="0.6.3"
+          export LADING_VERSION="0.11.2"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"
           echo "total samples: ${TOTAL_SAMPLES}"
           echo "regression p-value: ${P_VALUE}"
           echo "smp crate version: ${SMP_CRATE_VERSION}"
+          echo "lading version: ${LADING_VERSION}"
 
           echo "WARMUP_SECONDS=${WARMUP_SECONDS}" >> $GITHUB_OUTPUT
           echo "REPLICAS=${REPLICAS}" >> $GITHUB_OUTPUT
           echo "TOTAL_SAMPLES=${TOTAL_SAMPLES}" >> $GITHUB_OUTPUT
           echo "P_VALUE=${P_VALUE}" >> $GITHUB_OUTPUT
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
+          echo "LADING_VERSION=${LADING_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Setup system details
         id: system
         run: |
-          export CPUS="8"
+          export CPUS="7"
           export MEMORY="30g"
+          export VECTOR_CPUS="4"
 
           echo "cpus total: ${CPUS}"
           echo "memory total: ${MEMORY}"
+          echo "vector cpus: ${VECTOR_CPUS}"
 
           echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
           echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
+          echo "VECTOR_CPUS=${VECTOR_CPUS}" >> $GITHUB_OUTPUT
 
         # github.rest.actions.listWorkflowRunArtifacts only returns first 30
         # artifacts, and returns a { data, headers, status, url } object. The
@@ -114,7 +122,7 @@ jobs:
       - compute-metadata
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
+        uses: aws-actions/configure-aws-credentials@v1.7.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -176,7 +184,7 @@ jobs:
           docker load --input baseline-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
+        uses: aws-actions/configure-aws-credentials@v1.7.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -244,7 +252,7 @@ jobs:
           docker load --input comparison-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
+        uses: aws-actions/configure-aws-credentials@v1.7.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -273,27 +281,24 @@ jobs:
       - upload-comparison-image-to-ecr
     steps:
       - name: Check status, in-progress
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Submit Experiment",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "in_progress",
-               output: {
-                  title: "Submit Experiment",
-                  summary: "Submit experiments to Regression Detector cluster.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='pending' \
+            -f description='Experiments submitted to the Regression Detector cluster.' \
+            -f context='Regression Detector / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - uses: actions/checkout@v3
         with:
           ref: ${{ needs.compute-metadata.outputs.checkout-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
+        uses: aws-actions/configure-aws-credentials@v1.7.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -314,6 +319,7 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job submit \
+            --lading-version ${{ needs.compute-metadata.outputs.lading-version }} \
             --total-samples ${{ needs.compute-metadata.outputs.total-samples }} \
             --warmup-seconds ${{ needs.compute-metadata.outputs.warmup-seconds }} \
             --replicas ${{ needs.compute-metadata.outputs.replicas }} \
@@ -321,7 +327,11 @@ jobs:
             --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }} \
             --baseline-sha ${{ needs.compute-metadata.outputs.baseline-sha }} \
             --comparison-sha ${{ needs.compute-metadata.outputs.comparison-sha }} \
+            --target-command "/usr/local/bin/vector" \
             --target-config-dir ${{ github.workspace }}/regression/ \
+            --target-cpu-allotment "${{ needs.compute-metadata.outputs.cpus }}" \
+            --target-memory-allotment "${{ needs.compute-metadata.outputs.memory }}" \
+            --target-environment-variables "VECTOR_THREADS=${{ needs.compute-metadata.outputs.vector-cpus }},VECTOR_REQUIRE_HEALTHY=true" \
             --target-name vector \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
@@ -331,7 +341,7 @@ jobs:
           path: ${{ runner.temp }}/submission-metadata
 
       - name: Await job
-        timeout-minutes: 60
+        timeout-minutes: 120
         env:
           RUST_LOG: info
         run: |
@@ -344,7 +354,6 @@ jobs:
 
       - name: Handle cancellation if necessary
         if: ${{ cancelled() }}
-        timeout-minutes: 60
         env:
           RUST_LOG: info
         run: |
@@ -354,61 +363,124 @@ jobs:
 
       - name: Check status, cancelled
         if: ${{ cancelled() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Submit Experiment",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "cancelled",
-               output: {
-                  title: "Submit Experiment",
-                  summary: "Submit experiments to Regression Detector cluster.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='failure' \
+            -f description='Experiments submitted to the Regression Detector cluster cancelled.' \
+            -f context='Regression Detector / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, success
-        if: ${{ success() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Submit Experiment",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "success",
-               output: {
-                  title: "Submit Experiment",
-                  summary: "Submit experiments to Regression Detector cluster.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Experiments submitted to the Regression Detector cluster successfully.' \
+            -f context='Regression Detector / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, failure
         if: ${{ failure() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Submit Experiment",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "failure",
-               output: {
-                  title: "Submit Experiment",
-                  summary: "Submit experiments to Regression Detector cluster.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Experiments submitted to the Regression Detector cluster failed.' \
+            -f context='Regression Detector / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   ##
   ## ANALYZE
   ##
+
+  detect-regression:
+    name: Determine regression status
+    runs-on: ubuntu-22.04
+    needs:
+      - submit-job
+      - compute-metadata
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1-node16
+        with:
+          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Download SMP binary
+        run: |
+          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+
+      - name: Download submission metadata
+        uses: actions/download-artifact@v3
+        with:
+          name: vector-submission-metadata
+          path: ${{ runner.temp }}/
+
+      - name: Determine if PR introduced a regression
+        env:
+          RUST_LOG: info
+        run: |
+          chmod +x ${{ runner.temp }}/bin/smp
+
+          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job result \
+            --submission-metadata ${{ runner.temp }}/submission-metadata
+
+      - name: Check status, cancelled
+        if: ${{ cancelled() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='failure' \
+            -f description='Analyze experimental results from Regression Detector cancelled.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Check status, success
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Analyze experimental results from Regression Detector succeeded.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Check status, failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Analyze experimental results from Regression Detector failed.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   download-analysis:
     name: Download regression analysis & upload report
@@ -418,27 +490,24 @@ jobs:
       - compute-metadata
     steps:
       - name: Check status, in-progress
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Analyze Experimental Results",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "in_progress",
-               output: {
-                  title: "Analyze Experiment",
-                  summary: "Analyze experimental results from Regression Detector.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='pending' \
+            -f description='Analyze experimental results from Regression Detector.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - uses: actions/checkout@v3
         with:
           ref: ${{ needs.compute-metadata.outputs.checkout-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
+        uses: aws-actions/configure-aws-credentials@v1.7.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -485,54 +554,41 @@ jobs:
 
       - name: Check status, cancelled
         if: ${{ cancelled() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Analyze Experimental Results",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "cancelled",
-               output: {
-                  title: "Analyze Experiment",
-                  summary: "Analyze experimental results from Regression Detector.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='failure' \
+            -f description='Analyze experimental results from Regression Detector cancelled.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, success
-        if: ${{ success() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Analyze Experimental Results",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "success",
-               output: {
-                  title: "Analyze Experiment",
-                  summary: "Analyze experimental results from Regression Detector.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Analyze experimental results from Regression Detector succeeded.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, failure
         if: ${{ failure() }}
-        uses: actions/github-script@v6.3.3
-        with:
-          script: |
-            github.rest.checks.create({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               name: "Analyze Experiment",
-               head_sha: "${{ needs.compute-metadata.outputs.head-sha }}",
-               status: "completed",
-               conclusion: "failure",
-               output: {
-                  title: "Analyze Experimental Results",
-                  summary: "Analyze experimental results from Regression Detector.",
-               },
-            });
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
+            -f state='success' \
+            -f description='Analyze experimental results from Regression Detector failed.' \
+            -f context='Regression Detector / analyze-experiment' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

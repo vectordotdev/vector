@@ -138,7 +138,7 @@ impl<'a> Builder<'a> {
                     argument,
                     argument_span,
                 });
-            } else if !param_kind.is_superset(expr_kind) {
+            } else if param_kind.is_superset(expr_kind).is_err() {
                 arguments_with_unknown_type_validity.push((*parameter, node.clone()));
             }
 
@@ -244,7 +244,7 @@ impl<'a> Builder<'a> {
                             // Keep track of the type information, so that we
                             // can report these in a diagnostic error if no
                             // other input definition matches.
-                            if !input.kind.is_superset(type_def.kind()) {
+                            if input.kind.is_superset(type_def.kind()).is_err() {
                                 err_found_type_def = Some(type_def.kind().clone());
                                 continue;
                             }
@@ -510,7 +510,7 @@ impl<'a> Builder<'a> {
             // Check the type definition of the resulting block.This needs to match
             // whatever is configured by the closure input type.
             let expected_kind = input.output.into_kind();
-            if !expected_kind.is_superset(block_type_def.kind()) {
+            if expected_kind.is_superset(block_type_def.kind()).is_err() {
                 return Err(Error::ReturnTypeMismatch {
                     block_span,
                     found_kind: block_type_def.kind().clone(),
