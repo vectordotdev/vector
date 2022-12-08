@@ -660,6 +660,8 @@ jobs:
 
   publish-cloudsmith:
     name: Publish to Cloudsmith
+    # We only publish to CloudSmith for versioned releases, not nightlies.
+    if: ${{ inputs.mode == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
