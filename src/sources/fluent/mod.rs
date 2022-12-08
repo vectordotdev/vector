@@ -82,7 +82,8 @@ impl GenerateConfig for FluentConfig {
 #[async_trait::async_trait]
 impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = FluentSource::new(cx.log_namespace(self.log_namespace));
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let source = FluentSource::new(log_namespace);
         let shutdown_secs = 30;
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
         let tls_client_metadata_key = self
@@ -100,6 +101,8 @@ impl SourceConfig for FluentConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            FluentConfig::NAME,
+            log_namespace,
         )
     }
 

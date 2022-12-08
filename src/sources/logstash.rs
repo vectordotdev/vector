@@ -115,10 +115,11 @@ impl GenerateConfig for LogstashConfig {
 #[async_trait::async_trait]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let source = LogstashSource {
             timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone()),
-            log_namespace: cx.log_namespace(self.log_namespace),
             legacy_host_key_path: parse_value_path(log_schema().host_key()).ok(),
+            log_namespace,
         };
         let shutdown_secs = 30;
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
@@ -126,6 +127,7 @@ impl SourceConfig for LogstashConfig {
             .tls
             .as_ref()
             .and_then(|tls| tls.client_metadata_key.clone());
+
         let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
@@ -137,6 +139,8 @@ impl SourceConfig for LogstashConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            LogstashConfig::NAME,
+            log_namespace,
         )
     }
 

@@ -12,7 +12,7 @@ use futures::StreamExt;
 use listenfd::ListenFd;
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 
 #[cfg(unix)]
@@ -168,6 +168,8 @@ impl SourceConfig for SyslogConfig {
                     cx,
                     false.into(),
                     connection_limit,
+                    SyslogConfig::NAME,
+                    LogNamespace::Legacy,
                 )
             }
             Mode::Udp {
