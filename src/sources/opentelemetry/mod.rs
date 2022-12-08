@@ -11,7 +11,7 @@ mod status;
 use std::net::SocketAddr;
 
 use futures::{future::join, FutureExt, TryFutureExt};
-use lookup::owned_value_path;
+use lookup::{owned_value_path, LookupBuf};
 use opentelemetry_proto::convert::{
     ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY,
     SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
@@ -22,7 +22,7 @@ use value::kind::Collection;
 use value::Kind;
 use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LegacyKey;
+use vector_core::config::{log_schema, LegacyKey};
 use vector_core::{config::LogNamespace, schema::Definition};
 
 use crate::{
@@ -146,7 +146,6 @@ impl SourceConfig for OpentelemetryConfig {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
-        // TODO `.` should have meaning "message" when LogNamespace::Vector
         let schema_definition = Definition::new_with_default_metadata(Kind::any(), [log_namespace])
             .with_source_metadata(
                 Self::NAME,
@@ -223,6 +222,13 @@ impl SourceConfig for OpentelemetryConfig {
                 Some("timestamp"),
             )
             .with_standard_vector_source_metadata();
+
+        match log_namespace {
+            LogNamespace::Vector => schema_definition.with_meaning(LookupBuf::root(), "message"),
+            LogNamespace::Legacy => {
+                schema_definition.with_meaning(log_schema().message_key(), "message")
+            }
+        }
 
         vec![Output::default(DataType::Log)
             .with_port(LOGS)
