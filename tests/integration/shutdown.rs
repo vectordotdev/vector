@@ -258,7 +258,7 @@ fn configuration_path_recomputed() {
 
 #[test]
 fn remove_unix_socket_stream() {
-    let dir = support::create_directory();
+    let dir = create_directory();
     let mut path = dir.clone();
     path.push("tmp");
     path.set_extension("sock");
@@ -278,7 +278,7 @@ fn remove_unix_socket_stream() {
 
 #[test]
 fn remove_unix_socket_datagram() {
-    let dir = support::create_directory();
+    let dir = create_directory();
     let mut path = dir.clone();
     path.push("tmp");
     path.set_extension("sock");
