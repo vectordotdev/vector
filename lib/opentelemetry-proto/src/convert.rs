@@ -80,6 +80,7 @@ fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
     )
 }
 
+// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.15.0/specification/logs/data-model.md
 impl ResourceLog {
     fn into(self, log_namespace: LogNamespace, now: DateTime<Utc>) -> Event {
         let mut log = match log_namespace {
@@ -174,8 +175,8 @@ impl ResourceLog {
             self.log_record.dropped_attributes_count,
         );
 
-        // TODO Double check timestamp handling
-        // according to proto, if observed_time_unix_nano is missing, collector should set it
+        // According to log data model spec, if observed_time_unix_nano is missing, the collector
+        // should set it to the current time.
         let observed_timestamp = if self.log_record.observed_time_unix_nano > 0 {
             Utc.timestamp_nanos(self.log_record.observed_time_unix_nano as i64)
                 .into()
@@ -197,10 +198,11 @@ impl ResourceLog {
         } else {
             observed_timestamp
         };
-        log_namespace.insert_vector_metadata(
+        log_namespace.insert_source_metadata(
+            SOURCE_NAME,
             &mut log,
-            path!(log_schema().timestamp_key()),
-            path!("ingest_timestamp"),
+            Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+            path!("timestamp"),
             timestamp,
         );
 
@@ -210,6 +212,11 @@ impl ResourceLog {
             path!("source_type"),
             Bytes::from_static(SOURCE_NAME.as_bytes()),
         );
+        if log_namespace == LogNamespace::Vector {
+            log.metadata_mut()
+                .value_mut()
+                .insert(path!("vector", "ingest_timestamp"), now);
+        }
 
         log.into()
     }

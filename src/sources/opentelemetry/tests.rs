@@ -125,7 +125,7 @@ async fn receive_grpc_logs_legacy_namespace() {
     .await;
 }
 
-pub fn new_source(
+pub(super) fn new_source(
     status: EventStatus,
 ) -> (
     SourceSender,

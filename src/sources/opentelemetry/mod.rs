@@ -146,6 +146,7 @@ impl SourceConfig for OpentelemetryConfig {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
+        // TODO `.` should have meaning "message" when LogNamespace::Vector
         let schema_definition = Definition::new_with_default_metadata(Kind::any(), [log_namespace])
             .with_source_metadata(
                 Self::NAME,
@@ -205,7 +206,6 @@ impl SourceConfig for OpentelemetryConfig {
                 Kind::integer(),
                 None,
             )
-            // TODO This is probably wrong, mixed up with the std vector metadata
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(
@@ -214,6 +214,13 @@ impl SourceConfig for OpentelemetryConfig {
                 &owned_value_path!(OBSERVED_TIMESTAMP_KEY),
                 Kind::timestamp(),
                 None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
             )
             .with_standard_vector_source_metadata();
 
