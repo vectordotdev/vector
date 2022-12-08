@@ -23,7 +23,7 @@ use super::{
     TlsIdentitySnafu, X509ParseSnafu,
 };
 
-const PEM_START_MARKER: &str = "-----BEGIN ";
+pub const PEM_START_MARKER: &str = "-----BEGIN ";
 
 pub const TEST_PEM_CA_PATH: &str = "tests/data/ca/certs/ca.cert.pem";
 pub const TEST_PEM_INTERMEDIATE_CA_PATH: &str =

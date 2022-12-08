@@ -44,7 +44,7 @@ pub struct VectorConfig {
     ///
     /// If set to `true`, requests will be compressed with [`gzip`][gzip_docs].
     ///
-    /// [gzip_docs]: https://en.wikipedia.org/wiki/Gzip
+    /// [gzip_docs]: https://www.gzip.org/
     #[serde(default)]
     compression: bool,
 

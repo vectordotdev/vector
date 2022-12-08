@@ -139,7 +139,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.59", default-features = false }
 futures = { version = "0.3.25", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.22.0", default-features = false, features = ["full"] }
+tokio = { version = "1.23.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.11", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -278,7 +278,7 @@ nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
 once_cell = { version = "1.16", default-features = false }
-openssl = { version = "0.10.43", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.44", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.4.0", default-features = false }
@@ -349,7 +349,7 @@ quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
 tokio-test = "0.4.2"
-tokio = { version = "1.22.0", features = ["test-util"] }
+tokio = { version = "1.23.0", features = ["test-util"] }
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
