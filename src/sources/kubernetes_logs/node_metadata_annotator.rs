@@ -5,6 +5,7 @@
 use crate::event::{Event, LogEvent};
 use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::runtime::reflector::{store::Store, ObjectRef};
+use lookup::lookup_v2::OptionalTargetPath;
 use lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
@@ -17,13 +18,14 @@ use super::Config;
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
     /// Event field for Node labels.
-    pub node_labels: OwnedTargetPath,
+    pub node_labels: OptionalTargetPath,
 }
 
 impl Default for FieldsSpec {
     fn default() -> Self {
         Self {
-            node_labels: OwnedTargetPath::event(owned_value_path!("kubernetes", "node_labels")),
+            node_labels: OwnedTargetPath::event(owned_value_path!("kubernetes", "node_labels"))
+                .into(),
         }
     }
 }
@@ -71,18 +73,18 @@ fn annotate_from_metadata(
     log_namespace: LogNamespace,
 ) {
     if let Some(labels) = &metadata.labels {
-        let path = &fields_spec.node_labels.path;
+        if let Some(prefix_path) = &fields_spec.node_labels.path {
+            for (key, value) in labels.iter() {
+                let key_path = path!(key);
 
-        for (key, value) in labels.iter() {
-            let key_path = path!(key);
-
-            log_namespace.insert_source_metadata(
-                Config::NAME,
-                log,
-                Some(LegacyKey::Overwrite(path.concat(key_path))),
-                path!("node_labels", key),
-                value.to_owned(),
-            )
+                log_namespace.insert_source_metadata(
+                    Config::NAME,
+                    log,
+                    Some(LegacyKey::Overwrite((&prefix_path.path).concat(key_path))),
+                    path!("node_labels", key),
+                    value.to_owned(),
+                )
+            }
         }
     }
 }
@@ -163,7 +165,7 @@ mod tests {
             ),
             (
                 FieldsSpec {
-                    node_labels: parse_target_path("node_labels").unwrap(),
+                    node_labels: parse_target_path("node_labels").unwrap().into(),
                 },
                 ObjectMeta {
                     name: Some("sandbox0-name".to_owned()),
