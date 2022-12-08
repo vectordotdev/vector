@@ -13,13 +13,26 @@ autobenches = false # our benchmarks are not runnable on their own either way
 rust-version = "1.64.0"
 
 [[bin]]
+name = "vector"
+test = false
+bench = false
+
+[[test]]
+name = "integration"
+path = "tests/integration/lib.rs"
+
+[[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"
+test = false
+bench = false
 required-features = ["default-no-api-client"]
 
 [[bin]]
 name = "secret-backend-example"
 path = "src/config/loading/secret_backend_example.rs"
+test = false
+bench = false
 
 [profile.dev]
 split-debuginfo = "unpacked" # Faster debug builds on macOS
