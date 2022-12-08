@@ -345,6 +345,17 @@ code = 200
 id = "38c5b0d0-5e7e-42aa-ae86-2b642ad2d1b8"
 ```
 
+If there are hyphens in the field name, you will need to quote this part (at least in YAML):
+
+```yaml
+  - name: hyphens
+    inputs:
+      - insert_at: hyphens
+        type: log
+        log_fields:
+          labels."this-has-hyphens": "this is a test"
+```
+
 ##### Raw string value
 
 To specify a raw string value for a log event, use `value`:

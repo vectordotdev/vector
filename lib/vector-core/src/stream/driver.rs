@@ -4,13 +4,16 @@ use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::{BytesSent, CallError, CountByteSize, PollReadyError};
+use vector_common::internal_event::{
+    register, BytesSent, CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
+    PollReadyError, Registered,
+};
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 
 use super::FuturesUnorderedCount;
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::{emit, EventsSent},
+    internal_event::emit,
 };
 
 pub trait DriverResponse {
@@ -78,6 +81,8 @@ where
         let batched_input = input.ready_chunks(1024);
         pin!(batched_input);
 
+        let events_sent = register(EventsSent::from(Output(None)));
+
         loop {
             // Core behavior of the loop:
             // - always check to see if we have any response futures that have completed
@@ -142,12 +147,19 @@ where
                             request_id,
                         );
                         let finalizers = req.take_finalizers();
+                        let events_sent = events_sent.clone();
 
                         let metadata = req.get_metadata();
 
                         let fut = svc.call(req)
                             .err_into()
-                            .map(move |result| Self::handle_response(result, request_id, finalizers, &metadata))
+                            .map(move |result| Self::handle_response(
+                                result,
+                                request_id,
+                                finalizers,
+                                &metadata,
+                                &events_sent,
+                            ))
                             .instrument(info_span!("request", request_id).or_current());
 
                         in_flight.push(fut);
@@ -171,6 +183,7 @@ where
         request_id: usize,
         finalizers: EventFinalizers,
         metadata: &RequestMetadata,
+        events_sent: &Registered<EventsSent>,
     ) {
         match result {
             Err(error) => {
@@ -187,13 +200,7 @@ where
                             protocol: protocol.to_string().into(),
                         });
                     }
-                    let cbs = response.events_sent();
-                    emit(EventsSent {
-                        count: cbs.0,
-                        byte_size: cbs.1,
-                        output: None,
-                    });
-
+                    events_sent.emit(response.events_sent());
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
                 } else if response.event_status() == EventStatus::Rejected {
                     Self::emit_call_error(None, request_id, metadata.event_count());

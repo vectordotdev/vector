@@ -41,8 +41,8 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.6.2"
-          export LADING_VERSION="0.10.2"
+          export SMP_CRATE_VERSION="0.6.3"
+          export LADING_VERSION="0.11.2"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"

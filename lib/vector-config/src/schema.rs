@@ -390,9 +390,12 @@ pub fn generate_const_string_schema(value: String) -> SchemaObject {
     }
 }
 
-pub fn generate_internal_tagged_variant_schema(tag: String, value: String) -> SchemaObject {
+pub fn generate_internal_tagged_variant_schema(
+    tag: String,
+    value_schema: SchemaObject,
+) -> SchemaObject {
     let mut properties = IndexMap::new();
-    properties.insert(tag.clone(), generate_const_string_schema(value));
+    properties.insert(tag.clone(), value_schema);
 
     let mut required = BTreeSet::new();
     required.insert(tag);

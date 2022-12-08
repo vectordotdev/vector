@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.26.0"
+version = "0.27.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -13,13 +13,26 @@ autobenches = false # our benchmarks are not runnable on their own either way
 rust-version = "1.64.0"
 
 [[bin]]
+name = "vector"
+test = false
+bench = false
+
+[[test]]
+name = "integration"
+path = "tests/integration/lib.rs"
+
+[[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"
+test = false
+bench = false
 required-features = ["default-no-api-client"]
 
 [[bin]]
 name = "secret-backend-example"
 path = "src/config/loading/secret_backend_example.rs"
+test = false
+bench = false
 
 [profile.dev]
 split-debuginfo = "unpacked" # Faster debug builds on macOS
@@ -137,9 +150,9 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.3", default-features = false }
-async-trait = { version = "0.1.58", default-features = false }
+async-trait = { version = "0.1.59", default-features = false }
 futures = { version = "0.3.25", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.22.0", default-features = false, features = ["full"] }
+tokio = { version = "1.23.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.11", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -182,7 +195,7 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 # Serde
-serde = { version = "1.0.148", default-features = false, features = ["derive"] }
+serde = { version = "1.0.149", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.7", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.89", default-features = false, features = ["raw_value"] }
@@ -211,7 +224,7 @@ itertools = { version = "0.10.5", default-features = false, optional = true }
 
 # API client
 crossterm = { version = "0.25.0", default-features = false, features = ["event-stream"], optional = true }
-num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
+num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.19.0", optional = true, default-features = false, features = ["crossterm"] }
 
@@ -229,7 +242,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.15", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
-axum = { version = "0.5.17", default-features = false }
+axum = { version = "0.6.1", default-features = false }
 base64 = { version = "0.13.1", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.13.0", default-features = false, features = ["ssl", "chrono"] }
@@ -278,10 +291,11 @@ nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
 once_cell = { version = "1.16", default-features = false }
-openssl = { version = "0.10.43", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.44", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.4.0", default-features = false }
+paste = "1.0.9"
 percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
@@ -333,7 +347,7 @@ tonic-build = { version = "0.8", default-features = false, features = ["transpor
 
 [dev-dependencies]
 approx = "0.5.1"
-assert_cmd = { version = "2.0.6", default-features = false }
+assert_cmd = { version = "2.0.7", default-features = false }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
@@ -341,14 +355,14 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 base64 = "0.13.1"
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.10.5", default-features = false }
-libc = "0.2.137"
+libc = "0.2.138"
 similar-asserts = "1.4.2"
 proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
 tokio-test = "0.4.2"
-tokio = { version = "1.22.0", features = ["test-util"] }
+tokio = { version = "1.23.0", features = ["test-util"] }
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
@@ -777,7 +791,7 @@ clickhouse-integration-tests = ["sinks-clickhouse"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
-datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces"]
+datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces", "axum/tokio"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]

@@ -48,12 +48,14 @@ base: components: sinks: websocket: configuration: {
 					basic: """
 						Basic authentication.
 
-						The username and password are concatenated and encoded via base64.
+						The username and password are concatenated and encoded via [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
 						"""
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc) is passed as-is.
 						"""
 				}
 			}
@@ -76,7 +78,7 @@ base: components: sinks: websocket: configuration: {
 		required:    true
 		type: object: options: {
 			avro: {
-				description:   "Apache Avro serializer options."
+				description:   "Apache Avro-specific encoder options."
 				relevant_when: "codec = \"avro\""
 				required:      true
 				type: object: options: schema: {
@@ -88,27 +90,55 @@ base: components: sinks: websocket: configuration: {
 			codec: {
 				required: true
 				type: string: enum: {
-					avro:        "Apache Avro serialization."
-					gelf:        "GELF serialization."
-					json:        "JSON serialization."
-					logfmt:      "Logfmt serialization."
-					native:      "Native Vector serialization based on Protocol Buffers."
-					native_json: "Native Vector serialization based on JSON."
-					raw_message: """
-						No serialization.
+					avro: """
+						Encodes an event as an [Apache Avro][apache_avro] message.
 
-						This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-						they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-						while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-						event.
+						[apache_avro]: https://avro.apache.org/
+						"""
+					gelf: """
+						Encodes an event as a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: """
+						Encodes an event as [JSON][json].
+
+						[json]: https://www.json.org/
+						"""
+					logfmt: """
+						Encodes an event as a [logfmt][logfmt] message.
+
+						[logfmt]: https://brandur.org/logfmt
+						"""
+					native: """
+						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf]([EXPERIMENTAL][experimental]).
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Encodes an event in Vector’s [native JSON format][vector_native_json]([EXPERIMENTAL][experimental]).
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					raw_message: """
+						No encoding.
+
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
-						Plaintext serialization.
+						Plaintext encoding.
 
-						This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-						they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-						while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-						event.
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}

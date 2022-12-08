@@ -24,6 +24,7 @@ use vrl::{
     CompileConfig, Program, Runtime, Terminate, VrlRuntime,
 };
 
+use crate::transforms::MetricTagsValues;
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
@@ -63,6 +64,15 @@ pub struct RemapConfig {
     /// [vrl]: https://vector.dev/docs/reference/vrl
     #[configurable(metadata(docs::examples = "./my/program.vrl",))]
     pub file: Option<PathBuf>,
+
+    /// When set to `single`, metric tag values will be exposed as single strings, the
+    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+    /// will be ignored.
+    ///
+    /// When set to `full`, all metric tags will be exposed as arrays of either string or null
+    /// values.
+    #[serde(default)]
+    pub metric_tag_values: MetricTagsValues,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
     /// time zone.
@@ -316,6 +326,7 @@ where
     default_schema_definition: Arc<schema::Definition>,
     dropped_schema_definition: Arc<schema::Definition>,
     runner: Runner,
+    metric_tag_values: MetricTagsValues,
 }
 
 pub trait VrlRunner {
@@ -403,6 +414,7 @@ where
             default_schema_definition: Arc::new(default_schema_definition),
             dropped_schema_definition: Arc::new(dropped_schema_definition),
             runner,
+            metric_tag_values: config.metric_tag_values,
         })
     }
 
@@ -499,7 +511,14 @@ where
             None
         };
 
-        let mut target = VrlTarget::new(event, self.program.info());
+        let mut target = VrlTarget::new(
+            event,
+            self.program.info(),
+            match self.metric_tag_values {
+                MetricTagsValues::Single => false,
+                MetricTagsValues::Full => true,
+            },
+        );
         let result = self.run_vrl(&mut target);
 
         match result {

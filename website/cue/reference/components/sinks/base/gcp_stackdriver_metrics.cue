@@ -174,11 +174,11 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
 						const:   "adaptive"
 						default: "none"
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -252,7 +252,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 		type: bool: default: false
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

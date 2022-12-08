@@ -671,7 +671,7 @@ impl RunningTopology {
                 // now:
                 debug!(component = %key, fanout_id = %input, "Replacing component input in fanout.");
 
-                let _ = output.send(ControlMessage::Replace(key.clone(), Some(tx.clone())));
+                let _ = output.send(ControlMessage::Replace(key.clone(), tx.clone()));
             }
         }
 
@@ -722,7 +722,7 @@ impl RunningTopology {
                     // now to pause further sends through that component until we reconnect:
                     debug!(component = %key, fanout_id = %input, "Pausing component input in fanout.");
 
-                    let _ = output.send(ControlMessage::Replace(key.clone(), None));
+                    let _ = output.send(ControlMessage::Pause(key.clone()));
                 }
             }
         }

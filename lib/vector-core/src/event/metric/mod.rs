@@ -349,6 +349,14 @@ impl Metric {
         self.series.replace_tag(name, value)
     }
 
+    pub fn set_multi_value_tag(
+        &mut self,
+        name: String,
+        values: impl IntoIterator<Item = TagValue>,
+    ) {
+        self.series.set_multi_value_tag(name, values);
+    }
+
     /// Zeroes out the data in this metric.
     pub fn zero(&mut self) {
         self.data.zero();
@@ -443,7 +451,9 @@ impl ByteSizeOf for Metric {
 
 impl EstimatedJsonEncodedSizeOf for Metric {
     fn estimated_json_encoded_size_of(&self) -> usize {
-        0 // The JSON encoded size of a metric is unspecified.
+        // TODO: For now we're using the in-memory representation of the metric, but we'll convert
+        // this to actually calculate the JSON encoded size in the near future.
+        self.size_of()
     }
 }
 

@@ -450,7 +450,7 @@ mod tests {
         event::{Event, EventStatus, Value},
         test_util::{
             components::{self, assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
-            next_addr, spawn_collect_n, trace_init, wait_for_tcp,
+            next_addr, spawn_collect_n, wait_for_tcp,
         },
         SourceSender,
     };
@@ -473,7 +473,6 @@ mod tests {
         framing: Option<FramingConfig>,
         decoding: Option<DeserializerConfig>,
     ) -> (impl Stream<Item = Event> + 'a, SocketAddr) {
-        components::init_test();
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let path = path.to_owned();
@@ -587,31 +586,31 @@ mod tests {
         rx: impl Stream<Item = Event> + Unpin,
         n: usize,
     ) -> Vec<Event> {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
-            spawn_collect_n(async move { assert_eq!(200, send.await) }, rx, n).await
-        })
-        .await
+        spawn_collect_n(async move { assert_eq!(200, send.await) }, rx, n).await
     }
 
     #[tokio::test]
     async fn http_multiline_text() {
-        let body = "test body\ntest body 2";
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
+            let body = "test body\ntest body 2";
 
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            "POST",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            None,
-        )
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                "POST",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                None,
+            )
+            .await;
+
+            spawn_ok_collect_n(send(addr, body), rx, 2).await
+        })
         .await;
-
-        let mut events = spawn_ok_collect_n(send(addr, body), rx, 2).await;
 
         {
             let event = events.remove(0);
@@ -638,21 +637,24 @@ mod tests {
         //same as above test but with a newline at the end
         let body = "test body\ntest body 2\n";
 
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            "POST",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            None,
-        )
-        .await;
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                "POST",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                None,
+            )
+            .await;
 
-        let mut events = spawn_ok_collect_n(send(addr, body), rx, 2).await;
+            spawn_ok_collect_n(send(addr, body), rx, 2).await
+        })
+        .await;
 
         {
             let event = events.remove(0);
@@ -670,25 +672,26 @@ mod tests {
 
     #[tokio::test]
     async fn http_bytes_codec_preserves_newlines() {
-        trace_init();
-
         let body = "foo\nbar";
 
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            "POST",
-            true,
-            EventStatus::Delivered,
-            true,
-            Some(BytesDecoderConfig::new().into()),
-            None,
-        )
-        .await;
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                "POST",
+                true,
+                EventStatus::Delivered,
+                true,
+                Some(BytesDecoderConfig::new().into()),
+                None,
+            )
+            .await;
 
-        let mut events = spawn_ok_collect_n(send(addr, body), rx, 1).await;
+            spawn_ok_collect_n(send(addr, body), rx, 1).await
+        })
+        .await;
 
         assert_eq!(events.len(), 1);
 
@@ -1135,6 +1138,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_wrong_path() {
+        components::init_test();
         let (_rx, addr) = source(
             vec![],
             vec![],
@@ -1217,6 +1221,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_get_method() {
+        components::init_test();
         let (_rx, addr) = source(
             vec![],
             vec![],
