@@ -451,7 +451,8 @@ where
                         emit!(EventsSent {
                             count,
                             byte_size,
-                            output: None
+                            output: None,
+                            source: None,
                         });
                         // TODO: Emit a BytesSent event here too
                     }

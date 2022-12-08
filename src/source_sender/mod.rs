@@ -26,7 +26,6 @@ const TEST_BUFFER_SIZE: usize = 100;
 const LAG_TIME_NAME: &str = "source_lag_time_seconds";
 
 pub struct Builder {
-    id: usize,
     buf_size: usize,
     inner: Option<Inner>,
     named_inners: HashMap<String, Inner>,
@@ -39,27 +38,31 @@ impl Builder {
     pub fn with_buffer(self, n: usize) -> Self {
         Self {
             buf_size: n,
-            id: self.id,
             inner: self.inner,
             named_inners: self.named_inners,
             lag_time: self.lag_time,
         }
     }
 
-    pub fn add_output(&mut self, output: Output) -> LimitedReceiver<EventArray> {
+    pub fn add_output(&mut self, output: Output, source_id: usize) -> LimitedReceiver<EventArray> {
         match output.port {
             None => {
                 let (inner, rx) = Inner::new_with_buffer(
                     self.buf_size,
                     DEFAULT_OUTPUT.to_owned(),
                     self.lag_time.clone(),
+                    source_id,
                 );
                 self.inner = Some(inner);
                 rx
             }
             Some(name) => {
-                let (inner, rx) =
-                    Inner::new_with_buffer(self.buf_size, name.clone(), self.lag_time.clone());
+                let (inner, rx) = Inner::new_with_buffer(
+                    self.buf_size,
+                    name.clone(),
+                    self.lag_time.clone(),
+                    source_id,
+                );
                 self.named_inners.insert(name, inner);
                 rx
             }
@@ -70,7 +73,6 @@ impl Builder {
     #[allow(clippy::missing_const_for_fn)]
     pub fn build(self) -> SourceSender {
         SourceSender {
-            id: self.id,
             inner: self.inner,
             named_inners: self.named_inners,
         }
@@ -79,15 +81,13 @@ impl Builder {
 
 #[derive(Debug, Clone)]
 pub struct SourceSender {
-    id: usize,
     inner: Option<Inner>,
     named_inners: HashMap<String, Inner>,
 }
 
 impl SourceSender {
-    pub fn builder(id: usize) -> Builder {
+    pub fn builder() -> Builder {
         Builder {
-            id,
             buf_size: CHUNK_SIZE,
             inner: None,
             named_inners: Default::default(),
@@ -96,12 +96,11 @@ impl SourceSender {
     }
 
     #[cfg(test)]
-    pub fn new_with_buffer(id: usize, n: usize) -> (Self, LimitedReceiver<EventArray>) {
+    pub fn new_with_buffer(n: usize) -> (Self, LimitedReceiver<EventArray>) {
         let lag_time = Some(register_histogram!(LAG_TIME_NAME));
-        let (inner, rx) = Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time);
+        let (inner, rx) = Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, 0);
         (
             Self {
-                id,
                 inner: Some(inner),
                 named_inners: Default::default(),
             },
@@ -111,14 +110,14 @@ impl SourceSender {
 
     #[cfg(test)]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(0, TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
         let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
 
     #[cfg(test)]
     pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(0, TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
@@ -137,7 +136,7 @@ impl SourceSender {
     pub fn new_test_errors(
         error_at: impl Fn(usize) -> bool,
     ) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(0, TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
@@ -167,7 +166,7 @@ impl SourceSender {
     ) -> impl Stream<Item = EventArray> + Unpin {
         // The lag_time parameter here will need to be filled in if this function is ever used for
         // non-test situations.
-        let (inner, recv) = Inner::new_with_buffer(100, name.clone(), None);
+        let (inner, recv) = Inner::new_with_buffer(100, name.clone(), None, 0);
         let recv = recv.into_stream().map(move |mut events| {
             events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
@@ -184,7 +183,7 @@ impl SourceSender {
         self.inner
             .as_mut()
             .expect("no default output")
-            .send_event(event, self.id)
+            .send_event(event)
             .await
     }
 
@@ -227,6 +226,7 @@ impl SourceSender {
 
 #[derive(Clone)]
 struct Inner {
+    source_id: usize,
     inner: LimitedSender<EventArray>,
     output: String,
     lag_time: Option<Histogram>,
@@ -247,10 +247,12 @@ impl Inner {
         n: usize,
         output: String,
         lag_time: Option<Histogram>,
+        source_id: usize,
     ) -> (Self, LimitedReceiver<EventArray>) {
         let (tx, rx) = channel::limited(n);
         (
             Self {
+                source_id,
                 inner: tx,
                 output,
                 lag_time,
@@ -259,11 +261,11 @@ impl Inner {
         )
     }
 
-    async fn send(&mut self, mut events: EventArray, source_id: usize) -> Result<(), ClosedError> {
+    async fn send(&mut self, mut events: EventArray) -> Result<(), ClosedError> {
         let reference = Utc::now().timestamp_millis();
         events.iter_events_mut().for_each(|mut event| {
             self.emit_lag_time(event.as_event_ref(), reference);
-            event.metadata_mut().set_source_id(source_id);
+            event.metadata_mut().set_source_id(self.source_id);
         });
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
@@ -272,16 +274,13 @@ impl Inner {
             count,
             byte_size,
             output: Some(self.output.as_ref()),
+            source: None,
         });
         Ok(())
     }
 
-    async fn send_event(
-        &mut self,
-        event: impl Into<EventArray>,
-        source_id: usize,
-    ) -> Result<(), ClosedError> {
-        self.send(event.into(), source_id).await
+    async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
+        self.send(event.into()).await
     }
 
     async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
@@ -322,6 +321,7 @@ impl Inner {
                         count,
                         byte_size,
                         output: Some(self.output.as_ref()),
+                        source: None,
                     });
                     return Err(error.into());
                 }
@@ -332,6 +332,7 @@ impl Inner {
             count,
             byte_size,
             output: Some(self.output.as_ref()),
+            source: None,
         });
 
         Ok(())

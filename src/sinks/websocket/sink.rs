@@ -30,6 +30,7 @@ use vector_core::{
 
 use crate::{
     codecs::{Encoder, Transformer},
+    config::SinkContext,
     dns, emit,
     event::{Event, EventStatus, Finalizable},
     http::Auth,
@@ -40,6 +41,7 @@ use crate::{
     sinks::util::{retries::ExponentialBackoff, StreamSink},
     sinks::websocket::config::WebSocketSinkConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
+    topology::builder::SourceDetails,
 };
 
 #[derive(Debug, Snafu)]
@@ -193,10 +195,15 @@ pub struct WebSocketSink {
     connector: WebSocketConnector,
     ping_interval: Option<u64>,
     ping_timeout: Option<u64>,
+    sources_details: Vec<SourceDetails>,
 }
 
 impl WebSocketSink {
-    pub fn new(config: &WebSocketSinkConfig, connector: WebSocketConnector) -> crate::Result<Self> {
+    pub fn new(
+        config: &WebSocketSinkConfig,
+        connector: WebSocketConnector,
+        ctx: SinkContext,
+    ) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -207,6 +214,7 @@ impl WebSocketSink {
             connector,
             ping_interval: config.ping_interval.filter(|v| *v > 0),
             ping_timeout: config.ping_timeout.filter(|v| *v > 0),
+            sources_details: ctx.sources_details.clone(),
         })
     }
 
@@ -289,6 +297,10 @@ impl WebSocketSink {
                     self.transformer.transform(&mut event);
 
                     let event_byte_size = event.estimated_json_encoded_size_of();
+                    let source = event.metadata().source_id().and_then(|id| self
+                                        .sources_details
+                                        .get(id)
+                                        .map(|details| details.key.id()));
 
                     let mut bytes = BytesMut::new();
                     let res = match self.encoder.encode(event, &mut bytes) {
@@ -302,7 +314,8 @@ impl WebSocketSink {
                                 emit!(EventsSent {
                                     count: 1,
                                     byte_size: event_byte_size,
-                                    output: None
+                                    output: None,
+                                    source,
                                 });
                                 bytes_sent.emit(ByteSize(message_len));
                             })

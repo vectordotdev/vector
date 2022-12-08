@@ -422,7 +422,8 @@ fn handle(
             emit!(EventsSent {
                 count,
                 byte_size,
-                output: None
+                output: None,
+                source: None,
             });
         }
 

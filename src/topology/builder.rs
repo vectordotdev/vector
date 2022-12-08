@@ -197,14 +197,14 @@ pub async fn build_pieces(
 
         let mut builder = {
             let _span = span.enter();
-            SourceSender::builder(pipeline_source_id).with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+            SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
         };
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
         for output in source_outputs {
-            let mut rx = builder.add_output(output.clone());
+            let mut rx = builder.add_output(output.clone(), pipeline_source_id);
 
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
@@ -859,6 +859,7 @@ fn build_task_transform(
                 count: events.len(),
                 byte_size: events.estimated_json_encoded_size_of(),
                 output: None,
+                source: None,
             });
         });
     let transform = async move {

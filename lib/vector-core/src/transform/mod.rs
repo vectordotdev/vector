@@ -281,6 +281,7 @@ impl TransformOutputs {
                 count,
                 byte_size,
                 output: Some(DEFAULT_OUTPUT),
+                source: None,
             });
         }
 
@@ -293,6 +294,7 @@ impl TransformOutputs {
                 count,
                 byte_size,
                 output: Some(key.as_ref()),
+                source: None,
             });
         }
 

@@ -96,6 +96,7 @@ impl StreamSink<EventArray> for BlackholeSink {
                 count: events.len(),
                 byte_size: message_len,
                 output: None,
+                source: None,
             });
 
             emit!(BytesSent {

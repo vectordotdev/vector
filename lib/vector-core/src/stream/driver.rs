@@ -192,6 +192,7 @@ where
                         count: cbs.0,
                         byte_size: cbs.1,
                         output: None,
+                        source: None,
                     });
 
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`

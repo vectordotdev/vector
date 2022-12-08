@@ -54,6 +54,7 @@ where
                         byte_size: event_byte_size,
                         count: 1,
                         output: None,
+                        source: None,
                     });
                     bytes_sent.emit(ByteSize(bytes.len()));
                 }

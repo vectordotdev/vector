@@ -20,6 +20,7 @@ use crate::{
     sinks::util::StreamSink,
     template::{Template, TemplateParseError},
     tls::TlsEnableableConfig,
+    topology::builder::SourceDetails,
 };
 
 #[derive(Debug, Snafu)]
@@ -99,9 +100,9 @@ impl GenerateConfig for NatsSinkConfig {
 impl SinkConfig for NatsSinkConfig {
     async fn build(
         &self,
-        _cx: SinkContext,
+        ctx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = NatsSink::new(self.clone()).await?;
+        let sink = NatsSink::new(self.clone(), ctx).await?;
         let healthcheck = healthcheck(self.clone()).boxed();
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -140,20 +141,23 @@ pub struct NatsSink {
     encoder: Encoder<()>,
     connection: nats::asynk::Connection,
     subject: Template,
+    sources_details: Vec<SourceDetails>,
 }
 
 impl NatsSink {
-    async fn new(config: NatsSinkConfig) -> Result<Self, BuildError> {
+    async fn new(config: NatsSinkConfig, ctx: SinkContext) -> Result<Self, BuildError> {
         let connection = config.connect().await?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build().context(EncodingSnafu)?;
         let encoder = Encoder::<()>::new(serializer);
+        let sources_details = ctx.sources_details.clone();
 
         Ok(NatsSink {
             connection,
             transformer,
             encoder,
             subject: Template::try_from(config.subject).context(SubjectTemplateSnafu)?,
+            sources_details,
         })
     }
 }
@@ -182,6 +186,10 @@ impl StreamSink<Event> for NatsSink {
             self.transformer.transform(&mut event);
 
             let event_byte_size = event.estimated_json_encoded_size_of();
+            let source = event
+                .metadata()
+                .source_id()
+                .and_then(|id| self.sources_details.get(id).map(|details| details.key.id()));
 
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {
@@ -202,7 +210,8 @@ impl StreamSink<Event> for NatsSink {
                     emit!(EventsSent {
                         byte_size: event_byte_size,
                         count: 1,
-                        output: None
+                        output: None,
+                        source,
                     });
                     bytes_sent.emit(ByteSize(bytes.len()));
                 }

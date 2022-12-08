@@ -28,6 +28,7 @@ use crate::{
     internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
     sinks::util::StreamSink,
     template::Template,
+    topology::builder::SourceDetails,
 };
 mod bytes_path;
 use std::convert::TryFrom;
@@ -152,9 +153,9 @@ impl OutFile {
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,
-        _cx: SinkContext,
+        ctx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self)?;
+        let sink = FileSink::new(self, ctx.sources_details.clone())?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -178,10 +179,14 @@ pub struct FileSink {
     idle_timeout: Duration,
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
+    sources_details: Vec<SourceDetails>,
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig) -> crate::Result<Self> {
+    pub fn new(
+        config: &FileSinkConfig,
+        sources_details: Vec<SourceDetails>,
+    ) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -193,6 +198,7 @@ impl FileSink {
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
             files: ExpiringHashMap::default(),
             compression: config.compression,
+            sources_details,
         })
     }
 
@@ -335,6 +341,11 @@ impl FileSink {
         trace!(message = "Writing an event to file.", path = ?path);
         let event_size = event.estimated_json_encoded_size_of();
         let finalizers = event.take_finalizers();
+        let source = event
+            .metadata()
+            .source_id()
+            .and_then(|id| self.sources_details.get(id).map(|details| details.key.id()));
+
         match write_event_to_file(file, event, &self.transformer, &mut self.encoder).await {
             Ok(byte_size) => {
                 finalizers.update_status(EventStatus::Delivered);
@@ -342,6 +353,7 @@ impl FileSink {
                     count: 1,
                     byte_size: event_size,
                     output: None,
+                    source,
                 });
                 emit!(FileBytesSent {
                     byte_size,
@@ -439,7 +451,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config).unwrap();
+        let sink = FileSink::new(&config, vec![]).unwrap();
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(
@@ -475,7 +487,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config).unwrap();
+        let sink = FileSink::new(&config, vec![]).unwrap();
         let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(
@@ -511,7 +523,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config).unwrap();
+        let sink = FileSink::new(&config, vec![]).unwrap();
         let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(
@@ -552,7 +564,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config).unwrap();
+        let sink = FileSink::new(&config, vec![]).unwrap();
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -637,7 +649,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config).unwrap();
+        let sink = FileSink::new(&config, vec![]).unwrap();
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);
