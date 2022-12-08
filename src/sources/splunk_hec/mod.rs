@@ -941,6 +941,7 @@ enum Time {
 }
 
 /// Creates event from raw request
+#[allow(clippy::too_many_arguments)]
 fn raw_event(
     bytes: Bytes,
     gzip: bool,
