@@ -282,7 +282,7 @@ async fn insert_events_over_http() {
 }
 
 #[tokio::test]
-async fn insert_events_over_http_with_compression() {
+async fn insert_events_over_http_with_gzip_compression() {
     trace_init();
 
     run_insert_tests(
