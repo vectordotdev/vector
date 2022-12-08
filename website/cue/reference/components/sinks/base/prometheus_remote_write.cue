@@ -35,19 +35,19 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "The AWS access key ID."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			assume_role: {
 				description:   "The ARN of the role to assume."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			credentials_file: {
 				description:   "Path to the credentials file."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			load_timeout_secs: {
 				description:   "Timeout for successfully loading any credentials, in seconds."
@@ -59,13 +59,13 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "Basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			profile: {
 				description:   "The credentials profile to use."
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			region: {
 				description: """
@@ -76,13 +76,13 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			secret_access_key: {
 				description:   "The AWS secret access key."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
 				required: true
@@ -100,13 +100,13 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "The bearer token to send."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
 				description:   "Basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -117,12 +117,12 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			endpoint: {
 				description: "The API endpoint of the service."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			region: {
 				description: "The AWS region to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -176,12 +176,12 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			[prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	endpoint: {
 		description: "The endpoint to send data to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	quantiles: {
 		description: """
@@ -211,15 +211,9 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: {
-					default: {
-						decrease_ratio:      0.9
-						ewma_alpha:          0.4
-						rtt_deviation_scale: 2.5
-					}
-					options: {
-						decrease_ratio: {
-							description: """
+				type: object: options: {
+					decrease_ratio: {
+						description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -227,11 +221,11 @@ base: components: sinks: prometheus_remote_write: configuration: {
 
 																Note that the new limit is rounded down after applying this ratio.
 																"""
-							required: false
-							type: float: default: 0.9
-						}
-						ewma_alpha: {
-							description: """
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -240,11 +234,11 @@ base: components: sinks: prometheus_remote_write: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-							required: false
-							type: float: default: 0.4
-						}
-						rtt_deviation_scale: {
-							description: """
+						required: false
+						type: float: default: 0.4
+					}
+					rtt_deviation_scale: {
+						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
@@ -254,9 +248,8 @@ base: components: sinks: prometheus_remote_write: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-							required: false
-							type: float: default: 2.5
-						}
+						required: false
+						type: float: default: 2.5
 					}
 				}
 			}
@@ -265,8 +258,19 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				required:    false
 				type: {
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: {
+							adaptive: """
+															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+
+															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															"""
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
+						}
 					}
 					uint: {}
 				}
@@ -339,7 +343,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -348,7 +352,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -360,7 +364,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -369,7 +373,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -378,7 +382,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

@@ -34,17 +34,17 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			access_key_id: {
 				description: "The AWS access key ID."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			assume_role: {
 				description: "The ARN of the role to assume."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			credentials_file: {
 				description: "Path to the credentials file."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			load_timeout_secs: {
 				description: "Timeout for successfully loading any credentials, in seconds."
@@ -54,7 +54,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			profile: {
 				description: "The credentials profile to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			region: {
 				description: """
@@ -64,12 +64,12 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					for the service itself.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -134,11 +134,12 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
 					avro: """
 						Encodes an event as an [Apache Avro][apache_avro] message.
@@ -195,12 +196,12 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -215,7 +216,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 	endpoint: {
 		description: "The API endpoint of the service."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	partition_key_field: {
 		description: """
@@ -224,12 +225,12 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			If not specified, a unique partition key will be generated for each Kinesis record.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	region: {
 		description: "The AWS region to use."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	request: {
 		description: """
@@ -247,15 +248,9 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: {
-					default: {
-						decrease_ratio:      0.9
-						ewma_alpha:          0.4
-						rtt_deviation_scale: 2.5
-					}
-					options: {
-						decrease_ratio: {
-							description: """
+				type: object: options: {
+					decrease_ratio: {
+						description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -263,11 +258,11 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 
 																Note that the new limit is rounded down after applying this ratio.
 																"""
-							required: false
-							type: float: default: 0.9
-						}
-						ewma_alpha: {
-							description: """
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -276,11 +271,11 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-							required: false
-							type: float: default: 0.4
-						}
-						rtt_deviation_scale: {
-							description: """
+						required: false
+						type: float: default: 0.4
+					}
+					rtt_deviation_scale: {
+						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
@@ -290,9 +285,8 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-							required: false
-							type: float: default: 2.5
-						}
+						required: false
+						type: float: default: 2.5
 					}
 				}
 			}
@@ -301,8 +295,19 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				required:    false
 				type: {
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: {
+							adaptive: """
+															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+
+															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															"""
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
+						}
 					}
 					uint: {}
 				}
@@ -359,7 +364,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			[stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -373,7 +378,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -382,7 +387,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -394,7 +399,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -403,7 +408,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -412,7 +417,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

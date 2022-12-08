@@ -20,17 +20,20 @@ base: components: sources: amqp: configuration: {
 		}
 	}
 	connection: {
-		description: "Connection options for `AMQP` source."
+		description: "AMQP connection options."
 		required:    true
 		type: object: options: {
 			connection_string: {
 				description: """
-					URI for the `AMQP` server.
+					URI for the AMQP server.
 
-					Format: amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>
+					The URI has the format of
+					`amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>`.
+
+					The default vhost can be specified by using a value of `%2f`.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: examples: ["amqp://user:password@127.0.0.1:5672/%2f?timeout=10"]
 			}
 			tls: {
 				description: "TLS configuration."
@@ -44,7 +47,7 @@ base: components: sources: amqp: configuration: {
 																they are defined.
 																"""
 						required: false
-						type: array: items: type: string: syntax: "literal"
+						type: array: items: type: string: {}
 					}
 					ca_file: {
 						description: """
@@ -53,7 +56,7 @@ base: components: sources: amqp: configuration: {
 																The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					crt_file: {
 						description: """
@@ -65,7 +68,7 @@ base: components: sources: amqp: configuration: {
 																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					key_file: {
 						description: """
@@ -74,7 +77,7 @@ base: components: sources: amqp: configuration: {
 																The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					key_pass: {
 						description: """
@@ -83,7 +86,7 @@ base: components: sources: amqp: configuration: {
 																This has no effect unless `key_file` is set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					verify_certificate: {
 						description: """
@@ -124,14 +127,15 @@ base: components: sources: amqp: configuration: {
 		required:    false
 		type: string: {
 			default: "vector"
-			syntax:  "literal"
+			examples: ["consumer-group-name"]
 		}
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -174,10 +178,7 @@ base: components: sources: amqp: configuration: {
 	exchange_key: {
 		description: "The `AMQP` exchange key."
 		required:    false
-		type: string: {
-			default: "exchange"
-			syntax:  "literal"
-		}
+		type: string: default: "exchange"
 	}
 	framing: {
 		description: """
@@ -211,7 +212,8 @@ base: components: sources: amqp: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -256,25 +258,16 @@ base: components: sources: amqp: configuration: {
 	offset_key: {
 		description: "The `AMQP` offset key."
 		required:    false
-		type: string: {
-			default: "offset"
-			syntax:  "literal"
-		}
+		type: string: default: "offset"
 	}
 	queue: {
 		description: "The name of the queue to consume."
 		required:    false
-		type: string: {
-			default: "vector"
-			syntax:  "literal"
-		}
+		type: string: default: "vector"
 	}
 	routing_key_field: {
 		description: "The `AMQP` routing key."
 		required:    false
-		type: string: {
-			default: "routing"
-			syntax:  "literal"
-		}
+		type: string: default: "routing"
 	}
 }

@@ -5,7 +5,8 @@ base: components: sources: file_descriptor: configuration: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -82,7 +83,8 @@ base: components: sources: file_descriptor: configuration: {
 				}
 			}
 			method: {
-				required: true
+				description: "The framing method."
+				required:    true
 				type: string: enum: {
 					bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 					character_delimited: "Byte frames which are delimited by a chosen character."
@@ -130,7 +132,7 @@ base: components: sources: file_descriptor: configuration: {
 			By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	max_length: {
 		description: """

@@ -8,7 +8,7 @@ base: components: sources: internal_metrics: configuration: {
 			By default, `vector` is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	scrape_interval_secs: {
 		description: "The interval between metric gathering, in seconds."
@@ -18,34 +18,28 @@ base: components: sources: internal_metrics: configuration: {
 	tags: {
 		description: "Tag configuration for the `internal_metrics` source."
 		required:    false
-		type: object: {
-			default: {
-				host_key: null
-				pid_key:  null
+		type: object: options: {
+			host_key: {
+				description: """
+					Sets the name of the tag to use to add the current hostname to each metric.
+
+					The value will be the current hostname for wherever Vector is running.
+
+					By default, the [global `log_schema.host_key` option][global_host_key] is used.
+					"""
+				required: false
+				type: string: {}
 			}
-			options: {
-				host_key: {
-					description: """
-						Sets the name of the tag to use to add the current hostname to each metric.
+			pid_key: {
+				description: """
+					Sets the name of the tag to use to add the current process ID to each metric.
 
-						The value will be the current hostname for wherever Vector is running.
+					The value will be the current process ID for Vector itself.
 
-						By default, the [global `log_schema.host_key` option][global_host_key] is used.
-						"""
-					required: false
-					type: string: syntax: "literal"
-				}
-				pid_key: {
-					description: """
-						Sets the name of the tag to use to add the current process ID to each metric.
-
-						The value will be the current process ID for Vector itself.
-
-						By default, this is not set and the tag will not be automatically added.
-						"""
-					required: false
-					type: string: syntax: "literal"
-				}
+					By default, this is not set and the tag will not be automatically added.
+					"""
+				required: false
+				type: string: {}
 			}
 		}
 	}

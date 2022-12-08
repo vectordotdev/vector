@@ -38,11 +38,12 @@ base: components: sinks: papertrail: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
 					avro: """
 						Encodes an event as an [Apache Avro][apache_avro] message.
@@ -99,12 +100,12 @@ base: components: sinks: papertrail: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -119,7 +120,7 @@ base: components: sinks: papertrail: configuration: {
 	endpoint: {
 		description: "The endpoint to send logs to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	keepalive: {
 		description: "TCP keepalive settings for socket-based components."
@@ -152,7 +153,7 @@ base: components: sinks: papertrail: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -161,7 +162,7 @@ base: components: sinks: papertrail: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -173,7 +174,7 @@ base: components: sinks: papertrail: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -192,7 +193,7 @@ base: components: sinks: papertrail: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -201,7 +202,7 @@ base: components: sinks: papertrail: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

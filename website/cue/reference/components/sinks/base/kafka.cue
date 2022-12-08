@@ -60,7 +60,7 @@ base: components: sinks: kafka: configuration: {
 			Each value must be in the form of `<host>` or `<host>:<port>`, and separated by a comma.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	compression: {
 		description: "Supported compression types for Kafka."
@@ -87,11 +87,12 @@ base: components: sinks: kafka: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
 					avro: """
 						Encodes an event as an [Apache Avro][apache_avro] message.
@@ -148,12 +149,12 @@ base: components: sinks: kafka: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -172,7 +173,7 @@ base: components: sinks: kafka: configuration: {
 			If omitted, no headers will be written.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	key_field: {
 		description: """
@@ -183,7 +184,7 @@ base: components: sinks: kafka: configuration: {
 			Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	librdkafka_options: {
 		description: """
@@ -195,15 +196,8 @@ base: components: sinks: kafka: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				A map of advanced options to pass directly to the underlying `librdkafka` client.
-
-				For more information on configuration options, see [Configuration properties][config_props_docs].
-
-				[config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-				"""
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 	message_timeout_ms: {
@@ -233,17 +227,17 @@ base: components: sinks: kafka: configuration: {
 			mechanism: {
 				description: "The SASL mechanism to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			password: {
 				description: "The SASL password."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			username: {
 				description: "The SASL username."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -264,7 +258,7 @@ base: components: sinks: kafka: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -273,7 +267,7 @@ base: components: sinks: kafka: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -285,7 +279,7 @@ base: components: sinks: kafka: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -304,7 +298,7 @@ base: components: sinks: kafka: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -313,7 +307,7 @@ base: components: sinks: kafka: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

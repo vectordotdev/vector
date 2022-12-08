@@ -39,7 +39,7 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be `token`.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			oauth2: {
 				description: "OAuth2-specific authenticatgion configuration."
@@ -48,7 +48,7 @@ base: components: sinks: pulsar: configuration: {
 					audience: {
 						description: "The OAuth2 audience."
 						required:    false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					credentials_url: {
 						description: """
@@ -57,17 +57,17 @@ base: components: sinks: pulsar: configuration: {
 																A data URL is also supported.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					issuer_url: {
 						description: "The issuer URL."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					scope: {
 						description: "The OAuth2 scope."
 						required:    false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -79,7 +79,7 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be the signed JWT, in the compact representation.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -94,11 +94,12 @@ base: components: sinks: pulsar: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
 					avro: """
 						Encodes an event as an [Apache Avro][apache_avro] message.
@@ -155,12 +156,12 @@ base: components: sinks: pulsar: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -175,16 +176,16 @@ base: components: sinks: pulsar: configuration: {
 	endpoint: {
 		description: "The endpoint to which the Pulsar client should connect to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	partition_key_field: {
 		description: "Log field to use as Pulsar message key"
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	topic: {
 		description: "The Pulsar topic name to write events to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

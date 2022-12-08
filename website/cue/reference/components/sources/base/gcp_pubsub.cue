@@ -45,7 +45,7 @@ base: components: sources: gcp_pubsub: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	credentials_path: {
 		description: """
@@ -59,13 +59,14 @@ base: components: sources: gcp_pubsub: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -108,7 +109,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	endpoint: {
 		description: "The endpoint from which to pull data."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	framing: {
 		description: """
@@ -142,7 +143,8 @@ base: components: sources: gcp_pubsub: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -218,7 +220,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	project: {
 		description: "The project name from which to pull logs."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	retry_delay_seconds: {
 		description: "Deprecated, old name of `retry_delay_secs`."
@@ -238,7 +240,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	subscription: {
 		description: "The subscription within the project which is configured to receive logs."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -252,7 +254,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -261,7 +263,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -273,7 +275,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -282,7 +284,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -291,7 +293,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

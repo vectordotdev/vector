@@ -45,7 +45,7 @@ pub mod sized_bytes_codec;
 /// Configuration for the `exec` source.
 #[configurable_component(source("exec"))]
 #[derive(Clone, Debug)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct ExecConfig {
     #[configurable(derived)]
     pub mode: Mode,
@@ -57,6 +57,7 @@ pub struct ExecConfig {
     pub streaming: Option<StreamingConfig>,
 
     /// The command to be run, plus any arguments required.
+    #[configurable(metadata(docs::examples = "echo", docs::examples = "Hello World!"))]
     pub command: Vec<String>,
 
     /// The directory in which to run the command.
@@ -986,30 +987,27 @@ mod tests {
     #[cfg(unix)]
     async fn test_run_command_linux() {
         let config = standard_scheduled_test_config();
+        let hostname = Some("Some.Machine".to_string());
+        let decoder = Default::default();
+        let shutdown = ShutdownSignal::noop();
+        let (tx, mut rx) = SourceSender::new_test();
 
-        let (mut rx, timeout_result) = crate::test_util::components::assert_source_compliance(
+        // Wait for our task to finish, wrapping it in a timeout
+        let timeout = tokio::time::timeout(
+            time::Duration::from_secs(5),
+            run_command(
+                config.clone(),
+                hostname,
+                decoder,
+                shutdown,
+                tx,
+                LogNamespace::Legacy,
+            ),
+        );
+
+        let timeout_result = crate::test_util::components::assert_source_compliance(
             &crate::test_util::components::SOURCE_TAGS,
-            async {
-                let hostname = Some("Some.Machine".to_string());
-                let decoder = Default::default();
-                let shutdown = ShutdownSignal::noop();
-                let (tx, rx) = SourceSender::new_test();
-
-                // Wait for our task to finish, wrapping it in a timeout
-                let result = tokio::time::timeout(
-                    time::Duration::from_secs(5),
-                    run_command(
-                        config.clone(),
-                        hostname,
-                        decoder,
-                        shutdown,
-                        tx,
-                        LogNamespace::Legacy,
-                    ),
-                )
-                .await;
-                (rx, result)
-            },
+            timeout,
         )
         .await;
 

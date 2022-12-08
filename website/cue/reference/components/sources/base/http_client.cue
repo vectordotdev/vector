@@ -9,10 +9,11 @@ base: components: sources: http_client: configuration: {
 				description:   "The password to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					basic: """
 						Basic authentication.
@@ -32,13 +33,13 @@ base: components: sources: http_client: configuration: {
 				description:   "The bearer token to send."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
 				description:   "The username to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -46,7 +47,8 @@ base: components: sources: http_client: configuration: {
 		description: "Decoder to use on the HTTP responses."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -92,7 +94,7 @@ base: components: sources: http_client: configuration: {
 			Example: "http://127.0.0.1:9898/logs"
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	framing: {
 		description: "Framing to use in the decoding."
@@ -120,7 +122,8 @@ base: components: sources: http_client: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -169,12 +172,8 @@ base: components: sources: http_client: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Headers to apply to the HTTP requests.
-				One or more values for the same header can be provided.
-				"""
 			required: true
-			type: array: items: type: string: syntax: "literal"
+			type: array: items: type: string: {}
 		}
 	}
 	method: {
@@ -201,14 +200,8 @@ base: components: sources: http_client: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Custom parameters for the HTTP request query string.
-
-				One or more values for the same parameter key can be provided. The parameters provided in this option are
-				appended to any parameters manually provided in the `endpoint` option.
-				"""
 			required: true
-			type: array: items: type: string: syntax: "literal"
+			type: array: items: type: string: {}
 		}
 	}
 	scrape_interval_secs: {
@@ -228,7 +221,7 @@ base: components: sources: http_client: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -237,7 +230,7 @@ base: components: sources: http_client: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -249,7 +242,7 @@ base: components: sources: http_client: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -258,7 +251,7 @@ base: components: sources: http_client: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -267,7 +260,7 @@ base: components: sources: http_client: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

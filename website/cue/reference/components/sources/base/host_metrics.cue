@@ -12,32 +12,26 @@ base: components: sources: host_metrics: configuration: {
 			base: {
 				description: "The base cgroup name to provide metrics for."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			base_dir: {
 				description: "Base cgroup directory, for testing use only"
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			groups: {
 				description: "Lists of group name patterns to include or exclude."
 				required:    false
-				type: object: {
-					default: {
-						excludes: null
-						includes: null
+				type: object: options: {
+					excludes: {
+						description: "Any patterns which should be excluded."
+						required:    false
+						type: array: items: type: string: {}
 					}
-					options: {
-						excludes: {
-							description: "Any patterns which should be excluded."
-							required:    false
-							type: array: items: type: string: syntax: "literal"
-						}
-						includes: {
-							description: "Any patterns which should be included."
-							required:    false
-							type: array: items: type: string: syntax: "literal"
-						}
+					includes: {
+						description: "Any patterns which should be included."
+						required:    false
+						type: array: items: type: string: {}
 					}
 				}
 			}
@@ -76,22 +70,16 @@ base: components: sources: host_metrics: configuration: {
 		type: object: options: devices: {
 			description: "Lists of device name patterns to include or exclude."
 			required:    false
-			type: object: {
-				default: {
-					excludes: null
-					includes: null
+			type: object: options: {
+				excludes: {
+					description: "Any patterns which should be excluded."
+					required:    false
+					type: array: items: type: string: {}
 				}
-				options: {
-					excludes: {
-						description: "Any patterns which should be excluded."
-						required:    false
-						type: array: items: type: string: syntax: "literal"
-					}
-					includes: {
-						description: "Any patterns which should be included."
-						required:    false
-						type: array: items: type: string: syntax: "literal"
-					}
+				includes: {
+					description: "Any patterns which should be included."
+					required:    false
+					type: array: items: type: string: {}
 				}
 			}
 		}
@@ -103,66 +91,48 @@ base: components: sources: host_metrics: configuration: {
 			devices: {
 				description: "Lists of device name patterns to include or exclude."
 				required:    false
-				type: object: {
-					default: {
-						excludes: null
-						includes: null
+				type: object: options: {
+					excludes: {
+						description: "Any patterns which should be excluded."
+						required:    false
+						type: array: items: type: string: {}
 					}
-					options: {
-						excludes: {
-							description: "Any patterns which should be excluded."
-							required:    false
-							type: array: items: type: string: syntax: "literal"
-						}
-						includes: {
-							description: "Any patterns which should be included."
-							required:    false
-							type: array: items: type: string: syntax: "literal"
-						}
+					includes: {
+						description: "Any patterns which should be included."
+						required:    false
+						type: array: items: type: string: {}
 					}
 				}
 			}
 			filesystems: {
 				description: "Lists of filesystem name patterns to include or exclude."
 				required:    false
-				type: object: {
-					default: {
-						excludes: null
-						includes: null
+				type: object: options: {
+					excludes: {
+						description: "Any patterns which should be excluded."
+						required:    false
+						type: array: items: type: string: {}
 					}
-					options: {
-						excludes: {
-							description: "Any patterns which should be excluded."
-							required:    false
-							type: array: items: type: string: syntax: "literal"
-						}
-						includes: {
-							description: "Any patterns which should be included."
-							required:    false
-							type: array: items: type: string: syntax: "literal"
-						}
+					includes: {
+						description: "Any patterns which should be included."
+						required:    false
+						type: array: items: type: string: {}
 					}
 				}
 			}
 			mountpoints: {
 				description: "Lists of mount point path patterns to include or exclude."
 				required:    false
-				type: object: {
-					default: {
-						excludes: null
-						includes: null
+				type: object: options: {
+					excludes: {
+						description: "Any patterns which should be excluded."
+						required:    false
+						type: array: items: type: string: {}
 					}
-					options: {
-						excludes: {
-							description: "Any patterns which should be excluded."
-							required:    false
-							type: array: items: type: string: syntax: "literal"
-						}
-						includes: {
-							description: "Any patterns which should be included."
-							required:    false
-							type: array: items: type: string: syntax: "literal"
-						}
+					includes: {
+						description: "Any patterns which should be included."
+						required:    false
+						type: array: items: type: string: {}
 					}
 				}
 			}
@@ -175,10 +145,7 @@ base: components: sources: host_metrics: configuration: {
 			By default, `host` is used.
 			"""
 		required: false
-		type: string: {
-			default: "host"
-			syntax:  "literal"
-		}
+		type: string: default: "host"
 	}
 	network: {
 		description: "Options for the “network” metrics collector."
@@ -186,22 +153,16 @@ base: components: sources: host_metrics: configuration: {
 		type: object: options: devices: {
 			description: "Lists of device name patterns to include or exclude."
 			required:    false
-			type: object: {
-				default: {
-					excludes: null
-					includes: null
+			type: object: options: {
+				excludes: {
+					description: "Any patterns which should be excluded."
+					required:    false
+					type: array: items: type: string: {}
 				}
-				options: {
-					excludes: {
-						description: "Any patterns which should be excluded."
-						required:    false
-						type: array: items: type: string: syntax: "literal"
-					}
-					includes: {
-						description: "Any patterns which should be included."
-						required:    false
-						type: array: items: type: string: syntax: "literal"
-					}
+				includes: {
+					description: "Any patterns which should be included."
+					required:    false
+					type: array: items: type: string: {}
 				}
 			}
 		}

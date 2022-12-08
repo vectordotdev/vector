@@ -28,17 +28,20 @@ base: components: sinks: amqp: configuration: {
 		}
 	}
 	connection: {
-		description: "Connection options for the `amqp` sink."
+		description: "AMQP connection options."
 		required:    true
 		type: object: options: {
 			connection_string: {
 				description: """
-					URI for the `AMQP` server.
+					URI for the AMQP server.
 
-					Format: amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>
+					The URI has the format of
+					`amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>`.
+
+					The default vhost can be specified by using a value of `%2f`.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: examples: ["amqp://user:password@127.0.0.1:5672/%2f?timeout=10"]
 			}
 			tls: {
 				description: "TLS configuration."
@@ -52,7 +55,7 @@ base: components: sinks: amqp: configuration: {
 																they are defined.
 																"""
 						required: false
-						type: array: items: type: string: syntax: "literal"
+						type: array: items: type: string: {}
 					}
 					ca_file: {
 						description: """
@@ -61,7 +64,7 @@ base: components: sinks: amqp: configuration: {
 																The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					crt_file: {
 						description: """
@@ -73,7 +76,7 @@ base: components: sinks: amqp: configuration: {
 																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					key_file: {
 						description: """
@@ -82,7 +85,7 @@ base: components: sinks: amqp: configuration: {
 																The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					key_pass: {
 						description: """
@@ -91,7 +94,7 @@ base: components: sinks: amqp: configuration: {
 																This has no effect unless `key_file` is set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					verify_certificate: {
 						description: """
@@ -138,11 +141,12 @@ base: components: sinks: amqp: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
 					avro: """
 						Encodes an event as an [Apache Avro][apache_avro] message.
@@ -199,12 +203,12 @@ base: components: sinks: amqp: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."

@@ -26,7 +26,7 @@ pub struct AmqpSinkConfig {
     /// Template used to generate a routing key which corresponds to a queue binding.
     pub(crate) routing_key: Option<Template>,
 
-    /// Connection options for the `amqp` sink.
+    #[configurable(derived)]
     pub(crate) connection: AmqpConfig,
 
     #[configurable(derived)]

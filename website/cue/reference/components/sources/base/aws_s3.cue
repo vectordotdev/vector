@@ -13,13 +13,10 @@ base: components: sources: aws_s3: configuration: {
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: {
-			default: enabled: null
-			options: enabled: {
-				description: "Whether or not end-to-end acknowledgements are enabled for this source."
-				required:    false
-				type: bool: {}
-			}
+		type: object: options: enabled: {
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
+			required:    false
+			type: bool: {}
 		}
 	}
 	assume_role: {
@@ -29,54 +26,51 @@ base: components: sources: aws_s3: configuration: {
 			[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
 		required:    false
-		type: object: {
-			default: load_timeout_secs: null
-			options: {
-				access_key_id: {
-					description: "The AWS access key ID."
-					required:    true
-					type: string: syntax: "literal"
-				}
-				assume_role: {
-					description: "The ARN of the role to assume."
-					required:    true
-					type: string: syntax: "literal"
-				}
-				credentials_file: {
-					description: "Path to the credentials file."
-					required:    true
-					type: string: syntax: "literal"
-				}
-				load_timeout_secs: {
-					description: "Timeout for successfully loading any credentials, in seconds."
-					required:    false
-					type: uint: {}
-				}
-				profile: {
-					description: "The credentials profile to use."
-					required:    false
-					type: string: syntax: "literal"
-				}
-				region: {
-					description: """
-						The AWS region to send STS requests to.
+		type: object: options: {
+			access_key_id: {
+				description: "The AWS access key ID."
+				required:    true
+				type: string: {}
+			}
+			assume_role: {
+				description: "The ARN of the role to assume."
+				required:    true
+				type: string: {}
+			}
+			credentials_file: {
+				description: "Path to the credentials file."
+				required:    true
+				type: string: {}
+			}
+			load_timeout_secs: {
+				description: "Timeout for successfully loading any credentials, in seconds."
+				required:    false
+				type: uint: {}
+			}
+			profile: {
+				description: "The credentials profile to use."
+				required:    false
+				type: string: {}
+			}
+			region: {
+				description: """
+					The AWS region to send STS requests to.
 
-						If not set, this will default to the configured region
-						for the service itself.
-						"""
-					required: false
-					type: string: syntax: "literal"
-				}
-				secret_access_key: {
-					description: "The AWS secret access key."
-					required:    true
-					type: string: syntax: "literal"
-				}
+					If not set, this will default to the configured region
+					for the service itself.
+					"""
+				required: false
+				type: string: {}
+			}
+			secret_access_key: {
+				description: "The AWS secret access key."
+				required:    true
+				type: string: {}
 			}
 		}
 	}
@@ -103,7 +97,7 @@ base: components: sources: aws_s3: configuration: {
 	endpoint: {
 		description: "The API endpoint of the service."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	multiline: {
 		description: """
@@ -120,7 +114,7 @@ base: components: sources: aws_s3: configuration: {
 					This setting must be configured in conjunction with `mode`.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			mode: {
 				description: """
@@ -159,7 +153,7 @@ base: components: sources: aws_s3: configuration: {
 			start_pattern: {
 				description: "Regular expression pattern that is used to match the start of a new message."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			timeout_ms: {
 				description: """
@@ -175,7 +169,7 @@ base: components: sources: aws_s3: configuration: {
 	region: {
 		description: "The AWS region to use."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	sqs: {
 		description: """
@@ -221,7 +215,7 @@ base: components: sources: aws_s3: configuration: {
 			queue_url: {
 				description: "The URL of the SQS queue to poll for bucket notifications."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			tls_options: {
 				description: "TLS configuration."
@@ -235,7 +229,7 @@ base: components: sources: aws_s3: configuration: {
 																they are defined.
 																"""
 						required: false
-						type: array: items: type: string: syntax: "literal"
+						type: array: items: type: string: {}
 					}
 					ca_file: {
 						description: """
@@ -244,7 +238,7 @@ base: components: sources: aws_s3: configuration: {
 																The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					crt_file: {
 						description: """
@@ -256,7 +250,7 @@ base: components: sources: aws_s3: configuration: {
 																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					key_file: {
 						description: """
@@ -265,7 +259,7 @@ base: components: sources: aws_s3: configuration: {
 																The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					key_pass: {
 						description: """
@@ -274,7 +268,7 @@ base: components: sources: aws_s3: configuration: {
 																This has no effect unless `key_file` is set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					verify_certificate: {
 						description: """
@@ -346,7 +340,7 @@ base: components: sources: aws_s3: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -355,7 +349,7 @@ base: components: sources: aws_s3: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -367,7 +361,7 @@ base: components: sources: aws_s3: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -376,7 +370,7 @@ base: components: sources: aws_s3: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -385,7 +379,7 @@ base: components: sources: aws_s3: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

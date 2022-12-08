@@ -22,7 +22,7 @@ base: components: sources: heroku_logs: configuration: {
 	address: {
 		description: "The address to listen for connections on."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	auth: {
 		description: "HTTP Basic authentication configuration."
@@ -31,12 +31,12 @@ base: components: sources: heroku_logs: configuration: {
 			password: {
 				description: "The password for basic authentication."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			username: {
 				description: "The username for basic authentication."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -44,7 +44,8 @@ base: components: sources: heroku_logs: configuration: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -116,7 +117,8 @@ base: components: sources: heroku_logs: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -167,7 +169,7 @@ base: components: sources: heroku_logs: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	tls: {
@@ -182,7 +184,7 @@ base: components: sources: heroku_logs: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -191,7 +193,7 @@ base: components: sources: heroku_logs: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -203,7 +205,7 @@ base: components: sources: heroku_logs: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -222,7 +224,7 @@ base: components: sources: heroku_logs: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -231,7 +233,7 @@ base: components: sources: heroku_logs: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

@@ -20,7 +20,8 @@ base: components: sources: redis: configuration: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -92,7 +93,8 @@ base: components: sources: redis: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -137,7 +139,7 @@ base: components: sources: redis: configuration: {
 	key: {
 		description: "The Redis key to read messages from."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	list: {
 		description: "Options for the Redis `list` data type."
@@ -160,7 +162,7 @@ base: components: sources: redis: configuration: {
 			By default, this is not set and the field will not be automatically added.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	url: {
 		description: """
@@ -169,6 +171,6 @@ base: components: sources: redis: configuration: {
 			The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured via TLS.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

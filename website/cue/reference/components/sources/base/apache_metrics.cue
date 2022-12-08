@@ -4,7 +4,7 @@ base: components: sources: apache_metrics: configuration: {
 	endpoints: {
 		description: "The list of `mod_status` endpoints to scrape metrics from."
 		required:    true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	namespace: {
 		description: """
@@ -13,10 +13,7 @@ base: components: sources: apache_metrics: configuration: {
 			Disabled if empty.
 			"""
 		required: false
-		type: string: {
-			default: "apache"
-			syntax:  "literal"
-		}
+		type: string: default: "apache"
 	}
 	scrape_interval_secs: {
 		description: "The interval between scrapes, in seconds."

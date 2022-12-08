@@ -36,7 +36,8 @@ base: components: sinks: configuration: {
 				type: uint: {}
 			}
 			type: {
-				required: false
+				description: "The type of buffer to use."
+				required:    false
 				type: string: {
 					default: "memory"
 					enum: {
@@ -115,7 +116,7 @@ base: components: sinks: configuration: {
 					components -- port, path, etc -- are allowed as well.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -132,10 +133,7 @@ base: components: sinks: configuration: {
 			[configuration]: https://vector.dev/docs/reference/configuration/
 			"""
 		required: true
-		type: array: items: type: string: {
-			examples: ["my-source-or-transform-id", "prefix-*"]
-			syntax: "literal"
-		}
+		type: array: items: type: string: examples: ["my-source-or-transform-id", "prefix-*"]
 	}
 	proxy: {
 		description: """
@@ -159,10 +157,7 @@ base: components: sinks: configuration: {
 					Must be a valid URI string.
 					"""
 				required: false
-				type: string: {
-					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
-				}
+				type: string: examples: ["http://foo.bar:3128"]
 			}
 			https: {
 				description: """
@@ -171,10 +166,7 @@ base: components: sinks: configuration: {
 					Must be a valid URI string.
 					"""
 				required: false
-				type: string: {
-					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
-				}
+				type: string: examples: ["http://foo.bar:3128"]
 			}
 			no_proxy: {
 				description: """
@@ -195,7 +187,7 @@ base: components: sinks: configuration: {
 				required: false
 				type: array: {
 					default: []
-					items: type: string: syntax: "literal"
+					items: type: string: {}
 				}
 			}
 		}
