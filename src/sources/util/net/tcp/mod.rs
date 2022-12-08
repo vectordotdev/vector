@@ -314,7 +314,6 @@ async fn handle_stream<T>(
                         let acker = source.build_acker(&frames);
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
 
-
                         let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
@@ -347,7 +346,6 @@ async fn handle_stream<T>(
                                 }
                             }
                         }
-
 
                         source.handle_events(&mut events, peer_addr);
                         match out.send_batch(events).await {
