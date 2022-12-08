@@ -382,7 +382,7 @@ async fn insert_events_with_failure() {
 }
 
 #[tokio::test]
-async fn insert_events_with_failure_and_compression() {
+async fn insert_events_with_failure_and_gzip_compression() {
     trace_init();
 
     run_insert_tests(
