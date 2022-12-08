@@ -63,7 +63,7 @@ async fn default_fan_out() {
 
     config.add_sink("out2", &["in"], backpressure_sink(events_to_sink));
 
-    let (_, _) = start_topology(config.build().unwrap(), false).await;
+    let (_topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
     wait_until_expected(&source_counter, expected_sourced_events).await;
@@ -103,7 +103,7 @@ async fn buffer_drop_fan_out() {
     });
     config.add_sink_outer("out2", sink_outer);
 
-    let (_, _) = start_topology(config.build().unwrap(), false).await;
+    let (_topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
     wait_until_expected(&source_counter, expected_sourced_events).await;
@@ -147,7 +147,7 @@ async fn multiple_inputs_backpressure() {
     config.add_source("in2", backpressure_source(&source_counter));
     config.add_sink("out", &["in1", "in2"], backpressure_sink(events_to_sink));
 
-    let (_, _) = start_topology(config.build().unwrap(), false).await;
+    let (_topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
     wait_until_expected(&source_counter, expected_sourced_events).await;
