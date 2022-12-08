@@ -1,11 +1,12 @@
 use vector_core::metric_tags;
 
 use super::*;
-use crate::{
-    event::{metric, Event, Metric, MetricTags},
-    test_util::components::assert_transform_compliance,
-    transforms::test::create_topology,
+use crate::event::{metric, Event, Metric, MetricTags};
+use crate::test_util::components::assert_transform_compliance;
+use crate::transforms::tag_cardinality_limit::config::{
+    default_cache_size, BloomFilterConfig, Mode,
 };
+use crate::transforms::test::create_topology;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 

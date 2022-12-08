@@ -95,7 +95,7 @@ const fn default_value_limit() -> u32 {
     500
 }
 
-const fn default_cache_size() -> usize {
+pub(crate) const fn default_cache_size() -> usize {
     5000 * 1024 // 5KB
 }
 
