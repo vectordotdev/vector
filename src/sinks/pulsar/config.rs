@@ -12,7 +12,8 @@ use futures_util::FutureExt;
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 use pulsar::error::AuthenticationError;
 use pulsar::{
-    message::proto, Authentication, Error as PulsarError, ProducerOptions, Pulsar, TokioExecutor,
+    compression, message::proto, Authentication, Error as PulsarError, ProducerOptions, Pulsar,
+    TokioExecutor,
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -179,14 +180,28 @@ impl PulsarSinkConfig {
             batch_size: None,
             compression: None,
         };
-        if let Some(compression) = &self.compression {
-            match compression {
-                PulsarCompression::None => opts.compression = Some(proto::CompressionType::None),
-                PulsarCompression::Lz4 => opts.compression = Some(proto::CompressionType::Lz4),
-                PulsarCompression::Zlib => opts.compression = Some(proto::CompressionType::Zlib),
-                PulsarCompression::Zstd => opts.compression = Some(proto::CompressionType::Zstd),
+        if let Some(config_compression) = &self.compression {
+            match config_compression {
+                PulsarCompression::None => opts.compression = Some(compression::Compression::None),
+                PulsarCompression::Lz4 => {
+                    opts.compression = Some(compression::Compression::Lz4(
+                        compression::CompressionLz4::default(),
+                    ))
+                }
+                PulsarCompression::Zlib => {
+                    opts.compression = Some(compression::Compression::Zlib(
+                        compression::CompressionZlib::default(),
+                    ))
+                }
+                PulsarCompression::Zstd => {
+                    opts.compression = Some(compression::Compression::Zstd(
+                        compression::CompressionZstd::default(),
+                    ))
+                }
                 PulsarCompression::Snappy => {
-                    opts.compression = Some(proto::CompressionType::Snappy)
+                    opts.compression = Some(compression::Compression::Snappy(
+                        compression::CompressionSnappy::default(),
+                    ))
                 }
             }
         }
