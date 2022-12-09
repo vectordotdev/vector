@@ -33,6 +33,7 @@ pub struct BasicSinkConfig {
 impl_generate_config_from_default!(BasicSinkConfig);
 
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 enum Mode {
     Normal(SourceSender),
     Dead,

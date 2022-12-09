@@ -1565,7 +1565,11 @@ fn test_config_outputs() {
                                 Kind::timestamp(),
                                 Some("timestamp"),
                             )
-                            .with_event_field(&owned_value_path!("hostname"), Kind::bytes(), None)
+                            .with_event_field(
+                                &owned_value_path!("hostname"),
+                                Kind::bytes(),
+                                Some("host"),
+                            )
                             .optional_field(
                                 &owned_value_path!("severity"),
                                 Kind::bytes(),
@@ -1636,7 +1640,7 @@ fn test_config_outputs() {
                                 .with_event_field(
                                     &owned_value_path!("hostname"),
                                     Kind::bytes(),
-                                    None,
+                                    Some("host"),
                                 )
                                 .optional_field(
                                     &owned_value_path!("severity"),
