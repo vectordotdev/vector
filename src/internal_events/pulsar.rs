@@ -86,3 +86,29 @@ impl InternalEvent for PulsarAcknowledgmentError {
         counter!("events_failed_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct PulsarNegativeAcknowledgmentError {
+    pub error: ConsumerError,
+}
+
+impl InternalEvent for PulsarNegativeAcknowledgmentError {
+    fn emit(self) {
+        error!(
+            message = "Failed to negatively acknowledge message.",
+            error = %self.error,
+            error_code = "negative_acknowledge_message",
+            error_type = error_type::ACKNOWLEDGMENT_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "negative_acknowledge_message",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
+        counter!("events_failed_total", 1);
+    }
+}

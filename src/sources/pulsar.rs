@@ -1,14 +1,12 @@
 use crate::codecs::{Decoder, DecodingConfig};
 use crate::config::{SourceConfig, SourceContext};
-use crate::internal_events::PulsarAcknowledgmentError;
+use crate::event::{BatchNotifier};
 use crate::internal_events::PulsarReadError;
 use crate::internal_events::StreamClosedError;
-use crate::serde::{default_decoding, default_framing_message_based};
+use crate::internal_events::{EventsReceived, PulsarAcknowledgmentError, PulsarNegativeAcknowledgmentError};
+use crate::serde::{bool_or_struct, default_decoding, default_framing_message_based};
 use crate::SourceSender;
-use bytes::Bytes;
-use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use codecs::StreamDecodingError;
 use futures_util::StreamExt;
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 use pulsar::error::AuthenticationError;
@@ -21,14 +19,15 @@ use vector_common::finalization::BatchStatus;
 use vector_common::finalizer::OrderedFinalizer;
 use vector_common::internal_event::ByteSize;
 use vector_common::internal_event::{
-    BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
+    BytesReceived, InternalEventHandle as _, Protocol,
 };
 use vector_common::sensitive_string::SensitiveString;
 use vector_common::shutdown::ShutdownSignal;
 use vector_config::component::GenerateConfig;
 use vector_config_macros::configurable_component;
-use vector_core::config::{log_schema, LogNamespace, Output, SourceAcknowledgementsConfig};
+use vector_core::config::{LogNamespace, Output, SourceAcknowledgementsConfig};
 use vector_core::event::Event;
+use codecs::StreamDecodingError;
 use vector_core::ByteSizeOf;
 
 /// Configuration for the `pulsar` source.
@@ -131,9 +130,17 @@ struct DeadLetterQueuePolicy {
     pub dead_letter_topic: String,
 }
 
-#[derive(Debug)]
 struct FinalizerEntry {
-    acker: Arc<Mutex<Consumer<String, TokioExecutor>>>,
+    consumer: Arc<Mutex<Consumer<String, TokioExecutor>>>,
+    message: pulsar::consumer::Message<std::string::String>,
+}
+
+impl std::fmt::Debug for FinalizerEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FinalizerEntry")
+            .field("message", &self.message.payload)
+            .finish()
+    }
 }
 
 impl GenerateConfig for PulsarSourceConfig {
@@ -244,12 +251,13 @@ async fn create_consumer(
 }
 
 async fn pulsar_source(
-    mut consumer: Consumer<String, TokioExecutor>,
+    consumer: Consumer<String, TokioExecutor>,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
 ) -> Result<(), ()> {
+    let consumer = Arc::new(Mutex::new(consumer));
     let (finalizer, mut ack_stream) =
         OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
 
@@ -262,12 +270,13 @@ async fn pulsar_source(
                     handle_ack(status, entry).await;
                 }
             },
-            Some(maybe_message) = consumer.next() => {
+            Some(maybe_message) = consumer.lock().await.next() => {
                 match maybe_message {
                     Ok(msg) => {
                         bytes_received.emit(ByteSize(msg.payload.data.len()));
                         let mut stream = FramedRead::new(msg.payload.data.as_ref(), decoder.clone());
-                        while let Some(next) = stream.next().await {
+                        let stream = async_stream::stream! {
+                            while let Some(next) = stream.next().await {
                             match next {
                                 Ok((events, _byte_size)) => {
                                     let count = events.len();
@@ -276,33 +285,21 @@ async fn pulsar_source(
                                         byte_size: events.size_of()
                                     });
 
-                                    let now = Utc::now();
+                                    let now = chrono::Utc::now();
 
                                     let events = events.into_iter().map(|mut event| {
                                         if let Event::Log(ref mut log) = event {
                                             log.try_insert(
-                                                log_schema().source_type_key(),
-                                                Bytes::from("pulsar"),
+                                                crate::config::log_schema().source_type_key(),
+                                                bytes::Bytes::from("pulsar"),
                                             );
-                                            log.try_insert(log_schema().timestamp_key(), now);
+                                            log.try_insert(crate::config::log_schema().timestamp_key(), now);
                                         }
                                         event
                                     });
 
-                                    //out.send_batch(events).await.map_err(|error| {
-                                    //    emit!(StreamClosedError { error, count });
-                                    //})?;
-                                    match out.send_batch(events).await {
-                                        Err(error) => {
-                                            emit!(StreamClosedError { error, count: 1 });
-                                        }
-                                        Ok(_) => {
-                                            finalizer.add(msg.into(), receiver);
-                                        }
-                                    }
-
-                                    if let Err(error) = consumer.ack(&msg).await {
-                                        emit!(PulsarAcknowledgmentError { error });
+                                    for event in events {
+                                        yield event;
                                     }
                                 }
                                 Err(error) => {
@@ -314,6 +311,9 @@ async fn pulsar_source(
                                 }
                             }
                         }
+                        }.boxed();
+
+                        finalize_event_stream(consumer.clone(), &finalizer, &mut out, stream, msg.clone()).await;
                     }
                     Err(error) => {
                         emit!(PulsarReadError { error })
@@ -326,21 +326,56 @@ async fn pulsar_source(
     Ok(())
 }
 
+/// Send the event stream created by the framed read to the `out` stream.
+async fn finalize_event_stream(
+    consumer: Arc<Mutex<Consumer<String, TokioExecutor>>>,
+    finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
+    out: &mut SourceSender,
+    mut stream: std::pin::Pin<Box<dyn futures_util::Stream<Item = Event> + Send + '_>>,
+    message: pulsar::consumer::Message<std::string::String>,
+) {
+    match finalizer {
+        Some(finalizer) => {
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
+
+            match out.send_event_stream(&mut stream).await {
+                Err(error) => {
+                    emit!(StreamClosedError { error, count: 1 });
+                }
+                Ok(_) => {
+                    finalizer.add(FinalizerEntry{ consumer, message }, receiver);
+                }
+            }
+        }
+        None => match out.send_event_stream(&mut stream).await {
+            Err(error) => {
+                emit!(StreamClosedError { error, count: 1 });
+            }
+            Ok(_) => {
+                if let Err(error) = consumer.lock().await.ack(&message).await {
+                    emit!(PulsarAcknowledgmentError { error });
+                }
+            }
+        },
+    }
+}
+
 async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
     match status {
         BatchStatus::Delivered => {
-            if let Err(error) = entry.acker.lock().await.ack().await {
-                emit!(AmqpAckError { error });
+            if let Err(error) = entry.consumer.lock().await.ack(&entry.message).await {
+                emit!(PulsarAcknowledgmentError { error });
             }
         }
         BatchStatus::Errored => {
-            if let Err(error) = entry.acker.lock().await.nack(ack_options).await {
-                emit!(AmqpRejectError { error });
+            if let Err(error) = entry.consumer.lock().await.nack(&entry.message).await {
+                emit!(PulsarNegativeAcknowledgmentError { error });
             }
         }
         BatchStatus::Rejected => {
-            if let Err(error) = entry.acker.lock().await.nack().await {
-                emit!(AmqpRejectError { error });
+            if let Err(error) = entry.consumer.lock().await.nack(&entry.message).await {
+                emit!(PulsarNegativeAcknowledgmentError { error });
             }
         }
     }
