@@ -695,7 +695,7 @@ jobs:
           path: target/artifacts
       - name: Push amd64 deb
         id: push-deb-amd64
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -708,7 +708,7 @@ jobs:
           file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
       - name: Push arm64 deb
         id: push-deb-arm64
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -721,7 +721,7 @@ jobs:
           file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_arm64.deb"
       - name: Push armhf deb
         id: push-deb-armhf
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -734,7 +734,7 @@ jobs:
           file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_armhf.deb"
       - name: Push x86_64 RPM
         id: push-rpm-x86_64
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -747,7 +747,7 @@ jobs:
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
       - name: Push aarch64 RPM
         id: push-rpm-aarch64
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -760,7 +760,7 @@ jobs:
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
       - name: Push armv7-gnu RPM
         id: push-rpm-armv7-gnu
-        uses: cloudsmith-io/action@v0.5.2
+        uses: cloudsmith-io/action@v0.5.3
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
