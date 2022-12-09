@@ -5,17 +5,24 @@ use std::hash::{Hash, Hasher};
 use std::{cmp::Ordering, mem};
 
 use indexmap::IndexSet;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::{configurable_component, Configurable};
 
 /// A single tag value, either a bare tag or a value.
 #[derive(Clone, Configurable, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(untagged)]
 pub enum TagValue {
     /// Bare tag value.
     Bare,
     /// Tag value containing a string.
     Value(#[configurable(transparent)] String),
+}
+
+impl From<String> for TagValue {
+    fn from(value: String) -> Self {
+        Self::Value(value)
+    }
 }
 
 impl From<Option<String>> for TagValue {
@@ -124,7 +131,6 @@ impl TagValueSet {
         }
     }
 
-    #[cfg(test)]
     fn len(&self) -> usize {
         match self {
             Self::Empty => 0,
@@ -377,18 +383,38 @@ impl ByteSizeOf for TagValueSet {
 
 impl<'de> Deserialize<'de> for TagValueSet {
     fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
-        // Deserialize from a single string only
-        let s = String::deserialize(de)?;
-        Ok(Self::from([s]))
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Variants {
+            // Backwards compatibility for existing data
+            String(String),
+            // This is the new form of tag values
+            Array(Vec<TagValue>),
+        }
+
+        Variants::deserialize(de).map(|v| match v {
+            Variants::String(s) => Self::from([s]),
+            Variants::Array(a) => Self::from(a),
+        })
     }
 }
 
 impl Serialize for TagValueSet {
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-        // Always serialize the tags as a single value
-        match self.as_single() {
-            Some(s) => ser.serialize_str(s),
-            None => ser.serialize_none(),
+        match self.len() {
+            // Serialize a single tag as before.
+            1 => match self.as_single() {
+                Some(s) => ser.serialize_str(s),
+                None => ser.serialize_none(),
+            },
+            // Serialize all other sizes (including empty tag sets) as arrays.
+            len => {
+                let mut ser = ser.serialize_seq(Some(len))?;
+                for value in self {
+                    ser.serialize_element(&value)?;
+                }
+                ser.end()
+            }
         }
     }
 }
@@ -445,10 +471,22 @@ impl MetricTags {
         self.0.get(name).and_then(TagValueSet::as_single)
     }
 
-    pub fn insert(&mut self, name: String, value: String) -> Option<String> {
+    /// Add a value to a tag. This does not replace any existing tags unless the value is a
+    /// duplicate.
+    pub fn insert(&mut self, name: String, value: impl Into<TagValue>) {
+        self.0.entry(name).or_default().insert(value.into());
+    }
+
+    /// Replace all the values of a tag with a single value.
+    pub fn replace(&mut self, name: String, value: impl Into<TagValue>) -> Option<String> {
         self.0
-            .insert(name, TagValueSet::from([value]))
+            .insert(name, TagValueSet::from([value.into()]))
             .and_then(TagValueSet::into_single)
+    }
+
+    pub fn set_multi_value(&mut self, name: String, values: impl IntoIterator<Item = TagValue>) {
+        let x = TagValueSet::from_iter(values);
+        self.0.insert(name, x);
     }
 
     pub fn remove(&mut self, name: &str) -> Option<String> {

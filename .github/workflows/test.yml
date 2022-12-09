@@ -111,7 +111,6 @@ jobs:
       - run: make test
         env:
           CARGO_BUILD_JOBS: 5
-      - run: make test-enterprise
       - name: Upload test results
         run: scripts/upload-test-results.sh
         if: always()
@@ -251,7 +250,6 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make test
       - run: make test-behavior
-      - run: make test-enterprise
 
   test-windows:
     name: Unit - Windows
@@ -262,7 +260,6 @@ jobs:
       - uses: actions/checkout@v3
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
       - run: make test
-      - run: make test-enterprise
 
   test-vrl:
     name: VRL - Linux
