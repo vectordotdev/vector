@@ -200,13 +200,6 @@ async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
         assert_eq!(new_event2, Some(event2));
         // The third event should have been modified to remove "tag1"
         assert_ne!(new_event3, Some(event3));
-
-        // let new_event3 = new_event3.unwrap();
-        // assert!(!new_event3.as_metric().tags().unwrap().contains_key("tag1"));
-        // assert_eq!(
-        //     "val1",
-        //     new_event3.as_metric().tags().unwrap().get("tag2").unwrap()
-        // );
     })
     .await;
 }
