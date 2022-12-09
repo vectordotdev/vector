@@ -9,15 +9,22 @@ releases: "0.25.0": {
 	known_issues: [
 		"""
 			Vector fails to load configurations using environment variables outside of string values
-			for configuration options. This will be fixed in 0.25.1.
+			for configuration options. Fixed in 0.25.1.
 			""",
 		"""
 			Vector fails to load multi-file configurations using the global `timezone` configuration
-			option. This will be fixed in 0.25.1.
+			option. Fixed in 0.25.1.
 			""",
 		"""
-			The `prometheus_remote_write` sink doesn't support specifying `auth.bearer` as it
-			should. This will be fixed in 0.25.1.
+			The `prometheus_remote_write` sink doesn't support specifying the configuration
+			`auth.bearer` as it should. Fixed in 0.25.1.
+			""",
+		"""
+			The `abort` VRL function emits ERROR, rather than DEBUG, logs when discarding an event. Fixed in 0.25.2.
+			""",
+		"""
+			The `azure_blob` sink incorrectly passes a redacted value for the `connection_string`, rather than the actual
+			contents. Fixed in 0.25.2.
 			""",
 	]
 

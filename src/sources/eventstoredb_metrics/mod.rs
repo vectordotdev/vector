@@ -7,7 +7,7 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::types::Stats;
 use crate::{
@@ -121,7 +121,7 @@ fn eventstoredb(
                             Ok(stats) => {
                                 let metrics = stats.metrics(namespace.clone());
                                 let count = metrics.len();
-                                let byte_size = metrics.size_of();
+                                let byte_size = metrics.estimated_json_encoded_size_of();
 
                                 emit!(EventsReceived { count, byte_size });
 

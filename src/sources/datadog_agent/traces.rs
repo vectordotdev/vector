@@ -6,7 +6,7 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
 use crate::{
@@ -132,7 +132,7 @@ fn handle_dd_trace_payload_v1(
         .collect();
 
     emit!(EventsReceived {
-        byte_size: trace_events.size_of(),
+        byte_size: trace_events.estimated_json_encoded_size_of(),
         count: trace_events.len(),
     });
 
@@ -242,7 +242,7 @@ fn handle_dd_trace_payload_v0(
         })).collect();
 
     emit!(EventsReceived {
-        byte_size: trace_events.size_of(),
+        byte_size: trace_events.estimated_json_encoded_size_of(),
         count: trace_events.len(),
     });
 

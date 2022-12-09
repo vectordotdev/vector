@@ -1,9 +1,8 @@
-#![cfg(feature = "cli-tests")]
 use std::{fs::read_dir, process::Command};
 
 use assert_cmd::prelude::*;
 
-mod support;
+use crate::{create_directory, create_file, overwrite_file};
 
 const FAILING_HEALTHCHECK: &str = r#"
 data_dir = "${VECTOR_DATA_DIR}"
@@ -73,14 +72,14 @@ fn clean_generate() {
 #[test]
 fn validate_cleanup() {
     // Create component directories with some file.
-    let dir = support::create_directory();
+    let dir = create_directory();
     let mut path = dir.clone();
     path.push("tmp");
     path.set_extension("data");
-    support::overwrite_file(path.clone(), "");
+    overwrite_file(path.clone(), "");
 
     // Config with some components that write to file system.
-    let config = support::create_file(
+    let config = create_file(
         source_config(
             r#"
     type = "file"
@@ -134,10 +133,10 @@ fn validate_ignore_healthcheck() {
 }
 
 fn validate(config: &str) -> i32 {
-    let dir = support::create_directory();
+    let dir = create_directory();
 
     // Config with some components that write to file system.
-    let config = support::create_file(config);
+    let config = create_file(config);
 
     // Run vector
     let mut cmd = Command::cargo_bin("vector").unwrap();
