@@ -246,13 +246,13 @@ pub(in crate::sinks) fn influx_line_protocol(
 fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
     let original_len = output.len();
     // `tags` is already sorted
-    for (key, value) in tags {
+    for (key, value) in tags.iter_single() {
         if key.is_empty() || value.is_empty() {
             continue;
         }
-        encode_string(&key, output);
+        encode_string(key, output);
         output.put_u8(b'=');
-        encode_string(&value, output);
+        encode_string(value, output);
         output.put_u8(b',');
     }
 

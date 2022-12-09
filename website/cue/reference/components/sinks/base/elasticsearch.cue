@@ -27,6 +27,19 @@ base: components: sinks: elasticsearch: configuration: {
 			type: bool: {}
 		}
 	}
+	api_version: {
+		description: "The API version of Elasticsearch."
+		required:    false
+		type: string: {
+			default: "auto"
+			enum: {
+				auto: "Auto-detect the api version. Will fail if endpoint isn't reachable."
+				v6:   "Use the Elasticsearch 6.x API."
+				v7:   "Use the Elasticsearch 7.x API."
+				v8:   "Use the Elasticsearch 8.x API."
+			}
+		}
+	}
 	auth: {
 		description: "Authentication strategies."
 		required:    false
@@ -158,27 +171,27 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	compression: {
-		description: "Compression configuration."
-		required:    false
-		type: {
-			object: options: {
-				algorithm: {
-					required: false
-					type: string: {
-						const:   "zlib"
-						default: "none"
-					}
-				}
-				level: {
-					description: "Compression level."
-					required:    false
-					type: {
-						number: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-						string: enum: ["none", "fast", "best", "default"]
-					}
-				}
+		description: """
+			Compression configuration.
+
+			All compression algorithms use the default compression level unless otherwise specified.
+			"""
+		required: false
+		type: string: {
+			default: "none"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://zlib.net/
+					"""
 			}
-			string: enum: ["none", "gzip", "zlib"]
 		}
 	}
 	data_stream: {
@@ -448,11 +461,11 @@ base: components: sinks: elasticsearch: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
 						const:   "adaptive"
 						default: "none"
 					}
+					uint: {}
 				}
 			}
 			headers: {
@@ -528,12 +541,14 @@ base: components: sinks: elasticsearch: configuration: {
 			`type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
 
 			If enabled, the `doc_type` option will be ignored.
+
+			This option has been deprecated, the `api_version` option should be used instead.
 			"""
 		required: false
-		type: bool: default: false
+		type: bool: {}
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
@@ -550,7 +565,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

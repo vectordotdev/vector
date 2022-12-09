@@ -1,21 +1,26 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
+use lookup::path;
 use regex::bytes::{CaptureLocations, Regex};
 use vector_common::conversion;
+use vector_config::NamedComponent;
+use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 use crate::{
     event::{self, Event, Value},
     internal_events::{
         ParserConversionError, ParserMatchError, ParserMissingFieldError, DROP_EVENT,
     },
+    sources::kubernetes_logs::Config,
     transforms::{FunctionTransform, OutputBuffer},
 };
 
-pub const MULTILINE_TAG: &str = "multiline_tag";
-pub const NEW_LINE_TAG: &str = "new_line_tag";
-const TIMESTAMP_TAG: &str = "timestamp";
-const CRI_REGEX_PATTERN: &str = r"(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)(?P<new_line_tag>\n?)$";
+const CRI_REGEX_PATTERN: &str = r"(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)\n?$";
+const MESSAGE_KEY: &str = "message";
+const MULTILINE_KEY: &str = "multiline_tag";
+const STREAM_KEY: &str = "stream";
+const TIMESTAMP_KEY: &str = "timestamp";
 
 /// Parser for the CRI log format.
 ///
@@ -34,11 +39,11 @@ pub(super) struct Cri {
     pattern: Regex,
     capture_locations: CaptureLocations,
     capture_names: Vec<(usize, String)>,
-    field: &'static str,
+    log_namespace: LogNamespace,
 }
 
-impl Default for Cri {
-    fn default() -> Self {
+impl Cri {
+    pub fn new(log_namespace: LogNamespace) -> Self {
         let pattern =
             Regex::new(CRI_REGEX_PATTERN).expect("CRI log regex pattern should never fail");
 
@@ -53,21 +58,28 @@ impl Default for Cri {
             pattern,
             capture_locations,
             capture_names,
-            field: crate::config::log_schema().message_key(),
+            log_namespace,
         }
     }
 }
 
 impl FunctionTransform for Cri {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+        let message_field = match self.log_namespace {
+            LogNamespace::Vector => ".",
+            LogNamespace::Legacy => log_schema().message_key(),
+        };
+
         // Get the log field with the message, if it exists, and coerce it to bytes.
         let log = event.as_mut_log();
-        let value = log.get(self.field).map(|s| s.coerce_to_bytes());
+        let value = log.remove(message_field).map(|s| s.coerce_to_bytes());
         match value {
             None => {
                 // The message field was missing, inexplicably. If we can't find the message field, there's nothing for
                 // us to actually decode, so there's no event we could emit, and so we just emit the error and return.
-                emit!(ParserMissingFieldError::<DROP_EVENT> { field: self.field });
+                emit!(ParserMissingFieldError::<DROP_EVENT> {
+                    field: message_field
+                });
                 return;
             }
             Some(s) => match self.pattern.captures_read(&mut self.capture_locations, &s) {
@@ -84,7 +96,7 @@ impl FunctionTransform for Cri {
                             // For all fields except `timestamp`, simply treat them as `Value::Bytes`. For
                             // `timestamp`, however, we actually make sure we can convert it correctly and feed it
                             // in as `Value::Timestamp`.
-                            let value = if name == TIMESTAMP_TAG {
+                            let value = if name == TIMESTAMP_KEY {
                                 let ds = String::from_utf8_lossy(raw);
                                 match DateTime::parse_from_str(&ds, "%+") {
                                     Ok(dt) => Some(Value::Timestamp(dt.with_timezone(&Utc))),
@@ -107,49 +119,56 @@ impl FunctionTransform for Cri {
                         })
                     });
 
-                    let mut drop_original = true;
                     for (name, value) in captures {
-                        // If we're already overriding the original field, don't remove it after.
-                        if name == self.field {
-                            drop_original = false;
+                        match name.as_str() {
+                            MESSAGE_KEY => {
+                                // Insert either directly into `.` or `log_schema().message_key()`,
+                                // overwriting the original "full" CRI log that included additional fields.
+                                drop(log.insert(message_field, value));
+                            }
+                            MULTILINE_KEY => {
+                                // If the MULTILINE_TAG is 'P' (partial), insert our generic `_partial` key.
+                                // This is safe to `unwrap()` as we've just ensured this value is a Value::Bytes
+                                // during the above capturing and mapping.
+                                if value.as_bytes().unwrap()[0] == b'P' {
+                                    self.log_namespace.insert_source_metadata(
+                                        Config::NAME,
+                                        log,
+                                        Some(LegacyKey::Overwrite(path!(event::PARTIAL))),
+                                        path!(event::PARTIAL),
+                                        true,
+                                    );
+                                }
+                            }
+                            TIMESTAMP_KEY => {
+                                // Insert the TIMESTAMP_TAG parsed out of the CRI log, this is the timestamp of
+                                // when the runtime processed this message.
+                                self.log_namespace.insert_source_metadata(
+                                    Config::NAME,
+                                    log,
+                                    Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+                                    path!(TIMESTAMP_KEY),
+                                    value,
+                                );
+                            }
+                            STREAM_KEY => {
+                                self.log_namespace.insert_source_metadata(
+                                    Config::NAME,
+                                    log,
+                                    Some(LegacyKey::Overwrite(path!(STREAM_KEY))),
+                                    path!(STREAM_KEY),
+                                    value,
+                                );
+                            }
+                            _ => {
+                                unreachable!("all CRI captures groups should be matched");
+                            }
                         }
-
-                        drop(log.insert(name.as_str(), value));
-                    }
-
-                    // If we didn't overwrite the original field, remove it now.
-                    if drop_original {
-                        drop(log.remove(self.field));
                     }
                 }
             },
         }
 
-        // Remove the newline tag field, if it exists.
-        //
-        // For additional details, see https://github.com/vectordotdev/vector/issues/8606.
-        let _ = log.remove(NEW_LINE_TAG);
-
-        // Detect if this is a partial event by examining the multiline tag field, and if it is, convert it to the more
-        // generic `_partial` field that partial event merger will be looking for.
-        match log.remove(MULTILINE_TAG) {
-            Some(Value::Bytes(val)) => {
-                let is_partial = val[0] == b'P';
-                if is_partial {
-                    log.insert(event::PARTIAL, true);
-                }
-            }
-            _ => {
-                // The multiline tag always needs to exist in the message, and it needs to be a string, so if we didn't
-                // find it, or it's not a string, this is an invalid event overall so we don't emit the event.
-
-                // TODO: Should we actually emit an internal event/error here? It would definitely be weird if a
-                // mandated field in the log format wasn't present/the right type.
-                return;
-            }
-        };
-
-        // Since we successfully parsed the message, send it onward.
         output.push(event);
     }
 }
@@ -166,100 +185,109 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn cases() -> Vec<(String, Vec<Event>)> {
+    pub fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
         vec![
             (
-                "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1".into(),
+                Bytes::from(
+                    "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1",
+                ),
                 vec![test_util::make_log_event(
-                    "The content of the log entry 1",
+                    vrl::value!("The content of the log entry 1"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     false,
+                    log_namespace,
                 )],
             ),
             (
-                "2016-10-06T00:17:09.669794202Z stdout P First line of log entry 2".into(),
+                Bytes::from("2016-10-06T00:17:09.669794202Z stdout P First line of log entry 2"),
                 vec![test_util::make_log_event(
-                    "First line of log entry 2",
+                    vrl::value!("First line of log entry 2"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     true,
+                    log_namespace,
                 )],
             ),
             (
-                "2016-10-06T00:17:09.669794202Z stdout P Second line of the log entry 2".into(),
+                Bytes::from(
+                    "2016-10-06T00:17:09.669794202Z stdout P Second line of the log entry 2",
+                ),
                 vec![test_util::make_log_event(
-                    "Second line of the log entry 2",
+                    vrl::value!("Second line of the log entry 2"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     true,
+                    log_namespace,
                 )],
             ),
             (
-                "2016-10-06T00:17:10.113242941Z stderr F Last line of the log entry 2".into(),
+                Bytes::from("2016-10-06T00:17:10.113242941Z stderr F Last line of the log entry 2"),
                 vec![test_util::make_log_event(
-                    "Last line of the log entry 2",
+                    vrl::value!("Last line of the log entry 2"),
                     "2016-10-06T00:17:10.113242941Z",
                     "stderr",
                     false,
+                    log_namespace,
                 )],
             ),
             // A part of the partial message with a realistic length.
             (
-                [
-                    r#"2016-10-06T00:17:10.113242941Z stdout P "#,
-                    make_long_string("very long message ", 16 * 1024).as_str(),
-                ]
-                .join(""),
+                Bytes::from(
+                    [
+                        r#"2016-10-06T00:17:10.113242941Z stdout P "#,
+                        make_long_string("very long message ", 16 * 1024).as_str(),
+                    ]
+                    .join(""),
+                ),
                 vec![test_util::make_log_event(
-                    make_long_string("very long message ", 16 * 1024).as_str(),
+                    vrl::value!(make_long_string("very long message ", 16 * 1024)),
                     "2016-10-06T00:17:10.113242941Z",
                     "stdout",
                     true,
+                    log_namespace,
+                )],
+            ),
+            (
+                // This is not valid UTF-8 string, ends with \n
+                // 2021-08-05T17:35:26.640507539Z stdout P Hello World Привет Ми\xd1\n
+                Bytes::from(vec![
+                    50, 48, 50, 49, 45, 48, 56, 45, 48, 53, 84, 49, 55, 58, 51, 53, 58, 50, 54, 46,
+                    54, 52, 48, 53, 48, 55, 53, 51, 57, 90, 32, 115, 116, 100, 111, 117, 116, 32,
+                    80, 32, 72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209,
+                    128, 208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209, 10,
+                ]),
+                vec![test_util::make_log_event(
+                    vrl::value!(Bytes::from(vec![
+                        72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128,
+                        208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209,
+                    ])),
+                    "2021-08-05T17:35:26.640507539Z",
+                    "stdout",
+                    true,
+                    log_namespace,
                 )],
             ),
         ]
     }
 
-    pub fn byte_cases() -> Vec<(Bytes, Vec<Event>)> {
-        vec![(
-            // This is not valid UTF-8 string, ends with \n
-            // 2021-08-05T17:35:26.640507539Z stdout P Hello World Привет Ми\xd1\n
-            Bytes::from(vec![
-                50, 48, 50, 49, 45, 48, 56, 45, 48, 53, 84, 49, 55, 58, 51, 53, 58, 50, 54, 46, 54,
-                52, 48, 53, 48, 55, 53, 51, 57, 90, 32, 115, 116, 100, 111, 117, 116, 32, 80, 32,
-                72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128, 208,
-                184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209, 10,
-            ]),
-            vec![test_util::make_log_event_with_byte_message(
-                Bytes::from(vec![
-                    72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128,
-                    208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209,
-                ]),
-                "2021-08-05T17:35:26.640507539Z",
-                "stdout",
-                true,
-            )],
-        )]
-    }
-
     #[test]
-    fn test_parsing() {
+    fn test_parsing_valid_vector_namespace() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Cri::default()),
-            |s| Event::Log(LogEvent::from(s)),
-            cases(),
+            || Transform::function(Cri::new(LogNamespace::Vector)),
+            |bytes| Event::Log(LogEvent::from(vrl::value!(bytes))),
+            valid_cases(LogNamespace::Vector),
         );
     }
 
     #[test]
-    fn test_parsing_bytes() {
+    fn test_parsing_valid_legacy_namespace() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Cri::default()),
-            |bytes| LogEvent::from(bytes).into(),
-            byte_cases(),
+            || Transform::function(Cri::new(LogNamespace::Legacy)),
+            |bytes| Event::Log(LogEvent::from(bytes)),
+            valid_cases(LogNamespace::Legacy),
         );
     }
 }

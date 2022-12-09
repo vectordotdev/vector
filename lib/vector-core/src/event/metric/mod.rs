@@ -1,7 +1,6 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
-    collections::btree_map,
     convert::AsRef,
     fmt::{self, Display, Formatter},
     num::NonZeroU32,
@@ -14,7 +13,10 @@ use vector_config::configurable_component;
 use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
-    event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
+    event::{
+        estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
+        EventFinalizers, EventMetadata, Finalizable,
+    },
     ByteSizeOf,
 };
 
@@ -343,15 +345,16 @@ impl Metric {
     /// containing the previous value of the tag.
     ///
     /// *Note:* This will create the tags map if it is not present.
-    pub fn insert_tag(&mut self, name: String, value: String) -> Option<String> {
-        self.series.insert_tag(name, value)
+    pub fn replace_tag(&mut self, name: String, value: String) -> Option<String> {
+        self.series.replace_tag(name, value)
     }
 
-    /// Gets the given tag's corresponding entry in this metric.
-    ///
-    /// *Note:* This will create the tags map if it is not present, even if nothing is later inserted.
-    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
-        self.series.tag_entry(key)
+    pub fn set_multi_value_tag(
+        &mut self,
+        name: String,
+        values: impl IntoIterator<Item = TagValue>,
+    ) {
+        self.series.set_multi_value_tag(name, values);
     }
 
     /// Zeroes out the data in this metric.
@@ -443,6 +446,14 @@ impl ByteSizeOf for Metric {
         self.series.allocated_bytes()
             + self.data.allocated_bytes()
             + self.metadata.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for Metric {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        // TODO: For now we're using the in-memory representation of the metric, but we'll convert
+        // this to actually calculate the JSON encoded size in the near future.
+        self.size_of()
     }
 }
 

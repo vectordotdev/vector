@@ -14,12 +14,10 @@ use crossbeam_utils::atomic::AtomicCell;
 use lookup::lookup_v2::TargetPath;
 use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
-use vector_common::{
-    estimated_json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
-    EventDataEq,
-};
+use vector_common::EventDataEq;
 
 use super::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
@@ -79,9 +77,7 @@ impl EstimatedJsonEncodedSizeOf for Inner {
         self.json_encoded_size_cache
             .load()
             .unwrap_or_else(|| {
-                let value = JsonEncodedByteCountingValue(&self.fields);
-
-                let size = value.estimated_json_encoded_size_of();
+                let size = self.fields.estimated_json_encoded_size_of();
                 let size = NonZeroUsize::new(size).expect("Size cannot be zero");
 
                 self.json_encoded_size_cache.store(Some(size));
@@ -180,20 +176,15 @@ impl LogEvent {
         &mut self.metadata
     }
 
+    /// This detects the log namespace used at runtime by checking for the existence
+    /// of the read-only "vector" metadata, which only exists (and is required to exist)
+    /// with the `Vector` log namespace.
     pub fn namespace(&self) -> LogNamespace {
-        // The (read-only) vector prefix on metadata is used to determine which namespace
-        // is being used. The user is prevented from modifying data here.
-        // This prefix should always exist for logs with the "Vector" namespace,
-        // and should never exist otherwise.
-        if self.metadata().value().contains(path!("vector")) {
+        if self.contains((PathPrefix::Metadata, path!("vector"))) {
             LogNamespace::Vector
         } else {
             LogNamespace::Legacy
         }
-    }
-
-    pub fn estimated_json_encoded_size_of(&self) -> usize {
-        self.inner.estimated_json_encoded_size_of()
     }
 }
 
@@ -206,6 +197,12 @@ impl ByteSizeOf for LogEvent {
 impl Finalizable for LogEvent {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for LogEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.inner.estimated_json_encoded_size_of()
     }
 }
 

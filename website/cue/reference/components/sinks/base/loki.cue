@@ -48,12 +48,14 @@ base: components: sinks: loki: configuration: {
 					basic: """
 						Basic authentication.
 
-						The username and password are concatenated and encoded via base64.
+						The username and password are concatenated and encoded via [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
 						"""
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc) is passed as-is.
 						"""
 				}
 			}
@@ -100,27 +102,24 @@ base: components: sinks: loki: configuration: {
 	compression: {
 		description: "Compose with basic compression and Loki-specific compression."
 		required:    false
-		type: {
-			object: options: {
-				algorithm: {
-					required: true
-					type: string: const: "zlib"
-				}
-				level: {
-					description: "Compression level."
-					required:    false
-					type: {
-						number: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-						string: enum: ["none", "fast", "best", "default"]
-					}
-				}
-			}
-			string: {
-				default: "snappy"
-				enum: snappy: """
+		type: string: {
+			default: "snappy"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				snappy: """
 					Snappy compression.
 
 					This implies sending push requests as Protocol Buffers.
+					"""
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://zlib.net/
 					"""
 			}
 		}
@@ -130,7 +129,7 @@ base: components: sinks: loki: configuration: {
 		required:    true
 		type: object: options: {
 			avro: {
-				description:   "Apache Avro serializer options."
+				description:   "Apache Avro-specific encoder options."
 				relevant_when: "codec = \"avro\""
 				required:      true
 				type: object: options: schema: {
@@ -142,27 +141,55 @@ base: components: sinks: loki: configuration: {
 			codec: {
 				required: true
 				type: string: enum: {
-					avro:        "Apache Avro serialization."
-					gelf:        "GELF serialization."
-					json:        "JSON serialization."
-					logfmt:      "Logfmt serialization."
-					native:      "Native Vector serialization based on Protocol Buffers."
-					native_json: "Native Vector serialization based on JSON."
-					raw_message: """
-						No serialization.
+					avro: """
+						Encodes an event as an [Apache Avro][apache_avro] message.
 
-						This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-						they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-						while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-						event.
+						[apache_avro]: https://avro.apache.org/
+						"""
+					gelf: """
+						Encodes an event as a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: """
+						Encodes an event as [JSON][json].
+
+						[json]: https://www.json.org/
+						"""
+					logfmt: """
+						Encodes an event as a [logfmt][logfmt] message.
+
+						[logfmt]: https://brandur.org/logfmt
+						"""
+					native: """
+						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf]([EXPERIMENTAL][experimental]).
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Encodes an event in Vector’s [native JSON format][vector_native_json]([EXPERIMENTAL][experimental]).
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					raw_message: """
+						No encoding.
+
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
-						Plaintext serialization.
+						Plaintext encoding.
 
-						This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-						they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-						while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-						event.
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}
@@ -190,7 +217,7 @@ base: components: sinks: loki: configuration: {
 		description: """
 			The base URL of the Loki instance.
 
-			Vector will append `/loki/api/v1/push` to this.
+			Vector will append the value of `path` to this.
 			"""
 		required: true
 		type: string: syntax: "literal"
@@ -253,6 +280,18 @@ base: components: sinks: loki: configuration: {
 				drop:              "Drop the event."
 				rewrite_timestamp: "Rewrite the timestamp of the event to the timestamp of the latest event seen by the sink."
 			}
+		}
+	}
+	path: {
+		description: """
+			The path to use in the URL of the Loki instance.
+
+			By default, `"/loki/api/v1/push"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "/loki/api/v1/push"
+			syntax:  "literal"
 		}
 	}
 	remove_label_fields: {
@@ -338,11 +377,11 @@ base: components: sinks: loki: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
 						const:   "adaptive"
 						default: "none"
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -402,7 +441,7 @@ base: components: sinks: loki: configuration: {
 		type: string: syntax: "template"
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
@@ -419,7 +458,7 @@ base: components: sinks: loki: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

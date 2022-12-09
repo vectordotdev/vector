@@ -105,6 +105,7 @@ pub struct AwsS3Config {
     tls_options: Option<TlsConfig>,
 
     /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
 }
@@ -156,7 +157,15 @@ impl SourceConfig for AwsS3Config {
                 Kind::bytes(),
                 None,
             )
+            .with_source_metadata(
+                Self::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
             .with_standard_vector_source_metadata()
+            // for metadata that is added to the events dynamically from the metadata
             .with_source_metadata(
                 Self::NAME,
                 None,
@@ -165,6 +174,7 @@ impl SourceConfig for AwsS3Config {
                 None,
             );
 
+        // for metadata that is added to the events dynamically from the metadata
         if log_namespace == LogNamespace::Legacy {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
@@ -680,7 +690,7 @@ mod integration_tests {
                 queue_url: queue_url.to_string(),
                 poll_secs: 1,
                 visibility_timeout_secs: 0,
-                client_concurrency: 1,
+                client_concurrency: None,
                 ..Default::default()
             }),
             acknowledgements: true.into(),

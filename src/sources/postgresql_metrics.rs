@@ -20,7 +20,7 @@ use tokio_postgres::{
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::{metric_tags, ByteSizeOf};
+use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
@@ -37,7 +37,7 @@ macro_rules! tags {
         {
             let mut tags = $tags.clone();
             $(
-                tags.insert($key.into(), $value.into());
+                tags.replace($key.into(), String::from($value));
             )*
             tags
         }
@@ -97,7 +97,7 @@ enum CollectError {
 struct PostgresqlMetricsTlsConfig {
     /// Absolute path to an additional CA certificate file.
     ///
-    /// The certficate must be in the DER or PEM (X.509) format.
+    /// The certificate must be in the DER or PEM (X.509) format.
     ca_file: PathBuf,
 }
 
@@ -535,7 +535,11 @@ impl PostgresqlMetrics {
             Ok(result) => {
                 let (count, byte_size, received_byte_size) =
                     result.iter().fold((0, 0, 0), |res, (set, size)| {
-                        (res.0 + set.len(), res.1 + set.size_of(), res.2 + size)
+                        (
+                            res.0 + set.len(),
+                            res.1 + set.estimated_json_encoded_size_of(),
+                            res.2 + size,
+                        )
                     });
                 emit!(EndpointBytesReceived {
                     byte_size: received_byte_size,
