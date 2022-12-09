@@ -21,7 +21,7 @@ _values: {
 //
 // * `none` - compression is not applied
 // * `gzip` - gzip compression applied
-#CompressionAlgorithm: "none" | "gzip" | "lz4" | "snappy" | "zstd"
+#CompressionAlgorithm: "none" | "gzip" | "lz4" | "snappy" | "zstd" | "zlib"
 
 #CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
 

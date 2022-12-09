@@ -4476,6 +4476,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "lz4"
+version = "1.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e9e2dd86df36ce760a60f6ff6ad526f7ba1f14ba0356f8254fb6905e6494df1"
+dependencies = [
+ "libc",
+ "lz4-sys",
+]
+
+[[package]]
+name = "lz4-sys"
+version = "1.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57d27b317e207b10f69f5e75494119e391a96f48861ae870d1da6edac98ca900"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
 name = "macaddr"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6017,10 +6037,12 @@ dependencies = [
  "chrono",
  "crc",
  "data-url",
+ "flate2",
  "futures 0.3.25",
  "futures-io",
  "futures-timer",
  "log",
+ "lz4",
  "native-tls",
  "nom",
  "oauth2",
@@ -6033,11 +6055,13 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "snap",
  "tokio",
  "tokio-native-tls",
  "tokio-util",
  "url",
  "uuid 1.2.2",
+ "zstd",
 ]
 
 [[package]]
