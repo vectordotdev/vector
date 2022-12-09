@@ -60,6 +60,7 @@ impl<St, Svc> Driver<St, Svc> {
     ///
     /// If this is set, the driver will fetch and use the `bytes_sent` value from responses in a
     /// `BytesSent` event.
+    #[must_use]
     pub fn protocol(mut self, protocol: impl Into<SharedString>) -> Self {
         self.protocol = Some(protocol.into());
         self
@@ -432,7 +433,7 @@ mod tests {
         let driver = Driver::new(input_stream, service);
 
         // Now actually run the driver, consuming all of the input.
-        assert_eq!(driver.run(None).await, Ok(()));
+        assert_eq!(driver.run().await, Ok(()));
         // Make sure the final finalizer task runs.
         tokio::task::yield_now().await;
         assert_eq!(input_total, counter.load(Ordering::SeqCst));
