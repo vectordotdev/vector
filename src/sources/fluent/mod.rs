@@ -132,6 +132,13 @@ impl FluentConfig {
 
         let tag_key = parse_value_path("tag").ok().map(LegacyKey::Overwrite);
 
+        let tls_client_metadata_path = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.as_ref())
+            .and_then(|x| parse_value_path(x).ok())
+            .map(LegacyKey::Overwrite);
+
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let mut schema_definition = BytesDeserializerConfig
@@ -163,6 +170,13 @@ impl FluentConfig {
                 FluentConfig::NAME,
                 None,
                 &owned_value_path!("record"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                tls_client_metadata_path,
+                &owned_value_path!("tls_client_metadata"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             );
