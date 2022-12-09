@@ -264,21 +264,22 @@ impl SourceConfig for Config {
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(
-                    self.namespace_annotation_fields
-                        .namespace_labels
-                        .path
-                        .clone(),
-                )),
+                self.namespace_annotation_fields
+                    .namespace_labels
+                    .path
+                    .clone()
+                    .map(|x| LegacyKey::Overwrite(x.path)),
                 &owned_value_path!("namespace_labels"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(
-                    self.node_annotation_fields.node_labels.path.clone(),
-                )),
+                self.node_annotation_fields
+                    .node_labels
+                    .path
+                    .clone()
+                    .map(|x| LegacyKey::Overwrite(x.path)),
                 &owned_value_path!("node_labels"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,

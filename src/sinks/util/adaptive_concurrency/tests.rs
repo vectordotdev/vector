@@ -432,7 +432,7 @@ async fn run_test(params: TestParams) -> TestResults {
     config.add_source("in", demo_logs);
     config.add_sink("out", &["in"], test_config);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
     let controller = metrics::Controller::get().unwrap();
 

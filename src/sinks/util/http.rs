@@ -15,7 +15,8 @@ use http::StatusCode;
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
-use tower::Service;
+use tower::{Service, ServiceBuilder};
+use tower_http::decompression::DecompressionLayer;
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -379,7 +380,7 @@ where
 
     fn call(&mut self, body: B) -> Self::Future {
         let request_builder = Arc::clone(&self.request_builder);
-        let mut http_client = self.inner.clone();
+        let http_client = self.inner.clone();
 
         Box::pin(async move {
             let request = request_builder(body).await.map_err(|error| {
@@ -390,9 +391,13 @@ where
             let request = request.map(Body::from);
             let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
 
+            let mut decompression_service = ServiceBuilder::new()
+                .layer(DecompressionLayer::new())
+                .service(http_client);
+
             // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emmited
             // in `HttpClient::send`.
-            let response = http_client.call(request).await?;
+            let response = decompression_service.call(request).await?;
 
             if response.status().is_success() {
                 emit!(EndpointBytesSent {
