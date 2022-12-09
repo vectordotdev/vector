@@ -83,7 +83,7 @@ pub struct LuaConfig {
     /// When set to `full`, all metric tags will be exposed as arrays of either string or null
     /// values.
     #[serde(default)]
-    metric_tags_values: MetricTagsValues,
+    metric_tag_values: MetricTagsValues,
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
@@ -269,7 +269,7 @@ impl Lua {
             timers.push((timer, handler_key));
         }
 
-        let multi_value_tags = config.metric_tags_values == MetricTagsValues::Full;
+        let multi_value_tags = config.metric_tag_values == MetricTagsValues::Full;
 
         Ok(Self {
             lua,

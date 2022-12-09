@@ -73,7 +73,7 @@ base: components: transforms: lua: configuration: {
 			}
 		}
 	}
-	metric_tags_values: {
+	metric_tag_values: {
 		description: """
 			When set to `single`, metric tag values will be exposed as single strings, the
 			same as they were before this config option. Tags with multiple values will show the last assigned value, and null values

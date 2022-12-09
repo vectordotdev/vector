@@ -119,12 +119,7 @@ impl<'a> ToLua<'a> for LuaMetricTags {
             )?))
         } else {
             Ok(LuaValue::Table(
-                lua.create_table_from(
-                    self.tags
-                        .0
-                        .into_iter()
-                        .map(|(key, value)| (key, value.into_single())),
-                )?,
+                lua.create_table_from(self.tags.iter_single())?,
             ))
         }
     }
