@@ -223,12 +223,12 @@ impl SourceConfig for OpentelemetryConfig {
             )
             .with_standard_vector_source_metadata();
 
-        match log_namespace {
+        let schema_definition = match log_namespace {
             LogNamespace::Vector => schema_definition.with_meaning(LookupBuf::root(), "message"),
             LogNamespace::Legacy => {
                 schema_definition.with_meaning(log_schema().message_key(), "message")
             }
-        }
+        };
 
         vec![Output::default(DataType::Log)
             .with_port(LOGS)
