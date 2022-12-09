@@ -49,6 +49,28 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				required:      true
 				type: string: syntax: "literal"
 			}
+			imds: {
+				description:   "Configuration for authenticating with AWS through IMDS."
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: object: options: {
+					connect_timeout: {
+						description: "Connect timeout for IMDS, in seconds."
+						required:    true
+						type: uint: {}
+					}
+					max_attempts: {
+						description: "Number of IMDS retries for fetching tokens & metadata"
+						required:    true
+						type: uint: {}
+					}
+					read_timeout: {
+						description: "Read timeout for IMDS, in seconds."
+						required:    true
+						type: uint: {}
+					}
+				}
+			}
 			load_timeout_secs: {
 				description:   "Timeout for successfully loading any credentials, in seconds."
 				relevant_when: "strategy = \"aws\""
