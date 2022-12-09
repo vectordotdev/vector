@@ -252,7 +252,7 @@ impl SourceConfig for SocketConfig {
                     .as_ref()
                     .and_then(|tls| tls.client_metadata_key.as_ref())
                     .and_then(|x| parse_value_path(x).ok())
-                    .map(LegacyKey::InsertIfEmpty);
+                    .map(LegacyKey::Overwrite);
 
                 schema_definition
                     .with_source_metadata(
