@@ -61,8 +61,9 @@ pub struct RouteConfig {
     /// `<transform_name>.<route_id>`. If an event doesn’t match any route, it will be sent to the
     /// `<transform_name>._unmatched` output.
     ///
-    /// Both `_unmatched`, as well as `_default`, are reserved output names and cannot be used as a
-    /// route name.
+    /// Both `_unmatched`, as well as `_default`, are reserved output names and thus cannot be used
+    /// as a route name.
+    #[configurable(metadata(docs::additional_props_description = "An individual route."))]
     route: IndexMap<String, AnyCondition>,
 }
 
