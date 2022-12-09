@@ -800,6 +800,10 @@ mod test {
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "host"),
                     Kind::bytes(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogstashConfig::NAME, "tls_client_metadata"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 );
 
         assert_eq!(definition, expected_definition)

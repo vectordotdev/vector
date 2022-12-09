@@ -969,7 +969,11 @@ mod tests {
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                 )
-                .with_metadata_field(&owned_value_path!("fluent", "host"), Kind::bytes());
+                .with_metadata_field(&owned_value_path!("fluent", "host"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "tls_client_metadata"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                );
 
         assert_eq!(definition, expected_definition)
     }
