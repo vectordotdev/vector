@@ -452,9 +452,9 @@ impl PrometheusExporter {
         }
     }
 
-    async fn start_server_if_needed(&mut self) {
+    async fn start_server_if_needed(&mut self) -> crate::Result<()> {
         if self.server_shutdown_trigger.is_some() {
-            return;
+            return Ok(());
         }
 
         let handler = Handler {
@@ -494,14 +494,10 @@ impl PrometheusExporter {
         let tls = self.config.tls.clone();
         let address = self.config.address;
 
-        tokio::spawn(async move {
-            let tls = MaybeTlsSettings::from_config(&tls, true)
-                .map_err(|error| error!("Server TLS error: {}.", error))?;
-            let listener = tls
-                .bind(&address)
-                .await
-                .map_err(|error| error!("Server bind error: {}.", error))?;
+        let tls = MaybeTlsSettings::from_config(&tls, true)?;
+        let listener = tls.bind(&address).await?;
 
+        tokio::spawn(async move {
             info!(message = "Building HTTP server.", address = %address);
 
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
@@ -515,13 +511,16 @@ impl PrometheusExporter {
         });
 
         self.server_shutdown_trigger = Some(trigger);
+        Ok(())
     }
 }
 
 #[async_trait]
 impl StreamSink<Event> for PrometheusExporter {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        self.start_server_if_needed().await;
+        self.start_server_if_needed()
+            .await
+            .map_err(|error| error!("Failed to start Prometheus exporter: {}.", error))?;
 
         let mut last_flush = Instant::now();
         let flush_period = self.config.flush_period_secs;
