@@ -48,9 +48,10 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing::Instrument;
-use vector_common::internal_event::CallError;
+use vector_common::internal_event::{
+    CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
+};
 // === StreamSink<Event> ===
-use vector_core::internal_event::EventsSent;
 pub use vector_core::sink::StreamSink;
 
 use super::{
@@ -439,20 +440,16 @@ where
             message = "Submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
+        let events_sent = register!(EventsSent::from(Output(None)));
         self.service
             .call(items)
             .err_into()
             .map(move |result| {
                 let status = result_status(&result);
                 finalizers.update_status(status);
-
                 match status {
                     EventStatus::Delivered => {
-                        emit!(EventsSent {
-                            count,
-                            byte_size,
-                            output: None
-                        });
+                        events_sent.emit(CountByteSize(count, byte_size));
                         // TODO: Emit a BytesSent event here too
                     }
                     EventStatus::Rejected => {

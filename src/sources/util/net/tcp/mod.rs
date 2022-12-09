@@ -18,7 +18,7 @@ use tokio::{
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
 use vector_common::finalization::AddBatchNotifier;
-use vector_core::{config::SourceAcknowledgementsConfig, ByteSizeOf};
+use vector_core::{config::SourceAcknowledgementsConfig, EstimatedJsonEncodedSizeOf};
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
@@ -314,13 +314,12 @@ async fn handle_stream<T>(
                         let acker = source.build_acker(&frames);
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
 
-
                         let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
                         emit!(SocketEventsReceived {
                             mode: SocketMode::Tcp,
-                            byte_size: events.size_of(),
+                            byte_size: events.estimated_json_encoded_size_of(),
                             count,
                         });
 
@@ -347,7 +346,6 @@ async fn handle_stream<T>(
                                 }
                             }
                         }
-
 
                         source.handle_events(&mut events, peer_addr);
                         match out.send_batch(events).await {

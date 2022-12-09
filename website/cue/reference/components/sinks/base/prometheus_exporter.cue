@@ -60,12 +60,14 @@ base: components: sinks: prometheus_exporter: configuration: {
 					basic: """
 						Basic authentication.
 
-						The username and password are concatenated and encoded via base64.
+						The username and password are concatenated and encoded via [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
 						"""
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc) is passed as-is.
 						"""
 				}
 			}
@@ -180,7 +182,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

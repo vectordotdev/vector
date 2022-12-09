@@ -133,8 +133,8 @@ impl SourceConfig for SocketConfig {
                     }
                 };
 
-                let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
                 let log_namespace = cx.log_namespace(config.log_namespace);
+                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder, log_namespace);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
@@ -160,7 +160,7 @@ impl SourceConfig for SocketConfig {
                 let decoder = DecodingConfig::new(
                     config.framing().clone(),
                     config.decoding().clone(),
-                    LogNamespace::Legacy,
+                    log_namespace,
                 )
                 .build();
                 Ok(udp::udp(
@@ -173,17 +173,16 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
+                let log_namespace = cx.log_namespace(config.log_namespace);
                 let decoder = DecodingConfig::new(
                     config
                         .framing
                         .clone()
                         .unwrap_or_else(default_framing_message_based),
                     config.decoding.clone(),
-                    LogNamespace::Legacy,
+                    log_namespace,
                 )
                 .build();
-
-                let log_namespace = cx.log_namespace(config.log_namespace);
 
                 unix::unix_datagram(config, decoder, cx.shutdown, cx.out, log_namespace)
             }
@@ -210,9 +209,8 @@ impl SourceConfig for SocketConfig {
                     }
                 };
 
-                let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
-
                 let log_namespace = cx.log_namespace(config.log_namespace);
+                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build();
 
                 unix::unix_stream(config, decoder, cx.shutdown, cx.out, log_namespace)
             }
@@ -440,6 +438,7 @@ mod test {
                 .unwrap();
 
             let event = rx.next().await.unwrap();
+
             assert_eq!(event.as_log()["host"], addr.ip().to_string().into());
             assert_eq!(event.as_log()["port"], addr.port().into());
         })
@@ -466,8 +465,10 @@ mod test {
                 .unwrap();
 
             let event = rx.next().await.unwrap();
-            let event_meta = event.as_log().metadata().value();
+            let log = event.as_log();
+            let event_meta = log.metadata().value();
 
+            assert_eq!(log.value(), &"test".into());
             assert_eq!(
                 event_meta.get(path!("vector", "source_type")).unwrap(),
                 &vrl::value!(SocketConfig::NAME)
@@ -1010,9 +1011,10 @@ mod test {
 
             let from = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
+            let log = events[0].as_log();
+            let event_meta = log.metadata().value();
 
-            let event_meta = events[0].as_log().metadata().value();
-
+            assert_eq!(log.value(), &"test".into());
             assert_eq!(
                 event_meta.get(path!("vector", "source_type")).unwrap(),
                 &vrl::value!(SocketConfig::NAME)
@@ -1305,8 +1307,10 @@ mod test {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", false, true).await;
             let events = collect_n(rx, 1).await;
-            let event_meta = events[0].as_log().metadata().value();
+            let log = events[0].as_log();
+            let event_meta = log.metadata().value();
 
+            assert_eq!(log.value(), &"test".into());
             assert_eq!(events.len(), 1);
 
             assert_eq!(
@@ -1314,7 +1318,6 @@ mod test {
                 &vrl::value!(SocketConfig::NAME)
             );
 
-            assert_eq!(events[0].as_log()["message"], "test".into());
             assert_eq!(
                 event_meta.get(path!(SocketConfig::NAME, "host")).unwrap(),
                 &vrl::value!(UNNAMED_SOCKET_HOST)
@@ -1436,14 +1439,15 @@ mod test {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", true, true).await;
             let events = collect_n(rx, 1).await;
-            let event_meta = events[0].as_log().metadata().value();
+            let log = events[0].as_log();
+            let event_meta = log.metadata().value();
 
+            assert_eq!(log.value(), &"test".into());
             assert_eq!(1, events.len());
             assert_eq!(
                 event_meta.get(path!("vector", "source_type")).unwrap(),
                 &vrl::value!(SocketConfig::NAME)
             );
-            assert_eq!(events[0].as_log()["message"], "test".into());
             assert_eq!(
                 event_meta.get(path!(SocketConfig::NAME, "host")).unwrap(),
                 &vrl::value!(UNNAMED_SOCKET_HOST)

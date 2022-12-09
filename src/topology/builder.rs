@@ -16,6 +16,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
+use vector_common::internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _};
 use vector_config::NamedComponent;
 use vector_core::config::LogNamespace;
 use vector_core::{
@@ -26,7 +27,6 @@ use vector_core::{
         },
         BufferType, WhenFull,
     },
-    internal_event::EventsSent,
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
@@ -346,15 +346,22 @@ pub async fn build_pieces(
         let merged_definition =
             schema::merged_definition(&transform.inputs, config, &mut definition_cache);
 
+        let span = error_span!(
+            "transform",
+            component_kind = "transform",
+            component_id = %key.id(),
+            component_type = %transform.inner.get_component_name(),
+            // maintained for compatibility
+            component_name = %key.id(),
+        );
+
         for output in transform
             .inner
             .outputs(&merged_definition, config.schema.log_namespace())
         {
-            let definition = match output.log_schema_definition {
-                Some(definition) => definition,
-                None => merged_definition.clone(),
-            };
-
+            let definition = output
+                .log_schema_definition
+                .unwrap_or_else(|| merged_definition.clone());
             schema_definitions.insert(output.port, definition);
         }
 
@@ -374,7 +381,12 @@ pub async fn build_pieces(
             config.schema.log_namespace(),
         );
 
-        let transform = match transform.inner.build(&context).await {
+        let transform = match transform
+            .inner
+            .build(&context)
+            .instrument(span.clone())
+            .await
+        {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", key, error));
                 continue;
@@ -387,7 +399,10 @@ pub async fn build_pieces(
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
-        let (transform_task, transform_outputs) = build_transform(transform, node, input_rx);
+        let (transform_task, transform_outputs) = {
+            let _span = span.enter();
+            build_transform(transform, node, input_rx)
+        };
 
         outputs.extend(transform_outputs);
         tasks.insert(key.clone(), transform_task);
@@ -835,14 +850,14 @@ fn build_task_transform(
                 byte_size: events.estimated_json_encoded_size_of(),
             })
         });
+    let events_sent = register!(EventsSent::from(internal_event::Output(None)));
     let stream = t
         .transform(Box::pin(filtered))
-        .inspect(|events: &EventArray| {
-            emit!(EventsSent {
-                count: events.len(),
-                byte_size: events.estimated_json_encoded_size_of(),
-                output: None,
-            });
+        .inspect(move |events: &EventArray| {
+            events_sent.emit(CountByteSize(
+                events.len(),
+                events.estimated_json_encoded_size_of(),
+            ));
         });
     let transform = async move {
         debug!("Task transform starting.");
