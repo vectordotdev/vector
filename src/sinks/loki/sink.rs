@@ -404,7 +404,7 @@ impl LokiSink {
             }
         };
 
-        let sink = input
+        input
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
@@ -441,9 +441,10 @@ impl LokiSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run(Some(self.protocol.into())).await
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await
     }
 }
 

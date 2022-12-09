@@ -390,56 +390,42 @@ where
         let partitioner = EventPartitioner::default();
 
         let builder_limit = NonZeroUsize::new(64);
+        let input = input.batched_partitioned(partitioner, self.batch_settings);
         if self.schema_enabled {
-            let sink = input
-                .batched_partitioned(partitioner, self.batch_settings)
-                .request_builder(
-                    builder_limit,
-                    SemanticLogRequestBuilder {
-                        default_api_key,
-                        encoding: SemanticJsonEncoding {
-                            log_schema: self.encoding.log_schema,
-                            encoder: self.encoding.encoder,
-                        },
-                        compression: self.compression,
+            input.request_builder(
+                builder_limit,
+                SemanticLogRequestBuilder {
+                    default_api_key,
+                    encoding: SemanticJsonEncoding {
+                        log_schema: self.encoding.log_schema,
+                        encoder: self.encoding.encoder,
                     },
-                )
-                .filter_map(|request| async move {
-                    match request {
-                        Err(error) => {
-                            emit!(SinkRequestBuildError { error });
-                            None
-                        }
-                        Ok(req) => Some(req),
-                    }
-                })
-                .into_driver(self.service);
-
-            sink.run(Some(self.protocol.into())).await
+                    compression: self.compression,
+                },
+            )
         } else {
-            let sink = input
-                .batched_partitioned(partitioner, self.batch_settings)
-                .request_builder(
-                    builder_limit,
-                    LogRequestBuilder {
-                        default_api_key,
-                        encoding: self.encoding,
-                        compression: self.compression,
-                    },
-                )
-                .filter_map(|request| async move {
-                    match request {
-                        Err(error) => {
-                            emit!(SinkRequestBuildError { error });
-                            None
-                        }
-                        Ok(req) => Some(req),
-                    }
-                })
-                .into_driver(self.service);
-
-            sink.run(Some(self.protocol.into())).await
+            input.request_builder(
+                builder_limit,
+                LogRequestBuilder {
+                    default_api_key,
+                    encoding: self.encoding,
+                    compression: self.compression,
+                },
+            )
         }
+        .filter_map(|request| async move {
+            match request {
+                Err(error) => {
+                    emit!(SinkRequestBuildError { error });
+                    None
+                }
+                Ok(req) => Some(req),
+            }
+        })
+        .into_driver(self.service)
+        .protocol(self.protocol)
+        .run()
+        .await
     }
 }
 

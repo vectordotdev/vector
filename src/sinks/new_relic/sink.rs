@@ -157,8 +157,9 @@ where
             compression: self.compression,
             credentials: Arc::clone(&self.credentials),
         };
+        let protocol = get_http_scheme_from_uri(&self.credentials.get_uri());
 
-        let sink = input
+        input
             .batched(self.batcher_settings.into_byte_size_config())
             .request_builder(builder_limit, request_builder)
             .filter_map(
@@ -172,10 +173,10 @@ where
                     }
                 },
             )
-            .into_driver(self.service);
-
-        let protocol = get_http_scheme_from_uri(&self.credentials.get_uri());
-        sink.run(Some(protocol.into())).await
+            .into_driver(self.service)
+            .protocol(protocol)
+            .run()
+            .await
     }
 }
 

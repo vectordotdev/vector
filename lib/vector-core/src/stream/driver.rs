@@ -44,11 +44,25 @@ pub trait DriverResponse {
 pub struct Driver<St, Svc> {
     input: St,
     service: Svc,
+    protocol: Option<SharedString>,
 }
 
 impl<St, Svc> Driver<St, Svc> {
     pub fn new(input: St, service: Svc) -> Self {
-        Self { input, service }
+        Self {
+            input,
+            service,
+            protocol: None,
+        }
+    }
+
+    /// Set the protocol name for this driver.
+    ///
+    /// If this is set, the driver will fetch and use the `bytes_sent` value from responses in a
+    /// `BytesSent` event.
+    pub fn protocol(mut self, protocol: impl Into<SharedString>) -> Self {
+        self.protocol = Some(protocol.into());
+        self
     }
 }
 
@@ -65,28 +79,25 @@ where
     ///
     /// All in-flight calls to the provided `service` will also be completed before `run` returns.
     ///
-    /// # Parameters
-    ///
-    /// - `protocol` is the name of the protocol to use in the `BytesSent` event. If this is `None`,
-    /// no `BytesSent` event will be emitted, and the `bytes_sent` value from the response will not
-    /// be used.
-    ///
     /// # Errors
     ///
     /// The return type is mostly to simplify caller code.
     /// An error is currently only returned if a service returns an error from `poll_ready`
-    pub async fn run(self, protocol: Option<SharedString>) -> Result<(), ()> {
+    pub async fn run(self) -> Result<(), ()> {
         let mut in_flight = FuturesUnorderedCount::new();
         let mut next_batch: Option<VecDeque<St::Item>> = None;
         let mut seq_num = 0usize;
 
-        let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
-
-        let Self { input, mut service } = self;
+        let Self {
+            input,
+            mut service,
+            protocol,
+        } = self;
 
         let batched_input = input.ready_chunks(1024);
         pin!(batched_input);
 
+        let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
         let events_sent = register(EventsSent::from(Output(None)));
 
         loop {

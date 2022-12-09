@@ -100,7 +100,7 @@ where
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let sink = input
+        input
             .batched_partitioned(EventPartitioner, self.batch_settings)
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)
@@ -118,9 +118,10 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run(Some(self.protocol.into())).await?;
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await?;
 
         // Create a channel for the stats flushing thread to communicate back that it has flushed
         // remaining stats. This is necessary so that we do not terminate the process while the
