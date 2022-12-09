@@ -14,7 +14,11 @@ use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 use pulsar::error::AuthenticationError;
 use pulsar::{Authentication, SubType};
 use pulsar::{Consumer, Pulsar, TokioExecutor};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio_util::codec::FramedRead;
+use vector_common::finalization::BatchStatus;
+use vector_common::finalizer::OrderedFinalizer;
 use vector_common::internal_event::ByteSize;
 use vector_common::internal_event::{
     BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
@@ -23,7 +27,7 @@ use vector_common::sensitive_string::SensitiveString;
 use vector_common::shutdown::ShutdownSignal;
 use vector_config::component::GenerateConfig;
 use vector_config_macros::configurable_component;
-use vector_core::config::{log_schema, LogNamespace, Output};
+use vector_core::config::{log_schema, LogNamespace, Output, SourceAcknowledgementsConfig};
 use vector_core::event::Event;
 use vector_core::ByteSizeOf;
 
@@ -71,6 +75,10 @@ pub struct PulsarSourceConfig {
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 /// Authentication configuration.
@@ -123,6 +131,11 @@ struct DeadLetterQueuePolicy {
     pub dead_letter_topic: String,
 }
 
+#[derive(Debug)]
+struct FinalizerEntry {
+    acker: Arc<Mutex<Consumer<String, TokioExecutor>>>,
+}
+
 impl GenerateConfig for PulsarSourceConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -144,12 +157,14 @@ impl SourceConfig for PulsarSourceConfig {
             LogNamespace::Legacy,
         )
         .build();
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(pulsar_source(
             consumer,
             decoder,
             cx.shutdown,
             cx.out,
+            acknowledgements,
         )))
     }
 
@@ -233,11 +248,20 @@ async fn pulsar_source(
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
+    acknowledgements: bool,
 ) -> Result<(), ()> {
+    let (finalizer, mut ack_stream) =
+        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
     loop {
         tokio::select! {
             _ = &mut shutdown => break,
+            entry = ack_stream.next() => {
+                if let Some((status, entry)) = entry {
+                    handle_ack(status, entry).await;
+                }
+            },
             Some(maybe_message) = consumer.next() => {
                 match maybe_message {
                     Ok(msg) => {
@@ -265,9 +289,17 @@ async fn pulsar_source(
                                         event
                                     });
 
-                                    out.send_batch(events).await.map_err(|error| {
-                                        emit!(StreamClosedError { error, count });
-                                    })?;
+                                    //out.send_batch(events).await.map_err(|error| {
+                                    //    emit!(StreamClosedError { error, count });
+                                    //})?;
+                                    match out.send_batch(events).await {
+                                        Err(error) => {
+                                            emit!(StreamClosedError { error, count: 1 });
+                                        }
+                                        Ok(_) => {
+                                            finalizer.add(msg.into(), receiver);
+                                        }
+                                    }
 
                                     if let Err(error) = consumer.ack(&msg).await {
                                         emit!(PulsarAcknowledgmentError { error });
@@ -292,6 +324,26 @@ async fn pulsar_source(
     }
 
     Ok(())
+}
+
+async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
+    match status {
+        BatchStatus::Delivered => {
+            if let Err(error) = entry.acker.lock().await.ack().await {
+                emit!(AmqpAckError { error });
+            }
+        }
+        BatchStatus::Errored => {
+            if let Err(error) = entry.acker.lock().await.nack(ack_options).await {
+                emit!(AmqpRejectError { error });
+            }
+        }
+        BatchStatus::Rejected => {
+            if let Err(error) = entry.acker.lock().await.nack().await {
+                emit!(AmqpRejectError { error });
+            }
+        }
+    }
 }
 
 #[cfg(test)]
