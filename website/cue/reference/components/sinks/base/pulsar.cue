@@ -182,14 +182,14 @@ base: components: sinks: pulsar: configuration: {
 		required:    false
 		type: string: syntax: "literal"
 	}
-	topic: {
-		description: "The Pulsar topic name to write events to."
-		required:    true
-		type: string: syntax: "literal"
-	}
 	producer_name: {
 		description: "The name of the producer. If not specified, the default name assigned by Pulsar will be used."
 		required:    false
+		type: string: syntax: "literal"
+	}
+	topic: {
+		description: "The Pulsar topic name to write events to."
+		required:    true
 		type: string: syntax: "literal"
 	}
 }
