@@ -282,6 +282,23 @@ async fn insert_events_over_http() {
 }
 
 #[tokio::test]
+async fn insert_events_over_http_with_gzip_compression() {
+    trace_init();
+
+    run_insert_tests(
+        ElasticsearchConfig {
+            endpoints: vec![http_server()],
+            doc_type: Some("log_lines".into()),
+            compression: Compression::gzip_default(),
+            ..config()
+        },
+        false,
+        BatchStatus::Delivered,
+    )
+    .await;
+}
+
+#[tokio::test]
 async fn insert_events_over_https() {
     trace_init();
 
@@ -356,6 +373,23 @@ async fn insert_events_with_failure() {
             endpoints: vec![http_server()],
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
+            ..config()
+        },
+        true,
+        BatchStatus::Rejected,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn insert_events_with_failure_and_gzip_compression() {
+    trace_init();
+
+    run_insert_tests(
+        ElasticsearchConfig {
+            endpoints: vec![http_server()],
+            doc_type: Some("log_lines".into()),
+            compression: Compression::gzip_default(),
             ..config()
         },
         true,
