@@ -86,6 +86,3 @@ pub(super) fn get_properties(
         None
     })
 }
-
-#[cfg(test)]
-mod tests {}
