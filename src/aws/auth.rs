@@ -201,6 +201,30 @@ mod tests {
     }
 
     #[test]
+    fn parsing_default_with_imds_client() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.imds.max_attempts = 10
+            auth.imds.connect_timeout = 60
+            auth.imds.read_timeout = 30
+        "#,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            config.auth,
+            AwsAuthentication::Default {
+                load_timeout_secs: None,
+                imds: Some(ImdsAuthentication {
+                    max_attempts: 10,
+                    connect_timeout: 60,
+                    read_timeout: 30
+                }),
+            }
+        ));
+    }
+
+    #[test]
     fn parsing_old_assume_role() {
         let config = toml::from_str::<ComponentConfig>(
             r#"
@@ -223,6 +247,41 @@ mod tests {
         .unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::Role { .. }));
+    }
+
+    #[test]
+    fn parsing_assume_role_with_imds_client() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.assume_role = "root"
+            auth.imds.max_attempts = 5
+            auth.imds.connect_timeout = 30
+            auth.imds.read_timeout = 10
+        "#,
+        )
+        .unwrap();
+
+        match config.auth {
+            AwsAuthentication::Role {
+                assume_role,
+                load_timeout_secs,
+                imds,
+                region,
+            } => {
+                assert_eq!(&assume_role, "root");
+                assert_eq!(load_timeout_secs, None);
+                assert!(matches!(
+                    imds,
+                    Some(ImdsAuthentication {
+                        max_attempts: 5,
+                        connect_timeout: 30,
+                        read_timeout: 10
+                    })
+                ));
+                assert_eq!(region, None);
+            }
+            _ => panic!(),
+        }
     }
 
     #[test]
