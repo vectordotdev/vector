@@ -259,6 +259,7 @@ mod tests {
     fn output_schema_definition_vector_namespace() {
         let config = NatsSourceConfig {
             log_namespace: Some(true),
+            subject_key_field: "subject".to_string(),
             ..Default::default()
         };
 
@@ -274,15 +275,18 @@ mod tests {
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
-                );
+                )
+                .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes());
 
         assert_eq!(definition, expected_definition);
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
-        let config = NatsSourceConfig::default();
-
+        let config = NatsSourceConfig {
+            subject_key_field: "subject".to_string(),
+            ..Default::default()
+        };
         let definition = config.outputs(LogNamespace::Legacy)[0]
             .clone()
             .log_schema_definition
@@ -298,7 +302,8 @@ mod tests {
             Some("message"),
         )
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
-        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None);
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("subject"), Kind::bytes(), None);
 
         assert_eq!(definition, expected_definition);
     }
