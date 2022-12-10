@@ -60,6 +60,33 @@ components: _aws: {
 							examples: [30]
 						}
 					}
+					imds: {
+						description: "Configuration for authenticating with AWS through IMDS."
+						required:    false
+						type: object: options: {
+							connect_timeout: {
+								description: "Connect timeout for IMDS, in seconds."
+								required:    true
+								type: uint: {
+									examples: [30]
+								}
+							}
+							max_attempts: {
+								description: "Number of IMDS retries for fetching tokens & metadata"
+								required:    true
+								type: uint: {
+									examples: [5]
+								}
+							}
+							read_timeout: {
+								description: "Read timeout for IMDS, in seconds."
+								required:    true
+								type: uint: {
+									examples: [15]
+								}
+							}
+						}
+					}
 					profile: {
 						category:    "Auth"
 						common:      false
