@@ -191,6 +191,7 @@ impl SinkConfig for GcsSinkConfig {
             base_url.clone(),
             auth.clone(),
         )?;
+        auth.spawn_regenerate_token();
         let sink = self.build_sink(client, base_url, auth)?;
 
         Ok((sink, healthcheck))
@@ -228,7 +229,6 @@ impl GcsSinkConfig {
         let request_settings = RequestSettings::new(self)?;
 
         let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings);
-
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
