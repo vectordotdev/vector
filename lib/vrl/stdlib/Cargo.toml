@@ -73,6 +73,7 @@ vrl = { path = "../vrl" , features = ["test"]}
 
 [features]
 default = [
+    "abs",
     "append",
     "array",
     "assert",
@@ -216,6 +217,7 @@ default = [
     "values"
 ]
 
+abs = []
 append = []
 array = []
 assert = []
