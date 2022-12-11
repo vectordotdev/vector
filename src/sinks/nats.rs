@@ -115,7 +115,7 @@ impl SinkConfig for NatsSinkConfig {
     }
 }
 
-impl std::convert::TryFrom<&NatsSinkConfig> for nats::asynk::Options {
+impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSinkConfig) -> Result<Self, Self::Error> {
@@ -124,8 +124,8 @@ impl std::convert::TryFrom<&NatsSinkConfig> for nats::asynk::Options {
 }
 
 impl NatsSinkConfig {
-    async fn connect(&self) -> Result<nats::asynk::Connection, BuildError> {
-        let options: nats::asynk::Options = self.try_into().context(ConfigSnafu)?;
+    async fn connect(&self) -> Result<async_nats::Client, BuildError> {
+        let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
 
         options.connect(&self.url).await.context(ConnectSnafu)
     }
@@ -138,7 +138,7 @@ async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
 pub struct NatsSink {
     transformer: Transformer,
     encoder: Encoder<()>,
-    connection: nats::asynk::Connection,
+    connection: async_nats::Client,
     subject: Template,
 }
 
@@ -191,7 +191,8 @@ impl StreamSink<Event> for NatsSink {
                 continue;
             }
 
-            match self.connection.publish(&subject, &bytes).await {
+            let message_size = bytes.len();
+            match self.connection.publish(subject.clone(), bytes.freeze()).await {
                 Err(error) => {
                     finalizers.update_status(EventStatus::Errored);
 
@@ -201,7 +202,7 @@ impl StreamSink<Event> for NatsSink {
                     finalizers.update_status(EventStatus::Delivered);
 
                     events_sent.emit(CountByteSize(1, event_byte_size));
-                    bytes_sent.emit(ByteSize(bytes.len()));
+                    bytes_sent.emit(ByteSize(message_size));
                 }
             }
         }

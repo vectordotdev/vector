@@ -287,7 +287,7 @@ lru = { version = "0.8.1", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.3.1", default-features = false, features = ["tokio-runtime"], optional = true }
-nats = { version = "0.23.1", default-features = false, optional = true }
+async-nats = { version = "0.24.0", default-features = false, optional = true }
 nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
@@ -537,7 +537,7 @@ sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
-sources-nats = ["dep:nats", "dep:nkeys"]
+sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
@@ -690,7 +690,7 @@ sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
 sinks-logdna = []
 sinks-loki = ["loki-logproto"]
-sinks-nats = ["dep:nats", "dep:nkeys"]
+sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["dep:syslog"]

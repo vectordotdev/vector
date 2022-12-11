@@ -1,6 +1,6 @@
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
-use futures::{pin_mut, stream, Stream, StreamExt};
+use futures::{pin_mut, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{
@@ -28,7 +28,7 @@ enum BuildError {
     #[snafu(display("NATS Connect Error: {}", source))]
     Connect { source: std::io::Error },
     #[snafu(display("NATS Subscribe Error: {}", source))]
-    Subscribe { source: std::io::Error },
+    Subscribe { source: async_nats::Error },
 }
 
 /// Configuration for the `nats` source.
@@ -121,13 +121,13 @@ impl SourceConfig for NatsSourceConfig {
 }
 
 impl NatsSourceConfig {
-    async fn connect(&self) -> Result<nats::asynk::Connection, BuildError> {
-        let options: nats::asynk::Options = self.try_into().context(ConfigSnafu)?;
+    async fn connect(&self) -> Result<async_nats::Client, BuildError> {
+        let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
         options.connect(&self.url).await.context(ConnectSnafu)
     }
 }
 
-impl std::convert::TryFrom<&NatsSourceConfig> for nats::asynk::Options {
+impl std::convert::TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
@@ -135,29 +135,21 @@ impl std::convert::TryFrom<&NatsSourceConfig> for nats::asynk::Options {
     }
 }
 
-fn get_subscription_stream(
-    subscription: nats::asynk::Subscription,
-) -> impl Stream<Item = nats::asynk::Message> {
-    stream::unfold(subscription, |subscription| async move {
-        subscription.next().await.map(|msg| (msg, subscription))
-    })
-}
-
 async fn nats_source(
     // Take ownership of the connection so it doesn't get dropped.
-    _connection: nats::asynk::Connection,
-    subscription: nats::asynk::Subscription,
+    _connection: async_nats::Client,
+    subscriber: async_nats::Subscriber,
     decoder: Decoder,
     log_namespace: LogNamespace,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
-    let stream = get_subscription_stream(subscription).take_until(shutdown);
+    let stream = subscriber.take_until(shutdown);
     pin_mut!(stream);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
     while let Some(msg) = stream.next().await {
-        bytes_received.emit(ByteSize(msg.data.len()));
-        let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
+        bytes_received.emit(ByteSize(msg.payload.len()));
+        let mut stream = FramedRead::new(msg.payload.as_ref(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
@@ -199,12 +191,12 @@ async fn nats_source(
 
 async fn create_subscription(
     config: &NatsSourceConfig,
-) -> Result<(nats::asynk::Connection, nats::asynk::Subscription), BuildError> {
+) -> Result<(async_nats::Client, async_nats::Subscriber), BuildError> {
     let nc = config.connect().await?;
 
     let subscription = match &config.queue {
-        None => nc.subscribe(&config.subject).await,
-        Some(queue) => nc.queue_subscribe(&config.subject, queue).await,
+        None => nc.subscribe(config.subject.clone()).await,
+        Some(queue) => nc.queue_subscribe(config.subject.clone(), queue.clone()).await,
     };
 
     let subscription = subscription.context(SubscribeSnafu)?;
