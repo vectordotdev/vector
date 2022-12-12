@@ -8,6 +8,7 @@ use bytes::Bytes;
 use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use listenfd::ListenFd;
+use lookup::metadata_path;
 use smallvec::SmallVec;
 use socket2::SockRef;
 use tokio::{
@@ -18,6 +19,7 @@ use tokio::{
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
 use vector_common::finalization::AddBatchNotifier;
+use vector_core::config::LogNamespace;
 use vector_core::{config::SourceAcknowledgementsConfig, EstimatedJsonEncodedSizeOf};
 
 use self::request_limiter::RequestLimiter;
@@ -113,6 +115,8 @@ where
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         max_connections: Option<u32>,
+        source_name: &'static str,
+        log_namespace: LogNamespace,
     ) -> crate::Result<crate::sources::Source> {
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
 
@@ -202,6 +206,8 @@ where
                                 acknowledgements,
                                 request_limiter,
                                 tls_client_metadata_key.clone(),
+                                source_name,
+                                log_namespace,
                             );
 
                             tokio::spawn(
@@ -233,6 +239,8 @@ async fn handle_stream<T>(
     acknowledgements: bool,
     request_limiter: RequestLimiter,
     tls_client_metadata_key: Option<String>,
+    source_name: &'static str,
+    log_namespace: LogNamespace,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
@@ -336,13 +344,22 @@ async fn handle_stream<T>(
                             }
                         }
 
-                        if let Some(tls_client_metadata_key) = &tls_client_metadata_key {
-                            if let Some(certificate_metadata) = &certificate_metadata {
-                                let mut metadata: BTreeMap<String, value::Value> = BTreeMap::new();
-                                metadata.insert("subject".to_string(), certificate_metadata.subject().into());
-                                for event in &mut events {
-                                    let log = event.as_mut_log();
-                                    log.insert(&tls_client_metadata_key[..], value::Value::from(metadata.clone()));
+
+                        if let Some(certificate_metadata) = &certificate_metadata {
+                            let mut metadata: BTreeMap<String, value::Value> = BTreeMap::new();
+                            metadata.insert("subject".to_string(), certificate_metadata.subject().into());
+                            for event in &mut events {
+                                let log = event.as_mut_log();
+
+                                match log_namespace {
+                                    LogNamespace::Vector => {
+                                        log.insert(metadata_path!(source_name, "tls_client_metadata"), metadata.clone());
+                                    }
+                                    LogNamespace::Legacy => {
+                                        if let Some(tls_client_metadata_key) = &tls_client_metadata_key {
+                                            log.insert(&tls_client_metadata_key[..], metadata.clone());
+                                        }
+                                    }
                                 }
                             }
                         }
