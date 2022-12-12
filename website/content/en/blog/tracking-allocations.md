@@ -10,7 +10,7 @@ badges:
 tags: ["allocation-tracing", "tracking allocations"]
 ---
 
-We are excited to announce that [Vector] now provides per-component memory usage metrics. To explore the feature, start a vector instance with the `allocation-tracing` option, launch `vector top` and monitor your components! This feature leverages a custom wrapping allocator combined with a separate reporting thread to collect our new metrics. 
+We are excited to announce that [Vector] now provides per-component memory usage metrics. To explore the feature, start a vector instance with the `allocation-tracing` option, launch `vector top` and monitor your components! This feature leverages a custom wrapping allocator combined with a separate reporting thread to collect our new metrics.
 
 ## What's new
 
@@ -18,7 +18,7 @@ We provide the following new metrics: `component_allocated_bytes`, `component_al
 
 - `component_allocated_bytes` captures the current net allocations/deallocations.
 - `component_allocated_bytes_total` shows the accumulated total allocations.
-- `component_deallocated_bytes_total` shows the accumulated total deallocations. 
+- `component_deallocated_bytes_total` shows the accumulated total deallocations.
 
 ## How it works
 
