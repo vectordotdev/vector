@@ -502,6 +502,10 @@ impl OutputBuffer {
     pub fn into_events(self) -> impl Iterator<Item = Event> {
         self.0.into_iter().flat_map(EventArray::into_events)
     }
+
+    pub fn take_events(&mut self) -> Vec<EventArray> {
+        std::mem::take(&mut self.0)
+    }
 }
 
 impl ByteSizeOf for OutputBuffer {

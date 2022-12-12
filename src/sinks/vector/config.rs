@@ -69,6 +69,14 @@ pub struct VectorConfig {
     pub(in crate::sinks::vector) acknowledgements: AcknowledgementsConfig,
 }
 
+impl VectorConfig {
+    /// Creates a `VectorConfig` with the given address.
+    pub fn from_address(addr: Uri) -> Self {
+        let addr = addr.to_string();
+        default_config(addr.as_str())
+    }
+}
+
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(default_config("127.0.0.1:6000")).unwrap()
@@ -141,16 +149,16 @@ async fn healthcheck(
     }
 
     let request = service.client.health_check(proto::HealthCheckRequest {});
-
-    if let Ok(response) = request.await {
-        let status = proto::ServingStatus::from_i32(response.into_inner().status);
-
-        if let Some(proto::ServingStatus::Serving) = status {
-            return Ok(());
-        }
+    match request.await {
+        Ok(response) => match proto::ServingStatus::from_i32(response.into_inner().status) {
+            Some(proto::ServingStatus::Serving) => Ok(()),
+            Some(status) => Err(Box::new(VectorSinkError::Health {
+                status: Some(status.as_str_name()),
+            })),
+            None => Err(Box::new(VectorSinkError::Health { status: None })),
+        },
+        Err(source) => Err(Box::new(VectorSinkError::Request { source })),
     }
-
-    Err(Box::new(VectorSinkError::Health))
 }
 
 /// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
