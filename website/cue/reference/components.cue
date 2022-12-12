@@ -425,9 +425,8 @@ components: {
 		}
 		let Args = _args
 		enabled:        bool
-		auto_generated: bool | *false
 
-		if enabled && !auto_generated {
+		if enabled {
 			can_verify_certificate: bool
 			if Args.mode == "connect" {
 				can_verify_hostname: bool
