@@ -6,9 +6,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
         Event, Value,
