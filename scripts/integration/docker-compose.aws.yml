@@ -2,7 +2,7 @@ version: "3"
 
 services:
   mock-ec2-metadata:
-    image: docker.io/timberiodev/mock-ec2-metadata:latest
+    image: public.ecr.aws/aws-ec2/amazon-ec2-metadata-mock:v1.11.2
     networks:
       - backend
   mock-localstack:
@@ -48,7 +48,7 @@ services:
       - AWS_ACCESS_KEY_ID=dummy
       - AWS_SECRET_ACCESS_KEY=dummy
       - CLOUDWATCH_ADDRESS=http://mock-localstack:4566
-      - EC2_METADATA_ADDRESS=http://mock-ec2-metadata:8111
+      - EC2_METADATA_ADDRESS=http://mock-ec2-metadata:1338
       - ECS_ADDRESS=http://mock-ecs
       - KINESIS_ADDRESS=http://mock-localstack:4566
       - ELASTICSEARCH_ADDRESS=http://mock-localstack:4571
