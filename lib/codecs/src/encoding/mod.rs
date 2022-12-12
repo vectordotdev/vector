@@ -182,46 +182,64 @@ impl tokio_util::codec::Encoder<()> for Framer {
     }
 }
 
-/// Configuration for building a `Serializer`.
+/// Serializer configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
+#[configurable(description = "Configures how events are encoded into raw bytes.")]
+#[configurable(metadata(docs::enum_tag_description = "The codec to use for encoding events."))]
 pub enum SerializerConfig {
-    /// Apache Avro serialization.
+    /// Encodes an event as an [Apache Avro][apache_avro] message.
+    ///
+    /// [apache_avro]: https://avro.apache.org/
     Avro {
-        /// Apache Avro serializer options.
+        /// Apache Avro-specific encoder options.
         avro: AvroSerializerOptions,
     },
 
-    /// GELF serialization.
+    /// Encodes an event as a [GELF][gelf] message.
+    ///
+    /// [gelf]: https://docs.graylog.org/docs/gelf
     Gelf,
 
-    /// JSON serialization.
+    /// Encodes an event as [JSON][json].
+    ///
+    /// [json]: https://www.json.org/
     Json,
 
-    /// Logfmt serialization.
+    /// Encodes an event as a [logfmt][logfmt] message.
+    ///
+    /// [logfmt]: https://brandur.org/logfmt
     Logfmt,
 
-    /// Native Vector serialization based on Protocol Buffers.
+    /// Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf]([EXPERIMENTAL][experimental]).
+    ///
+    /// [vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+    /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
 
-    /// Native Vector serialization based on JSON.
+    /// Encodes an event in Vector’s [native JSON format][vector_native_json]([EXPERIMENTAL][experimental]).
+    ///
+    /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+    /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     NativeJson,
 
-    /// No serialization.
+    /// No encoding.
     ///
-    /// This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-    /// they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-    /// while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-    /// event.
+    /// This "encoding" simply uses the `message` field of a log event.
+    ///
+    /// Users should take care if they're modifying their log events (such as by using a `remap`
+    /// transform, etc) and removing the message field while doing additional parsing on it, as this
+    /// could lead to the encoding emitting empty strings for the given event.
     RawMessage,
 
-    /// Plaintext serialization.
+    /// Plaintext encoding.
     ///
-    /// This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-    /// they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-    /// while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-    /// event.
+    /// This "encoding" simply uses the `message` field of a log event.
+    ///
+    /// Users should take care if they're modifying their log events (such as by using a `remap`
+    /// transform, etc) and removing the message field while doing additional parsing on it, as this
+    /// could lead to the encoding emitting empty strings for the given event.
     Text,
 }
 

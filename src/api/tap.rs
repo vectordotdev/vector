@@ -589,7 +589,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let source_tap_stream = create_events_stream(
             topology.watch(),
@@ -647,7 +647,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let source_tap_stream = create_events_stream(
             topology.watch(),
@@ -697,7 +697,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let transform_tap_stream = create_events_stream(
             topology.watch(),
@@ -750,7 +750,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let tap_stream = create_events_stream(
             topology.watch(),
@@ -824,7 +824,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let tap_stream = create_events_stream(
             topology.watch(),
@@ -884,7 +884,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let transform_tap_remap_dropped_stream = create_events_stream(
             topology.watch(),
@@ -960,7 +960,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let mut transform_tap_all_outputs_stream = create_events_stream(
             topology.watch(),
