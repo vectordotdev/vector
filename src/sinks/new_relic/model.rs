@@ -44,10 +44,11 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 // Generate Value::Object() from BTreeMap<String, String>
                 let (series, data, _) = metric.into_parts();
                 let attr = series.tags.map(|tags| {
-                    Value::from(tags
-                        .into_iter()
-                        .map(|(key, value)| (key, Value::from(value)))
-                        .collect::<BTreeMap<_, _>>())
+                    Value::from(
+                        tags.into_iter()
+                            .map(|(key, value)| (key, Value::from(value)))
+                            .collect::<BTreeMap<_, _>>(),
+                    )
                 });
 
                 // We only handle gauge and counter metrics
@@ -64,17 +65,20 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                     );
                     metric_data.insert(
                         "timestamp".to_owned(),
-                        Value::from(data
-                            .time
-                            .timestamp
-                            .unwrap_or_else(|| DateTime::<Utc>::from(SystemTime::now()))
-                            .timestamp()),
+                        Value::from(
+                            data.time
+                                .timestamp
+                                .unwrap_or_else(|| DateTime::<Utc>::from(SystemTime::now()))
+                                .timestamp(),
+                        ),
                     );
                     if let Some(attr) = attr {
                         metric_data.insert("attributes".to_owned(), attr);
                     }
                     // Set type and type related attributes
-                    if let (MetricValue::Counter { .. }, MetricKind::Incremental) = (data.value, data.kind) {
+                    if let (MetricValue::Counter { .. }, MetricKind::Incremental) =
+                        (data.value, data.kind)
+                    {
                         if let Some(interval_ms) = data.time.interval_ms {
                             metric_data.insert(
                                 "interval.ms".to_owned(),

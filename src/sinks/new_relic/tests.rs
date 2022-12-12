@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::TryFrom, time::SystemTime, num::NonZeroU32};
+use std::{collections::HashMap, convert::TryFrom, num::NonZeroU32, time::SystemTime};
 
 use chrono::{DateTime, Utc};
 use futures::{future::ready, stream};
