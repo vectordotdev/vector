@@ -26,7 +26,9 @@ We provide the following new metrics: `component_allocated_bytes`, `component_al
 
 ## How it works
 
-From a high level point of view, we leverage our current component [tracing] infrastructure to track when a component "enters"/"exits" on a given thread. During each allocation/deallocation, we determine the responsible component via state stored in thread locals. Allocations that aren't associated with any components are tracked by a `root` component.
+Under the hood, Vector uses a custom memory allocator implementation which captures each time an allocation is made (or freed) and associates it with the currently-executing component. This works build upon some of the existing tracing functionality that Vector uses internal to provide structured logging, but has undergone a lot of work and effort around trying to optimize it for production usage.
+
+As well, we also track allocations for the "root" component. The root component includes anything Vector allocates itself, regardless of whatever is specified in your configuration.
 
 ## Notes
 
