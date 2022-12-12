@@ -9,6 +9,7 @@ use futures::{StreamExt, TryFutureExt};
 use listenfd::ListenFd;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_config::configurable_component;
 use vector_core::EstimatedJsonEncodedSizeOf;
 
@@ -181,15 +182,25 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Clone)]
 pub(crate) struct StatsdDeserializer {
     socket_mode: Option<SocketMode>,
+    events_received: Option<Registered<EventsReceived>>,
 }
 
 impl StatsdDeserializer {
-    pub const fn udp() -> Self {
+    pub fn udp() -> Self {
         Self {
             socket_mode: Some(SocketMode::Udp),
+            // The other modes emit a different `EventsReceived`.
+            events_received: Some(register!(EventsReceived)),
+        }
+    }
+
+    pub const fn tcp() -> Self {
+        Self {
+            socket_mode: None,
+            events_received: None,
         }
     }
 
@@ -197,6 +208,7 @@ impl StatsdDeserializer {
     pub const fn unix() -> Self {
         Self {
             socket_mode: Some(SocketMode::Unix),
+            events_received: None,
         }
     }
 }
@@ -223,12 +235,9 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         {
             Ok(metric) => {
                 let event = Event::Metric(metric);
-                // The other modes already emit EventsReceived
-                if matches!(self.socket_mode, Some(SocketMode::Udp)) {
-                    emit!(EventsReceived {
-                        count: 1,
-                        byte_size: event.estimated_json_encoded_size_of(),
-                    });
+                if let Some(er) = &self.events_received {
+                    let byte_size = event.estimated_json_encoded_size_of();
+                    er.emit(CountByteSize(1, byte_size));
                 }
                 Ok(smallvec![event])
             }
@@ -301,7 +310,7 @@ impl TcpSource for StatsdTcpSource {
     fn decoder(&self) -> Self::Decoder {
         Decoder::new(
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-            Deserializer::Boxed(Box::new(StatsdDeserializer::default())),
+            Deserializer::Boxed(Box::new(StatsdDeserializer::tcp())),
         )
     }
 

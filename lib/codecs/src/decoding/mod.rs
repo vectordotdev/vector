@@ -397,7 +397,7 @@ impl DeserializerConfig {
 }
 
 /// Parse structured events from bytes.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Deserializer {
     /// Uses a `BytesDeserializer` for deserialization.
     Bytes(BytesDeserializer),

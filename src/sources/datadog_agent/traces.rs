@@ -6,12 +6,12 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_core::EstimatedJsonEncodedSizeOf;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
 use crate::{
     event::{Event, TraceEvent, Value},
-    internal_events::EventsReceived,
     sources::{
         datadog_agent::{ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
@@ -74,11 +74,8 @@ fn build_trace_filter(
                             )
                         })
                     });
-                if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(super::TRACES))
-                } else {
-                    handle_request(events, acknowledgements, out.clone(), None)
-                }
+                let output = multiple_outputs.then_some(super::TRACES);
+                handle_request(events, acknowledgements, out.clone(), output)
             },
         )
         .boxed()
@@ -131,10 +128,10 @@ fn handle_dd_trace_payload_v1(
         .flat_map(convert_dd_tracer_payload)
         .collect();
 
-    emit!(EventsReceived {
-        byte_size: trace_events.estimated_json_encoded_size_of(),
-        count: trace_events.len(),
-    });
+    source.events_received.emit(CountByteSize(
+        trace_events.len(),
+        trace_events.estimated_json_encoded_size_of(),
+    ));
 
     let enriched_events = trace_events
         .into_iter()
@@ -241,10 +238,10 @@ fn handle_dd_trace_payload_v0(
             trace_event
         })).collect();
 
-    emit!(EventsReceived {
-        byte_size: trace_events.estimated_json_encoded_size_of(),
-        count: trace_events.len(),
-    });
+    source.events_received.emit(CountByteSize(
+        trace_events.len(),
+        trace_events.estimated_json_encoded_size_of(),
+    ));
 
     let enriched_events = trace_events
         .into_iter()
