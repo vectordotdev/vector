@@ -447,9 +447,10 @@ fn spawn_component_topology(
             let pieces = topology::build_or_log_errors(&config, &config_diff, HashMap::new())
                 .await
                 .unwrap();
-            let (topology, mut crash_rx) = topology::start_validated(config, config_diff, pieces)
-                .await
-                .unwrap();
+            let (topology, (_, mut crash_rx)) =
+                topology::start_validated(config, config_diff, pieces)
+                    .await
+                    .unwrap();
 
             debug!("Component topology built and spawned.");
             topology_started.mark_as_done();
