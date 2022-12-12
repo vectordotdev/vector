@@ -10,22 +10,23 @@ badges:
 tags: ["allocation-tracing", "tracking allocations"]
 ---
 
-We are excited to announce that [Vector] now provides per-component memory usage metrics. To explore the feature, launch `vector top` and monitor your components! This feature leverages a custom wrapping allocator combined with a separate reporting thread to collect our new metrics. 
+We are excited to announce that [Vector] now provides per-component memory usage metrics. To explore the feature, start a vector instance with the `allocation-tracing` option, launch `vector top` and monitor your components! This feature leverages a custom wrapping allocator combined with a separate reporting thread to collect our new metrics. 
 
 ## What's new
 
 We provide the following new metrics: `component_allocated_bytes`, `component_allocated_bytes_total`, and `component_deallocated_bytes_total`.
+
 - `component_allocated_bytes` captures the current net allocations/deallocations.
 - `component_allocated_bytes_total` shows the accumulated total allocations.
 - `component_deallocated_bytes_total` shows the accumulated total deallocations. 
 
 ## How it works
 
-From a high level point of view, we leverage our current component [tracing] infrastructure to track when a component "enters"/"exits" on a given thread. During each allocation/deallocation, we determine the responsible component via state stored in thread locals. Allocations that aren't associated with any components are tracked by a `root` component. 
+From a high level point of view, we leverage our current component [tracing] infrastructure to track when a component "enters"/"exits" on a given thread. During each allocation/deallocation, we determine the responsible component via state stored in thread locals. Allocations that aren't associated with any components are tracked by a `root` component.
 
 ## Notes
 
-This feature currently only supports unix based platforms. When enabled, there is approximately 20% overhead on program throughput based on our benchmarks. Track per component allocation data but not how ownership is transferred w/ the components. 
+This feature currently only supports unix based platforms. When enabled, there is approximately 20% overhead in throughput based on our benchmarks.
 
 ## Next steps
 
