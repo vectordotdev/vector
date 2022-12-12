@@ -56,7 +56,7 @@ impl Default for AmqpSinkConfig {
 impl GenerateConfig for AmqpSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
-            r#"connection.connection_string = "amqp://localhost:5672/%2f"
+            r#"connection_string = "amqp://localhost:5672/%2f"
             routing_key = "user_id"
             exchange = "test"
             encoding.codec = "json""#,
