@@ -554,9 +554,9 @@ impl RunningTopology {
                 }
             }
 
-            for input in &new_pieces.inputs {
+            for (key, input) in &new_pieces.inputs {
                 self.inputs_tap_metadata
-                    .insert(input.0.clone(), input.1 .1.clone());
+                    .insert(key.clone(), input.1.clone());
             }
         }
 
