@@ -19,6 +19,7 @@ use chrono::{SecondsFormat, Utc};
 use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
+use http::Uri;
 use lookup::event_path;
 use rand::{thread_rng, Rng};
 use snafu::Snafu;
@@ -37,7 +38,7 @@ use crate::{
     codecs::{Encoder, Transformer},
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator},
-    http::HttpClient,
+    http::{get_http_scheme_from_uri, HttpClient},
     serde::json::to_string,
     sinks::{
         azure_common::{
@@ -398,6 +399,7 @@ impl DatadogArchivesSinkConfig {
         auth: GcpAuthenticator,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&Default::default());
+        let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>()?);
 
         let batcher_settings = BatchConfig::<DatadogArchivesDefaultBatchSettings>::default()
             .into_batcher_settings()
@@ -440,7 +442,13 @@ impl DatadogArchivesSinkConfig {
 
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
 
-        let sink = GcsSink::new(svc, request_builder, partitioner, batcher_settings);
+        let sink = GcsSink::new(
+            svc,
+            request_builder,
+            partitioner,
+            batcher_settings,
+            protocol,
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }

@@ -20,7 +20,7 @@ use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::{configurable_component, NamedComponent};
 
@@ -261,6 +261,7 @@ pub struct IngestorProcess {
     acknowledgements: bool,
     log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
 }
 
 impl IngestorProcess {
@@ -278,6 +279,7 @@ impl IngestorProcess {
             acknowledgements,
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
+            events_received: register!(EventsReceived),
         }
     }
 
@@ -485,6 +487,7 @@ impl IngestorProcess {
         // the case that the same vector instance processes the same message.
         let mut read_error = None;
         let bytes_received = self.bytes_received.clone();
+        let events_received = self.events_received.clone();
         let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
             FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
                 .map(|res| {
@@ -578,10 +581,7 @@ impl IngestorProcess {
                 }
             };
 
-            emit!(EventsReceived {
-                count: 1,
-                byte_size: log.estimated_json_encoded_size_of()
-            });
+            events_received.emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
 
             log
         });

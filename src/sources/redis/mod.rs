@@ -10,7 +10,7 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use value::Kind;
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
@@ -22,7 +22,6 @@ use crate::{
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
-    SourceSender,
 };
 
 mod channel;
@@ -168,35 +167,24 @@ impl SourceConfig for RedisSourceConfig {
         let bytes_received = register!(BytesReceived::from(Protocol::from(
             connection_info.protocol
         )));
+        let events_received = register!(EventsReceived);
+        let handler = InputHandler {
+            client,
+            bytes_received: bytes_received.clone(),
+            events_received: events_received.clone(),
+            key: self.key.clone(),
+            redis_key: self.redis_key.clone(),
+            decoder,
+            cx,
+            log_namespace,
+        };
 
         match self.data_type {
             DataTypeConfig::List => {
-                let list = self.list.unwrap_or_default();
-                list::watch(list::WatchInputs {
-                    client,
-                    bytes_received: bytes_received.clone(),
-                    key: self.key.clone(),
-                    redis_key: self.redis_key.clone(),
-                    method: list.method,
-                    decoder,
-                    cx,
-                    log_namespace,
-                })
-                .await
+                let method = self.list.unwrap_or_default().method;
+                handler.watch(method).await
             }
-            DataTypeConfig::Channel => {
-                channel::subscribe(channel::SubscribeInputs {
-                    client,
-                    connection_info,
-                    bytes_received: bytes_received.clone(),
-                    key: self.key.clone(),
-                    redis_key: self.redis_key.clone(),
-                    decoder,
-                    cx,
-                    log_namespace,
-                })
-                .await
-            }
+            DataTypeConfig::Channel => handler.subscribe(connection_info).await,
         }
     }
 
@@ -229,73 +217,79 @@ impl SourceConfig for RedisSourceConfig {
     }
 }
 
-async fn handle_line(
-    line: String,
-    key: &str,
-    redis_key: Option<&str>,
-    decoder: Decoder,
-    bytes_received: &Registered<BytesReceived>,
-    out: &mut SourceSender,
-    log_namespace: LogNamespace,
-) -> Result<(), ()> {
-    let now = Utc::now();
+pub(self) struct InputHandler {
+    pub client: redis::Client,
+    pub bytes_received: Registered<BytesReceived>,
+    pub events_received: Registered<EventsReceived>,
+    pub key: String,
+    pub redis_key: Option<String>,
+    pub decoder: Decoder,
+    pub log_namespace: LogNamespace,
+    pub cx: SourceContext,
+}
 
-    bytes_received.emit(ByteSize(line.len()));
+impl InputHandler {
+    async fn handle_line(&mut self, line: String) -> Result<(), ()> {
+        let now = Utc::now();
 
-    let mut stream = FramedRead::new(line.as_ref(), decoder.clone());
-    while let Some(next) = stream.next().await {
-        match next {
-            Ok((events, _byte_size)) => {
-                let count = events.len();
-                emit!(EventsReceived {
-                    byte_size: events.estimated_json_encoded_size_of(),
-                    count,
-                });
+        self.bytes_received.emit(ByteSize(line.len()));
 
-                let events = events.into_iter().map(|mut event| {
-                    if let Event::Log(ref mut log) = event {
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            path!(log_schema().source_type_key()),
-                            path!("source_type"),
-                            Bytes::from(RedisSourceConfig::NAME),
-                        );
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            path!(log_schema().timestamp_key()),
-                            path!("ingest_timestamp"),
-                            now,
-                        );
+        let mut stream = FramedRead::new(line.as_ref(), self.decoder.clone());
+        while let Some(next) = stream.next().await {
+            match next {
+                Ok((events, _byte_size)) => {
+                    let count = events.len();
+                    let byte_size = events.estimated_json_encoded_size_of();
+                    self.events_received.emit(CountByteSize(count, byte_size));
 
-                        let redis_key_path = redis_key.map(|x| [BorrowedSegment::from(x)]);
+                    let events = events.into_iter().map(|mut event| {
+                        if let Event::Log(ref mut log) = event {
+                            self.log_namespace.insert_vector_metadata(
+                                log,
+                                path!(log_schema().source_type_key()),
+                                path!("source_type"),
+                                Bytes::from(RedisSourceConfig::NAME),
+                            );
+                            self.log_namespace.insert_vector_metadata(
+                                log,
+                                path!(log_schema().timestamp_key()),
+                                path!("ingest_timestamp"),
+                                now,
+                            );
 
-                        log_namespace.insert_source_metadata(
-                            RedisSourceConfig::NAME,
-                            log,
-                            redis_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
-                            path!("key"),
-                            key,
-                        );
-                    };
+                            let redis_key_path = self
+                                .redis_key
+                                .as_deref()
+                                .map(|x| [BorrowedSegment::from(x)]);
 
-                    event
-                });
+                            self.log_namespace.insert_source_metadata(
+                                RedisSourceConfig::NAME,
+                                log,
+                                redis_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                                path!("key"),
+                                self.key.as_str(),
+                            );
+                        };
 
-                if let Err(error) = out.send_batch(events).await {
-                    emit!(StreamClosedError { error, count });
-                    return Err(());
+                        event
+                    });
+
+                    if let Err(error) = self.cx.out.send_batch(events).await {
+                        emit!(StreamClosedError { error, count });
+                        return Err(());
+                    }
                 }
-            }
-            Err(error) => {
-                // Error is logged by `crate::codecs::Decoder`, no further
-                // handling is needed here.
-                if !error.can_continue() {
-                    break;
+                Err(error) => {
+                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // handling is needed here.
+                    if !error.can_continue() {
+                        break;
+                    }
                 }
             }
         }
+        Ok(())
     }
-    Ok(())
 }
 
 #[cfg(test)]
