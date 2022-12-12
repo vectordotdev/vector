@@ -10,7 +10,11 @@ badges:
 tags: ["allocation-tracing", "tracking allocations"]
 ---
 
-We are excited to announce that [Vector] now provides per-component memory usage metrics. To explore the feature, start a vector instance with the `allocation-tracing` option, launch `vector top` and monitor your components! This feature leverages a custom wrapping allocator combined with a separate reporting thread to collect our new metrics.
+We are excited to announce that Vector now has support for exposing per-component memory usage metrics. This work begins to address an often-requested  feature from users who want to understand how Vector uses memory, and what parts of their configuration are responsible for high memory usage.
+
+## Trying it out
+
+To quickly try it out, you can pass `--allocation-tracing` when launching Vector which will enable the allocation tracing feature. This will emit new memory usage metrics as part of Vector's `internal_metrics` source output, as well as expose a new column in the `vector top` user interface to show the memory usage per component.
 
 ## What's new
 
