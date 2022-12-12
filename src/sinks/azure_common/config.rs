@@ -75,8 +75,8 @@ impl DriverResponse for AzureBlobResponse {
         CountByteSize(self.count, self.events_byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.byte_size, "https"))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
     }
 }
 
