@@ -221,6 +221,7 @@ impl HecAckClient {
                 "/services/collector/ack",
                 None,
                 MetadataFields::default(),
+                false,
             )
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 

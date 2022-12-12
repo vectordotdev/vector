@@ -12,8 +12,6 @@ pub mod aws_ec2_metadata;
 pub mod dedupe;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
-#[cfg(feature = "transforms-geoip")]
-pub mod geoip;
 pub mod log_to_metric;
 #[cfg(feature = "transforms-lua")]
 pub mod lua;
@@ -41,7 +39,7 @@ pub use vector_core::transform::{
     TransformOutputsBuf,
 };
 use vector_core::{
-    config::{Input, Output},
+    config::{Input, LogNamespace, Output},
     schema,
 };
 
@@ -54,6 +52,20 @@ enum BuildError {
 
     #[snafu(display("Invalid substring expression: {}", name))]
     InvalidSubstring { name: String },
+}
+
+/// The user configuration to choose the metric tag strategy.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MetricTagsValues {
+    /// Tag values will be exposed as single strings, the
+    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+    /// will be ignored.
+    #[default]
+    Single,
+    /// All tags will be exposed as arrays of either string or null values.
+    Full,
 }
 
 /// Configurable transforms in Vector.
@@ -77,10 +89,6 @@ pub enum Transforms {
     /// Filter.
     #[cfg(feature = "transforms-filter")]
     Filter(#[configurable(derived)] filter::FilterConfig),
-
-    /// GeoIP.
-    #[cfg(feature = "transforms-geoip")]
-    Geoip(#[configurable(derived)] geoip::GeoipConfig),
 
     /// Log to metric.
     LogToMetric(#[configurable(derived)] log_to_metric::LogToMetricConfig),
@@ -149,8 +157,6 @@ impl NamedComponent for Transforms {
             Transforms::Dedupe(config) => config.get_component_name(),
             #[cfg(feature = "transforms-filter")]
             Transforms::Filter(config) => config.get_component_name(),
-            #[cfg(feature = "transforms-geoip")]
-            Transforms::Geoip(config) => config.get_component_name(),
             Transforms::LogToMetric(config) => config.get_component_name(),
             #[cfg(feature = "transforms-lua")]
             Transforms::Lua(config) => config.get_component_name(),

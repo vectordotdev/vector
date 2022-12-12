@@ -1,23 +1,23 @@
-use std::{collections::BTreeMap, convert::TryFrom, num::ParseFloatError};
+use std::num::ParseFloatError;
 
 use chrono::Utc;
 use indexmap::IndexMap;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
     },
     event::{
-        metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
         Event, Value,
     },
     internal_events::{
-        LogToMetricFieldNullError, LogToMetricParseFloatError, LogToMetricTemplateParseError,
-        ParserMissingFieldError, DROP_EVENT,
+        LogToMetricFieldNullError, LogToMetricParseFloatError, ParserMissingFieldError, DROP_EVENT,
     },
     schema,
-    template::{Template, TemplateParseError, TemplateRenderingError},
+    template::{Template, TemplateRenderingError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -34,135 +34,80 @@ pub struct LogToMetricConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct CounterConfig {
-    /// Name of the field in the event to generate the counter.
-    field: String,
-
-    /// Overrides the name of the counter.
-    ///
-    /// If not specified, `field` is used as the name of the counter.
-    name: Option<String>,
-
-    /// Sets the namespace for the counter.
-    namespace: Option<String>,
-
     /// Increments the counter by the value in `field`, instead of only by `1`.
     #[serde(default = "default_increment_by_value")]
-    increment_by_value: bool,
+    pub increment_by_value: bool,
 
     #[configurable(derived)]
     #[serde(default = "default_kind")]
-    kind: MetricKind,
-
-    /// Tags to apply to the counter.
-    tags: Option<IndexMap<String, String>>,
-}
-
-/// Specification of a gauge derived from a log event.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct GaugeConfig {
-    /// Name of the field in the event to generate the gauge from.
-    pub field: String,
-
-    /// Overrides the name of the gauge.
-    ///
-    /// If not specified, `field` is used as the name of the gauge.
-    pub name: Option<String>,
-
-    /// Sets the namespace for the gauge.
-    pub namespace: Option<String>,
-
-    /// Tags to apply to the gauge.
-    pub tags: Option<IndexMap<String, String>>,
-}
-
-/// Specification of a set derived from a log event.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct SetConfig {
-    /// Name of the field in the event to generate the set from.
-    field: String,
-
-    /// Overrides the name of the set.
-    ///
-    /// If not specified, `field` is used as the name of the set.
-    name: Option<String>,
-
-    /// Sets the namespace for the set.
-    namespace: Option<String>,
-
-    /// Tags to apply to the set.
-    tags: Option<IndexMap<String, String>>,
-}
-
-/// Specification of a histogram derived from a log event.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct HistogramConfig {
-    /// Name of the field in the event to generate the histogram from.
-    field: String,
-
-    /// Overrides the name of the histogram.
-    ///
-    /// If not specified, `field` is used as the name of the histogram.
-    name: Option<String>,
-
-    /// Sets the namespace for the histogram.
-    namespace: Option<String>,
-
-    /// Tags to apply to the histogram.
-    tags: Option<IndexMap<String, String>>,
-}
-
-/// Specification of a summary derived from a log event.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct SummaryConfig {
-    /// Name of the field in the event to generate the summary from.
-    field: String,
-
-    /// Overrides the name of the summary.
-    ///
-    /// If not specified, `field` is used as the name of the summary.
-    name: Option<String>,
-
-    /// Sets the namespace for the summary.
-    namespace: Option<String>,
-
-    /// Tags to apply to the summary.
-    tags: Option<IndexMap<String, String>>,
+    pub kind: MetricKind,
 }
 
 /// Specification of a metric derived from a log event.
+// TODO: While we're resolving the schema for this enum somewhat reasonably (in
+// `generate-components-docs.rb`), we have a problem where an overlapping field (overlap between two
+// or more of the subschemas) takes the details of the last subschema to be iterated over that
+// contains that field, such that, for example, the `Summary` variant below is overriding the
+// description for almost all of the fields because they're shared across all of the variants.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct MetricConfig {
+    /// Name of the field in the event to generate the metric.
+    pub field: Template,
+
+    /// Overrides the name of the counter.
+    ///
+    /// If not specified, `field` is used as the name of the metric.
+    pub name: Option<Template>,
+
+    /// Sets the namespace for the metric.
+    pub namespace: Option<Template>,
+
+    /// Tags to apply to the metric.
+    pub tags: Option<IndexMap<String, TagConfig>>,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub metric: MetricTypeConfig,
+}
+
+/// Specification of the value of a created tag.
+///
+/// This may be a single value, a `null` for a bare tag, or an array of either.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(untagged)]
+pub enum TagConfig {
+    /// A single tag value.
+    Plain(#[configurable(transparent)] Option<Template>),
+    /// An array of values to give to the same tag name.
+    Multi(#[configurable(transparent)] Vec<Option<Template>>),
+}
+
+/// Specification of the type of an individual metric, and any associated data.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum MetricConfig {
+pub enum MetricTypeConfig {
     /// A counter.
     Counter(#[configurable(derived)] CounterConfig),
 
     /// A histogram.
-    Histogram(#[configurable(derived)] HistogramConfig),
+    Histogram,
 
     /// A gauge.
-    Gauge(#[configurable(derived)] GaugeConfig),
+    Gauge,
 
     /// A set.
-    Set(#[configurable(derived)] SetConfig),
+    Set,
 
     /// A summary.
-    Summary(#[configurable(derived)] SummaryConfig),
+    Summary,
 }
 
 impl MetricConfig {
     fn field(&self) -> &str {
-        match self {
-            MetricConfig::Counter(CounterConfig { field, .. }) => field,
-            MetricConfig::Histogram(HistogramConfig { field, .. }) => field,
-            MetricConfig::Gauge(GaugeConfig { field, .. }) => field,
-            MetricConfig::Set(SetConfig { field, .. }) => field,
-            MetricConfig::Summary(SummaryConfig { field, .. }) => field,
-        }
+        self.field.get_ref()
     }
 }
 
@@ -182,14 +127,16 @@ pub struct LogToMetric {
 impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            metrics: vec![MetricConfig::Counter(CounterConfig {
-                field: "field_name".to_string(),
+            metrics: vec![MetricConfig {
+                field: "field_name".try_into().expect("Fixed template"),
                 name: None,
                 namespace: None,
-                increment_by_value: false,
-                kind: MetricKind::Incremental,
                 tags: None,
-            })],
+                metric: MetricTypeConfig::Counter(CounterConfig {
+                    increment_by_value: false,
+                    kind: MetricKind::Incremental,
+                }),
+            }],
         })
         .unwrap()
     }
@@ -205,7 +152,7 @@ impl TransformConfig for LogToMetricConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 
@@ -227,7 +174,6 @@ enum TransformError {
     FieldNull {
         field: String,
     },
-    TemplateParseError(TemplateParseError),
     TemplateRenderingError(TemplateRenderingError),
     ParseFloatError {
         field: String,
@@ -235,43 +181,60 @@ enum TransformError {
     },
 }
 
-fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
-    let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
+fn render_template(template: &Template, event: &Event) -> Result<String, TransformError> {
     template
         .render_string(event)
         .map_err(TransformError::TemplateRenderingError)
 }
 
 fn render_tags(
-    tags: &Option<IndexMap<String, String>>,
+    tags: &Option<IndexMap<String, TagConfig>>,
     event: &Event,
-) -> Result<Option<BTreeMap<String, String>>, TransformError> {
+) -> Result<Option<MetricTags>, TransformError> {
     Ok(match tags {
         None => None,
         Some(tags) => {
-            let mut map = BTreeMap::new();
-            for (name, value) in tags {
-                match render_template(value, event) {
-                    Ok(tag) => {
-                        map.insert(name.to_string(), tag);
+            let mut result = MetricTags::default();
+            for (name, config) in tags {
+                match config {
+                    TagConfig::Plain(template) => {
+                        render_tag_into(event, name, template, &mut result)?
                     }
-                    Err(TransformError::TemplateRenderingError(error)) => {
-                        emit!(crate::internal_events::TemplateRenderingError {
-                            error,
-                            drop_event: false,
-                            field: Some(name.as_str()),
-                        });
+                    TagConfig::Multi(vec) => {
+                        for template in vec {
+                            render_tag_into(event, name, template, &mut result)?;
+                        }
                     }
-                    Err(other) => return Err(other),
                 }
             }
-            if !map.is_empty() {
-                Some(map)
-            } else {
-                None
-            }
+            result.as_option()
         }
     })
+}
+
+fn render_tag_into(
+    event: &Event,
+    name: &str,
+    template: &Option<Template>,
+    result: &mut MetricTags,
+) -> Result<(), TransformError> {
+    let value = match template {
+        None => TagValue::Bare,
+        Some(template) => match render_template(template, event) {
+            Ok(result) => TagValue::Value(result),
+            Err(TransformError::TemplateRenderingError(error)) => {
+                emit!(crate::internal_events::TemplateRenderingError {
+                    error,
+                    drop_event: false,
+                    field: Some(name),
+                });
+                return Ok(());
+            }
+            Err(other) => return Err(other),
+        },
+    };
+    result.insert(name.to_string(), value);
+    Ok(())
 }
 
 fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
@@ -296,12 +259,22 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         Some(value) => Ok(value),
     }?;
 
-    match config {
-        MetricConfig::Counter(counter) => {
+    let name = config.name.as_ref().unwrap_or(&config.field);
+    let name = render_template(name, event)?;
+
+    let namespace = config.namespace.as_ref();
+    let namespace = namespace
+        .map(|namespace| render_template(namespace, event))
+        .transpose()?;
+
+    let tags = render_tags(&config.tags, event)?;
+
+    let (kind, value) = match &config.metric {
+        MetricTypeConfig::Counter(counter) => {
             let value = if counter.increment_by_value {
                 value.to_string_lossy().parse().map_err(|error| {
                     TransformError::ParseFloatError {
-                        field: counter.field.clone(),
+                        field: config.field.get_ref().to_owned(),
                         error,
                     }
                 })?
@@ -309,27 +282,9 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 1.0
             };
 
-            let name = counter.name.as_ref().unwrap_or(&counter.field);
-            let name = render_template(name, event)?;
-
-            let namespace = counter.namespace.as_ref();
-            let namespace = namespace
-                .map(|namespace| render_template(namespace, event))
-                .transpose()?;
-
-            let tags = render_tags(&counter.tags, event)?;
-
-            Ok(Metric::new_with_metadata(
-                name,
-                counter.kind,
-                MetricValue::Counter { value },
-                metadata,
-            )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
+            (counter.kind, MetricValue::Counter { value })
         }
-        MetricConfig::Histogram(hist) => {
+        MetricTypeConfig::Histogram => {
             let value = value.to_string_lossy().parse().map_err(|error| {
                 TransformError::ParseFloatError {
                     field: field.to_string(),
@@ -337,30 +292,15 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 }
             })?;
 
-            let name = hist.name.as_ref().unwrap_or(&hist.field);
-            let name = render_template(name, event)?;
-
-            let namespace = hist.namespace.as_ref();
-            let namespace = namespace
-                .map(|namespace| render_template(namespace, event))
-                .transpose()?;
-
-            let tags = render_tags(&hist.tags, event)?;
-
-            Ok(Metric::new_with_metadata(
-                name,
+            (
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: vector_core::samples![value => 1],
                     statistic: StatisticKind::Histogram,
                 },
-                metadata,
             )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
         }
-        MetricConfig::Summary(summary) => {
+        MetricTypeConfig::Summary => {
             let value = value.to_string_lossy().parse().map_err(|error| {
                 TransformError::ParseFloatError {
                     field: field.to_string(),
@@ -368,30 +308,15 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 }
             })?;
 
-            let name = summary.name.as_ref().unwrap_or(&summary.field);
-            let name = render_template(name, event)?;
-
-            let namespace = summary.namespace.as_ref();
-            let namespace = namespace
-                .map(|namespace| render_template(namespace, event))
-                .transpose()?;
-
-            let tags = render_tags(&summary.tags, event)?;
-
-            Ok(Metric::new_with_metadata(
-                name,
+            (
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: vector_core::samples![value => 1],
                     statistic: StatisticKind::Summary,
                 },
-                metadata,
             )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
         }
-        MetricConfig::Gauge(gauge) => {
+        MetricTypeConfig::Gauge => {
             let value = value.to_string_lossy().parse().map_err(|error| {
                 TransformError::ParseFloatError {
                     field: field.to_string(),
@@ -399,52 +324,23 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 }
             })?;
 
-            let name = gauge.name.as_ref().unwrap_or(&gauge.field);
-            let name = render_template(name, event)?;
-
-            let namespace = gauge.namespace.as_ref();
-            let namespace = namespace
-                .map(|namespace| render_template(namespace, event))
-                .transpose()?;
-
-            let tags = render_tags(&gauge.tags, event)?;
-
-            Ok(Metric::new_with_metadata(
-                name,
-                MetricKind::Absolute,
-                MetricValue::Gauge { value },
-                metadata,
-            )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
+            (MetricKind::Absolute, MetricValue::Gauge { value })
         }
-        MetricConfig::Set(set) => {
-            let value = value.to_string_lossy();
+        MetricTypeConfig::Set => {
+            let value = value.to_string_lossy().into_owned();
 
-            let name = set.name.as_ref().unwrap_or(&set.field);
-            let name = render_template(name, event)?;
-
-            let namespace = set.namespace.as_ref();
-            let namespace = namespace
-                .map(|namespace| render_template(namespace, event))
-                .transpose()?;
-
-            let tags = render_tags(&set.tags, event)?;
-
-            Ok(Metric::new_with_metadata(
-                name,
+            (
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: std::iter::once(value).collect(),
                 },
-                metadata,
             )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
         }
-    }
+    };
+    Ok(Metric::new_with_metadata(name, kind, value, metadata)
+        .with_namespace(namespace)
+        .with_tags(tags)
+        .with_timestamp(timestamp))
 }
 
 impl FunctionTransform for LogToMetric {
@@ -480,9 +376,6 @@ impl FunctionTransform for LogToMetric {
                                 field: None,
                             })
                         }
-                        TransformError::TemplateParseError(error) => {
-                            emit!(LogToMetricTemplateParseError { error })
-                        }
                     };
                     // early return to prevent the partial buffer from being sent
                     return;
@@ -503,6 +396,7 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::test_util::components::assert_transform_compliance;
@@ -522,6 +416,10 @@ mod tests {
 
     fn parse_config(s: &str) -> LogToMetricConfig {
         toml::from_str(s).unwrap()
+    }
+
+    fn parse_yaml_config(s: &str) -> LogToMetricConfig {
+        serde_yaml::from_str(s).unwrap()
     }
 
     fn ts() -> DateTime<Utc> {
@@ -634,17 +532,67 @@ mod tests {
                 metadata,
             )
             .with_namespace(Some("app"))
-            .with_tags(Some(
-                vec![
-                    ("method".to_owned(), "post".to_owned()),
-                    ("code".to_owned(), "200".to_owned()),
-                    ("host".to_owned(), "localhost".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "method" => "post",
+                "code" => "200",
+                "host" => "localhost",
+            )))
             .with_timestamp(Some(ts()))
         );
+    }
+
+    #[tokio::test]
+    async fn multi_value_tags_yaml() {
+        // Have to use YAML to represent bare tags
+        let config = parse_yaml_config(
+            r#"
+            metrics:
+            - field: "message"
+              type: "counter"
+              tags:
+                tag:
+                - "one"
+                - null
+                - "two"
+            "#,
+        );
+
+        let event = create_event("message", "I am log");
+        let metric = do_transform(config, event).await.unwrap().into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(tags.iter_single().collect::<Vec<_>>(), vec![("tag", "two")]);
+
+        assert_eq!(tags.iter_all().count(), 3);
+        for (name, value) in tags.iter_all() {
+            assert_eq!(name, "tag");
+            assert!(value == None || value == Some("one") || value == Some("two"));
+        }
+    }
+
+    #[tokio::test]
+    async fn multi_value_tags_toml() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            field = "message"
+            type = "counter"
+            [metrics.tags]
+            tag = ["one", "two"]
+            "#,
+        );
+
+        let event = create_event("message", "I am log");
+        let metric = do_transform(config, event).await.unwrap().into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(tags.iter_single().collect::<Vec<_>>(), vec![("tag", "two")]);
+
+        assert_eq!(tags.iter_all().count(), 2);
+        for (name, value) in tags.iter_all() {
+            assert_eq!(name, "tag");
+            assert!(value == Some("one") || value == Some("two"));
+        }
     }
 
     #[tokio::test]

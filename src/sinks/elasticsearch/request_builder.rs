@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -8,7 +9,10 @@ use crate::{
             encoder::{ElasticsearchEncoder, ProcessedEvent},
             service::ElasticsearchRequest,
         },
-        util::{request_builder::EncodeResult, Compression, RequestBuilder},
+        util::{
+            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+            RequestBuilder,
+        },
     },
 };
 
@@ -40,31 +44,38 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, mut events: Vec<ProcessedEvent>) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        mut events: Vec<ProcessedEvent>,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let events_byte_size = events
             .iter()
             .map(|x| x.log.size_of())
             .reduce(|a, b| a + b)
             .unwrap_or(0);
 
-        let metadata = Metadata {
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
+
+        let es_metadata = Metadata {
             finalizers: events.take_finalizers(),
             batch_size: events.len(),
             events_byte_size,
         };
-        (metadata, events)
+        (es_metadata, metadata_builder, events)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        es_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         ElasticsearchRequest {
             payload: payload.into_payload(),
-            finalizers: metadata.finalizers,
-            batch_size: metadata.batch_size,
-            events_byte_size: metadata.events_byte_size,
+            finalizers: es_metadata.finalizers,
+            batch_size: es_metadata.batch_size,
+            events_byte_size: es_metadata.events_byte_size,
+            metadata,
         }
     }
 }

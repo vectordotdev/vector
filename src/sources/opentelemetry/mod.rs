@@ -11,25 +11,23 @@ mod status;
 use std::net::SocketAddr;
 
 use futures::{future::join, FutureExt, TryFutureExt};
-
 use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
-use vector_common::internal_event::{BytesReceived, Protocol};
+use vector_common::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
+use self::{
+    grpc::Service,
+    http::{build_warp_filter, run_http_server},
+};
 use crate::{
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
+        DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext,
     },
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-};
-
-use self::{
-    grpc::Service,
-    http::{build_warp_filter, run_http_server},
 };
 
 pub const LOGS: &str = "logs";
@@ -47,7 +45,7 @@ pub struct OpentelemetryConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 /// Configuration for the `opentelemetry` gRPC server.
@@ -100,12 +98,14 @@ impl GenerateConfig for OpentelemetryConfig {
 #[async_trait::async_trait]
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let events_received = register!(EventsReceived);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(&self.grpc.tls, true)?;
         let grpc_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
+            events_received: events_received.clone(),
         })
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
         let grpc_source = run_grpc_server(
@@ -121,7 +121,7 @@ impl SourceConfig for OpentelemetryConfig {
         let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
         let protocol = http_tls_settings.http_protocol_name();
         let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
-        let filters = build_warp_filter(acknowledgements, cx.out, bytes_received);
+        let filters = build_warp_filter(acknowledgements, cx.out, bytes_received, events_received);
         let http_source =
             run_http_server(self.http.address, http_tls_settings, filters, cx.shutdown);
 

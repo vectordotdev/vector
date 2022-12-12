@@ -6,20 +6,22 @@ use codecs::{
     NewlineDelimitedDecoder,
 };
 use futures::{StreamExt, TryFutureExt};
+use listenfd::ListenFd;
 use smallvec::{smallvec, SmallVec};
-use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::parser::ParseError;
-use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
+use super::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
     codecs::Decoder,
     config::{self, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
     internal_events::{
-        EventsReceived, SocketBytesReceived, SocketMode, StatsdSocketError, StreamClosedError,
+        EventsReceived, SocketBindError, SocketBytesReceived, SocketMode, SocketReceiveError,
+        StreamClosedError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -57,7 +59,7 @@ pub enum StatsdConfig {
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
     /// The address to listen for messages on.
-    address: SocketAddr,
+    address: SocketListenAddr,
 
     /// The size, in bytes, of the receive buffer used for each connection.
     ///
@@ -66,7 +68,7 @@ pub struct UdpConfig {
 }
 
 impl UdpConfig {
-    pub const fn from_address(address: SocketAddr) -> Self {
+    pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
             receive_buffer_bytes: None,
@@ -103,8 +105,7 @@ pub struct TcpConfig {
 
 impl TcpConfig {
     #[cfg(test)]
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    pub fn from_address(address: SocketListenAddr) -> Self {
+    pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
             keepalive: None,
@@ -122,9 +123,12 @@ const fn default_shutdown_timeout_secs() -> u64 {
 
 impl GenerateConfig for StatsdConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::Udp(UdpConfig::from_address(SocketAddr::V4(
-            SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8125),
-        ))))
+        toml::Value::try_from(Self::Udp(UdpConfig::from_address(
+            SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::new(127, 0, 0, 1),
+                8125,
+            ))),
+        )))
         .unwrap()
     }
 }
@@ -166,8 +170,8 @@ impl SourceConfig for StatsdConfig {
 
     fn resources(&self) -> Vec<Resource> {
         match self.clone() {
-            Self::Tcp(tcp) => vec![tcp.address.into()],
-            Self::Udp(udp) => vec![Resource::udp(udp.address)],
+            Self::Tcp(tcp) => vec![tcp.address.as_tcp_resource()],
+            Self::Udp(udp) => vec![udp.address.as_udp_resource()],
             #[cfg(unix)]
             Self::Unix(_) => vec![],
         }
@@ -178,15 +182,25 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Clone)]
 pub(crate) struct StatsdDeserializer {
     socket_mode: Option<SocketMode>,
+    events_received: Option<Registered<EventsReceived>>,
 }
 
 impl StatsdDeserializer {
-    pub const fn udp() -> Self {
+    pub fn udp() -> Self {
         Self {
             socket_mode: Some(SocketMode::Udp),
+            // The other modes emit a different `EventsReceived`.
+            events_received: Some(register!(EventsReceived)),
+        }
+    }
+
+    pub const fn tcp() -> Self {
+        Self {
+            socket_mode: None,
+            events_received: None,
         }
     }
 
@@ -194,6 +208,7 @@ impl StatsdDeserializer {
     pub const fn unix() -> Self {
         Self {
             socket_mode: Some(SocketMode::Unix),
+            events_received: None,
         }
     }
 }
@@ -220,12 +235,9 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         {
             Ok(metric) => {
                 let event = Event::Metric(metric);
-                // The other modes already emit EventsReceived
-                if matches!(self.socket_mode, Some(SocketMode::Udp)) {
-                    emit!(EventsReceived {
-                        count: 1,
-                        byte_size: event.size_of(),
-                    });
+                if let Some(er) = &self.events_received {
+                    let byte_size = event.estimated_json_encoded_size_of();
+                    er.emit(CountByteSize(1, byte_size));
                 }
                 Ok(smallvec![event])
             }
@@ -239,10 +251,14 @@ async fn statsd_udp(
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
-    // TODO: This should probably be based off of the `socket` source in UDP mode. If it's missing features needed, we
-    // should add them. Reduce, reuse, recycle.
-    let socket = UdpSocket::bind(&config.address)
-        .map_err(|error| emit!(StatsdSocketError::bind(error)))
+    let listenfd = ListenFd::from_env();
+    let socket = try_bind_udp_socket(config.address, listenfd)
+        .map_err(|error| {
+            emit!(SocketBindError {
+                mode: SocketMode::Udp,
+                error
+            })
+        })
         .await?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
@@ -271,7 +287,10 @@ async fn statsd_udp(
                 }
             }
             Err(error) => {
-                emit!(StatsdSocketError::read(error));
+                emit!(SocketReceiveError {
+                    mode: SocketMode::Udp,
+                    error
+                });
             }
         }
     }
@@ -291,7 +310,7 @@ impl TcpSource for StatsdTcpSource {
     fn decoder(&self) -> Self::Decoder {
         Decoder::new(
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-            Deserializer::Boxed(Box::new(StatsdDeserializer::default())),
+            Deserializer::Boxed(Box::new(StatsdDeserializer::tcp())),
         )
     }
 
@@ -306,6 +325,7 @@ mod test {
     use futures_util::SinkExt;
     use tokio::{
         io::AsyncWriteExt,
+        net::UdpSocket,
         time::{sleep, Duration, Instant},
     };
     use vector_core::{config::ComponentKey, event::EventContainer};
@@ -331,7 +351,7 @@ mod test {
     async fn test_statsd_udp() {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async move {
             let in_addr = next_addr();
-            let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr));
+            let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
                 let bind_addr = next_addr();

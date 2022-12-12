@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
     event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
@@ -19,19 +20,21 @@ use super::{
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
-use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::sinks::loki::event::LokiBatchEncoding;
+use crate::sinks::{
+    loki::config::{CompressionConfigAdapter, ExtendedCompression},
+    util::metadata::RequestMetadataBuilder,
+};
 use crate::{
     codecs::{Encoder, Transformer},
     config::log_schema,
-    http::HttpClient,
+    http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
         SinkRequestBuildError, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
-        metadata::{RequestMetadata, RequestMetadataBuilder},
         request_builder::EncodeResult,
         service::{ServiceBuilderExt, Svc},
         Compression, RequestBuilder,
@@ -100,7 +103,7 @@ impl From<std::io::Error> for RequestBuildError {
 }
 
 impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
-    type Metadata = (Option<String>, EventFinalizers, RequestMetadataBuilder);
+    type Metadata = (Option<String>, EventFinalizers);
     type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
     type Payload = Bytes;
@@ -121,21 +124,22 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     fn split_input(
         &self,
         input: (PartitionKey, Vec<LokiRecord>),
-    ) -> (Self::Metadata, Self::Events) {
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (key, mut events) = input;
-        let metadata_builder = RequestMetadata::builder(&events);
+
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let finalizers = events.take_finalizers();
 
-        ((key.tenant_id, finalizers, metadata_builder), events)
+        ((key.tenant_id, finalizers), metadata_builder, events)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        loki_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (tenant_id, finalizers, metadata_builder) = metadata;
-        let metadata = metadata_builder.build(&payload);
+        let (tenant_id, finalizers) = loki_metadata;
         let compression = self.compression;
 
         LokiRequest {
@@ -176,7 +180,7 @@ impl EventEncoder {
                         for (k, v) in output {
                             vec.push((
                                 slugify_text(format!("{}{}", opening_prefix, k)),
-                                Value::from(v).to_string_lossy(),
+                                Value::from(v).to_string_lossy().into_owned(),
                             ))
                         }
                     }
@@ -322,6 +326,7 @@ pub struct LokiSink {
     batch_settings: BatcherSettings,
     out_of_order_action: OutOfOrderAction,
     service: Svc<LokiService, LokiRetryLogic>,
+    protocol: &'static str,
 }
 
 impl LokiSink {
@@ -346,9 +351,15 @@ impl LokiSink {
             }
         };
 
+        let protocol = get_http_scheme_from_uri(&config.endpoint.uri);
         let service = tower::ServiceBuilder::new()
             .settings(request_limits, LokiRetryLogic)
-            .service(LokiService::new(client, config.endpoint, config.auth)?);
+            .service(LokiService::new(
+                client,
+                config.endpoint,
+                config.path,
+                config.auth,
+            )?);
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
@@ -376,6 +387,7 @@ impl LokiSink {
             batch_settings: config.batch.into_batcher_settings()?,
             out_of_order_action: config.out_of_order_action,
             service,
+            protocol,
         })
     }
 
@@ -392,7 +404,7 @@ impl LokiSink {
             }
         };
 
-        let sink = input
+        input
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
@@ -411,15 +423,11 @@ impl LokiSink {
                         })
                         .collect::<Vec<_>>();
                     if count > 0 {
-                        emit!(LokiOutOfOrderEventRewritten {
-                            count: count as u64
-                        });
+                        emit!(LokiOutOfOrderEventRewritten { count });
                     }
                     Some((partition, result))
                 } else {
-                    emit!(LokiOutOfOrderEventDropped {
-                        count: batch.len() as u64
-                    });
+                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
                     None
                 }
             })
@@ -433,9 +441,10 @@ impl LokiSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await
     }
 }
 

@@ -21,15 +21,17 @@ use crate::{
         s3_common::{
             self,
             config::{S3Options, S3RetryLogic},
+            partitioner::S3KeyPartitioner,
             service::S3Service,
             sink::S3Sink,
         },
         util::{
-            partitioner::KeyPartitioner, BatchConfig, BulkSizeBasedDefaultBatchSettings,
-            Compression, ServiceBuilderExt, TowerRequestConfig,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
+            TowerRequestConfig,
         },
         Healthcheck,
     },
+    template::Template,
     tls::TlsConfig,
 };
 
@@ -52,7 +54,7 @@ pub struct S3SinkConfig {
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
     /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
     /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::templateable))]
     pub key_prefix: Option<String>,
 
     /// The timestamp format for the time component of the object key.
@@ -182,7 +184,14 @@ impl S3SinkConfig {
             .cloned()
             .unwrap_or_else(|| DEFAULT_KEY_PREFIX.into())
             .try_into()?;
-        let partitioner = KeyPartitioner::new(key_prefix);
+        let ssekms_key_id = self
+            .options
+            .ssekms_key_id
+            .as_ref()
+            .cloned()
+            .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
+            .transpose()?;
+        let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id);
 
         // And now collect all of the S3-specific options and configuration knobs.
         let filename_time_format = self

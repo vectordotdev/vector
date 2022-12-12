@@ -33,6 +33,13 @@ components: transforms: aws_ec2_metadata: {
 				aws ec2 modify-instance-metadata-options --instance-id <ID> --http-endpoint enabled --http-put-response-hop-limit 2
 				```
 				""",
+			"""
+				Accessing instance tags must be explicitly enabled for each instance. This can be done in the AWS Console, or with the following CLI command:
+
+				```bash
+				aws ec2 modify-instance-metadata-options --instance-id <ID> --instance-metadata-tags enabled
+				```
+				""",
 		]
 		notices: []
 		warnings: [
@@ -42,61 +49,7 @@ components: transforms: aws_ec2_metadata: {
 		]
 	}
 
-	configuration: {
-		endpoint: {
-			common:      false
-			description: "Override the default EC2 Metadata endpoint."
-			required:    false
-			type: string: {
-				default: "http://169.254.169.254"
-			}
-		}
-		fields: {
-			common:      true
-			description: "A list of fields to include in each event."
-			required:    false
-			type: array: {
-				default: ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"]
-				items: type: string: {
-					examples: ["instance-id", "local-hostname"]
-				}
-			}
-		}
-		namespace: {
-			common:      true
-			description: "Prepend a namespace to each field's key."
-			required:    false
-			type: string: {
-				default: ""
-				examples: ["", "ec2", "aws.ec2"]
-			}
-		}
-		proxy: configuration._proxy
-		refresh_interval_secs: {
-			common:      true
-			description: "The interval in seconds on which the metadata from the IMDSv2 will be refreshed."
-			required:    false
-			type: uint: {
-				default: 10
-				unit:    null
-			}
-		}
-		refresh_timeout_secs: {
-			common:      true
-			description: "The timeout in seconds for requests to the IMDSv2."
-			required:    false
-			type: uint: {
-				default: 1
-				unit:    null
-			}
-		}
-		required: {
-			common:      false
-			description: "Whether or not vector should exit with error if initial metadata request fails."
-			required:    false
-			type: bool: default: true
-		}
-	}
+	configuration: base.components.transforms.aws_ec2_metadata.configuration
 
 	env_vars: {
 		http_proxy:  env_vars._http_proxy
@@ -207,6 +160,18 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["subnet-9d6713b9"]
+				}
+			}
+			"tags": {
+				description: "The instance's tags"
+				required:    false
+				type: object: {
+					examples: [
+						{
+							"Name":          "InstanceName"
+							"ApplicationId": "12345678"
+						},
+					]
 				}
 			}
 			"vpc-id": {

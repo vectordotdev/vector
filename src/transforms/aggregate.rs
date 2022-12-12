@@ -1,5 +1,5 @@
 use std::{
-    collections::{btree_map::Entry, BTreeMap},
+    collections::{hash_map::Entry, HashMap},
     pin::Pin,
     time::Duration,
 };
@@ -7,6 +7,7 @@ use std::{
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext},
@@ -19,7 +20,7 @@ use crate::{
 /// Configuration for the `aggregate` transform.
 #[configurable_component(transform("aggregate"))]
 #[derive(Clone, Debug, Default)]
-#[serde(deny_unknown_fields, default)]
+#[serde(deny_unknown_fields)]
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
     ///
@@ -44,7 +45,7 @@ impl TransformConfig for AggregateConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 }
@@ -54,14 +55,14 @@ type MetricEntry = (metric::MetricData, EventMetadata);
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
-    map: BTreeMap<metric::MetricSeries, MetricEntry>,
+    map: HashMap<metric::MetricSeries, MetricEntry>,
 }
 
 impl Aggregate {
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
-            map: BTreeMap::new(),
+            map: Default::default(),
         })
     }
 

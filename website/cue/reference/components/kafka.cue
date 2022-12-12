@@ -85,6 +85,26 @@ components: _kafka: {
 				this dependency is packaged with Vector, meaning you do not need to install it.
 				"""
 		}
+		azure_event_hubs: {
+			title: "Azure Event Hubs"
+			body:  """
+				It is possible to use the `kafka` source and sink with [Azure Event Hubs](\(urls.azure_event_hubs))
+				for all tiers other than the [Basic tier](\(urls.azure_event_hubs_tiers)). More details
+				can be found [here](\(urls.azure_event_hubs_kafka)). To configure the source and
+				sink to connect to Azure Event Hubs set the following options:
+				- `bootstrap_servers` - `<namespace name>.servicebus.windows.net:9093`
+				- `group_id` - The consumer group. Note that if the default group (`$Default`) is used it must
+				  be specified as `$$Default` to escape the `$` used for environment variables.
+				- `topics` - The event hub name.
+				- `sasl.enabled` - Set to `true`.
+				- `sasl.mechanism` - Set to `PLAIN`.
+				- `sasl.username` - Set to `$$ConnectionString` (note the double `$$`).
+				- `sasl.password` - Set to the connection string. See [here](\(urls.azure_event_hubs_connection_string)).
+				- `tls.enabled` - Set to `true`.
+				- `tls.ca_file` - The certificate authority file.
+				- `tls.verify_certificate` - Set to `true`.
+				"""
+		}
 	}
 
 	telemetry: metrics: {

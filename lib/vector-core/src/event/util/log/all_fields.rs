@@ -150,8 +150,8 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use pretty_assertions::assert_eq;
     use serde_json::json;
+    use similar_asserts::assert_eq;
 
     use super::{super::test::fields_from_json, *};
 

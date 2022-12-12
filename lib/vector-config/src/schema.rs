@@ -22,15 +22,22 @@ use crate::{
 /// patterns, etc), as well as actual arbitrary key/value data.
 pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata<T>)
 where
-    T: Serialize,
+    T: Configurable + Serialize,
 {
     // Set the title/description of this schema.
     //
     // By default, we want to populate `description` because most things don't need a title: their property name or type
     // name is the title... which is why we enforce description being present at the very least.
+    //
+    // Additionally, we panic if a description is missing _unless_ one of these two conditions is
+    // met:
+    // - the field is marked transparent
+    // - `T` is referenceable and _does_ have a description
+    let has_referenceable_description =
+        T::referenceable_name().is_some() && T::metadata().description().is_some();
     let schema_title = metadata.title().map(|s| s.to_string());
     let schema_description = metadata.description().map(|s| s.to_string());
-    if schema_description.is_none() && !metadata.transparent() {
+    if schema_description.is_none() && !metadata.transparent() && !has_referenceable_description {
         panic!("no description provided for `{}`; all `Configurable` types must define a description or be provided one when used within another `Configurable` type", std::any::type_name::<T>());
     }
 
@@ -47,15 +54,44 @@ where
         ..Default::default()
     };
 
-    // Set any custom attributes as extensions on the schema.
+    // Set any custom attributes as extensions on the schema. If an attribute is declared multiple
+    // times, we turn the value into an array and merge them together. We _do_ not that, however, if
+    // the original value is a flag, or the value being added to an existing key is a flag, as
+    // having a flag declared multiple times, or mixing a flag with a KV pair, doesn't make sense.
     let mut custom_map = Map::new();
     for attribute in metadata.custom_attributes() {
         match attribute {
             CustomAttribute::Flag(key) => {
-                custom_map.insert(key.to_string(), Value::Bool(true));
+                match custom_map.insert(key.to_string(), Value::Bool(true)) {
+                    // Overriding a flag is fine, because flags are only ever "enabled", so there's
+                    // no harm to enabling it... again. Likewise, if there was no existing value,
+                    // it's fine.
+                    Some(Value::Bool(_)) | None => {},
+                    // Any other value being present means we're clashing with a different metadata
+                    // attribute, which is not good, so we have to bail out.
+                    _ => panic!("Tried to set metadata flag '{}' but already existed in schema metadata for `{}`.", key, std::any::type_name::<T>()),
+                }
             }
             CustomAttribute::KeyValue { key, value } => {
-                custom_map.insert(key.to_string(), Value::String(value.to_string()));
+                custom_map.entry(key.to_string())
+                    .and_modify(|existing_value| match existing_value {
+                        // When we have an existing KV pair, convert it to a multi-value KV pair.
+                        Value::String(_) => {
+                            let existing_str = std::mem::replace(existing_value, Value::Null);
+                            *existing_value = Value::Array(vec![existing_str, Value::String(value.to_string())]);
+                        },
+                        // This is already a multi-value KV pair, so just append the value.
+                        Value::Array(items) => {
+                            items.push(Value::String(value.to_string()));
+                        },
+                        // We have an unexpected value for this existing key, which is unallowed.
+                        Value::Bool(_) => {
+                            panic!("Tried to set metadata key/value pair '{}' but already existed in schema metadata for `{}` as a flag.", key, std::any::type_name::<T>());
+                        },
+                        // The existing value had an entirely unexpected value type... uh oh!
+                        _ => panic!("Tried to set metadata key/value pair '{}' but already existed in schema metadata for `{}` as unexpected value type.", key, std::any::type_name::<T>()),
+                    })
+                    .or_insert(Value::String(value.to_string()));
             }
         }
     }
@@ -115,13 +151,16 @@ pub fn generate_number_schema<N>() -> SchemaObject
 where
     N: Configurable + ConfigurableNumber,
 {
+    // TODO: Once `schemars` has proper integer support, we should allow specifying min/max bounds
+    // in a way that's relevant to the number class. As is, we're always forcing bounds to fit into
+    // `f64` regardless of whether or not we're using `u64` vs `f64` vs `i16`, and so on.
     let minimum = N::get_enforced_min_bound();
     let maximum = N::get_enforced_max_bound();
 
     // We always set the minimum/maximum bound to the mechanical limits. Any additional constraining as part of field
     // validators will overwrite these limits.
     let mut schema = SchemaObject {
-        instance_type: Some(InstanceType::Number.into()),
+        instance_type: Some(N::class().as_instance_type().into()),
         number: Some(Box::new(NumberValidation {
             minimum: Some(minimum),
             maximum: Some(maximum),
@@ -246,6 +285,7 @@ pub fn generate_struct_schema(
     }
 }
 
+#[allow(dead_code)]
 pub fn generate_optional_schema<T>(
     gen: &mut SchemaGenerator,
     metadata: Metadata<T>,
@@ -350,9 +390,12 @@ pub fn generate_const_string_schema(value: String) -> SchemaObject {
     }
 }
 
-pub fn generate_internal_tagged_variant_schema(tag: String, value: String) -> SchemaObject {
+pub fn generate_internal_tagged_variant_schema(
+    tag: String,
+    value_schema: SchemaObject,
+) -> SchemaObject {
     let mut properties = IndexMap::new();
-    properties.insert(tag.clone(), generate_const_string_schema(value));
+    properties.insert(tag.clone(), value_schema);
 
     let mut required = BTreeSet::new();
     required.insert(tag);
@@ -384,7 +427,7 @@ where
     T::validate_metadata(&overrides)?;
 
     let mut schema = match T::referenceable_name() {
-        // When `T` has a referencable name, try looking it up in the schema generator's definition
+        // When `T` has a referenceable name, try looking it up in the schema generator's definition
         // list, and if it exists, create a schema reference to it. Otherwise, generate it and
         // backfill it in the schema generator.
         Some(name) => {
@@ -415,7 +458,7 @@ where
 
             get_schema_ref(gen, name)
         }
-        // Always generate the schema directly if `T` is not referencable.
+        // Always generate the schema directly if `T` is not referenceable.
         None => T::generate_schema(gen)?,
     };
 

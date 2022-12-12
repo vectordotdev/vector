@@ -37,7 +37,6 @@ pub struct LogdnaConfig {
     endpoint: Option<UriSerde>,
 
     /// The hostname that will be attached to each batch of events.
-    #[configurable(metadata(templateable))]
     hostname: Template,
 
     /// The MAC address that will be attached to each batch of events.
@@ -47,7 +46,6 @@ pub struct LogdnaConfig {
     ip: Option<String>,
 
     /// The tags that will be attached to each batch of events.
-    #[configurable(metadata(templateable))]
     tags: Option<Vec<Template>>,
 
     #[configurable(derived)]

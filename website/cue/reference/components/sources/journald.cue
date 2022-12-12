@@ -242,7 +242,7 @@ components: sources: journald: {
 				with. If the `journalctl` command is not in the environment path you can
 				specify the exact location via the `journalctl_path` option. For more
 				information on this communication strategy please see
-				[issue #1473](\(urls.vector_issues)/1437).
+				[issue #1473](\(urls.vector_issues)/1473).
 				"""
 		}
 		non_ascii: {

@@ -171,6 +171,27 @@ impl ElasticsearchCommonMode {
     }
 }
 
+/// Configuration for api version.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum ElasticsearchApiVersion {
+    /// Auto-detect the api version. Will fail if endpoint isn't reachable.
+    Auto,
+    /// Use the Elasticsearch 6.x API.
+    V6,
+    /// Use the Elasticsearch 7.x API.
+    V7,
+    /// Use the Elasticsearch 8.x API.
+    V8,
+}
+
+impl Default for ElasticsearchApiVersion {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum ParseError {

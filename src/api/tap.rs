@@ -429,7 +429,7 @@ mod tests {
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
     use crate::test_util::{start_topology, trace_init};
-    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
+    use crate::transforms::log_to_metric::{LogToMetricConfig, MetricConfig, MetricTypeConfig};
     use crate::transforms::remap::RemapConfig;
 
     #[test]
@@ -589,7 +589,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let source_tap_stream = create_events_stream(
             topology.watch(),
@@ -628,12 +628,13 @@ mod tests {
             "to_metric",
             &["in"],
             LogToMetricConfig {
-                metrics: vec![MetricConfig::Gauge(GaugeConfig {
-                    field: "message".to_string(),
+                metrics: vec![MetricConfig {
+                    field: "message".try_into().expect("Fixed template string"),
                     name: None,
                     namespace: None,
                     tags: None,
-                })],
+                    metric: MetricTypeConfig::Gauge,
+                }],
             },
         );
         config.add_sink(
@@ -646,7 +647,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let source_tap_stream = create_events_stream(
             topology.watch(),
@@ -696,7 +697,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let transform_tap_stream = create_events_stream(
             topology.watch(),
@@ -749,7 +750,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let tap_stream = create_events_stream(
             topology.watch(),
@@ -823,7 +824,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let tap_stream = create_events_stream(
             topology.watch(),
@@ -883,7 +884,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let transform_tap_remap_dropped_stream = create_events_stream(
             topology.watch(),
@@ -959,7 +960,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let mut transform_tap_all_outputs_stream = create_events_stream(
             topology.watch(),

@@ -1,5 +1,4 @@
 use std::{
-    collections::BTreeMap,
     future::ready,
     time::{Duration, Instant},
 };
@@ -11,7 +10,7 @@ use hyper::{Body, Request};
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
@@ -161,9 +160,10 @@ fn apache_metrics(
                     .body(Body::empty())
                     .expect("error creating request");
 
-                let mut tags: BTreeMap<String, String> = BTreeMap::new();
-                tags.insert("endpoint".into(), sanitized_url.to_string());
-                tags.insert("host".into(), url.sanitized_authority());
+                let tags = metric_tags! {
+                    "endpoint" => sanitized_url.to_string(),
+                    "host" => url.sanitized_authority(),
+                };
 
                 let start = Instant::now();
                 let namespace = namespace.clone();
@@ -221,7 +221,7 @@ fn apache_metrics(
                                     .collect::<Vec<_>>();
 
                                 emit!(ApacheMetricsEventsReceived {
-                                    byte_size: metrics.size_of(),
+                                    byte_size: metrics.estimated_json_encoded_size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
                                 });
@@ -282,7 +282,7 @@ mod test {
         service::{make_service_fn, service_fn},
         Body, Response, Server,
     };
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
 
     use super::*;
@@ -383,9 +383,9 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     Some(tags) => {
                         assert_eq!(
                             tags.get("endpoint"),
-                            Some(&format!("http://{}/metrics", in_addr))
+                            Some(&format!("http://{}/metrics", in_addr)[..])
                         );
-                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()));
+                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()[..]));
                     }
                     None => error!(message = "No tags for metric.", metric = ?m),
                 }

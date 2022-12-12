@@ -8,7 +8,6 @@ mod crud;
 mod debug;
 
 pub mod merge;
-pub mod remove;
 
 pub use crud::*;
 

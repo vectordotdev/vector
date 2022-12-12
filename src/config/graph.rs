@@ -80,7 +80,9 @@ impl Graph {
                 id.clone(),
                 Node::Transform {
                     in_ty: transform.inner.input().data_type(),
-                    outputs: transform.inner.outputs(&schema::Definition::any()),
+                    outputs: transform
+                        .inner
+                        .outputs(&schema::Definition::any(), schema.log_namespace()),
                 },
             );
         }
@@ -360,7 +362,7 @@ impl Graph {
 
 #[cfg(test)]
 mod test {
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::*;
 

@@ -12,6 +12,7 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -38,18 +39,23 @@ impl RetryLogic for LogApiRetry {
 
 #[derive(Debug, Clone)]
 pub struct LogApiRequest {
-    pub batch_size: usize,
     pub api_key: Arc<str>,
     pub compression: Compression,
     pub body: Bytes,
     pub finalizers: EventFinalizers,
-    pub events_byte_size: usize,
     pub uncompressed_size: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl Finalizable for LogApiRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for LogApiRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -59,7 +65,6 @@ pub struct LogApiResponse {
     count: usize,
     events_byte_size: usize,
     raw_byte_size: usize,
-    protocol: String,
 }
 
 impl DriverResponse for LogApiResponse {
@@ -71,8 +76,8 @@ impl DriverResponse for LogApiResponse {
         CountByteSize(self.count, self.events_byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.raw_byte_size, &self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
     }
 }
 
@@ -103,10 +108,12 @@ impl Service<LogApiRequest> for LogApiService {
     type Error = DatadogApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, request: LogApiRequest) -> Self::Future {
         let mut client = self.client.clone();
         let http_request = Request::post(&self.uri)
@@ -128,10 +135,9 @@ impl Service<LogApiRequest> for LogApiService {
             http_request
         };
 
-        let count = request.batch_size;
-        let events_byte_size = request.events_byte_size;
+        let count = request.get_metadata().event_count();
+        let events_byte_size = request.get_metadata().events_byte_size();
         let raw_byte_size = request.uncompressed_size;
-        let protocol = self.uri.scheme_str().unwrap_or("http").to_string();
 
         let http_request = http_request
             .header(CONTENT_LENGTH, request.body.len())
@@ -145,7 +151,6 @@ impl Service<LogApiRequest> for LogApiService {
                     count,
                     events_byte_size,
                     raw_byte_size,
-                    protocol,
                 },
             )
         })

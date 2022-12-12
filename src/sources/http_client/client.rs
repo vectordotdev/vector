@@ -14,8 +14,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     http::Auth,
-    serde::default_decoding,
-    serde::default_framing_message_based,
+    serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
         http::HttpMethod,
@@ -83,7 +82,8 @@ pub struct HttpClientConfig {
     #[configurable(derived)]
     pub auth: Option<Auth>,
 
-    /// The namespace to use for logs. This overrides the global setting
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
 }
@@ -202,24 +202,19 @@ impl HttpClientContext {
 
     /// Enriches events with source_type, timestamp
     fn enrich_events(&self, events: &mut Vec<Event>) {
+        let now = Utc::now();
+
         for event in events {
             match event {
                 Event::Log(ref mut log) => {
-                    self.log_namespace.insert_vector_metadata(
+                    self.log_namespace.insert_standard_vector_source_metadata(
                         log,
-                        log_schema().source_type_key(),
-                        "source_type",
                         HttpClientConfig::NAME,
-                    );
-                    self.log_namespace.insert_vector_metadata(
-                        log,
-                        log_schema().timestamp_key(),
-                        "ingest_timestamp",
-                        Utc::now(),
+                        now,
                     );
                 }
                 Event::Metric(ref mut metric) => {
-                    metric.insert_tag(
+                    metric.replace_tag(
                         log_schema().source_type_key().to_string(),
                         HttpClientConfig::NAME.to_string(),
                     );
@@ -246,12 +241,7 @@ impl HttpClientBuilder for HttpClientContext {
 
 impl http_client::HttpClientContext for HttpClientContext {
     /// Decodes the HTTP response body into events per the decoder configured.
-    fn on_response(
-        &mut self,
-        _url: &http::Uri,
-        _header: &Parts,
-        body: &Bytes,
-    ) -> Option<Vec<Event>> {
+    fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         // get the body into a byte array
         let mut buf = BytesMut::new();
         let body = String::from_utf8_lossy(body);

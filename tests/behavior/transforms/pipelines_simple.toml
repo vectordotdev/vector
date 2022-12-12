@@ -48,9 +48,8 @@ value = "hello world"
 extract_from = "pipelines_processing"
 
 [[tests.outputs.conditions]]
-type = "check_fields"
-"went_through_bar.equals" = true
-"went_through_foo.equals" = true
+type = "vrl"
+source = ".went_through_bar == true && .went_through_foo == true"
 
 [[tests]]
 name = "filtered log"
@@ -63,5 +62,5 @@ value = "bonjour le monde"
 extract_from = "pipelines_processing"
 
 [[tests.outputs.conditions]]
-type = "check_fields"
-"went_through_bar.equals" = true
+type = "vrl"
+source = ".went_through_bar == true"
