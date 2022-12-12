@@ -122,9 +122,7 @@ impl Function for ParseCef {
         arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let translate_custom_fields = arguments
-            .optional("translate_custom_fields")
-            .unwrap_or_else(|| expr!(false));
+        let translate_custom_fields = arguments.optional("translate_custom_fields");
         let custom_field_map = build_map();
 
         Ok(ParseCefFn {
@@ -139,7 +137,7 @@ impl Function for ParseCef {
 #[derive(Clone, Debug)]
 pub(crate) struct ParseCefFn {
     pub(crate) value: Box<dyn Expression>,
-    pub(crate) translate_custom_fields: Box<dyn Expression>,
+    pub(crate) translate_custom_fields: Option<Box<dyn Expression>>,
     custom_field_map: HashMap<&'static str, (usize, CustomField)>,
 }
 
@@ -147,7 +145,11 @@ impl FunctionExpression for ParseCefFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let bytes = bytes.try_bytes_utf8_lossy()?;
-        let translate_custom_fields = self.translate_custom_fields.resolve(ctx)?.try_boolean()?;
+        let translate_custom_fields = if let Some(field) = self.translate_custom_fields.as_ref() {
+            field.resolve(ctx)?.try_boolean()?
+        } else {
+            false
+        };
 
         let result = parse(&bytes)?;
 
