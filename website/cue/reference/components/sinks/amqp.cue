@@ -13,7 +13,7 @@ components: sinks: amqp: {
 	}
 
 	features: {
-		auto_generated: true
+		auto_generated:   true
 		acknowledgements: false
 		buffer: enabled:      true
 		healthcheck: enabled: true

@@ -267,93 +267,46 @@ components: sources: [Name=string]: {
 				}
 			}
 		}
+	}
 
-		output: {
-			logs?: [Name=string]: {
-				fields: {
-					_current_timestamp: {
-						description: string | *"The exact time the event was ingested into Vector."
-						required:    true
-						type: timestamp: {}
-					}
+	output: {
+		logs?: [Name=string]: {
+			fields: {
+				_current_timestamp: {
+					description: string | *"The exact time the event was ingested into Vector."
+					required:    true
+					type: timestamp: {}
+				}
 
-					_local_host: {
-						description: string | *"The local hostname, equivalent to the `gethostname` command."
-						required:    true
-						type: string: {
-							examples: [_values.local_host]
-						}
-					}
-
-					_raw_line: {
-						description: "The raw line, unparsed."
-						required:    true
-						type: string: {
-							examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
-						}
-					}
-
-					_client_metadata: {
-						common:      false
-						description: "Client TLS metadata."
-						required:    false
-						type: object: {
-							options: {
-								subject: {
-									common:      true
-									description: "The subject from the client TLS certificate. Only added if `tls.client_metadata_key` is set. Key name depends on configured `client_metadata_key`"
-									required:    false
-									type: string: {
-										default: null
-										examples: [ "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
-									}
-								}
-							}
-						}
+				_local_host: {
+					description: string | *"The local hostname, equivalent to the `gethostname` command."
+					required:    true
+					type: string: {
+						examples: [_values.local_host]
 					}
 				}
-			}
-		}
 
-		output: {
-			logs?: [Name=string]: {
-				fields: {
-					_current_timestamp: {
-						description: string | *"The exact time the event was ingested into Vector."
-						required:    true
-						type: timestamp: {}
+				_raw_line: {
+					description: "The raw line, unparsed."
+					required:    true
+					type: string: {
+						examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
 					}
+				}
 
-					_local_host: {
-						description: string | *"The local hostname, equivalent to the `gethostname` command."
-						required:    true
-						type: string: {
-							examples: [_values.local_host]
-						}
-					}
-
-					_raw_line: {
-						description: "The raw line, unparsed."
-						required:    true
-						type: string: {
-							examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
-						}
-					}
-
-					_client_metadata: {
-						common:      false
-						description: "Client TLS metadata."
-						required:    false
-						type: object: {
-							options: {
-								subject: {
-									common:      true
-									description: "The subject from the client TLS certificate. Only added if `tls.client_metadata_key` is set. Key name depends on configured `client_metadata_key`"
-									required:    false
-									type: string: {
-										default: null
-										examples: [ "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
-									}
+				_client_metadata: {
+					common:      false
+					description: "Client TLS metadata."
+					required:    false
+					type: object: {
+						options: {
+							subject: {
+								common:      true
+								description: "The subject from the client TLS certificate. Only added if `tls.client_metadata_key` is set. Key name depends on configured `client_metadata_key`"
+								required:    false
+								type: string: {
+									default: null
+									examples: [ "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
 								}
 							}
 						}

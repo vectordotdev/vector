@@ -4,6 +4,7 @@ components: sources: amqp: {
 	title: "AMQP"
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false

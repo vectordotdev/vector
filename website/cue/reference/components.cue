@@ -424,7 +424,7 @@ components: {
 			mode: "accept" | "connect"
 		}
 		let Args = _args
-		enabled: bool
+		enabled:        bool
 		auto_generated: bool | *false
 
 		if enabled && !auto_generated {
