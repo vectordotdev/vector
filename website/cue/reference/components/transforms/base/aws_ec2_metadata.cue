@@ -102,10 +102,7 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 		required:    false
 		type: array: {
 			default: []
-			items: type: string: {
-				examples: ["Name", "Project"]
-				syntax: "literal"
-			}
+			items: type: string: examples: ["Name", "Project"]
 		}
 	}
 }

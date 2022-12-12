@@ -124,7 +124,7 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 		}
 	}
 	encoding: {
-		description: "Encoding configuration."
+		description: "Configures how events are encoded into raw bytes."
 		required:    true
 		type: object: options: {
 			avro: {
@@ -134,7 +134,7 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: {}
+					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
 			}
 			codec: {
@@ -164,7 +164,7 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 					native: """
 						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
 
-						This codec is ([EXPERIMENTAL][experimental]).
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -172,7 +172,7 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 					native_json: """
 						Encodes an event in Vector’s [native JSON format][vector_native_json].
 
-						This codec is ([EXPERIMENTAL][experimental]).
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
