@@ -459,6 +459,62 @@ mod test {
     }
 
     #[tokio::test]
+    async fn test_prometheus_duplicate_tags() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics").map(|| {
+            r#"
+                    metric_label{code="200", code="success"} 100 1612411516789
+                    "#
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            scrape_interval_secs: 1,
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: true,
+            query: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(3),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+
+        let metrics: Vec<vector_core::event::Metric> = events
+            .into_iter()
+            .map(|event| event.into_metric())
+            .collect();
+        let metric = &metrics[0];
+
+        assert_eq!(metric.name(), "metric_label");
+
+        let mut code_tag = metric
+            .tags()
+            .unwrap()
+            .iter_all()
+            .filter(|(name, _value)| *name == "code")
+            .map(|(_name, value)| value)
+            .collect::<Vec<_>>();
+
+        // Sort because the tag order shouldn't matter
+        code_tag.sort();
+
+        assert_eq!(2, code_tag.len());
+        assert_eq!("200", code_tag[0].unwrap());
+        assert_eq!("success", code_tag[1].unwrap());
+    }
+
+    #[tokio::test]
     async fn test_prometheus_request_query() {
         let in_addr = next_addr();
 
