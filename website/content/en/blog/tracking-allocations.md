@@ -30,9 +30,13 @@ Under the hood, Vector uses a custom memory allocator implementation which captu
 
 As well, we also track allocations for the "root" component. The root component includes anything Vector allocates itself, regardless of whatever is specified in your configuration.
 
-## Notes
+## Using allocation tracing in production
 
-This feature currently only supports unix based platforms. When enabled, there is approximately 20% overhead in throughput based on our benchmarks.
+Currently, this feature is only supported on Linux builds of Vector. This may change in the future as we continue to improve allocation tracing.
+
+Additionally, there is a small performance overhead imposed by allocation tracing when enabled. Vector runs a set of soak tests in CI in order to catch performance regressions during development. These soak tests emulate common Vector use cases, such as remapping events, or converting payloads from one event type to another, and so on.
+
+In our development and testing of this feature, we've observed around a 20% reduction in throughput. This should be low enough to allow enabling it on a single Vector instance for debugging purposes, but care should be taken before enabling it across your entire fleet.
 
 ## Next steps
 
