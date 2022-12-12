@@ -144,6 +144,8 @@ impl SourceConfig for OpentelemetryConfig {
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
     }
 
+    // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",
+    // as both are optional and can be converted to/from.
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = Definition::new_with_default_metadata(Kind::any(), [log_namespace])
@@ -180,7 +182,7 @@ impl SourceConfig for OpentelemetryConfig {
                 Some(LegacyKey::Overwrite(owned_value_path!(SEVERITY_TEXT_KEY))),
                 &owned_value_path!(SEVERITY_TEXT_KEY),
                 Kind::bytes().or_undefined(),
-                None,
+                Some("severity"),
             )
             .with_source_metadata(
                 Self::NAME,
