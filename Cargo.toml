@@ -416,7 +416,7 @@ target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables"
 target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 
 # Enables features that work only on systems providing `cfg(unix)`
-unix = ["tikv-jemallocator"]
+unix = ["tikv-jemallocator", "allocation-tracing"]
 allocation-tracing = []
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
