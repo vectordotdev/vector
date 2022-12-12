@@ -424,7 +424,7 @@ components: {
 			mode: "accept" | "connect"
 		}
 		let Args = _args
-		enabled:        bool
+		enabled: bool
 
 		if enabled {
 			can_verify_certificate: bool
