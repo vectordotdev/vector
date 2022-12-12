@@ -10,7 +10,7 @@ use listenfd::ListenFd;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::parser::ParseError;
@@ -157,6 +157,8 @@ impl SourceConfig for StatsdConfig {
                     cx,
                     false.into(),
                     config.connection_limit,
+                    StatsdConfig::NAME,
+                    LogNamespace::Legacy,
                 )
             }
             #[cfg(unix)]

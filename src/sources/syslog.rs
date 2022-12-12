@@ -184,6 +184,8 @@ impl SourceConfig for SyslogConfig {
                     cx,
                     false.into(),
                     connection_limit,
+                    SyslogConfig::NAME,
+                    log_namespace,
                 )
             }
             Mode::Udp {
@@ -520,6 +522,10 @@ mod test {
                     Kind::object(Collection::from_unknown(Kind::object(
                         Collection::from_unknown(Kind::bytes()),
                     ))),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("syslog", "tls_client_metadata"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 );
 
         assert_eq!(definition, expected_definition);

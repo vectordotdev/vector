@@ -5,7 +5,7 @@ mod unix;
 
 use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
 use lookup::{lookup_v2::parse_value_path, owned_value_path};
-use value::Kind;
+use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
 
@@ -153,6 +153,8 @@ impl SourceConfig for SocketConfig {
                     cx,
                     false.into(),
                     config.connection_limit,
+                    SocketConfig::NAME,
+                    log_namespace,
                 )
             }
             Mode::Udp(config) => {
@@ -245,6 +247,13 @@ impl SourceConfig for SocketConfig {
                         LegacyKey::InsertIfEmpty,
                     );
 
+                let tls_client_metadata_path = config
+                    .tls()
+                    .as_ref()
+                    .and_then(|tls| tls.client_metadata_key.as_ref())
+                    .and_then(|x| parse_value_path(x).ok())
+                    .map(LegacyKey::Overwrite);
+
                 schema_definition
                     .with_source_metadata(
                         Self::NAME,
@@ -258,6 +267,14 @@ impl SourceConfig for SocketConfig {
                         Some(port_key_path),
                         &owned_value_path!("port"),
                         Kind::bytes(),
+                        None,
+                    )
+                    .with_source_metadata(
+                        Self::NAME,
+                        tls_client_metadata_path,
+                        &owned_value_path!("tls_client_metadata"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                            .or_undefined(),
                         None,
                     )
             }
@@ -636,6 +653,81 @@ mod test {
             );
 
             assert_eq!(event.as_log()["tls_peer"], tls_meta.clone().into(),);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn tcp_with_tls_vector_namespace() {
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let (tx, mut rx) = SourceSender::new_test();
+            let addr = next_addr();
+
+            let mut config = TcpConfig::from_address(addr.into());
+            config.set_tls(Some(TlsSourceConfig {
+                tls_config: TlsEnableableConfig {
+                    enabled: Some(true),
+                    options: TlsConfig {
+                        verify_certificate: Some(true),
+                        crt_file: Some(tls::TEST_PEM_CRT_PATH.into()),
+                        key_file: Some(tls::TEST_PEM_KEY_PATH.into()),
+                        ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                        ..Default::default()
+                    },
+                },
+                client_metadata_key: None,
+            }));
+            config.log_namespace = Some(true);
+
+            let server = SocketConfig::from(config)
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+
+            let lines = vec!["one line".to_owned(), "another line".to_owned()];
+
+            wait_for_tcp(addr).await;
+            send_lines_tls(
+                addr,
+                "localhost".into(),
+                lines.into_iter(),
+                std::path::Path::new(tls::TEST_PEM_CA_PATH),
+                std::path::Path::new(tls::TEST_PEM_CLIENT_CRT_PATH),
+                std::path::Path::new(tls::TEST_PEM_CLIENT_KEY_PATH),
+            )
+            .await
+            .unwrap();
+
+            let event = rx.next().await.unwrap();
+            let log = event.as_log();
+            let event_meta = log.metadata().value();
+
+            assert_eq!(log.value(), &"one line".into());
+
+            let tls_meta: BTreeMap<String, value::Value> = btreemap!(
+                "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
+            );
+
+            assert_eq!(
+                event_meta
+                    .get(path!(SocketConfig::NAME, "tls_client_metadata"))
+                    .unwrap(),
+                &vrl::value!(tls_meta.clone())
+            );
+
+            let event = rx.next().await.unwrap();
+            let log = event.as_log();
+            let event_meta = log.metadata().value();
+
+            assert_eq!(log.value(), &"another line".into());
+
+            assert_eq!(
+                event_meta
+                    .get(path!(SocketConfig::NAME, "tls_client_metadata"))
+                    .unwrap(),
+                &vrl::value!(tls_meta.clone())
+            );
         })
         .await;
     }

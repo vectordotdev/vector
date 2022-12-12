@@ -343,7 +343,7 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.26.1", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.11.3", default-features = false, optional = true }
+prost-build = { version = "0.11.4", default-features = false, optional = true }
 tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
@@ -839,6 +839,9 @@ enterprise-tests = [
   "sinks-loki",
   "api",
 ]
+
+component-validation-runner = ["dep:tonic", "sources-internal_logs", "sources-internal_metrics", "sources-vector", "sinks-vector"]
+component-validation-tests = ["component-validation-runner", "sources", "transforms", "sinks"]
 
 # Grouping together features for benchmarks. We exclude the API client due to it causing the build process to run out
 # of memory when those additional dependencies are built in CI.
