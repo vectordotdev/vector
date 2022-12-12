@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
+use vector_common::internal_event::{EventsReceived, Registered};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::event::{BatchNotifier, BatchStatus};
@@ -286,6 +287,7 @@ pub(crate) struct DatadogAgentSource {
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
     metrics_schema_definition: Arc<schema::Definition>,
+    events_received: Registered<EventsReceived>,
 }
 
 #[derive(Clone)]
@@ -337,6 +339,7 @@ impl DatadogAgentSource {
             logs_schema_definition: Arc::new(logs_schema_definition),
             metrics_schema_definition: Arc::new(metrics_schema_definition),
             log_namespace,
+            events_received: register!(EventsReceived),
         }
     }
 

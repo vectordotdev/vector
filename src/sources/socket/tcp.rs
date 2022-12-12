@@ -168,7 +168,7 @@ impl TcpConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RawTcpSource {
     config: TcpConfig,
     decoder: Decoder,
