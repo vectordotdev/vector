@@ -16,7 +16,7 @@ We are excited to announce that Vector now has support for exposing per-componen
 
 ![vector top with allocation tracing](/img/blog/vector-top-allocation-tracking.png)
 
-To explore the feature, start a vector instance with the `allocation-tracing` option, launch `vector top` and monitor your components!
+To explore the feature, start a Vector instance with the `allocation-tracing` option, launch `vector top` and monitor your components!
 
 ## What's new
 
@@ -26,7 +26,7 @@ We provide the following new metrics: `component_allocated_bytes`, `component_al
 - `component_allocated_bytes_total` shows the accumulated total allocations.
 - `component_deallocated_bytes_total` shows the accumulated total deallocations.
 
-The following image visualizes the `component_allocated_bytes` metric of a sample vector instance:
+The following image visualizes the `component_allocated_bytes` metric of a sample Vector instance:
 ![Visualization of the allocation tracking metrics via Datadog](/img/blog/vector-allocation-tracking-graph.png)
 
 ## How it works
@@ -49,5 +49,4 @@ In this example, Vector will attribute that memory usage to other components -- 
 
 Adding support for shared ownership tracking provides further insights into the lifetimes of components, further easing the debugging process.
 
-[vector]: /
 [tracing]: https://docs.rs/tracing/latest/tracing/
