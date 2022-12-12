@@ -178,6 +178,8 @@ components: {
 		}
 		let Args = _args
 
+		auto_generated: bool | *false
+
 		if Args.kind == "source" {
 			acknowledgements: bool
 			collect?:         #FeaturesCollect
@@ -423,8 +425,9 @@ components: {
 		}
 		let Args = _args
 		enabled: bool
+		auto_generated: bool | *false
 
-		if enabled {
+		if enabled && !auto_generated {
 			can_verify_certificate: bool
 			if Args.mode == "connect" {
 				can_verify_hostname: bool

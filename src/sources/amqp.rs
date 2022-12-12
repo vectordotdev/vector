@@ -60,7 +60,7 @@ pub struct AmqpSourceConfig {
     #[configurable(metadata(docs::examples = "consumer-group-name"))]
     pub(crate) consumer: String,
 
-    #[configurable(derived)]
+    #[serde(flatten)]
     pub(crate) connection: AmqpConfig,
 
     /// The `AMQP` routing key.

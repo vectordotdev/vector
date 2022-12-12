@@ -13,6 +13,7 @@ components: sources: exec: {
 	}
 
 	features: {
+		auto_generated: true
 		acknowledgements: false
 		multiline: enabled: false
 		codecs: {

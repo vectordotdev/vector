@@ -13,6 +13,7 @@ components: sinks: clickhouse: {
 	}
 
 	features: {
+		auto_generated: true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
