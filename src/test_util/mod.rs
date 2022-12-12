@@ -678,7 +678,13 @@ impl CountReceiver<Event> {
 pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
-) -> (RunningTopology, tokio::sync::mpsc::UnboundedReceiver<()>) {
+) -> (
+    RunningTopology,
+    (
+        tokio::sync::mpsc::UnboundedSender<()>,
+        tokio::sync::mpsc::UnboundedReceiver<()>,
+    ),
+) {
     config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())

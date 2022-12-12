@@ -309,7 +309,9 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => Deserializer::Bytes(BytesDeserializerConfig.build()),
             DeserializerConfig::Json => Deserializer::Json(JsonDeserializerConfig.build()),
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => Deserializer::Syslog(SyslogDeserializerConfig.build()),
+            DeserializerConfig::Syslog => {
+                Deserializer::Syslog(SyslogDeserializerConfig::default().build())
+            }
             DeserializerConfig::Native => Deserializer::Native(NativeDeserializerConfig.build()),
             DeserializerConfig::NativeJson => {
                 Deserializer::NativeJson(NativeJsonDeserializerConfig.build())
@@ -341,7 +343,7 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json => JsonDeserializerConfig.output_type(),
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => SyslogDeserializerConfig.output_type(),
+            DeserializerConfig::Syslog => SyslogDeserializerConfig::default().output_type(),
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
             DeserializerConfig::NativeJson => NativeJsonDeserializerConfig.output_type(),
             DeserializerConfig::Gelf => GelfDeserializerConfig.output_type(),
@@ -354,7 +356,9 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json => JsonDeserializerConfig.schema_definition(log_namespace),
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => SyslogDeserializerConfig.schema_definition(log_namespace),
+            DeserializerConfig::Syslog => {
+                SyslogDeserializerConfig::default().schema_definition(log_namespace)
+            }
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::NativeJson => {
                 NativeJsonDeserializerConfig.schema_definition(log_namespace)
@@ -397,7 +401,7 @@ impl DeserializerConfig {
 }
 
 /// Parse structured events from bytes.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Deserializer {
     /// Uses a `BytesDeserializer` for deserialization.
     Bytes(BytesDeserializer),

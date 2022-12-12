@@ -186,7 +186,6 @@ impl tokio_util::codec::Encoder<()> for Framer {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
-#[configurable(description = "Configures how events are encoded into raw bytes.")]
 #[configurable(metadata(docs::enum_tag_description = "The codec to use for encoding events."))]
 pub enum SerializerConfig {
     /// Encodes an event as an [Apache Avro][apache_avro] message.

@@ -1,6 +1,7 @@
 #[cfg(test)]
 use std::borrow::Borrow;
 use std::collections::{hash_map::DefaultHasher, BTreeMap};
+use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::{cmp::Ordering, mem};
 
@@ -8,6 +9,7 @@ use indexmap::IndexSet;
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::{configurable_component, Configurable};
+use vrl_lib::prelude::fmt::Formatter;
 
 /// A single tag value, either a bare tag or a value.
 #[derive(Clone, Configurable, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -97,6 +99,22 @@ impl Default for TagValueSet {
     }
 }
 
+impl Display for TagValueSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> vrl_lib::prelude::fmt::Result {
+        for (i, value) in self.iter().enumerate() {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            if let Some(value) = value {
+                write!(f, "\"{}\"", value)?;
+            } else {
+                write!(f, "null")?;
+            }
+        }
+        Ok(())
+    }
+}
+
 impl TagValueSet {
     /// Convert this set into a single value, mimicking the behavior of this set being just a plain
     /// single string while still storing all of the values.
@@ -124,7 +142,7 @@ impl TagValueSet {
         }
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         match self {
             Self::Empty => true,
             Self::Single(_) | Self::Set(_) => false, // the `Set` variant will never be empty
@@ -149,25 +167,6 @@ impl TagValueSet {
             Self::Empty => false,
             Self::Single(tag) => value == tag,
             Self::Set(set) => set.contains(value),
-        }
-    }
-
-    fn retain(&mut self, mut f: impl FnMut(TagValueRef<'_>) -> bool) {
-        match self {
-            Self::Empty => (),
-            Self::Single(tag) => {
-                if !f(tag.as_option()) {
-                    *self = Self::Empty;
-                }
-            }
-            Self::Set(set) => {
-                set.retain(|value| f(value.as_option()));
-                match set.len() {
-                    0 => *self = Self::Empty,
-                    1 => *self = Self::Single(set.pop().unwrap()),
-                    _ => {}
-                }
-            }
         }
     }
 
@@ -435,6 +434,11 @@ impl MetricTags {
         (!self.is_empty()).then_some(self)
     }
 
+    /// Iterates over all the tag value sets
+    pub fn iter_sets(&self) -> impl Iterator<Item = (&str, &TagValueSet)> {
+        self.0.iter().map(|(key, value)| (key.as_str(), value))
+    }
+
     /// Iterate over references to all values of each tag.
     pub fn iter_all(&self) -> impl Iterator<Item = (&str, TagValueRef<'_>)> {
         self.0
@@ -506,11 +510,8 @@ impl MetricTags {
         }
     }
 
-    pub fn retain(&mut self, mut f: impl FnMut(&str, &str) -> bool) {
-        self.0.retain(|key, tags| {
-            tags.retain(|tag| tag.map_or(false, |tag| f(key, tag)));
-            !tags.is_empty()
-        });
+    pub fn retain(&mut self, mut f: impl FnMut(&str, &TagValueSet) -> bool) {
+        self.0.retain(|key, tags| f(key.as_str(), tags));
     }
 }
 

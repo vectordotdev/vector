@@ -16,7 +16,9 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
-use vector_common::internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _};
+use vector_common::internal_event::{
+    self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
+};
 use vector_config::NamedComponent;
 use vector_core::config::LogNamespace;
 use vector_core::{
@@ -493,14 +495,15 @@ pub async fn build_pieces(
 
             let mut rx = wrap(rx);
 
+            let events_received = register!(EventsReceived);
             sink.run(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
                     .inspect(|events| {
-                        emit!(EventsReceived {
-                            count: events.len(),
-                            byte_size: events.estimated_json_encoded_size_of(),
-                        })
+                        events_received.emit(CountByteSize(
+                            events.len(),
+                            events.estimated_json_encoded_size_of(),
+                        ))
                     })
                     .take_until_if(tripwire),
             )
@@ -701,6 +704,7 @@ struct Runner {
     outputs: TransformOutputs,
     timer: crate::utilization::Timer,
     last_report: Instant,
+    events_received: Registered<EventsReceived>,
 }
 
 impl Runner {
@@ -717,6 +721,7 @@ impl Runner {
             outputs,
             timer: crate::utilization::Timer::new(),
             last_report: Instant::now(),
+            events_received: register!(EventsReceived),
         }
     }
 
@@ -727,10 +732,10 @@ impl Runner {
             self.last_report = stopped;
         }
 
-        emit!(EventsReceived {
-            count: events.len(),
-            byte_size: events.estimated_json_encoded_size_of(),
-        });
+        self.events_received.emit(CountByteSize(
+            events.len(),
+            events.estimated_json_encoded_size_of(),
+        ));
     }
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
@@ -842,13 +847,14 @@ fn build_task_transform(
 
     let input_rx = crate::utilization::wrap(input_rx.into_stream());
 
+    let events_received = register!(EventsReceived);
     let filtered = input_rx
         .filter(move |events| ready(filter_events_type(events, input_type)))
-        .inspect(|events| {
-            emit!(EventsReceived {
-                count: events.len(),
-                byte_size: events.estimated_json_encoded_size_of(),
-            })
+        .inspect(move |events| {
+            events_received.emit(CountByteSize(
+                events.len(),
+                events.estimated_json_encoded_size_of(),
+            ))
         });
     let events_sent = register!(EventsSent::from(internal_event::Output(None)));
     let stream = t

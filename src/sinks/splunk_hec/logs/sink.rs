@@ -77,7 +77,7 @@ where
             endpoint_target: self.endpoint_target,
         };
 
-        let sink = input
+        input
             .map(move |event| process_log(event, &data))
             .batched_partitioned(
                 if self.endpoint_target == EndpointTarget::Raw {
@@ -104,9 +104,9 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .run()
+            .await
     }
 }
 

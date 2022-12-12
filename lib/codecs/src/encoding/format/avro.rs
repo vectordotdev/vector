@@ -44,6 +44,9 @@ impl AvroSerializerConfig {
 #[derive(Clone, Debug)]
 pub struct AvroSerializerOptions {
     /// The Avro schema.
+    #[configurable(metadata(
+        docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#
+    ))]
     pub schema: String,
 }
 

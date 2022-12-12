@@ -127,35 +127,57 @@ components: sinks: [Name=string]: {
 			if features.send != _|_ {
 				if features.send.encoding.enabled {
 					encoding: {
-						description: """
-							Configures the encoding specific sink behavior.
-							"""
-						required: features.send.encoding.codec.enabled
+						description: "Configures how events are encoded into raw bytes."
+						required:    features.send.encoding.codec.enabled
 						if !features.send.encoding.codec.enabled {common: true}
 						type: object: {
 							if features.send.encoding.codec.enabled {
 								examples: [{codec: "json"}]
 								options: codec: {
-									description: "The encoding codec used to serialize the events before outputting."
+									description: "The codec to use for encoding events."
 									required:    true
 									type: string: {
 										examples: features.send.encoding.codec.enum
 										enum: {
 											for codec in features.send.encoding.codec.enum {
 												if codec == "text" {
-													text: "The message field from the event."
+													text: """
+														Plaintext encoding.
+
+														This "encoding" simply uses the `message` field of a log event.
+
+														Users should take care if they're modifying their log events (such as by using a `remap`
+														transform, etc) and removing the message field while doing additional parsing on it, as this
+														could lead to the encoding emitting empty strings for the given event.
+														"""
 												}
 												if codec == "logfmt" {
-													logfmt: "[logfmt](\(urls.logfmt)) encoded event."
+													logfmt: """
+														Encodes an event as a [logfmt][logfmt] message.
+
+														[logfmt]: https://brandur.org/logfmt
+														"""
 												}
 												if codec == "json" {
-													json: "JSON encoded event."
+													json: """
+														Encodes an event as [JSON][json].
+
+														[json]: https://www.json.org/
+														"""
 												}
 												if codec == "gelf" {
-													gelf: "[GELF](https://docs.graylog.org/docs/gelf) encoded event."
+													gelf: """
+														Encodes an event as a [GELF][gelf] message.
+
+														[gelf]: https://docs.graylog.org/docs/gelf
+														"""
 												}
 												if codec == "avro" {
-													avro: "Avro encoded event with a given schema."
+													avro: """
+														Encodes an event as an [Apache Avro][apache_avro] message.
+
+														[apache_avro]: https://avro.apache.org/
+														"""
 												}
 											}
 										}
@@ -167,12 +189,12 @@ components: sinks: [Name=string]: {
 									for codec in features.send.encoding.codec.enum {
 										if codec == "avro" {
 											avro: {
-												description:   "Options for the `avro` codec."
+												description:   "Apache Avro-specific encoder options."
 												required:      true
 												relevant_when: "codec = `avro`"
 												type: object: options: {
 													schema: {
-														description: "The Avro schema declaration."
+														description: "The Avro schema."
 														required:    true
 														type: string: {
 															examples: [

@@ -136,16 +136,19 @@ impl DatadogTracesEndpointConfiguration {
 }
 
 impl DatadogTracesConfig {
-    fn generate_traces_endpoint_configuration(
-        &self,
-    ) -> crate::Result<DatadogTracesEndpointConfiguration> {
-        let base_uri = self.endpoint.clone().unwrap_or_else(|| {
+    fn get_base_uri(&self) -> String {
+        self.endpoint.clone().unwrap_or_else(|| {
             format!(
                 "https://trace.agent.{}",
                 get_base_domain(self.site.as_ref(), None)
             )
-        });
+        })
+    }
 
+    fn generate_traces_endpoint_configuration(
+        &self,
+    ) -> crate::Result<DatadogTracesEndpointConfiguration> {
+        let base_uri = self.get_base_uri();
         let traces_endpoint = build_uri(&base_uri, "/api/v0.2/traces")?;
         let stats_endpoint = build_uri(&base_uri, "/api/v0.2/stats")?;
 
@@ -154,9 +157,7 @@ impl DatadogTracesConfig {
             stats_endpoint,
         })
     }
-}
 
-impl DatadogTracesConfig {
     pub fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.inner());
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
@@ -191,7 +192,13 @@ impl DatadogTracesConfig {
         // tripwire= Receiver that APM stats flush thread listens for exit signal on.
         let (shutdown, tripwire) = channel::<Sender<()>>();
 
-        let sink = TracesSink::new(service, request_builder, batcher_settings, shutdown);
+        let sink = TracesSink::new(
+            service,
+            request_builder,
+            batcher_settings,
+            shutdown,
+            self.get_protocol(),
+        );
 
         // Send the APM stats payloads independently of the sink framework.
         // This is necessary to comply with what the APM stats backend of Datadog expects with
@@ -228,6 +235,14 @@ impl DatadogTracesConfig {
             false,
         )?;
         Ok(HttpClient::new(tls_settings, proxy)?)
+    }
+
+    fn get_protocol(&self) -> String {
+        build_uri(&self.get_base_uri(), "")
+            .unwrap()
+            .scheme_str()
+            .unwrap_or("http")
+            .to_string()
     }
 }
 

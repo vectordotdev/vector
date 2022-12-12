@@ -97,4 +97,15 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 		required:    false
 		type: bool: default: true
 	}
+	tags: {
+		description: "A list of instance tags to include in each transformed event."
+		required:    false
+		type: array: {
+			default: []
+			items: type: string: {
+				examples: ["Name", "Project"]
+				syntax: "literal"
+			}
+		}
+	}
 }

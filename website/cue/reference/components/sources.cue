@@ -6,14 +6,6 @@ components: sources: [Name=string]: {
 	features: _
 
 	configuration: {
-		if features.collect != _|_ {
-			if features.collect.proxy != _|_ {
-				if features.collect.proxy.enabled {
-					proxy: base.components.sources.configuration.proxy
-				}
-			}
-		}
-
 		if !features.auto_generated {
 			if features.collect != _|_ {
 				if features.collect.checkpoint.enabled {
@@ -166,22 +158,52 @@ components: sources: [Name=string]: {
 					}
 					decoding: {
 						common:      false
-						description: "Configures in which way frames are decoded into events."
+						description: "Configures how events are decoded from raw bytes."
 						required:    false
 						type: object: options: {
 							codec: {
-								description: "The decoding method."
+								description: "The codec to use for decoding events."
 								required:    false
 								common:      true
 								type: string: {
 									default: "bytes"
 									enum: {
-										bytes:       "Events containing the byte frame as-is."
-										json:        "Events being parsed from a JSON string."
-										gelf:        "Events being parsed from a [GELF](https://docs.graylog.org/docs/gelf) message."
-										syslog:      "Events being parsed from a Syslog message."
-										native:      "Events being parsed from Vector's [native protobuf format](\(urls.native_proto_schema)) ([EXPERIMENTAL](/highlights/2022-03-31-native-event-codecs))."
-										native_json: "Events being parsed from Vector's [native JSON format](\(urls.native_json_schema)) ([EXPERIMENTAL](/highlights/2022-03-31-native-event-codecs))."
+										bytes: "Uses the raw bytes as-is."
+										json: """
+											Decodes the raw bytes as [JSON][json].
+
+											[json]: https://www.json.org/
+											"""
+										gelf: """
+											Decodes the raw bytes as a [GELF][gelf] message.
+
+											[gelf]: https://docs.graylog.org/docs/gelf
+											"""
+										syslog: """
+											Decodes the raw bytes as a Syslog message.
+
+											Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
+											[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+
+											[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+											[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
+											"""
+										native: """
+											Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+											This codec is ([EXPERIMENTAL][experimental]).
+
+											[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+											[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+											"""
+										native_json: """
+											Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+											This codec is ([EXPERIMENTAL][experimental]).
+
+											[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+											[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+											"""
 									}
 								}
 							}
@@ -212,6 +234,12 @@ components: sources: [Name=string]: {
 			}
 
 			if features.collect != _|_ {
+				if features.collect.proxy != _|_ {
+					if features.collect.proxy.enabled {
+						proxy: configuration._proxy
+					}
+				}
+
 				if features.collect.tls != _|_ {
 					if features.collect.tls.enabled {
 						tls: configuration._tls_connect & {_args: {

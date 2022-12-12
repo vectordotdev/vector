@@ -42,7 +42,7 @@ base: components: sinks: pulsar: configuration: {
 				type: string: {}
 			}
 			oauth2: {
-				description: "OAuth2-specific authenticatgion configuration."
+				description: "OAuth2-specific authentication configuration."
 				required:    false
 				type: object: options: {
 					audience: {
@@ -183,7 +183,12 @@ base: components: sinks: pulsar: configuration: {
 		type: string: {}
 	}
 	partition_key_field: {
-		description: "Log field to use as Pulsar message key"
+		description: "Log field to use as Pulsar message key."
+		required:    false
+		type: string: syntax: "literal"
+	}
+	producer_name: {
+		description: "The name of the producer. If not specified, the default name assigned by Pulsar will be used."
 		required:    false
 		type: string: {}
 	}
