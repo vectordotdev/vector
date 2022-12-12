@@ -139,6 +139,16 @@ pub struct VectorConfig {
     log_namespace: Option<bool>,
 }
 
+impl VectorConfig {
+    /// Creates a `VectorConfig` with the given address.
+    pub fn from_address(addr: SocketAddr) -> Self {
+        Self {
+            address: addr,
+            ..Default::default()
+        }
+    }
+}
+
 impl Default for VectorConfig {
     fn default() -> Self {
         Self {
