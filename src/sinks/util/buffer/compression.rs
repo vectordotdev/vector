@@ -4,9 +4,8 @@ use indexmap::IndexMap;
 use serde::{de, ser};
 use vector_config::{
     schema::{
-        apply_metadata, generate_const_string_schema, generate_enum_schema,
-        generate_internal_tagged_variant_schema, generate_one_of_schema, generate_struct_schema,
-        get_or_generate_schema,
+        apply_metadata, generate_const_string_schema, generate_enum_schema, generate_one_of_schema,
+        generate_struct_schema, get_or_generate_schema,
     },
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     Configurable, GenerateError, Metadata,
@@ -23,12 +22,12 @@ pub enum Compression {
 
     /// [Gzip][gzip] compression.
     ///
-    /// [gzip]: https://en.wikipedia.org/wiki/Gzip
+    /// [gzip]: https://www.gzip.org/
     Gzip(CompressionLevel),
 
     /// [Zlib][zlib] compression.
     ///
-    /// [zlib]: https://en.wikipedia.org/wiki/Zlib
+    /// [zlib]: https://zlib.net/
     Zlib(CompressionLevel),
 }
 
@@ -58,6 +57,14 @@ impl Compression {
             Self::None => None,
             Self::Gzip(_) => Some("gzip"),
             Self::Zlib(_) => Some("deflate"),
+        }
+    }
+
+    pub const fn accept_encoding(self) -> Option<&'static str> {
+        match self {
+            Self::Gzip(_) => Some("gzip"),
+            Self::Zlib(_) => Some("deflate"),
+            _ => None,
         }
     }
 
@@ -170,31 +177,31 @@ impl ser::Serialize for Compression {
     {
         use ser::SerializeMap;
 
-        let mut map = serializer.serialize_map(None)?;
-        let mut level = None;
+        let default_level = CompressionLevel::const_default();
+
         match self {
-            Compression::None => map.serialize_entry("algorithm", "none")?,
+            Compression::None => serializer.serialize_str("none"),
             Compression::Gzip(gzip_level) => {
-                map.serialize_entry("algorithm", "gzip")?;
-                level = Some(*gzip_level);
+                if *gzip_level != default_level {
+                    let mut map = serializer.serialize_map(None)?;
+                    map.serialize_entry("algorithm", "gzip")?;
+                    map.serialize_entry("level", &gzip_level)?;
+                    map.end()
+                } else {
+                    serializer.serialize_str("gzip")
+                }
             }
             Compression::Zlib(zlib_level) => {
-                map.serialize_entry("algorithm", "zlib")?;
-                level = Some(*zlib_level);
+                if *zlib_level != default_level {
+                    let mut map = serializer.serialize_map(None)?;
+                    map.serialize_entry("algorithm", "zlib")?;
+                    map.serialize_entry("level", &zlib_level)?;
+                    map.end()
+                } else {
+                    serializer.serialize_str("zlib")
+                }
             }
         }
-
-        // If there's a level present, and it's _not_ the default compression level, then serialize it. We already
-        // handle deserializing as the default level when the level isn't explicitly specified (but `algorithm` is) so
-        // serializing the default would just clutter the serialized output.
-        if let Some(level) = level {
-            let default = CompressionLevel::const_default();
-            if level != default {
-                map.serialize_entry("level", &level)?
-            }
-        }
-
-        map.end()
     }
 }
 
@@ -206,7 +213,8 @@ impl Configurable for Compression {
 
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        metadata.set_description("Compression configuration.");
+        metadata.set_title("Compression configuration.");
+        metadata.set_description("All compression algorithms use the default compression level unless otherwise specified.");
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
         metadata
     }
@@ -214,18 +222,60 @@ impl Configurable for Compression {
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         const ALGORITHM_NAME: &str = "algorithm";
         const LEVEL_NAME: &str = "level";
-        const NONE_NAME: &str = "none";
-        const GZIP_NAME: &str = "gzip";
-        const ZLIB_NAME: &str = "zlib";
+        const LOGICAL_NAME: &str = "logical_name";
+        const ENUM_TAGGING_MODE: &str = "docs::enum_tagging";
 
-        // First, we need to be able to handle all of the string-only variants.
-        let const_values = [NONE_NAME, GZIP_NAME, ZLIB_NAME]
-            .iter()
-            .map(|s| serde_json::Value::from(*s))
-            .collect();
+        let generate_string_schema = |logical_name: &str,
+                                      title: Option<&'static str>,
+                                      description: &'static str|
+         -> SchemaObject {
+            let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
+            let mut const_metadata = Metadata::<()>::with_description(description);
+            if let Some(title) = title {
+                const_metadata.set_title(title);
+            }
+            const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
+            apply_metadata(&mut const_schema, const_metadata);
+            const_schema
+        };
 
-        // Now we need to handle when the user specifies the full object-based notation in order to
-        // specify the compression level, and so on.
+        // First, we'll create the string-only subschemas for each algorithm, and wrap those up
+        // within a one-of schema.
+        let mut string_metadata = Metadata::<()>::with_description("Compression algorithm.");
+        string_metadata.add_custom_attribute(CustomAttribute::kv(ENUM_TAGGING_MODE, "external"));
+
+        let none_string_subschema = generate_string_schema("None", None, "No compression.");
+        let gzip_string_subschema = generate_string_schema(
+            "Gzip",
+            Some("[Gzip][gzip] compression."),
+            "[gzip]: https://www.gzip.org/",
+        );
+        let zlib_string_subschema = generate_string_schema(
+            "Zlib",
+            Some("[Zlib]][zlib] compression."),
+            "[zlib]: https://zlib.net/",
+        );
+
+        let mut all_string_oneof_subschema = generate_one_of_schema(&[
+            none_string_subschema,
+            gzip_string_subschema,
+            zlib_string_subschema,
+        ]);
+        apply_metadata(&mut all_string_oneof_subschema, string_metadata.clone());
+
+        // Next we'll create a full schema for the given algorithms.
+        //
+        // TODO: We're currently using all three algorithms in the enum subschema for `algorithm`,
+        // but in reality, `level` is never used when the algorithm is `none`. This is _currently_
+        // fine because the field is optional, and we don't use `deny_unknown_fields`, so if users
+        // specify it when the algorithm is `none`: no harm, no foul.
+        //
+        // However, it does lead to a suboptimal schema being generated, one that sort of implies it
+        // may have value when set, even if the algorithm is `none`. We do this because, otherwise,
+        // it's very hard to reconcile the resolved schemas during component documentation
+        // generation, where we need to be able to generate the right enum key/value pair for the
+        // `none` algorithm as part of the overall set of enum values declared for the `algorithm`
+        // field in the "full" schema version.
         let mut compression_level_metadata = Metadata::default();
         compression_level_metadata.set_transparent();
         let compression_level_schema =
@@ -234,59 +284,22 @@ impl Configurable for Compression {
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());
 
-        // Build the None schema.
-        let mut none_schema = generate_internal_tagged_variant_schema(
+        let mut properties = IndexMap::new();
+        properties.insert(
             ALGORITHM_NAME.to_string(),
-            NONE_NAME.to_string(),
+            all_string_oneof_subschema.clone(),
         );
-        let mut none_metadata = Metadata::<()>::with_description("No compression.");
-        none_metadata.add_custom_attribute(CustomAttribute::KeyValue {
-            key: "logical_name".to_string(),
-            value: "None".to_string(),
-        });
-        apply_metadata(&mut none_schema, none_metadata);
+        properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
 
-        // Build the Gzip schema.
-        let mut gzip_properties = IndexMap::new();
-        gzip_properties.insert(
-            ALGORITHM_NAME.to_string(),
-            generate_const_string_schema(GZIP_NAME.to_string()),
-        );
-        gzip_properties.insert(LEVEL_NAME.to_string(), compression_level_schema.clone());
+        let mut full_subschema = generate_struct_schema(properties, required, None);
+        let mut full_metadata = Metadata::<()>::with_description("");
+        full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
+        apply_metadata(&mut full_subschema, full_metadata);
 
-        let mut gzip_schema = generate_struct_schema(gzip_properties, required.clone(), None);
-        let mut gzip_metadata = Metadata::<()>::with_title("[Gzip][gzip] compression.");
-        gzip_metadata.set_description("[gzip]: https://en.wikipedia.org/wiki/Gzip");
-        gzip_metadata.add_custom_attribute(CustomAttribute::KeyValue {
-            key: "logical_name".to_string(),
-            value: "Gzip".to_string(),
-        });
-        apply_metadata(&mut gzip_schema, gzip_metadata);
-
-        // Build the Zlib schema.
-        let mut zlib_properties = IndexMap::new();
-        zlib_properties.insert(
-            ALGORITHM_NAME.to_string(),
-            generate_const_string_schema(ZLIB_NAME.to_string()),
-        );
-        zlib_properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
-
-        let mut zlib_schema = generate_struct_schema(zlib_properties, required, None);
-        let mut zlib_metadata = Metadata::<()>::with_title("[Zlib]][zlib] compression.");
-        zlib_metadata.set_description("[zlib]: https://en.wikipedia.org/wiki/Zlib");
-        zlib_metadata.add_custom_attribute(CustomAttribute::KeyValue {
-            key: "logical_name".to_string(),
-            value: "Zlib".to_string(),
-        });
-        apply_metadata(&mut zlib_schema, zlib_metadata);
-
+        // Finally, we zip both schemas together.
         Ok(generate_one_of_schema(&[
-            // Handle the condensed string form.
-            generate_enum_schema(const_values),
-            // Handle the expanded object form.
-            none_schema,
-            gzip_schema,
-            zlib_schema,
+            all_string_oneof_subschema,
+            full_subschema,
         ]))
     }
 }
