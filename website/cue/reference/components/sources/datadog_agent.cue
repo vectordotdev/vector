@@ -232,14 +232,24 @@ components: sources: datadog_agent: {
 					metrics.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
 				```
 
+				In order to send traces the [Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated with the
+				following options:
+
+				```yaml
+				vector:
+					traces.enabled: true
+					traces.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
+				```
 				"""
 		}
 		trace_support: {
-			title: "Trace support"
+			title: "Trace support caveats"
 			body: """
-				The `datadog_agent` source is capable of receiving traces from the Datadog Agent for versions < 6/7.33.
-				We are working on adding support for the newer agent versions as well as support for passing along APM
-				statistics used by Datadog.
+				The `datadog_agent` source is capable of receiving traces from the Datadog Agent and
+				forwarding them to Datadog. In order to have accurate APM statistics, you should
+				disable any sampling of traces within the Datadog Agent or client SDKs as Vector
+				calculates the metrics that drive the APM statistics (like span hit count and
+				duration distribution).
 				"""
 		}
 	}

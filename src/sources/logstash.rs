@@ -13,6 +13,7 @@ use lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath, 
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
+use value::kind::Collection;
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
@@ -72,6 +73,13 @@ impl LogstashConfig {
             .ok()
             .map(LegacyKey::InsertIfEmpty);
 
+        let tls_client_metadata_path = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.as_ref())
+            .and_then(|x| parse_value_path(x).ok())
+            .map(LegacyKey::Overwrite);
+
         BytesDeserializerConfig
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata()
@@ -88,6 +96,13 @@ impl LogstashConfig {
                 &owned_value_path!("host"),
                 Kind::bytes(),
                 Some("host"),
+            )
+            .with_source_metadata(
+                Self::NAME,
+                tls_client_metadata_path,
+                &owned_value_path!("tls_client_metadata"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
             )
     }
 }
@@ -115,10 +130,11 @@ impl GenerateConfig for LogstashConfig {
 #[async_trait::async_trait]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let source = LogstashSource {
             timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone()),
-            log_namespace: cx.log_namespace(self.log_namespace),
             legacy_host_key_path: parse_value_path(log_schema().host_key()).ok(),
+            log_namespace,
         };
         let shutdown_secs = 30;
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
@@ -126,6 +142,7 @@ impl SourceConfig for LogstashConfig {
             .tls
             .as_ref()
             .and_then(|tls| tls.client_metadata_key.clone());
+
         let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
@@ -137,6 +154,8 @@ impl SourceConfig for LogstashConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            LogstashConfig::NAME,
+            log_namespace,
         )
     }
 
@@ -781,6 +800,10 @@ mod test {
                 .with_metadata_field(
                     &owned_value_path!(LogstashConfig::NAME, "host"),
                     Kind::bytes(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogstashConfig::NAME, "tls_client_metadata"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 );
 
         assert_eq!(definition, expected_definition)

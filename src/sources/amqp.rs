@@ -25,7 +25,10 @@ use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
 use value::Kind;
-use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
+use vector_common::{
+    finalizer::UnorderedFinalizer,
+    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
+};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
@@ -312,6 +315,7 @@ async fn receive_event(
         exchange: &exchange,
         delivery_tag: msg.delivery_tag as i64,
     };
+    let events_received = register!(EventsReceived);
 
     let stream = stream! {
         while let Some(result) = stream.next().await {
@@ -322,10 +326,10 @@ async fn receive_event(
                         protocol: "amqp_0_9_1",
                     });
 
-                    emit!(EventsReceived {
-                        byte_size: events.estimated_json_encoded_size_of(),
-                        count: events.len(),
-                    });
+                    events_received.emit(CountByteSize(
+                        events.len(),
+                        events.estimated_json_encoded_size_of(),
+                    ));
 
                     for mut event in events {
                         populate_event(&mut event,

@@ -65,7 +65,6 @@ pub struct LogApiResponse {
     count: usize,
     events_byte_size: usize,
     raw_byte_size: usize,
-    protocol: String,
 }
 
 impl DriverResponse for LogApiResponse {
@@ -77,8 +76,8 @@ impl DriverResponse for LogApiResponse {
         CountByteSize(self.count, self.events_byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.raw_byte_size, &self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
     }
 }
 
@@ -139,7 +138,6 @@ impl Service<LogApiRequest> for LogApiService {
         let count = request.get_metadata().event_count();
         let events_byte_size = request.get_metadata().events_byte_size();
         let raw_byte_size = request.uncompressed_size;
-        let protocol = self.uri.scheme_str().unwrap_or("http").to_string();
 
         let http_request = http_request
             .header(CONTENT_LENGTH, request.body.len())
@@ -153,7 +151,6 @@ impl Service<LogApiRequest> for LogApiService {
                     count,
                     events_byte_size,
                     raw_byte_size,
-                    protocol,
                 },
             )
         })

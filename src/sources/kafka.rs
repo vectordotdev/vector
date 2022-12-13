@@ -219,12 +219,8 @@ impl SourceConfig for KafkaSourceConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let consumer = create_consumer(self)?;
-        let decoder = DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            LogNamespace::Legacy,
-        )
-        .build();
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
@@ -957,7 +953,7 @@ mod integration_test {
                     .is_timestamp());
 
                 assert_eq!(
-                    event.as_log().get("message").unwrap(),
+                    event.as_log().value(),
                     &vrl::value!(format!("{} {:03}", TEXT, i))
                 );
                 assert_eq!(
@@ -1024,10 +1020,17 @@ mod integration_test {
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
         let consumer = create_consumer(&config).unwrap();
 
+        let decoder = DecodingConfig::new(
+            config.framing.clone(),
+            config.decoding.clone(),
+            log_namespace,
+        )
+        .build();
+
         tokio::spawn(kafka_source(
             config,
             consumer,
-            Decoder::default(),
+            decoder,
             shutdown,
             tx,
             acknowledgements,

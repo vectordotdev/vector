@@ -16,6 +16,7 @@ use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
 use value::{kind::Collection, Kind};
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
@@ -253,6 +254,7 @@ struct SplunkSource {
     idx_ack: Option<Arc<IndexerAcknowledgement>>,
     store_hec_token: bool,
     log_namespace: LogNamespace,
+    events_received: Registered<EventsReceived>,
 }
 
 impl SplunkSource {
@@ -281,6 +283,7 @@ impl SplunkSource {
             idx_ack,
             store_hec_token: config.store_hec_token,
             log_namespace,
+            events_received: register!(EventsReceived),
         }
     }
 
@@ -297,6 +300,7 @@ impl SplunkSource {
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
         let log_namespace = self.log_namespace;
+        let events_received = self.events_received.clone();
 
         warp::post()
             .and(
@@ -322,6 +326,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
+                    let events_received = events_received.clone();
                     emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
@@ -377,10 +382,10 @@ impl SplunkSource {
                         }
 
                         if !events.is_empty() {
-                            emit!(EventsReceived {
-                                count: events.len(),
-                                byte_size: events.estimated_json_encoded_size_of(),
-                            });
+                            events_received.emit(CountByteSize(
+                                events.len(),
+                                events.estimated_json_encoded_size_of(),
+                            ));
 
                             if let Err(ClosedError) = out.send_batch(events).await {
                                 return Err(Rejection::from(ApiError::ServerShutdown));
@@ -403,6 +408,7 @@ impl SplunkSource {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
+        let events_received = self.events_received.clone();
         let log_namespace = self.log_namespace;
 
         warp::post()
@@ -425,6 +431,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
+                    let events_received = events_received.clone();
                     emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
@@ -442,8 +449,16 @@ impl SplunkSource {
                             ),
                             _ => None,
                         };
-                        let mut event =
-                            raw_event(body, gzip, channel_id, remote, xff, batch, log_namespace)?;
+                        let mut event = raw_event(
+                            body,
+                            gzip,
+                            channel_id,
+                            remote,
+                            xff,
+                            batch,
+                            log_namespace,
+                            &events_received,
+                        )?;
                         if let Some(token) = token.filter(|_| store_hec_token) {
                             event.metadata_mut().set_splunk_hec_token(token.into());
                         }
@@ -926,6 +941,7 @@ enum Time {
 }
 
 /// Creates event from raw request
+#[allow(clippy::too_many_arguments)]
 fn raw_event(
     bytes: Bytes,
     gzip: bool,
@@ -934,6 +950,7 @@ fn raw_event(
     xff: Option<String>,
     batch: Option<BatchNotifier>,
     log_namespace: LogNamespace,
+    events_received: &Registered<EventsReceived>,
 ) -> Result<Event, Rejection> {
     // Process gzip
     let message: Value = if gzip {
@@ -997,10 +1014,7 @@ fn raw_event(
     }
 
     let event = Event::from(log);
-    emit!(EventsReceived {
-        count: 1,
-        byte_size: event.estimated_json_encoded_size_of(),
-    });
+    events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
 
     Ok(event)
 }

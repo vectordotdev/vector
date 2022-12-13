@@ -312,6 +312,32 @@ impl SerializerConfig {
         }
     }
 
+    /// Return an appropriate default framer for the given serializer.
+    pub fn default_stream_framing(&self) -> FramingConfig {
+        match self {
+            // TODO: Technically, Avro messages are supposed to be framed[1] as a vector of
+            // length-delimited buffers -- `len` as big-endian 32-bit unsigned integer, followed by
+            // `len` bytes -- with a "zero-length buffer" to terminate the overall message... which
+            // our length delimited framer obviously will not do.
+            //
+            // This is OK for now, because the Avro serializer is more ceremonial than anything
+            // else, existing to curry serializer config options to Pulsar's native client, not to
+            // actually serialize the bytes themselves... but we're still exposing this method and
+            // we should do so accurately, even if practically it doesn't need to be.
+            //
+            // [1]: https://avro.apache.org/docs/1.11.1/specification/_print/#message-framing
+            SerializerConfig::Avro { .. } | SerializerConfig::Native => {
+                FramingConfig::LengthDelimited
+            }
+            SerializerConfig::Gelf
+            | SerializerConfig::Json
+            | SerializerConfig::Logfmt
+            | SerializerConfig::NativeJson
+            | SerializerConfig::RawMessage
+            | SerializerConfig::Text => FramingConfig::NewlineDelimited,
+        }
+    }
+
     /// The data type of events that are accepted by this `Serializer`.
     pub fn input_type(&self) -> DataType {
         match self {
