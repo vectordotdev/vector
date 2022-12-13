@@ -30,7 +30,6 @@ pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
 
-use vector_common::config::ComponentKey;
 use vector_config::{configurable_component, NamedComponent};
 pub use vector_core::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
@@ -41,7 +40,7 @@ use vector_core::{
     schema,
 };
 
-use crate::config::{InnerTopology, TransformConfig, TransformContext};
+use crate::config::{TransformConfig, TransformContext};
 
 #[derive(Debug, Snafu)]
 enum BuildError {

@@ -52,9 +52,7 @@ pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use source::{SourceConfig, SourceContext, SourceOuter};
-pub use transform::{
-    InnerTopology, InnerTopologyTransform, TransformConfig, TransformContext, TransformOuter,
-};
+pub use transform::{TransformConfig, TransformContext, TransformOuter};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
@@ -112,7 +110,6 @@ pub struct Config {
     transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
-    expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
     secret: IndexMap<ComponentKey, SecretBackends>,
 }
 
@@ -150,16 +147,6 @@ impl Config {
             .get(id)
             .map(|t| &t.inputs[..])
             .or_else(|| self.sinks.get(id).map(|s| &s.inputs[..]))
-    }
-
-    /// Expand a logical component id (i.e. from the config file) into the ids of the
-    /// components it was expanded to as part of the macro process. Does not check that the
-    /// identifier is otherwise valid.
-    pub fn expand_input(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
-        self.expansions
-            .get(identifier)
-            .cloned()
-            .unwrap_or_else(|| vec![identifier.clone()])
     }
 
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
@@ -372,7 +359,6 @@ impl TestDefinition<String> {
     fn resolve_outputs(
         self,
         graph: &graph::Graph,
-        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
@@ -393,19 +379,7 @@ impl TestDefinition<String> {
                     conditions,
                 } = old;
 
-                let extract_from = extract_from
-                    .to_vec()
-                    .into_iter()
-                    .flat_map(|from| {
-                        if let Some(expanded) = expansions.get(&from) {
-                            expanded.to_vec()
-                        } else {
-                            vec![from]
-                        }
-                    })
-                    .collect::<Vec<_>>();
-
-                (extract_from, conditions)
+                (extract_from.to_vec(), conditions)
             })
             .filter_map(|(extract_from, conditions)| {
                 let mut outputs = Vec::new();

@@ -335,9 +335,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::load_builder_from_paths;
-    use crate::{
-        config::{ComponentKey, ConfigPath},
-    };
+    use crate::config::{ComponentKey, ConfigPath};
 
     #[test]
     fn load_namespacing_folder() {
