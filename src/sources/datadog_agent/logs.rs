@@ -6,13 +6,13 @@ use codecs::StreamDecodingError;
 use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_config::NamedComponent;
-use vector_core::{config::LegacyKey, ByteSizeOf};
+use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{
     event::Event,
-    internal_events::EventsReceived,
     sources::{
         datadog_agent::{
             handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
@@ -56,11 +56,8 @@ pub(crate) fn build_warp_filter(
                         )
                     });
 
-                if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(super::LOGS))
-                } else {
-                    handle_request(events, acknowledgements, out.clone(), None)
-                }
+                let output = multiple_outputs.then_some(super::LOGS);
+                handle_request(events, acknowledgements, out.clone(), output)
             },
         )
         .boxed()
@@ -183,10 +180,10 @@ pub(crate) fn decode_log_body(
         }
     }
 
-    emit!(EventsReceived {
-        byte_size: decoded.size_of(),
-        count: decoded.len(),
-    });
+    source.events_received.emit(CountByteSize(
+        decoded.len(),
+        decoded.estimated_json_encoded_size_of(),
+    ));
 
     Ok(decoded)
 }

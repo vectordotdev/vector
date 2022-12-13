@@ -124,7 +124,7 @@ impl Definition {
     }
 
     /// An object with any fields, and the `Legacy` namespace.
-    /// This is the default schema for a source that does not explicitely provide one yet.
+    /// This is the default schema for a source that does not explicitly provide one yet.
     pub fn default_legacy_namespace() -> Self {
         Self::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy])
     }
@@ -445,6 +445,10 @@ impl Definition {
 
     pub fn event_kind(&self) -> &Kind {
         &self.event_kind
+    }
+
+    pub fn event_kind_mut(&mut self) -> &mut Kind {
+        &mut self.event_kind
     }
 
     pub fn metadata_kind(&self) -> &Kind {

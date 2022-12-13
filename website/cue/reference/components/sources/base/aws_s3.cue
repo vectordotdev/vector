@@ -197,7 +197,7 @@ base: components: sources: aws_s3: configuration: {
 					consumption rate affects the S3 object retrieval rate.
 					"""
 				required: false
-				type: uint: default: 10
+				type: uint: {}
 			}
 			delete_message: {
 				description: """
@@ -224,7 +224,7 @@ base: components: sources: aws_s3: configuration: {
 				type: string: syntax: "literal"
 			}
 			tls_options: {
-				description: "Standard TLS options."
+				description: "TLS configuration."
 				required:    false
 				type: object: options: {
 					alpn_protocols: {
@@ -241,7 +241,7 @@ base: components: sources: aws_s3: configuration: {
 						description: """
 																Absolute path to an additional CA certificate file.
 
-																The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+																The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 																"""
 						required: false
 						type: string: syntax: "literal"
@@ -335,7 +335,7 @@ base: components: sources: aws_s3: configuration: {
 		}
 	}
 	tls_options: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
@@ -352,7 +352,7 @@ base: components: sources: aws_s3: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

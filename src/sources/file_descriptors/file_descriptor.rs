@@ -2,10 +2,10 @@ use std::fs::File;
 use std::io;
 use std::os::unix::io::FromRawFd;
 
-use super::FileDescriptorConfig;
+use super::{outputs, FileDescriptorConfig};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 
 use crate::{
@@ -39,6 +39,11 @@ pub struct FileDescriptorSourceConfig {
 
     /// The file descriptor number to read from.
     pub fd: u32,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl FileDescriptorConfig for FileDescriptorSourceConfig {
@@ -72,11 +77,15 @@ impl GenerateConfig for FileDescriptorSourceConfig {
 impl SourceConfig for FileDescriptorSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let pipe = io::BufReader::new(unsafe { File::from_raw_fd(self.fd as i32) });
-        self.source(pipe, cx.shutdown, cx.out)
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
+        self.source(pipe, cx.shutdown, cx.out, log_namespace)
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        outputs(log_namespace, &self.host_key, &self.decoding, Self::NAME)
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -90,6 +99,7 @@ impl SourceConfig for FileDescriptorSourceConfig {
 
 #[cfg(test)]
 mod tests {
+    use lookup::path;
     use nix::unistd::{close, pipe, write};
 
     use super::*;
@@ -118,6 +128,7 @@ mod tests {
                 framing: None,
                 decoding: default_decoding(),
                 fd: read_fd as u32,
+                log_namespace: None,
             };
 
             let mut stream = rx;
@@ -151,6 +162,55 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn file_descriptor_decodes_line_vector_namespace() {
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let (read_fd, write_fd) = pipe().unwrap();
+            let config = FileDescriptorSourceConfig {
+                max_length: crate::serde::default_max_length(),
+                host_key: Default::default(),
+                framing: None,
+                decoding: default_decoding(),
+                fd: read_fd as u32,
+                log_namespace: Some(true),
+            };
+
+            let mut stream = rx;
+
+            write(write_fd, b"hello world\nhello world again\n").unwrap();
+            close(write_fd).unwrap();
+
+            let context = SourceContext::new_test(tx, None);
+            config.build(context).await.unwrap().await.unwrap();
+
+            let event = stream.next().await;
+            let event = event.unwrap();
+            let log = event.as_log();
+            let meta = log.metadata().value();
+
+            assert_eq!(&vrl::value!("hello world"), log.value());
+            assert_eq!(
+                meta.get(path!("vector", "source_type")).unwrap(),
+                &vrl::value!("file_descriptor")
+            );
+            assert!(meta
+                .get(path!("vector", "ingest_timestamp"))
+                .unwrap()
+                .is_timestamp());
+
+            let event = stream.next().await;
+            let event = event.unwrap();
+            let log = event.as_log();
+
+            assert_eq!(&vrl::value!("hello world again"), log.value());
+
+            let event = stream.next().await;
+            assert!(event.is_none());
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn file_descriptor_handles_invalid_fd() {
         assert_source_error(&COMPONENT_ERROR_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
@@ -161,6 +221,7 @@ mod tests {
                 framing: None,
                 decoding: default_decoding(),
                 fd: write_fd as u32, // intentionally giving the source a write-only fd
+                log_namespace: None,
             };
 
             let mut stream = rx;

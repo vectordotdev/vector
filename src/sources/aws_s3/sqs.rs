@@ -1,4 +1,4 @@
-use std::{future::ready, panic, sync::Arc};
+use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
 
 use aws_sdk_s3::{error::GetObjectError, Client as S3Client};
 use aws_sdk_sqs::{
@@ -20,13 +20,13 @@ use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::{configurable_component, NamedComponent};
 
 use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus},
+    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
@@ -40,10 +40,7 @@ use crate::{
     SourceSender,
 };
 use lookup::{metadata_path, path, PathPrefix};
-use vector_core::{
-    config::{log_schema, LegacyKey, LogNamespace},
-    ByteSizeOf,
-};
+use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -95,9 +92,7 @@ pub(super) struct Config {
     /// high rate of messages being pushed into the queue and the objects being fetched are small. In these cases,
     /// Vector may not fully utilize system resources without fetching more messages per second, as the SQS message
     /// consumption rate affects the S3 object retrieval rate.
-    #[serde(default = "default_client_concurrency")]
-    #[derivative(Default(value = "default_client_concurrency()"))]
-    pub(super) client_concurrency: u32,
+    pub(super) client_concurrency: Option<NonZeroUsize>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -115,10 +110,6 @@ const fn default_visibility_timeout_secs() -> u32 {
 
 const fn default_true() -> bool {
     true
-}
-
-fn default_client_concurrency() -> u32 {
-    crate::num_threads() as u32
 }
 
 #[derive(Debug, Snafu)]
@@ -188,7 +179,7 @@ pub struct State {
 
     queue_url: String,
     poll_secs: i32,
-    client_concurrency: u32,
+    client_concurrency: usize,
     visibility_timeout_secs: i32,
     delete_message: bool,
 }
@@ -217,7 +208,10 @@ impl Ingestor {
 
             queue_url: config.queue_url,
             poll_secs: config.poll_secs as i32,
-            client_concurrency: config.client_concurrency,
+            client_concurrency: config
+                .client_concurrency
+                .map(|n| n.get())
+                .unwrap_or_else(crate::num_threads),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
         });
@@ -267,6 +261,7 @@ pub struct IngestorProcess {
     acknowledgements: bool,
     log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
 }
 
 impl IngestorProcess {
@@ -284,6 +279,7 @@ impl IngestorProcess {
             acknowledgements,
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
+            events_received: register!(EventsReceived),
         }
     }
 
@@ -491,6 +487,7 @@ impl IngestorProcess {
         // the case that the same vector instance processes the same message.
         let mut read_error = None;
         let bytes_received = self.bytes_received.clone();
+        let events_received = self.events_received.clone();
         let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
             FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
                 .map(|res| {
@@ -568,30 +565,23 @@ impl IngestorProcess {
             // This handles the transition from the original timestamp logic. Originally the
             // `timestamp_key` was populated by the `last_modified` time on the object, falling
             // back to calling `now()`.
-            match (log_namespace, timestamp) {
-                (LogNamespace::Vector, None) => {
-                    log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
-                }
-                (LogNamespace::Vector, Some(timestamp)) => {
-                    log.insert(metadata_path!(AwsS3Config::NAME, "timestamp"), timestamp);
+            match log_namespace {
+                LogNamespace::Vector => {
+                    if let Some(timestamp) = timestamp {
+                        log.insert(metadata_path!(AwsS3Config::NAME, "timestamp"), timestamp);
+                    }
 
                     log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
                 }
-                (LogNamespace::Legacy, None) => {
+                LogNamespace::Legacy => {
                     log.try_insert(
                         (PathPrefix::Event, log_schema().timestamp_key()),
-                        Utc::now(),
+                        timestamp.unwrap_or_else(Utc::now),
                     );
-                }
-                (LogNamespace::Legacy, Some(timestamp)) => {
-                    log.try_insert((PathPrefix::Event, log_schema().timestamp_key()), timestamp);
                 }
             };
 
-            emit!(EventsReceived {
-                count: 1,
-                byte_size: log.size_of()
-            });
+            events_received.emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
 
             log
         });
@@ -676,7 +666,7 @@ enum Event {
 #[serde(rename_all = "PascalCase")]
 pub struct S3TestEvent {
     pub service: String,
-    pub event_name: S3EventName,
+    pub event: S3EventName,
     pub bucket: String,
 }
 
@@ -870,4 +860,24 @@ fn test_key_deserialize() {
         },
         value
     );
+}
+
+#[test]
+fn test_s3_testevent() {
+    let value: S3TestEvent = serde_json::from_str(
+        r#"{
+        "Service":"Amazon S3",
+        "Event":"s3:TestEvent",
+        "Time":"2014-10-13T15:57:02.089Z",
+        "Bucket":"bucketname",
+        "RequestId":"5582815E1AEA5ADF",
+        "HostId":"8cLeGAmw098X5cv4Zkwcmo8vvZa3eH3eKxsPzbB9wrR+YstdA6Knx4Ip8EXAMPLE"
+     }"#,
+    )
+    .unwrap();
+
+    assert_eq!(value.service, "Amazon S3".to_string());
+    assert_eq!(value.bucket, "bucketname".to_string());
+    assert_eq!(value.event.kind, "s3".to_string());
+    assert_eq!(value.event.name, "TestEvent".to_string());
 }

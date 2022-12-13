@@ -39,6 +39,7 @@ jobs:
         dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         cue: ${{ steps.filter.outputs.cue }}
+        component_docs: ${{ steps.filter.outputs.component_docs }}
         markdown: ${{ steps.filter.outputs.markdown }}
       steps:
       - uses: actions/checkout@v3
@@ -73,6 +74,8 @@ jobs:
               - 'scripts/cross/**'
             cue:
               - 'website/cue/**'
+            component_docs:
+              - 'scripts/generate-component-docs.rb'
             markdown:
               - '**/**.md'
             internal_events:
@@ -108,7 +111,6 @@ jobs:
       - run: make test
         env:
           CARGO_BUILD_JOBS: 5
-      - run: make test-enterprise
       - name: Upload test results
         run: scripts/upload-test-results.sh
         if: always()
@@ -248,7 +250,6 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make test
       - run: make test-behavior
-      - run: make test-enterprise
 
   test-windows:
     name: Unit - Windows
@@ -259,7 +260,6 @@ jobs:
       - uses: actions/checkout@v3
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
       - run: make test
-      - run: make test-enterprise
 
   test-vrl:
     name: VRL - Linux
@@ -359,6 +359,9 @@ jobs:
       - name: Check Markdown
         if: needs.changes.outputs.markdown == 'true'
         run: make check-markdown
+      - name: Check Component Docs
+        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
+        run: make check-component-docs
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'

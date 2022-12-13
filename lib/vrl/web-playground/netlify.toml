@@ -11,7 +11,7 @@
   publish = "public/"
 
   # Default build command.
-  command = "sh ../../../scripts/ensure-wasm-pack-installed.sh && wasm-pack build --target web --out-dir public"
+  command = "bash ../../../scripts/ensure-wasm-pack-installed.sh && wasm-pack build --target web --out-dir public"
 
   # Ignore everything except the base directory and changes to vector/lib/
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF . ../../../lib"

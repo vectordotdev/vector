@@ -33,7 +33,7 @@ async fn test_source_error() {
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, (_, crash)) = start_topology(config.build().unwrap(), false).await;
 
     // Wait for our source to become ready to accept connections, and likewise, wait for our sink's target server to
     // receive its connection from the output sink.
@@ -78,7 +78,7 @@ async fn test_source_panic() {
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, (_, crash)) = start_topology(config.build().unwrap(), false).await;
 
     // Wait for our source to become ready to accept connections, and likewise, wait for our sink's target server to
     // receive its connection from the output sink.
@@ -125,7 +125,7 @@ async fn test_sink_error() {
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, (_, crash)) = start_topology(config.build().unwrap(), false).await;
 
     // Wait for our sources to become ready to accept connections, and likewise, wait for our sink's target server to
     // receive its connection from the output sink.
@@ -174,7 +174,7 @@ async fn test_sink_panic() {
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, (_, crash)) = start_topology(config.build().unwrap(), false).await;
 
     // Wait for our sources to become ready to accept connections, and likewise, wait for our sink's target server to
     // receive its connection from the output sink.

@@ -166,7 +166,7 @@ weight = 2
 
 [[languages.en.menus.footer]]
 name = "Privacy"
-url = "https://www.datadoghq.com/privacy/"
+url = "https://www.datadoghq.com/legal/privacy/"
 parent = "about"
 weight = 3
 

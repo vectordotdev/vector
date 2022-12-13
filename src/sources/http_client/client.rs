@@ -82,7 +82,7 @@ pub struct HttpClientConfig {
     #[configurable(derived)]
     pub auth: Option<Auth>,
 
-    /// The namespace to use for logs. This overrides the global setting
+    /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
@@ -214,7 +214,7 @@ impl HttpClientContext {
                     );
                 }
                 Event::Metric(ref mut metric) => {
-                    metric.insert_tag(
+                    metric.replace_tag(
                         log_schema().source_type_key().to_string(),
                         HttpClientConfig::NAME.to_string(),
                     );

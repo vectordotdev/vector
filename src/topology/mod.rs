@@ -75,7 +75,10 @@ pub async fn start_validated(
     config: Config,
     diff: ConfigDiff,
     mut pieces: Pieces,
-) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
+) -> Option<(
+    RunningTopology,
+    (mpsc::UnboundedSender<()>, mpsc::UnboundedReceiver<()>),
+)> {
     let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
     let expire_metrics = match (
@@ -103,7 +106,7 @@ pub async fn start_validated(
         return None;
     }
 
-    let mut running_topology = RunningTopology::new(config, abort_tx);
+    let mut running_topology = RunningTopology::new(config, abort_tx.clone());
 
     if !running_topology
         .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
@@ -114,7 +117,7 @@ pub async fn start_validated(
     running_topology.connect_diff(&diff, &mut pieces).await;
     running_topology.spawn_diff(&diff, pieces);
 
-    Some((running_topology, abort_rx))
+    Some((running_topology, (abort_tx, abort_rx)))
 }
 
 pub async fn build_or_log_errors(
