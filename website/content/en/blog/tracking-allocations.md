@@ -22,7 +22,7 @@ To explore the feature, start a Vector instance with the `allocation-tracing` op
 
 We provide the following new metrics: `component_allocated_bytes`, `component_allocated_bytes_total`, and `component_deallocated_bytes_total`.
 
-- `component_allocated_bytes` captures the current net allocations/deallocations.
+- `component_allocated_bytes` shows the current net allocations/deallocations.
 - `component_allocated_bytes_total` shows the accumulated total allocations.
 - `component_deallocated_bytes_total` shows the accumulated total deallocations.
 
