@@ -375,6 +375,7 @@ mod integration_tests {
             tls: None,
             auth: None,
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -406,6 +407,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -437,6 +439,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -467,6 +470,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -497,6 +501,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -528,6 +533,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -559,6 +565,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -591,6 +598,7 @@ mod integration_tests {
             }),
             auth: None,
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -617,6 +625,7 @@ mod integration_tests {
             tls: None,
             auth: None,
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -651,6 +660,7 @@ mod integration_tests {
             }),
             auth: None,
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -683,6 +693,7 @@ mod integration_tests {
             }),
             auth: None,
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -719,6 +730,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
@@ -755,6 +767,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
+            subject_key_field: "subject".to_string(),
         };
 
         let r = publish_and_check(conf).await;
