@@ -44,7 +44,11 @@ impl Builder {
         }
     }
 
-    pub fn add_output(&mut self, output: Output, source_id: usize) -> LimitedReceiver<EventArray> {
+    pub fn add_output(
+        &mut self,
+        output: Output,
+        source_id: (usize, String),
+    ) -> LimitedReceiver<EventArray> {
         match output.port {
             None => {
                 let (inner, rx) = Inner::new_with_buffer(
@@ -226,10 +230,15 @@ impl SourceSender {
 
 #[derive(Clone)]
 struct Inner {
-    source_id: usize,
     inner: LimitedSender<EventArray>,
     output: String,
     lag_time: Option<Histogram>,
+
+    /// The unique ID of the source to which this sender belongs.
+    ///
+    /// - The `usize` is the ID attached to individual event metadata.
+    /// - The `String` is used in the `EventsSent` internal event triggered by the sender.
+    source_id: (usize, String),
 }
 
 impl fmt::Debug for Inner {
@@ -247,7 +256,7 @@ impl Inner {
         n: usize,
         output: String,
         lag_time: Option<Histogram>,
-        source_id: usize,
+        source_id: (usize, String),
     ) -> (Self, LimitedReceiver<EventArray>) {
         let (tx, rx) = channel::limited(n);
         (
@@ -265,7 +274,7 @@ impl Inner {
         let reference = Utc::now().timestamp_millis();
         events.iter_events_mut().for_each(|mut event| {
             self.emit_lag_time(event.as_event_ref(), reference);
-            event.metadata_mut().set_source_id(self.source_id);
+            event.metadata_mut().set_source_id(self.source_id.0);
         });
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
@@ -274,7 +283,7 @@ impl Inner {
             count,
             byte_size,
             output: Some(self.output.as_ref()),
-            source: None,
+            source: Some(&self.source_id.1),
         });
         Ok(())
     }

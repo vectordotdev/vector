@@ -64,6 +64,15 @@ impl<'a> EventRef<'a> {
             _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
         }
     }
+
+    /// Access the metadata in this reference.
+    pub fn metadata(&self) -> &EventMetadata {
+        match self {
+            Self::Log(event) => event.metadata(),
+            Self::Metric(event) => event.metadata(),
+            Self::Trace(event) => event.metadata(),
+        }
+    }
 }
 
 impl<'a> From<&'a Event> for EventRef<'a> {

@@ -12,6 +12,7 @@ use crate::{
         into_event_stream, EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef,
     },
     fanout::{self, Fanout},
+    topology::builder::SourceDetails,
     ByteSizeOf,
 };
 
@@ -220,10 +221,14 @@ pub struct TransformOutputs {
     outputs_spec: Vec<Output>,
     primary_output: Option<Fanout>,
     named_outputs: HashMap<String, Fanout>,
+    sources_details: Vec<SourceDetails>,
 }
 
 impl TransformOutputs {
-    pub fn new(outputs_in: Vec<Output>) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
+    pub fn new(
+        outputs_in: Vec<Output>,
+        sources_details: Vec<SourceDetails>,
+    ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
         let mut primary_output = None;
         let mut named_outputs = HashMap::new();
@@ -247,6 +252,7 @@ impl TransformOutputs {
             outputs_spec,
             primary_output,
             named_outputs,
+            sources_details,
         };
 
         (me, controls)
@@ -267,22 +273,31 @@ impl TransformOutputs {
         buf: &mut TransformOutputsBuf,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         if let Some(primary) = self.primary_output.as_mut() {
-            let count = buf.primary_buffer.as_ref().map_or(0, OutputBuffer::len);
-            let byte_size = buf.primary_buffer.as_ref().map_or(
-                0,
-                EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of,
-            );
-            buf.primary_buffer
-                .as_mut()
-                .expect("mismatched outputs")
-                .send(primary)
-                .await?;
-            emit(EventsSent {
-                count,
-                byte_size,
-                output: Some(DEFAULT_OUTPUT),
-                source: None,
+            let primary_buffer = buf.primary_buffer.as_mut().expect("mismatched outputs");
+
+            let count = primary_buffer.len();
+            let byte_size = primary_buffer.estimated_json_encoded_size_of();
+
+            primary_buffer.send(primary).await?;
+
+            let mut sources: HashMap<Option<usize>, usize> = HashMap::new();
+            primary_buffer.iter_events().for_each(|event| {
+                sources
+                    .entry(event.metadata().source_id())
+                    .and_modify(|i| *i += 1)
+                    .or_insert(1);
             });
+
+            for (source_id, count) in sources {
+                emit(EventsSent {
+                    count,
+                    byte_size,
+                    output: Some(DEFAULT_OUTPUT),
+                    source: source_id.and_then(|id| {
+                        self.sources_details.get(id).map(|details| details.key.id())
+                    }),
+                });
+            }
         }
 
         for (key, buf) in &mut buf.named_buffers {
@@ -290,12 +305,25 @@ impl TransformOutputs {
             let byte_size = buf.estimated_json_encoded_size_of();
             buf.send(self.named_outputs.get_mut(key).expect("unknown output"))
                 .await?;
-            emit(EventsSent {
-                count,
-                byte_size,
-                output: Some(key.as_ref()),
-                source: None,
+
+            let mut sources: HashMap<Option<usize>, usize> = HashMap::new();
+            buf.iter_events().for_each(|event| {
+                sources
+                    .entry(event.metadata().source_id())
+                    .and_modify(|i| *i += 1)
+                    .or_insert(1);
             });
+
+            for (source_id, count) in sources {
+                emit(EventsSent {
+                    count,
+                    byte_size,
+                    output: Some(key.as_ref()),
+                    source: source_id.and_then(|id| {
+                        self.sources_details.get(id).map(|details| details.key.id())
+                    }),
+                });
+            }
         }
 
         Ok(())
