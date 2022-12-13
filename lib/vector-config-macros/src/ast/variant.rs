@@ -146,7 +146,7 @@ impl<'a> Variant<'a> {
     /// Whether or not this variant is visible during either serialization or deserialization.
     ///
     /// This is derived from whether any of the `serde` visibility attributes are applied: `skip`,
-    /// `skip_serializing, and `skip_deserializing`. Unless the variant is skipped entirely, it will
+    /// `skip_serializing`, and `skip_deserializing`. Unless the variant is skipped entirely, it will
     /// be considered visible and part of the schema.
     pub fn visible(&self) -> bool {
         self.attrs.visible
