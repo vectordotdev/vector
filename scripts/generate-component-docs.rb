@@ -115,6 +115,14 @@ def get_cached_expanded_schema(schema_name)
 end
 
 # Generic helpers for making working with Ruby a bit easier.
+def to_pretty_json(value)
+  if value.is_a?(Hash)
+    JSON.pretty_generate(Hash[*value.sort.flatten])
+  else
+    JSON.pretty_generate(value)
+  end
+end
+
 def deep_copy(obj)
   Marshal.load(Marshal.dump(obj))
 end
@@ -255,9 +263,9 @@ def get_docs_type_for_value(schema, value)
   # declaratively figure out the right field to dig into if we were discerning an integer/number
   # value, and so on.
   #
-  # We just use the detected value type.
-  schema_type = schema['type'] unless schema.nil?
-  if schema.nil? || schema_type.nil?
+  # We just use the detected value type in that case.
+  schema_instance_type = get_schema_instance_type(schema) unless schema.nil?
+  if schema.nil? || schema_instance_type.nil?
     return docs_type_str(value)
   end
 
@@ -265,9 +273,9 @@ def get_docs_type_for_value(schema, value)
   # and we abort. Otherwise, we fallthrough below to make sure we're handling special cases i.e.
   # numeric types.
   value_type = json_type_str(value)
-  if value_type != schema_type
-    @logger.error "Schema type and value type are a mismatch, which should not happen."
-    @logger.error "Schema type: #{schema_type}"
+  if value_type != schema_instance_type
+    @logger.error "Schema instance type and value type are a mismatch, which should not happen."
+    @logger.error "Schema instance type: #{schema_instance_type}"
     @logger.error "Value: #{value} (type: #{value_type})"
     exit
   end
@@ -369,12 +377,30 @@ def get_schema_type(schema)
   elsif schema.key?('oneOf')
     'one-of'
   elsif schema.key?('type')
-    schema['type']
+    get_schema_instance_type(schema)
   elsif schema.key?('const')
     'const'
   elsif schema.key?('enum')
     'enum'
   end
+end
+
+def get_schema_instance_type(schema)
+  maybe_type = schema['type']
+
+  # If the schema specifies multiple instance types, see if `null` is one of them, and if so,
+  # remove it. After that, if only one value is left, return that value directly rather than
+  # wrapped in an array.
+  #
+  # Otherwise, return the original array.
+  if maybe_type.is_a?(Array)
+    filtered = maybe_type.reject { |instance_type| instance_type == "null" }
+    if filtered.length == 1
+      return filtered[0]
+    end
+  end
+
+  maybe_type
 end
 
 # Fixes grouped enums by adjusting the schema type where necessary.
@@ -911,6 +937,14 @@ def resolve_bare_schema(root_schema, schema)
       fix_grouped_enums_if_numeric!(grouped)
       grouped.transform_values! { |values| { 'enum' => values } }
       grouped
+    when 'null'
+      # We don't really do anything with null schemas. They exist to present a valid JSON Schema
+      # document but we should simply be marking a given field using such a schema as not being
+      # required if it's allowed to be `null`.
+      #
+      # TODO: Does this actually make sense / hold in terms of things like specifying bare tags,
+      # where we want to indicate that `null` is one of the real, possible values to set?
+      { 'null' => {} }
     else
       @logger.error "Failed to resolve the schema. Schema: #{schema}"
       exit
@@ -926,6 +960,24 @@ def resolve_enum_schema(root_schema, schema)
   # Collect all of the tagging mode information upfront.
   enum_tagging = get_schema_metadata(schema, 'docs::enum_tagging')
   if enum_tagging.nil?
+    # We essentially never generate one-of schemas that aren't mapped to an enum. The only excpetion
+    # to this, at present, is when handling optional schemas. In some cases, we may generate a
+    # one-of schema with two subschemas: a null schema, and an all-of schema,
+    #
+    # See if that's what we're actually dealing with, and if so, resolve the all-of schema and
+    # return that instead.
+    if subschema_count == 2
+      null_idx = subschemas.index { |subschema| subschema['type'] == 'null' }
+      unless null_idx.nil?
+        @logger.debug "Detected optional all-of schema, unwrapping all-of schema to resolve..."
+
+        allof_idx = null_idx.zero? ? 1 : 0
+        allof_schema = subschemas[allof_idx]
+
+        return { '_resolved' => resolve_schema(root_schema, allof_schema) }
+      end
+    end
+
     @logger.error 'Enum schemas should never be missing the metadata for the enum tagging mode.'
     @logger.error "Schema: #{schema}"
     exit
@@ -1062,8 +1114,8 @@ def resolve_enum_schema(root_schema, schema)
 
             if reduced_existing_property != reduced_new_property
               @logger.error "Had overlapping property '#{property_name}' from resolved enum subschema, but schemas differed:"
-              @logger.error "Existing property schema (reduced): #{reduced_existing_property}"
-              @logger.error "New property schema (reduced): #{reduced_new_property}"
+              @logger.error "Existing property schema (reduced): #{to_pretty_json(reduced_existing_property)}"
+              @logger.error "New property schema (reduced): #{to_pretty_json(reduced_new_property)}"
               exit
             end
 
@@ -1297,9 +1349,9 @@ def apply_schema_default_value!(source_schema, resolved_schema)
     if resolved_schema_type_field.nil?
       @logger.error "Schema has default value declared that does not match type of resolved schema: \
       \
-      Source schema: #{JSON.pretty_generate(source_schema)} \
-      Default value: #{JSON.pretty_generate(default_value)} (type: #{default_value_type}) \
-      Resolved schema: #{JSON.pretty_generate(resolved_schema)}"
+      Source schema: #{to_pretty_json(source_schema)} \
+      Default value: #{to_pretty_json(default_value)} (type: #{default_value_type}) \
+      Resolved schema: #{to_pretty_json(resolved_schema)}"
       exit
     end
 
@@ -1444,6 +1496,8 @@ def reconcile_resolved_schema!(resolved_schema)
     @logger.debug "Schema was not an full resolved schema; reconciliation not applicable."
     return
   end
+
+  @logger.debug "Reconciling schema: #{to_pretty_json(resolved_schema)}"
 
   # If we're dealing with an object schema, run this for each of its properties.
   object_properties = resolved_schema.dig('type', 'object', 'options')
@@ -1602,7 +1656,7 @@ def render_and_import_schema(root_schema, schema_name, friendly_name, config_map
   tmp_file_prefix = config_map_path.join('-')
 
   final = { 'base' => { 'components' => data } }
-  final_json = JSON.pretty_generate(final)
+  final_json = to_pretty_json(final)
 
   # Write the resolved schema as JSON, which we'll then use to import into a Cue file.
   json_output_file = write_to_temp_file(["config-schema-#{tmp_file_prefix}-", '.json'], final_json)

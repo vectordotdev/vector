@@ -8,8 +8,7 @@
 // optional: either literal `Option<T>` fields or if they all have defaults.
 //
 // This could clean up some of the required properties where we have a field-level/struct-level
-// default that we can check by looking at the metadata for the type implementing `T`, maybe even
-// such that the default impl of `Configurable::is_optional` could just use that.
+// default that we can check by looking at the metadata for the type implementing `T`.
 //
 // TODO: What happens if we try to stick in a field that has a struct with a lifetime attached to
 // it? How does the name of that get generated in terms of what ends up in the schema? Do we even
