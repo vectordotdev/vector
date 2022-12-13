@@ -20,7 +20,7 @@ To explore the feature, you'll have to [download](https://vector.dev/download/) 
 
 ## What's new
 
-We provide the following new metrics: `component_allocated_bytes`, `component_allocated_bytes_total`, and `component_deallocated_bytes_total`.
+We provide the following new metrics: `component_allocated_bytes`, `component_allocated_bytes_total`, and `component_deallocated_bytes_total`. These metrics are tagged in the same way as other internal `component_*` metrics, allowing you to drill down on the memory usage of a particular component, or type of component.
 
 - `component_allocated_bytes` shows the current net allocations/deallocations.
 - `component_allocated_bytes_total` shows the accumulated total allocations.
