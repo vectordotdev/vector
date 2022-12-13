@@ -192,7 +192,11 @@ impl StreamSink<Event> for NatsSink {
             }
 
             let message_size = bytes.len();
-            match self.connection.publish(subject.clone(), bytes.freeze()).await {
+            match self
+                .connection
+                .publish(subject.clone(), bytes.freeze())
+                .await
+            {
                 Err(error) => {
                     finalizers.update_status(EventStatus::Errored);
 
@@ -253,8 +257,8 @@ mod integration_tests {
             .connect()
             .await
             .expect("failed to connect with test consumer");
-        let sub = consumer
-            .subscribe(&subject)
+        let mut sub = consumer
+            .subscribe(subject)
             .await
             .expect("failed to subscribe with test consumer");
 
@@ -266,11 +270,11 @@ mod integration_tests {
 
         // Unsubscribe from the channel.
         thread::sleep(Duration::from_secs(3));
-        sub.drain().await.unwrap();
+        sub.unsubscribe().await.unwrap();
 
         let mut output: Vec<String> = Vec::new();
         while let Some(msg) = sub.next().await {
-            output.push(String::from_utf8_lossy(&msg.data).to_string())
+            output.push(String::from_utf8_lossy(&msg.payload).to_string())
         }
 
         assert_eq!(output.len(), input.len());

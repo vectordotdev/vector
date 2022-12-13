@@ -196,7 +196,10 @@ async fn create_subscription(
 
     let subscription = match &config.queue {
         None => nc.subscribe(config.subject.clone()).await,
-        Some(queue) => nc.queue_subscribe(config.subject.clone(), queue.clone()).await,
+        Some(queue) => {
+            nc.queue_subscribe(config.subject.clone(), queue.clone())
+                .await
+        }
     };
 
     let subscription = subscription.context(SubscribeSnafu)?;
@@ -273,6 +276,7 @@ mod tests {
 mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
+    use bytes::Bytes;
     use vector_core::config::log_schema;
 
     use super::*;
@@ -306,7 +310,10 @@ mod integration_tests {
                 ShutdownSignal::noop(),
                 tx,
             ));
-            nc_pub.publish(&subject, msg).await.unwrap();
+            nc_pub
+                .publish(subject, Bytes::from_static(msg.as_bytes()))
+                .await
+                .unwrap();
 
             collect_n(rx, 1).await
         })

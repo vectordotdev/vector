@@ -14,7 +14,7 @@ pub enum NatsConfigError {
     #[snafu(display("NATS TLS Config Error: missing cert"))]
     TlsMissingCert,
     #[snafu(display("NATS Credentials file error"))]
-    CredentialsFileError{source: std::io::Error}
+    CredentialsFileError { source: std::io::Error },
 }
 
 /// Configuration of the authentication strategy when interacting with NATS.
@@ -122,17 +122,16 @@ impl NatsAuthConfig {
             NatsAuthConfig::CredentialsFile { credentials_file } => {
                 async_nats::ConnectOptions::with_credentials(
                     &std::fs::read_to_string(credentials_file.path.clone())
-                    .context(CredentialsFileSnafu)?
-                ).context(CredentialsFileSnafu)
-            },
+                        .context(CredentialsFileSnafu)?,
+                )
+                .context(CredentialsFileSnafu)
+            }
             NatsAuthConfig::Nkey { nkey } => nkeys::KeyPair::from_seed(&nkey.seed)
                 .context(AuthConfigSnafu)
-                .map(|_kp| {
-                    async_nats::ConnectOptions::with_nkey(nkey.nkey.clone())
-                }),
-            NatsAuthConfig::Token { token } => {
-                Ok(async_nats::ConnectOptions::with_token(token.value.inner().to_string()))
-            }
+                .map(|_kp| async_nats::ConnectOptions::with_nkey(nkey.nkey.clone())),
+            NatsAuthConfig::Token { token } => Ok(async_nats::ConnectOptions::with_token(
+                token.value.inner().to_string(),
+            )),
         }
     }
 }
@@ -147,8 +146,7 @@ pub(crate) fn from_tls_auth_config(
         Some(auth) => auth.to_nats_options()?,
     };
 
-    let nats_options = nats_options
-        .name(connection_name);
+    let nats_options = nats_options.name(connection_name);
 
     match tls_config {
         None => Ok(nats_options),
@@ -166,7 +164,9 @@ pub(crate) fn from_tls_auth_config(
 
             let nats_options = match (&tls_config.options.crt_file, &tls_config.options.key_file) {
                 (None, None) => nats_options,
-                (Some(crt_file), Some(key_file)) => nats_options.add_client_certificate(crt_file.clone(), key_file.clone()),
+                (Some(crt_file), Some(key_file)) => {
+                    nats_options.add_client_certificate(crt_file.clone(), key_file.clone())
+                }
                 (Some(_crt_file), None) => return Err(NatsConfigError::TlsMissingKey),
                 (None, Some(_key_file)) => return Err(NatsConfigError::TlsMissingCert),
             };
