@@ -17,8 +17,6 @@ pub mod log_to_metric;
 pub mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
-#[cfg(feature = "transforms-pipelines")]
-pub mod pipelines;
 #[cfg(feature = "transforms-reduce")]
 pub mod reduce;
 #[cfg(feature = "transforms-remap")]
@@ -101,15 +99,6 @@ pub enum Transforms {
     #[cfg(feature = "transforms-metric_to_log")]
     MetricToLog(#[configurable(derived)] metric_to_log::MetricToLogConfig),
 
-    /// Pipelines. (inner)
-    #[cfg(feature = "transforms-pipelines")]
-    #[configurable(metadata(skip_docs))]
-    Pipeline(#[configurable(derived)] pipelines::PipelineConfig),
-
-    /// Pipelines.
-    #[cfg(feature = "transforms-pipelines")]
-    Pipelines(#[configurable(derived)] pipelines::PipelinesConfig),
-
     /// Reduce.
     #[cfg(feature = "transforms-reduce")]
     Reduce(#[configurable(derived)] reduce::ReduceConfig),
@@ -162,10 +151,6 @@ impl NamedComponent for Transforms {
             Transforms::Lua(config) => config.get_component_name(),
             #[cfg(feature = "transforms-metric_to_log")]
             Transforms::MetricToLog(config) => config.get_component_name(),
-            #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipeline(config) => config.get_component_name(),
-            #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipelines(config) => config.get_component_name(),
             #[cfg(feature = "transforms-reduce")]
             Transforms::Reduce(config) => config.get_component_name(),
             #[cfg(feature = "transforms-remap")]
