@@ -31,7 +31,7 @@ The following image visualizes the `component_allocated_bytes` metric of a sampl
 
 ## How it works
 
-Under the hood, Vector uses a custom memory allocator implementation that captures each allocation/deallocation and associates it with the currently-executing component. This work builds upon Vector's existing [tracing] functionality. Allocations that aren't associated with any components are tracked by a `root` component.
+Under the hood, Vector uses a custom memory allocator implementation that captures each allocation/deallocation and associates it with the currently-executing component. This work builds upon Vector's existing tracing functionality. Allocations that aren't associated with any components are tracked by a `root` component.
 
 ## Using allocation tracing in production
 
@@ -48,5 +48,3 @@ We currently do not provide support for determining shared memory usage between 
 In this example, Vector will attribute that memory usage to other components -- because that is where the initial allocations occurred -- but does not account for allocations moving to another component, where that new component is keeping the allocation alive (such as a sink batching events, as mentioned above).
 
 Adding support for shared ownership tracking provides further insights into the lifetimes of components, further easing the debugging process.
-
-[tracing]: https://docs.rs/tracing/latest/tracing/
