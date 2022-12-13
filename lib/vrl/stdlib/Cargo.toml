@@ -213,7 +213,8 @@ default = [
     "unnest",
     "upcase",
     "uuid_v4",
-    "values"
+    "values",
+    "zip"
 ]
 
 append = []
@@ -359,6 +360,7 @@ unnest = ["dep:lookup_lib"]
 upcase = []
 uuid_v4 = ["dep:bytes", "dep:uuid"]
 values = []
+zip = []
 
 [lib]
 bench = false

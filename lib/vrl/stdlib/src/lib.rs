@@ -318,6 +318,8 @@ mod upcase;
 mod uuid_v4;
 #[cfg(feature = "values")]
 mod values;
+#[cfg(feature = "zip")]
+mod zip;
 
 // -----------------------------------------------------------------------------
 
@@ -599,6 +601,8 @@ pub use upcase::Upcase;
 pub use uuid_v4::UuidV4;
 #[cfg(feature = "values")]
 pub use values::Values;
+#[cfg(feature = "zip")]
+pub use zip::Zip;
 
 #[cfg(feature = "array")]
 pub use crate::array::Array;
@@ -896,5 +900,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(UuidV4),
         #[cfg(feature = "values")]
         Box::new(Values),
+        #[cfg(feature = "zip")]
+        Box::new(Zip),
     ]
 }
