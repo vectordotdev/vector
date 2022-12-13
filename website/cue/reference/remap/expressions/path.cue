@@ -117,7 +117,7 @@ remap: expressions: path: {
 			source: #"""
 				%
 				"""#
-			return: input.log
+			return: {}
 		},
 		{
 			title: "Top-level path"
@@ -166,14 +166,6 @@ remap: expressions: path: {
 				."parent.key.with.special characters".child
 				"""#
 			return: "Hello, World!"
-		},
-		{
-			title: "Accessing a metadata field"
-			input: log: message: "Hello, World!"
-			source: #"""
-				%vector.ingest_timestamp
-				"""#
-			return: input.log
-		},
+		}
 	]
 }
