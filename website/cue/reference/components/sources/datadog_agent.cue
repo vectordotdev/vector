@@ -236,8 +236,9 @@ components: sources: datadog_agent: {
 				following options:
 
 				```yaml
-				apm_config:
-					apm_dd_url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
+				vector:
+					traces.enabled: true
+					traces.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
 				```
 				"""
 		}
