@@ -23,8 +23,7 @@ To explore the feature, you'll have to [download](https://vector.dev/download/) 
 We provide the following new metrics: `component_allocated_bytes`, `component_allocated_bytes_total`, and `component_deallocated_bytes_total`. These metrics are tagged in the same way as other internal `component_*` metrics, allowing you to drill down on the memory usage of a particular component, or type of component.
 
 - `component_allocated_bytes` shows the current net allocations/deallocations.
-- `component_allocated_bytes_total` shows the accumulated total allocations.
-- `component_deallocated_bytes_total` shows the accumulated total deallocations.
+- `component_allocated_bytes_total` and `component_deallocated_bytes_total` show the total number of bytes allocated and deallocated, respectively.
 
 The following image visualizes the `component_allocated_bytes` metric of a sample Vector instance:
 ![Visualization of the allocation tracking metrics via Datadog](/img/blog/vector-allocation-tracking-graph.png)
@@ -43,8 +42,6 @@ In our development and testing of this feature, we've observed ~20% reduction in
 
 ## Next steps
 
-We currently do not provide support for determining shared memory usage between components. For example, when a sink is batching events, and is configured to batch many events, you may observe high Vector memory usage. If you looked at the memory usage metrics, you would see most of it being attributed to components that either created the events (such as a source) or processed the events (such as any transforms that modified the event) rather than the sink which is batching the events.
-
-In this example, Vector will attribute that memory usage to other components -- because that is where the initial allocations occurred -- but does not account for allocations moving to another component, where that new component is keeping the allocation alive (such as a sink batching events, as mentioned above).
+We currently do not provide support for tracking memory ownership between components. For example, when a sink is batching events, and is configured to batch many events, you may observe high Vector memory usage. If you looked at the memory usage metrics, you would see most of it being attributed to components that either created the events (such as a source) or processed the events (such as any transforms that modified the event) rather than the sink which is batching the events.
 
 Adding support for shared ownership tracking provides further insights into the lifetimes of components, further easing the debugging process.
