@@ -20,7 +20,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, PathPrefix};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
@@ -67,15 +67,18 @@ pub struct AmqpSourceConfig {
 
     /// The `AMQP` routing key.
     #[serde(default = "default_routing_key_field")]
-    pub(crate) routing_key_field: String,
+    #[derivative(Default(value = "default_routing_key_field()"))]
+    pub(crate) routing_key_field: OptionalValuePath,
 
     /// The `AMQP` exchange key.
     #[serde(default = "default_exchange_key")]
-    pub(crate) exchange_key: String,
+    #[derivative(Default(value = "default_exchange_key()"))]
+    pub(crate) exchange_key: OptionalValuePath,
 
     /// The `AMQP` offset key.
     #[serde(default = "default_offset_key")]
-    pub(crate) offset_key: String,
+    #[derivative(Default(value = "default_offset_key()"))]
+    pub(crate) offset_key: OptionalValuePath,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -105,16 +108,16 @@ fn default_consumer() -> String {
     "vector".into()
 }
 
-fn default_routing_key_field() -> String {
-    "routing".into()
+fn default_routing_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("routing"))
 }
 
-fn default_exchange_key() -> String {
-    "exchange".into()
+fn default_exchange_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("exchange"))
 }
 
-fn default_offset_key() -> String {
-    "offset".into()
+fn default_offset_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("offset"))
 }
 
 impl_generate_config_from_default!(AmqpSourceConfig);
@@ -149,23 +152,24 @@ impl SourceConfig for AmqpSourceConfig {
             )
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(
-                    &self.routing_key_field
-                ))),
+                self.routing_key_field
+                    .path
+                    .clone()
+                    .map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("routing"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(&self.exchange_key))),
+                self.exchange_key.path.clone().map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("exchange"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(&self.offset_key))),
+                self.offset_key.path.clone().map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("offset"),
                 Kind::integer(),
                 None,
@@ -217,11 +221,11 @@ pub(crate) async fn amqp_source(
 }
 
 struct Keys<'a> {
-    routing_key_field: &'a str,
+    routing_key_field: &'a OptionalValuePath,
     routing: &'a str,
-    exchange_key: &'a str,
+    exchange_key: &'a OptionalValuePath,
     exchange: &'a str,
-    offset_key: &'a str,
+    offset_key: &'a OptionalValuePath,
     delivery_tag: i64,
 }
 
@@ -237,7 +241,10 @@ fn populate_event(
     log_namespace.insert_source_metadata(
         AmqpSourceConfig::NAME,
         log,
-        Some(LegacyKey::InsertIfEmpty(keys.routing_key_field)),
+        keys.routing_key_field
+            .path
+            .as_ref()
+            .map(LegacyKey::InsertIfEmpty),
         "routing",
         keys.routing.to_string(),
     );
@@ -245,7 +252,10 @@ fn populate_event(
     log_namespace.insert_source_metadata(
         AmqpSourceConfig::NAME,
         log,
-        Some(LegacyKey::InsertIfEmpty(keys.exchange_key)),
+        keys.exchange_key
+            .path
+            .as_ref()
+            .map(LegacyKey::InsertIfEmpty),
         "exchange",
         keys.exchange.to_string(),
     );
@@ -253,7 +263,7 @@ fn populate_event(
     log_namespace.insert_source_metadata(
         AmqpSourceConfig::NAME,
         log,
-        Some(LegacyKey::InsertIfEmpty(keys.offset_key)),
+        keys.offset_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
         "offset",
         keys.delivery_tag,
     );
@@ -308,9 +318,9 @@ async fn receive_event(
     let routing = msg.routing_key.to_string();
     let exchange = msg.exchange.to_string();
     let keys = Keys {
-        routing_key_field: config.routing_key_field.as_str(),
-        exchange_key: config.exchange_key.as_str(),
-        offset_key: config.offset_key.as_str(),
+        routing_key_field: &config.routing_key_field,
+        exchange_key: &config.exchange_key,
+        offset_key: &config.offset_key,
         routing: &routing,
         exchange: &exchange,
         delivery_tag: msg.delivery_tag as i64,
@@ -528,12 +538,7 @@ pub mod test {
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
-        let config = AmqpSourceConfig {
-            routing_key_field: "routing".to_string(),
-            exchange_key: "exchange".to_string(),
-            offset_key: "offset".to_string(),
-            ..Default::default()
-        };
+        let config = AmqpSourceConfig::default();
 
         let definition = config.outputs(LogNamespace::Legacy)[0]
             .clone()
@@ -629,8 +634,6 @@ mod integration_test {
         let mut config = make_config();
         config.consumer = consumer;
         config.queue = queue;
-        config.routing_key_field = "message_key".to_string();
-        config.exchange_key = "exchange".to_string();
         let (_conn, channel) = config.connection.connect().await.unwrap();
         let exchange_opts = lapin::options::ExchangeDeclareOptions {
             auto_delete: true,
@@ -690,7 +693,7 @@ mod integration_test {
         let log = events[0].as_log();
         trace!("{:?}", log);
         assert_eq!(log[log_schema().message_key()], "my message".into());
-        assert_eq!(log["message_key"], routing_key.into());
+        assert_eq!(log["routing"], routing_key.into());
         assert_eq!(log[log_schema().source_type_key()], "amqp".into());
         let log_ts = log[log_schema().timestamp_key()].as_timestamp().unwrap();
         assert!(log_ts.signed_duration_since(now) < chrono::Duration::seconds(1));
