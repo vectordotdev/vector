@@ -129,75 +129,105 @@ impl Expression for Op {
 
         let mut state = state.clone();
         let mut lhs_def = self.lhs.apply_type_info(&mut state);
+        let lhs_value = self.lhs.as_value();
 
         // TODO: this is incorrect, but matches the existing behavior of the compiler
         // see: https://github.com/vectordotdev/vector/issues/13789
         // and: https://github.com/vectordotdev/vector/issues/13791
 
-        let rhs_def = self.rhs.apply_type_info(&mut state);
+        // let rhs_def = match self.opcode {
+        //     Err | Or | Merge | And | Eq | Ne | Gt | Ge | Lt | Le => TypeDef::null(),
+        //     _ => {
+        //         // TODO: delete me. Backwards compact while the implementation is modified
+        //         self.rhs.apply_type_info(&mut state)
+        //     }
+        // };
+
+        // calculates state for an RHS that may or may not be resolved at runtime
+        let maybe_rhs = |state: &mut TypeState| {
+            let rhs_info = self.rhs.type_info(&state);
+            *state = state.clone().merge(rhs_info.state);
+            rhs_info.result
+        };
 
         let result = match self.opcode {
-            // ok/err ?? ok
-            Err if rhs_def.is_infallible() => lhs_def.union(rhs_def).infallible(),
+            Err => {
+                let rhs_def = maybe_rhs(&mut state);
+                // let rhs_info = self.rhs.type_info(&state);
+                // entire expression is only fallible if both lhs and rhs were fallible
+                let fallible = lhs_def.is_fallible() && rhs_def.is_fallible();
 
-            // ... ?? ...
-            Err => lhs_def.union(rhs_def),
-
-            // null || ...
-            Or if lhs_def.is_null() => rhs_def,
-
-            // not null || ...
-            Or if !(lhs_def.is_superset(&K::null()).is_ok()
-                || lhs_def.is_superset(&K::boolean()).is_ok()) =>
-            {
-                lhs_def
+                lhs_def.union(rhs_def).with_fallibility(fallible)
             }
 
-            // ... || ...
-            Or if !lhs_def.is_boolean() => {
-                // We can remove Null from the lhs since we know that if the lhs is Null
-                // we will be taking the rhs and only the rhs type_def will then be relevant.
-                lhs_def.remove_null();
+            Or => {
+                if lhs_def.is_null() || lhs_value == Some(Value::Boolean(false)) {
+                    println!("OR - A");
+                    // lhs is always "false"
+                    self.rhs.apply_type_info(&mut state)
+                } else if !(lhs_def.contains_null() || lhs_def.contains_boolean())
+                    || lhs_value == Some(Value::Boolean(true))
+                {
+                    // lhs is always "true"
+                    lhs_def
+                } else {
+                    // not sure if lhs is true/false, merge both
 
-                lhs_def.union(rhs_def)
+                    // We can remove Null from the lhs since we know that if the lhs is Null
+                    // we will be returning the rhs and only the rhs type_def will then be relevant.
+                    lhs_def.remove_null();
+
+                    lhs_def.union(maybe_rhs(&mut state))
+                }
             }
-
-            Or => lhs_def.union(rhs_def),
 
             // ... | ...
-            Merge => lhs_def.merge_overwrite(rhs_def),
+            Merge => lhs_def.merge_overwrite(self.rhs.apply_type_info(&mut state)),
 
-            // null && ...
-            And if lhs_def.is_null() => rhs_def
-                .fallible_unless(K::null().or_boolean())
-                .with_kind(K::boolean()),
-
-            // ... && ...
-            And => lhs_def
-                .fallible_unless(K::null().or_boolean())
-                .union(rhs_def.fallible_unless(K::null().or_boolean()))
-                .with_kind(K::boolean()),
+            And => {
+                if lhs_def.is_null() || lhs_value == Some(Value::Boolean(false)) {
+                    // lhs is always "false"
+                    TypeDef::boolean()
+                } else if lhs_value == Some(Value::Boolean(true)) {
+                    // lhs is always "true"
+                    // keep the fallibility of RHS, but change it to a boolean
+                    self.rhs.apply_type_info(&mut state).with_kind(K::boolean())
+                } else {
+                    // unknown if lhs is true or false
+                    lhs_def
+                        .fallible_unless(K::null().or_boolean())
+                        .union(maybe_rhs(&mut state).fallible_unless(K::null().or_boolean()))
+                        .with_kind(K::boolean())
+                }
+            }
 
             // ... == ...
             // ... != ...
-            Eq | Ne => lhs_def.union(rhs_def).with_kind(K::boolean()),
-
-            // "b" >  "a"
-            // "a" >= "a"
-            // "a" <  "b"
-            // "b" <= "b"
-            Gt | Ge | Lt | Le if lhs_def.is_bytes() && rhs_def.is_bytes() => {
-                lhs_def.union(rhs_def).with_kind(K::boolean())
-            }
-
-            // ... >  ...
-            // ... >= ...
-            // ... <  ...
-            // ... <= ...
-            Gt | Ge | Lt | Le => lhs_def
-                .fallible_unless(K::integer().or_float())
-                .union(rhs_def.fallible_unless(K::integer().or_float()))
+            Eq | Ne => lhs_def
+                .union(self.rhs.apply_type_info(&mut state))
                 .with_kind(K::boolean()),
+
+            Gt | Ge | Lt | Le => {
+                let rhs_def = self.rhs.apply_type_info(&mut state);
+
+                // "b" >  "a"
+                // "a" >= "a"
+                // "a" <  "b"
+                // "b" <= "b"
+                if lhs_def.is_bytes() && rhs_def.is_bytes() {
+                    lhs_def.union(rhs_def).with_kind(K::boolean())
+                }
+                // ... >  ...
+                // ... >= ...
+                // ... <  ...
+                // ... <= ...
+                else {
+                    lhs_def
+                        .fallible_unless(K::integer().or_float())
+                        .union(rhs_def.fallible_unless(K::integer().or_float()))
+                        .with_kind(K::boolean())
+                }
+            }
 
             // ... / ...
             Div => {

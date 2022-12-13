@@ -1,0 +1,9 @@
+# result: { "boolean": true }
+
+# This should be infallible (even though the right-hand side is fallible)
+true || (1/0)
+
+
+x = false
+true || {x = "string"}
+type_def(x)

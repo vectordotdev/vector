@@ -1,0 +1,5 @@
+# result: { "boolean": true }
+
+a = null && "" # should be infallible (always returns false)
+
+type_def(a)
