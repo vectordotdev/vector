@@ -9,7 +9,7 @@ use codecs::{
 };
 
 use http::{Method, StatusCode, Uri};
-use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
 use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
@@ -112,7 +112,7 @@ pub struct SimpleHttpConfig {
 
     /// The event key in which the requested URL path used to send the request will be stored.
     #[serde(default = "default_path_key")]
-    path_key: String,
+    path_key: OptionalValuePath,
 
     /// Specifies the action of the HTTP request.
     #[serde(default = "default_http_method")]
@@ -147,9 +147,7 @@ impl SimpleHttpConfig {
             .schema_definition(log_namespace)
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
-                parse_value_path(&self.path_key)
-                    .ok()
-                    .map(LegacyKey::InsertIfEmpty),
+                self.path_key.path.clone().map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("path"),
                 Kind::bytes(),
                 None,
@@ -289,8 +287,8 @@ fn default_path() -> String {
     "/".to_string()
 }
 
-fn default_path_key() -> String {
-    "path".to_string()
+fn default_path_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("path"))
 }
 
 /// Removes duplicates from the list, and logs a `warn!()` for each duplicate removed.
@@ -368,7 +366,7 @@ impl SourceConfig for SimpleHttpConfig {
 struct SimpleHttpSource {
     headers: Vec<String>,
     query_parameters: Vec<String>,
-    path_key: String,
+    path_key: OptionalValuePath,
     decoder: Decoder,
     log_namespace: LogNamespace,
 }
@@ -389,7 +387,7 @@ impl SimpleHttpSource {
             self.log_namespace.insert_source_metadata(
                 SimpleHttpConfig::NAME,
                 log,
-                Some(LegacyKey::InsertIfEmpty(path!(self.path_key.as_str()))),
+                self.path_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
                 path!("path"),
                 request_path.to_owned(),
             );
@@ -487,6 +485,7 @@ mod tests {
     };
     use futures::Stream;
     use http::{HeaderMap, Method};
+    use lookup::lookup_v2::OptionalValuePath;
     use similar_asserts::assert_eq;
 
     use super::{remove_duplicates, SimpleHttpConfig};
@@ -522,7 +521,7 @@ mod tests {
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let path = path.to_owned();
-        let path_key = path_key.to_owned();
+        let path_key = OptionalValuePath::from(owned_value_path!(path_key));
         let context = SourceContext::new_test(sender, None);
         let method = match Method::from_str(method).unwrap() {
             Method::GET => HttpMethod::Get,

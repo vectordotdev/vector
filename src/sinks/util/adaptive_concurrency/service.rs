@@ -16,7 +16,6 @@ use crate::sinks::util::retries::RetryLogic;
 /// Enforces a limit on the concurrent number of requests the underlying
 /// service can handle. Automatically expands and contracts the actual
 /// concurrency limit depending on observed request response behavior.
-#[derive(Debug)]
 pub struct AdaptiveConcurrencyLimit<S, L> {
     inner: S,
     pub(super) controller: Arc<Controller<L>>,
