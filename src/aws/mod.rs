@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, SystemTime};
 
-pub use auth::AwsAuthentication;
+pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::meta::region::ProvideRegion;
 use aws_sigv4::http_request::{SignableRequest, SigningSettings};
 use aws_sigv4::SigningParams;

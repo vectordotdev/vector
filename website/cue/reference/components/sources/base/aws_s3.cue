@@ -35,7 +35,14 @@ base: components: sources: aws_s3: configuration: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
 		required:    false
 		type: object: {
-			default: load_timeout_secs: null
+			default: {
+				imds: {
+					connect_timeout_seconds: 1
+					max_attempts:            4
+					read_timeout_seconds:    1
+				}
+				load_timeout_secs: null
+			}
 			options: {
 				access_key_id: {
 					description: "The AWS access key ID."
@@ -51,6 +58,40 @@ base: components: sources: aws_s3: configuration: {
 					description: "Path to the credentials file."
 					required:    true
 					type: string: syntax: "literal"
+				}
+				imds: {
+					description: "Configuration for authenticating with AWS through IMDS."
+					required:    false
+					type: object: {
+						default: {
+							connect_timeout_seconds: 1
+							max_attempts:            4
+							read_timeout_seconds:    1
+						}
+						options: {
+							connect_timeout_seconds: {
+								description: "Connect timeout for IMDS."
+								required:    false
+								type: uint: {
+									default: 1
+									unit:    "seconds"
+								}
+							}
+							max_attempts: {
+								description: "Number of IMDS retries for fetching tokens and metadata."
+								required:    false
+								type: uint: default: 4
+							}
+							read_timeout_seconds: {
+								description: "Read timeout for IMDS."
+								required:    false
+								type: uint: {
+									default: 1
+									unit:    "seconds"
+								}
+							}
+						}
+					}
 				}
 				load_timeout_secs: {
 					description: "Timeout for successfully loading any credentials, in seconds."
