@@ -196,7 +196,6 @@ impl From<Config> for ConfigBuilder {
             tests,
             secret,
             hash: _,
-            expansions: _,
         } = config;
 
         let transforms = transforms
