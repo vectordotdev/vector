@@ -15,7 +15,7 @@ use vector_core::{
 
 use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
-    http::{get_http_scheme_from_uri, Auth, HttpClient},
+    http::{Auth, HttpClient},
     sinks::util::{retries::RetryLogic, UriSerde},
 };
 
@@ -49,7 +49,6 @@ pub enum LokiError {
 
 #[derive(Debug, Snafu)]
 pub struct LokiResponse {
-    protocol: &'static str,
     metadata: RequestMetadata,
 }
 
@@ -65,8 +64,8 @@ impl DriverResponse for LokiResponse {
         )
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.metadata.request_encoded_size(), self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.metadata.request_encoded_size())
     }
 }
 
@@ -127,7 +126,6 @@ impl Service<LokiRequest> for LokiService {
             }
         };
         let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
-        let protocol = get_http_scheme_from_uri(&self.endpoint.uri);
 
         let metadata = request.get_metadata();
 
@@ -154,7 +152,7 @@ impl Service<LokiRequest> for LokiService {
                     let status = response.status();
 
                     if status.is_success() {
-                        Ok(LokiResponse { protocol, metadata })
+                        Ok(LokiResponse { metadata })
                     } else {
                         Err(LokiError::ServerError { code: status })
                     }

@@ -273,9 +273,9 @@ async fn tap_handler(
                 } = watch_rx.borrow().clone();
 
                 // Remove tap sinks from components that have gone away/can no longer match.
-                let updated_keys = outputs.keys().map(|output| output.output_id.component.clone()).collect::<HashSet<_>>();
+                let output_keys = outputs.keys().map(|output| output.output_id.component.clone()).collect::<HashSet<_>>();
                 sinks.retain(|key, _| {
-                    !removals.contains(key) && updated_keys.contains(key) || {
+                    !removals.contains(key) && output_keys.contains(key) || {
                         debug!(message = "Removing component.", component_id = %key);
                         false
                     }

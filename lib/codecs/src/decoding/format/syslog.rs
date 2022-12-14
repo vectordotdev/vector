@@ -178,6 +178,14 @@ impl SyslogDeserializerConfig {
                         ))),
                         None,
                     )
+                    .with_source_metadata(
+                        source,
+                        None,
+                        &owned_value_path!("tls_client_metadata"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                            .or_undefined(),
+                        None,
+                    )
             }
         }
     }
