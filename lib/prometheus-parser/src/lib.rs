@@ -375,7 +375,7 @@ impl MetricGroupSet {
     fn insert_sample(
         &mut self,
         name: &str,
-        labels: &Vec<(String, String)>,
+        labels: &[(String, String)],
         sample: proto::Sample,
     ) -> Result<(), ParserError> {
         let (_, basename, group) = self.get_group(name);
@@ -383,7 +383,7 @@ impl MetricGroupSet {
             basename.len(),
             Metric {
                 name: name.into(),
-                labels: labels.clone(),
+                labels: labels.to_vec(),
                 value: sample.value,
                 timestamp: Some(sample.timestamp),
             },
@@ -479,9 +479,9 @@ mod test {
     macro_rules! labels {
         () => { Vec::new() };
         ( $( $name:ident => $value:literal ),* ) => {{
-            let mut result = Vec::<(String, String)>::new();
-            $( result.push((stringify!($name).into(), $value.to_string())); )*
-            result
+            vec![
+                $( (stringify!($name).into(), $value.to_string()), )*
+            ]
         }};
     }
 
