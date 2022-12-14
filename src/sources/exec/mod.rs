@@ -57,7 +57,7 @@ pub struct ExecConfig {
     pub streaming: Option<StreamingConfig>,
 
     /// The command to be run, plus any arguments required.
-    #[configurable(metadata(docs::examples = r#"["echo", "Hello World!"]"#))]
+    #[configurable(metadata(docs::examples = "echo", docs::examples = "Hello World!"))]
     pub command: Vec<String>,
 
     /// The directory in which to run the command.
