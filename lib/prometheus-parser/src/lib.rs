@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use std::{collections::BTreeMap, convert::TryFrom};
+use std::convert::TryFrom;
 
 use indexmap::IndexMap;
 use snafu::ResultExt;
@@ -67,7 +67,19 @@ vector_common::impl_event_data_eq!(ParserError);
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct GroupKey {
     pub timestamp: Option<i64>,
-    pub labels: BTreeMap<String, String>,
+    pub labels: Vec<(String, String)>,
+}
+
+impl GroupKey {
+    fn remove_label(&mut self, label: &str) -> Option<String> {
+        for idx in 0..self.labels.len() {
+            if self.labels[idx].0 == label {
+                return Some(self.labels.swap_remove(idx).1);
+            }
+        }
+
+        None
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -170,7 +182,7 @@ impl GroupKind {
             }
             Self::Histogram(ref mut metrics) => match suffix {
                 "_bucket" => {
-                    let bucket = key.labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
+                    let bucket = key.remove_label("le").ok_or(ParserError::ExpectedLeTag)?;
                     let (_, bucket) = line::Metric::parse_value(&bucket)
                         .map_err(Into::into)
                         .context(ParseLabelValueSnafu)?;
@@ -199,8 +211,7 @@ impl GroupKind {
             Self::Summary(ref mut metrics) => match suffix {
                 "" => {
                     let quantile = key
-                        .labels
-                        .remove("quantile")
+                        .remove_label("quantile")
                         .ok_or(ParserError::ExpectedQuantileTag)?;
                     let value = metric.value;
                     let (_, quantile) = line::Metric::parse_value(&quantile)
@@ -364,7 +375,7 @@ impl MetricGroupSet {
     fn insert_sample(
         &mut self,
         name: &str,
-        labels: &BTreeMap<String, String>,
+        labels: &Vec<(String, String)>,
         sample: proto::Sample,
     ) -> Result<(), ParserError> {
         let (_, basename, group) = self.get_group(name);
@@ -409,12 +420,21 @@ pub fn parse_request(request: proto::WriteRequest) -> Result<Vec<MetricGroup>, P
     }
 
     for timeseries in request.timeseries {
-        let mut labels: BTreeMap<String, String> = timeseries
+        let mut name = None;
+        let labels: Vec<(String, String)> = timeseries
             .labels
             .into_iter()
-            .map(|label| (label.name, label.value))
+            .filter_map(|label| {
+                if label.name == METRIC_NAME_LABEL {
+                    name = Some(label.value);
+                    None
+                } else {
+                    Some((label.name, label.value))
+                }
+            })
             .collect();
-        let name = match labels.remove(METRIC_NAME_LABEL) {
+
+        let name = match name {
             Some(name) => name,
             None => return Err(ParserError::RequestNoNameLabel),
         };
@@ -457,10 +477,10 @@ mod test {
     }
 
     macro_rules! labels {
-        () => { BTreeMap::new() };
+        () => { Vec::new() };
         ( $( $name:ident => $value:literal ),* ) => {{
-            let mut result = BTreeMap::<String, String>::new();
-            $( result.insert(stringify!($name).into(), $value.to_string()); )*
+            let mut result = Vec::<(String, String)>::new();
+            $( result.push((stringify!($name).into(), $value.to_string())); )*
             result
         }};
     }

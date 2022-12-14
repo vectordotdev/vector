@@ -532,6 +532,12 @@ impl<const N: usize> From<[(String, String); N]> for MetricTags {
     }
 }
 
+impl From<Vec<(String, String)>> for MetricTags {
+    fn from(tags: Vec<(String, String)>) -> Self {
+        tags.into_iter().collect()
+    }
+}
+
 impl FromIterator<(String, String)> for MetricTags {
     fn from_iter<T: IntoIterator<Item = (String, String)>>(tags: T) -> Self {
         let mut result = Self::default();

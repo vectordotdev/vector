@@ -1,7 +1,5 @@
 //! Parse a single line of Prometheus text format.
 
-use std::collections::BTreeMap;
-
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
@@ -97,7 +95,7 @@ pub struct Header {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metric {
     pub name: String,
-    pub labels: BTreeMap<String, String>,
+    pub labels: Vec<(String, String)>,
     pub value: f64,
     pub timestamp: Option<i64>,
 }
@@ -179,10 +177,10 @@ impl Metric {
         }
     }
 
-    fn parse_labels_inner(mut input: &str) -> IResult<BTreeMap<String, String>> {
+    fn parse_labels_inner(mut input: &str) -> IResult<Vec<(String, String)>> {
         let sep = match_char(',');
 
-        let mut result = BTreeMap::new();
+        let mut result = Vec::new();
         loop {
             match Self::element_parser(input)? {
                 (inner_input, None) => {
@@ -190,7 +188,7 @@ impl Metric {
                     break;
                 }
                 (inner_input, Some((name, value))) => {
-                    result.insert(name, value);
+                    result.push((name, value));
 
                     // try matching ",", if doesn't match then
                     // check if the list ended with "}".
@@ -214,11 +212,11 @@ impl Metric {
     }
 
     /// Parse `{label_name="value",...}`
-    fn parse_labels(input: &str) -> IResult<BTreeMap<String, String>> {
+    fn parse_labels(input: &str) -> IResult<Vec<(String, String)>> {
         let input = trim_space(input);
 
         match opt(char('{'))(input) {
-            Ok((input, None)) => Ok((input, BTreeMap::new())),
+            Ok((input, None)) => Ok((input, Vec::new())),
             Ok((input, Some(_))) => Self::parse_labels_inner(input),
             Err(failure) => Err(failure),
         }
@@ -394,8 +392,6 @@ fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
 
 #[cfg(test)]
 mod test {
-    use vector_common::btreemap;
-
     use super::*;
 
     #[test]
@@ -616,30 +612,33 @@ mod test {
         let input = wrap("{}");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, BTreeMap::new());
+        assert_eq!(r, Vec::new());
 
         let input = wrap(r#"{name="value"}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, BTreeMap::from([("name".into(), "value".into())]));
+        assert_eq!(r, Vec::from([("name".into(), "value".into())]));
 
         let input = wrap(r#"{name="value",}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, BTreeMap::from([("name".into(), "value".into())]));
+        assert_eq!(r, Vec::from([("name".into(), "value".into())]));
 
-        let input = wrap(r#"{ name = "" ,b="a=b" , a="},", _c = "\""}"#);
+        let input = wrap(r#"{ name = "", a="},", b="a=b", _c = "\""}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(
             r,
-            btreemap! {"name" => "", "a" => "},", "b" => "a=b", "_c" => "\""}
+            vec![("name", ""), ("a", "},"), ("b", "a=b"), ("_c", "\"")]
+                .iter()
+                .map(|(a, b)| (a.to_string(), b.to_string()))
+                .collect::<Vec<_>>()
         );
         assert_eq!(left, tail);
 
         let input = wrap("100");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, "100".to_owned() + tail);
-        assert_eq!(r, BTreeMap::new());
+        assert_eq!(r, Vec::new());
 
         // We don't allow these values
 
