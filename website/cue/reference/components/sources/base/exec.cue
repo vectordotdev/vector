@@ -4,7 +4,7 @@ base: components: sources: exec: configuration: {
 	command: {
 		description: "The command to be run, plus any arguments required."
 		required:    true
-		type: array: items: type: string: examples: ["echo", "Hello World!"]
+		type: array: items: type: string: examples: ["[\"echo\", \"Hello World!\"]"]
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."

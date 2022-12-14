@@ -3,19 +3,12 @@ package metadata
 base: components: sinks: configuration: {
 	buffer: {
 		description: """
-			Buffer configuration.
+			Configures the buffering behavior for this sink.
 
-			Buffers are compromised of stages(*) that form a buffer _topology_, with input items being
-			subject to configurable behavior when each stage reaches configured limits.  Buffers are
-			configured for sinks, where backpressure from the sink can be handled by the buffer.  This
-			allows absorbing temporary load, or potentially adding write-ahead-log behavior to a sink to
-			increase the durability of a given Vector pipeline.
+			More information about the individual buffer types, and buffer behavior, can be found in the
+			[Buffering Model][buffering_model] section.
 
-			While we use the term "buffer topology" here, a buffer topology is referred to by the more
-			common "buffer" or "buffers" shorthand.  This is related to buffers originally being a single
-			component, where you could only choose which buffer type to use.  As we expand buffer
-			functionality to allow chaining buffers together, you'll see "buffer topology" used in internal
-			documentation to correctly reflect the internal structure.
+			[buffering_model]: /docs/about/under-the-hood/architecture/buffering-model/
 			"""
 		required: false
 		type: object: options: {
