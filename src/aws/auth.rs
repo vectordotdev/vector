@@ -26,12 +26,14 @@ pub struct ImdsAuthentication {
 
     /// Connect timeout for IMDS.
     #[serde(default = "default_timeout")]
+    #[serde(rename = "connect_timeout_seconds")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[derivative(Default(value = "default_timeout()"))]
     connect_timeout: Duration,
 
     /// Read timeout for IMDS.
     #[serde(default = "default_timeout")]
+    #[serde(rename = "read_timeout_seconds")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[derivative(Default(value = "default_timeout()"))]
     read_timeout: Duration,
@@ -182,6 +184,9 @@ mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
 
+    const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+    const READ_TIMEOUT: Duration = Duration::from_secs(10);
+
     #[derive(Serialize, Deserialize, Clone, Debug)]
     struct ComponentConfig {
         assume_role: Option<String>,
@@ -222,21 +227,19 @@ mod tests {
     fn parsing_default_with_imds_client() {
         let config = toml::from_str::<ComponentConfig>(
             r#"
-            auth.imds.max_attempts = 10
-            auth.imds.connect_timeout = 60
-            auth.imds.read_timeout = 30
+            auth.imds.max_attempts = 5
+            auth.imds.connect_timeout_seconds = 30
+            auth.imds.read_timeout_seconds = 10
         "#,
         )
         .unwrap();
 
-        const CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
-        const READ_TIMEOUT: Duration = Duration::from_secs(30);
         assert!(matches!(
             config.auth,
             AwsAuthentication::Default {
                 load_timeout_secs: None,
                 imds: ImdsAuthentication {
-                    max_attempts: 10,
+                    max_attempts: 5,
                     connect_timeout: CONNECT_TIMEOUT,
                     read_timeout: READ_TIMEOUT,
                 },
@@ -275,8 +278,8 @@ mod tests {
             r#"
             auth.assume_role = "root"
             auth.imds.max_attempts = 5
-            auth.imds.connect_timeout = 30
-            auth.imds.read_timeout = 10
+            auth.imds.connect_timeout_seconds = 30
+            auth.imds.read_timeout_seconds = 10
         "#,
         )
         .unwrap();

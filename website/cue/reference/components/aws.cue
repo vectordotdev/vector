@@ -65,7 +65,7 @@ components: _aws: {
 						required:    false
 						type: object: {
 							options: {
-								connect_timeout: {
+								connect_timeout_seconds: {
 									description: "Connect timeout for IMDS."
 									required:    false
 									type: uint: {
@@ -78,7 +78,7 @@ components: _aws: {
 									required:    false
 									type: uint: default: 4
 								}
-								read_timeout: {
+								read_timeout_seconds: {
 									description: "Read timeout for IMDS."
 									required:    false
 									type: uint: {

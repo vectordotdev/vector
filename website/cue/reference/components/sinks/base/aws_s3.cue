@@ -122,12 +122,12 @@ base: components: sinks: aws_s3: configuration: {
 				required:    false
 				type: object: {
 					default: {
-						connect_timeout: 1
-						max_attempts:    4
-						read_timeout:    1
+						connect_timeout_seconds: 1
+						max_attempts:            4
+						read_timeout_seconds:    1
 					}
 					options: {
-						connect_timeout: {
+						connect_timeout_seconds: {
 							description: "Connect timeout for IMDS."
 							required:    false
 							type: uint: {
@@ -140,7 +140,7 @@ base: components: sinks: aws_s3: configuration: {
 							required:    false
 							type: uint: default: 4
 						}
-						read_timeout: {
+						read_timeout_seconds: {
 							description: "Read timeout for IMDS."
 							required:    false
 							type: uint: {

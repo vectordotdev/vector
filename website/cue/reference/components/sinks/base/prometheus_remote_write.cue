@@ -54,7 +54,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				relevant_when: "strategy = \"aws\""
 				required:      false
 				type: object: options: {
-					connect_timeout: {
+					connect_timeout_seconds: {
 						description: "Connect timeout for IMDS."
 						required:    false
 						type: uint: {
@@ -67,7 +67,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 						required:    false
 						type: uint: default: 4
 					}
-					read_timeout: {
+					read_timeout_seconds: {
 						description: "Read timeout for IMDS."
 						required:    false
 						type: uint: {
