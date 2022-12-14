@@ -4,6 +4,7 @@ use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, imds, sts::AssumeRoleProviderBuilder,
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
+use serde_with::serde_as;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
@@ -12,19 +13,36 @@ use vector_config::configurable_component;
 const DEFAULT_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// IMDS Client Configuration for authenticating with AWS.
+#[serde_as]
 #[configurable_component]
 #[derive(Copy, Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct ImdsAuthentication {
-    /// Number of IMDS retries for fetching tokens & metadata
+    /// Number of IMDS retries for fetching tokens and metadata.
+    #[serde(default = "default_max_attempts")]
+    #[derivative(Default(value = "default_max_attempts()"))]
     max_attempts: u32,
 
-    /// Connect timeout for IMDS, in seconds.
-    connect_timeout: u64,
+    /// Connect timeout for IMDS.
+    #[serde(default = "default_timeout")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[derivative(Default(value = "default_timeout()"))]
+    connect_timeout: Duration,
 
-    /// Read timeout for IMDS, in seconds.
-    read_timeout: u64,
+    /// Read timeout for IMDS.
+    #[serde(default = "default_timeout")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[derivative(Default(value = "default_timeout()"))]
+    read_timeout: Duration,
+}
+
+const fn default_max_attempts() -> u32 {
+    4
+}
+
+const fn default_timeout() -> Duration {
+    Duration::from_secs(1)
 }
 
 /// Configuration of the authentication strategy for interacting with AWS services.
@@ -62,7 +80,8 @@ pub enum AwsAuthentication {
         load_timeout_secs: Option<u64>,
 
         /// Configuration for authenticating with AWS through IMDS.
-        imds: Option<ImdsAuthentication>,
+        #[serde(default)]
+        imds: ImdsAuthentication,
 
         /// The AWS region to send STS requests to.
         ///
@@ -78,7 +97,8 @@ pub enum AwsAuthentication {
         load_timeout_secs: Option<u64>,
 
         /// Configuration for authenticating with AWS through IMDS.
-        imds: Option<ImdsAuthentication>,
+        #[serde(default)]
+        imds: ImdsAuthentication,
     },
 }
 
@@ -136,25 +156,23 @@ impl AwsAuthentication {
 async fn default_credentials_provider(
     region: Region,
     load_timeout_secs: Option<u64>,
-    imds: Option<ImdsAuthentication>,
+    imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
-    let mut chain = DefaultCredentialsChain::builder()
+    let client = imds::Client::builder()
+        .max_attempts(imds.max_attempts)
+        .connect_timeout(imds.connect_timeout)
+        .read_timeout(imds.read_timeout)
+        .build()
+        .await?;
+
+    let chain = DefaultCredentialsChain::builder()
         .region(region)
+        .imds_client(client)
         .load_timeout(
             load_timeout_secs
                 .map(Duration::from_secs)
                 .unwrap_or(DEFAULT_LOAD_TIMEOUT),
         );
-
-    if let Some(imds) = imds {
-        let client = imds::Client::builder()
-            .max_attempts(imds.max_attempts)
-            .connect_timeout(Duration::from_secs(imds.connect_timeout))
-            .read_timeout(Duration::from_secs(imds.read_timeout))
-            .build()
-            .await?;
-        chain = chain.imds_client(client);
-    }
 
     Ok(SharedCredentialsProvider::new(chain.build().await))
 }
@@ -195,7 +213,7 @@ mod tests {
             config.auth,
             AwsAuthentication::Default {
                 load_timeout_secs: Some(10),
-                imds: None,
+                imds: ImdsAuthentication { .. },
             }
         ));
     }
@@ -211,15 +229,17 @@ mod tests {
         )
         .unwrap();
 
+        const CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
+        const READ_TIMEOUT: Duration = Duration::from_secs(30);
         assert!(matches!(
             config.auth,
             AwsAuthentication::Default {
                 load_timeout_secs: None,
-                imds: Some(ImdsAuthentication {
+                imds: ImdsAuthentication {
                     max_attempts: 10,
-                    connect_timeout: 60,
-                    read_timeout: 30
-                }),
+                    connect_timeout: CONNECT_TIMEOUT,
+                    read_timeout: READ_TIMEOUT,
+                },
             }
         ));
     }
@@ -261,6 +281,8 @@ mod tests {
         )
         .unwrap();
 
+        const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+        const READ_TIMEOUT: Duration = Duration::from_secs(10);
         match config.auth {
             AwsAuthentication::Role {
                 assume_role,
@@ -272,11 +294,11 @@ mod tests {
                 assert_eq!(load_timeout_secs, None);
                 assert!(matches!(
                     imds,
-                    Some(ImdsAuthentication {
+                    ImdsAuthentication {
                         max_attempts: 5,
-                        connect_timeout: 30,
-                        read_timeout: 10
-                    })
+                        connect_timeout: CONNECT_TIMEOUT,
+                        read_timeout: READ_TIMEOUT,
+                    }
                 ));
                 assert_eq!(region, None);
             }
@@ -305,7 +327,7 @@ mod tests {
             } => {
                 assert_eq!(&assume_role, "auth.root");
                 assert_eq!(load_timeout_secs, Some(10));
-                assert!(imds.is_none());
+                assert!(matches!(imds, ImdsAuthentication { .. }));
                 assert_eq!(region.unwrap(), "us-west-2");
             }
             _ => panic!(),

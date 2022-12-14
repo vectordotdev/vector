@@ -68,19 +68,25 @@ base: components: sinks: elasticsearch: configuration: {
 				required:      false
 				type: object: options: {
 					connect_timeout: {
-						description: "Connect timeout for IMDS, in seconds."
-						required:    true
-						type: uint: {}
+						description: "Connect timeout for IMDS."
+						required:    false
+						type: uint: {
+							default: 1
+							unit:    "seconds"
+						}
 					}
 					max_attempts: {
-						description: "Number of IMDS retries for fetching tokens & metadata"
-						required:    true
-						type: uint: {}
+						description: "Number of IMDS retries for fetching tokens and metadata."
+						required:    false
+						type: uint: default: 4
 					}
 					read_timeout: {
-						description: "Read timeout for IMDS, in seconds."
-						required:    true
-						type: uint: {}
+						description: "Read timeout for IMDS."
+						required:    false
+						type: uint: {
+							default: 1
+							unit:    "seconds"
+						}
 					}
 				}
 			}

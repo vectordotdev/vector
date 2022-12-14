@@ -49,21 +49,34 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
 				required:    false
-				type: object: options: {
-					connect_timeout: {
-						description: "Connect timeout for IMDS, in seconds."
-						required:    true
-						type: uint: {}
+				type: object: {
+					default: {
+						connect_timeout: 1
+						max_attempts:    4
+						read_timeout:    1
 					}
-					max_attempts: {
-						description: "Number of IMDS retries for fetching tokens & metadata"
-						required:    true
-						type: uint: {}
-					}
-					read_timeout: {
-						description: "Read timeout for IMDS, in seconds."
-						required:    true
-						type: uint: {}
+					options: {
+						connect_timeout: {
+							description: "Connect timeout for IMDS."
+							required:    false
+							type: uint: {
+								default: 1
+								unit:    "seconds"
+							}
+						}
+						max_attempts: {
+							description: "Number of IMDS retries for fetching tokens and metadata."
+							required:    false
+							type: uint: default: 4
+						}
+						read_timeout: {
+							description: "Read timeout for IMDS."
+							required:    false
+							type: uint: {
+								default: 1
+								unit:    "seconds"
+							}
+						}
 					}
 				}
 			}
