@@ -284,8 +284,6 @@ mod tests {
         )
         .unwrap();
 
-        const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-        const READ_TIMEOUT: Duration = Duration::from_secs(10);
         match config.auth {
             AwsAuthentication::Role {
                 assume_role,
