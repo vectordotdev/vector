@@ -452,7 +452,8 @@ aws-core = [
   "dep:aws-smithy-client",
   "dep:aws-smithy-http",
   "dep:aws-smithy-http-tower",
-  "dep:aws-smithy-types"
+  "dep:aws-smithy-types",
+  "dep:serde_with",
 ]
 
 # Anything that requires Protocol Buffers.
