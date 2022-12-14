@@ -182,7 +182,7 @@ aws-sigv4 = { version = "0.51.0", default-features = false, features = ["sign-ht
 aws-config = { version = "0.51.0", default-features = false, features = ["rustls"], optional = true }
 aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.51.0", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http = { version = "0.52.0", default-features = false, features = ["event-stream"], optional = true }
 aws-smithy-http-tower = { version = "0.51.0", default-features = false, optional = true }
 aws-smithy-types = { version = "0.51.0", default-features = false, optional = true }
 
