@@ -45,6 +45,10 @@ where
         }
     }
 
+    fn is_optional() -> bool {
+        true
+    }
+
     fn metadata() -> Metadata<Self> {
         // We clone the default metadata of the wrapped type because otherwise this "level" of the schema would
         // effective sever the link between things like the description of `T` itself and what we show for a field of
