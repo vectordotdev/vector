@@ -273,8 +273,8 @@ impl StringCollector {
             (None, Some(tag)) => write!(result, "{{{}}}", Self::format_tag(tag.0, &tag.1)),
             (Some(tags), ref tag) => {
                 let mut parts = tags
-                    .iter_single()
-                    .map(|(key, value)| Self::format_tag(key, value))
+                    .iter_all()
+                    .filter_map(|(key, value)| value.map(|value| Self::format_tag(key, value)))
                     .collect::<Vec<_>>();
 
                 if let Some((key, value)) = tag {

@@ -602,7 +602,10 @@ mod tests {
         finalization::{BatchNotifier, BatchStatus},
         sensitive_string::SensitiveString,
     };
-    use vector_core::{event::StatisticKind, metric_tags, samples};
+    use vector_core::{
+        event::{MetricTags, StatisticKind},
+        metric_tags, samples,
+    };
 
     use super::*;
     use crate::{
@@ -779,6 +782,28 @@ mod tests {
 
         assert!(response_result.is_err());
         assert_eq!(response_result.unwrap_err(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn prometheus_duplicate_labels() {
+        let (name1, event1) = create_metric_with_tags(
+            None,
+            MetricValue::Gauge { value: 123.4 },
+            Some(metric_tags!("tag" => "value", "tag" => "more value")),
+        );
+        let events = vec![event1];
+
+        let body = export_and_fetch(None, events, false).await;
+        dbg!(&body);
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{tag="more value",tag="value"}} 123.4
+            "#},
+            name = name1
+        )));
     }
 
     #[tokio::test]
@@ -1000,9 +1025,17 @@ mod tests {
     }
 
     pub(self) fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
+        create_metric_with_tags(name, value, Some(metric_tags!("some_tag" => "some_value")))
+    }
+
+    pub(self) fn create_metric_with_tags(
+        name: Option<String>,
+        value: MetricValue,
+        tags: Option<MetricTags>,
+    ) -> (String, Event) {
         let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
         let event = Metric::new(name.clone(), MetricKind::Incremental, value)
-            .with_tags(Some(metric_tags!("some_tag" => "some_value")))
+            .with_tags(tags)
             .into();
         (name, event)
     }
