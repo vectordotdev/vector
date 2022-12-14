@@ -302,29 +302,34 @@ pub fn make_schema_optional(schema: &mut SchemaObject) -> Result<(), GenerateErr
         // schema, and we have to bail.
         None => match schema.subschemas.as_mut() {
             None => return Err(GenerateError::InvalidOptionalSchema),
-            Some(subschemas) => if let Some(any_of) = subschemas.any_of.as_mut() {
-                any_of.push(Schema::Object(generate_null_schema()));
-            } else if let Some(one_of) = subschemas.one_of.as_mut() {
-                one_of.push(Schema::Object(generate_null_schema()));
-            } else if subschemas.all_of.is_some() {
-                // If we're dealing with an all-of schema, we have to build a new one-of schema
-                // where the two choices are either the `null` schema, or a subschema comprised of
-                // the all-of subschemas.
-                let all_of = subschemas.all_of.take().expect("all-of subschemas must be present here");
-                let new_all_of_schema = SchemaObject {
-                    subschemas: Some(Box::new(SubschemaValidation {
-                        all_of: Some(all_of),
+            Some(subschemas) => {
+                if let Some(any_of) = subschemas.any_of.as_mut() {
+                    any_of.push(Schema::Object(generate_null_schema()));
+                } else if let Some(one_of) = subschemas.one_of.as_mut() {
+                    one_of.push(Schema::Object(generate_null_schema()));
+                } else if subschemas.all_of.is_some() {
+                    // If we're dealing with an all-of schema, we have to build a new one-of schema
+                    // where the two choices are either the `null` schema, or a subschema comprised of
+                    // the all-of subschemas.
+                    let all_of = subschemas
+                        .all_of
+                        .take()
+                        .expect("all-of subschemas must be present here");
+                    let new_all_of_schema = SchemaObject {
+                        subschemas: Some(Box::new(SubschemaValidation {
+                            all_of: Some(all_of),
+                            ..Default::default()
+                        })),
                         ..Default::default()
-                    })),
-                    ..Default::default()
-                };
+                    };
 
-                subschemas.one_of = Some(vec![
-                    Schema::Object(generate_null_schema()),
-                    Schema::Object(new_all_of_schema),
-                ]);
-            } else {
-                return Err(GenerateError::InvalidOptionalSchema)
+                    subschemas.one_of = Some(vec![
+                        Schema::Object(generate_null_schema()),
+                        Schema::Object(new_all_of_schema),
+                    ]);
+                } else {
+                    return Err(GenerateError::InvalidOptionalSchema);
+                }
             }
         },
         Some(sov) => match sov {
