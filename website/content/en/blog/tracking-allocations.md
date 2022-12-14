@@ -3,7 +3,7 @@ title: Monitoring Vector's per-component memory usage
 short: Allocation tracking
 description: Gaining insight into Vector's per-component memory usage.
 authors: ["arshiyasolei", "tobz"]
-date: "2022-12-13"
+date: "2022-12-14"
 badges:
   type: announcement
   domains: ["monitoring"]
@@ -36,12 +36,12 @@ Under the hood, Vector uses a custom memory allocator implementation that captur
 
 Currently, this feature is only supported on Unix builds of Vector. This may change in the future as we continue to improve allocation tracing.
 
-Additionally, there is a performance overhead imposed by allocation tracing when enabled. Vector runs a set of soak tests in CI to catch performance regressions during development. These soak tests emulate common Vector use cases, such as remapping events, or converting payloads from one event type to another, and so on.
+Additionally, there is a performance overhead imposed by allocation tracing when enabled and no overhead when disabled. Vector runs a set of soak tests in CI to catch performance regressions during development. These soak tests emulate common Vector use cases, such as remapping events, or converting payloads from one event type to another, and so on.
 
 In our development and testing of this feature, we've observed ~20% reduction in throughput. This overhead may be acceptable for debugging purposes, but care should be taken before enabling it across your entire fleet.
 
 ## Next steps
 
-We currently do not provide support for tracking memory ownership between components. For example, when a sink is batching events, and is configured to batch many events, you may observe high Vector memory usage. If you looked at the memory usage metrics, you would see most of it being attributed to components that either created the events (such as a source) or processed the events (such as any transforms that modified the event) rather than the sink which is batching the events.
+We currently do not provide support for tracking memory ownership between components. For example, when a sink is batching events, and is configured to batch many events, you may observe high Vector memory usage. If you looked at the memory usage metrics, you would see most of it being attributed to components that either created the events (such as a source) or processed the events (such as any transforms that modified the event) rather than the sink which is batching the events. Adding support for shared ownership tracking provides further insights into the lifetimes of components, further easing the debugging process.
 
-Adding support for shared ownership tracking provides further insights into the lifetimes of components, further easing the debugging process.
+Please Let us know your feedback and suggestions [here](https://github.com/vectordotdev/vector/issues/15474)!
