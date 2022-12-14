@@ -164,7 +164,7 @@ components: transforms: aws_ec2_metadata: {
 			}
 			"tags": {
 				description: "The instance's tags"
-				required:    false
+				required: false
 				type: object: {
 					examples: [
 						{
