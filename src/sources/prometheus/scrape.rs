@@ -458,6 +458,62 @@ mod test {
         }
     }
 
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we accept the metric, but take the last label in the list.
+    #[tokio::test]
+    async fn test_prometheus_duplicate_tags() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics").map(|| {
+            r#"
+                    metric_label{code="200",code="success"} 100 1612411516789
+            "#
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            scrape_interval_secs: 1,
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: true,
+            query: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(3),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+
+        let metrics: Vec<vector_core::event::Metric> = events
+            .into_iter()
+            .map(|event| event.into_metric())
+            .collect();
+        let metric = &metrics[0];
+
+        assert_eq!(metric.name(), "metric_label");
+
+        let code_tag = metric
+            .tags()
+            .unwrap()
+            .iter_all()
+            .filter(|(name, _value)| *name == "code")
+            .map(|(_name, value)| value)
+            .collect::<Vec<_>>();
+
+        assert_eq!(1, code_tag.len());
+        assert_eq!("success", code_tag[0].unwrap());
+    }
+
     #[tokio::test]
     async fn test_prometheus_request_query() {
         let in_addr = next_addr();
