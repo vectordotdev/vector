@@ -1,6 +1,7 @@
 use std::io;
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
+use lookup::lookup_v2::OptionalValuePath;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 
@@ -29,7 +30,7 @@ pub struct StdinConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    pub host_key: Option<String>,
+    pub host_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]
     pub framing: Option<FramingConfig>,
@@ -45,7 +46,7 @@ pub struct StdinConfig {
 }
 
 impl FileDescriptorConfig for StdinConfig {
-    fn host_key(&self) -> Option<String> {
+    fn host_key(&self) -> Option<OptionalValuePath> {
         self.host_key.clone()
     }
 
