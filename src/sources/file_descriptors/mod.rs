@@ -8,17 +8,21 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
-use lookup::{owned_value_path, path, OwnedValuePath};
+use lookup::{
+    lookup_v2::{parse_value_path, OptionalValuePath},
+    owned_value_path, path, OwnedValuePath,
+};
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_config::NamedComponent;
-use vector_core::config::{LegacyKey, LogNamespace, Output};
-use vector_core::event::Event;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_core::{
+    config::{LegacyKey, LogNamespace, Output},
+    event::Event,
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},

@@ -1,6 +1,4 @@
-use std::fs::File;
-use std::io;
-use std::os::unix::io::FromRawFd;
+use std::{fs::File, io, os::unix::io::FromRawFd};
 
 use super::{outputs, FileDescriptorConfig};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
