@@ -267,7 +267,7 @@ mod test {
 
     /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
     /// > Label names MUST be unique within a LabelSet.
-    /// Prometheus itself will reject the metrict with an error. Largely to remain backward compatible with older versions of Vecotr,
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
     /// we accept the metric, but take the last label in the list.
     #[tokio::test]
     async fn receives_metrics_duplicate_labels() {

@@ -941,8 +941,8 @@ mod tests {
 
     /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
     /// > Label names MUST be unique within a LabelSet.
-    /// Prometheus itself will reject the metrict with an error. Largely to remain backward compatible with older versions of Vecotr,
-    /// we only pushlish the last tag in the list.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we only publish the last tag in the list.
     #[test]
     fn encodes_duplicate_tags() {
         let tags = metric_tags!(
