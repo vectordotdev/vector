@@ -151,24 +151,18 @@ fn parse_log_line(line: &[u8]) -> Option<ParsedLog> {
 
     let after_timestamp_pos = rest.iter().position(is_delimiter)?;
     let (timestamp, rest) = rest.split_at(after_timestamp_pos + 1);
-    let timestamp = timestamp
-        .split_last()
-        .expect("delimiter is always present")
-        .1;
+    let timestamp = timestamp.split_last()?.1; // Trim the delimiter
 
     let after_stream_pos = rest.iter().position(is_delimiter)?;
     let (stream, rest) = rest.split_at(after_stream_pos + 1);
-    let stream = stream.split_last().expect("delimiter is always present").1;
+    let stream = stream.split_last()?.1;
     if stream != b"stdout".as_ref() && stream != b"stderr".as_ref() {
         return None;
     }
 
     let after_multiline_tag_pos = rest.iter().position(is_delimiter)?;
     let (multiline_tag, rest) = rest.split_at(after_multiline_tag_pos + 1);
-    let multiline_tag = multiline_tag
-        .split_last()
-        .expect("delimiter is always present")
-        .1;
+    let multiline_tag = multiline_tag.split_last()?.1;
     if multiline_tag != b"F".as_ref() && multiline_tag != b"P".as_ref() {
         return None;
     }
@@ -177,7 +171,7 @@ fn parse_log_line(line: &[u8]) -> Option<ParsedLog> {
     let message = if has_new_line_tag {
         // Remove the newline tag field, if it exists.
         // For additional details, see https://github.com/vectordotdev/vector/issues/8606.
-        rest.split_last().expect("cannot be empty").1
+        rest.split_last()?.1
     } else {
         rest
     };
