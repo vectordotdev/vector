@@ -13,13 +13,14 @@ use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use futures::{Stream, StreamExt};
-use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
-use lookup::{metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix};
+use lookup::{
+    lookup_v2::{parse_value_path, OptionalValuePath},
+    metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
-use value::kind::Collection;
-use value::Kind;
+use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
