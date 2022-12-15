@@ -81,6 +81,14 @@ components: sources: prometheus_remote_write: {
 				are emitted as gauges.
 				"""
 		}
+
+		duplicate_tags: {
+			title: "Duplicate Tags"
+			body: """
+				Duplicate tag names are invalid within Prometheus. Prometheus itself will reject a metric with duplicate
+				tags. Vector will accept the metric, but will only take the last tag specified.
+				"""
+		}
 	}
 
 	telemetry: metrics: {
