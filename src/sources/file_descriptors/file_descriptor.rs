@@ -1,10 +1,9 @@
-use std::fs::File;
-use std::io;
-use std::os::unix::io::FromRawFd;
+use std::{fs::File, io, os::unix::io::FromRawFd};
 
 use super::{outputs, FileDescriptorConfig};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
+use lookup::lookup_v2::OptionalValuePath;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 
@@ -28,7 +27,7 @@ pub struct FileDescriptorSourceConfig {
     /// The value will be the current hostname for wherever Vector is running.
     ///
     /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
-    pub host_key: Option<String>,
+    pub host_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]
     pub framing: Option<FramingConfig>,
@@ -47,7 +46,7 @@ pub struct FileDescriptorSourceConfig {
 }
 
 impl FileDescriptorConfig for FileDescriptorSourceConfig {
-    fn host_key(&self) -> Option<String> {
+    fn host_key(&self) -> Option<OptionalValuePath> {
         self.host_key.clone()
     }
 
