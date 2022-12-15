@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use indexmap::IndexMap;
 use serde::Serialize;
 use vector_config::{configurable_component, Configurable, NamedComponent};
 use vector_core::config::LogNamespace;
@@ -65,57 +64,6 @@ where
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
         }
-    }
-}
-
-impl TransformOuter<String> {
-    pub(crate) fn expand(
-        mut self,
-        key: ComponentKey,
-        parent_types: &HashSet<&'static str>,
-        transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
-        expansions: &mut IndexMap<ComponentKey, Vec<ComponentKey>>,
-    ) -> Result<(), String> {
-        if !self.inner.nestable(parent_types) {
-            return Err(format!(
-                "the component {} cannot be nested in {:?}",
-                self.inner.get_component_name(),
-                parent_types
-            ));
-        }
-
-        let expansion = self
-            .inner
-            .expand(&key, &self.inputs)
-            .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
-
-        let mut ptypes = parent_types.clone();
-        ptypes.insert(self.inner.get_component_name());
-
-        if let Some(inner_topology) = expansion {
-            let mut children = Vec::new();
-
-            expansions.insert(
-                key,
-                inner_topology
-                    .outputs()
-                    .into_iter()
-                    .map(ComponentKey::from)
-                    .collect(),
-            );
-
-            for (inner_name, inner_transform) in inner_topology.inner {
-                let child = TransformOuter {
-                    inputs: inner_transform.inputs,
-                    inner: inner_transform.inner,
-                };
-                children.push(inner_name.clone());
-                transforms.insert(inner_name, child);
-            }
-        } else {
-            transforms.insert(key, self);
-        }
-        Ok(())
     }
 }
 
@@ -253,52 +201,5 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// nested under transforms of a specific type, or if such nesting is fundamentally disallowed.
     fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
         true
-    }
-
-    /// Attempts to expand the transform into a subtopology of transforms.
-    ///
-    /// This mechanism allows a transform to act like a macro pattern, where only one transform is
-    /// configured from the user's perspective, but multiple transforms can be created, and
-    /// connected, and returned back to the topology in a seamless way.
-    ///
-    /// If the transform supports expansion, `Ok(Some(...))` is returned containing the inner
-    /// topology that represents an organized subtopology consisting of the set of expanded
-    /// transforms. Otherwise, if expansion is not supported for this transform, `Ok(None)` is returned.
-    ///
-    /// # Errors
-    ///
-    /// If there is an error during expansion, an error variant explaining the issue is returned.
-    fn expand(
-        &mut self,
-        _name: &ComponentKey,
-        _inputs: &[String],
-    ) -> crate::Result<Option<InnerTopology>> {
-        Ok(None)
-    }
-}
-
-#[derive(Debug, Serialize)]
-pub struct InnerTopologyTransform {
-    pub inputs: Inputs<String>,
-    pub inner: Transforms,
-}
-
-#[derive(Debug, Default)]
-pub struct InnerTopology {
-    pub inner: IndexMap<ComponentKey, InnerTopologyTransform>,
-    pub outputs: Vec<(ComponentKey, Vec<Output>)>,
-}
-
-impl InnerTopology {
-    pub fn outputs(&self) -> Vec<String> {
-        self.outputs
-            .iter()
-            .flat_map(|(name, outputs)| {
-                outputs.iter().map(|output| match output.port {
-                    Some(ref port) => name.port(port),
-                    None => name.id().to_string(),
-                })
-            })
-            .collect()
     }
 }

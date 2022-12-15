@@ -18,13 +18,19 @@ use opentelemetry_proto::convert::{
 };
 
 use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
-use value::kind::Collection;
-use value::Kind;
-use vector_common::internal_event::{BytesReceived, Protocol};
+use value::{kind::Collection, Kind};
+use vector_common::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{log_schema, LegacyKey};
-use vector_core::{config::LogNamespace, schema::Definition};
+use vector_core::{
+    config::LogNamespace,
+    config::{log_schema, LegacyKey},
+    schema::Definition,
+};
 
+use self::{
+    grpc::Service,
+    http::{build_warp_filter, run_http_server},
+};
 use crate::{
     config::{
         DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
@@ -33,11 +39,6 @@ use crate::{
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-};
-
-use self::{
-    grpc::Service,
-    http::{build_warp_filter, run_http_server},
 };
 
 pub const LOGS: &str = "logs";
@@ -115,6 +116,7 @@ impl GenerateConfig for OpentelemetryConfig {
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let events_received = register!(EventsReceived);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(&self.grpc.tls, true)?;
@@ -122,6 +124,7 @@ impl SourceConfig for OpentelemetryConfig {
             pipeline: cx.out.clone(),
             acknowledgements,
             log_namespace,
+            events_received: events_received.clone(),
         })
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
         let grpc_source = run_grpc_server(
@@ -137,7 +140,13 @@ impl SourceConfig for OpentelemetryConfig {
         let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
         let protocol = http_tls_settings.http_protocol_name();
         let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
-        let filters = build_warp_filter(acknowledgements, log_namespace, cx.out, bytes_received);
+        let filters = build_warp_filter(
+            acknowledgements,
+            log_namespace,
+            cx.out,
+            bytes_received,
+            events_received,
+        );
         let http_source =
             run_http_server(self.http.address, http_tls_settings, filters, cx.shutdown);
 

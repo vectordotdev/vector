@@ -14,7 +14,7 @@ use vector_core::{
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
-    aws::RegionOrEndpoint,
+    aws::{ImdsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -252,6 +252,7 @@ async fn auto_version_aws() {
     let config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
+            imds: ImdsAuthentication::default(),
         })),
         endpoints: vec![aws_server()],
         aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -273,6 +274,23 @@ async fn insert_events_over_http() {
             endpoints: vec![http_server()],
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
+            ..config()
+        },
+        false,
+        BatchStatus::Delivered,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn insert_events_over_http_with_gzip_compression() {
+    trace_init();
+
+    run_insert_tests(
+        ElasticsearchConfig {
+            endpoints: vec![http_server()],
+            doc_type: Some("log_lines".into()),
+            compression: Compression::gzip_default(),
             ..config()
         },
         false,
@@ -314,6 +332,7 @@ async fn insert_events_on_aws() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
+                imds: ImdsAuthentication::default(),
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -334,6 +353,7 @@ async fn insert_events_on_aws_with_compression() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
+                imds: ImdsAuthentication::default(),
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -356,6 +376,23 @@ async fn insert_events_with_failure() {
             endpoints: vec![http_server()],
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
+            ..config()
+        },
+        true,
+        BatchStatus::Rejected,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn insert_events_with_failure_and_gzip_compression() {
+    trace_init();
+
+    run_insert_tests(
+        ElasticsearchConfig {
+            endpoints: vec![http_server()],
+            doc_type: Some("log_lines".into()),
+            compression: Compression::gzip_default(),
             ..config()
         },
         true,

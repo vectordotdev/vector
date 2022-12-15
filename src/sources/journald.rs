@@ -31,7 +31,9 @@ use tokio_util::codec::FramedRead;
 use value::{kind::Collection, Kind, Value};
 use vector_common::{
     finalizer::OrderedFinalizer,
-    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered},
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
 };
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
@@ -402,6 +404,7 @@ impl JournaldSource {
         mut shutdown: ShutdownSignal,
     ) -> bool {
         let bytes_received = register!(BytesReceived::from(Protocol::from("journald")));
+        let events_received = register!(EventsReceived);
 
         let batch_size = self.batch_size;
         loop {
@@ -430,7 +433,10 @@ impl JournaldSource {
                     }
                 }
             }
-            if let Some(x) = batch.finish(finalizer, &bytes_received).await {
+            if let Some(x) = batch
+                .finish(finalizer, &bytes_received, &events_received)
+                .await
+            {
                 break x;
             }
         }
@@ -513,6 +519,7 @@ impl<'a> Batch<'a> {
         mut self,
         finalizer: &Finalizer,
         bytes_received: &'a Registered<BytesReceived>,
+        events_received: &'a Registered<EventsReceived>,
     ) -> Option<bool> {
         drop(self.batch);
 
@@ -522,10 +529,8 @@ impl<'a> Batch<'a> {
 
         if !self.events.is_empty() {
             let count = self.events.len();
-            emit!(EventsReceived {
-                count,
-                byte_size: self.events.estimated_json_encoded_size_of(),
-            });
+            let byte_size = self.events.estimated_json_encoded_size_of();
+            events_received.emit(CountByteSize(count, byte_size));
 
             match self.source.out.send_batch(self.events).await {
                 Ok(_) => {

@@ -17,8 +17,6 @@ pub mod log_to_metric;
 pub mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
-#[cfg(feature = "transforms-pipelines")]
-pub mod pipelines;
 #[cfg(feature = "transforms-reduce")]
 pub mod reduce;
 #[cfg(feature = "transforms-remap")]
@@ -32,7 +30,6 @@ pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
 
-use vector_common::config::ComponentKey;
 use vector_config::{configurable_component, NamedComponent};
 pub use vector_core::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
@@ -43,7 +40,7 @@ use vector_core::{
     schema,
 };
 
-use crate::config::{InnerTopology, TransformConfig, TransformContext};
+use crate::config::{TransformConfig, TransformContext};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -52,6 +49,20 @@ enum BuildError {
 
     #[snafu(display("Invalid substring expression: {}", name))]
     InvalidSubstring { name: String },
+}
+
+/// The user configuration to choose the metric tag strategy.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MetricTagsValues {
+    /// Tag values will be exposed as single strings, the
+    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+    /// will be ignored.
+    #[default]
+    Single,
+    /// All tags will be exposed as arrays of either string or null values.
+    Full,
 }
 
 /// Configurable transforms in Vector.
@@ -86,15 +97,6 @@ pub enum Transforms {
     /// Metric to log.
     #[cfg(feature = "transforms-metric_to_log")]
     MetricToLog(#[configurable(derived)] metric_to_log::MetricToLogConfig),
-
-    /// Pipelines. (inner)
-    #[cfg(feature = "transforms-pipelines")]
-    #[configurable(metadata(skip_docs))]
-    Pipeline(#[configurable(derived)] pipelines::PipelineConfig),
-
-    /// Pipelines.
-    #[cfg(feature = "transforms-pipelines")]
-    Pipelines(#[configurable(derived)] pipelines::PipelinesConfig),
 
     /// Reduce.
     #[cfg(feature = "transforms-reduce")]
@@ -148,10 +150,6 @@ impl NamedComponent for Transforms {
             Transforms::Lua(config) => config.get_component_name(),
             #[cfg(feature = "transforms-metric_to_log")]
             Transforms::MetricToLog(config) => config.get_component_name(),
-            #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipeline(config) => config.get_component_name(),
-            #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipelines(config) => config.get_component_name(),
             #[cfg(feature = "transforms-reduce")]
             Transforms::Reduce(config) => config.get_component_name(),
             #[cfg(feature = "transforms-remap")]

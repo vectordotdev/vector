@@ -13,13 +13,26 @@ autobenches = false # our benchmarks are not runnable on their own either way
 rust-version = "1.64.0"
 
 [[bin]]
+name = "vector"
+test = false
+bench = false
+
+[[test]]
+name = "integration"
+path = "tests/integration/lib.rs"
+
+[[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"
+test = false
+bench = false
 required-features = ["default-no-api-client"]
 
 [[bin]]
 name = "secret-backend-example"
 path = "src/config/loading/secret_backend_example.rs"
+test = false
+bench = false
 
 [profile.dev]
 split-debuginfo = "unpacked" # Faster debug builds on macOS
@@ -139,7 +152,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.59", default-features = false }
 futures = { version = "0.3.25", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.22.0", default-features = false, features = ["full"] }
+tokio = { version = "1.23.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.11", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -181,8 +194,9 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
+tower-http = { version = "0.3.5", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.149", default-features = false, features = ["derive"] }
+serde = { version = "1.0.150", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.7", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.89", default-features = false, features = ["raw_value"] }
@@ -278,7 +292,7 @@ nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
 once_cell = { version = "1.16", default-features = false }
-openssl = { version = "0.10.43", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.44", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.4.0", default-features = false }
@@ -329,7 +343,7 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.26.1", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.11.3", default-features = false, optional = true }
+prost-build = { version = "0.11.4", default-features = false, optional = true }
 tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
@@ -349,7 +363,7 @@ quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
 tokio-test = "0.4.2"
-tokio = { version = "1.22.0", features = ["test-util"] }
+tokio = { version = "1.23.0", features = ["test-util"] }
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
@@ -402,7 +416,7 @@ target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables"
 target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 
 # Enables features that work only on systems providing `cfg(unix)`
-unix = ["tikv-jemallocator"]
+unix = ["tikv-jemallocator", "allocation-tracing"]
 allocation-tracing = []
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
@@ -438,7 +452,8 @@ aws-core = [
   "dep:aws-smithy-client",
   "dep:aws-smithy-http",
   "dep:aws-smithy-http-tower",
-  "dep:aws-smithy-types"
+  "dep:aws-smithy-types",
+  "dep:serde_with",
 ]
 
 # Anything that requires Protocol Buffers.
@@ -825,6 +840,9 @@ enterprise-tests = [
   "sinks-loki",
   "api",
 ]
+
+component-validation-runner = ["dep:tonic", "sources-internal_logs", "sources-internal_metrics", "sources-vector", "sinks-vector"]
+component-validation-tests = ["component-validation-runner", "sources", "transforms", "sinks"]
 
 # Grouping together features for benchmarks. We exclude the API client due to it causing the build process to run out
 # of memory when those additional dependencies are built in CI.

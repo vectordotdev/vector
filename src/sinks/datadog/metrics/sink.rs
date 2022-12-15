@@ -58,6 +58,7 @@ pub(crate) struct DatadogMetricsSink<S> {
     service: S,
     request_builder: DatadogMetricsRequestBuilder,
     batch_settings: BatcherSettings,
+    protocol: String,
 }
 
 impl<S> DatadogMetricsSink<S>
@@ -72,18 +73,20 @@ where
         service: S,
         request_builder: DatadogMetricsRequestBuilder,
         batch_settings: BatcherSettings,
+        protocol: String,
     ) -> Self {
         DatadogMetricsSink {
             service,
             request_builder,
             batch_settings,
+            protocol,
         }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut splitter: MetricSplitter<AggregatedSummarySplitter> = MetricSplitter::default();
 
-        let sink = input
+        input
             // Convert `Event` to `Metric` so we don't have to deal with constant conversions.
             .filter_map(|event| ready(event.try_into_metric()))
             // Split aggregated summaries into individual metrics for count, sum, and the quantiles, which lets us
@@ -133,9 +136,10 @@ where
             })
             // Finally, we generate the driver which will take our requests, send them off, and appropriately handle
             // finalization of the events, and logging/metrics, as the requests are responded to.
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await
     }
 }
 
