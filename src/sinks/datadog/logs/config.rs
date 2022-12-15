@@ -137,9 +137,11 @@ impl DatadogLogsConfig {
             });
         http::Uri::try_from(endpoint).expect("URI not valid")
     }
-}
 
-impl DatadogLogsConfig {
+    fn get_protocol(&self) -> String {
+        self.get_uri().scheme_str().unwrap_or("http").to_string()
+    }
+
     pub fn build_processor(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.inner());
         let request_limits = self.request.unwrap_with(&Default::default());
@@ -157,7 +159,9 @@ impl DatadogLogsConfig {
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(client, self.get_uri(), self.enterprise));
 
-        let sink = LogSinkBuilder::new(self.encoding.clone(), service, default_api_key, batch)
+        let encoding = self.encoding.clone();
+        let protocol = self.get_protocol();
+        let sink = LogSinkBuilder::new(encoding, service, default_api_key, batch, protocol)
             .compression(self.compression.unwrap_or_default())
             .build();
 

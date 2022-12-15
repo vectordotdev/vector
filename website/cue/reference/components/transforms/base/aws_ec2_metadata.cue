@@ -75,11 +75,11 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 
 					| Pattern             | Example match                                                               |
 					| ------------------- | --------------------------------------------------------------------------- |
-					| Domain names        | `**example.com**` matches requests to `**example.com**`                     |
-					| Wildcard domains    | `**.example.com**` matches requests to `**example.com**` and its subdomains |
-					| IP addresses        | `**127.0.0.1**` matches requests to `**127.0.0.1**`                         |
-					| [CIDR][cidr] blocks | `**192.168.0.0/16**` matches requests to any IP addresses in this range     |
-					| Splat               | `__*__` matches all hosts                                                   |
+					| Domain names        | `example.com` matches requests to `example.com`                     |
+					| Wildcard domains    | `.example.com` matches requests to `example.com` and its subdomains |
+					| IP addresses        | `127.0.0.1` matches requests to `127.0.0.1`                         |
+					| [CIDR][cidr] blocks | `192.168.0.0/16` matches requests to any IP addresses in this range     |
+					| Splat               | `*` matches all hosts                                                   |
 
 					[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 					"""
@@ -111,5 +111,16 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 		description: "Requires the transform to be able to successfully query the EC2 metadata before Vector can start."
 		required:    false
 		type: bool: default: true
+	}
+	tags: {
+		description: "A list of instance tags to include in each transformed event."
+		required:    false
+		type: array: {
+			default: []
+			items: type: string: {
+				examples: ["Name", "Project"]
+				syntax: "literal"
+			}
+		}
 	}
 }

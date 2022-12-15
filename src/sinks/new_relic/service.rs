@@ -21,10 +21,7 @@ use vector_core::{
 };
 
 use super::{NewRelicCredentials, NewRelicSinkError};
-use crate::{
-    http::{get_http_scheme_from_uri, HttpClient},
-    sinks::util::Compression,
-};
+use crate::{http::HttpClient, sinks::util::Compression};
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiRequest {
@@ -50,7 +47,6 @@ impl MetaDescriptive for NewRelicApiRequest {
 #[derive(Debug)]
 pub struct NewRelicApiResponse {
     event_status: EventStatus,
-    protocol: &'static str,
     metadata: RequestMetadata,
 }
 
@@ -66,8 +62,8 @@ impl DriverResponse for NewRelicApiResponse {
         )
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.metadata.request_encoded_size(), self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.metadata.request_encoded_size())
     }
 }
 
@@ -89,7 +85,6 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
         let mut client = self.client.clone();
 
         let uri = request.credentials.get_uri();
-        let protocol = get_http_scheme_from_uri(&uri);
 
         let http_request = Request::post(&uri)
             .header(CONTENT_TYPE, "application/json")
@@ -113,7 +108,6 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
                 Ok(_) => Ok(NewRelicApiResponse {
                     event_status: EventStatus::Delivered,
                     metadata,
-                    protocol,
                 }),
                 Err(_) => Err(NewRelicSinkError::new("HTTP request error")),
             }

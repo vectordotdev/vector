@@ -5,7 +5,7 @@ use heim::net::os::linux::IoCountersExt;
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
 use vector_config::configurable_component;
-use vector_core::event::MetricTags;
+use vector_core::metric_tags;
 
 use crate::internal_events::HostMetricsScrapeDetailError;
 
@@ -44,42 +44,43 @@ impl HostMetrics {
                     .await
                 {
                     let interface = counter.interface();
+                    let tags = metric_tags!("device" => interface);
                     output.counter(
                         "network_receive_bytes_total",
                         counter.bytes_recv().get::<byte>() as f64,
-                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                        tags.clone(),
                     );
                     output.counter(
                         "network_receive_errs_total",
                         counter.errors_recv() as f64,
-                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                        tags.clone(),
                     );
                     output.counter(
                         "network_receive_packets_total",
                         counter.packets_recv() as f64,
-                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                        tags.clone(),
                     );
                     output.counter(
                         "network_transmit_bytes_total",
                         counter.bytes_sent().get::<byte>() as f64,
-                        MetricTags::from([(String::from("device"), interface.to_string())]),
-                    );
-                    output.counter(
-                        "network_transmit_errs_total",
-                        counter.errors_sent() as f64,
-                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                        tags.clone(),
                     );
                     #[cfg(any(target_os = "linux", windows))]
                     output.counter(
                         "network_transmit_packets_drop_total",
                         counter.drop_sent() as f64,
-                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                        tags.clone(),
                     );
                     #[cfg(any(target_os = "linux", windows))]
                     output.counter(
                         "network_transmit_packets_total",
                         counter.packets_sent() as f64,
-                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                        tags.clone(),
+                    );
+                    output.counter(
+                        "network_transmit_errs_total",
+                        counter.errors_sent() as f64,
+                        tags,
                     );
                 }
             }

@@ -72,7 +72,10 @@ base: components: sources: file: configuration: {
 			By default, `file` is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {
+			default: "file"
+			syntax:  "literal"
+		}
 	}
 	fingerprint: {
 		description: """
@@ -134,7 +137,7 @@ base: components: sources: file: configuration: {
 			This controls the interval at which Vector searches for files. Higher value result in greater chances of some short living files being missed between searches, but lower value increases the performance impact of file discovery.
 			"""
 		required: false
-		type: uint: default: 0
+		type: uint: default: 1000
 	}
 	host_key: {
 		description: """
@@ -181,7 +184,7 @@ base: components: sources: file: configuration: {
 		description: "String sequence used to separate one file line from another."
 		required:    false
 		type: string: {
-			default: ""
+			default: "\n"
 			syntax:  "literal"
 		}
 	}
@@ -197,7 +200,7 @@ base: components: sources: file: configuration: {
 	max_read_bytes: {
 		description: "An approximate limit on the amount of data read from a single file at a given time."
 		required:    false
-		type: uint: default: 0
+		type: uint: default: 2048
 	}
 	message_start_indicator: {
 		description: """
@@ -215,7 +218,7 @@ base: components: sources: file: configuration: {
 			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
 			"""
 		required: false
-		type: uint: default: 0
+		type: uint: default: 1000
 	}
 	multiline: {
 		description: """

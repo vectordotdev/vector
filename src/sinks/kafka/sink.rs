@@ -84,13 +84,14 @@ impl KafkaSink {
             log_schema: log_schema(),
         };
 
-        let sink = input
+        input
             .filter_map(|event|
                 // request_builder is fallible but the places it can fail are emitting
                 // `Error` and `DroppedEvent` internal events appropriately so no need to here.
                 future::ready(request_builder.build_request(event)))
-            .into_driver(service);
-        sink.run().await
+            .into_driver(service)
+            .run()
+            .await
     }
 }
 

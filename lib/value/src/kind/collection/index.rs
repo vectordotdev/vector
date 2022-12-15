@@ -1,5 +1,6 @@
-use crate::kind::collection::CollectionRemove;
+use crate::kind::collection::{CollectionKey, CollectionRemove};
 use crate::kind::Collection;
+use lookup::lookup_v2::OwnedSegment;
 
 /// An `index` type that can be used in `Collection<Index>`
 #[derive(Debug, Clone, Default, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
@@ -16,6 +17,12 @@ impl Index {
     #[must_use]
     pub const fn to_usize(self) -> usize {
         self.0
+    }
+}
+
+impl CollectionKey for Index {
+    fn to_segment(&self) -> OwnedSegment {
+        OwnedSegment::Index(self.0 as isize)
     }
 }
 

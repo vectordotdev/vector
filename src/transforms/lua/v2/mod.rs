@@ -6,6 +6,9 @@ use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
+use crate::event::lua::event::LuaEvent;
+use crate::schema::Definition;
+use crate::transforms::MetricTagsValues;
 use crate::{
     config::{self, DataType, Input, Output, CONFIG_PATHS},
     event::Event,
@@ -72,6 +75,15 @@ pub struct LuaConfig {
     /// A list of timers which should be configured and executed periodically.
     #[serde(default)]
     timers: Vec<TimerConfig>,
+
+    /// When set to `single`, metric tag values will be exposed as single strings, the
+    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+    /// will be ignored.
+    ///
+    /// When set to `full`, all metric tags will be exposed as arrays of either string or null
+    /// values.
+    #[serde(default)]
+    metric_tag_values: MetricTagsValues,
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
@@ -165,8 +177,11 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Metric | DataType::Log)]
+    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        // Lua causes the type definition to be reset
+        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
+
+        vec![Output::default(DataType::Metric | DataType::Log).with_schema_definition(definition)]
     }
 }
 
@@ -185,6 +200,7 @@ pub struct Lua {
     hook_process: mlua::RegistryKey,
     hook_shutdown: Option<mlua::RegistryKey>,
     timers: Vec<(Timer, mlua::RegistryKey)>,
+    multi_value_tags: bool,
 }
 
 // Helper to create `RegistryKey` from Lua function code
@@ -253,6 +269,8 @@ impl Lua {
             timers.push((timer, handler_key));
         }
 
+        let multi_value_tags = config.metric_tag_values == MetricTagsValues::Full;
+
         Ok(Self {
             lua,
             invocations_after_gc: 0,
@@ -260,6 +278,7 @@ impl Lua {
             hook_init,
             hook_process,
             hook_shutdown,
+            multi_value_tags,
         })
     }
 
@@ -273,7 +292,13 @@ impl Lua {
             })?;
 
             lua.registry_value::<mlua::Function>(&self.hook_process)?
-                .call((event, emit))
+                .call((
+                    LuaEvent {
+                        event,
+                        metric_multi_value_tags: self.multi_value_tags,
+                    },
+                    emit,
+                ))
         });
 
         self.attempt_gc();
@@ -327,7 +352,13 @@ impl RuntimeTransform for Lua {
         let _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 lua.registry_value::<mlua::Function>(&self.hook_process)?
-                    .call((event, wrap_emit_fn(scope, emit_fn)?))
+                    .call((
+                        LuaEvent {
+                            event,
+                            metric_multi_value_tags: self.multi_value_tags,
+                        },
+                        wrap_emit_fn(scope, emit_fn)?,
+                    ))
             })
             .context(RuntimeErrorHooksProcessSnafu)
             .map_err(|e| emit!(LuaBuildError { error: e }));

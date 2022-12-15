@@ -6,14 +6,13 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
-use vector_buffers::EventCount;
 use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
     event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
     stream::BatcherSettings,
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    ByteSizeOf,
 };
 
 use super::{
@@ -29,7 +28,7 @@ use crate::sinks::{
 use crate::{
     codecs::{Encoder, Transformer},
     config::log_schema,
-    http::HttpClient,
+    http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
         SinkRequestBuildError, TemplateRenderingError,
@@ -103,41 +102,9 @@ impl From<std::io::Error> for RequestBuildError {
     }
 }
 
-pub(super) struct LokiRecords(pub Vec<LokiRecord>);
-
-impl ByteSizeOf for LokiRecords {
-    fn allocated_bytes(&self) -> usize {
-        self.0
-            .iter()
-            .fold(0, |res, item| res + item.allocated_bytes())
-    }
-}
-
-impl EventCount for LokiRecords {
-    fn event_count(&self) -> usize {
-        self.0.iter().fold(0, |res, item| res + item.event_count())
-    }
-}
-
-impl EstimatedJsonEncodedSizeOf for LokiRecords {
-    fn estimated_json_encoded_size_of(&self) -> usize {
-        self.0
-            .iter()
-            .fold(0, |res, item| res + item.estimated_json_encoded_size_of())
-    }
-}
-
-impl EstimatedJsonEncodedSizeOf for &LokiRecords {
-    fn estimated_json_encoded_size_of(&self) -> usize {
-        self.0
-            .iter()
-            .fold(0, |res, item| res + item.estimated_json_encoded_size_of())
-    }
-}
-
-impl RequestBuilder<(PartitionKey, LokiRecords)> for LokiRequestBuilder {
+impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Metadata = (Option<String>, EventFinalizers);
-    type Events = LokiRecords;
+    type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
     type Payload = Bytes;
     type Request = LokiRequest;
@@ -156,12 +123,12 @@ impl RequestBuilder<(PartitionKey, LokiRecords)> for LokiRequestBuilder {
 
     fn split_input(
         &self,
-        input: (PartitionKey, LokiRecords),
+        input: (PartitionKey, Vec<LokiRecord>),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (key, mut events) = input;
 
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
-        let finalizers = events.0.take_finalizers();
+        let finalizers = events.take_finalizers();
 
         ((key.tenant_id, finalizers), metadata_builder, events)
     }
@@ -359,6 +326,7 @@ pub struct LokiSink {
     batch_settings: BatcherSettings,
     out_of_order_action: OutOfOrderAction,
     service: Svc<LokiService, LokiRetryLogic>,
+    protocol: &'static str,
 }
 
 impl LokiSink {
@@ -383,9 +351,15 @@ impl LokiSink {
             }
         };
 
+        let protocol = get_http_scheme_from_uri(&config.endpoint.uri);
         let service = tower::ServiceBuilder::new()
             .settings(request_limits, LokiRetryLogic)
-            .service(LokiService::new(client, config.endpoint, config.auth)?);
+            .service(LokiService::new(
+                client,
+                config.endpoint,
+                config.path,
+                config.auth,
+            )?);
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
@@ -413,6 +387,7 @@ impl LokiSink {
             batch_settings: config.batch.into_batcher_settings()?,
             out_of_order_action: config.out_of_order_action,
             service,
+            protocol,
         })
     }
 
@@ -429,7 +404,7 @@ impl LokiSink {
             }
         };
 
-        let sink = input
+        input
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
@@ -456,7 +431,6 @@ impl LokiSink {
                     None
                 }
             })
-            .map(|(key, records)| (key, LokiRecords(records)))
             .request_builder(Some(request_builder_concurrency), self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -467,9 +441,10 @@ impl LokiSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await
     }
 }
 

@@ -108,6 +108,14 @@ pub struct HecLogsSinkConfig {
     #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
     pub timestamp_key: String,
 
+    /// Passes the auto_extract_timestamp option to Splunk.
+    /// Note this option is only used by Version 8 and above of Splunk.
+    /// This will cause Splunk to extract the timestamp from the message text rather than use
+    /// the timestamp embedded in the event. The timestamp must be in the format yyyy-mm-dd hh:mm:ss.
+    /// This option only applies for the `Event` endpoint target.
+    #[serde(default)]
+    pub auto_extract_timestamp: Option<bool>,
+
     #[configurable(derived)]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
@@ -135,6 +143,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
             timestamp_key: timestamp_key(),
+            auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
         })
         .unwrap()
@@ -144,6 +153,10 @@ impl GenerateConfig for HecLogsSinkConfig {
 #[async_trait::async_trait]
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        if self.auto_extract_timestamp.is_some() && self.endpoint_target == EndpointTarget::Raw {
+            return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
+        }
+
         let client = create_client(&self.tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
@@ -183,6 +196,7 @@ impl HecLogsSinkConfig {
         let encoder = HecLogsEncoder {
             transformer,
             encoder,
+            auto_extract_timestamp: self.auto_extract_timestamp.unwrap_or_default(),
         };
         let request_builder = HecLogsRequestBuilder {
             encoder,
@@ -202,6 +216,7 @@ impl HecLogsSinkConfig {
                 client,
                 Arc::clone(&http_request_builder),
                 self.endpoint_target,
+                self.auto_extract_timestamp.unwrap_or_default(),
             ));
 
         let service = HecService::new(

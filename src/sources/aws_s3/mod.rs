@@ -4,12 +4,12 @@ use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
 use codecs::BytesDeserializerConfig;
 use futures::{stream, stream::StreamExt, TryStreamExt};
-use lookup::{owned_value_path, LookupBuf};
+use lookup::owned_value_path;
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
 use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{DataType, LogNamespace};
+use vector_core::config::{DataType, LegacyKey, LogNamespace};
 
 use super::util::MultilineConfig;
 use crate::{
@@ -105,6 +105,7 @@ pub struct AwsS3Config {
     tls_options: Option<TlsConfig>,
 
     /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
 }
@@ -137,34 +138,43 @@ impl SourceConfig for AwsS3Config {
             .schema_definition(log_namespace)
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("bucket")),
-                owned_value_path!("bucket"),
+                Some(LegacyKey::Overwrite(owned_value_path!("bucket"))),
+                &owned_value_path!("bucket"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("object")),
-                owned_value_path!("object"),
+                Some(LegacyKey::Overwrite(owned_value_path!("object"))),
+                &owned_value_path!("object"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(owned_value_path!("region")),
-                owned_value_path!("region"),
+                Some(LegacyKey::Overwrite(owned_value_path!("region"))),
+                &owned_value_path!("region"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                None::<LookupBuf>,
-                owned_value_path!("metadata"),
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_standard_vector_source_metadata()
+            // for metadata that is added to the events dynamically from the metadata
+            .with_source_metadata(
+                Self::NAME,
+                None,
+                &owned_value_path!("metadata"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
-            )
-            .with_standard_vector_source_metadata();
+            );
 
+        // for metadata that is added to the events dynamically from the metadata
         if log_namespace == LogNamespace::Legacy {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
@@ -680,7 +690,7 @@ mod integration_tests {
                 queue_url: queue_url.to_string(),
                 poll_secs: 1,
                 visibility_timeout_secs: 0,
-                client_concurrency: 1,
+                client_concurrency: None,
                 ..Default::default()
             }),
             acknowledgements: true.into(),

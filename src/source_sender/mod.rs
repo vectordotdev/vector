@@ -10,7 +10,9 @@ use vector_core::event::{into_event_stream, EventStatus};
 use vector_core::{
     config::{log_schema, Output},
     event::{array, Event, EventArray, EventContainer, EventRef},
-    internal_event::{EventsSent, DEFAULT_OUTPUT},
+    internal_event::{
+        self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
+    },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
@@ -223,6 +225,7 @@ struct Inner {
     inner: LimitedSender<EventArray>,
     output: String,
     lag_time: Option<Histogram>,
+    events_sent: Registered<EventsSent>,
 }
 
 impl fmt::Debug for Inner {
@@ -245,8 +248,11 @@ impl Inner {
         (
             Self {
                 inner: tx,
-                output,
+                output: output.clone(),
                 lag_time,
+                events_sent: register!(EventsSent::from(internal_event::Output(Some(
+                    output.into()
+                )))),
             },
             rx,
         )
@@ -260,11 +266,7 @@ impl Inner {
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
         self.inner.send(events).await.map_err(|_| ClosedError)?;
-        emit!(EventsSent {
-            count,
-            byte_size,
-            output: Some(self.output.as_ref()),
-        });
+        self.events_sent.emit(CountByteSize(count, byte_size));
         Ok(())
     }
 
@@ -289,38 +291,22 @@ impl Inner {
         E: Into<Event> + ByteSizeOf,
         I: IntoIterator<Item = E>,
     {
-        let mut count = 0;
-        let mut byte_size = 0;
-
         let reference = Utc::now().timestamp_millis();
         let events = events.into_iter().map(Into::into);
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             events
                 .iter_events()
                 .for_each(|event| self.emit_lag_time(event, reference));
-            let this_count = events.len();
-            let this_size = events.estimated_json_encoded_size_of();
+            let cbs = CountByteSize(events.len(), events.estimated_json_encoded_size_of());
             match self.inner.send(events).await {
                 Ok(()) => {
-                    count += this_count;
-                    byte_size += this_size;
+                    self.events_sent.emit(cbs);
                 }
                 Err(error) => {
-                    emit!(EventsSent {
-                        count,
-                        byte_size,
-                        output: Some(self.output.as_ref()),
-                    });
                     return Err(error.into());
                 }
             }
         }
-
-        emit!(EventsSent {
-            count,
-            byte_size,
-            output: Some(self.output.as_ref()),
-        });
 
         Ok(())
     }

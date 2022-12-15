@@ -229,12 +229,12 @@ impl HttpClientContext for PrometheusScrapeContext {
                     {
                         match (honor_label, metric.tag_value(tag)) {
                             (false, Some(old_instance)) => {
-                                metric.insert_tag(format!("exported_{}", tag), old_instance);
-                                metric.insert_tag(tag.clone(), instance.clone());
+                                metric.replace_tag(format!("exported_{}", tag), old_instance);
+                                metric.replace_tag(tag.clone(), instance.clone());
                             }
                             (true, Some(_)) => {}
                             (_, None) => {
-                                metric.insert_tag(tag.clone(), instance.clone());
+                                metric.replace_tag(tag.clone(), instance.clone());
                             }
                         }
                     }
@@ -246,12 +246,12 @@ impl HttpClientContext for PrometheusScrapeContext {
                     {
                         match (honor_label, metric.tag_value(tag)) {
                             (false, Some(old_endpoint)) => {
-                                metric.insert_tag(format!("exported_{}", tag), old_endpoint);
-                                metric.insert_tag(tag.clone(), endpoint.clone());
+                                metric.replace_tag(format!("exported_{}", tag), old_endpoint);
+                                metric.replace_tag(tag.clone(), endpoint.clone());
                             }
                             (true, Some(_)) => {}
                             (_, None) => {
-                                metric.insert_tag(tag.clone(), endpoint.clone());
+                                metric.replace_tag(tag.clone(), endpoint.clone());
                             }
                         }
                     }
@@ -611,7 +611,7 @@ mod test {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
         sleep(Duration::from_secs(1)).await;
 
         let response = Client::new()

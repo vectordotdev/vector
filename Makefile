@@ -305,7 +305,7 @@ test-docs: ## Run the docs test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-all
-test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behavioral, and integration.
+test-all: test test-docs test-behavior test-integration test-component-validation ## Runs all tests: unit, docs, behavioral, integration, and component validation.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
@@ -327,10 +327,6 @@ test-behavior-%: ## Runs behavioral test for a given category
 .PHONY: test-behavior
 test-behavior: ## Runs all behavioral tests
 test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
-
-.PHONY: test-enterprise
-test-enterprise: ## Runs enterprise related behavioral tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "enterprise-tests" --test enterprise
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
@@ -358,6 +354,10 @@ test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration te
 test-integration-aws-cloudwatch-metrics: ## Runs AWS Cloudwatch Metrics integration tests
 	FILTER=::aws_cloudwatch_metrics make test-integration-aws
 
+.PHONY: test-integration-aws-kinesis
+test-integration-aws-kinesis: ## Runs AWS Kinesis integration tests
+	FILTER=::aws_kinesis make test-integration-aws
+
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
@@ -383,7 +383,11 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test cli --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
+
+.PHONY: test-component-validation
+test-component-validation: ## Runs component validation tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 components::validation::tests
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
@@ -443,7 +447,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
-check-all: check-scripts check-deny
+check-all: check-scripts check-deny check-component-docs
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -485,8 +489,13 @@ check-scripts: ## Check that scipts do not have common mistakes
 check-deny: ## Check advisories licenses and sources for crate dependencies
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-deny.sh
 
+.PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
+
+.PHONY: check-component-docs
+check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-docs.sh
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -631,6 +640,10 @@ sync-install: ## Sync the install.sh script for access via sh.vector.dev
 test-vrl: ## Run the VRL test suite
 	@scripts/test-vrl.sh
 
+.PHONY: compile-vrl-wasm
+compile-vrl-wasm: ## Compile VRL crates to WASM target
+	@scripts/compile-vrl-wasm.sh
+
 ##@ Utility
 
 .PHONY: build-ci-docker-images
@@ -652,9 +665,10 @@ generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
-	${MAYBE_ENVIRONMENT_EXEC} cargo build
-	target/debug/vector generate-schema > /tmp/vector-config-schema.json
-	scripts/generate-components-docs.rb /tmp/vector-config-schema.json
+	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
+	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
+	${MAYBE_ENVIRONMENT_EXEC} scripts/generate-component-docs.rb /tmp/vector-config-schema.json \
+		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

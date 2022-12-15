@@ -26,8 +26,8 @@ use super::{compiler::expand_globs, graph::Graph, OutputId, TransformConfig};
 use crate::{
     conditions::Condition,
     config::{
-        self, compiler::expand_macros, loading, ComponentKey, Config, ConfigBuilder, ConfigPath,
-        SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
+        self, loading, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
+        TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, LogEvent, Value},
     schema, signal,
@@ -170,17 +170,14 @@ impl UnitTestBuildMetadata {
             template_sources.insert(key.clone(), UnitTestSourceConfig::default());
         }
 
-        // In order to attach a sink to any valid extraction point, we need to
-        // expand relevant transforms
-        let mut builder = config_builder.clone();
-        let _ = expand_macros(&mut builder)?;
+        let builder = config_builder.clone();
         let available_extract_targets = builder
             .transforms
             .iter()
             .flat_map(|(key, transform)| {
                 transform
                     .inner
-                    .outputs(&schema::Definition::any())
+                    .outputs(&schema::Definition::any(), builder.schema.log_namespace())
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -360,17 +357,14 @@ async fn build_unit_test(
     test: TestDefinition<String>,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
-    let mut transform_only_config = config_builder.clone();
-    let expansions = expand_macros(&mut transform_only_config)?;
-    let expansions = crate::config::compiler::to_string_expansions(&expansions);
+    let transform_only_config = config_builder.clone();
     let transform_only_graph = Graph::new_unchecked(
         &transform_only_config.sources,
         &transform_only_config.transforms,
         &transform_only_config.sinks,
-        &expansions,
         transform_only_config.schema,
     );
-    let test = test.resolve_outputs(&transform_only_graph, &expansions)?;
+    let test = test.resolve_outputs(&transform_only_graph)?;
 
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
@@ -380,18 +374,11 @@ async fn build_unit_test(
     config_builder.sinks = sinks;
     expand_globs(&mut config_builder);
 
-    // To properly identify all components relevant to the test, expand relevant
-    // transforms
-    let mut expanded_config = config_builder.clone();
-    let expansions = expand_macros(&mut expanded_config)?;
-    let expansions = crate::config::compiler::to_string_expansions(&expansions);
-
     let graph = Graph::new_unchecked(
-        &expanded_config.sources,
-        &expanded_config.transforms,
-        &expanded_config.sinks,
-        &expansions,
-        expanded_config.schema,
+        &config_builder.sources,
+        &config_builder.transforms,
+        &config_builder.sinks,
+        config_builder.schema,
     );
 
     let mut valid_components = get_relevant_test_components(
@@ -422,7 +409,6 @@ async fn build_unit_test(
         &config_builder.sources,
         &config_builder.transforms,
         &config_builder.sinks,
-        &expansions,
         config_builder.schema,
     );
     let valid_inputs = graph.input_map()?;
@@ -458,15 +444,17 @@ async fn build_unit_test(
 /// To avoid warning logs that occur when building such topologies, we construct
 /// a NoOp sink here whose sole purpose is to consume any "loose end" outputs.
 fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
-    let mut config = config.clone();
-    let _ = expand_macros(&mut config);
+    let config = config.clone();
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&schema::Definition::new_with_default_metadata(
-                Kind::any(),
-                [LogNamespace::Legacy, LogNamespace::Vector],
-            ))
+            .outputs(
+                &schema::Definition::new_with_default_metadata(
+                    Kind::any(),
+                    [LogNamespace::Legacy, LogNamespace::Vector],
+                ),
+                config.schema.log_namespace(),
+            )
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {

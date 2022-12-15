@@ -49,6 +49,34 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				required:      true
 				type: string: syntax: "literal"
 			}
+			imds: {
+				description:   "Configuration for authenticating with AWS through IMDS."
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: object: options: {
+					connect_timeout_seconds: {
+						description: "Connect timeout for IMDS."
+						required:    false
+						type: uint: {
+							default: 1
+							unit:    "seconds"
+						}
+					}
+					max_attempts: {
+						description: "Number of IMDS retries for fetching tokens and metadata."
+						required:    false
+						type: uint: default: 4
+					}
+					read_timeout_seconds: {
+						description: "Read timeout for IMDS."
+						required:    false
+						type: uint: {
+							default: 1
+							unit:    "seconds"
+						}
+					}
+				}
+			}
 			load_timeout_secs: {
 				description:   "Timeout for successfully loading any credentials, in seconds."
 				relevant_when: "strategy = \"aws\""
@@ -89,7 +117,18 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				type: string: enum: {
 					aws:   "Amazon Prometheus Service-specific authentication."
 					basic: "HTTP Basic Authentication."
+					bearer: """
+						Bearer authentication.
+
+						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						"""
 				}
+			}
+			token: {
+				description:   "The bearer token to send."
+				relevant_when: "strategy = \"bearer\""
+				required:      true
+				type: string: syntax: "literal"
 			}
 			user: {
 				description:   "Basic authentication username."
@@ -253,11 +292,11 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
 						const:   "adaptive"
 						default: "none"
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -317,7 +356,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		type: string: syntax: "template"
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
@@ -334,7 +373,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

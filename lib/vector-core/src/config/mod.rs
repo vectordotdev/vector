@@ -1,6 +1,8 @@
 use std::{fmt, num::NonZeroUsize};
 
 use bitmask_enum::bitmask;
+use bytes::Bytes;
+use chrono::{DateTime, Utc};
 
 mod global_options;
 mod log_schema;
@@ -9,8 +11,7 @@ pub mod proxy;
 use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
-use lookup::lookup_v2::ValuePath;
-use lookup::{path, PathPrefix};
+use lookup::{lookup_v2::ValuePath, path, PathPrefix};
 use serde::{Deserialize, Serialize};
 use value::Value;
 pub use vector_common::config::ComponentKey;
@@ -112,8 +113,7 @@ pub struct Output {
     ///
     /// For *sources*, a `None` schema is identical to a `Some(Definition::source_default())`.
     ///
-    /// For a *transform*, a `None` schema means the transform inherits the merged [`Definition`]
-    /// of its inputs, without modifying the schema further.
+    /// For a *transform*, a schema [`Definition`] is required if `Datatype` is Log.
     pub log_schema_definition: Option<schema::Definition>,
 }
 
@@ -283,6 +283,16 @@ impl Default for LogNamespace {
     }
 }
 
+/// A shortcut to specify no `LegacyKey` should be used (since otherwise a turbofish would be required)
+pub const NO_LEGACY_KEY: Option<LegacyKey<&'static str>> = None;
+
+pub enum LegacyKey<T> {
+    /// Always insert the data, even if the field previously existed
+    Overwrite(T),
+    /// Only insert the data if the field is currently empty
+    InsertIfEmpty(T),
+}
+
 impl LogNamespace {
     /// Vector: This is added to "event metadata", nested under the source name.
     ///
@@ -291,7 +301,7 @@ impl LogNamespace {
         &self,
         source_name: &'a str,
         log: &mut LogEvent,
-        legacy_key: impl ValuePath<'a>,
+        legacy_key: Option<LegacyKey<impl ValuePath<'a>>>,
         metadata_key: impl ValuePath<'a>,
         value: impl Into<Value>,
     ) {
@@ -301,9 +311,15 @@ impl LogNamespace {
                     .value_mut()
                     .insert(path!(source_name).concat(metadata_key), value);
             }
-            LogNamespace::Legacy => {
-                log.try_insert((PathPrefix::Event, legacy_key), value);
-            }
+            LogNamespace::Legacy => match legacy_key {
+                None => { /* don't insert */ }
+                Some(LegacyKey::Overwrite(key)) => {
+                    log.insert((PathPrefix::Event, key), value);
+                }
+                Some(LegacyKey::InsertIfEmpty(key)) => {
+                    log.try_insert((PathPrefix::Event, key), value);
+                }
+            },
         }
     }
 
@@ -326,6 +342,31 @@ impl LogNamespace {
         }
     }
 
+    /// Vector: The `ingest_timestamp`, and `source_type` fields are added to "event metadata", nested
+    /// under the name "vector". This data will be marked as read-only in VRL.
+    ///
+    /// Legacy: The values of `source_type_key`, and `timestamp_key` are stored as keys on the event root,
+    /// only if a field with that name doesn't already exist.
+    pub fn insert_standard_vector_source_metadata(
+        &self,
+        log: &mut LogEvent,
+        source_name: &'static str,
+        now: DateTime<Utc>,
+    ) {
+        self.insert_vector_metadata(
+            log,
+            path!(log_schema().source_type_key()),
+            path!("source_type"),
+            Bytes::from_static(source_name.as_bytes()),
+        );
+        self.insert_vector_metadata(
+            log,
+            path!(log_schema().timestamp_key()),
+            path!("ingest_timestamp"),
+            now,
+        );
+    }
+
     /// Vector: This is added to the "event metadata", nested under the name "vector". This data
     /// will be marked as read-only in VRL.
     ///
@@ -343,7 +384,9 @@ impl LogNamespace {
                     .value_mut()
                     .insert(path!("vector").concat(metadata_key), value);
             }
-            LogNamespace::Legacy => log.try_insert((PathPrefix::Event, legacy_key), value),
+            LogNamespace::Legacy => {
+                log.try_insert((PathPrefix::Event, legacy_key), value);
+            }
         }
     }
 

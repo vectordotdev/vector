@@ -220,6 +220,7 @@ impl From<ParseFloatError> for ParseError {
 #[cfg(test)]
 mod test {
     use vector_common::assert_event_data_eq;
+    use vector_core::metric_tags;
 
     use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
@@ -245,14 +246,10 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_tags(Some(
-                vec![
-                    ("tag1".to_owned(), "true".to_owned()),
-                    ("tag2".to_owned(), "value".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))),
+            .with_tags(Some(metric_tags!(
+                "tag1" => "true",
+                "tag2" => "value",
+            )))),
         );
     }
 
@@ -307,15 +304,11 @@ mod test {
                     statistic: StatisticKind::Histogram
                 },
             )
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                    ("e".to_owned(), "".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))),
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west1",
+                "production" => "true",
+                "e" => "",
+            )))),
         );
     }
 
@@ -331,15 +324,11 @@ mod test {
                     statistic: StatisticKind::Summary
                 },
             )
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                    ("e".to_owned(), "".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))),
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west1",
+                "production" => "true",
+                "e" => "",
+            )))),
         );
     }
 

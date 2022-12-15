@@ -12,7 +12,7 @@ use serde::Serialize;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use vector_buffers::EventCount;
-use vector_core::{sink::StreamSink, ByteSizeOf};
+use vector_core::{sink::StreamSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::{
     config::AmqpSinkConfig, encoder::AmqpEncoder, request_builder::AmqpRequestBuilder,
@@ -41,6 +41,12 @@ impl EventCount for AmqpEvent {
 impl ByteSizeOf for AmqpEvent {
     fn allocated_bytes(&self) -> usize {
         self.event.size_of()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for AmqpEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.event.estimated_json_encoded_size_of()
     }
 }
 
@@ -127,7 +133,7 @@ impl AmqpSink {
             channel: Arc::clone(&self.channel),
         });
 
-        let sink = input
+        input
             .filter_map(|event| std::future::ready(self.make_amqp_event(event)))
             .request_builder(None, request_builder)
             .filter_map(|request| async move {
@@ -139,9 +145,10 @@ impl AmqpSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(service);
-
-        sink.run().await
+            .into_driver(service)
+            .protocol("amqp_0_9_1")
+            .run()
+            .await
     }
 }
 
