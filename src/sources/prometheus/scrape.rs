@@ -468,7 +468,7 @@ mod test {
 
         let dummy_endpoint = warp::path!("metrics").map(|| {
             r#"
-                    metric_label{code="200", code="success"} 100 1612411516789
+                    metric_label{code="200",code="success"} 100 1612411516789
             "#
         });
 
