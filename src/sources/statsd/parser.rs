@@ -124,7 +124,7 @@ fn parse_sampling(input: &str) -> Result<f64, ParseError> {
     }
 }
 
-/// statsd (and dogstatsd) support bare, single and multi-value tags.
+/// Statsd (and dogstatsd) support bare, single and multi-value tags.
 fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
     if !input.starts_with('#') || input.len() < 2 {
         return Err(ParseError::Malformed(
