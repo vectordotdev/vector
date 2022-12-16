@@ -19,119 +19,36 @@ base: components: sources: amqp: configuration: {
 			type: bool: {}
 		}
 	}
-	connection: {
-		description: "Connection options for `AMQP` source."
-		required:    true
-		type: object: options: {
-			connection_string: {
-				description: """
-					URI for the `AMQP` server.
+	connection_string: {
+		description: """
+			URI for the AMQP server.
 
-					Format: amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>
-					"""
-				required: true
-				type: string: syntax: "literal"
-			}
-			tls: {
-				description: "TLS configuration."
-				required:    false
-				type: object: options: {
-					alpn_protocols: {
-						description: """
-																Sets the list of supported ALPN protocols.
+			The URI has the format of
+			`amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>`.
 
-																Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-																they are defined.
-																"""
-						required: false
-						type: array: items: type: string: syntax: "literal"
-					}
-					ca_file: {
-						description: """
-																Absolute path to an additional CA certificate file.
+			The default vhost can be specified by using a value of `%2f`.
 
-																The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-																"""
-						required: false
-						type: string: syntax: "literal"
-					}
-					crt_file: {
-						description: """
-																Absolute path to a certificate file used to identify this server.
-
-																The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-																an inline string in PEM format.
-
-																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
-																"""
-						required: false
-						type: string: syntax: "literal"
-					}
-					key_file: {
-						description: """
-																Absolute path to a private key file used to identify this server.
-
-																The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-																"""
-						required: false
-						type: string: syntax: "literal"
-					}
-					key_pass: {
-						description: """
-																Passphrase used to unlock the encrypted key file.
-
-																This has no effect unless `key_file` is set.
-																"""
-						required: false
-						type: string: syntax: "literal"
-					}
-					verify_certificate: {
-						description: """
-																Enables certificate verification.
-
-																If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-																issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-																certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-																so on until reaching a root certificate.
-
-																Relevant for both incoming and outgoing connections.
-
-																Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
-																"""
-						required: false
-						type: bool: {}
-					}
-					verify_hostname: {
-						description: """
-																Enables hostname verification.
-
-																If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
-																the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
-
-																Only relevant for outgoing connections.
-
-																Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-																"""
-						required: false
-						type: bool: {}
-					}
-				}
-			}
-		}
+			In order to connect over TLS, a scheme of `amqps` can be specified instead i.e.
+			`amqps://...`. Additional TLS settings, such as client certificate verification, etc, can be
+			configured under the `tls` section.
+			"""
+		required: true
+		type: string: examples: ["amqp://user:password@127.0.0.1:5672/%2f?timeout=10"]
 	}
 	consumer: {
 		description: "The identifier for the consumer."
 		required:    false
 		type: string: {
 			default: "vector"
-			syntax:  "literal"
+			examples: ["consumer-group-name"]
 		}
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -147,13 +64,17 @@ base: components: sources: amqp: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -174,10 +95,7 @@ base: components: sources: amqp: configuration: {
 	exchange_key: {
 		description: "The `AMQP` exchange key."
 		required:    false
-		type: string: {
-			default: "exchange"
-			syntax:  "literal"
-		}
+		type: string: default: "exchange"
 	}
 	framing: {
 		description: """
@@ -211,7 +129,8 @@ base: components: sources: amqp: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -256,25 +175,101 @@ base: components: sources: amqp: configuration: {
 	offset_key: {
 		description: "The `AMQP` offset key."
 		required:    false
-		type: string: {
-			default: "offset"
-			syntax:  "literal"
-		}
+		type: string: default: "offset"
 	}
 	queue: {
 		description: "The name of the queue to consume."
 		required:    false
-		type: string: {
-			default: "vector"
-			syntax:  "literal"
-		}
+		type: string: default: "vector"
 	}
 	routing_key_field: {
 		description: "The `AMQP` routing key."
 		required:    false
-		type: string: {
-			default: "routing"
-			syntax:  "literal"
+		type: string: default: "routing"
+	}
+	tls: {
+		description: "TLS configuration."
+		required:    false
+		type: object: options: {
+			alpn_protocols: {
+				description: """
+					Sets the list of supported ALPN protocols.
+
+					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
+					they are defined.
+					"""
+				required: false
+				type: array: items: type: string: {}
+			}
+			ca_file: {
+				description: """
+					Absolute path to an additional CA certificate file.
+
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: {}
+			}
+			crt_file: {
+				description: """
+					Absolute path to a certificate file used to identify this server.
+
+					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+					an inline string in PEM format.
+
+					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					"""
+				required: false
+				type: string: {}
+			}
+			key_file: {
+				description: """
+					Absolute path to a private key file used to identify this server.
+
+					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: {}
+			}
+			key_pass: {
+				description: """
+					Passphrase used to unlock the encrypted key file.
+
+					This has no effect unless `key_file` is set.
+					"""
+				required: false
+				type: string: {}
+			}
+			verify_certificate: {
+				description: """
+					Enables certificate verification.
+
+					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
+					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
+					so on until reaching a root certificate.
+
+					Relevant for both incoming and outgoing connections.
+
+					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+					"""
+				required: false
+				type: bool: {}
+			}
+			verify_hostname: {
+				description: """
+					Enables hostname verification.
+
+					If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+					the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+
+					Only relevant for outgoing connections.
+
+					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+					"""
+				required: false
+				type: bool: {}
+			}
 		}
 	}
 }

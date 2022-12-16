@@ -14,7 +14,10 @@ components: sinks: http: {
 
 	features: {
 		acknowledgements: true
-		healthcheck: enabled: true
+		healthcheck: {
+			enabled:  true
+			uses_uri: true
+		}
 		send: {
 			batch: {
 				enabled:      true
@@ -98,18 +101,6 @@ components: sinks: http: {
 					PUT:  "PUT"
 					POST: "POST"
 				}
-			}
-		}
-		healthcheck: type: object: options: uri: {
-			common: false
-			description: """
-				The full URI to make HTTP health check request to. This should include the protocol and host,
-				but can also include the port, path, and any other valid part of a URI.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["https://10.22.212.22:9000/health"]
 			}
 		}
 	}

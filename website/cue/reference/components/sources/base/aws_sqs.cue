@@ -26,48 +26,41 @@ base: components: sources: aws_sqs: configuration: {
 			access_key_id: {
 				description: "The AWS access key ID."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			assume_role: {
 				description: "The ARN of the role to assume."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			credentials_file: {
 				description: "Path to the credentials file."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
 				required:    false
-				type: object: {
-					default: {
-						connect_timeout_seconds: 1
-						max_attempts:            4
-						read_timeout_seconds:    1
+				type: object: options: {
+					connect_timeout_seconds: {
+						description: "Connect timeout for IMDS."
+						required:    false
+						type: uint: {
+							default: 1
+							unit:    "seconds"
+						}
 					}
-					options: {
-						connect_timeout_seconds: {
-							description: "Connect timeout for IMDS."
-							required:    false
-							type: uint: {
-								default: 1
-								unit:    "seconds"
-							}
-						}
-						max_attempts: {
-							description: "Number of IMDS retries for fetching tokens and metadata."
-							required:    false
-							type: uint: default: 4
-						}
-						read_timeout_seconds: {
-							description: "Read timeout for IMDS."
-							required:    false
-							type: uint: {
-								default: 1
-								unit:    "seconds"
-							}
+					max_attempts: {
+						description: "Number of IMDS retries for fetching tokens and metadata."
+						required:    false
+						type: uint: default: 4
+					}
+					read_timeout_seconds: {
+						description: "Read timeout for IMDS."
+						required:    false
+						type: uint: {
+							default: 1
+							unit:    "seconds"
 						}
 					}
 				}
@@ -80,7 +73,7 @@ base: components: sources: aws_sqs: configuration: {
 			profile: {
 				description: "The credentials profile to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			region: {
 				description: """
@@ -90,12 +83,12 @@ base: components: sources: aws_sqs: configuration: {
 					for the service itself.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -117,7 +110,8 @@ base: components: sources: aws_sqs: configuration: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -133,13 +127,17 @@ base: components: sources: aws_sqs: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -169,7 +167,7 @@ base: components: sources: aws_sqs: configuration: {
 	endpoint: {
 		description: "The API endpoint of the service."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	framing: {
 		description: """
@@ -203,7 +201,8 @@ base: components: sources: aws_sqs: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -258,12 +257,12 @@ base: components: sources: aws_sqs: configuration: {
 	queue_url: {
 		description: "The URL of the SQS queue to poll for messages."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	region: {
 		description: "The AWS region to use."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -277,7 +276,7 @@ base: components: sources: aws_sqs: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -286,7 +285,7 @@ base: components: sources: aws_sqs: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -298,7 +297,7 @@ base: components: sources: aws_sqs: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -307,7 +306,7 @@ base: components: sources: aws_sqs: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -316,7 +315,7 @@ base: components: sources: aws_sqs: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

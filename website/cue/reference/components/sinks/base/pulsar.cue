@@ -39,7 +39,7 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be `token`.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			oauth2: {
 				description: "OAuth2-specific authentication configuration."
@@ -48,7 +48,7 @@ base: components: sinks: pulsar: configuration: {
 					audience: {
 						description: "The OAuth2 audience."
 						required:    false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					credentials_url: {
 						description: """
@@ -57,17 +57,17 @@ base: components: sinks: pulsar: configuration: {
 																A data URL is also supported.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					issuer_url: {
 						description: "The issuer URL."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					scope: {
 						description: "The OAuth2 scope."
 						required:    false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -79,12 +79,12 @@ base: components: sinks: pulsar: configuration: {
 					When used for JWT, the value should be the signed JWT, in the compact representation.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
 	encoding: {
-		description: "Encoding configuration."
+		description: "Configures how events are encoded into raw bytes."
 		required:    true
 		type: object: options: {
 			avro: {
@@ -94,11 +94,12 @@ base: components: sinks: pulsar: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
 					avro: """
 						Encodes an event as an [Apache Avro][apache_avro] message.
@@ -121,13 +122,17 @@ base: components: sinks: pulsar: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf]([EXPERIMENTAL][experimental]).
+						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json]([EXPERIMENTAL][experimental]).
+						Encodes an event in Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -155,12 +160,12 @@ base: components: sinks: pulsar: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -175,21 +180,21 @@ base: components: sinks: pulsar: configuration: {
 	endpoint: {
 		description: "The endpoint to which the Pulsar client should connect to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	partition_key_field: {
 		description: "Log field to use as Pulsar message key."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	producer_name: {
 		description: "The name of the producer. If not specified, the default name assigned by Pulsar will be used."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	topic: {
 		description: "The Pulsar topic name to write events to."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

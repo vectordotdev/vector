@@ -60,9 +60,10 @@ pub struct AmqpSourceConfig {
 
     /// The identifier for the consumer.
     #[serde(default = "default_consumer")]
+    #[configurable(metadata(docs::examples = "consumer-group-name"))]
     pub(crate) consumer: String,
 
-    /// Connection options for `AMQP` source.
+    #[serde(flatten)]
     pub(crate) connection: AmqpConfig,
 
     /// The `AMQP` routing key.

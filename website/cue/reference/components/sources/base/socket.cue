@@ -7,7 +7,7 @@ base: components: sources: socket: configuration: {
 		required:      true
 		type: {
 			number: {}
-			string: syntax: "literal"
+			string: {}
 		}
 	}
 	connection_limit: {
@@ -20,7 +20,8 @@ base: components: sources: socket: configuration: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -36,13 +37,17 @@ base: components: sources: socket: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -92,7 +97,8 @@ base: components: sources: socket: configuration: {
 				}
 			}
 			method: {
-				required: true
+				description: "The framing method."
+				required:    true
 				type: string: enum: {
 					bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 					character_delimited: "Byte frames which are delimited by a chosen character."
@@ -142,7 +148,7 @@ base: components: sources: socket: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
@@ -185,7 +191,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
 		required:      true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	port_key: {
 		description: """
@@ -197,7 +203,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	receive_buffer_bytes: {
 		description: """
@@ -239,7 +245,7 @@ base: components: sources: socket: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -248,12 +254,12 @@ base: components: sources: socket: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			client_metadata_key: {
 				description: "Event field for client certificate metadata."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -265,7 +271,7 @@ base: components: sources: socket: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -284,7 +290,7 @@ base: components: sources: socket: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -293,7 +299,7 @@ base: components: sources: socket: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """
