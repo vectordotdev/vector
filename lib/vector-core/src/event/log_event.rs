@@ -574,7 +574,7 @@ impl tracing::field::Visit for LogEvent {
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn Debug) {
-        self.insert(field.name(), format!("{:?}", value));
+        self.insert(field.name(), format!("{value:?}"));
     }
 
     fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {

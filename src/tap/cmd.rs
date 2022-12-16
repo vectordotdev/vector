@@ -28,7 +28,7 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
     // features; the config is available even if `api` is disabled.
     let mut url = opts.url.clone().unwrap_or_else(|| {
         let addr = config::api::default_address().unwrap();
-        Url::parse(&*format!("http://{}/graphql", addr))
+        Url::parse(&format!("http://{}/graphql", addr))
             .expect("Couldn't parse default API URL. Please report this.")
     });
 

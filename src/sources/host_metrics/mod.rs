@@ -272,7 +272,7 @@ impl HostMetrics {
     pub async fn host_metrics(&self, output: &mut MetricsBuffer) {
         output.name = "host";
         match heim::host::uptime().await {
-            Ok(time) => output.gauge("uptime", time.get::<second>() as f64, MetricTags::default()),
+            Ok(time) => output.gauge("uptime", time.get::<second>(), MetricTags::default()),
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
                     message: "Failed to load host uptime info",
@@ -284,7 +284,7 @@ impl HostMetrics {
         match heim::host::boot_time().await {
             Ok(time) => output.gauge(
                 "boot_time",
-                time.get::<second>() as f64,
+                time.get::<second>(),
                 MetricTags::default(),
             ),
             Err(error) => {

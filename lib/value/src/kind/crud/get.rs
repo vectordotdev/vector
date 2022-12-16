@@ -467,7 +467,7 @@ mod tests {
                 },
             ),
         ] {
-            assert_eq!(kind.at_path(&path), want, "test: {}", title);
+            assert_eq!(kind.at_path(&path), want, "test: {title}");
         }
     }
 }

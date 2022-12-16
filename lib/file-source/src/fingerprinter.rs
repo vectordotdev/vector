@@ -252,7 +252,7 @@ mod test {
         fs::write(&empty_path, []).unwrap();
         fs::write(&full_line_path, &full_line_data).unwrap();
         fs::write(&duplicate_path, &full_line_data).unwrap();
-        fs::write(&not_full_line_path, &not_full_line_data).unwrap();
+        fs::write(&not_full_line_path, not_full_line_data).unwrap();
 
         let mut buf = Vec::new();
         assert!(fingerprinter
@@ -418,7 +418,7 @@ mod test {
         let medium_path = target_dir.path().join("medium.log");
         let duplicate_path = target_dir.path().join("duplicate.log");
         fs::write(&empty_path, []).unwrap();
-        fs::write(&small_path, &small_data).unwrap();
+        fs::write(&small_path, small_data).unwrap();
         fs::write(&medium_path, &medium_data).unwrap();
         fs::write(&duplicate_path, &medium_data).unwrap();
 

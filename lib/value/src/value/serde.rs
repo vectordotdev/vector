@@ -254,7 +254,7 @@ mod test {
                             |_| panic!("This test should never read Err'ing test fixtures."),
                             |fixture_file| {
                                 let path = fixture_file.path();
-                                let buf = parse_artifact(&path).unwrap();
+                                let buf = parse_artifact(path).unwrap();
 
                                 let serde_value: serde_json::Value =
                                     serde_json::from_slice(&buf).unwrap();

@@ -922,7 +922,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
     } else {
         splunk_response::SUCCESS
     };
-    response_json(StatusCode::OK, &body)
+    response_json(StatusCode::OK, body)
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
@@ -1156,7 +1156,7 @@ mod tests {
         opts: &SendWithOpts<'_>,
     ) -> RequestBuilder {
         let mut b = reqwest::Client::new()
-            .post(&format!("http://{}/{}", address, api))
+            .post(format!("http://{}/{}", address, api))
             .header("Authorization", format!("Splunk {}", token));
 
         b = match opts.channel {
@@ -1742,7 +1742,7 @@ mod tests {
         let (source, address) = source(None).await;
 
         let b = reqwest::Client::new()
-            .post(&format!(
+            .post(format!(
                 "http://{}/{}",
                 address, "services/collector/event"
             ))
@@ -1811,15 +1811,15 @@ mod tests {
             let nano = case.timestamp_nanos();
 
             assert_eq!(
-                parse_timestamp(sec as i64).unwrap().timestamp(),
+                parse_timestamp(sec).unwrap().timestamp(),
                 case.timestamp()
             );
             assert_eq!(
-                parse_timestamp(millis as i64).unwrap().timestamp_millis(),
+                parse_timestamp(millis).unwrap().timestamp_millis(),
                 case.timestamp_millis()
             );
             assert_eq!(
-                parse_timestamp(nano as i64).unwrap().timestamp_nanos(),
+                parse_timestamp(nano).unwrap().timestamp_nanos(),
                 case.timestamp_nanos()
             );
         }

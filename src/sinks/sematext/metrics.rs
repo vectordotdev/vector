@@ -421,7 +421,7 @@ mod tests {
                 Metric::new(
                     *metric,
                     MetricKind::Incremental,
-                    MetricValue::Counter { value: *val as f64 },
+                    MetricValue::Counter { value: *val },
                 )
                 .with_namespace(Some(*namespace))
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))

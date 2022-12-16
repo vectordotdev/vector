@@ -288,7 +288,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
         "start".into(),
         Value::from(Utc.timestamp_nanos(dd_span.start)),
     );
-    span.insert("duration".into(), Value::from(dd_span.duration as i64));
+    span.insert("duration".into(), Value::from(dd_span.duration));
     span.insert("error".into(), Value::from(dd_span.error as i64));
     span.insert("meta".into(), Value::from(convert_tags(dd_span.meta)));
     span.insert(
@@ -300,7 +300,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
                 .map(|(k, v)| {
                     (
                         k,
-                        NotNan::new(v as f64)
+                        NotNan::new(v)
                             .map(Value::Float)
                             .unwrap_or(Value::Null),
                     )

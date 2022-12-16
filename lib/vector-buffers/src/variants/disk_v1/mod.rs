@@ -487,15 +487,15 @@ where
 }
 
 pub(self) fn get_old_style_buffer_dir_name(base: &str) -> String {
-    format!("{}_buffer", base)
+    format!("{base}_buffer")
 }
 
 pub(self) fn get_new_style_buffer_dir_name(base: &str) -> String {
-    format!("{}_id", base)
+    format!("{base}_id")
 }
 
 pub(self) fn get_sidelined_old_style_buffer_dir_name(base: &str) -> String {
-    format!("{}_buffer_old", base)
+    format!("{base}_buffer_old")
 }
 
 pub(crate) fn get_new_style_buffer_dir_path(base: &Path, id: &str) -> PathBuf {

@@ -281,7 +281,7 @@ impl<'a> FromLua<'a> for Metric {
                     return Err(LuaError::FromLuaConversionError {
                         from: value.type_name(),
                         to: "Metric",
-                        message: Some(format!("Invalid sketch type '{}' given", x)),
+                        message: Some(format!("Invalid sketch type '{x}' given")),
                     })
                 }
             }

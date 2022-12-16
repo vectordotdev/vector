@@ -78,11 +78,11 @@ impl fmt::Display for Object {
         let exprs = self
             .inner
             .iter()
-            .map(|(k, v)| format!(r#""{}": {}"#, k, v))
+            .map(|(k, v)| format!(r#""{k}": {v}"#))
             .collect::<Vec<_>>()
             .join(", ");
 
-        write!(f, "{{ {} }}", exprs)
+        write!(f, "{{ {exprs} }}")
     }
 }
 

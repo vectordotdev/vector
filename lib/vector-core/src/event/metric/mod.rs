@@ -410,14 +410,14 @@ impl Display for Metric {
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         if let Some(timestamp) = &self.data.time.timestamp {
-            write!(fmt, "{:?} ", timestamp)?;
+            write!(fmt, "{timestamp:?} ")?;
         }
         let kind = match self.data.kind {
             MetricKind::Absolute => '=',
             MetricKind::Incremental => '+',
         };
         self.series.fmt(fmt)?;
-        write!(fmt, " {} ", kind)?;
+        write!(fmt, " {kind} ")?;
         self.data.value.fmt(fmt)
     }
 }
@@ -560,7 +560,7 @@ where
 {
     let mut this_sep = "";
     for item in items {
-        write!(fmt, "{}", this_sep)?;
+        write!(fmt, "{this_sep}")?;
         writer(fmt, item)?;
         this_sep = sep;
     }
@@ -569,9 +569,9 @@ where
 
 fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
     if word.contains(|c: char| !c.is_ascii_alphanumeric() && c != '_') {
-        write!(fmt, "{:?}", word)
+        write!(fmt, "{word:?}")
     } else {
-        write!(fmt, "{}", word)
+        write!(fmt, "{word}")
     }
 }
 

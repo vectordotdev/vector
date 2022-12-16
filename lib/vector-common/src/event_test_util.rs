@@ -21,11 +21,11 @@ pub fn contains_name_once(pattern: &str) -> Result<(), String> {
                     names.push_str(", ");
                 }
                 n_events += 1;
-                let _ = write!(names, "`{}`", event);
+                let _ = write!(names, "`{event}`");
             }
         }
         if n_events == 0 {
-            Err(format!("Missing event `{}`", pattern))
+            Err(format!("Missing event `{pattern}`"))
         } else if n_events > 1 {
             Err(format!(
                 "Multiple ({}) events matching `{}`: ({}). Hint! Don't use the `assert_x_` \
@@ -46,7 +46,7 @@ pub fn clear_recorded_events() {
 pub fn debug_print_events() {
     EVENTS_RECORDED.with(|events| {
         for event in events.borrow().iter() {
-            println!("{}", event);
+            println!("{event}");
         }
     });
 }

@@ -521,7 +521,7 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
             .collect::<Vec<_>>();
         MetricSketch::AgentDDSketch(
             AgentDDSketch::from_raw(
-                sketch.count as u32,
+                sketch.count,
                 sketch.min,
                 sketch.max,
                 sketch.sum,

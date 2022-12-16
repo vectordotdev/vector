@@ -183,7 +183,7 @@ impl<'a> EncodedWord<'a> {
         // Convert to UTF-8
         let charset = self.charset.unwrap_or("utf-8");
         let charset = Charset::for_label_no_replacement(charset.as_bytes())
-            .ok_or_else(|| format!("Unable to decode {:?} value", charset))?;
+            .ok_or_else(|| format!("Unable to decode {charset:?} value"))?;
         let (cow, _) = charset.decode_without_bom_handling(&decoded);
         Ok(cow.into_owned())
     }
