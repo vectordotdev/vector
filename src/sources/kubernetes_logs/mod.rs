@@ -138,10 +138,15 @@ pub struct Config {
     /// a significant overhead.
     glob_minimum_cooldown_ms: usize,
 
-    /// This field sets the timestamp when an event is ingested.
+    /// Overrides the name of the log field used to add the ingestion timestamp to each event.
+    ///
     /// This is useful to compute the latency between important event processing
     /// stages. For example, the time delta between when a log line was written and when it was
     /// processed by the `kubernetes_logs` source.
+    ///
+    /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+    ///
+    /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     ingestion_timestamp_field: Option<String>,
 
     /// The default time zone for timestamps without an explicit zone.
