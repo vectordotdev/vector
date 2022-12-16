@@ -402,9 +402,9 @@ struct TopologyController {
 impl TopologyController {
     async fn reload(&mut self, new_config: Option<config::Config>) -> Option<SignalTo> {
         let Some(mut new_config) = new_config else {
-        emit!(VectorConfigLoadError);
-        return None;
-    };
+            emit!(VectorConfigLoadError);
+            return None;
+        };
 
         new_config
             .healthchecks
