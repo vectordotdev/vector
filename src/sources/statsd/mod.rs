@@ -323,6 +323,8 @@ impl TcpSource for StatsdTcpSource {
 
 #[cfg(test)]
 mod test {
+    use std::collections::BTreeMap;
+
     use futures::channel::mpsc;
     use futures_util::SinkExt;
     use tokio::{
@@ -330,7 +332,13 @@ mod test {
         net::UdpSocket,
         time::{sleep, Duration, Instant},
     };
-    use vector_core::{config::ComponentKey, event::EventContainer};
+    use vector_core::{
+        config::ComponentKey,
+        event::{
+            metric::{MetricName, MetricSeries, TagValue},
+            EventContainer,
+        },
+    };
 
     use super::*;
     use crate::test_util::{
@@ -487,8 +495,36 @@ mod test {
             .collect::<AbsoluteMetricState>();
         let metrics = state.finish();
 
-        assert_counter(&metrics, series!("foo", "a" => "true", "b" => "b"), 100.0);
-        assert_counter(&metrics, series!("foo", "a" => "true", "b" => "c"), 100.0);
+        let series_one = MetricSeries {
+            name: MetricName {
+                name: "foo".to_owned(),
+                namespace: None,
+            },
+            tags: Some(
+                BTreeMap::from([
+                    ("a".to_owned(), TagValue::from(None)),
+                    ("b".to_owned(), TagValue::from(Some("b".to_owned()))),
+                ])
+                .into(),
+            ),
+        };
+        assert_counter(&metrics, series_one, 100.0);
+
+        let series_two = MetricSeries {
+            name: MetricName {
+                name: "foo".to_owned(),
+                namespace: None,
+            },
+            tags: Some(
+                BTreeMap::from([
+                    ("a".to_owned(), TagValue::from(None)),
+                    ("b".to_owned(), TagValue::from(Some("c".to_owned()))),
+                ])
+                .into(),
+            ),
+        };
+        assert_counter(&metrics, series_two, 100.0);
+
         assert_gauge(&metrics, series!("bar"), 42.0);
         assert_distribution(
             &metrics,

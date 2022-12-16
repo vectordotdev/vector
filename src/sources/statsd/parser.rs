@@ -6,6 +6,7 @@ use std::{
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use vector_core::event::metric::TagValue;
 
 use crate::event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 
@@ -123,6 +124,7 @@ fn parse_sampling(input: &str) -> Result<f64, ParseError> {
     }
 }
 
+/// statsd (and dogstatsd) support bare, single and multi-value tags.
 fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
     if !input.starts_with('#') || input.len() < 2 {
         return Err(ParseError::Malformed(
@@ -135,11 +137,8 @@ fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
         .map(|chunk| {
             let pair: Vec<_> = chunk.split(':').collect();
             let key = &pair[0];
-            // same as in telegraf plugin:
-            // if tag value is not provided, use "true"
-            // https://github.com/influxdata/telegraf/blob/master/plugins/inputs/statsd/datadog.go#L152
-            let value = pair.get(1).unwrap_or(&"true");
-            ((*key).to_owned(), (*value).to_owned())
+            let tag_value: TagValue = pair.get(1).map(|s| String::from(s.to_owned())).into();
+            ((*key).to_owned(), tag_value)
         })
         .collect())
 }
@@ -219,8 +218,10 @@ impl From<ParseFloatError> for ParseError {
 
 #[cfg(test)]
 mod test {
+    use std::collections::BTreeMap;
+
     use vector_common::assert_event_data_eq;
-    use vector_core::metric_tags;
+    use vector_core::event::{metric::TagValue, MetricTags};
 
     use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
@@ -246,10 +247,33 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_tags(Some(metric_tags!(
-                "tag1" => "true",
-                "tag2" => "value",
-            )))),
+            .with_tags(Some(
+                BTreeMap::from([
+                    ("tag1".to_owned(), TagValue::from(None)),
+                    ("tag2".to_owned(), TagValue::from(Some("value".to_owned())))
+                ])
+                .into()
+            ))),
+        );
+    }
+
+    #[test]
+    fn enhanced_tags() {
+        let expected_tags = vec![
+            ("tag1".to_owned(), TagValue::from(None)),
+            ("tag2".to_owned(), TagValue::from(Some("valueA".to_owned()))),
+            ("tag2".to_owned(), TagValue::from(Some("valueB".to_owned()))),
+            ("tag3".to_owned(), TagValue::from(Some("value".to_owned()))),
+            ("tag3".to_owned(), TagValue::from(None)),
+        ];
+        assert_event_data_eq!(
+            parse("foo:1|c|#tag1,tag2:valueA,tag2:valueB,tag3:value,tag3"),
+            Ok(Metric::new(
+                "foo",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(MetricTags::from_iter(expected_tags)))),
         );
     }
 
@@ -304,11 +328,14 @@ mod test {
                     statistic: StatisticKind::Histogram
                 },
             )
-            .with_tags(Some(metric_tags!(
-                "region" => "us-west1",
-                "production" => "true",
-                "e" => "",
-            )))),
+            .with_tags(Some(
+                BTreeMap::from([
+                    ("region".to_owned(), TagValue::from("us-west1".to_owned())),
+                    ("production".to_owned(), TagValue::from(None)),
+                    ("e".to_owned(), TagValue::from("".to_owned())),
+                ])
+                .into()
+            ))),
         );
     }
 
@@ -324,11 +351,14 @@ mod test {
                     statistic: StatisticKind::Summary
                 },
             )
-            .with_tags(Some(metric_tags!(
-                "region" => "us-west1",
-                "production" => "true",
-                "e" => "",
-            )))),
+            .with_tags(Some(
+                BTreeMap::from([
+                    ("region".to_owned(), TagValue::from("us-west1".to_owned())),
+                    ("production".to_owned(), TagValue::from(None)),
+                    ("e".to_owned(), TagValue::from("".to_owned())),
+                ])
+                .into()
+            ))),
         );
     }
 
