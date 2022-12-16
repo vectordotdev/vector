@@ -7,16 +7,20 @@ use super::util::{Compression, RequestBuilder, SinkBuilderExt};
 use super::Healthcheck;
 use crate::config::{GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
+use crate::internal_events::SinkRequestBuildError;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use futures::{stream::BoxStream, StreamExt};
 use snafu::Snafu;
 use vector_common::finalization::EventFinalizers;
+use vector_common::internal_event::CountByteSize;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_common::{
     finalization::{EventStatus, Finalizable},
     internal_event::{BytesSent, EventsSent},
 };
 use vector_config::configurable_component;
+use vector_core::stream::DriverResponse;
 use vector_core::tls::TlsSettings;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
@@ -62,14 +66,27 @@ impl SinkConfig for BasicConfig {
     }
 }
 
-struct BasicResponse;
+struct BasicResponse {
+    byte_size: usize,
+}
+
+impl DriverResponse for BasicResponse {
+    fn event_status(&self) -> EventStatus {
+        EventStatus::Delivered
+    }
+
+    fn events_sent(&self) -> CountByteSize {
+        // (events count, byte size)
+        CountByteSize(1, self.byte_size)
+    }
+}
 
 struct BasicService {
     endpoint: String,
     client: HttpClient,
 }
 
-impl tower::Service<Vec<u8>> for BasicService {
+impl tower::Service<BasicRequest> for BasicService {
     type Response = BasicResponse;
 
     type Error = &'static str;
@@ -78,14 +95,15 @@ impl tower::Service<Vec<u8>> for BasicService {
 
     fn poll_ready(
         &mut self,
-        cx: &mut std::task::Context<'_>,
+        _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, request: Vec<u8>) -> Self::Future {
-        let body = hyper::Body::from(request);
-        let req = http::Request::post("http:localhost:5678")
+    fn call(&mut self, request: BasicRequest) -> Self::Future {
+        let byte_size = request.payload.len();
+        let body = hyper::Body::from(request.payload);
+        let req = http::Request::post(&self.endpoint)
             .header("Content-Type", "application/json")
             .body(body)
             .unwrap();
@@ -96,7 +114,7 @@ impl tower::Service<Vec<u8>> for BasicService {
             match client.call(req).await {
                 Ok(response) => {
                     if response.status().is_success() {
-                        Ok(BasicResponse)
+                        Ok(BasicResponse { byte_size })
                     } else {
                         Err("received error response")
                     }
@@ -114,7 +132,7 @@ struct BasicSink {
 }
 
 impl BasicSink {
-    pub fn new(config: &BasicConfig) -> Self {
+    pub fn new(_config: &BasicConfig) -> Self {
         let tls = TlsSettings::from_options(&None).unwrap();
         let client = HttpClient::new(tls, &Default::default()).unwrap();
         let endpoint = "http://localhost:5678".to_string();
@@ -160,6 +178,13 @@ impl From<std::io::Error> for RequestBuildError {
 struct BasicRequest {
     payload: Bytes,
     finalizers: EventFinalizers,
+    metadata: RequestMetadata,
+}
+
+impl MetaDescriptive for BasicRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
+    }
 }
 
 impl Finalizable for BasicRequest {
@@ -186,7 +211,7 @@ impl RequestBuilder<Event> for BasicRequestBuilder {
 
     fn split_input(
         &self,
-        input: Event,
+        mut input: Event,
     ) -> (
         Self::Metadata,
         super::util::metadata::RequestMetadataBuilder,
@@ -201,7 +226,7 @@ impl RequestBuilder<Event> for BasicRequestBuilder {
     fn build_request(
         &self,
         metadata: Self::Metadata,
-        _request_metadata: vector_common::request_metadata::RequestMetadata,
+        request_metadata: RequestMetadata,
         payload: super::util::request_builder::EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let finalizers = metadata;
@@ -209,6 +234,7 @@ impl RequestBuilder<Event> for BasicRequestBuilder {
         BasicRequest {
             finalizers,
             payload: payload.into_payload(),
+            metadata: request_metadata,
         }
     }
 }
@@ -224,7 +250,7 @@ impl StreamSink<Event> for BasicSink {
 }
 
 impl BasicSink {
-    async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let service = tower::ServiceBuilder::new().service(BasicService {
             client: self.client.clone(),
             endpoint: self.endpoint.clone(),
