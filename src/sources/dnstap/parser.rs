@@ -556,35 +556,17 @@ impl<'a> DnstapParser<'a> {
 
         self.insert(self.event_schema.dns_query_header_schema().qr(), header.qr);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().aa(),
-            header.aa,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().aa(), header.aa);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().tc(),
-            header.tc,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().tc(), header.tc);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().rd(),
-            header.rd,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().rd(), header.rd);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().ra(),
-            header.ra,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().ra(), header.ra);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().ad(),
-            header.ad,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().ad(), header.ad);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().cd(),
-            header.cd,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().cd(), header.cd);
 
         self.insert(
             self.event_schema.dns_query_header_schema().question_count(),

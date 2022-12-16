@@ -594,10 +594,7 @@ impl diagnostic::DiagnosticMessage for Error {
                 value,
                 error,
             } => vec![
-                Label::primary(
-                    format!(r#"invalid argument "{keyword}""#),
-                    Span::default(),
-                ),
+                Label::primary(format!(r#"invalid argument "{keyword}""#), Span::default()),
                 Label::context(format!("received: {value}"), Span::default()),
                 Label::context(format!("error: {error}"), Span::default()),
             ],

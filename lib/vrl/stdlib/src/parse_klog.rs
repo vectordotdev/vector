@@ -31,9 +31,7 @@ fn parse_klog(bytes: Value) -> Resolved {
             "timestamp".into(),
             Value::Timestamp(
                 Utc.datetime_from_str(&format!("{year}{timestamp}"), "%Y%m%d %H:%M:%S%.f")
-                    .map_err(|error| {
-                        format!(r#"failed parsing timestamp {timestamp}: {error}"#)
-                    })?,
+                    .map_err(|error| format!(r#"failed parsing timestamp {timestamp}: {error}"#))?,
             ),
         );
     }

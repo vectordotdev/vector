@@ -29,9 +29,7 @@ fn parse_glog(bytes: Value) -> Resolved {
             "timestamp".into(),
             Value::Timestamp(
                 Utc.datetime_from_str(timestamp, "%Y%m%d %H:%M:%S%.f")
-                    .map_err(|error| {
-                        format!(r#"failed parsing timestamp {timestamp}: {error}"#)
-                    })?,
+                    .map_err(|error| format!(r#"failed parsing timestamp {timestamp}: {error}"#))?,
             ),
         );
     }

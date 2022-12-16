@@ -2004,10 +2004,7 @@ mod tests {
             let millis = case.timestamp_millis();
             let nano = case.timestamp_nanos();
 
-            assert_eq!(
-                parse_timestamp(sec).unwrap().timestamp(),
-                case.timestamp()
-            );
+            assert_eq!(parse_timestamp(sec).unwrap().timestamp(), case.timestamp());
             assert_eq!(
                 parse_timestamp(millis).unwrap().timestamp_millis(),
                 case.timestamp_millis()

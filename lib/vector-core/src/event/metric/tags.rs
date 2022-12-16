@@ -106,7 +106,7 @@ impl Display for TagValueSet {
                 write!(f, ", ")?;
             }
             if let Some(value) = value {
-                write!(f, "\"{}\"", value)?;
+                write!(f, "\"{value}\"")?;
             } else {
                 write!(f, "null")?;
             }

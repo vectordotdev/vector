@@ -294,14 +294,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
             dd_span
                 .metrics
                 .into_iter()
-                .map(|(k, v)| {
-                    (
-                        k,
-                        NotNan::new(v)
-                            .map(Value::Float)
-                            .unwrap_or(Value::Null),
-                    )
-                })
+                .map(|(k, v)| (k, NotNan::new(v).map(Value::Float).unwrap_or(Value::Null)))
                 .collect::<BTreeMap<String, Value>>(),
         ),
     );

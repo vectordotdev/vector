@@ -289,11 +289,7 @@ impl HostMetrics {
         }
 
         match heim::host::boot_time().await {
-            Ok(time) => output.gauge(
-                "boot_time",
-                time.get::<second>(),
-                MetricTags::default(),
-            ),
+            Ok(time) => output.gauge("boot_time", time.get::<second>(), MetricTags::default()),
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
                     message: "Failed to load host boot time info",
