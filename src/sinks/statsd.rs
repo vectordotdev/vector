@@ -10,7 +10,10 @@ use futures_util::FutureExt;
 use tokio_util::codec::Encoder;
 use tower::{Service, ServiceBuilder};
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{
+    event::metric::{TagValue, TagValueSet},
+    ByteSizeOf,
+};
 
 use super::util::SinkBatchSettings;
 #[cfg(unix)]
@@ -166,14 +169,30 @@ impl SinkConfig for StatsdSinkConfig {
     }
 }
 
+// Note that if multi-valued tags are present, this encoding may change the order from the input
+// event, since the tags with multiple values may not have been grouped together.
+// This is not an issue, but noting as it may be an observed behavior.
 fn encode_tags(tags: &MetricTags) -> String {
     let parts: Vec<_> = tags
-        .iter_single()
-        .map(|(name, value)| {
-            if value == "true" {
-                name.to_string()
-            } else {
-                format!("{}:{}", name, value)
+        .iter_sets()
+        .map(|(name, tag_value_set)| match tag_value_set {
+            TagValueSet::Empty => name.to_owned(),
+            TagValueSet::Single(tag_value) => match tag_value {
+                TagValue::Bare => name.to_owned(),
+                TagValue::Value(value) => format!("{}:{}", name, value),
+            },
+            TagValueSet::Set(index_set) => {
+                let parts: Vec<_> = index_set
+                    .iter()
+                    .map(|tag_value| match tag_value {
+                        TagValue::Bare => name.to_owned(),
+                        TagValue::Value(value) => {
+                            format!("{}:{}", name, value)
+                        }
+                    })
+                    .collect();
+
+                parts.join(",")
             }
         })
         .collect();
@@ -301,7 +320,7 @@ mod test {
     use futures::{channel::mpsc, StreamExt, TryStreamExt};
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-    use vector_core::metric_tags;
+    use vector_core::event::metric::TagValue;
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
@@ -320,19 +339,32 @@ mod test {
     }
 
     fn tags() -> MetricTags {
-        metric_tags!(
-            "normal_tag" => "value",
-            "true_tag" => "true",
-            "empty_tag" => "",
-        )
+        let expected_tags = vec![
+            ("normal_tag".to_owned(), TagValue::from("value".to_owned())),
+            (
+                "multi_value".to_owned(),
+                TagValue::from(Some("true".to_owned())),
+            ),
+            (
+                "multi_value".to_owned(),
+                TagValue::from(Some("false".to_owned())),
+            ),
+            ("multi_value".to_owned(), TagValue::from(None)),
+            ("bare_tag".to_owned(), TagValue::from(None)),
+        ];
+        MetricTags::from_iter(expected_tags)
     }
 
     #[test]
     fn test_encode_tags() {
-        assert_eq!(
-            &encode_tags(&tags()),
-            "empty_tag:,normal_tag:value,true_tag"
-        );
+        let actual = encode_tags(&tags()).split(',').collect::<Vec<_>>().sort();
+
+        let expected = "normal_tag:value,multi_value:true,multi_value:false,multi_value"
+            .split(',')
+            .collect::<Vec<_>>()
+            .sort();
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -549,7 +581,7 @@ mod test {
         let messages = collect_n(rx, 1).await;
         assert_eq!(
             messages[0],
-            Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01\n"),
+            Bytes::from("vector.counter:1.5|c|#bare_tag,multi_value:true,multi_value:false,multi_value,normal_tag:value\nvector.histogram:2|h|@0.01\n"),
         );
     }
 }
