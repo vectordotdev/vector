@@ -139,6 +139,12 @@ components: sinks: gcp_stackdriver_metrics: {
 	}
 
 	how_it_works: {
+		duplicate_tags: {
+			title: "Duplicate tags"
+			body: """
+					Duplicate tag names cannot be sent to GCP. Vector will only send the last tag specified.
+				"""
+		}
 	}
 
 	permissions: iam: [
