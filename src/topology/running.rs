@@ -832,19 +832,13 @@ impl RunningTopology {
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
         {
-            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
-                task.id().to_string(),
-                "sink".to_string(),
-                task.typetag().to_string(),
-            );
-            debug!(
-                component_kind = "sink",
-                component_type = task.typetag(),
-                component_id = task.id(),
-                group_id = group_id.as_raw().to_string(),
-                "Registered new allocation group."
-            );
-            group_id.attach_to_span(&task_span);
+            let group_token =
+                crate::internal_telemetry::allocations::AllocationGroup::register(vec![
+                    task.id().to_string(),
+                    "sink".to_string(),
+                    task.typetag().to_string(),
+                ]);
+            group_token.attach_to_span(&task_span);
         }
 
         let task_name = format!(">> {} ({})", task.typetag(), task.id());
@@ -869,19 +863,13 @@ impl RunningTopology {
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
         {
-            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
-                task.id().to_string(),
-                "transform".to_string(),
-                task.typetag().to_string(),
-            );
-            debug!(
-                component_kind = "transform",
-                component_type = task.typetag(),
-                component_id = task.id(),
-                group_id = group_id.as_raw().to_string(),
-                "Registered new allocation group."
-            );
-            group_id.attach_to_span(&task_span);
+            let group_token =
+                crate::internal_telemetry::allocations::AllocationGroup::register(vec![
+                    task.id().to_string(),
+                    "transform".to_string(),
+                    task.typetag().to_string(),
+                ]);
+            group_token.attach_to_span(&task_span);
         }
 
         let task_name = format!(">> {} ({}) >>", task.typetag(), task.id());
@@ -906,20 +894,13 @@ impl RunningTopology {
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
         {
-            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
-                task.id().to_string(),
-                "source".to_string(),
-                task.typetag().to_string(),
-            );
-
-            debug!(
-                component_kind = "source",
-                component_type = task.typetag(),
-                component_id = task.id(),
-                group_id = group_id.as_raw().to_string(),
-                "Registered new allocation group."
-            );
-            group_id.attach_to_span(&task_span);
+            let group_token =
+                crate::internal_telemetry::allocations::AllocationGroup::register(vec![
+                    task.id().to_string(),
+                    "source".to_string(),
+                    task.typetag().to_string(),
+                ]);
+            group_token.attach_to_span(&task_span);
         }
 
         let task_name = format!("{} ({}) >>", task.typetag(), task.id());
