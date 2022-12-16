@@ -67,7 +67,8 @@ pub struct PrometheusScrapeConfig {
 
     /// Controls how tag conflicts are handled if the scraped source has tags to be added.
     ///
-    /// If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag is renamed by prepending `exported_` to the original name.
+    /// If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
+    /// is renamed by prepending `exported_` to the original name.
     ///
     /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]

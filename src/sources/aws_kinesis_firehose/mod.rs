@@ -79,7 +79,7 @@ pub enum Compression {
     /// The compression scheme of the object is determined by looking at its file signature, also known
     /// as [magic bytes](\(urls.magic_bytes)).
     ///
-    ///If the record fails to decompress with the discovered format, the record is forwarded as is.
+    /// If the record fails to decompress with the discovered format, the record is forwarded as is.
     /// Thus, if you know the records are always gzip encoded (for example, if they are coming from AWS CloudWatch Logs),
     /// set `gzip` in this field so that any records that are not-gzipped are rejected.
     #[derivative(Default)]

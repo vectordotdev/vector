@@ -98,7 +98,7 @@ type Matches = HashMap<String, HashSet<String>>;
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
-    /// Only include entries that appended to the journal after starting.
+    /// Only include entries that appended to the journal after the entries have been read.
     pub since_now: Option<bool>,
 
     /// Only include entries that occurred after the current boot of the system.

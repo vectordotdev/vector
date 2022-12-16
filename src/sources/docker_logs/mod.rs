@@ -66,7 +66,6 @@ static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 pub struct DockerLogsConfig {
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///
-    /// The value is the current hostname.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
