@@ -196,7 +196,7 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.3.5", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.149", default-features = false, features = ["derive"] }
+serde = { version = "1.0.150", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.7", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.89", default-features = false, features = ["raw_value"] }
@@ -343,7 +343,7 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.26.1", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.11.3", default-features = false, optional = true }
+prost-build = { version = "0.11.4", default-features = false, optional = true }
 tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
@@ -416,7 +416,7 @@ target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables"
 target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 
 # Enables features that work only on systems providing `cfg(unix)`
-unix = ["tikv-jemallocator"]
+unix = ["tikv-jemallocator", "allocation-tracing"]
 allocation-tracing = []
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
@@ -452,7 +452,8 @@ aws-core = [
   "dep:aws-smithy-client",
   "dep:aws-smithy-http",
   "dep:aws-smithy-http-tower",
-  "dep:aws-smithy-types"
+  "dep:aws-smithy-types",
+  "dep:serde_with",
 ]
 
 # Anything that requires Protocol Buffers.
@@ -839,6 +840,9 @@ enterprise-tests = [
   "sinks-loki",
   "api",
 ]
+
+component-validation-runner = ["dep:tonic", "sources-internal_logs", "sources-internal_metrics", "sources-vector", "sinks-vector"]
+component-validation-tests = ["component-validation-runner", "sources", "transforms", "sinks"]
 
 # Grouping together features for benchmarks. We exclude the API client due to it causing the build process to run out
 # of memory when those additional dependencies are built in CI.

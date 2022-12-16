@@ -33,6 +33,13 @@ components: transforms: aws_ec2_metadata: {
 				aws ec2 modify-instance-metadata-options --instance-id <ID> --http-endpoint enabled --http-put-response-hop-limit 2
 				```
 				""",
+			"""
+				Accessing instance tags must be explicitly enabled for each instance. This can be done in the AWS Console, or with the following CLI command:
+
+				```bash
+				aws ec2 modify-instance-metadata-options --instance-id <ID> --instance-metadata-tags enabled
+				```
+				""",
 		]
 		notices: []
 		warnings: [
@@ -153,6 +160,18 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["subnet-9d6713b9"]
+				}
+			}
+			"tags": {
+				description: "The instance's tags"
+				required:    false
+				type: object: {
+					examples: [
+						{
+							"Name":          "InstanceName"
+							"ApplicationId": "12345678"
+						},
+					]
 				}
 			}
 			"vpc-id": {

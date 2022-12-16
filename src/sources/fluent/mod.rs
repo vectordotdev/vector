@@ -82,7 +82,8 @@ impl GenerateConfig for FluentConfig {
 #[async_trait::async_trait]
 impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = FluentSource::new(cx.log_namespace(self.log_namespace));
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let source = FluentSource::new(log_namespace);
         let shutdown_secs = 30;
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
         let tls_client_metadata_key = self
@@ -100,6 +101,8 @@ impl SourceConfig for FluentConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            FluentConfig::NAME,
+            log_namespace,
         )
     }
 
@@ -128,6 +131,13 @@ impl FluentConfig {
             .map(LegacyKey::InsertIfEmpty);
 
         let tag_key = parse_value_path("tag").ok().map(LegacyKey::Overwrite);
+
+        let tls_client_metadata_path = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.as_ref())
+            .and_then(|x| parse_value_path(x).ok())
+            .map(LegacyKey::Overwrite);
 
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
@@ -160,6 +170,13 @@ impl FluentConfig {
                 FluentConfig::NAME,
                 None,
                 &owned_value_path!("record"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                tls_client_metadata_path,
+                &owned_value_path!("tls_client_metadata"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             );
@@ -952,7 +969,11 @@ mod tests {
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                 )
-                .with_metadata_field(&owned_value_path!("fluent", "host"), Kind::bytes());
+                .with_metadata_field(&owned_value_path!("fluent", "host"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "tls_client_metadata"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                );
 
         assert_eq!(definition, expected_definition)
     }

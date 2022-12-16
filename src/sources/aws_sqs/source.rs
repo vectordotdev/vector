@@ -9,6 +9,7 @@ use futures::{FutureExt, StreamExt};
 use tokio::{pin, select};
 use tracing_futures::Instrument;
 use vector_common::finalizer::UnorderedFinalizer;
+use vector_common::internal_event::{EventsReceived, Registered};
 use vector_core::config::LogNamespace;
 
 use crate::{
@@ -59,12 +60,14 @@ impl SqsSource {
             );
             Arc::new(finalizer)
         });
+        let events_received = register!(EventsReceived);
 
         for _ in 0..self.concurrency {
             let source = self.clone();
             let shutdown = shutdown.clone().fuse();
             let mut out = out.clone();
             let finalizer = finalizer.clone();
+            let events_received = events_received.clone();
             task_handles.push(tokio::spawn(
                 async move {
                     let finalizer = finalizer.as_ref();
@@ -72,7 +75,7 @@ impl SqsSource {
                     loop {
                         select! {
                             _ = &mut shutdown => break,
-                            _ = source.run_once(&mut out, finalizer) => {},
+                            _ = source.run_once(&mut out, finalizer, events_received.clone()) => {},
                         }
                     }
                 }
@@ -92,7 +95,12 @@ impl SqsSource {
         Ok(())
     }
 
-    async fn run_once(&self, out: &mut SourceSender, finalizer: Option<&Arc<Finalizer>>) {
+    async fn run_once(
+        &self,
+        out: &mut SourceSender,
+        finalizer: Option<&Arc<Finalizer>>,
+        events_received: Registered<EventsReceived>,
+    ) {
         let result = self
             .client
             .receive_message()
@@ -146,6 +154,7 @@ impl SqsSource {
                         timestamp,
                         &batch,
                         self.log_namespace,
+                        &events_received,
                     );
                     events.extend(decoded);
                 }
@@ -240,6 +249,7 @@ mod tests {
             Some(now),
             &None,
             LogNamespace::Vector,
+            &register!(EventsReceived),
         )
         .collect();
         assert_eq!(events.len(), 1);
@@ -291,6 +301,7 @@ mod tests {
             Some(now),
             &None,
             LogNamespace::Legacy,
+            &register!(EventsReceived),
         )
         .collect();
         assert_eq!(events.len(), 1);

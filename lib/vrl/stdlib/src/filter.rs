@@ -35,7 +35,7 @@ where
             .collect::<Result<Vec<_>>>()
             .map(Into::into),
 
-        _ => unreachable!("function requires collection types as input"),
+        _ => Err("function requires collection types as input".into()),
     }
 }
 
