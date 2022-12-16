@@ -46,6 +46,40 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 				required:    true
 				type: string: syntax: "literal"
 			}
+			imds: {
+				description: "Configuration for authenticating with AWS through IMDS."
+				required:    false
+				type: object: {
+					default: {
+						connect_timeout_seconds: 1
+						max_attempts:            4
+						read_timeout_seconds:    1
+					}
+					options: {
+						connect_timeout_seconds: {
+							description: "Connect timeout for IMDS."
+							required:    false
+							type: uint: {
+								default: 1
+								unit:    "seconds"
+							}
+						}
+						max_attempts: {
+							description: "Number of IMDS retries for fetching tokens and metadata."
+							required:    false
+							type: uint: default: 4
+						}
+						read_timeout_seconds: {
+							description: "Read timeout for IMDS."
+							required:    false
+							type: uint: {
+								default: 1
+								unit:    "seconds"
+							}
+						}
+					}
+				}
+			}
 			load_timeout_secs: {
 				description: "Timeout for successfully loading any credentials, in seconds."
 				required:    false
@@ -100,27 +134,27 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 		}
 	}
 	compression: {
-		description: "Compression configuration."
-		required:    false
-		type: {
-			object: options: {
-				algorithm: {
-					required: false
-					type: string: {
-						const:   "zlib"
-						default: "none"
-					}
-				}
-				level: {
-					description: "Compression level."
-					required:    false
-					type: {
-						string: enum: ["none", "fast", "best", "default"]
-						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-					}
-				}
+		description: """
+			Compression configuration.
+
+			All compression algorithms use the default compression level unless otherwise specified.
+			"""
+		required: false
+		type: string: {
+			default: "none"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://zlib.net/
+					"""
 			}
-			string: enum: ["none", "gzip", "zlib"]
 		}
 	}
 	encoding: {
@@ -128,7 +162,7 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 		required:    true
 		type: object: options: {
 			avro: {
-				description:   "Apache Avro serializer options."
+				description:   "Apache Avro-specific encoder options."
 				relevant_when: "codec = \"avro\""
 				required:      true
 				type: object: options: schema: {
@@ -140,27 +174,55 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 			codec: {
 				required: true
 				type: string: enum: {
-					avro:        "Apache Avro serialization."
-					gelf:        "GELF serialization."
-					json:        "JSON serialization."
-					logfmt:      "Logfmt serialization."
-					native:      "Native Vector serialization based on Protocol Buffers."
-					native_json: "Native Vector serialization based on JSON."
-					raw_message: """
-						No serialization.
+					avro: """
+						Encodes an event as an [Apache Avro][apache_avro] message.
 
-						This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-						they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-						while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-						event.
+						[apache_avro]: https://avro.apache.org/
+						"""
+					gelf: """
+						Encodes an event as a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: """
+						Encodes an event as [JSON][json].
+
+						[json]: https://www.json.org/
+						"""
+					logfmt: """
+						Encodes an event as a [logfmt][logfmt] message.
+
+						[logfmt]: https://brandur.org/logfmt
+						"""
+					native: """
+						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf]([EXPERIMENTAL][experimental]).
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Encodes an event in Vector’s [native JSON format][vector_native_json]([EXPERIMENTAL][experimental]).
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					raw_message: """
+						No encoding.
+
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
-						Plaintext serialization.
+						Plaintext encoding.
 
-						This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-						they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-						while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-						event.
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}
@@ -263,11 +325,11 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
 						const:   "adaptive"
 						default: "none"
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -325,7 +387,7 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 		type: string: syntax: "literal"
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

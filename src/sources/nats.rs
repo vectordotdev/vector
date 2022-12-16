@@ -4,7 +4,7 @@ use futures::{pin_mut, stream, Stream, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
+    ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
 };
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
@@ -152,6 +152,7 @@ async fn nats_source(
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
+    let events_received = register!(EventsReceived);
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
@@ -162,10 +163,8 @@ async fn nats_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(EventsReceived {
-                        count,
-                        byte_size: events.estimated_json_encoded_size_of()
-                    });
+                    let byte_size = events.estimated_json_encoded_size_of();
+                    events_received.emit(CountByteSize(count, byte_size));
 
                     let now = Utc::now();
 

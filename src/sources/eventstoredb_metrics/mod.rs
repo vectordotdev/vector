@@ -4,7 +4,9 @@ use futures::{FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::EstimatedJsonEncodedSizeOf;
@@ -83,6 +85,7 @@ fn eventstoredb(
     let url: Uri = endpoint.as_str().parse()?;
 
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+    let events_received = register!(EventsReceived);
 
     Ok(Box::pin(
         async move {
@@ -123,7 +126,7 @@ fn eventstoredb(
                                 let count = metrics.len();
                                 let byte_size = metrics.estimated_json_encoded_size_of();
 
-                                emit!(EventsReceived { count, byte_size });
+                                events_received.emit(CountByteSize(count, byte_size));
 
                                 if let Err(error) = cx.out.send_batch(metrics).await {
                                     emit!(StreamClosedError { count, error });

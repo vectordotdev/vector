@@ -22,7 +22,8 @@ use tracing::{Instrument, Span};
 use vector_config::configurable_component;
 use vector_core::{
     internal_event::{
-        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        Registered,
     },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
@@ -370,68 +371,76 @@ fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
     false
 }
 
-fn handle(
-    req: Request<Body>,
-    auth: &Option<Auth>,
-    default_namespace: Option<&str>,
-    buckets: &[f64],
-    quantiles: &[f64],
-    metrics: &RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>,
-    bytes_sent: &Registered<BytesSent>,
-) -> Response<Body> {
-    let mut response = Response::new(Body::empty());
+#[derive(Clone)]
+struct Handler {
+    auth: Option<Auth>,
+    default_namespace: Option<String>,
+    buckets: Box<[f64]>,
+    quantiles: Box<[f64]>,
+    bytes_sent: Registered<BytesSent>,
+    events_sent: Registered<EventsSent>,
+}
 
-    match (authorized(&req, auth), req.method(), req.uri().path()) {
-        (false, _, _) => {
-            *response.status_mut() = StatusCode::UNAUTHORIZED;
-            response.headers_mut().insert(
-                http::header::WWW_AUTHENTICATE,
-                HeaderValue::from_static("Basic, Bearer"),
-            );
-        }
+impl Handler {
+    fn handle(
+        &self,
+        req: Request<Body>,
+        metrics: &RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>,
+    ) -> Response<Body> {
+        let mut response = Response::new(Body::empty());
 
-        (true, &Method::GET, "/metrics") => {
-            let metrics = metrics.read().expect(LOCK_FAILED);
-
-            let count = metrics.len();
-            let byte_size = metrics
-                .iter()
-                .map(|(_, (metric, _))| metric.estimated_json_encoded_size_of())
-                .sum();
-
-            let mut collector = StringCollector::new();
-
-            for (_, (metric, _)) in metrics.iter() {
-                collector.encode_metric(default_namespace, buckets, quantiles, metric);
+        match (authorized(&req, &self.auth), req.method(), req.uri().path()) {
+            (false, _, _) => {
+                *response.status_mut() = StatusCode::UNAUTHORIZED;
+                response.headers_mut().insert(
+                    http::header::WWW_AUTHENTICATE,
+                    HeaderValue::from_static("Basic, Bearer"),
+                );
             }
 
-            drop(metrics);
+            (true, &Method::GET, "/metrics") => {
+                let metrics = metrics.read().expect(LOCK_FAILED);
 
-            let body = collector.finish();
-            let body_size = body.size_of();
+                let count = metrics.len();
+                let byte_size = metrics
+                    .iter()
+                    .map(|(_, (metric, _))| metric.estimated_json_encoded_size_of())
+                    .sum();
 
-            *response.body_mut() = body.into();
+                let mut collector = StringCollector::new();
 
-            response.headers_mut().insert(
-                "Content-Type",
-                HeaderValue::from_static("text/plain; version=0.0.4"),
-            );
+                for (_, (metric, _)) in metrics.iter() {
+                    collector.encode_metric(
+                        self.default_namespace.as_deref(),
+                        &self.buckets,
+                        &self.quantiles,
+                        metric,
+                    );
+                }
 
-            bytes_sent.emit(ByteSize(body_size));
+                drop(metrics);
 
-            emit!(EventsSent {
-                count,
-                byte_size,
-                output: None
-            });
+                let body = collector.finish();
+                let body_size = body.size_of();
+
+                *response.body_mut() = body.into();
+
+                response.headers_mut().insert(
+                    "Content-Type",
+                    HeaderValue::from_static("text/plain; version=0.0.4"),
+                );
+
+                self.events_sent.emit(CountByteSize(count, byte_size));
+                self.bytes_sent.emit(ByteSize(body_size));
+            }
+
+            (true, _, _) => {
+                *response.status_mut() = StatusCode::NOT_FOUND;
+            }
         }
 
-        (true, _, _) => {
-            *response.status_mut() = StatusCode::NOT_FOUND;
-        }
+        response
     }
-
-    response
 }
 
 impl PrometheusExporter {
@@ -443,41 +452,32 @@ impl PrometheusExporter {
         }
     }
 
-    async fn start_server_if_needed(&mut self) {
+    async fn start_server_if_needed(&mut self) -> crate::Result<()> {
         if self.server_shutdown_trigger.is_some() {
-            return;
+            return Ok(());
         }
 
-        let bytes_sent = register!(BytesSent::from(Protocol::HTTP));
+        let handler = Handler {
+            bytes_sent: register!(BytesSent::from(Protocol::HTTP)),
+            events_sent: register!(EventsSent::from(Output(None))),
+            default_namespace: self.config.default_namespace.clone(),
+            buckets: self.config.buckets.clone().into(),
+            quantiles: self.config.quantiles.clone().into(),
+            auth: self.config.auth.clone(),
+        };
 
         let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
-        let default_namespace = self.config.default_namespace.clone();
-        let buckets = self.config.buckets.clone();
-        let quantiles = self.config.quantiles.clone();
-        let auth = self.config.auth.clone();
 
         let new_service = make_service_fn(move |_| {
             let span = Span::current();
             let metrics = Arc::clone(&metrics);
-            let default_namespace = default_namespace.clone();
-            let buckets = buckets.clone();
-            let quantiles = quantiles.clone();
-            let bytes_sent = bytes_sent.clone();
-            let auth = auth.clone();
+            let handler = handler.clone();
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
                     span.in_scope(|| {
-                        let response = handle(
-                            req,
-                            &auth,
-                            default_namespace.as_deref(),
-                            &buckets,
-                            &quantiles,
-                            &metrics,
-                            &bytes_sent,
-                        );
+                        let response = handler.handle(req, &metrics);
 
                         emit!(PrometheusServerRequestComplete {
                             status_code: response.status(),
@@ -494,14 +494,10 @@ impl PrometheusExporter {
         let tls = self.config.tls.clone();
         let address = self.config.address;
 
-        tokio::spawn(async move {
-            let tls = MaybeTlsSettings::from_config(&tls, true)
-                .map_err(|error| error!("Server TLS error: {}.", error))?;
-            let listener = tls
-                .bind(&address)
-                .await
-                .map_err(|error| error!("Server bind error: {}.", error))?;
+        let tls = MaybeTlsSettings::from_config(&tls, true)?;
+        let listener = tls.bind(&address).await?;
 
+        tokio::spawn(async move {
             info!(message = "Building HTTP server.", address = %address);
 
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
@@ -515,13 +511,16 @@ impl PrometheusExporter {
         });
 
         self.server_shutdown_trigger = Some(trigger);
+        Ok(())
     }
 }
 
 #[async_trait]
 impl StreamSink<Event> for PrometheusExporter {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        self.start_server_if_needed().await;
+        self.start_server_if_needed()
+            .await
+            .map_err(|error| error!("Failed to start Prometheus exporter: {}.", error))?;
 
         let mut last_flush = Instant::now();
         let flush_period = self.config.flush_period_secs;
@@ -602,7 +601,10 @@ mod tests {
         finalization::{BatchNotifier, BatchStatus},
         sensitive_string::SensitiveString,
     };
-    use vector_core::{event::StatisticKind, metric_tags, samples};
+    use vector_core::{
+        event::{MetricTags, StatisticKind},
+        metric_tags, samples,
+    };
 
     use super::*;
     use crate::{
@@ -828,6 +830,35 @@ mod tests {
         );
     }
 
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we only publish the last tag in the list.
+    #[tokio::test]
+    async fn prometheus_duplicate_labels() {
+        let (name, event) = create_metric_with_tags(
+            None,
+            MetricValue::Gauge { value: 123.4 },
+            Some(metric_tags!("code" => "200", "code" => "success")),
+        );
+        let events = vec![event];
+
+        let response_result = export_and_fetch_with_auth(None, None, events, false).await;
+
+        assert!(response_result.is_ok());
+
+        let body = response_result.expect("Cannot extract body from the response");
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{code="success"}} 123.4
+            "# },
+            name = name
+        )));
+    }
+
     async fn export_and_fetch(
         tls_config: Option<TlsEnableableConfig>,
         mut events: Vec<Event>,
@@ -1000,9 +1031,17 @@ mod tests {
     }
 
     pub(self) fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
+        create_metric_with_tags(name, value, Some(metric_tags!("some_tag" => "some_value")))
+    }
+
+    pub(self) fn create_metric_with_tags(
+        name: Option<String>,
+        value: MetricValue,
+        tags: Option<MetricTags>,
+    ) -> (String, Event) {
         let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
         let event = Metric::new(name.clone(), MetricKind::Incremental, value)
-            .with_tags(Some(metric_tags!("some_tag" => "some_value")))
+            .with_tags(tags)
             .into();
         (name, event)
     }

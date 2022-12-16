@@ -55,6 +55,40 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 				required:    true
 				type: string: syntax: "literal"
 			}
+			imds: {
+				description: "Configuration for authenticating with AWS through IMDS."
+				required:    false
+				type: object: {
+					default: {
+						connect_timeout_seconds: 1
+						max_attempts:            4
+						read_timeout_seconds:    1
+					}
+					options: {
+						connect_timeout_seconds: {
+							description: "Connect timeout for IMDS."
+							required:    false
+							type: uint: {
+								default: 1
+								unit:    "seconds"
+							}
+						}
+						max_attempts: {
+							description: "Number of IMDS retries for fetching tokens and metadata."
+							required:    false
+							type: uint: default: 4
+						}
+						read_timeout_seconds: {
+							description: "Read timeout for IMDS."
+							required:    false
+							type: uint: {
+								default: 1
+								unit:    "seconds"
+							}
+						}
+					}
+				}
+			}
 			load_timeout_secs: {
 				description: "Timeout for successfully loading any credentials, in seconds."
 				required:    false
@@ -109,27 +143,27 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 		}
 	}
 	compression: {
-		description: "Compression configuration."
-		required:    false
-		type: {
-			object: options: {
-				algorithm: {
-					required: false
-					type: string: {
-						const:   "zlib"
-						default: "none"
-					}
-				}
-				level: {
-					description: "Compression level."
-					required:    false
-					type: {
-						string: enum: ["none", "fast", "best", "default"]
-						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-					}
-				}
+		description: """
+			Compression configuration.
+
+			All compression algorithms use the default compression level unless otherwise specified.
+			"""
+		required: false
+		type: string: {
+			default: "none"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://zlib.net/
+					"""
 			}
-			string: enum: ["none", "gzip", "zlib"]
 		}
 	}
 	default_namespace: {
@@ -221,11 +255,11 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
 						const:   "adaptive"
 						default: "none"
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -274,7 +308,7 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 		}
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

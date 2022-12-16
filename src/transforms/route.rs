@@ -66,13 +66,6 @@ pub struct RouteConfig {
     route: IndexMap<String, AnyCondition>,
 }
 
-#[cfg(feature = "transforms-pipelines")]
-impl RouteConfig {
-    pub(crate) const fn new(route: IndexMap<String, AnyCondition>) -> Self {
-        Self { route }
-    }
-}
-
 impl GenerateConfig for RouteConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
