@@ -956,8 +956,11 @@ def resolve_bare_schema(root_schema, schema)
 end
 
 def resolve_enum_schema(root_schema, schema)
-  # Filter out all subschemas which are purely null schemas used for indicating optionality.
-  subschemas = schema['oneOf'].reject { |subschema| subschema['type'] == 'null' }
+  # Filter out all subschemas which are purely null schemas used for indicating optionality, as well
+  # as any subschemas that are marked as being hidden.
+  subschemas = schema['oneOf']
+    .reject { |subschema| subschema['type'] == 'null' }
+    .reject { |subschema| get_schema_metadata(subschema, 'docs::hidden') }
   subschema_count = subschemas.count
 
   # If we only have one subschema after filtering, check to see if it's an `allOf` schema. If so, we
