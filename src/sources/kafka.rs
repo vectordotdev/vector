@@ -53,6 +53,10 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
+struct Metrics {
+    topic_lag_metric: bool,
+}
+
 /// Configuration for the `kafka` source.
 #[configurable_component(source("kafka"))]
 #[derive(Clone, Debug, Derivative)]
@@ -163,6 +167,8 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    metrics: Metrics,
 }
 
 impl KafkaSourceConfig {
