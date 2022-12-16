@@ -29,7 +29,7 @@ where
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let concurrency_limit = NonZeroUsize::new(50);
 
-        let driver = input
+        input
             .filter_map(ensure_required_fields)
             .request_builder(concurrency_limit, DatadogEventsRequestBuilder::new())
             .filter_map(|request| async move {
@@ -41,8 +41,9 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-        driver.run().await
+            .into_driver(self.service)
+            .run()
+            .await
     }
 }
 

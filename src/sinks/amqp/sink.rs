@@ -133,7 +133,7 @@ impl AmqpSink {
             channel: Arc::clone(&self.channel),
         });
 
-        let sink = input
+        input
             .filter_map(|event| std::future::ready(self.make_amqp_event(event)))
             .request_builder(None, request_builder)
             .filter_map(|request| async move {
@@ -145,9 +145,10 @@ impl AmqpSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(service);
-
-        sink.run().await
+            .into_driver(service)
+            .protocol("amqp_0_9_1")
+            .run()
+            .await
     }
 }
 

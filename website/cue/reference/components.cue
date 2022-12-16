@@ -178,6 +178,8 @@ components: {
 		}
 		let Args = _args
 
+		auto_generated: bool | *false
+
 		if Args.kind == "source" {
 			acknowledgements: bool
 			collect?:         #FeaturesCollect
@@ -210,9 +212,10 @@ components: {
 				enabled: true
 			}
 
-			// `healtcheck` notes if a component offers a healthcheck on boot.
+			// `healthcheck` notes if a component offers a healthcheck on boot.
 			healthcheck: {
-				enabled: bool
+				enabled:   bool
+				uses_uri?: bool
 			}
 
 			exposes?: #FeaturesExpose
@@ -934,25 +937,6 @@ components: {
 						},
 					]
 					options: {}
-				}
-			}
-
-			if Kind != "source" && Kind != "transform" {
-				inputs: {
-					description: """
-						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))
-						IDs. Wildcards (`*`) are supported.
-
-						See [configuration](\(urls.vector_configuration)) for more info.
-						"""
-					required:    true
-					sort:        -1
-					type: array: items: type: string: {
-						examples: [
-							"my-source-or-transform-id",
-							"prefix-*",
-						]
-					}
 				}
 			}
 

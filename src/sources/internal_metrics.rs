@@ -1,6 +1,7 @@
 use futures::StreamExt;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::EstimatedJsonEncodedSizeOf;
@@ -122,6 +123,7 @@ struct InternalMetrics<'a> {
 
 impl<'a> InternalMetrics<'a> {
     async fn run(mut self) -> Result<(), ()> {
+        let events_received = register!(EventsReceived);
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
         while interval.next().await.is_some() {
@@ -133,7 +135,7 @@ impl<'a> InternalMetrics<'a> {
             let byte_size = metrics.estimated_json_encoded_size_of();
 
             emit!(InternalMetricsBytesReceived { byte_size });
-            emit!(EventsReceived { count, byte_size });
+            events_received.emit(CountByteSize(count, byte_size));
 
             let batch = metrics.into_iter().map(|mut metric| {
                 // A metric starts out with a default "vector" namespace, but will be overridden

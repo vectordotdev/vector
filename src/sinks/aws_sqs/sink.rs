@@ -50,7 +50,7 @@ impl SqsSink {
             .settings(request, super::retry::SqsRetryLogic)
             .service(self.service);
 
-        let sink = input
+        input
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|req| async move {
                 req.map_err(|error| {
@@ -58,9 +58,9 @@ impl SqsSink {
                 })
                 .ok()
             })
-            .into_driver(service);
-
-        sink.run().await
+            .into_driver(service)
+            .run()
+            .await
     }
 }
 

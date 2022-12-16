@@ -14,7 +14,7 @@ use vector_core::{
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
-    aws::RegionOrEndpoint,
+    aws::{ImdsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -252,6 +252,7 @@ async fn auto_version_aws() {
     let config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
+            imds: ImdsAuthentication::default(),
         })),
         endpoints: vec![aws_server()],
         aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -331,6 +332,7 @@ async fn insert_events_on_aws() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
+                imds: ImdsAuthentication::default(),
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -351,6 +353,7 @@ async fn insert_events_on_aws_with_compression() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
+                imds: ImdsAuthentication::default(),
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),

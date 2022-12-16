@@ -13,13 +13,14 @@ use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use futures::{Stream, StreamExt};
-use lookup::lookup_v2::parse_value_path;
-use lookup::{metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{
+    lookup_v2::{parse_value_path, OptionalValuePath},
+    metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
-use value::kind::Collection;
-use value::Kind;
+use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
@@ -71,7 +72,7 @@ pub struct DockerLogsConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "host_key")]
-    host_key: String,
+    host_key: OptionalValuePath,
 
     /// Docker host to connect to.
     ///
@@ -161,8 +162,8 @@ impl Default for DockerLogsConfig {
     }
 }
 
-fn host_key() -> String {
-    log_schema().host_key().to_string()
+fn host_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
 }
 
 impl DockerLogsConfig {
@@ -238,14 +239,13 @@ impl SourceConfig for DockerLogsConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
+
         let schema_definition = BytesDeserializerConfig
-            .schema_definition(log_namespace)
+            .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(self
-                    .host_key
-                    .as_str()))),
+                host_key,
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
@@ -636,7 +636,7 @@ impl DockerLogsSource {
 /// Used to construct and start event stream futures
 #[derive(Clone)]
 struct EventStreamBuilder {
-    host_key: String,
+    host_key: OptionalValuePath,
     hostname: Option<String>,
     core: Arc<DockerLogsSourceCore>,
     /// Event stream futures send events through this
@@ -773,7 +773,7 @@ impl EventStreamBuilder {
                 Box::new(events_stream)
             };
 
-        let host_key = self.host_key.clone();
+        let host_key = self.host_key.clone().path;
         let hostname = self.hostname.clone();
         let result = {
             let mut stream = events_stream
@@ -810,15 +810,17 @@ impl EventStreamBuilder {
 
 fn add_hostname(
     mut log: LogEvent,
-    host_key: &str,
+    host_key: &Option<OwnedValuePath>,
     hostname: &Option<String>,
     log_namespace: LogNamespace,
 ) -> LogEvent {
     if let Some(hostname) = hostname {
+        let legacy_host_key = host_key.as_ref().map(LegacyKey::Overwrite);
+
         log_namespace.insert_source_metadata(
             DockerLogsConfig::NAME,
             &mut log,
-            Some(LegacyKey::Overwrite(host_key)),
+            legacy_host_key,
             path!("host"),
             hostname.clone(),
         );

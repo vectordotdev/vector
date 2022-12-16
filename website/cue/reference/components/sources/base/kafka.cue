@@ -26,10 +26,7 @@ base: components: sources: kafka: configuration: {
 			See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for the `auto.offset.reset` option for further clarification.
 			"""
 		required: false
-		type: string: {
-			default: "largest"
-			syntax:  "literal"
-		}
+		type: string: default: "largest"
 	}
 	bootstrap_servers: {
 		description: """
@@ -41,7 +38,7 @@ base: components: sources: kafka: configuration: {
 			Must be in the form of `host:port`, and comma-separated.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	commit_interval_ms: {
 		description: "The frequency that the consumer offsets are committed (written) to offset storage, in milliseconds."
@@ -52,7 +49,8 @@ base: components: sources: kafka: configuration: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
@@ -68,13 +66,17 @@ base: components: sources: kafka: configuration: {
 						[json]: https://www.json.org/
 						"""
 					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -129,7 +131,8 @@ base: components: sources: kafka: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
@@ -174,7 +177,7 @@ base: components: sources: kafka: configuration: {
 	group_id: {
 		description: "The consumer group name to be used to consume events from Kafka."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	headers_key: {
 		description: """
@@ -185,10 +188,7 @@ base: components: sources: kafka: configuration: {
 			By default, `"headers"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "headers"
-			syntax:  "literal"
-		}
+		type: string: default: "headers"
 	}
 	key_field: {
 		description: """
@@ -199,10 +199,7 @@ base: components: sources: kafka: configuration: {
 			By default, `"message_key"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "message_key"
-			syntax:  "literal"
-		}
+		type: string: default: "message_key"
 	}
 	librdkafka_options: {
 		description: """
@@ -212,13 +209,8 @@ base: components: sources: kafka: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Advanced options set directly on the underlying `librdkafka` client.
-
-				See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
-				"""
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 	offset_key: {
@@ -230,10 +222,7 @@ base: components: sources: kafka: configuration: {
 			By default, `"offset"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "offset"
-			syntax:  "literal"
-		}
+		type: string: default: "offset"
 	}
 	partition_key: {
 		description: """
@@ -244,10 +233,7 @@ base: components: sources: kafka: configuration: {
 			By default, `"partition"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "partition"
-			syntax:  "literal"
-		}
+		type: string: default: "partition"
 	}
 	sasl: {
 		description: "Configuration for SASL authentication when interacting with Kafka."
@@ -271,17 +257,17 @@ base: components: sources: kafka: configuration: {
 			mechanism: {
 				description: "The SASL mechanism to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			password: {
 				description: "The SASL password."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			username: {
 				description: "The SASL username."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -307,7 +293,7 @@ base: components: sources: kafka: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -316,7 +302,7 @@ base: components: sources: kafka: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -328,7 +314,7 @@ base: components: sources: kafka: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -347,7 +333,7 @@ base: components: sources: kafka: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -356,7 +342,7 @@ base: components: sources: kafka: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """
@@ -399,10 +385,7 @@ base: components: sources: kafka: configuration: {
 			By default, `"topic"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "topic"
-			syntax:  "literal"
-		}
+		type: string: default: "topic"
 	}
 	topics: {
 		description: """
@@ -411,6 +394,6 @@ base: components: sources: kafka: configuration: {
 			Regular expression syntax is supported if the topic begins with `^`.
 			"""
 		required: true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 }

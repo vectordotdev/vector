@@ -186,7 +186,6 @@ impl tokio_util::codec::Encoder<()> for Framer {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
-#[configurable(description = "Configures how events are encoded into raw bytes.")]
 #[configurable(metadata(docs::enum_tag_description = "The codec to use for encoding events."))]
 pub enum SerializerConfig {
     /// Encodes an event as an [Apache Avro][apache_avro] message.
@@ -212,13 +211,17 @@ pub enum SerializerConfig {
     /// [logfmt]: https://brandur.org/logfmt
     Logfmt,
 
-    /// Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf]([EXPERIMENTAL][experimental]).
+    /// Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+    ///
+    /// This codec is **[experimental][experimental]**.
     ///
     /// [vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
 
-    /// Encodes an event in Vector’s [native JSON format][vector_native_json]([EXPERIMENTAL][experimental]).
+    /// Encodes an event in Vector’s [native JSON format][vector_native_json].
+    ///
+    /// This codec is **[experimental][experimental]**.
     ///
     /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -309,6 +312,32 @@ impl SerializerConfig {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
             SerializerConfig::Text => Ok(Serializer::Text(TextSerializerConfig.build())),
+        }
+    }
+
+    /// Return an appropriate default framer for the given serializer.
+    pub fn default_stream_framing(&self) -> FramingConfig {
+        match self {
+            // TODO: Technically, Avro messages are supposed to be framed[1] as a vector of
+            // length-delimited buffers -- `len` as big-endian 32-bit unsigned integer, followed by
+            // `len` bytes -- with a "zero-length buffer" to terminate the overall message... which
+            // our length delimited framer obviously will not do.
+            //
+            // This is OK for now, because the Avro serializer is more ceremonial than anything
+            // else, existing to curry serializer config options to Pulsar's native client, not to
+            // actually serialize the bytes themselves... but we're still exposing this method and
+            // we should do so accurately, even if practically it doesn't need to be.
+            //
+            // [1]: https://avro.apache.org/docs/1.11.1/specification/_print/#message-framing
+            SerializerConfig::Avro { .. } | SerializerConfig::Native => {
+                FramingConfig::LengthDelimited
+            }
+            SerializerConfig::Gelf
+            | SerializerConfig::Json
+            | SerializerConfig::Logfmt
+            | SerializerConfig::NativeJson
+            | SerializerConfig::RawMessage
+            | SerializerConfig::Text => FramingConfig::NewlineDelimited,
         }
     }
 

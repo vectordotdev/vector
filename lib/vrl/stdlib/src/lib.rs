@@ -28,6 +28,8 @@
 
 mod util;
 
+#[cfg(feature = "abs")]
+mod abs;
 #[cfg(feature = "append")]
 mod append;
 #[cfg(feature = "array")]
@@ -321,6 +323,8 @@ mod values;
 
 // -----------------------------------------------------------------------------
 
+#[cfg(feature = "abs")]
+pub use abs::Abs;
 #[cfg(feature = "append")]
 pub use append::Append;
 #[cfg(feature = "assert")]
@@ -610,6 +614,8 @@ pub use crate::sha1::Sha1;
 #[must_use]
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
+        #[cfg(feature = "abs")]
+        Box::new(Abs),
         #[cfg(feature = "append")]
         Box::new(Append),
         #[cfg(feature = "array")]

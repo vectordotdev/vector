@@ -3,6 +3,7 @@ package metadata
 components: sinks: _splunk_hec: {
 	configuration: {
 		acknowledgements: {
+			required: false
 			type: object: {
 				options: {
 					indexer_acknowledgements_enabled: {

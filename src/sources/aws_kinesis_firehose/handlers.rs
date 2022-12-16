@@ -10,7 +10,9 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::{
     finalization::AddBatchNotifier,
-    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Registered},
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
+    },
 };
 use vector_config::NamedComponent;
 use vector_core::{
@@ -54,6 +56,7 @@ pub(super) async fn firehose(
     mut context: Context,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     let log_namespace = context.log_namespace;
+    let events_received = register!(EventsReceived);
 
     for record in request.records {
         let bytes = decode_record(&record, context.compression)
@@ -67,10 +70,10 @@ pub(super) async fn firehose(
         loop {
             match stream.next().await {
                 Some(Ok((mut events, _byte_size))) => {
-                    emit!(EventsReceived {
-                        count: events.len(),
-                        byte_size: events.estimated_json_encoded_size_of(),
-                    });
+                    events_received.emit(CountByteSize(
+                        events.len(),
+                        events.estimated_json_encoded_size_of(),
+                    ));
 
                     let (batch, receiver) = context
                         .acknowledgements
