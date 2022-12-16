@@ -756,7 +756,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         Ok(log.into())
     }
 
-    /// Build the log event for the vector namespace.
+    /// Build the log event for the namespace.
     /// In this namespace the log event is created entirely from the event field.
     /// No renaming of the `line` field is done.
     fn build_log_vector(&mut self, json: &mut JsonValue) -> Result<LogEvent, Rejection> {
