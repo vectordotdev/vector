@@ -89,11 +89,11 @@ base: components: sinks: pulsar: configuration: {
 		type: string: {
 			default: "none"
 			enum: {
-				none:   "No compression."
 				lz4:    "LZ4."
+				none:   "No compression."
+				snappy: "Snappy."
 				zlib:   "Zlib."
 				zstd:   "Zstandard."
-				snappy: "Snappy."
 			}
 		}
 	}
