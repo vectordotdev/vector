@@ -193,6 +193,16 @@ components: sinks: prometheus_remote_write: {
 		traces: false
 	}
 
+	how_it_works: {
+		multi_value_tags: {
+			title: "Multivalue Tags"
+			body: """
+				Duplicate tag names are invalid within Prometheus and Prometheus will reject a metric with duplicate
+				tags. When sending a tag with multiple values, Vector will send the last value specified.
+				"""
+		}
+	}
+
 	telemetry: metrics: {
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
