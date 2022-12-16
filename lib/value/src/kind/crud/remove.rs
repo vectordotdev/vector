@@ -53,7 +53,7 @@ impl Kind {
                             object
                                 .known_mut()
                                 .get_mut(&Field::from(field.clone()))
-                                .map_or(&mut at_path_kind, |child| child)
+                                .unwrap_or(&mut at_path_kind)
                                 .remove_inner(&segments[1..], compact)
                                 .compact(object, field.clone(), compact)
                         })
@@ -106,7 +106,7 @@ impl Kind {
                         array
                             .known_mut()
                             .get_mut(&(index as usize).into())
-                            .map_or(&mut at_path_kind, |child| child)
+                            .unwrap_or(&mut at_path_kind)
                             .remove_inner(&segments[1..], compact)
                             .compact(array, index as usize, compact)
                     } else {
