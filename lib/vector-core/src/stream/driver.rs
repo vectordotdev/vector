@@ -4,25 +4,26 @@ use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::{BytesSent, CallError, CountByteSize, PollReadyError};
+use vector_common::internal_event::{
+    register, ByteSize, BytesSent, CallError, CountByteSize, EventsSent, InternalEventHandle as _,
+    Output, PollReadyError, Registered, SharedString,
+};
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 
 use super::FuturesUnorderedCount;
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::{emit, EventsSent},
+    internal_event::emit,
 };
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> CountByteSize;
 
-    /// Return a tuple containing the number of bytes that were sent in the
-    /// request that returned this response together with the protocol the
-    /// bytes were sent over.
+    /// Return the number of bytes that were sent in the request that returned this response.
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
+    fn bytes_sent(&self) -> Option<usize> {
         None
     }
 }
@@ -43,11 +44,26 @@ pub trait DriverResponse {
 pub struct Driver<St, Svc> {
     input: St,
     service: Svc,
+    protocol: Option<SharedString>,
 }
 
 impl<St, Svc> Driver<St, Svc> {
     pub fn new(input: St, service: Svc) -> Self {
-        Self { input, service }
+        Self {
+            input,
+            service,
+            protocol: None,
+        }
+    }
+
+    /// Set the protocol name for this driver.
+    ///
+    /// If this is set, the driver will fetch and use the `bytes_sent` value from responses in a
+    /// `BytesSent` event.
+    #[must_use]
+    pub fn protocol(mut self, protocol: impl Into<SharedString>) -> Self {
+        self.protocol = Some(protocol.into());
+        self
     }
 }
 
@@ -73,10 +89,17 @@ where
         let mut next_batch: Option<VecDeque<St::Item>> = None;
         let mut seq_num = 0usize;
 
-        let Self { input, mut service } = self;
+        let Self {
+            input,
+            mut service,
+            protocol,
+        } = self;
 
         let batched_input = input.ready_chunks(1024);
         pin!(batched_input);
+
+        let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
+        let events_sent = register(EventsSent::from(Output(None)));
 
         loop {
             // Core behavior of the loop:
@@ -142,12 +165,21 @@ where
                             request_id,
                         );
                         let finalizers = req.take_finalizers();
+                        let bytes_sent = bytes_sent.clone();
+                        let events_sent = events_sent.clone();
 
                         let metadata = req.get_metadata();
 
                         let fut = svc.call(req)
                             .err_into()
-                            .map(move |result| Self::handle_response(result, request_id, finalizers, &metadata))
+                            .map(move |result| Self::handle_response(
+                                result,
+                                request_id,
+                                finalizers,
+                                &metadata,
+                                &bytes_sent,
+                                &events_sent,
+                            ))
                             .instrument(info_span!("request", request_id).or_current());
 
                         in_flight.push(fut);
@@ -171,6 +203,8 @@ where
         request_id: usize,
         finalizers: EventFinalizers,
         metadata: &RequestMetadata,
+        bytes_sent: &Option<Registered<BytesSent>>,
+        events_sent: &Registered<EventsSent>,
     ) {
         match result {
             Err(error) => {
@@ -181,19 +215,12 @@ where
                 trace!(message = "Service call succeeded.", request_id);
                 finalizers.update_status(response.event_status());
                 if response.event_status() == EventStatus::Delivered {
-                    if let Some((byte_size, protocol)) = response.bytes_sent() {
-                        emit(BytesSent {
-                            byte_size,
-                            protocol: protocol.to_string().into(),
-                        });
+                    if let Some(bytes_sent) = bytes_sent {
+                        if let Some(byte_size) = response.bytes_sent() {
+                            bytes_sent.emit(ByteSize(byte_size));
+                        }
                     }
-                    let cbs = response.events_sent();
-                    emit(EventsSent {
-                        count: cbs.0,
-                        byte_size: cbs.1,
-                        output: None,
-                    });
-
+                    events_sent.emit(response.events_sent());
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
                 } else if response.event_status() == EventStatus::Rejected {
                     Self::emit_call_error(None, request_id, metadata.event_count());

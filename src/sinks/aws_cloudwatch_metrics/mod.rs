@@ -13,7 +13,7 @@ use futures_util::{future, future::BoxFuture};
 use std::task::{Context, Poll};
 use tower::Service;
 use vector_config::configurable_component;
-use vector_core::{sink::VectorSink, ByteSizeOf};
+use vector_core::{sink::VectorSink, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     aws::{
@@ -196,9 +196,9 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
 }
 
 fn tags_to_dimensions(tags: &MetricTags) -> Vec<Dimension> {
-    // according to the API, up to 10 dimensions per metric can be provided
+    // according to the API, up to 30 dimensions per metric can be provided
     tags.iter_single()
-        .take(10)
+        .take(30)
         .map(|(k, v)| Dimension::builder().name(k).value(v).build())
         .collect()
 }
@@ -230,7 +230,7 @@ impl CloudWatchMetricsSvc {
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter({
-                    let byte_size = event.size_of();
+                    let byte_size = event.estimated_json_encoded_size_of();
                     normalizer.normalize(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()

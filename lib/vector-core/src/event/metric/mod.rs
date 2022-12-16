@@ -13,7 +13,10 @@ use vector_config::configurable_component;
 use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
-    event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
+    event::{
+        estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
+        EventFinalizers, EventMetadata, Finalizable,
+    },
     ByteSizeOf,
 };
 
@@ -346,6 +349,14 @@ impl Metric {
         self.series.replace_tag(name, value)
     }
 
+    pub fn set_multi_value_tag(
+        &mut self,
+        name: String,
+        values: impl IntoIterator<Item = TagValue>,
+    ) {
+        self.series.set_multi_value_tag(name, values);
+    }
+
     /// Zeroes out the data in this metric.
     pub fn zero(&mut self) {
         self.data.zero();
@@ -435,6 +446,14 @@ impl ByteSizeOf for Metric {
         self.series.allocated_bytes()
             + self.data.allocated_bytes()
             + self.metadata.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for Metric {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        // TODO: For now we're using the in-memory representation of the metric, but we'll convert
+        // this to actually calculate the JSON encoded size in the near future.
+        self.size_of()
     }
 }
 

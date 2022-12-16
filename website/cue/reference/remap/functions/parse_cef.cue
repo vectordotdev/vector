@@ -18,6 +18,12 @@ remap: functions: parse_cef: {
 			required:    true
 			type: ["string"]
 		},
+		{
+			name:        "translate_custom_fields"
+			description: "Toggles translation of custom field pairs to `key: value`."
+			required:    false
+			type: ["boolean"]
+		},
 	]
 	internal_failure_reasons: [
 		"`value` isn't a properly formatted CEF string",
@@ -78,6 +84,24 @@ remap: functions: parse_cef: {
 				"spt":                "1232"
 			}
 		},
-
+		{
+			title: "Translate custom fields"
+			source: #"""
+				parse_cef!(
+					"CEF:0|Dev|firewall|2.2|1|Connection denied|5|c6a1=2345:0425:2CA1:0000:0000:0567:5673:23b5 c6a1Label=Device IPv6 Address",
+					translate_custom_fields: true
+				)
+				"""#
+			return: {
+				"cefVersion":          "0"
+				"deviceVendor":        "Dev"
+				"deviceProduct":       "firewall"
+				"deviceVersion":       "2.2"
+				"deviceEventClassId":  "1"
+				"name":                "Connection denied"
+				"severity":            "5"
+				"Device IPv6 Address": "2345:0425:2CA1:0000:0000:0567:5673:23b5"
+			}
+		},
 	]
 }

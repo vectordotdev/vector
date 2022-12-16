@@ -305,7 +305,7 @@ test-docs: ## Run the docs test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-all
-test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behavioral, and integration.
+test-all: test test-docs test-behavior test-integration test-component-validation ## Runs all tests: unit, docs, behavioral, integration, and component validation.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
@@ -327,10 +327,6 @@ test-behavior-%: ## Runs behavioral test for a given category
 .PHONY: test-behavior
 test-behavior: ## Runs all behavioral tests
 test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
-
-.PHONY: test-enterprise
-test-enterprise: ## Runs enterprise related behavioral tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "enterprise-tests" --test enterprise
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
@@ -387,7 +383,11 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test cli --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
+
+.PHONY: test-component-validation
+test-component-validation: ## Runs component validation tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 components::validation::tests
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 

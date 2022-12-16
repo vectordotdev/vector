@@ -153,14 +153,10 @@ impl GenerateConfig for LogplexConfig {
 #[async_trait::async_trait]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            LogNamespace::Legacy,
-        )
-        .build();
-
         let log_namespace = cx.log_namespace(self.log_namespace);
+
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),

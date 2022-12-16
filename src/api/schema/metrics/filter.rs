@@ -229,6 +229,34 @@ pub fn component_counter_metrics(
     })
 }
 
+/// Returns a stream of `Vec<Metric>`, where `metric_name` matches the name of the metric
+/// (e.g. "processed_events_total"), and the value is derived from `MetricValue::Gauge`. Uses a
+/// local cache to match against the `component_id` of a metric, to return results only when
+/// the value of a current iteration is greater than the previous. This is useful for the client
+/// to be notified as metrics increase without returning 'empty' or identical results.
+pub fn component_gauge_metrics(
+    interval: i32,
+    filter_fn: &'static MetricFilterFn,
+) -> impl Stream<Item = Vec<Metric>> {
+    let mut cache = BTreeMap::new();
+
+    component_to_filtered_metrics(interval, filter_fn).map(move |map| {
+        map.into_iter()
+            .filter_map(|(id, metrics)| {
+                let m = sum_metrics_owned(metrics)?;
+                match m.value() {
+                    MetricValue::Gauge { value }
+                        if cache.insert(id, *value).unwrap_or(0.00) < *value =>
+                    {
+                        Some(m)
+                    }
+                    _ => None,
+                }
+            })
+            .collect()
+    })
+}
+
 /// Returns the throughput of a 'counter' metric, sampled over `interval` milliseconds
 /// and filtered by the provided `filter_fn`.
 pub fn counter_throughput(

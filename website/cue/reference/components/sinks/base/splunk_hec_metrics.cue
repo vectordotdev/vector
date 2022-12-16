@@ -78,27 +78,27 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		}
 	}
 	compression: {
-		description: "Compression configuration."
-		required:    false
-		type: {
-			object: options: {
-				algorithm: {
-					required: false
-					type: string: {
-						const:   "zlib"
-						default: "none"
-					}
-				}
-				level: {
-					description: "Compression level."
-					required:    false
-					type: {
-						string: enum: ["none", "fast", "best", "default"]
-						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-					}
-				}
+		description: """
+			Compression configuration.
+
+			All compression algorithms use the default compression level unless otherwise specified.
+			"""
+		required: false
+		type: string: {
+			default: "none"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://zlib.net/
+					"""
 			}
-			string: enum: ["none", "gzip", "zlib"]
 		}
 	}
 	default_namespace: {
@@ -217,11 +217,11 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
 						const:   "adaptive"
 						default: "none"
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -290,7 +290,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		type: string: syntax: "template"
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
@@ -307,7 +307,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
 				type: string: syntax: "literal"

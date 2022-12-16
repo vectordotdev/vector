@@ -21,7 +21,7 @@ use tonic::{
 };
 use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vector_config::{configurable_component, NamedComponent};
@@ -270,9 +270,13 @@ impl SourceConfig for PubsubConfig {
 
         let token_generator = auth.spawn_regenerate_token();
 
+        let protocol = uri
+            .scheme()
+            .map(|scheme| Protocol(scheme.to_string().into()))
+            .unwrap_or(Protocol::HTTP);
+
         let source = PubsubSource {
             endpoint,
-            uri,
             auth,
             token_generator,
             subscription: format!(
@@ -294,6 +298,8 @@ impl SourceConfig for PubsubConfig {
             concurrency: Default::default(),
             full_response_size: self.full_response_size,
             log_namespace,
+            bytes_received: register!(BytesReceived::from(protocol)),
+            events_received: register!(EventsReceived),
         }
         .run_all(
             self.max_concurrency,
@@ -344,7 +350,6 @@ impl_generate_config_from_default!(PubsubConfig);
 #[derive(Clone)]
 struct PubsubSource {
     endpoint: Endpoint,
-    uri: Uri,
     auth: GcpAuthenticator,
     token_generator: watch::Receiver<()>,
     subscription: String,
@@ -361,6 +366,8 @@ struct PubsubSource {
     concurrency: Arc<AtomicUsize>,
     full_response_size: usize,
     log_namespace: LogNamespace,
+    bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
 }
 
 enum State {
@@ -480,13 +487,6 @@ impl PubsubSource {
             Finalizer::maybe_new(self.acknowledgements, self.shutdown.clone());
         let mut pending_acks = 0;
 
-        let protocol = self
-            .uri
-            .scheme()
-            .map(|scheme| Protocol(scheme.to_string().into()))
-            .unwrap_or(Protocol::HTTP);
-        let bytes_received = register!(BytesReceived::from(protocol));
-
         loop {
             tokio::select! {
                 biased;
@@ -507,7 +507,6 @@ impl PubsubSource {
                             &ack_ids_sender,
                             &mut pending_acks,
                             busy_flag,
-                            &bytes_received,
                         ).await;
                     }
                     Some(Err(error)) => break translate_error(error),
@@ -585,12 +584,11 @@ impl PubsubSource {
         ack_ids: &mpsc::Sender<Vec<String>>,
         pending_acks: &mut usize,
         busy_flag: &Arc<AtomicBool>,
-        bytes_received: &Registered<BytesReceived>,
     ) {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
-        bytes_received.emit(ByteSize(response.size_of()));
+        self.bytes_received.emit(ByteSize(response.size_of()));
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let (events, ids) = self.parse_messages(response.received_messages, batch).await;
@@ -634,7 +632,7 @@ impl PubsubSource {
     }
 
     fn parse_message<'a>(
-        &self,
+        &'a self,
         message: proto::PubsubMessage,
         batch: &'a Option<BatchNotifier>,
     ) -> impl Iterator<Item = Event> + 'a {
@@ -658,6 +656,7 @@ impl PubsubSource {
             }),
             batch,
             log_namespace,
+            &self.events_received,
         )
         .map(move |mut event| {
             if let Some(log) = event.maybe_as_log_mut() {

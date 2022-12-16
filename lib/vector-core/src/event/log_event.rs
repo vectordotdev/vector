@@ -14,12 +14,10 @@ use crossbeam_utils::atomic::AtomicCell;
 use lookup::lookup_v2::TargetPath;
 use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
-use vector_common::{
-    estimated_json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
-    EventDataEq,
-};
+use vector_common::EventDataEq;
 
 use super::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
@@ -79,9 +77,7 @@ impl EstimatedJsonEncodedSizeOf for Inner {
         self.json_encoded_size_cache
             .load()
             .unwrap_or_else(|| {
-                let value = JsonEncodedByteCountingValue(&self.fields);
-
-                let size = value.estimated_json_encoded_size_of();
+                let size = self.fields.estimated_json_encoded_size_of();
                 let size = NonZeroUsize::new(size).expect("Size cannot be zero");
 
                 self.json_encoded_size_cache.store(Some(size));
@@ -190,10 +186,6 @@ impl LogEvent {
             LogNamespace::Legacy
         }
     }
-
-    pub fn estimated_json_encoded_size_of(&self) -> usize {
-        self.inner.estimated_json_encoded_size_of()
-    }
 }
 
 impl ByteSizeOf for LogEvent {
@@ -205,6 +197,12 @@ impl ByteSizeOf for LogEvent {
 impl Finalizable for LogEvent {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for LogEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.inner.estimated_json_encoded_size_of()
     }
 }
 

@@ -7,6 +7,7 @@ use std::{
 use crate::ByteSizeOf;
 pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
+pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
@@ -25,6 +26,7 @@ pub use vrl_target::{TargetEvents, VrlTarget};
 pub mod array;
 pub mod discriminant;
 pub mod error;
+mod estimated_json_encoded_size_of;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
@@ -58,6 +60,16 @@ impl ByteSizeOf for Event {
             Event::Log(log_event) => log_event.allocated_bytes(),
             Event::Metric(metric_event) => metric_event.allocated_bytes(),
             Event::Trace(trace_event) => trace_event.allocated_bytes(),
+        }
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for Event {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        match self {
+            Event::Log(log_event) => log_event.estimated_json_encoded_size_of(),
+            Event::Metric(metric_event) => metric_event.estimated_json_encoded_size_of(),
+            Event::Trace(trace_event) => trace_event.estimated_json_encoded_size_of(),
         }
     }
 }
