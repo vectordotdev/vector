@@ -335,7 +335,9 @@ impl util::http::HttpSink for HttpSink {
         }
 
         for (header, value) in self.request.headers.iter() {
-            builder.headers_mut().expect("Failed to access headers")
+            builder
+                .headers_mut()
+                .expect("Failed to access headers")
                 .insert(HeaderName::try_from(header)?, HeaderValue::try_from(value)?);
         }
 
