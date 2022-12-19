@@ -229,6 +229,14 @@ base: components: sources: nats: configuration: {
 		required:    true
 		type: string: syntax: "template"
 	}
+	subject_key_field: {
+		description: "The `NATS` subject key."
+		required:    false
+		type: string: {
+			default: "subject"
+			syntax:  "literal"
+		}
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
