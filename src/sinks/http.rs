@@ -335,7 +335,11 @@ impl util::http::HttpSink for HttpSink {
         }
 
         for (header, value) in self.request.headers.iter() {
-            builder = builder.header(header.as_str(), value.as_str());
+            builder
+                .headers_mut()
+                // The request builder should not have errors at this point, and if it did it would fail in the call to `body()` also.
+                .expect("Failed to access headers in http::Request builder- builder has errors.")
+                .insert(HeaderName::try_from(header)?, HeaderValue::try_from(value)?);
         }
 
         let mut request = builder.body(body.freeze()).unwrap();
