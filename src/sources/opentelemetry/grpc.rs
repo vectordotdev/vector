@@ -34,7 +34,7 @@ impl LogsService for Service {
             .into_inner()
             .resource_logs
             .into_iter()
-            .flat_map(|v| v.into_iter(self.log_namespace))
+            .flat_map(|v| v.into_event_iter(self.log_namespace))
             .collect();
 
         let count = events.len();

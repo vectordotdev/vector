@@ -100,7 +100,7 @@ fn decode_body(
     let events: Vec<Event> = request
         .resource_logs
         .into_iter()
-        .flat_map(|v| v.into_iter(log_namespace))
+        .flat_map(|v| v.into_event_iter(log_namespace))
         .collect();
 
     events_received.emit(CountByteSize(

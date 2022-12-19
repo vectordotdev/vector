@@ -28,7 +28,7 @@ pub const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
 pub const FLAGS_KEY: &str = "flags";
 
 impl ResourceLogs {
-    pub fn into_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
+    pub fn into_event_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
         let resource = self.resource;
         let now = Utc::now();
 
@@ -40,7 +40,7 @@ impl ResourceLogs {
                     resource: resource.clone(),
                     log_record,
                 }
-                .into(log_namespace, now)
+                .into_event(log_namespace, now)
             })
     }
 }
@@ -82,7 +82,7 @@ fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
 
 // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.15.0/specification/logs/data-model.md
 impl ResourceLog {
-    fn into(self, log_namespace: LogNamespace, now: DateTime<Utc>) -> Event {
+    fn into_event(self, log_namespace: LogNamespace, now: DateTime<Utc>) -> Event {
         let mut log = match log_namespace {
             LogNamespace::Vector => {
                 if let Some(v) = self.log_record.body.and_then(|av| av.value) {
