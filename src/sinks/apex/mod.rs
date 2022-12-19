@@ -29,7 +29,7 @@ use crate::{
 pub struct ApexSinkConfig {
     /// The base URI of the Apex instance.
     ///
-    /// Vector will append `/add_events` to this.
+    /// `/add_events` is appended to this.
     uri: UriSerde,
 
     /// The ID of the project to associate reported logs with.

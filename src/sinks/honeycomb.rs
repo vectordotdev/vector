@@ -26,7 +26,7 @@ pub struct HoneycombConfig {
     /// The team key that will be used to authenticate against Honeycomb.
     api_key: SensitiveString,
 
-    /// The dataset that Vector will send logs to.
+    /// The dataset to which logs are sent.
     // TODO: we probably want to make this a template
     // but this limits us in how we can do our healthcheck.
     dataset: String,

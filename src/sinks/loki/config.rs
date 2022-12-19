@@ -64,7 +64,7 @@ fn default_loki_path() -> String {
 pub struct LokiConfig {
     /// The base URL of the Loki instance.
     ///
-    /// Vector will append the value of `path` to this.
+    /// The `path` value is appended to this.
     pub endpoint: UriSerde,
 
     /// The path to use in the URL of the Loki instance.
