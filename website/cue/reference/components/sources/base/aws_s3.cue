@@ -110,10 +110,10 @@ base: components: sources: aws_s3: configuration: {
 				auto: """
 					Automatically attempt to determine the compression scheme.
 
-					Vector will try to determine the compression scheme of the object from its: `Content-Encoding` and
-					`Content-Type` metadata, as well as the key suffix (e.g. `.gz`).
+					The compression scheme of the object is determined from its `Content-Encoding` and
+					`Content-Type` metadata, as well as the key suffix (for example, `.gz`).
 
-					It will fallback to 'none' if the compression scheme cannot be determined.
+					It is set to 'none' if the compression scheme cannot be determined.
 					"""
 				gzip: "GZIP."
 				none: "Uncompressed."
@@ -214,7 +214,7 @@ base: components: sources: aws_s3: configuration: {
 
 					Should not typically need to be changed, but it can sometimes be beneficial to raise this value when there is a
 					high rate of messages being pushed into the queue and the objects being fetched are small. In these cases,
-					Vector may not fully utilize system resources without fetching more messages per second, as the SQS message
+					System resources may not be fully utilized without fetching more messages per second, as the SQS message
 					consumption rate affects the S3 object retrieval rate.
 					"""
 				required: false
@@ -222,9 +222,9 @@ base: components: sources: aws_s3: configuration: {
 			}
 			delete_message: {
 				description: """
-					Whether to delete the message once Vector processes it.
+					Whether to delete the message once it is processed.
 
-					It can be useful to set this to `false` to debug or during initial Vector setup.
+					It can be useful to set this to `false` for debugging or during the initial setup.
 					"""
 				required: false
 				type: bool: default: true
@@ -331,12 +331,12 @@ base: components: sources: aws_s3: configuration: {
 			}
 			visibility_timeout_secs: {
 				description: """
-					The visibility timeout to use for messages, in secords.
+					The visibility timeout to use for messages, in seconds.
 
-					This controls how long a message is left unavailable after Vector receives it. If Vector receives a message, and
-					takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it will be made reavailable for another consumer.
+					This controls how long a message is left unavailable after it is received. If a message is received, and
+					takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it is made available again for another consumer.
 
-					This can happen if, for example, if Vector crashes between consuming a message and deleting it.
+					This can happen if there is an issue between consuming a message and deleting it.
 					"""
 				required: false
 				type: uint: default: 300

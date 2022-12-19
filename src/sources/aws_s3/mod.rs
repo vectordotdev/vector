@@ -31,10 +31,10 @@ pub mod sqs;
 pub enum Compression {
     /// Automatically attempt to determine the compression scheme.
     ///
-    /// Vector will try to determine the compression scheme of the object from its: `Content-Encoding` and
-    /// `Content-Type` metadata, as well as the key suffix (e.g. `.gz`).
+    /// The compression scheme of the object is determined from its `Content-Encoding` and
+    /// `Content-Type` metadata, as well as the key suffix (for example, `.gz`).
     ///
-    /// It will fallback to 'none' if the compression scheme cannot be determined.
+    /// It is set to 'none' if the compression scheme cannot be determined.
     #[derivative(Default)]
     Auto,
     /// Uncompressed.

@@ -83,6 +83,20 @@ base: components: sinks: pulsar: configuration: {
 			}
 		}
 	}
+	compression: {
+		description: "Supported compression types for Pulsar."
+		required:    false
+		type: string: {
+			default: "none"
+			enum: {
+				lz4:    "LZ4."
+				none:   "No compression."
+				snappy: "Snappy."
+				zlib:   "Zlib."
+				zstd:   "Zstandard."
+			}
+		}
+	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
 		required:    true
