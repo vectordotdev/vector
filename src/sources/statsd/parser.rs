@@ -135,10 +135,14 @@ fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
     Ok(input[1..]
         .split(',')
         .map(|chunk| {
-            let pair: Vec<_> = chunk.split(':').collect();
-            let key = &pair[0];
-            let tag_value: TagValue = pair.get(1).map(|s| String::from(s.to_owned())).into();
-            ((*key).to_owned(), tag_value)
+            match chunk.find(':') {
+                // the notation `tag:` is valid for statsd, the effect is an empty string value.
+                Some(colon) => (
+                    chunk[..colon].to_string(),
+                    TagValue::Value(chunk[colon + 1..].to_string()),
+                ),
+                None => (chunk.to_string(), TagValue::Bare),
+            }
         })
         .collect())
 }
@@ -255,7 +259,7 @@ mod test {
     #[test]
     fn enhanced_tags() {
         assert_event_data_eq!(
-            parse("foo:1|c|#tag1,tag2:valueA,tag2:valueB,tag3:value,tag3"),
+            parse("foo:1|c|#tag1,tag2:valueA,tag2:valueB,tag3:value,tag3,tag4:"),
             Ok(Metric::new(
                 "foo",
                 MetricKind::Incremental,
@@ -267,6 +271,7 @@ mod test {
                 "tag2" => "valueB",
                 "tag3" => "value",
                 "tag3" => TagValue::Bare,
+                "tag4" => "",
             )))),
         );
     }
