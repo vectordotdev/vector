@@ -255,15 +255,7 @@ impl MetricToLog {
 
     pub fn transform_one(&self, mut metric: Metric) -> Option<LogEvent> {
         if !self.enhanced_tags {
-            if let Some(tags) = metric.tags_mut() {
-                tags.retain(|_, values| match std::mem::take(values).into_single() {
-                    Some(tag) => {
-                        *values = [tag].into();
-                        true
-                    }
-                    None => false,
-                });
-            }
+            metric.reduce_tags_to_single();
         }
         serde_json::to_value(&metric)
             .map_err(|error| emit!(MetricToLogSerializeError { error }))

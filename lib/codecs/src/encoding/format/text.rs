@@ -78,15 +78,7 @@ impl Encoder<Event> for TextSerializer {
             }
             Event::Metric(mut metric) => {
                 if self.metric_tag_values == MetricTagValues::Single {
-                    if let Some(tags) = metric.tags_mut() {
-                        tags.retain(|_, values| match std::mem::take(values).into_single() {
-                            Some(tag) => {
-                                *values = [tag].into();
-                                true
-                            }
-                            None => false,
-                        });
-                    }
+                    metric.reduce_tags_to_single();
                 }
                 let bytes = metric.to_string();
                 buffer.put(bytes.as_ref());
