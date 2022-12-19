@@ -124,6 +124,17 @@ components: sources: statsd: {
 				[metric data model](\(urls.vector_metric)) page for more info.
 				"""
 		}
+		tags: {
+			title: "Tags"
+			body:  """
+				The StatsD protocol removes any colon character found after the tag key:value
+				separator. For instance, the tagset "tagA:val::ue", is parsed by StatsD as
+				"tagA=value".
+				Additionally, a trailing colon on the last tag in a tagset will be parsed as
+				having a value of an empty string. For instance, the tagset "tagA:value,tagB:",
+				is parsed by StatsD as "tagA=value,tagB=".
+				"""
+		}
 	}
 
 	telemetry: metrics: {
