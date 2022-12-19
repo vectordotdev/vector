@@ -80,6 +80,7 @@ impl Encoder<Event> for TextSerializer {
 mod tests {
     use bytes::{Bytes, BytesMut};
     use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue};
+    use vector_core::metric_tags;
 
     use super::*;
 
@@ -103,11 +104,49 @@ mod tests {
                 values: vec!["bob".into()].into_iter().collect(),
             },
         ));
-        let mut serializer = TextSerializer;
+        let mut serializer = TextSerializerConfig::default().build();
 
         let mut buffer = BytesMut::new();
         serializer.encode(input, &mut buffer).unwrap();
 
         assert_eq!(buffer.freeze(), Bytes::from("users{} + bob"));
+    }
+
+    #[test]
+    fn serialize_metric_tags_full() {
+        let mut serializer = TextSerializerConfig::default().build();
+
+        let mut buffer = BytesMut::new();
+        serializer.encode(metric2(), &mut buffer).unwrap();
+
+        assert_eq!(
+            buffer.freeze(),
+            Bytes::from(r#"counter{a="first",a,a="second"} + 1"#)
+        );
+    }
+
+    #[test]
+    fn serialize_metric_tags_single() {
+        let mut serializer = TextSerializerConfig::default().build();
+
+        let mut buffer = BytesMut::new();
+        serializer.encode(metric2(), &mut buffer).unwrap();
+
+        assert_eq!(buffer.freeze(), Bytes::from(r#"counter{a="second"} + 1"#));
+    }
+
+    fn metric2() -> Event {
+        Event::Metric(
+            Metric::new(
+                "counter",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags! (
+                "a" => "first",
+                "a" => None,
+                "a" => "second",
+            ))),
+        )
     }
 }
