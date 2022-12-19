@@ -108,6 +108,7 @@ pub struct CloudwatchLogsSinkConfig {
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     pub assume_role: Option<String>,
 
     #[configurable(derived)]

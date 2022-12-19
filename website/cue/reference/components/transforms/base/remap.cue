@@ -46,10 +46,7 @@ base: components: transforms: remap: configuration: {
 			[vrl]: https://vector.dev/docs/reference/vrl
 			"""
 		required: false
-		type: string: {
-			examples: ["./my/program.vrl"]
-			syntax: "literal"
-		}
+		type: string: examples: ["./my/program.vrl"]
 	}
 	metric_tag_values: {
 		description: """

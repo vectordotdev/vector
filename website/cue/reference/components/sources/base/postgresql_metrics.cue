@@ -11,7 +11,7 @@ base: components: sources: postgresql_metrics: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	exclude_databases: {
@@ -25,7 +25,7 @@ base: components: sources: postgresql_metrics: configuration: {
 			This can be used in conjunction with `include_databases`.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	include_databases: {
 		description: """
@@ -39,7 +39,7 @@ base: components: sources: postgresql_metrics: configuration: {
 			This can be used in conjunction with `exclude_databases`.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	namespace: {
 		description: """
@@ -48,10 +48,7 @@ base: components: sources: postgresql_metrics: configuration: {
 			By default, `postgresql` is used.
 			"""
 		required: false
-		type: string: {
-			default: "postgresql"
-			syntax:  "literal"
-		}
+		type: string: default: "postgresql"
 	}
 	scrape_interval_secs: {
 		description: "The interval between scrapes, in seconds."
@@ -68,7 +65,7 @@ base: components: sources: postgresql_metrics: configuration: {
 				The certificate must be in the DER or PEM (X.509) format.
 				"""
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 }

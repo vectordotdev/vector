@@ -381,11 +381,12 @@ components: sinks: prometheus_exporter: {
 				"""
 		}
 
-		multi_value_tags: {
-			title: "Multivalue Tags"
+		duplicate_tag_names: {
+			title: "Duplicate tag names"
 			body: """
-				Duplicate tag names are invalid within Prometheus and Prometheus will reject a metric with duplicate
-				tags. When sending a tag with multiple values, Vector will send the last value specified.
+				Multiple tags with the same name are invalid within Prometheus and Prometheus
+				will reject a metric with duplicate tag names. When sending a tag with multiple
+				values for each name, Vector will only send the last value specified.
 				"""
 		}
 	}

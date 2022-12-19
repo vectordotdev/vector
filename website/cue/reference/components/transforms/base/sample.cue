@@ -16,10 +16,7 @@ base: components: transforms: sample: configuration: {
 			event doesn’t have `key_field`, events will be count rated.
 			"""
 		required: false
-		type: string: {
-			examples: ["message"]
-			syntax: "literal"
-		}
+		type: string: examples: ["message"]
 	}
 	rate: {
 		description: """

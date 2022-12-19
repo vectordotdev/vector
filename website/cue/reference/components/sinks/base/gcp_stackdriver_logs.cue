@@ -39,7 +39,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -70,7 +70,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 	billing_account_id: {
 		description: "The billing account ID to which to publish logs."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	credentials_path: {
 		description: """
@@ -84,7 +84,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			credentials JSON file.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -93,12 +93,12 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -119,7 +119,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			[folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	log_id: {
 		description: """
@@ -137,7 +137,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			This would be the identifier assigned to your organization on Google Cloud Platform.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	project_id: {
 		description: """
@@ -148,7 +148,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			[project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	request: {
 		description: """
@@ -166,15 +166,9 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: {
-					default: {
-						decrease_ratio:      0.9
-						ewma_alpha:          0.4
-						rtt_deviation_scale: 2.5
-					}
-					options: {
-						decrease_ratio: {
-							description: """
+				type: object: options: {
+					decrease_ratio: {
+						description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -182,11 +176,11 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 
 																Note that the new limit is rounded down after applying this ratio.
 																"""
-							required: false
-							type: float: default: 0.9
-						}
-						ewma_alpha: {
-							description: """
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -195,11 +189,11 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-							required: false
-							type: float: default: 0.4
-						}
-						rtt_deviation_scale: {
-							description: """
+						required: false
+						type: float: default: 0.4
+					}
+					rtt_deviation_scale: {
+						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
@@ -209,9 +203,8 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-							required: false
-							type: float: default: 2.5
-						}
+						required: false
+						type: float: default: 2.5
 					}
 				}
 			}
@@ -220,8 +213,19 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 				required:    false
 				type: {
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: {
+							adaptive: """
+															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+
+															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															"""
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
+						}
 					}
 					uint: {}
 				}
@@ -276,8 +280,20 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		required:    true
 		type: object: options: {
 			"*": {
-				description: "Type-specific labels."
-				required:    true
+				description: """
+					A templated field.
+
+					In many cases, components can be configured in such a way where some portion of the component's functionality can be
+					customized on a per-event basis. An example of this might be a sink that writes events to a file, where we want to
+					provide the flexibility to specify which file an event should go to by using an event field itself as part of the
+					input to the filename we use.
+
+					By using `Template`, users can specify either fixed strings or "templated" strings, which use a common syntax to
+					refer to fields in an event that will serve as the input data when rendering the template.  While a fixed string may
+					look something like `my-file.log`, a template string could look something like `my-file-{{key}}.log`, and the `key`
+					field of the event being processed would serve as the value when rendering the template into a string.
+					"""
+				required: true
 				type: string: syntax: "template"
 			}
 			type: {
@@ -287,7 +303,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					For example, the type of a Compute Engine VM instance is `gce_instance`.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -308,7 +324,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 			[logsev_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	skip_authentication: {
 		description: "Skip all authentication handling. For use with integration tests only."
@@ -327,7 +343,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -336,7 +352,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -348,7 +364,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -357,7 +373,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -366,7 +382,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

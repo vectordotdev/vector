@@ -15,7 +15,7 @@ base: components: sources: docker_logs: configuration: {
 			If absent, Vector will try to use `DOCKER_HOST` environment variable. If `DOCKER_HOST` is also absent, Vector will use default Docker local socket (`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows).
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	exclude_containers: {
 		description: """
@@ -32,7 +32,7 @@ base: components: sources: docker_logs: configuration: {
 			This can be used in conjunction with `include_containers`.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	host_key: {
 		description: """
@@ -45,10 +45,7 @@ base: components: sources: docker_logs: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {
-			default: "host"
-			syntax:  "literal"
-		}
+		type: string: default: "host"
 	}
 	include_containers: {
 		description: """
@@ -63,7 +60,7 @@ base: components: sources: docker_logs: configuration: {
 			This can be used in conjunction with `include_containers`.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	include_images: {
 		description: """
@@ -72,7 +69,7 @@ base: components: sources: docker_logs: configuration: {
 			If not provided, all images will be included.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	include_labels: {
 		description: """
@@ -81,7 +78,7 @@ base: components: sources: docker_logs: configuration: {
 			Labels should follow the syntax described in the [Docker object labels](https://docs.docker.com/config/labels-custom-metadata/) documentation.
 			"""
 		required: false
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	multiline: {
 		description: """
@@ -98,7 +95,7 @@ base: components: sources: docker_logs: configuration: {
 					This setting must be configured in conjunction with `mode`.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			mode: {
 				description: """
@@ -137,7 +134,7 @@ base: components: sources: docker_logs: configuration: {
 			start_pattern: {
 				description: "Regular expression pattern that is used to match the start of a new message."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			timeout_ms: {
 				description: """
@@ -160,10 +157,7 @@ base: components: sources: docker_logs: configuration: {
 			By default, `"_partial"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "_partial"
-			syntax:  "literal"
-		}
+		type: string: default: "_partial"
 	}
 	retry_backoff_secs: {
 		description: "The amount of time, in seconds, to wait before retrying after an error."
@@ -183,17 +177,17 @@ base: components: sources: docker_logs: configuration: {
 			ca_file: {
 				description: "Path to the CA certificate file."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: "Path to the TLS certificate file."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: "Path to the TLS key file."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}

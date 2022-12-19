@@ -105,48 +105,41 @@ base: components: sinks: aws_s3: configuration: {
 			access_key_id: {
 				description: "The AWS access key ID."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			assume_role: {
 				description: "The ARN of the role to assume."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			credentials_file: {
 				description: "Path to the credentials file."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
 				required:    false
-				type: object: {
-					default: {
-						connect_timeout_seconds: 1
-						max_attempts:            4
-						read_timeout_seconds:    1
+				type: object: options: {
+					connect_timeout_seconds: {
+						description: "Connect timeout for IMDS."
+						required:    false
+						type: uint: {
+							default: 1
+							unit:    "seconds"
+						}
 					}
-					options: {
-						connect_timeout_seconds: {
-							description: "Connect timeout for IMDS."
-							required:    false
-							type: uint: {
-								default: 1
-								unit:    "seconds"
-							}
-						}
-						max_attempts: {
-							description: "Number of IMDS retries for fetching tokens and metadata."
-							required:    false
-							type: uint: default: 4
-						}
-						read_timeout_seconds: {
-							description: "Read timeout for IMDS."
-							required:    false
-							type: uint: {
-								default: 1
-								unit:    "seconds"
-							}
+					max_attempts: {
+						description: "Number of IMDS retries for fetching tokens and metadata."
+						required:    false
+						type: uint: default: 4
+					}
+					read_timeout_seconds: {
+						description: "Read timeout for IMDS."
+						required:    false
+						type: uint: {
+							default: 1
+							unit:    "seconds"
 						}
 					}
 				}
@@ -159,7 +152,7 @@ base: components: sinks: aws_s3: configuration: {
 			profile: {
 				description: "The credentials profile to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			region: {
 				description: """
@@ -169,12 +162,12 @@ base: components: sinks: aws_s3: configuration: {
 					for the service itself.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -211,7 +204,7 @@ base: components: sinks: aws_s3: configuration: {
 			This must not include a leading `s3://` or a trailing `/`.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	compression: {
 		description: """
@@ -246,7 +239,7 @@ base: components: sinks: aws_s3: configuration: {
 			By default, the compression scheme used dictates this value.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	content_type: {
 		description: """
@@ -257,10 +250,10 @@ base: components: sinks: aws_s3: configuration: {
 			By default, `text/x-log` is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	encoding: {
-		description: "Encoding configuration."
+		description: "Configures how events are encoded into raw bytes."
 		required:    true
 		type: object: options: {
 			avro: {
@@ -270,11 +263,12 @@ base: components: sinks: aws_s3: configuration: {
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
 					avro: """
 						Encodes an event as an [Apache Avro][apache_avro] message.
@@ -297,13 +291,17 @@ base: components: sinks: aws_s3: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf]([EXPERIMENTAL][experimental]).
+						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json]([EXPERIMENTAL][experimental]).
+						Encodes an event in Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -331,12 +329,12 @@ base: components: sinks: aws_s3: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -351,7 +349,7 @@ base: components: sinks: aws_s3: configuration: {
 	endpoint: {
 		description: "The API endpoint of the service."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	filename_append_uuid: {
 		description: """
@@ -370,7 +368,7 @@ base: components: sinks: aws_s3: configuration: {
 	filename_extension: {
 		description: "The filename extension to use in the object key."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	filename_time_format: {
 		description: """
@@ -392,7 +390,7 @@ base: components: sinks: aws_s3: configuration: {
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	framing: {
 		description: "Framing configuration."
@@ -433,7 +431,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	grant_read: {
 		description: """
@@ -444,7 +442,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	grant_read_acp: {
 		description: """
@@ -455,7 +453,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	grant_write_acp: {
 		description: """
@@ -466,7 +464,7 @@ base: components: sinks: aws_s3: configuration: {
 			[grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	key_prefix: {
 		description: """
@@ -482,7 +480,7 @@ base: components: sinks: aws_s3: configuration: {
 	region: {
 		description: "The AWS region to use."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	request: {
 		description: """
@@ -500,15 +498,9 @@ base: components: sinks: aws_s3: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: {
-					default: {
-						decrease_ratio:      0.9
-						ewma_alpha:          0.4
-						rtt_deviation_scale: 2.5
-					}
-					options: {
-						decrease_ratio: {
-							description: """
+				type: object: options: {
+					decrease_ratio: {
+						description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -516,11 +508,11 @@ base: components: sinks: aws_s3: configuration: {
 
 																Note that the new limit is rounded down after applying this ratio.
 																"""
-							required: false
-							type: float: default: 0.9
-						}
-						ewma_alpha: {
-							description: """
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -529,11 +521,11 @@ base: components: sinks: aws_s3: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-							required: false
-							type: float: default: 0.4
-						}
-						rtt_deviation_scale: {
-							description: """
+						required: false
+						type: float: default: 0.4
+					}
+					rtt_deviation_scale: {
+						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
@@ -543,9 +535,8 @@ base: components: sinks: aws_s3: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-							required: false
-							type: float: default: 2.5
-						}
+						required: false
+						type: float: default: 2.5
 					}
 				}
 			}
@@ -554,8 +545,19 @@ base: components: sinks: aws_s3: configuration: {
 				required:    false
 				type: {
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: {
+							adaptive: """
+															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+
+															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															"""
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
+						}
 					}
 					uint: {}
 				}
@@ -662,9 +664,8 @@ base: components: sinks: aws_s3: configuration: {
 		description: "The tag-set for the object."
 		required:    false
 		type: object: options: "*": {
-			description: "The tag-set for the object."
-			required:    true
-			type: string: syntax: "literal"
+			required: true
+			type: string: {}
 		}
 	}
 	tls: {
@@ -679,7 +680,7 @@ base: components: sinks: aws_s3: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -688,7 +689,7 @@ base: components: sinks: aws_s3: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -700,7 +701,7 @@ base: components: sinks: aws_s3: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -709,7 +710,7 @@ base: components: sinks: aws_s3: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -718,7 +719,7 @@ base: components: sinks: aws_s3: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """
