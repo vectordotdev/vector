@@ -526,6 +526,18 @@ impl MetricTags {
     pub fn retain(&mut self, mut f: impl FnMut(&str, &mut TagValueSet) -> bool) {
         self.0.retain(|key, tags| f(key.as_str(), tags));
     }
+
+    /// Reduces all the tag values to their single value, discarding any for which that value would
+    /// be null.
+    pub(super) fn reduce_to_single(&mut self) {
+        self.retain(|_, values| match std::mem::take(values).into_single() {
+            Some(tag) => {
+                *values = TagValueSet::Single(TagValue::Value(tag));
+                true
+            }
+            None => false,
+        });
+    }
 }
 
 impl From<BTreeMap<String, String>> for MetricTags {
