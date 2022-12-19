@@ -223,7 +223,7 @@ base: components: sinks: loki: configuration: {
 		description: """
 			The base URL of the Loki instance.
 
-			Vector will append the value of `path` to this.
+			The `path` value is appended to this.
 			"""
 		required: true
 		type: string: examples: ["http://localhost:3100"]
