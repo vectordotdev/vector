@@ -117,6 +117,9 @@ components: sinks: [Name=string]: {
 									if algo == "zstd" {
 										zstd: "[zstd](\(urls.zstd)) compression. Compression level is `3` unless otherwise specified. Dictionaries are not supported."
 									}
+									if algo == "zlib" {
+										zlib: "[zlib](\(urls.zlib)) compression."
+									}
 								}
 							}
 						}
