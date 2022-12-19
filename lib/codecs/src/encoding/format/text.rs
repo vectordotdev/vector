@@ -8,19 +8,27 @@ use vector_core::{
     schema,
 };
 
+use crate::MetricTagValues;
+
 /// Config used to build a `TextSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct TextSerializerConfig;
+pub struct TextSerializerConfig {
+    /// Enable encoding tags using the enhanced encoding of [the `native_json` codec][vector_native_json].
+    ///
+    /// If set to `false`, tags will always be encoded as single string values using the last value
+    /// assigned to the tag.
+    pub metric_tag_values: MetricTagValues,
+}
 
 impl TextSerializerConfig {
     /// Creates a new `TextSerializerConfig`.
-    pub const fn new() -> Self {
-        Self
+    pub const fn new(metric_tag_values: MetricTagValues) -> Self {
+        Self { metric_tag_values }
     }
 
     /// Build the `TextSerializer` from this configuration.
     pub const fn build(&self) -> TextSerializer {
-        TextSerializer
+        TextSerializer::new(self.metric_tag_values)
     }
 
     /// The data type of events that are accepted by `TextSerializer`.
@@ -40,12 +48,14 @@ impl TextSerializerConfig {
 /// This serializer exists to emulate the behavior of the `StandardEncoding::Text` for backwards
 /// compatibility, until it is phased out completely.
 #[derive(Debug, Clone)]
-pub struct TextSerializer;
+pub struct TextSerializer {
+    metric_tag_values: MetricTagValues,
+}
 
 impl TextSerializer {
     /// Creates a new `TextSerializer`.
-    pub const fn new() -> Self {
-        Self
+    pub const fn new(metric_tag_values: MetricTagValues) -> Self {
+        Self { metric_tag_values }
     }
 }
 
@@ -65,7 +75,18 @@ impl Encoder<Event> for TextSerializer {
                     buffer.put(bytes);
                 }
             }
-            Event::Metric(metric) => {
+            Event::Metric(mut metric) => {
+                if self.metric_tag_values == MetricTagValues::Single {
+                    if let Some(tags) = metric.tags_mut() {
+                        tags.retain(|_, values| match std::mem::take(values).into_single() {
+                            Some(tag) => {
+                                *values = [tag].into();
+                                true
+                            }
+                            None => false,
+                        });
+                    }
+                }
                 let bytes = metric.to_string();
                 buffer.put(bytes.as_ref());
             }
@@ -85,54 +106,52 @@ mod tests {
     use super::*;
 
     #[test]
-    fn serialize_bytes_event() {
-        let input = Event::from(LogEvent::from_str_legacy("foo"));
-        let mut serializer = TextSerializer;
-
-        let mut buffer = BytesMut::new();
-        serializer.encode(input, &mut buffer).unwrap();
-
-        assert_eq!(buffer.freeze(), Bytes::from("foo"));
+    fn serialize_log() {
+        let buffer = serialize(
+            TextSerializerConfig::default(),
+            Event::from(LogEvent::from_str_legacy("foo")),
+        );
+        assert_eq!(buffer, Bytes::from("foo"));
     }
 
     #[test]
-    fn serialize_bytes_metric() {
-        let input = Event::Metric(Metric::new(
-            "users",
-            MetricKind::Incremental,
-            MetricValue::Set {
-                values: vec!["bob".into()].into_iter().collect(),
-            },
-        ));
-        let mut serializer = TextSerializerConfig::default().build();
-
-        let mut buffer = BytesMut::new();
-        serializer.encode(input, &mut buffer).unwrap();
-
-        assert_eq!(buffer.freeze(), Bytes::from("users{} + bob"));
+    fn serialize_metric() {
+        let buffer = serialize(
+            TextSerializerConfig::default(),
+            Event::Metric(Metric::new(
+                "users",
+                MetricKind::Incremental,
+                MetricValue::Set {
+                    values: vec!["bob".into()].into_iter().collect(),
+                },
+            )),
+        );
+        assert_eq!(buffer, Bytes::from("users{} + bob"));
     }
 
     #[test]
     fn serialize_metric_tags_full() {
-        let mut serializer = TextSerializerConfig::default().build();
-
-        let mut buffer = BytesMut::new();
-        serializer.encode(metric2(), &mut buffer).unwrap();
-
+        let buffer = serialize(
+            TextSerializerConfig {
+                metric_tag_values: MetricTagValues::Full,
+            },
+            metric2(),
+        );
         assert_eq!(
-            buffer.freeze(),
+            buffer,
             Bytes::from(r#"counter{a="first",a,a="second"} + 1"#)
         );
     }
 
     #[test]
     fn serialize_metric_tags_single() {
-        let mut serializer = TextSerializerConfig::default().build();
-
-        let mut buffer = BytesMut::new();
-        serializer.encode(metric2(), &mut buffer).unwrap();
-
-        assert_eq!(buffer.freeze(), Bytes::from(r#"counter{a="second"} + 1"#));
+        let buffer = serialize(
+            TextSerializerConfig {
+                metric_tag_values: MetricTagValues::Single,
+            },
+            metric2(),
+        );
+        assert_eq!(buffer, Bytes::from(r#"counter{a="second"} + 1"#));
     }
 
     fn metric2() -> Event {
@@ -148,5 +167,11 @@ mod tests {
                 "a" => "second",
             ))),
         )
+    }
+
+    fn serialize(config: TextSerializerConfig, input: Event) -> Bytes {
+        let mut buffer = BytesMut::new();
+        config.build().encode(input, &mut buffer).unwrap();
+        buffer.freeze()
     }
 }

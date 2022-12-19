@@ -311,7 +311,7 @@ impl SerializerConfig {
             SerializerConfig::RawMessage => {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
-            SerializerConfig::Text => Ok(Serializer::Text(TextSerializerConfig.build())),
+            SerializerConfig::Text => Ok(Serializer::Text(TextSerializerConfig::default().build())),
         }
     }
 
@@ -353,7 +353,7 @@ impl SerializerConfig {
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
-            SerializerConfig::Text => TextSerializerConfig.input_type(),
+            SerializerConfig::Text => TextSerializerConfig::default().input_type(),
         }
     }
 
@@ -369,7 +369,7 @@ impl SerializerConfig {
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
-            SerializerConfig::Text => TextSerializerConfig.schema_requirement(),
+            SerializerConfig::Text => TextSerializerConfig::default().schema_requirement(),
         }
     }
 }
