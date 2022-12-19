@@ -10,7 +10,7 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
+			By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
 			"""
 		required: false
 		type: string: {}
@@ -37,12 +37,12 @@ base: components: sources: kubernetes_logs: configuration: {
 		type: string: default: ""
 	}
 	extra_label_selector: {
-		description: "Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in `vector.dev/exclude` filter."
+		description: "Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in `exclude` filter."
 		required:    false
 		type: string: default: ""
 	}
 	extra_namespace_label_selector: {
-		description: "Specifies the label selector to filter `Namespace`s with, to be used in  addition to the built-in `vector.dev/exclude` filter."
+		description: "Specifies the label selector to filter `Namespace`s with, to be used in addition to the built-in `exclude` filter."
 		required:    false
 		type: string: default: ""
 	}
@@ -65,18 +65,23 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	ingestion_timestamp_field: {
 		description: """
-			A field to use to set the timestamp when Vector ingested the event.
+			Overrides the name of the log field used to add the ingestion timestamp to each event.
+
 			This is useful to compute the latency between important event processing
-			stages, i.e. the time delta between log line was written and when it was
+			stages. For example, the time delta between when a log line was written and when it was
 			processed by the `kubernetes_logs` source.
+
+			By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+
+			[global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
 			"""
 		required: false
 		type: string: {}
 	}
 	kube_config_file: {
 		description: """
-			Optional path to a kubeconfig file readable by Vector. If not set,
-			Vector will try to connect to Kubernetes using in-cluster configuration.
+			Optional path to a readable kubeconfig file. If not set,
+			a connection to Kubernetes is made using the in-cluster configuration.
 			"""
 		required: false
 		type: string: {}
@@ -185,7 +190,7 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	self_node_name: {
 		description: """
-			The `name` of the Kubernetes `Node` that Vector runs at.
+			The `name` of the Kubernetes `Node` that is running.
 
 			Configured to use an environment var by default, to be evaluated to a value provided by Kubernetes at `Pod` deploy time.
 			"""

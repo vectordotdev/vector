@@ -23,7 +23,7 @@ base: components: sources: file: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
+			By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
 			"""
 		required: false
 		type: string: {}
@@ -53,9 +53,9 @@ base: components: sources: file: configuration: {
 		description: """
 			Array of file patterns to exclude. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
 
-			Takes precedence over the `include` option. Note that the `exclude` patterns are applied _after_ Vector attempts to glob everything
-			in `include`. That is, Vector will still try to list all of the files matched by `include` and then filter them by the `exclude`
-			patterns. This can be impactful if `include` contains directories with contents that vector does not have access to.
+			Takes precedence over the `include` option. Note: The `exclude` patterns are applied _after_ the attempt to glob everything
+			in `include`. This means that all files are first matched by `include` and then filtered by the `exclude`
+			patterns. This can be impactful if `include` contains directories with contents that are not accessible.
 			"""
 		required: false
 		type: array: {
@@ -131,7 +131,7 @@ base: components: sources: file: configuration: {
 		description: """
 			Delay between file discovery calls, in milliseconds.
 
-			This controls the interval at which Vector searches for files. Higher value result in greater chances of some short living files being missed between searches, but lower value increases the performance impact of file discovery.
+			This controls the interval at which files are searched. A higher value results in greater chances of some short-lived files being missed between searches, but a lower value increases the performance impact of file discovery.
 			"""
 		required: false
 		type: uint: default: 1000
@@ -140,7 +140,7 @@ base: components: sources: file: configuration: {
 		description: """
 			Overrides the name of the log field used to add the current hostname to each event.
 
-			The value will be the current hostname for wherever Vector is running.
+			The value is the current hostname.
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
