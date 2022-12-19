@@ -121,7 +121,7 @@ impl ElasticsearchCommon {
             metric_config.host_tag.as_deref(),
             metric_config.timezone.unwrap_or_default(),
             LogNamespace::Legacy,
-            false, // FIXME: Is this right?
+            metric_config.enhanced_tags,
         );
 
         let region = config.aws.as_ref().and_then(|config| config.region());
