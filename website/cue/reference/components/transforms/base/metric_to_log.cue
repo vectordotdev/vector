@@ -11,10 +11,7 @@ base: components: transforms: metric_to_log: configuration: {
 			[global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
 			"""
 		required: false
-		type: string: {
-			examples: ["host", "hostname"]
-			syntax: "literal"
-		}
+		type: string: examples: ["host", "hostname"]
 	}
 	timezone: {
 		description: """

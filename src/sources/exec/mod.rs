@@ -45,7 +45,7 @@ pub mod sized_bytes_codec;
 /// Configuration for the `exec` source.
 #[configurable_component(source("exec"))]
 #[derive(Clone, Debug)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct ExecConfig {
     #[configurable(derived)]
     pub mode: Mode,
@@ -57,6 +57,7 @@ pub struct ExecConfig {
     pub streaming: Option<StreamingConfig>,
 
     /// The command to be run, plus any arguments required.
+    #[configurable(metadata(docs::examples = "echo", docs::examples = "Hello World!"))]
     pub command: Vec<String>,
 
     /// The directory in which to run the command.

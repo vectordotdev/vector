@@ -150,6 +150,17 @@ components: sources: prometheus_scrape: {
 		}}
 	}
 
+	how_it_works: {
+		duplicate_tag_names: {
+			title: "Duplicate tag names"
+			body: """
+				Multiple tags with the same name are invalid within Prometheus. Prometheus
+				itself will reject a metric with duplicate tags. Vector will accept the metric,
+				but will only take the last value for each tag name specified.
+				"""
+		}
+	}
+
 	output: metrics: {
 		_extra_tags: {
 			"instance": {

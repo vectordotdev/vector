@@ -1,13 +1,23 @@
 use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
 use vector_config::configurable_component;
 
-/// Connection options for `AMQP`.
+/// AMQP connection options.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub(crate) struct AmqpConfig {
-    /// URI for the `AMQP` server.
+    /// URI for the AMQP server.
     ///
-    /// Format: amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>
+    /// The URI has the format of
+    /// `amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>`.
+    ///
+    /// The default vhost can be specified by using a value of `%2f`.
+    ///
+    /// In order to connect over TLS, a scheme of `amqps` can be specified instead i.e.
+    /// `amqps://...`. Additional TLS settings, such as client certificate verification, etc, can be
+    /// configured under the `tls` section.
+    #[configurable(metadata(
+        docs::examples = "amqp://user:password@127.0.0.1:5672/%2f?timeout=10",
+    ))]
     pub(crate) connection_string: String,
 
     #[configurable(derived)]

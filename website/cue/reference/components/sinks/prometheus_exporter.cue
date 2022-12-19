@@ -380,5 +380,14 @@ components: sinks: prometheus_exporter: {
 				frequently.
 				"""
 		}
+
+		duplicate_tag_names: {
+			title: "Duplicate tag names"
+			body: """
+				Multiple tags with the same name are invalid within Prometheus and Prometheus
+				will reject a metric with duplicate tag names. When sending a tag with multiple
+				values for each name, Vector will only send the last value specified.
+				"""
+		}
 	}
 }
