@@ -6,7 +6,7 @@ use http::StatusCode;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_core::{metrics::AgentDDSketch, EstimatedJsonEncodedSizeOf};
+use vector_core::{event::metric::TagValue, metrics::AgentDDSketch, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
 use crate::{
@@ -378,9 +378,13 @@ fn decode_datadog_series_v1(
 
 fn into_metric_tags(tags: Vec<String>) -> MetricTags {
     tags.iter()
-        .map(|tag| {
-            let kv = tag.split_once(':').unwrap_or((tag, ""));
-            (kv.0.trim().to_string(), kv.1.trim().to_string())
+        .map(|tag| match tag.find(':') {
+            Some(colon) => {
+                let key = tag[..colon].to_string();
+                let value: TagValue = (tag[colon + 1..]).to_string().into();
+                (key, value)
+            }
+            None => (tag.to_string(), TagValue::Bare),
         })
         .collect()
 }

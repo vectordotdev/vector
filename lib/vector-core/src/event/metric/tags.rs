@@ -1,5 +1,7 @@
 #[cfg(test)]
 use std::borrow::Borrow;
+
+use std::borrow::Cow;
 use std::collections::{hash_map::DefaultHasher, BTreeMap};
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
@@ -33,6 +35,18 @@ impl From<Option<String>> for TagValue {
             None => Self::Bare,
             Some(value) => Self::Value(value),
         }
+    }
+}
+
+impl From<&str> for TagValue {
+    fn from(value: &str) -> Self {
+        Self::Value(value.to_string())
+    }
+}
+
+impl From<Cow<'_, str>> for TagValue {
+    fn from(value: Cow<'_, str>) -> Self {
+        Self::Value(value.to_string())
     }
 }
 
