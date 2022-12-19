@@ -84,8 +84,8 @@ base: components: sinks: humio_metrics: configuration: {
 	}
 	enhanced_tags: {
 		description: """
-			Should this transform encode tags using the enhanced encoding of [the `native_json`
-			codec][vector_native_json]?
+			Controls if this transform should encode tags using the enhanced encoding of [the
+			`native_json` codec][vector_native_json]?
 
 			If set to `false`, tags will always be encoded as single string values using the last value
 			assigned to the tag.
