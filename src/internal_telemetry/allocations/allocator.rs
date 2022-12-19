@@ -5,7 +5,7 @@ use std::{
 
 use crate::internal_telemetry::allocations::TRACE_ALLOCATIONS;
 
-type AllocationGroupRef = &'static AllocationGroup;
+use super::{accumulator::Accumulator, get_current_allocation_group, AllocationGroup};
 
 /// A tracing allocator that groups allocation events by groups.
 ///
@@ -47,7 +47,7 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for GroupedTracingAllocator<A> {
             .cast::<&'static AllocationGroup>();
         group_ref_ptr.write(allocation_group_ref);
 
-        allocation_group_ref.track_allocation(actual_layout.size() as u64);
+        Accumulator::track_allocation_local(actual_layout.size() as u64);
 
         actual_ptr
     }

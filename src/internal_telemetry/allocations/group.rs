@@ -1,12 +1,17 @@
 use std::{
-    cell::RefCell,
-    num::NonZerousize,
-    sync::atomic::{Atomicusize, Ordering},
+    borrow::Cow,
+    cell::UnsafeCell,
+    hash::Hasher,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
 };
 
 use tracing::Span;
 
 use super::tracing::WithAllocationGroup;
+use super::{accumulator::Accumulator, stack::GroupStack};
 
 thread_local! {
     /// A stack representing the currently active allocation groups.
@@ -15,33 +20,65 @@ thread_local! {
     /// stack. Any allocations which occur on this thread will be associated with whichever
     /// allocation group is currently at the top of the stack at the time that the allocation
     /// occurs.
-    static ALLOCATION_GROUP_STACK: RefCell<GroupStack<256>> =
-        const { RefCell::new(GroupStack::new()) };
+    static ALLOCATION_GROUP_STACK: UnsafeCell<GroupStack<256>> = const { UnsafeCell::new(GroupStack::new()) };
 }
 
 /// A registry of all registered allocation groups.
 static GROUP_REGISTRY: Mutex<Vec<&'static AllocationGroup>> = Mutex::new(Vec::new());
 
+/// Root allocation group.
+///
+/// All (de)allocations that occur when no other allocation group is active will be associated with
+/// the root allocation group.
+static ROOT_ALLOCATION_GROUP: AllocationGroup = AllocationGroup::root();
+
 /// An allocation group.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct AllocationGroup {
-    tags: Vec<(String, String)>,
+    pub component_id: Cow<'static, str>,
+    pub component_kind: Cow<'static, str>,
+    pub component_type: Cow<'static, str>,
     allocated_bytes: AtomicU64,
-    allocations: AtomicU64,
     deallocated_bytes: AtomicU64,
-    deallocations: AtomicU64,
 }
 
 impl AllocationGroup {
+    const fn new(
+        component_id: Cow<'static, str>,
+        component_kind: Cow<'static, str>,
+        component_type: Cow<'static, str>,
+    ) -> Self {
+        AllocationGroup {
+            component_id,
+            component_kind,
+            component_type,
+            allocated_bytes: AtomicU64::new(0),
+            deallocated_bytes: AtomicU64::new(0),
+        }
+    }
+
+    const fn root() -> Self {
+        Self::new(
+            Cow::Borrowed("root"),
+            Cow::Borrowed("root"),
+            Cow::Borrowed("root"),
+        )
+    }
+
     /// Registers an allocation group with the given tags.
     ///
     /// An `AllocationGroupToken` is returned, which provides access to the underlying group as well
     /// as helper methods for dealing with associating (de)allocation events with the group.
-    pub fn register(tags: Vec<(String, String)>) -> AllocationGroupToken {
-        let allocation_group = Box::leak(Box::new(Self {
-            tags,
-            ..Default::default()
-        }));
+    pub fn register(
+        component_id: &str,
+        component_kind: &str,
+        component_type: &str,
+    ) -> AllocationGroupToken {
+        let allocation_group = Box::leak(Box::new(Self::new(
+            component_id.to_string().into(),
+            component_kind.to_string().into(),
+            component_type.to_string().into(),
+        )));
 
         // Register the allocation group in the group registry.
         let mut registry = GROUP_REGISTRY.lock().expect("antidote");
@@ -51,20 +88,25 @@ impl AllocationGroup {
     }
 
     pub fn track_allocation(&self, allocated_bytes: u64) {
-        self.allocations.fetch_add(1, Ordering::Relaxed);
         self.allocated_bytes
             .fetch_add(allocated_bytes, Ordering::Relaxed);
     }
 
     pub fn track_deallocation(&self, deallocated_bytes: u64) {
-        self.deallocations.fetch_add(1, Ordering::Relaxed);
         self.deallocated_bytes
             .fetch_add(deallocated_bytes, Ordering::Relaxed);
+    }
+
+    pub fn consume_and_reset_statistics(&self) -> (u64, u64) {
+        let allocated_bytes = self.allocated_bytes.swap(0, Ordering::Relaxed);
+        let deallocated_bytes = self.deallocated_bytes.swap(0, Ordering::Relaxed);
+
+        (allocated_bytes, deallocated_bytes)
     }
 }
 
 /// A token tied to a specific allocation group.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug)]
 pub struct AllocationGroupToken(&'static AllocationGroup);
 
 impl AllocationGroupToken {
@@ -74,11 +116,28 @@ impl AllocationGroupToken {
     }
 
     pub fn enter(&self) {
-        let _ = ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().push(self.0));
+        // SAFETY: The group stack is per-thread, so we are the only ones that could possibly be
+        // accessing it here.
+        unsafe {
+            let _ = ALLOCATION_GROUP_STACK.try_with(|stack| {
+                (&mut *stack.get()).push(self.0);
+                Accumulator::enter(self.0);
+            });
+        }
     }
 
     pub fn exit(&self) {
-        let _ = ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().pop());
+        // SAFETY: The group stack is per-thread, so we are the only ones that could possibly be
+        // accessing it here.
+        unsafe {
+            let _ = ALLOCATION_GROUP_STACK.try_with(|stack| {
+                if let Some(new_group) = (&mut *stack.get()).pop() {
+                    Accumulator::enter(new_group);
+                } else {
+                    Accumulator::exit();
+                }
+            });
+        }
     }
 
     /// Attaches this allocation group to a [`Span`][tracing::Span].
@@ -105,64 +164,26 @@ impl PartialEq for AllocationGroupToken {
 
 impl Eq for AllocationGroupToken {}
 
-impl Hash for AllocationGroupToken {
+impl std::hash::Hash for AllocationGroupToken {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        (self.0 as *const _).hash(state)
+        (self.0 as *const AllocationGroup).hash(state)
     }
+}
+
+pub fn get_registered_allocation_groups() -> Vec<&'static AllocationGroup> {
+    let registry = GROUP_REGISTRY.lock().expect("antidote");
+    registry.clone()
 }
 
 /// Gets the current allocation group.
 #[inline(always)]
 pub(super) fn get_current_allocation_group() -> &'static AllocationGroup {
-    ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().current());
-}
-
-/// Calls `f` after suspending the active allocation group, if it was not already suspended.
-///
-/// If the active allocation group is not currently suspended, then `f` is called, after suspending it, with a reference
-/// to the suspended allocation group. If any other call to `try_with_suspended_allocation_group` happens while this
-/// method call is on the stack, `f` in those calls with itself not be called.
-#[inline(always)]
-pub(super) fn try_with_suspended_allocation_group<F>(f: F)
-where
-    F: FnOnce(AllocationGroupId),
-{
-    let _result = ALLOCATION_GROUP_STACK.try_with(
-        #[inline(always)]
-        |group_stack| {
-            // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, which allows callers to skip trying to run
-            // `f` if they cannot mutably borrow the current allocation group. As `try_borrow_mut` will only let one
-            // mutable borrow happen at a time, the tracker logic is never reentrant.
-            if let Ok(stack) = group_stack.try_borrow_mut() {
-                f(stack.current());
-            }
-        },
-    );
-}
-
-/// Calls `f` after suspending the active allocation group.
-///
-/// In constrast to `try_with_suspended_allocation_group`, this method will always call `f` after attempting to suspend
-/// the active allocation group, even if it was already suspended.
-///
-/// In practice, this method is primarily useful for "run this function and don't trace any (de)allocations at all" while
-/// `try_with_suspended_allocation_group` is primarily useful for "run this function if nobody else is tracing
-/// an (de)allocation right now".
-#[inline(always)]
-pub(super) fn with_suspended_allocation_group<F>(f: F)
-where
-    F: FnOnce(),
-{
-    let _result = ALLOCATION_GROUP_STACK.try_with(
-        #[inline(always)]
-        |group_stack| {
-            // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, as `try_borrow_mut` will only let one
-            // mutable borrow happen at a time. As we simply want to ensure that the allocation group is suspended, we
-            // don't care what the return value is: calling `try_borrow_mut` and holding on to the result until the end
-            // of the scope is sufficient to either suspend the allocation group or know that it's already suspended and
-            // will stay that way until we're done in this method.
-            let _result = group_stack.try_borrow_mut();
-            f();
-        },
-    );
+    // SAFETY: The group stack is per-thread, so we are the only ones that could possibly be
+    // accessing it here.
+    unsafe {
+        ALLOCATION_GROUP_STACK
+            .try_with(|stack| (&*stack.get()).current())
+            .unwrap_or_else(|_| Some(&ROOT_ALLOCATION_GROUP))
+            .unwrap_or_else(|| &ROOT_ALLOCATION_GROUP)
+    }
 }

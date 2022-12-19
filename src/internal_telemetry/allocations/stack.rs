@@ -1,4 +1,4 @@
-use super::token::AllocationGroupId;
+use super::AllocationGroup;
 
 /// An allocation group stack.
 ///
@@ -12,15 +12,15 @@ use super::token::AllocationGroupId;
 #[derive(Copy, Clone)]
 pub struct GroupStack<const N: usize> {
     idx: usize,
-    slots: [&'static AllocationGroup; N],
+    slots: [Option<&'static AllocationGroup>; N],
 }
 
 impl<const N: usize> GroupStack<N> {
     /// Creates an empty [`GroupStack`].
     pub const fn new() -> Self {
         Self {
-            slot_idx: 0,
-            slots: [AllocationGroup::root(); N],
+            idx: 0,
+            slots: [None; N],
         }
     }
 
@@ -28,27 +28,31 @@ impl<const N: usize> GroupStack<N> {
     ///
     /// If the stack is empty, then the root allocation group is the defacto active allocation
     /// group, and is returned as such.
-    pub const fn current(&self) -> &'static AllocationGroup {
-        self.slots[self.slot_idx]
+    pub const fn current(&self) -> Option<&'static AllocationGroup> {
+        self.slots[self.idx]
     }
 
     /// Pushes an allocation group on to the stack, marking it as the active allocation group.
     pub fn push(&mut self, group: &'static AllocationGroup) {
-        self.slot_idx += 1;
+        self.idx += 1;
 
-        if self.slot_idx >= self.slots.len() {
+        if self.idx >= self.slots.len() {
             panic!("tried to push new allocation group to the current stack, but hit the limit of {} entries", N);
         }
 
-        self.slots[self.slot_idx] = group;
+        self.slots[self.idx] = Some(group);
     }
 
     /// Pops the previous allocation group that was on the stack.
-    pub fn pop(&mut self) {
-        if self.slot_idx == 0 {
+    ///
+    /// Returns `Some(group)` if there's is a new active allocation group after popping, and `None`
+    /// if the stack is now empty.
+    pub fn pop(&mut self) -> Option<&'static AllocationGroup> {
+        if self.idx == 0 {
             panic!("tried to pop current allocation group from the stack but the stack is empty");
         }
 
-        self.slot_idx -= 1;
+        self.idx -= 1;
+        self.slots[self.idx]
     }
 }

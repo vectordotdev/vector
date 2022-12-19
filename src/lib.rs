@@ -22,16 +22,17 @@ extern crate tracing;
 #[macro_use]
 extern crate derivative;
 
+#[cfg(feature = "allocation-tracing")]
+use self::internal_telemetry::allocations::GroupedTracingAllocator;
+
 #[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracing")))]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[cfg(all(feature = "tikv-jemallocator", feature = "allocation-tracing"))]
 #[global_allocator]
-static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
-    self::internal_telemetry::allocations::get_grouped_tracing_allocator(
-        tikv_jemallocator::Jemalloc,
-    );
+static ALLOC: GroupedTracingAllocator<tikv_jemallocator::Jemalloc> =
+    GroupedTracingAllocator::new(tikv_jemallocator::Jemalloc);
 
 #[allow(unreachable_pub)]
 pub mod internal_telemetry;

@@ -832,12 +832,8 @@ impl RunningTopology {
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
         {
-            let group_token =
-                crate::internal_telemetry::allocations::AllocationGroup::register(vec![
-                    task.id().to_string(),
-                    "sink".to_string(),
-                    task.typetag().to_string(),
-                ]);
+            use crate::internal_telemetry::allocations::AllocationGroup;
+            let group_token = AllocationGroup::register(task.id(), "sink", task.typetag());
             group_token.attach_to_span(&task_span);
         }
 
@@ -863,12 +859,8 @@ impl RunningTopology {
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
         {
-            let group_token =
-                crate::internal_telemetry::allocations::AllocationGroup::register(vec![
-                    task.id().to_string(),
-                    "transform".to_string(),
-                    task.typetag().to_string(),
-                ]);
+            use crate::internal_telemetry::allocations::AllocationGroup;
+            let group_token = AllocationGroup::register(task.id(), "transform", task.typetag());
             group_token.attach_to_span(&task_span);
         }
 
@@ -894,12 +886,8 @@ impl RunningTopology {
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
         {
-            let group_token =
-                crate::internal_telemetry::allocations::AllocationGroup::register(vec![
-                    task.id().to_string(),
-                    "source".to_string(),
-                    task.typetag().to_string(),
-                ]);
+            use crate::internal_telemetry::allocations::AllocationGroup;
+            let group_token = AllocationGroup::register(task.id(), "source", task.typetag());
             group_token.attach_to_span(&task_span);
         }
 
