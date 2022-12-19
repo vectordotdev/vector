@@ -126,7 +126,7 @@ components: sources: statsd: {
 		}
 		tags: {
 			title: "Tags"
-			body:  """
+			body: """
 				The StatsD protocol removes any colon character found after the tag key:value
 				separator. For instance, the tagset "tagA:val::ue", is parsed by StatsD as
 				"tagA=value".
