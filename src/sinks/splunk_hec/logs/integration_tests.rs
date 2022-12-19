@@ -128,7 +128,7 @@ async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLog
 async fn splunk_insert_message() {
     let cx = SinkContext::new_test();
 
-    let config = config(TextSerializerConfig::new().into(), vec![]).await;
+    let config = config(TextSerializerConfig::default().into(), vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
@@ -151,7 +151,7 @@ async fn splunk_insert_raw_message() {
     let config = HecLogsSinkConfig {
         endpoint_target: EndpointTarget::Raw,
         source: Some(Template::try_from("zork").unwrap()),
-        ..config(TextSerializerConfig::new().into(), vec![]).await
+        ..config(TextSerializerConfig::default().into(), vec![]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -173,7 +173,7 @@ async fn splunk_insert_raw_message() {
 async fn splunk_insert_broken_token() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(TextSerializerConfig::new().into(), vec![]).await;
+    let mut config = config(TextSerializerConfig::default().into(), vec![]).await;
     config.default_token = "BROKEN_TOKEN".to_string().into();
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -189,7 +189,7 @@ async fn splunk_insert_broken_token() {
 async fn splunk_insert_source() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(TextSerializerConfig::new().into(), vec![]).await;
+    let mut config = config(TextSerializerConfig::default().into(), vec![]).await;
     config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -207,7 +207,7 @@ async fn splunk_insert_source() {
 async fn splunk_insert_index() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(TextSerializerConfig::new().into(), vec![]).await;
+    let mut config = config(TextSerializerConfig::default().into(), vec![]).await;
     config.index = Template::try_from("custom_index".to_string()).ok();
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -245,7 +245,7 @@ async fn splunk_index_is_interpolated() {
 async fn splunk_insert_many() {
     let cx = SinkContext::new_test();
 
-    let config = config(TextSerializerConfig::new().into(), vec![]).await;
+    let config = config(TextSerializerConfig::default().into(), vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (messages, events) = random_lines_with_stream(100, 10, None);

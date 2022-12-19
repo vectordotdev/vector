@@ -431,7 +431,7 @@ mod tests {
 
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key: {{ key }}".into()),
-            ..default_config((None::<FramingConfig>, TextSerializerConfig::new()).into())
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
         let key = sink_config
             .key_partitioner()
