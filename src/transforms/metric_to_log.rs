@@ -16,7 +16,6 @@ use crate::{
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
-    schema,
     schema::Definition,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
@@ -51,8 +50,8 @@ pub struct MetricToLogConfig {
     #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
 
-    /// Should this transform encode tags using the enhanced encoding of [the `native_json`
-    /// codec][vector_native_json]?
+    /// Controls if this transform should encode tags using the enhanced encoding of [the
+    /// `native_json` codec][vector_native_json]?
     ///
     /// If set to `false`, tags will always be encoded as single string values using the last value
     /// assigned to the tag.
@@ -87,7 +86,7 @@ impl TransformConfig for MetricToLogConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, _: &Definition, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition =
             Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
