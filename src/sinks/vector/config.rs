@@ -35,7 +35,7 @@ pub struct VectorConfig {
     /// Version of the configuration.
     version: Option<super::VectorConfigVersion>,
 
-    /// The downstream address to which to connect.
+    /// The downstream Vector address to which to connect.
     ///
     /// The address _must_ include a port.
     address: String,
