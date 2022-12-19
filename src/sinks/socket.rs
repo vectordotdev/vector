@@ -104,7 +104,7 @@ impl SocketSinkConfig {
         Self::new(
             Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(address),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements,
         )
@@ -327,7 +327,7 @@ mod test {
                     }),
                     None,
                 ),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };
@@ -446,7 +446,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(addr.to_string()),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };

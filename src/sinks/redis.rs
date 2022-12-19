@@ -396,7 +396,7 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
 mod tests {
     use std::{collections::HashMap, convert::TryFrom};
 
-    use codecs::{JsonSerializer, TextSerializer};
+    use codecs::{JsonSerializer, TextSerializerConfig};
     use vector_core::event::LogEvent;
 
     use super::*;
@@ -433,7 +433,7 @@ mod tests {
             evt.into(),
             &Template::try_from("key").unwrap(),
             &Default::default(),
-            &mut Encoder::<()>::new(TextSerializer::new().into()),
+            &mut Encoder::<()>::new(TextSerializerConfig::default().build().into()),
         )
         .unwrap()
         .item

@@ -166,7 +166,7 @@ fn splunk_encode_log_event_json() {
 #[test]
 fn splunk_encode_log_event_text() {
     let processed_event = get_processed_event();
-    let encoder = hec_encoder(TextSerializerConfig::new().into());
+    let encoder = hec_encoder(TextSerializerConfig::default().into());
     let mut bytes = Vec::new();
     encoder
         .encode_input(vec![processed_event], &mut bytes)

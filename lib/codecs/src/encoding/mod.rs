@@ -236,14 +236,18 @@ pub enum SerializerConfig {
     /// could lead to the encoding emitting empty strings for the given event.
     RawMessage,
 
-    /// Plaintext encoding.
+    /// Plain text encoding.
     ///
-    /// This "encoding" simply uses the `message` field of a log event.
+    /// This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+    /// encoding that resembles the Prometheus export format.
     ///
     /// Users should take care if they're modifying their log events (such as by using a `remap`
     /// transform, etc) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
-    Text,
+    Text(
+        /// Encoding options specific to the text serializer.
+        TextSerializerConfig,
+    ),
 }
 
 impl From<AvroSerializerConfig> for SerializerConfig {
@@ -289,8 +293,8 @@ impl From<RawMessageSerializerConfig> for SerializerConfig {
 }
 
 impl From<TextSerializerConfig> for SerializerConfig {
-    fn from(_: TextSerializerConfig) -> Self {
-        Self::Text
+    fn from(config: TextSerializerConfig) -> Self {
+        Self::Text(config)
     }
 }
 
@@ -311,7 +315,7 @@ impl SerializerConfig {
             SerializerConfig::RawMessage => {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
-            SerializerConfig::Text => Ok(Serializer::Text(TextSerializerConfig.build())),
+            SerializerConfig::Text(config) => Ok(Serializer::Text(config.build())),
         }
     }
 
@@ -337,7 +341,7 @@ impl SerializerConfig {
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
-            | SerializerConfig::Text => FramingConfig::NewlineDelimited,
+            | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
         }
     }
 
@@ -353,7 +357,7 @@ impl SerializerConfig {
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
-            SerializerConfig::Text => TextSerializerConfig.input_type(),
+            SerializerConfig::Text(config) => config.input_type(),
         }
     }
 
@@ -369,7 +373,7 @@ impl SerializerConfig {
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
-            SerializerConfig::Text => TextSerializerConfig.schema_requirement(),
+            SerializerConfig::Text(config) => config.schema_requirement(),
         }
     }
 }

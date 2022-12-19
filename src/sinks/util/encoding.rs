@@ -125,7 +125,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use codecs::{
-        CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, TextSerializer,
+        CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, TextSerializerConfig,
     };
     use value::Value;
     use vector_core::event::LogEvent;
@@ -318,7 +318,7 @@ mod tests {
     fn test_encode_event_text() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<()>::new(TextSerializer::new().into()),
+            crate::codecs::Encoder::<()>::new(TextSerializerConfig::default().build().into()),
         );
 
         let mut writer = Vec::new();

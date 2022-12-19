@@ -223,7 +223,7 @@ impl AzureBlobSinkConfig {
                 blob_prefix: None,
                 blob_time_format: None,
                 blob_append_uuid: None,
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
                 compression: Compression::None,
                 batch: Default::default(),
                 request: TowerRequestConfig::default(),
