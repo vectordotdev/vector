@@ -13,6 +13,7 @@ passthrough = [
 
 [target.x86_64-unknown-linux-gnu]
 image = "vector-cross-env:x86_64-unknown-linux-gnu"
+zig = "2.17"
 
 [target.aarch64-unknown-linux-gnu]
 image = "vector-cross-env:aarch64-unknown-linux-gnu"
