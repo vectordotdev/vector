@@ -22,7 +22,7 @@ base: components: sources: http_server: configuration: {
 	address: {
 		description: "The address to listen for connections on."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	auth: {
 		description: "HTTP Basic authentication configuration."
@@ -31,12 +31,12 @@ base: components: sources: http_server: configuration: {
 			password: {
 				description: "The password for basic authentication."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			username: {
 				description: "The username for basic authentication."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -44,7 +44,8 @@ base: components: sources: http_server: configuration: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: true
+			description: "The codec to use for decoding events."
+			required:    true
 			type: string: enum: {
 				bytes: "Uses the raw bytes as-is."
 				gelf: """
@@ -58,13 +59,17 @@ base: components: sources: http_server: configuration: {
 					[json]: https://www.json.org/
 					"""
 				native: """
-					Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf] ([EXPERIMENTAL][experimental]).
+					Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+					This codec is **[experimental][experimental]**.
 
 					[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
 					[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 					"""
 				native_json: """
-					Decodes the raw bytes as Vector’s [native JSON format][vector_native_json] ([EXPERIMENTAL][experimental]).
+					Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+					This codec is **[experimental][experimental]**.
 
 					[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 					[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
@@ -127,7 +132,8 @@ base: components: sources: http_server: configuration: {
 				}
 			}
 			method: {
-				required: true
+				description: "The framing method."
+				required:    true
 				type: string: enum: {
 					bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 					character_delimited: "Byte frames which are delimited by a chosen character."
@@ -175,7 +181,7 @@ base: components: sources: http_server: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	method: {
@@ -196,18 +202,12 @@ base: components: sources: http_server: configuration: {
 	path: {
 		description: "The URL path on which log event POST requests shall be sent."
 		required:    false
-		type: string: {
-			default: "/"
-			syntax:  "literal"
-		}
+		type: string: default: "/"
 	}
 	path_key: {
 		description: "The event key in which the requested URL path used to send the request will be stored."
 		required:    false
-		type: string: {
-			default: "path"
-			syntax:  "literal"
-		}
+		type: string: default: "path"
 	}
 	query_parameters: {
 		description: """
@@ -218,7 +218,7 @@ base: components: sources: http_server: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	strict_path: {
@@ -246,7 +246,7 @@ base: components: sources: http_server: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -255,7 +255,7 @@ base: components: sources: http_server: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -267,7 +267,7 @@ base: components: sources: http_server: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -286,7 +286,7 @@ base: components: sources: http_server: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -295,7 +295,7 @@ base: components: sources: http_server: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

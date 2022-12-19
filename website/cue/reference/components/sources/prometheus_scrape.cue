@@ -151,11 +151,12 @@ components: sources: prometheus_scrape: {
 	}
 
 	how_it_works: {
-		duplicate_tags: {
-			title: "Duplicate Tags"
+		duplicate_tag_names: {
+			title: "Duplicate tag names"
 			body: """
-				Duplicate tag names are invalid within Prometheus. Prometheus itself will reject a metric with duplicate
-				tags. Vector will accept the metric, but will only take the last tag specified.
+				Multiple tags with the same name are invalid within Prometheus. Prometheus
+				itself will reject a metric with duplicate tags. Vector will accept the metric,
+				but will only take the last value for each tag name specified.
 				"""
 		}
 	}

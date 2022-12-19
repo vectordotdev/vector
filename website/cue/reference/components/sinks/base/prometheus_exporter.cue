@@ -34,10 +34,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 			The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
 			"""
 		required: false
-		type: string: {
-			default: "0.0.0.0:9598"
-			syntax:  "literal"
-		}
+		type: string: default: "0.0.0.0:9598"
 	}
 	auth: {
 		description: """
@@ -52,10 +49,11 @@ base: components: sinks: prometheus_exporter: configuration: {
 				description:   "The password to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					basic: """
 						Basic authentication.
@@ -75,13 +73,13 @@ base: components: sinks: prometheus_exporter: configuration: {
 				description:   "The bearer token to send."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
 				description:   "The username to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -109,7 +107,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 			[prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	distributions_as_summaries: {
 		description: """
@@ -176,7 +174,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
@@ -185,7 +183,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -197,7 +195,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -216,7 +214,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -225,7 +223,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

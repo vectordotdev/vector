@@ -6,320 +6,284 @@ components: sinks: [Name=string]: {
 	features: _
 
 	configuration: {
-		if features.acknowledgements {
-			acknowledgements: {
-				common: true
-				description: """
-					Controls how acknowledgements are handled by this sink. When enabled, all connected sources that support end-to-end acknowledgements will wait for the destination of this sink to acknowledge receipt of events before providing acknowledgement to the sending source. These settings override the global `acknowledgement` settings.
-					"""
-				required: false
-				type: object: options: {
-					enabled: {
-						common:      true
-						description: "Controls if all connected sources will wait for this sink to deliver the events before acknowledging receipt."
-						warnings: ["We recommend enabling this option to avoid loss of data, as destination sinks may otherwise reject events after the source acknowledges their successful receipt."]
-						required: false
-						type: bool: default: false
-					}
-				}
-			}
-		}
+		inputs: base.components.sinks.configuration.inputs
+		buffer: base.components.sinks.configuration.buffer
+		healthcheck: {
+			description: base.components.sinks.configuration.healthcheck.description
+			required:    base.components.sinks.configuration.healthcheck.required
+			type: object: options: {
+				enabled: base.components.sinks.configuration.healthcheck.type.object.options.enabled
 
-		if features.send != _|_ && features.send.batch != _|_ {
-			if features.send.batch.enabled {
-				batch: {
-					common:      features.send.batch.common
-					description: "Configures the sink batching behavior."
-					required:    false
-					type: object: {
-						examples: []
-						options: {
-							max_bytes: {
-								common:      true
-								description: "The maximum size of a batch that will be processed by a sink. This is based on the uncompressed size of the batched events, before they are serialized / compressed."
-								required:    false
-								type: uint: {
-									default: features.send.batch.max_bytes | *null
-									unit:    "bytes"
-								}
-							}
-							max_events: {
-								common:      true
-								description: "The maximum size of a batch, in events, before it is flushed."
-								required:    false
-								type: uint: {
-									default: features.send.batch.max_events | *null
-									unit:    "events"
-								}
-							}
-							timeout_secs: {
-								common:      true
-								description: "The maximum age of a batch before it is flushed."
-								required:    false
-								type: float: {
-									default: features.send.batch.timeout_secs
-									unit:    "seconds"
-								}
-							}
+				if features.healthcheck != _|_ {
+					if features.healthcheck.uses_uri != _|_ {
+						if features.healthcheck.uses_uri {
+							uri: base.components.sinks.configuration.healthcheck.type.object.options.uri
 						}
 					}
 				}
 			}
 		}
 
-		buffer: {
-			common:      false
-			description: """
-				Configures the sink specific buffer behavior.
-
-				More information about the individual buffer types, and buffer behavior, can be found in the [Buffering Model](\(urls.vector_buffering_model)) section.
-				"""
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					max_events: {
-						common:        true
-						description:   "The maximum number of [events](\(urls.vector_data_model)) allowed in the buffer."
-						required:      false
-						relevant_when: "type = \"memory\""
-						type: uint: {
-							default: 500
-							unit:    "events"
-						}
-					}
-					max_size: {
-						description: """
-							The maximum size of the buffer on the disk. Must be at least ~256 megabytes (268435488 bytes).
-							"""
-						required:      true
-						relevant_when: "type = \"disk\""
-						type: uint: {
-							examples: [268435488]
-							unit: "bytes"
-						}
-					}
-					type: {
-						common:      true
-						description: "The type of buffer to use."
-						required:    false
-						type: string: {
-							default: "memory"
-							enum: {
-								memory: """
-									Events are buffered in memory.
-
-									This is more performant, but less durable. Data will be lost if Vector is restarted forcefully or crashes.
-									"""
-								disk: """
-									Events are buffered on disk.
-
-									This is less performant, but more durable. Data that has been synchronized to disk will not be lost if Vector is restarted forcefully or crashes.
-
-									Data is synchronized to disk every 500ms.
-									"""
-							}
-						}
-					}
-					when_full: {
-						common:      false
-						description: "The behavior when the buffer becomes full."
-						required:    false
-						type: string: {
-							default: "block"
-							enum: {
-								block: """
-									Waits for capacity in the buffer.
-
-									This will cause backpressure to propagate to upstream components, which can cause data to pile up on the edge.
-									"""
-								drop_newest: """
-									Drops the event without waiting for capacity in the buffer.
-
-									The data is lost. This should only be used when performance is the highest priority.
-									"""
-							}
-						}
-					}
-				}
-			}
-		}
-
-		if features.send != _|_ {
-			if features.send.compression.enabled {
-				compression: {
+		if !features.auto_generated {
+			if features.acknowledgements {
+				acknowledgements: {
 					common: true
 					description: """
-						The compression strategy used to compress the encoded event data before transmission.
-
-						The default compression level of the chosen algorithm is used.
-						Some cloud storage API clients and browsers will handle decompression transparently,
-						so files may not always appear to be compressed depending how they are accessed.
+						Controls how acknowledgements are handled by this sink. When enabled, all connected sources that support end-to-end acknowledgements will wait for the destination of this sink to acknowledge receipt of events before providing acknowledgement to the sending source. These settings override the global `acknowledgement` settings.
 						"""
 					required: false
-					type: string: {
-						default: features.send.compression.default
-						enum: {
-							for algo in features.send.compression.algorithms {
-								if algo == "none" {
-									none: "No compression."
-								}
-								if algo == "gzip" {
-									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression. Compression level is `6` unless otherwise specified."
-								}
-								if algo == "snappy" {
-									snappy: "[Snappy](\(urls.snappy)) compression."
-								}
-								if algo == "lz4" {
-									lz4: "[lz4](\(urls.lz4)) compression."
-								}
-								if algo == "zstd" {
-									zstd: "[zstd](\(urls.zstd)) compression. Compression level is `3` unless otherwise specified. Dictionaries are not supported."
-								}
-							}
+					type: object: options: {
+						enabled: {
+							common:      true
+							description: "Controls if all connected sources will wait for this sink to deliver the events before acknowledging receipt."
+							warnings: ["We recommend enabling this option to avoid loss of data, as destination sinks may otherwise reject events after the source acknowledges their successful receipt."]
+							required: false
+							type: bool: default: false
 						}
 					}
 				}
 			}
-		}
 
-		if features.send != _|_ {
-			if features.send.encoding.enabled {
-				encoding: {
-					description: """
-						Configures the encoding specific sink behavior.
-						"""
-					required: features.send.encoding.codec.enabled
-					if !features.send.encoding.codec.enabled {common: true}
-					type: object: {
-						if features.send.encoding.codec.enabled {
-							examples: [{codec: "json"}]
-							options: codec: {
-								description: "The encoding codec used to serialize the events before outputting."
-								required:    true
-								type: string: {
-									examples: features.send.encoding.codec.enum
-									enum: {
-										for codec in features.send.encoding.codec.enum {
-											if codec == "text" {
-												text: "The message field from the event."
-											}
-											if codec == "logfmt" {
-												logfmt: "[logfmt](\(urls.logfmt)) encoded event."
-											}
-											if codec == "json" {
-												json: "JSON encoded event."
-											}
-											if codec == "gelf" {
-												gelf: "[GELF](https://docs.graylog.org/docs/gelf) encoded event."
-											}
-											if codec == "avro" {
-												avro: "Avro encoded event with a given schema."
-											}
-										}
+			if features.send != _|_ && features.send.batch != _|_ {
+				if features.send.batch.enabled {
+					batch: {
+						common:      features.send.batch.common
+						description: "Configures the sink batching behavior."
+						required:    false
+						type: object: {
+							examples: []
+							options: {
+								max_bytes: {
+									common:      true
+									description: "The maximum size of a batch that will be processed by a sink. This is based on the uncompressed size of the batched events, before they are serialized / compressed."
+									required:    false
+									type: uint: {
+										default: features.send.batch.max_bytes | *null
+										unit:    "bytes"
+									}
+								}
+								max_events: {
+									common:      true
+									description: "The maximum size of a batch, in events, before it is flushed."
+									required:    false
+									type: uint: {
+										default: features.send.batch.max_events | *null
+										unit:    "events"
+									}
+								}
+								timeout_secs: {
+									common:      true
+									description: "The maximum age of a batch before it is flushed."
+									required:    false
+									type: float: {
+										default: features.send.batch.timeout_secs
+										unit:    "seconds"
 									}
 								}
 							}
 						}
-						options: {
+					}
+				}
+			}
+
+			if features.send != _|_ {
+				if features.send.compression.enabled {
+					compression: {
+						common: true
+						description: """
+							The compression strategy used to compress the encoded event data before transmission.
+
+							The default compression level of the chosen algorithm is used.
+							Some cloud storage API clients and browsers will handle decompression transparently,
+							so files may not always appear to be compressed depending how they are accessed.
+							"""
+						required: false
+						type: string: {
+							default: features.send.compression.default
+							enum: {
+								for algo in features.send.compression.algorithms {
+									if algo == "none" {
+										none: "No compression."
+									}
+									if algo == "gzip" {
+										gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression. Compression level is `6` unless otherwise specified."
+									}
+									if algo == "snappy" {
+										snappy: "[Snappy](\(urls.snappy)) compression."
+									}
+									if algo == "lz4" {
+										lz4: "[lz4](\(urls.lz4)) compression."
+									}
+									if algo == "zstd" {
+										zstd: "[zstd](\(urls.zstd)) compression. Compression level is `3` unless otherwise specified. Dictionaries are not supported."
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if features.send != _|_ {
+				if features.send.encoding.enabled {
+					encoding: {
+						description: "Configures how events are encoded into raw bytes."
+						required:    features.send.encoding.codec.enabled
+						if !features.send.encoding.codec.enabled {common: true}
+						type: object: {
 							if features.send.encoding.codec.enabled {
-								for codec in features.send.encoding.codec.enum {
-									if codec == "avro" {
-										avro: {
-											description:   "Options for the `avro` codec."
-											required:      true
-											relevant_when: "codec = `avro`"
-											type: object: options: {
-												schema: {
-													description: "The Avro schema declaration."
-													required:    true
-													type: string: {
-														examples: [
-															"""
-															{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }
-															""",
-														]
-													}
+								examples: [{codec: "json"}]
+								options: codec: {
+									description: "The codec to use for encoding events."
+									required:    true
+									type: string: {
+										examples: features.send.encoding.codec.enum
+										enum: {
+											for codec in features.send.encoding.codec.enum {
+												if codec == "text" {
+													text: """
+														Plaintext encoding.
+
+														This "encoding" simply uses the `message` field of a log event.
+
+														Users should take care if they're modifying their log events (such as by using a `remap`
+														transform, etc) and removing the message field while doing additional parsing on it, as this
+														could lead to the encoding emitting empty strings for the given event.
+														"""
+												}
+												if codec == "logfmt" {
+													logfmt: """
+														Encodes an event as a [logfmt][logfmt] message.
+
+														[logfmt]: https://brandur.org/logfmt
+														"""
+												}
+												if codec == "json" {
+													json: """
+														Encodes an event as [JSON][json].
+
+														[json]: https://www.json.org/
+														"""
+												}
+												if codec == "gelf" {
+													gelf: """
+														Encodes an event as a [GELF][gelf] message.
+
+														[gelf]: https://docs.graylog.org/docs/gelf
+														"""
+												}
+												if codec == "avro" {
+													avro: """
+														Encodes an event as an [Apache Avro][apache_avro] message.
+
+														[apache_avro]: https://avro.apache.org/
+														"""
 												}
 											}
 										}
 									}
 								}
 							}
-
-							except_fields: {
-								common:      false
-								description: "Prevent the sink from encoding the specified fields."
-								required:    false
-								type: array: {
-									default: null
-									items: type: string: {
-										examples: ["message", "parent.child"]
-										syntax: "field_path"
+							options: {
+								if features.send.encoding.codec.enabled {
+									for codec in features.send.encoding.codec.enum {
+										if codec == "avro" {
+											avro: {
+												description:   "Apache Avro-specific encoder options."
+												required:      true
+												relevant_when: "codec = `avro`"
+												type: object: options: {
+													schema: {
+														description: "The Avro schema."
+														required:    true
+														type: string: {
+															examples: [
+																"""
+																{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }
+																""",
+															]
+														}
+													}
+												}
+											}
+										}
 									}
 								}
-							}
 
-							only_fields: {
-								common:      false
-								description: "Makes the sink encode only the specified fields."
-								required:    false
-								type: array: {
-									default: null
-									items: type: string: {
-										examples: ["message", "parent.child"]
-										syntax: "field_path"
+								except_fields: {
+									common:      false
+									description: "Prevent the sink from encoding the specified fields."
+									required:    false
+									type: array: {
+										default: null
+										items: type: string: {
+											examples: ["message", "parent.child"]
+											syntax: "field_path"
+										}
 									}
 								}
-							}
 
-							timestamp_format: {
-								common:      false
-								description: "How to format event timestamps."
-								required:    false
-								type: string: {
-									default: "rfc3339"
-									enum: {
-										rfc3339: "Formats as a RFC3339 string"
-										unix:    "Formats as a unix timestamp"
+								only_fields: {
+									common:      false
+									description: "Makes the sink encode only the specified fields."
+									required:    false
+									type: array: {
+										default: null
+										items: type: string: {
+											examples: ["message", "parent.child"]
+											syntax: "field_path"
+										}
+									}
+								}
+
+								timestamp_format: {
+									common:      false
+									description: "How to format event timestamps."
+									required:    false
+									type: string: {
+										default: "rfc3339"
+										enum: {
+											rfc3339: "Formats as a RFC3339 string"
+											unix:    "Formats as a unix timestamp"
+										}
 									}
 								}
 							}
 						}
 					}
-				}
 
-				if features.send.encoding.codec.enabled {
-					if features.send.encoding.codec.framing {
-						framing: {
-							common:      false
-							description: "Configures in which way events encoded as byte frames should be separated in a payload."
-							required:    false
-							type: object: options: {
-								method: {
-									description: "The framing method."
-									required:    false
-									common:      true
-									type: string: {
-										default: "A suitable default is chosen depending on the sink type and the selected codec."
-										enum: {
-											bytes:               "Byte frames are concatenated."
-											character_delimited: "Byte frames are delimited by a chosen character."
-											length_delimited:    "Byte frames are prefixed by an unsigned big-endian 32-bit integer indicating the length."
-											newline_delimited:   "Byte frames are delimited by a newline character."
+					if features.send.encoding.codec.enabled {
+						if features.send.encoding.codec.framing {
+							framing: {
+								common:      false
+								description: "Configures in which way events encoded as byte frames should be separated in a payload."
+								required:    false
+								type: object: options: {
+									method: {
+										description: "The framing method."
+										required:    false
+										common:      true
+										type: string: {
+											default: "A suitable default is chosen depending on the sink type and the selected codec."
+											enum: {
+												bytes:               "Byte frames are concatenated."
+												character_delimited: "Byte frames are delimited by a chosen character."
+												length_delimited:    "Byte frames are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+												newline_delimited:   "Byte frames are delimited by a newline character."
+											}
 										}
 									}
-								}
-								character_delimited: {
-									description:   "Options for `character_delimited` framing."
-									required:      true
-									relevant_when: "method = `character_delimited`"
-									type: object: options: {
-										delimiter: {
-											description: "The character used to separate frames."
-											required:    true
-											type: ascii_char: {
-												examples: ["\n", "\t"]
+									character_delimited: {
+										description:   "Options for `character_delimited` framing."
+										required:      true
+										relevant_when: "method = `character_delimited`"
+										type: object: options: {
+											delimiter: {
+												description: "The character used to separate frames."
+												required:    true
+												type: ascii_char: {
+													examples: ["\n", "\t"]
+												}
 											}
 										}
 									}
@@ -329,159 +293,138 @@ components: sinks: [Name=string]: {
 					}
 				}
 			}
-		}
 
-		if features.healthcheck != _|_ {
-			if features.healthcheck.enabled {
-				healthcheck: {
-					common:      true
-					description: "Health check options for the sink."
-					required:    false
-					type: object: {
-						examples: []
-						options: {
-							enabled: {
-								common:      true
-								description: "Enables/disables the healthcheck upon Vector boot."
-								required:    false
-								type: bool: default: true
-							}
+			if features.send != _|_ {
+				if features.send.proxy != _|_ {
+					if features.send.proxy.enabled {
+						proxy: configuration._proxy
+					}
+				}
+
+				if features.send.request.enabled {
+					request: {
+						common:      false
+						description: "Configures the sink request behavior."
+						required:    false
+						if features.send.request.relevant_when != _|_ {
+							relevant_when: features.send.request.relevant_when
 						}
-					}
-				}
-			}
-		}
-
-		if features.send != _|_ {
-			if features.send.proxy != _|_ {
-				if features.send.proxy.enabled {
-					proxy: configuration._proxy
-				}
-			}
-
-			if features.send.request.enabled {
-				request: {
-					common:      false
-					description: "Configures the sink request behavior."
-					required:    false
-					if features.send.request.relevant_when != _|_ {
-						relevant_when: features.send.request.relevant_when
-					}
-					type: object: {
-						examples: []
-						options: {
-							adaptive_concurrency: {
-								common:      false
-								description: "Configure the adaptive concurrency algorithms. These values have been tuned by optimizing simulated results. In general you should not need to adjust these."
-								required:    false
-								type: object: {
-									examples: []
-									options: {
-										decrease_ratio: {
-											common:      false
-											description: "The fraction of the current value to set the new concurrency limit when decreasing the limit. Valid values are greater than 0 and less than 1. Smaller values cause the algorithm to scale back rapidly when latency increases. Note that the new limit is rounded down after applying this ratio."
-											required:    false
-											type: float: default: 0.9
-										}
-										ewma_alpha: {
-											common:      false
-											description: "The adaptive concurrency algorithm uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with the current RTT. This value controls how heavily new measurements are weighted compared to older ones. Valid values are greater than 0 and less than 1. Smaller values cause this reference to adjust more slowly, which may be useful if a service has unusually high response variability."
-											required:    false
-											type: float: default: 0.7
-										}
-										rtt_deviation_scale: {
-											common: false
-											description: """
-											When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
-											"""
-											required: false
-											type: float: default: 2.0
-										}
-									}
-								}
-							}
-							concurrency: {
-								common: true
-								if features.send.request.adaptive_concurrency {
-									description: "The maximum number of in-flight requests allowed at any given time, or \"adaptive\" to allow Vector to automatically set the limit based on current network and service conditions."
-								}
-								if !features.send.request.adaptive_concurrency {
-									description: "The maximum number of in-flight requests allowed at any given time."
-								}
-								required: false
-								type: uint: {
-									default: features.send.request.concurrency
-									unit:    "requests"
-								}
-							}
-							rate_limit_duration_secs: {
-								common:      true
-								description: "The time window, in seconds, used for the `rate_limit_num` option."
-								required:    false
-								type: uint: {
-									default: features.send.request.rate_limit_duration_secs
-									unit:    "seconds"
-								}
-							}
-							rate_limit_num: {
-								common:      true
-								description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
-								required:    false
-								type: uint: {
-									default: features.send.request.rate_limit_num
-									unit:    null
-								}
-							}
-							retry_attempts: {
-								common:      false
-								description: "The maximum number of retries to make for failed requests. The default, for all intents and purposes, represents an infinite number of retries."
-								required:    false
-								type: uint: {
-									default: 18446744073709552000
-									unit:    null
-								}
-							}
-							retry_initial_backoff_secs: {
-								common:      false
-								description: "The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs."
-								required:    false
-								type: uint: {
-									default: features.send.request.retry_initial_backoff_secs
-									unit:    "seconds"
-								}
-							}
-							retry_max_duration_secs: {
-								common:      false
-								description: "The maximum amount of time, in seconds, to wait between retries."
-								required:    false
-								type: uint: {
-									default: features.send.request.retry_max_duration_secs
-									unit:    "seconds"
-								}
-							}
-							timeout_secs: {
-								common:      true
-								description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower this value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
-								required:    false
-								type: uint: {
-									default: features.send.request.timeout_secs
-									unit:    "seconds"
-								}
-							}
-
-							if features.send.request.headers {
-								headers: {
+						type: object: {
+							examples: []
+							options: {
+								adaptive_concurrency: {
 									common:      false
-									description: "Options for custom headers."
+									description: "Configure the adaptive concurrency algorithms. These values have been tuned by optimizing simulated results. In general you should not need to adjust these."
 									required:    false
 									type: object: {
-										examples: [
-											{
-												"Authorization": "${HTTP_TOKEN}"
-												"X-Powered-By":  "Vector"
-											},
-										]
-										options: {}
+										examples: []
+										options: {
+											decrease_ratio: {
+												common:      false
+												description: "The fraction of the current value to set the new concurrency limit when decreasing the limit. Valid values are greater than 0 and less than 1. Smaller values cause the algorithm to scale back rapidly when latency increases. Note that the new limit is rounded down after applying this ratio."
+												required:    false
+												type: float: default: 0.9
+											}
+											ewma_alpha: {
+												common:      false
+												description: "The adaptive concurrency algorithm uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with the current RTT. This value controls how heavily new measurements are weighted compared to older ones. Valid values are greater than 0 and less than 1. Smaller values cause this reference to adjust more slowly, which may be useful if a service has unusually high response variability."
+												required:    false
+												type: float: default: 0.7
+											}
+											rtt_deviation_scale: {
+												common: false
+												description: """
+												When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
+												"""
+												required: false
+												type: float: default: 2.0
+											}
+										}
+									}
+								}
+								concurrency: {
+									common: true
+									if features.send.request.adaptive_concurrency {
+										description: "The maximum number of in-flight requests allowed at any given time, or \"adaptive\" to allow Vector to automatically set the limit based on current network and service conditions."
+									}
+									if !features.send.request.adaptive_concurrency {
+										description: "The maximum number of in-flight requests allowed at any given time."
+									}
+									required: false
+									type: uint: {
+										default: features.send.request.concurrency
+										unit:    "requests"
+									}
+								}
+								rate_limit_duration_secs: {
+									common:      true
+									description: "The time window, in seconds, used for the `rate_limit_num` option."
+									required:    false
+									type: uint: {
+										default: features.send.request.rate_limit_duration_secs
+										unit:    "seconds"
+									}
+								}
+								rate_limit_num: {
+									common:      true
+									description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
+									required:    false
+									type: uint: {
+										default: features.send.request.rate_limit_num
+										unit:    null
+									}
+								}
+								retry_attempts: {
+									common:      false
+									description: "The maximum number of retries to make for failed requests. The default, for all intents and purposes, represents an infinite number of retries."
+									required:    false
+									type: uint: {
+										default: 18446744073709552000
+										unit:    null
+									}
+								}
+								retry_initial_backoff_secs: {
+									common:      false
+									description: "The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs."
+									required:    false
+									type: uint: {
+										default: features.send.request.retry_initial_backoff_secs
+										unit:    "seconds"
+									}
+								}
+								retry_max_duration_secs: {
+									common:      false
+									description: "The maximum amount of time, in seconds, to wait between retries."
+									required:    false
+									type: uint: {
+										default: features.send.request.retry_max_duration_secs
+										unit:    "seconds"
+									}
+								}
+								timeout_secs: {
+									common:      true
+									description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower this value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
+									required:    false
+									type: uint: {
+										default: features.send.request.timeout_secs
+										unit:    "seconds"
+									}
+								}
+
+								if features.send.request.headers {
+									headers: {
+										common:      false
+										description: "Options for custom headers."
+										required:    false
+										type: object: {
+											examples: [
+												{
+													"Authorization": "${HTTP_TOKEN}"
+													"X-Powered-By":  "Vector"
+												},
+											]
+											options: {}
+										}
 									}
 								}
 							}
@@ -489,63 +432,63 @@ components: sinks: [Name=string]: {
 					}
 				}
 			}
-		}
 
-		if features.send != _|_ {
-			if features.send.send_buffer_bytes != _|_ {
-				send_buffer_bytes: {
-					common:      false
-					description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
-					required:    false
-					type: uint: {
-						default: null
-						examples: [65536]
-						unit: "bytes"
-					}
-					if features.send.send_buffer_bytes.relevant_when != _|_ {
-						relevant_when: features.send.send_buffer_bytes.relevant_when
+			if features.send != _|_ {
+				if features.send.send_buffer_bytes != _|_ {
+					send_buffer_bytes: {
+						common:      false
+						description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
+						required:    false
+						type: uint: {
+							default: null
+							examples: [65536]
+							unit: "bytes"
+						}
+						if features.send.send_buffer_bytes.relevant_when != _|_ {
+							relevant_when: features.send.send_buffer_bytes.relevant_when
+						}
 					}
 				}
-			}
 
-			if features.send.keepalive != _|_ {
-				keepalive: {
-					common:      false
-					description: "Configures the TCP keepalive behavior for the connection to the sink."
-					required:    false
-					type: object: {
-						examples: []
-						options: {
-							time_secs: {
-								common:      false
-								description: "The time a connection needs to be idle before sending TCP keepalive probes."
-								required:    false
-								type: uint: {
-									default: null
-									unit:    "seconds"
+				if features.send.keepalive != _|_ {
+					keepalive: {
+						common:      false
+						description: "Configures the TCP keepalive behavior for the connection to the sink."
+						required:    false
+						type: object: {
+							examples: []
+							options: {
+								time_secs: {
+									common:      false
+									description: "The time a connection needs to be idle before sending TCP keepalive probes."
+									required:    false
+									type: uint: {
+										default: null
+										unit:    "seconds"
+									}
 								}
 							}
 						}
 					}
 				}
+
+				if features.send.tls.enabled {
+					tls: configuration._tls_connect & {_args: {
+						can_verify_certificate: features.send.tls.can_verify_certificate
+						can_verify_hostname:    features.send.tls.can_verify_hostname
+						enabled_default:        features.send.tls.enabled_default
+						enabled_by_scheme:      features.send.tls.enabled_by_scheme
+					}}
+				}
 			}
 
-			if features.send.tls.enabled {
-				tls: configuration._tls_connect & {_args: {
-					can_verify_certificate: features.send.tls.can_verify_certificate
-					can_verify_hostname:    features.send.tls.can_verify_hostname
-					enabled_default:        features.send.tls.enabled_default
-					enabled_by_scheme:      features.send.tls.enabled_by_scheme
-				}}
-			}
-		}
-
-		if features.exposes != _|_ {
-			if features.exposes.tls.enabled {
-				tls: configuration._tls_accept & {_args: {
-					can_verify_certificate: features.exposes.tls.can_verify_certificate
-					enabled_default:        features.exposes.tls.enabled_default
-				}}
+			if features.exposes != _|_ {
+				if features.exposes.tls.enabled {
+					tls: configuration._tls_accept & {_args: {
+						can_verify_certificate: features.exposes.tls.can_verify_certificate
+						enabled_default:        features.exposes.tls.enabled_default
+					}}
+				}
 			}
 		}
 	}

@@ -71,11 +71,6 @@ where
         H::referenceable_name()
     }
 
-    fn is_optional() -> bool {
-        // Forward to the underlying `H`.
-        H::is_optional()
-    }
-
     fn metadata() -> Metadata<Self> {
         // Forward to the underlying `H`.
         //
