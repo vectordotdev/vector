@@ -320,7 +320,7 @@ mod test {
     use futures::{channel::mpsc, StreamExt, TryStreamExt};
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-    use vector_core::event::metric::TagValue;
+    use vector_core::{event::metric::TagValue, metric_tags};
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
@@ -339,20 +339,13 @@ mod test {
     }
 
     fn tags() -> MetricTags {
-        let expected_tags = vec![
-            ("normal_tag".to_owned(), TagValue::from("value".to_owned())),
-            (
-                "multi_value".to_owned(),
-                TagValue::from(Some("true".to_owned())),
-            ),
-            (
-                "multi_value".to_owned(),
-                TagValue::from(Some("false".to_owned())),
-            ),
-            ("multi_value".to_owned(), TagValue::from(None)),
-            ("bare_tag".to_owned(), TagValue::from(None)),
-        ];
-        MetricTags::from_iter(expected_tags)
+        metric_tags!(
+            "normal_tag" => "value",
+            "multi_value" => "true",
+            "multi_value" => "false",
+            "multi_value" => TagValue::Bare,
+            "bare_tag" => TagValue::Bare,
+        )
     }
 
     #[test]
@@ -361,9 +354,10 @@ mod test {
         let mut actual = actual.split(',').collect::<Vec<_>>();
         actual.sort();
 
-        let mut expected = "normal_tag:value,multi_value:true,multi_value:false,multi_value"
-            .split(',')
-            .collect::<Vec<_>>();
+        let mut expected =
+            "bare_tag,normal_tag:value,multi_value:true,multi_value:false,multi_value"
+                .split(',')
+                .collect::<Vec<_>>();
         expected.sort();
 
         assert_eq!(actual, expected);
