@@ -357,12 +357,14 @@ mod test {
 
     #[test]
     fn test_encode_tags() {
-        let actual = encode_tags(&tags()).split(',').collect::<Vec<_>>().sort();
+        let actual = encode_tags(&tags());
+        let mut actual = actual.split(',').collect::<Vec<_>>();
+        actual.sort();
 
-        let expected = "normal_tag:value,multi_value:true,multi_value:false,multi_value"
+        let mut expected = "normal_tag:value,multi_value:true,multi_value:false,multi_value"
             .split(',')
-            .collect::<Vec<_>>()
-            .sort();
+            .collect::<Vec<_>>();
+        expected.sort();
 
         assert_eq!(actual, expected);
     }

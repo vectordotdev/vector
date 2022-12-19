@@ -218,10 +218,8 @@ impl From<ParseFloatError> for ParseError {
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
-
     use vector_common::assert_event_data_eq;
-    use vector_core::event::{metric::TagValue, MetricTags};
+    use vector_core::{event::metric::TagValue, metric_tags};
 
     use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
@@ -247,25 +245,15 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_tags(Some(
-                BTreeMap::from([
-                    ("tag1".to_owned(), TagValue::from(None)),
-                    ("tag2".to_owned(), TagValue::from(Some("value".to_owned())))
-                ])
-                .into()
-            ))),
+            .with_tags(Some(metric_tags!(
+                "tag1" => TagValue::Bare,
+                "tag2" => "value",
+            )))),
         );
     }
 
     #[test]
     fn enhanced_tags() {
-        let expected_tags = vec![
-            ("tag1".to_owned(), TagValue::from(None)),
-            ("tag2".to_owned(), TagValue::from(Some("valueA".to_owned()))),
-            ("tag2".to_owned(), TagValue::from(Some("valueB".to_owned()))),
-            ("tag3".to_owned(), TagValue::from(Some("value".to_owned()))),
-            ("tag3".to_owned(), TagValue::from(None)),
-        ];
         assert_event_data_eq!(
             parse("foo:1|c|#tag1,tag2:valueA,tag2:valueB,tag3:value,tag3"),
             Ok(Metric::new(
@@ -273,7 +261,13 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_tags(Some(MetricTags::from_iter(expected_tags)))),
+            .with_tags(Some(metric_tags!(
+                "tag1" => TagValue::Bare,
+                "tag2" => "valueA",
+                "tag2" => "valueB",
+                "tag3" => "value",
+                "tag3" => TagValue::Bare,
+            )))),
         );
     }
 
@@ -328,14 +322,11 @@ mod test {
                     statistic: StatisticKind::Histogram
                 },
             )
-            .with_tags(Some(
-                BTreeMap::from([
-                    ("region".to_owned(), TagValue::from("us-west1".to_owned())),
-                    ("production".to_owned(), TagValue::from(None)),
-                    ("e".to_owned(), TagValue::from("".to_owned())),
-                ])
-                .into()
-            ))),
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west1",
+                "production" => TagValue::Bare,
+                "e" => "",
+            )))),
         );
     }
 
@@ -351,14 +342,11 @@ mod test {
                     statistic: StatisticKind::Summary
                 },
             )
-            .with_tags(Some(
-                BTreeMap::from([
-                    ("region".to_owned(), TagValue::from("us-west1".to_owned())),
-                    ("production".to_owned(), TagValue::from(None)),
-                    ("e".to_owned(), TagValue::from("".to_owned())),
-                ])
-                .into()
-            ))),
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west1",
+                "production" => TagValue::Bare,
+                "e" => "",
+            )))),
         );
     }
 

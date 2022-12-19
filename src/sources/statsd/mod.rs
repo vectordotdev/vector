@@ -323,8 +323,6 @@ impl TcpSource for StatsdTcpSource {
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
-
     use futures::channel::mpsc;
     use futures_util::SinkExt;
     use tokio::{
@@ -334,10 +332,7 @@ mod test {
     };
     use vector_core::{
         config::ComponentKey,
-        event::{
-            metric::{MetricName, MetricSeries, TagValue},
-            EventContainer,
-        },
+        event::{metric::TagValue, EventContainer},
     };
 
     use super::*;
@@ -495,35 +490,25 @@ mod test {
             .collect::<AbsoluteMetricState>();
         let metrics = state.finish();
 
-        let series_one = MetricSeries {
-            name: MetricName {
-                name: "foo".to_owned(),
-                namespace: None,
-            },
-            tags: Some(
-                BTreeMap::from([
-                    ("a".to_owned(), TagValue::from(None)),
-                    ("b".to_owned(), TagValue::from(Some("b".to_owned()))),
-                ])
-                .into(),
+        assert_counter(
+            &metrics,
+            series!(
+                "foo",
+                "a" => TagValue::Bare,
+                "b" => "b"
             ),
-        };
-        assert_counter(&metrics, series_one, 100.0);
+            100.0,
+        );
 
-        let series_two = MetricSeries {
-            name: MetricName {
-                name: "foo".to_owned(),
-                namespace: None,
-            },
-            tags: Some(
-                BTreeMap::from([
-                    ("a".to_owned(), TagValue::from(None)),
-                    ("b".to_owned(), TagValue::from(Some("c".to_owned()))),
-                ])
-                .into(),
+        assert_counter(
+            &metrics,
+            series!(
+                "foo",
+                "a" => TagValue::Bare,
+                "b" => "c"
             ),
-        };
-        assert_counter(&metrics, series_two, 100.0);
+            100.0,
+        );
 
         assert_gauge(&metrics, series!("bar"), 42.0);
         assert_distribution(
