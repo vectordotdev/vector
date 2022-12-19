@@ -68,7 +68,7 @@ vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 # Rename to "vrl" once we use a release with stable `-Z namespaced-features`:
 # https://doc.rust-lang.org/cargo/reference/unstable.html#namespaced-features
-vrl-lib = { package = "vrl", path = "../vrl/vrl", optional = true }
+vrl-lib = { package = "vrl", path = "../vrl/vrl" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "2.7.0"
@@ -97,13 +97,12 @@ rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.16", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
-vrl-lib = { package = "vrl", path = "../vrl/vrl"}
 
 [features]
 api = ["dep:async-graphql", "value/api"]
 default = []
 lua = ["dep:mlua", "dep:tokio-stream"]
-vrl = ["dep:vrl-lib", "dep:enrichment"]
+vrl = ["dep:enrichment"]
 test = ["vector-common/test", "proptest"]
 
 [[bench]]
