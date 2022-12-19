@@ -1,5 +1,4 @@
 use bytes::{BufMut, BytesMut};
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use value::Kind;
 use vector_core::{
@@ -11,12 +10,14 @@ use vector_core::{
 use crate::MetricTagValues;
 
 /// Config used to build a `TextSerializer`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[crate::configurable_component]
+#[derive(Debug, Clone, Default)]
 pub struct TextSerializerConfig {
-    /// Enable encoding tags using the enhanced encoding of [the `native_json` codec][vector_native_json].
+    /// Controls how metric tag values are encoded.
     ///
-    /// If set to `false`, tags will always be encoded as single string values using the last value
-    /// assigned to the tag.
+    /// When set to `single`, only the last non-bare value of tags will be displayed with the
+    /// metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+    #[serde(default)]
     pub metric_tag_values: MetricTagValues,
 }
 
