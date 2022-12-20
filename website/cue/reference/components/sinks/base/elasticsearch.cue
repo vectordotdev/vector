@@ -363,6 +363,17 @@ base: components: sinks: elasticsearch: configuration: {
 		description: "Configuration for the `metric_to_log` transform."
 		required:    false
 		type: object: options: {
+			enhanced_tags: {
+				description: """
+					Controls if this transform should encode tags using the enhanced encoding of [the
+					`native_json` codec][vector_native_json]?
+
+					If set to `false`, tags will always be encoded as single string values using the last value
+					assigned to the tag.
+					"""
+				required: false
+				type: bool: default: false
+			}
 			host_tag: {
 				description: """
 					Name of the tag in the metric to use for the source host.

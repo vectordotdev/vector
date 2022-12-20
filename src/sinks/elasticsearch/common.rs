@@ -118,9 +118,10 @@ impl ElasticsearchCommon {
 
         let metric_config = config.metrics.clone().unwrap_or_default();
         let metric_to_log = MetricToLog::new(
-            metric_config.host_tag,
+            metric_config.host_tag.as_deref(),
             metric_config.timezone.unwrap_or_default(),
             LogNamespace::Legacy,
+            metric_config.enhanced_tags,
         );
 
         let region = config.aws.as_ref().and_then(|config| config.region());

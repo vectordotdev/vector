@@ -82,6 +82,17 @@ base: components: sinks: humio_metrics: configuration: {
 		required:    false
 		type: string: {}
 	}
+	enhanced_tags: {
+		description: """
+			Controls if this transform should encode tags using the enhanced encoding of [the
+			`native_json` codec][vector_native_json]?
+
+			If set to `false`, tags will always be encoded as single string values using the last value
+			assigned to the tag.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	event_type: {
 		description: """
 			The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
