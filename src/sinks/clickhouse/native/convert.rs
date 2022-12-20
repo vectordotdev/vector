@@ -27,10 +27,10 @@ fn get_row_from_events(
     schema: &Vec<(String, SqlType)>,
     event: &LogEvent,
 ) -> crate::Result<Vec<(String, CHValue)>> {
-    let mut row = vec![];
+    let mut row = Vec::with_capacity(schema.len());
     for (col_name, ty) in schema {
         let event_field = event.get(col_name.as_str());
-        let column = into_clickhouse_value(event_field, ty).map_err(Box::new)?;
+        let column = into_clickhouse_value(event_field, ty)?;
         row.push((col_name.clone(), column))
     }
     Ok(row)

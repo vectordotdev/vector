@@ -44,7 +44,7 @@ impl tower::Service<Vec<LogEvent>> for ClickhouseService {
     fn call(&mut self, events: Vec<LogEvent>) -> Self::Future {
         let pool = self.pool.clone();
         let event_count = events.len();
-        let event_byte_size = events.iter().map(|e| e.size_of()).sum();
+        let event_byte_size = events.size_of();
         let schema = self.schema.clone();
         let table = self.table.clone();
         Box::pin(async move {

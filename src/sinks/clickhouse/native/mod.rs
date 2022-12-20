@@ -1,6 +1,6 @@
 mod convert;
-mod native_service;
-mod native_sink;
 mod parse;
+mod service;
+mod sink;
 
-pub use native_sink::build_native_sink;
+pub use sink::build_native_sink;

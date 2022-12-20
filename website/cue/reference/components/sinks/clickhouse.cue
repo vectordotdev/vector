@@ -94,9 +94,9 @@ components: sinks: clickhouse: {
 			}
 		}
 		use_native_proto: {
-			description: "If true`, ClickHouse Native Protocol is used. Defaults to `false`, using `JSONEachRow` over HTTP."
+			description: "If `true`, ClickHouse Native Protocol is used. Defaults to `false`, using `JSONEachRow` over HTTP."
 			required:    false
-			type: bool: default: false	
+			type: bool: default: false
 		}
 		table: {
 			description: "The table that data will be inserted into."
@@ -108,29 +108,29 @@ components: sinks: clickhouse: {
 		sql_table_col_def: {
 			description: """
 				The clickhouse table column definition.
-				If use_native_proto is true, this field must be configured!
+				If `use_native_proto` is `true`, this field must be configured!
 				The key represents not only the column name of clickhouse table but also the key of the log.
-				The value now only supports limited type:
-				_type: UInt8,16,32,64  Int8,16,32,64  String FixedString(int) Float32,64 Date DateTime IPv4,6
-				Array(_type) Nullable(_type) Map(String, _type)
+				The value currently only supports these types:
+				_type: UInt(8,16,32,64), Int(8,16,32,64), String, FixedString(Int), Float(32,64), Date, DateTime, IPv(4,6),
+				Array(_type), Nullable(_type), Map(String, _type).
 
-				Note: for now, empty space is not acceptable in type definition, which means
-				Map(String,UInt8) Nullable(Date) are valid
-				Map( String, UInt8) Nullable(Date ) is invalid
+				Note: for now, empty space is not acceptable in type definition, which means:
+				Map(String,UInt8), Nullable(Date) are valid.
+				Map( String, UInt8), Nullable(Date ) are invalid.
 				"""
-			required:    false
+			required: false
 			type: object: {
 				examples: [
 					{
-						"name": "String"
-						"age": "UInt8"
+						"name":     "String"
+						"age":      "UInt8"
 						"hobbites": "Map(String,String)"
-					}
+					},
 				]
 				options: {
 					"*": {
 						common:      false
-						description: "clickhouse table difinition"
+						description: "clickhouse table definition"
 						required:    false
 						type: string: {
 							default: null
