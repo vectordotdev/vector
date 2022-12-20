@@ -24,6 +24,7 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use value::Value;
 use vector_common::{
+    config::SourceDetails,
     internal_event::{
         ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
     },
@@ -31,7 +32,7 @@ use vector_common::{
     sensitive_string::SensitiveString,
 };
 use vector_config::configurable_component;
-use vector_core::config::log_schema;
+use vector_core::{config::log_schema, event::EventMetadata};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -121,6 +122,7 @@ enum PulsarSinkState {
                 Result<SendFuture, PulsarError>,
                 RequestMetadata,
                 EventFinalizers,
+                Option<usize>,
             ),
         >,
     ),
@@ -138,10 +140,12 @@ struct PulsarSink {
                 Result<CommandSendReceipt, PulsarError>,
                 RequestMetadata,
                 EventFinalizers,
+                Option<String>,
             ),
         >,
     >,
     bytes_sent: Registered<BytesSent>,
+    sources_details: Vec<SourceDetails>,
 }
 
 impl GenerateConfig for PulsarSinkConfig {
@@ -162,7 +166,7 @@ impl GenerateConfig for PulsarSinkConfig {
 impl SinkConfig for PulsarSinkConfig {
     async fn build(
         &self,
-        _cx: SinkContext,
+        ctx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let producer = self
             .create_pulsar_producer()
@@ -172,12 +176,14 @@ impl SinkConfig for PulsarSinkConfig {
         let transformer = self.encoding.transformer();
         let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
+        let sources_details = ctx.sources_details.clone();
 
         let sink = PulsarSink::new(
             producer,
             transformer,
             encoder,
             self.partition_key_field.clone(),
+            sources_details,
         )?;
 
         let producer = self
@@ -257,6 +263,7 @@ impl PulsarSink {
         transformer: Transformer,
         encoder: Encoder<()>,
         partition_key_field: Option<String>,
+        sources_details: Vec<SourceDetails>,
     ) -> crate::Result<Self> {
         Ok(Self {
             transformer,
@@ -265,12 +272,13 @@ impl PulsarSink {
             in_flight: FuturesUnordered::new(),
             bytes_sent: register!(BytesSent::from(Protocol::TCP)),
             partition_key_field,
+            sources_details,
         })
     }
 
     fn poll_in_flight_prepare(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         if let PulsarSinkState::Sending(fut) = &mut self.state {
-            let (producer, result, metadata, finalizers) = ready!(fut.as_mut().poll(cx));
+            let (producer, result, metadata, finalizers, source_id) = ready!(fut.as_mut().poll(cx));
 
             self.state = PulsarSinkState::Ready(producer);
             self.in_flight.push(Box::pin(async move {
@@ -278,7 +286,14 @@ impl PulsarSink {
                     Ok(fut) => fut.await,
                     Err(error) => Err(error),
                 };
-                (result, metadata, finalizers)
+
+                let source = source_id.and_then(|id| {
+                    self.sources_details
+                        .get(id)
+                        .map(|details| details.key.id().to_owned())
+                });
+
+                (result, metadata, finalizers, source)
             }));
         }
 
@@ -318,6 +333,8 @@ impl Sink<Event> for PulsarSink {
         let metadata_builder = RequestMetadataBuilder::from_events(&event);
         self.transformer.transform(&mut event);
 
+        let source_id = event.metadata().source_id();
+
         let finalizers = event.take_finalizers();
         let mut bytes = BytesMut::new();
         self.encoder.encode(event, &mut bytes).map_err(|_| {
@@ -346,7 +363,7 @@ impl Sink<Event> for PulsarSink {
                     builder = builder.with_key(key);
                 };
                 let result = builder.send().await;
-                (producer, result, metadata, finalizers)
+                (producer, result, metadata, finalizers, source_key)
             })),
         );
 
@@ -359,7 +376,7 @@ impl Sink<Event> for PulsarSink {
         let this = Pin::into_inner(self);
         while !this.in_flight.is_empty() {
             match ready!(Pin::new(&mut this.in_flight).poll_next(cx)) {
-                Some((Ok(result), metadata, finalizers)) => {
+                Some((Ok(result), metadata, finalizers, source)) => {
                     trace!(
                         message = "Pulsar sink produced message.",
                         message_id = ?result.message_id,
@@ -373,13 +390,13 @@ impl Sink<Event> for PulsarSink {
                         count: metadata.event_count(),
                         byte_size: metadata.events_estimated_json_encoded_byte_size(),
                         output: None,
-                        source: None,
+                        source,
                     });
 
                     this.bytes_sent
                         .emit(ByteSize(metadata.request_encoded_size()));
                 }
-                Some((Err(error), metadata, finalizers)) => {
+                Some((Err(error), metadata, finalizers, _)) => {
                     finalizers.update_status(EventStatus::Errored);
                     emit!(PulsarSendingError {
                         error: Box::new(error),
