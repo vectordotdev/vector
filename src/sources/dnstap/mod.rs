@@ -280,7 +280,7 @@ impl FrameHandler for DnstapFrameHandler {
             self.log_namespace.insert_source_metadata(
                 DnstapConfig::NAME,
                 &mut log_event,
-                Some(LegacyKey::Overwrite(path!(self.host_key()))),
+                self.host_key.as_ref().map(LegacyKey::Overwrite),
                 path!("host"),
                 host,
             );
@@ -333,8 +333,8 @@ impl FrameHandler for DnstapFrameHandler {
         self.socket_send_buffer_size
     }
 
-    fn host_key(&self) -> &str {
-        self.host_key.as_str()
+    fn host_key(&self) -> &Option<OwnedValuePath> {
+        &self.host_key
     }
 
     fn source_type_key(&self) -> &str {
