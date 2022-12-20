@@ -5,12 +5,13 @@ use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
 use super::{
-    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, LogEvent, Value,
+    BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
+    Finalizable, LogEvent, Value,
 };
 use crate::ByteSizeOf;
 
 /// Traces are a newtype of `LogEvent`
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct TraceEvent(LogEvent);
 
 impl TraceEvent {
@@ -85,10 +86,6 @@ impl TraceEvent {
     ) -> Option<Value> {
         self.0.insert(key.as_ref(), value.into())
     }
-
-    pub fn estimated_json_encoded_size_of(&self) -> usize {
-        self.0.estimated_json_encoded_size_of()
-    }
 }
 
 impl From<LogEvent> for TraceEvent {
@@ -106,6 +103,12 @@ impl From<BTreeMap<String, Value>> for TraceEvent {
 impl ByteSizeOf for TraceEvent {
     fn allocated_bytes(&self) -> usize {
         self.0.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for TraceEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0.estimated_json_encoded_size_of()
     }
 }
 

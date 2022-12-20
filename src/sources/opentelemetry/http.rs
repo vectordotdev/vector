@@ -10,11 +10,12 @@ use prost::Message;
 use snafu::Snafu;
 use tracing::Span;
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Registered,
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
 };
 use vector_core::{
+    config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -60,8 +61,10 @@ pub(crate) async fn run_http_server(
 
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
+    log_namespace: LogNamespace,
     out: SourceSender,
     bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
@@ -74,7 +77,7 @@ pub(crate) fn build_warp_filter(
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
             let events = decode(&encoding_header, body).and_then(|body| {
                 bytes_received.emit(ByteSize(body.len()));
-                decode_body(body)
+                decode_body(body, log_namespace, &events_received)
             });
 
             handle_request(events, acknowledgements, out.clone(), super::LOGS)
@@ -82,7 +85,11 @@ pub(crate) fn build_warp_filter(
         .boxed()
 }
 
-fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
+fn decode_body(
+    body: Bytes,
+    log_namespace: LogNamespace,
+    events_received: &Registered<EventsReceived>,
+) -> Result<Vec<Event>, ErrorMessage> {
     let request = ExportLogsServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
@@ -93,13 +100,13 @@ fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
     let events: Vec<Event> = request
         .resource_logs
         .into_iter()
-        .flat_map(|v| v.into_iter())
+        .flat_map(|v| v.into_event_iter(log_namespace))
         .collect();
 
-    emit!(EventsReceived {
-        byte_size: events.size_of(),
-        count: events.len(),
-    });
+    events_received.emit(CountByteSize(
+        events.len(),
+        events.estimated_json_encoded_size_of(),
+    ));
 
     Ok(events)
 }

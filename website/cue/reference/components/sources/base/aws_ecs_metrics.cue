@@ -13,10 +13,7 @@ base: components: sources: aws_ecs_metrics: configuration: {
 			- The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
 			"""
 		required: false
-		type: string: {
-			default: "http://169.254.170.2/v2"
-			syntax:  "literal"
-		}
+		type: string: default: "http://169.254.170.2/v2"
 	}
 	namespace: {
 		description: """
@@ -25,10 +22,7 @@ base: components: sources: aws_ecs_metrics: configuration: {
 			Disabled if empty.
 			"""
 		required: false
-		type: string: {
-			default: "awsecs"
-			syntax:  "literal"
-		}
+		type: string: default: "awsecs"
 	}
 	scrape_interval_secs: {
 		description: "The interval between scrapes, in seconds."

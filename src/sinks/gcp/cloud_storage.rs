@@ -4,20 +4,23 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::encoding::Framer;
 use http::header::{HeaderName, HeaderValue};
+use http::Uri;
 use indoc::indoc;
 use snafu::ResultExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use vector_common::request_metadata::RequestMetadata;
 use vector_config::configurable_component;
 use vector_core::event::{EventFinalizers, Finalizable};
 
+use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::HttpClient,
+    http::{get_http_scheme_from_uri, HttpClient},
     serde::json::to_string,
     sinks::{
         gcs_common::{
@@ -28,10 +31,7 @@ use crate::{
             sink::GcsSink,
         },
         util::{
-            batch::BatchConfig,
-            metadata::{RequestMetadata, RequestMetadataBuilder},
-            partitioner::KeyPartitioner,
-            request_builder::EncodeResult,
+            batch::BatchConfig, partitioner::KeyPartitioner, request_builder::EncodeResult,
             BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
             TowerRequestConfig,
         },
@@ -222,13 +222,15 @@ impl GcsSinkConfig {
 
         let partitioner = self.key_partitioner()?;
 
+        let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
+
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
             .service(GcsService::new(client, base_url, auth));
 
         let request_settings = RequestSettings::new(self)?;
 
-        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings);
+        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, protocol);
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -259,7 +261,7 @@ struct RequestSettings {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
-    type Metadata = (String, EventFinalizers, RequestMetadataBuilder);
+    type Metadata = (String, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
@@ -274,20 +276,24 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         &self.encoder
     }
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (String, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
-        let metadata_builder = RequestMetadata::builder(&events);
         let finalizers = events.take_finalizers();
+        let builder = RequestMetadataBuilder::from_events(&events);
 
-        ((partition_key, finalizers, metadata_builder), events)
+        ((partition_key, finalizers), builder, events)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        gcp_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (key, finalizers, metadata_builder) = metadata;
+        let (key, finalizers) = gcp_metadata;
         // TODO: pull the seconds from the last event
         let filename = {
             let seconds = Utc::now().format(&self.time_format);
@@ -301,8 +307,6 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         };
 
         let key = format!("{}{}.{}", key, filename, self.extension);
-
-        let metadata = metadata_builder.build(&payload);
         let body = payload.into_payload();
 
         GcsRequest {
@@ -464,8 +468,12 @@ mod tests {
             .partition(&log)
             .expect("key wasn't provided");
         let request_settings = request_settings(&sink_config);
-        let (metadata, _events) = request_settings.split_input((key, vec![log]));
-        request_settings.build_request(metadata, EncodeResult::uncompressed(Bytes::new()))
+        let (metadata, metadata_request_builder, _events) =
+            request_settings.split_input((key, vec![log]));
+        let payload = EncodeResult::uncompressed(Bytes::new());
+        let request_metadata = metadata_request_builder.build(&payload);
+
+        request_settings.build_request(metadata, request_metadata, payload)
     }
 
     #[test]

@@ -11,6 +11,7 @@ use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf};
 
 use crate::sinks::elasticsearch::sign_request;
@@ -25,12 +26,13 @@ use crate::{
 
 use super::{ElasticsearchCommon, ElasticsearchConfig};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ElasticsearchRequest {
     pub payload: Bytes,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
     pub events_byte_size: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl ByteSizeOf for ElasticsearchRequest {
@@ -48,6 +50,12 @@ impl ElementCount for ElasticsearchRequest {
 impl Finalizable for ElasticsearchRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for ElasticsearchRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -110,6 +118,10 @@ impl HttpRequestBuilder {
             builder = builder.header("Content-Encoding", ce);
         }
 
+        if let Some(ae) = self.compression.accept_encoding() {
+            builder = builder.header("Accept-Encoding", ae);
+        }
+
         for (header, value) in &self.http_request_config.headers {
             builder = builder.header(&header[..], &value[..]);
         }
@@ -165,6 +177,7 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
             let batch_size = req.batch_size;
             let events_byte_size = req.events_byte_size;
             let http_response = http_service.call(req).await?;
+
             let event_status = get_event_status(&http_response);
             Ok(ElasticsearchResponse {
                 event_status,

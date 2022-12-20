@@ -7,13 +7,13 @@ use futures::{stream::BoxStream, StreamExt};
 use lookup::event_path;
 use snafu::Snafu;
 use tower::Service;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
     config::{log_schema, LogSchema},
     event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
 };
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
@@ -22,6 +22,7 @@ use crate::{
     internal_events::SinkRequestBuildError,
     sinks::util::{
         encoding::{write_all, Encoder as _},
+        metadata::RequestMetadataBuilder,
         request_builder::EncodeResult,
         Compression, Compressor, RequestBuilder, SinkBuilderExt,
     },
@@ -45,6 +46,7 @@ pub struct LogSinkBuilder<S> {
     batch_settings: BatcherSettings,
     compression: Option<Compression>,
     default_api_key: Arc<str>,
+    protocol: String,
 }
 
 impl<S> LogSinkBuilder<S> {
@@ -53,6 +55,7 @@ impl<S> LogSinkBuilder<S> {
         service: S,
         default_api_key: Arc<str>,
         batch_settings: BatcherSettings,
+        protocol: String,
     ) -> Self {
         Self {
             encoding: JsonEncoding::new(transformer),
@@ -60,6 +63,7 @@ impl<S> LogSinkBuilder<S> {
             default_api_key,
             batch_settings,
             compression: None,
+            protocol,
         }
     }
 
@@ -76,6 +80,7 @@ impl<S> LogSinkBuilder<S> {
             service: self.service,
             batch_settings: self.batch_settings,
             compression: self.compression.unwrap_or_default(),
+            protocol: self.protocol,
         }
     }
 }
@@ -98,6 +103,8 @@ pub struct LogSink<S> {
     compression: Compression,
     /// Batch settings: timeout, max events, max bytes, etc.
     batch_settings: BatcherSettings,
+    /// The protocol name
+    protocol: String,
 }
 
 /// Customized encoding specific to the Datadog Logs sink, as the logs API only accepts JSON encoded
@@ -198,7 +205,7 @@ struct LogRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
-    type Metadata = (Arc<str>, usize, EventFinalizers, usize);
+    type Metadata = (Arc<str>, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = JsonEncoding;
     type Payload = Bytes;
@@ -213,14 +220,16 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: (Option<Arc<str>>, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (Option<Arc<str>>, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (api_key, mut events) = input;
-        let events_len = events.len();
         let finalizers = events.take_finalizers();
-        let events_byte_size = events.size_of();
-
         let api_key = api_key.unwrap_or_else(|| Arc::clone(&self.default_api_key));
-        ((api_key, events_len, finalizers, events_byte_size), events)
+        let builder = RequestMetadataBuilder::from_events(&events);
+
+        ((api_key, finalizers), builder, events)
     }
 
     fn encode_events(
@@ -259,19 +268,20 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        dd_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (api_key, batch_size, finalizers, events_byte_size) = metadata;
+        let (api_key, finalizers) = dd_metadata;
         let uncompressed_size = payload.uncompressed_byte_size;
+
         LogApiRequest {
-            batch_size,
             api_key,
             compression: self.compression,
             body: payload.into_payload(),
             finalizers,
-            events_byte_size,
             uncompressed_size,
+            metadata,
         }
     }
 }
@@ -283,7 +293,7 @@ struct SemanticLogRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilder {
-    type Metadata = (Arc<str>, usize, EventFinalizers, usize);
+    type Metadata = (Arc<str>, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = SemanticJsonEncoding;
     type Payload = Bytes;
@@ -298,14 +308,19 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
         &self.encoding
     }
 
-    fn split_input(&self, input: (Option<Arc<str>>, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (Option<Arc<str>>, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (api_key, mut events) = input;
-        let events_len = events.len();
+
+        let builder = RequestMetadataBuilder::from_events(&events);
+
         let finalizers = events.take_finalizers();
-        let events_byte_size = events.size_of();
 
         let api_key = api_key.unwrap_or_else(|| Arc::clone(&self.default_api_key));
-        ((api_key, events_len, finalizers, events_byte_size), events)
+
+        ((api_key, finalizers), builder, events)
     }
 
     fn encode_events(
@@ -344,19 +359,20 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        dd_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (api_key, batch_size, finalizers, events_byte_size) = metadata;
+        let (api_key, finalizers) = dd_metadata;
         let uncompressed_size = payload.uncompressed_byte_size;
+
         LogApiRequest {
-            batch_size,
             api_key,
             compression: self.compression,
             body: payload.into_payload(),
             finalizers,
-            events_byte_size,
             uncompressed_size,
+            metadata,
         }
     }
 }
@@ -374,56 +390,42 @@ where
         let partitioner = EventPartitioner::default();
 
         let builder_limit = NonZeroUsize::new(64);
+        let input = input.batched_partitioned(partitioner, self.batch_settings);
         if self.schema_enabled {
-            let sink = input
-                .batched_partitioned(partitioner, self.batch_settings)
-                .request_builder(
-                    builder_limit,
-                    SemanticLogRequestBuilder {
-                        default_api_key,
-                        encoding: SemanticJsonEncoding {
-                            log_schema: self.encoding.log_schema,
-                            encoder: self.encoding.encoder,
-                        },
-                        compression: self.compression,
+            input.request_builder(
+                builder_limit,
+                SemanticLogRequestBuilder {
+                    default_api_key,
+                    encoding: SemanticJsonEncoding {
+                        log_schema: self.encoding.log_schema,
+                        encoder: self.encoding.encoder,
                     },
-                )
-                .filter_map(|request| async move {
-                    match request {
-                        Err(error) => {
-                            emit!(SinkRequestBuildError { error });
-                            None
-                        }
-                        Ok(req) => Some(req),
-                    }
-                })
-                .into_driver(self.service);
-
-            sink.run().await
+                    compression: self.compression,
+                },
+            )
         } else {
-            let sink = input
-                .batched_partitioned(partitioner, self.batch_settings)
-                .request_builder(
-                    builder_limit,
-                    LogRequestBuilder {
-                        default_api_key,
-                        encoding: self.encoding,
-                        compression: self.compression,
-                    },
-                )
-                .filter_map(|request| async move {
-                    match request {
-                        Err(error) => {
-                            emit!(SinkRequestBuildError { error });
-                            None
-                        }
-                        Ok(req) => Some(req),
-                    }
-                })
-                .into_driver(self.service);
-
-            sink.run().await
+            input.request_builder(
+                builder_limit,
+                LogRequestBuilder {
+                    default_api_key,
+                    encoding: self.encoding,
+                    compression: self.compression,
+                },
+            )
         }
+        .filter_map(|request| async move {
+            match request {
+                Err(error) => {
+                    emit!(SinkRequestBuildError { error });
+                    None
+                }
+                Ok(req) => Some(req),
+            }
+        })
+        .into_driver(self.service)
+        .protocol(self.protocol)
+        .run()
+        .await
     }
 }
 

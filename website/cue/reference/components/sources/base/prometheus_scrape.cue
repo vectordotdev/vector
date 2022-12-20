@@ -14,20 +14,23 @@ base: components: sources: prometheus_scrape: configuration: {
 				description:   "The password to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					basic: """
 						Basic authentication.
 
-						The username and password are concatenated and encoded via base64.
+						The username and password are concatenated and encoded via [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
 						"""
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc) is passed as-is.
 						"""
 				}
 			}
@@ -35,13 +38,13 @@ base: components: sources: prometheus_scrape: configuration: {
 				description:   "The bearer token to send."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
 				description:   "The username to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -54,19 +57,19 @@ base: components: sources: prometheus_scrape: configuration: {
 			By default, `"endpoint"` is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	endpoints: {
 		description: "Endpoints to scrape metrics from."
 		required:    true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	honor_labels: {
 		description: """
-			Controls how tag conflicts are handled if the scraped source has tags that Vector would add.
+			Controls how tag conflicts are handled if the scraped source has tags to be added.
 
-			If `true`, Vector will not add the new tag if the scraped metric has the tag already. If `false`, Vector will
-			rename the conflicting tag by prepending `exported_` to the name.
+			If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
+			is renamed by prepending `exported_` to the original name.
 
 			This matches Prometheus’ `honor_labels` configuration.
 			"""
@@ -82,7 +85,7 @@ base: components: sources: prometheus_scrape: configuration: {
 			By default, `"instance"` is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	query: {
 		description: """
@@ -94,15 +97,8 @@ base: components: sources: prometheus_scrape: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Custom parameters for the scrape request query string.
-
-				One or more values for the same parameter key can be provided. The parameters provided in this option are
-				appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
-				scraping the `/federate` endpoint.
-				"""
 			required: true
-			type: array: items: type: string: syntax: "literal"
+			type: array: items: type: string: {}
 		}
 	}
 	scrape_interval_secs: {
@@ -111,7 +107,7 @@ base: components: sources: prometheus_scrape: configuration: {
 		type: uint: default: 15
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
@@ -122,16 +118,16 @@ base: components: sources: prometheus_scrape: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -143,7 +139,7 @@ base: components: sources: prometheus_scrape: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -152,7 +148,7 @@ base: components: sources: prometheus_scrape: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -161,7 +157,7 @@ base: components: sources: prometheus_scrape: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

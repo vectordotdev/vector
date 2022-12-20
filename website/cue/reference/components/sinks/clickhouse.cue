@@ -13,6 +13,7 @@ components: sinks: clickhouse: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -72,81 +73,7 @@ components: sinks: clickhouse: {
 		notices: []
 	}
 
-	configuration: {
-		auth: configuration._http_auth & {_args: {
-			password_example: "${CLICKHOUSE_PASSWORD}"
-			username_example: "${CLICKHOUSE_USERNAME}"
-		}}
-		database: {
-			common:      true
-			description: "The database that contains the table that data will be inserted into."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["mydatabase"]
-			}
-		}
-		endpoint: {
-			description: "The endpoint of the [Clickhouse](\(urls.clickhouse)) server."
-			required:    true
-			type: string: {
-				examples: ["http://localhost:8123", "tcp://localhost:9223"]
-			}
-		}
-		use_native_proto: {
-			description: "If `true`, ClickHouse Native Protocol is used. Defaults to `false`, using `JSONEachRow` over HTTP."
-			required:    false
-			type: bool: default: false
-		}
-		table: {
-			description: "The table that data will be inserted into."
-			required:    true
-			type: string: {
-				examples: ["mytable"]
-			}
-		}
-		sql_table_col_def: {
-			description: """
-				The clickhouse table column definition.
-				If `use_native_proto` is `true`, this field must be configured!
-				The key represents not only the column name of clickhouse table but also the key of the log.
-				The value currently only supports these types:
-				_type: UInt(8,16,32,64), Int(8,16,32,64), String, FixedString(Int), Float(32,64), Date, DateTime, IPv(4,6),
-				Array(_type), Nullable(_type), Map(String, _type).
-
-				Note: for now, empty space is not acceptable in type definition, which means:
-				Map(String,UInt8), Nullable(Date) are valid.
-				Map( String, UInt8), Nullable(Date ) are invalid.
-				"""
-			required: false
-			type: object: {
-				examples: [
-					{
-						"name":     "String"
-						"age":      "UInt8"
-						"hobbites": "Map(String,String)"
-					},
-				]
-				options: {
-					"*": {
-						common:      false
-						description: "clickhouse table definition"
-						required:    false
-						type: string: {
-							default: null
-							examples: ["String", "Map(String,Date)", "Array(Int64)"]
-						}
-					}
-				}
-			}
-		}
-		skip_unknown_fields: {
-			common:      true
-			description: "Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema."
-			required:    false
-			type: bool: default: false
-		}
-	}
+	configuration: base.components.sinks.clickhouse.configuration
 
 	input: {
 		logs:    true

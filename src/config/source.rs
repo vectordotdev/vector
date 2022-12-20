@@ -4,7 +4,9 @@ use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::{AcknowledgementsConfig, GlobalOptions, LogNamespace, Output},
+    config::{
+        AcknowledgementsConfig, GlobalOptions, LogNamespace, Output, SourceAcknowledgementsConfig,
+    },
     source::Source,
 };
 
@@ -140,7 +142,8 @@ impl SourceContext {
         }
     }
 
-    pub fn do_acknowledgements(&self, config: &AcknowledgementsConfig) -> bool {
+    pub fn do_acknowledgements(&self, config: SourceAcknowledgementsConfig) -> bool {
+        let config = AcknowledgementsConfig::from(config);
         if config.enabled() {
             warn!(
                 message = "Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.",

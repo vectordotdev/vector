@@ -28,6 +28,8 @@
 
 mod util;
 
+#[cfg(feature = "abs")]
+mod abs;
 #[cfg(feature = "append")]
 mod append;
 #[cfg(feature = "array")]
@@ -48,6 +50,8 @@ mod compact;
 mod contains;
 #[cfg(feature = "decode_base64")]
 mod decode_base64;
+#[cfg(feature = "decode_mime_q")]
+mod decode_mime_q;
 #[cfg(feature = "decode_percent")]
 mod decode_percent;
 #[cfg(feature = "decrypt")]
@@ -319,6 +323,8 @@ mod values;
 
 // -----------------------------------------------------------------------------
 
+#[cfg(feature = "abs")]
+pub use abs::Abs;
 #[cfg(feature = "append")]
 pub use append::Append;
 #[cfg(feature = "assert")]
@@ -337,6 +343,8 @@ pub use compact::Compact;
 pub use contains::Contains;
 #[cfg(feature = "decode_base64")]
 pub use decode_base64::DecodeBase64;
+#[cfg(feature = "decode_mime_q")]
+pub use decode_mime_q::DecodeMimeQ;
 #[cfg(feature = "decode_percent")]
 pub use decode_percent::DecodePercent;
 #[cfg(feature = "decrypt")]
@@ -606,6 +614,8 @@ pub use crate::sha1::Sha1;
 #[must_use]
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
+        #[cfg(feature = "abs")]
+        Box::new(Abs),
         #[cfg(feature = "append")]
         Box::new(Append),
         #[cfg(feature = "array")]
@@ -628,6 +638,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(DecodeBase64),
         #[cfg(feature = "decode_percent")]
         Box::new(DecodePercent),
+        #[cfg(feature = "decode_mime_q")]
+        Box::new(DecodeMimeQ),
         #[cfg(feature = "decrypt")]
         Box::new(Decrypt),
         #[cfg(feature = "del")]

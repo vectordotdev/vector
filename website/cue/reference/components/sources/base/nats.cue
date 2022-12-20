@@ -12,7 +12,7 @@ base: components: sources: nats: configuration: {
 				type: object: options: path: {
 					description: "Path to credentials file."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			nkey: {
@@ -27,7 +27,7 @@ base: components: sources: nats: configuration: {
 																Conceptually, this is equivalent to a public key.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					seed: {
 						description: """
@@ -36,7 +36,7 @@ base: components: sources: nats: configuration: {
 																Conceptually, this is equivalent to a private key.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -68,7 +68,7 @@ base: components: sources: nats: configuration: {
 				type: object: options: value: {
 					description: "Token."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: {}
 				}
 			}
 			user_password: {
@@ -79,12 +79,12 @@ base: components: sources: nats: configuration: {
 					password: {
 						description: "Password."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					user: {
 						description: "Username."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 				}
 			}
@@ -93,29 +93,66 @@ base: components: sources: nats: configuration: {
 	connection_name: {
 		description: "A name assigned to the NATS connection."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	decoding: {
-		description: "Configuration for building a `Deserializer`."
+		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
-					bytes:       "Configures the `BytesDeserializer`."
-					gelf:        "Configures the `GelfDeserializer`."
-					json:        "Configures the `JsonDeserializer`."
-					native:      "Configures the `NativeDeserializer`."
-					native_json: "Configures the `NativeJsonDeserializer`."
-					syslog:      "Configures the `SyslogDeserializer`."
+					bytes: "Uses the raw bytes as-is."
+					gelf: """
+						Decodes the raw bytes as a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: """
+						Decodes the raw bytes as [JSON][json].
+
+						[json]: https://www.json.org/
+						"""
+					native: """
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					syslog: """
+						Decodes the raw bytes as a Syslog message.
+
+						Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
+						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+
+						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
+						"""
 				}
 			}
 		}
 	}
 	framing: {
-		description: "Configuration for building a `Framer`."
-		required:    false
+		description: """
+			Framing configuration.
+
+			Framing deals with how events are separated when encoded in a raw byte form, where each event is
+			a "frame" that must be prefixed, or delimited, in a way that marks where an event begins and
+			ends within the byte stream.
+			"""
+		required: false
 		type: object: options: {
 			character_delimited: {
 				description:   "Options for the character delimited decoder."
@@ -139,15 +176,20 @@ base: components: sources: nats: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Configures the `BytesDecoder`."
-						character_delimited: "Configures the `CharacterDelimitedDecoder`."
-						length_delimited:    "Configures the `LengthDelimitedDecoder`."
-						newline_delimited:   "Configures the `NewlineDelimitedDecoder`."
-						octet_counting:      "Configures the `OctetCountingDecoder`."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+						character_delimited: "Byte frames which are delimited by a chosen character."
+						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited:   "Byte frames which are delimited by a newline character."
+						octet_counting: """
+															Byte frames according to the [octet counting][octet_counting] format.
+
+															[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+															"""
 					}
 				}
 			}
@@ -180,12 +222,17 @@ base: components: sources: nats: configuration: {
 	queue: {
 		description: "NATS Queue Group to join."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	subject: {
 		description: "The NATS subject to publish messages to."
 		required:    true
 		type: string: syntax: "template"
+	}
+	subject_key_field: {
+		description: "The `NATS` subject key."
+		required:    false
+		type: string: default: "subject"
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -199,16 +246,16 @@ base: components: sources: nats: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -220,7 +267,7 @@ base: components: sources: nats: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -239,7 +286,7 @@ base: components: sources: nats: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -248,7 +295,7 @@ base: components: sources: nats: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """
@@ -289,6 +336,6 @@ base: components: sources: nats: configuration: {
 			The URL must take the form of `nats://server:port`.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

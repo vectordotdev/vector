@@ -75,11 +75,16 @@ pub struct ElasticsearchConfig {
     #[configurable(deprecated)]
     pub suppress_type_name: Option<bool>,
 
+    /// Whether or not to retry successful requests containing partial failures.
+    ///
+    /// To avoid duplicates in Elasticsearch, please use option `id_key`.
+    #[serde(default)]
+    pub request_retry_partial: bool,
+
     /// The name of the event key that should map to Elasticsearch’s [`_id` field][es_id].
     ///
-    /// By default, Vector does not set the `_id` field, which allows Elasticsearch to set this
-    /// automatically. You should think carefully about setting your own Elasticsearch IDs, since
-    /// this can [hinder performance][perf_doc].
+    /// By default, the `_id` field is not set, which allows Elasticsearch to set this
+    /// automatically. Setting your own Elasticsearch IDs can [hinder performance][perf_doc].
     ///
     /// [es_id]: https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html
     /// [perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
@@ -407,7 +412,9 @@ impl SinkConfig for ElasticsearchConfig {
             .collect::<Vec<_>>();
 
         let service = request_limits.distributed_service(
-            ElasticsearchRetryLogic,
+            ElasticsearchRetryLogic {
+                retry_partial: self.request_retry_partial,
+            },
             services,
             health_config,
             ElasticsearchHealthLogic,

@@ -21,9 +21,6 @@ pub mod btreemap;
 #[cfg(feature = "byte_size_of")]
 pub mod byte_size_of;
 
-#[cfg(feature = "estimated_json_encoded_size_of")]
-pub mod estimated_json_encoded_size_of;
-
 pub mod config;
 
 #[cfg(feature = "conversion")]
@@ -49,6 +46,8 @@ pub mod finalizer;
 pub use finalizer::EmptyStream;
 
 pub mod internal_event;
+
+pub mod request_metadata;
 
 pub mod shutdown;
 

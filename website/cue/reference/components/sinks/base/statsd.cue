@@ -2,11 +2,28 @@ package metadata
 
 base: components: sinks: statsd: configuration: {
 	acknowledgements: {
-		description: "Configuration of acknowledgement behavior."
-		required:    false
+		description: """
+			Controls how acknowledgements are handled for this sink.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
 		type: object: options: enabled: {
-			description: "Enables end-to-end acknowledgements."
-			required:    false
+			description: """
+				Whether or not end-to-end acknowledgements are enabled.
+
+				When enabled for a sink, any source connected to that sink, where the source supports
+				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				before acknowledging them at the source.
+
+				Enabling or disabling acknowledgements at the sink level takes precedence over any global
+				[`acknowledgements`][global_acks] configuration.
+
+				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+				"""
+			required: false
 			type: bool: {}
 		}
 	}
@@ -18,7 +35,7 @@ base: components: sinks: statsd: configuration: {
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	batch: {
 		description:   "Event batching behavior."
@@ -55,7 +72,7 @@ base: components: sinks: statsd: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
@@ -83,7 +100,7 @@ base: components: sinks: statsd: configuration: {
 			"""
 		relevant_when: "mode = \"unix\""
 		required:      true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	send_buffer_bytes: {
 		description: """
@@ -108,16 +125,16 @@ base: components: sinks: statsd: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -129,7 +146,7 @@ base: components: sinks: statsd: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -148,7 +165,7 @@ base: components: sinks: statsd: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -157,7 +174,7 @@ base: components: sinks: statsd: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

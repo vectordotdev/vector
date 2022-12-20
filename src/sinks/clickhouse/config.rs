@@ -23,12 +23,15 @@ use super::{http_sink::build_http_sink, native::build_native_sink};
 pub struct ClickhouseConfig {
     /// The endpoint of the Clickhouse server.
     #[serde(alias = "host")]
+    #[configurable(metadata(docs::examples = "http://localhost:8123"))]
     pub endpoint: UriSerde,
 
     /// The table that data will be inserted into.
+    #[configurable(metadata(docs::examples = "mytable"))]
     pub table: String,
 
     /// The database that contains the table that data will be inserted into.
+    #[configurable(metadata(docs::examples = "mydatabase"))]
     pub database: Option<String>,
     /// If true`, ClickHouse Native Protocol is used. Defaults to `false`, using `JSONEachRow` over HTTP.
     #[serde(default)]

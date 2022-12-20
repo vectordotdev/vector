@@ -2,25 +2,31 @@ package metadata
 
 base: components: sources: file: configuration: {
 	acknowledgements: {
-		description: "Configuration of acknowledgement behavior."
-		required:    false
-		type: object: {
-			default: enabled: null
-			options: enabled: {
-				description: "Enables end-to-end acknowledgements."
-				required:    false
-				type: bool: {}
-			}
+		description: """
+			Controls how acknowledgements are handled by this source.
+
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
+
+			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
+		type: object: options: enabled: {
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
+			required:    false
+			type: bool: {}
 		}
 	}
 	data_dir: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
+			By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	encoding: {
 		description: "Character set encoding."
@@ -40,19 +46,21 @@ base: components: sources: file: configuration: {
 				logged.
 				"""
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 	exclude: {
 		description: """
 			Array of file patterns to exclude. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
 
-			Takes precedence over the `include` option.
+			Takes precedence over the `include` option. Note: The `exclude` patterns are applied _after_ the attempt to glob everything
+			in `include`. This means that all files are first matched by `include` and then filtered by the `exclude`
+			patterns. This can be impactful if `include` contains directories with contents that are not accessible.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	file_key: {
@@ -64,10 +72,7 @@ base: components: sources: file: configuration: {
 			By default, `file` is used.
 			"""
 		required: false
-		type: string: {
-			default: "file"
-			syntax:  "literal"
-		}
+		type: string: default: "file"
 	}
 	fingerprint: {
 		description: """
@@ -76,50 +81,45 @@ base: components: sources: file: configuration: {
 			This is important for `checkpointing` when file rotation is used.
 			"""
 		required: false
-		type: object: {
-			default: {
-				bytes:                null
-				ignored_header_bytes: 0
-				lines:                1
-				strategy:             "checksum"
+		type: object: options: {
+			bytes: {
+				description: """
+					Maximum number of bytes to use, from the lines that are read, for generating the checksum.
+
+					TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
+					bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
+					"""
+				relevant_when: "strategy = \"checksum\""
+				required:      false
+				type: uint: {}
 			}
-			options: {
-				bytes: {
-					description: """
-						Maximum number of bytes to use, from the lines that are read, for generating the checksum.
+			ignored_header_bytes: {
+				description: """
+					The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
 
-						TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
-						bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
-						"""
-					relevant_when: "strategy = \"checksum\""
-					required:      false
-					type: uint: {}
-				}
-				ignored_header_bytes: {
-					description: """
-						The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
+					This can be helpful if all files share a common header that should be skipped.
+					"""
+				relevant_when: "strategy = \"checksum\""
+				required:      false
+				type: uint: default: 0
+			}
+			lines: {
+				description: """
+					The number of lines to read for generating the checksum.
 
-						This can be helpful if all files share a common header that should be skipped.
-						"""
-					relevant_when: "strategy = \"checksum\""
-					required:      true
-					type: uint: {}
-				}
-				lines: {
-					description: """
-						The number of lines to read for generating the checksum.
+					If your files share a common header that is not always a fixed size,
 
-						If your files share a common header that is not always a fixed size,
-
-						If the file has less than this amount of lines, it won’t be read at all.
-						"""
-					relevant_when: "strategy = \"checksum\""
-					required:      false
-					type: uint: default: 1
-				}
-				strategy: {
-					required: true
-					type: string: enum: {
+					If the file has less than this amount of lines, it won’t be read at all.
+					"""
+				relevant_when: "strategy = \"checksum\""
+				required:      false
+				type: uint: default: 1
+			}
+			strategy: {
+				required: false
+				type: string: {
+					default: "checksum"
+					enum: {
 						checksum:         "Read lines from the beginning of the file and compute a checksum over them."
 						device_and_inode: "Use the [device and inode](https://en.wikipedia.org/wiki/Inode) as the identifier."
 					}
@@ -131,7 +131,7 @@ base: components: sources: file: configuration: {
 		description: """
 			Delay between file discovery calls, in milliseconds.
 
-			This controls the interval at which Vector searches for files. Higher value result in greater chances of some short living files being missed between searches, but lower value increases the performance impact of file discovery.
+			This controls the interval at which files are searched. A higher value results in greater chances of some short-lived files being missed between searches, but a lower value increases the performance impact of file discovery.
 			"""
 		required: false
 		type: uint: default: 1000
@@ -140,14 +140,14 @@ base: components: sources: file: configuration: {
 		description: """
 			Overrides the name of the log field used to add the current hostname to each event.
 
-			The value will be the current hostname for wherever Vector is running.
+			The value is the current hostname.
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	ignore_checkpoints: {
 		description: """
@@ -174,19 +174,13 @@ base: components: sources: file: configuration: {
 	}
 	include: {
 		description: "Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported."
-		required:    false
-		type: array: {
-			default: []
-			items: type: string: syntax: "literal"
-		}
+		required:    true
+		type: array: items: type: string: {}
 	}
 	line_delimiter: {
 		description: "String sequence used to separate one file line from another."
 		required:    false
-		type: string: {
-			default: "\n"
-			syntax:  "literal"
-		}
+		type: string: default: "\n"
 	}
 	max_line_bytes: {
 		description: """
@@ -209,7 +203,7 @@ base: components: sources: file: configuration: {
 			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	multi_line_timeout: {
 		description: """
@@ -235,7 +229,7 @@ base: components: sources: file: configuration: {
 					This setting must be configured in conjunction with `mode`.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			mode: {
 				description: """
@@ -274,7 +268,7 @@ base: components: sources: file: configuration: {
 			start_pattern: {
 				description: "Regular expression pattern that is used to match the start of a new message."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			timeout_ms: {
 				description: """
@@ -296,7 +290,7 @@ base: components: sources: file: configuration: {
 			Off by default, the offset is only added to the event if this is set.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	oldest_first: {
 		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."

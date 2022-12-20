@@ -2,10 +2,19 @@ package metadata
 
 base: components: sources: kafka: configuration: {
 	acknowledgements: {
-		description: "Configuration of acknowledgement behavior."
-		required:    false
+		description: """
+			Controls how acknowledgements are handled by this source.
+
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
+
+			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
 		type: object: options: enabled: {
-			description: "Enables end-to-end acknowledgements."
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
 			type: bool: {}
 		}
@@ -17,10 +26,7 @@ base: components: sources: kafka: configuration: {
 			See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for the `auto.offset.reset` option for further clarification.
 			"""
 		required: false
-		type: string: {
-			default: "largest"
-			syntax:  "literal"
-		}
+		type: string: default: "largest"
 	}
 	bootstrap_servers: {
 		description: """
@@ -32,7 +38,7 @@ base: components: sources: kafka: configuration: {
 			Must be in the form of `host:port`, and comma-separated.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	commit_interval_ms: {
 		description: "The frequency that the consumer offsets are committed (written) to offset storage, in milliseconds."
@@ -40,19 +46,50 @@ base: components: sources: kafka: configuration: {
 		type: uint: default: 5000
 	}
 	decoding: {
-		description: "Configuration for building a `Deserializer`."
+		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
-					bytes:       "Configures the `BytesDeserializer`."
-					gelf:        "Configures the `GelfDeserializer`."
-					json:        "Configures the `JsonDeserializer`."
-					native:      "Configures the `NativeDeserializer`."
-					native_json: "Configures the `NativeJsonDeserializer`."
-					syslog:      "Configures the `SyslogDeserializer`."
+					bytes: "Uses the raw bytes as-is."
+					gelf: """
+						Decodes the raw bytes as a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: """
+						Decodes the raw bytes as [JSON][json].
+
+						[json]: https://www.json.org/
+						"""
+					native: """
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					syslog: """
+						Decodes the raw bytes as a Syslog message.
+
+						Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
+						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+
+						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
+						"""
 				}
 			}
 		}
@@ -63,8 +100,14 @@ base: components: sources: kafka: configuration: {
 		type: uint: default: 100
 	}
 	framing: {
-		description: "Configuration for building a `Framer`."
-		required:    false
+		description: """
+			Framing configuration.
+
+			Framing deals with how events are separated when encoded in a raw byte form, where each event is
+			a "frame" that must be prefixed, or delimited, in a way that marks where an event begins and
+			ends within the byte stream.
+			"""
+		required: false
 		type: object: options: {
 			character_delimited: {
 				description:   "Options for the character delimited decoder."
@@ -88,15 +131,20 @@ base: components: sources: kafka: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Configures the `BytesDecoder`."
-						character_delimited: "Configures the `CharacterDelimitedDecoder`."
-						length_delimited:    "Configures the `LengthDelimitedDecoder`."
-						newline_delimited:   "Configures the `NewlineDelimitedDecoder`."
-						octet_counting:      "Configures the `OctetCountingDecoder`."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+						character_delimited: "Byte frames which are delimited by a chosen character."
+						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited:   "Byte frames which are delimited by a newline character."
+						octet_counting: """
+															Byte frames according to the [octet counting][octet_counting] format.
+
+															[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+															"""
 					}
 				}
 			}
@@ -129,7 +177,7 @@ base: components: sources: kafka: configuration: {
 	group_id: {
 		description: "The consumer group name to be used to consume events from Kafka."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	headers_key: {
 		description: """
@@ -140,10 +188,7 @@ base: components: sources: kafka: configuration: {
 			By default, `"headers"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "headers"
-			syntax:  "literal"
-		}
+		type: string: default: "headers"
 	}
 	key_field: {
 		description: """
@@ -154,10 +199,7 @@ base: components: sources: kafka: configuration: {
 			By default, `"message_key"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "message_key"
-			syntax:  "literal"
-		}
+		type: string: default: "message_key"
 	}
 	librdkafka_options: {
 		description: """
@@ -167,13 +209,8 @@ base: components: sources: kafka: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Advanced options set directly on the underlying `librdkafka` client.
-
-				See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
-				"""
 			required: true
-			type: string: syntax: "literal"
+			type: string: {}
 		}
 	}
 	offset_key: {
@@ -185,10 +222,7 @@ base: components: sources: kafka: configuration: {
 			By default, `"offset"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "offset"
-			syntax:  "literal"
-		}
+		type: string: default: "offset"
 	}
 	partition_key: {
 		description: """
@@ -199,10 +233,7 @@ base: components: sources: kafka: configuration: {
 			By default, `"partition"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "partition"
-			syntax:  "literal"
-		}
+		type: string: default: "partition"
 	}
 	sasl: {
 		description: "Configuration for SASL authentication when interacting with Kafka."
@@ -226,17 +257,17 @@ base: components: sources: kafka: configuration: {
 			mechanism: {
 				description: "The SASL mechanism to use."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			password: {
 				description: "The SASL password."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			username: {
 				description: "The SASL username."
 				required:    false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -262,16 +293,16 @@ base: components: sources: kafka: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -283,7 +314,7 @@ base: components: sources: kafka: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -302,7 +333,7 @@ base: components: sources: kafka: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -311,7 +342,7 @@ base: components: sources: kafka: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """
@@ -354,10 +385,7 @@ base: components: sources: kafka: configuration: {
 			By default, `"topic"` is used.
 			"""
 		required: false
-		type: string: {
-			default: "topic"
-			syntax:  "literal"
-		}
+		type: string: default: "topic"
 	}
 	topics: {
 		description: """
@@ -366,6 +394,6 @@ base: components: sources: kafka: configuration: {
 			Regular expression syntax is supported if the topic begins with `^`.
 			"""
 		required: true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 }

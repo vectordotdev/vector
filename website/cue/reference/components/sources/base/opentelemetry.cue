@@ -2,10 +2,19 @@ package metadata
 
 base: components: sources: opentelemetry: configuration: {
 	acknowledgements: {
-		description: "Configuration of acknowledgement behavior."
-		required:    false
+		description: """
+			Controls how acknowledgements are handled by this source.
+
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
+
+			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
 		type: object: options: enabled: {
-			description: "Enables end-to-end acknowledgements."
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
 			required:    false
 			type: bool: {}
 		}
@@ -21,7 +30,7 @@ base: components: sources: opentelemetry: configuration: {
 					It _must_ include a port.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			tls: {
 				description: "Configures the TLS options for incoming/outgoing connections."
@@ -35,16 +44,16 @@ base: components: sources: opentelemetry: configuration: {
 																they are defined.
 																"""
 						required: false
-						type: array: items: type: string: syntax: "literal"
+						type: array: items: type: string: {}
 					}
 					ca_file: {
 						description: """
 																Absolute path to an additional CA certificate file.
 
-																The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+																The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					crt_file: {
 						description: """
@@ -56,7 +65,7 @@ base: components: sources: opentelemetry: configuration: {
 																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					enabled: {
 						description: """
@@ -75,7 +84,7 @@ base: components: sources: opentelemetry: configuration: {
 																The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					key_pass: {
 						description: """
@@ -84,7 +93,7 @@ base: components: sources: opentelemetry: configuration: {
 																This has no effect unless `key_file` is set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					verify_certificate: {
 						description: """
@@ -131,7 +140,7 @@ base: components: sources: opentelemetry: configuration: {
 					It _must_ include a port.
 					"""
 				required: true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			tls: {
 				description: "Configures the TLS options for incoming/outgoing connections."
@@ -145,16 +154,16 @@ base: components: sources: opentelemetry: configuration: {
 																they are defined.
 																"""
 						required: false
-						type: array: items: type: string: syntax: "literal"
+						type: array: items: type: string: {}
 					}
 					ca_file: {
 						description: """
 																Absolute path to an additional CA certificate file.
 
-																The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+																The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					crt_file: {
 						description: """
@@ -166,7 +175,7 @@ base: components: sources: opentelemetry: configuration: {
 																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					enabled: {
 						description: """
@@ -185,7 +194,7 @@ base: components: sources: opentelemetry: configuration: {
 																The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					key_pass: {
 						description: """
@@ -194,7 +203,7 @@ base: components: sources: opentelemetry: configuration: {
 																This has no effect unless `key_file` is set.
 																"""
 						required: false
-						type: string: syntax: "literal"
+						type: string: {}
 					}
 					verify_certificate: {
 						description: """

@@ -36,6 +36,7 @@ pub struct ConfigBuilder {
     pub api: api::Options,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub schema: schema::Options,
 
@@ -195,7 +196,6 @@ impl From<Config> for ConfigBuilder {
             tests,
             secret,
             hash: _,
-            expansions: _,
         } = config;
 
         let transforms = transforms

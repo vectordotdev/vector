@@ -2,11 +2,28 @@ package metadata
 
 base: components: sinks: datadog_logs: configuration: {
 	acknowledgements: {
-		description: "Configuration of acknowledgement behavior."
-		required:    false
+		description: """
+			Controls how acknowledgements are handled for this sink.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
 		type: object: options: enabled: {
-			description: "Enables end-to-end acknowledgements."
-			required:    false
+			description: """
+				Whether or not end-to-end acknowledgements are enabled.
+
+				When enabled for a sink, any source connected to that sink, where the source supports
+				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				before acknowledging them at the source.
+
+				Enabling or disabling acknowledgements at the sink level takes precedence over any global
+				[`acknowledgements`][global_acks] configuration.
+
+				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+				"""
+			required: false
 			type: bool: {}
 		}
 	}
@@ -37,24 +54,24 @@ base: components: sinks: datadog_logs: configuration: {
 		}
 	}
 	compression: {
-		description: "Compression configuration."
-		required:    false
-		type: {
-			object: options: {
-				algorithm: {
-					required: true
-					type: string: const: "zlib"
-				}
-				level: {
-					description: "Compression level."
-					required:    false
-					type: {
-						number: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-						string: enum: ["none", "fast", "best", "default"]
-					}
-				}
-			}
-			string: enum: ["none", "gzip", "zlib"]
+		description: """
+			Compression configuration.
+
+			All compression algorithms use the default compression level unless otherwise specified.
+			"""
+		required: false
+		type: string: enum: {
+			gzip: """
+				[Gzip][gzip] compression.
+
+				[gzip]: https://www.gzip.org/
+				"""
+			none: "No compression."
+			zlib: """
+				[Zlib]][zlib] compression.
+
+				[zlib]: https://zlib.net/
+				"""
 		}
 	}
 	default_api_key: {
@@ -67,7 +84,7 @@ base: components: sinks: datadog_logs: configuration: {
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -76,12 +93,12 @@ base: components: sinks: datadog_logs: configuration: {
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -96,7 +113,7 @@ base: components: sinks: datadog_logs: configuration: {
 	endpoint: {
 		description: "The endpoint to send logs to."
 		required:    false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	region: {
 		description: """
@@ -126,15 +143,9 @@ base: components: sinks: datadog_logs: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: {
-					default: {
-						decrease_ratio:      0.9
-						ewma_alpha:          0.4
-						rtt_deviation_scale: 2.5
-					}
-					options: {
-						decrease_ratio: {
-							description: """
+				type: object: options: {
+					decrease_ratio: {
+						description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -142,11 +153,11 @@ base: components: sinks: datadog_logs: configuration: {
 
 																Note that the new limit is rounded down after applying this ratio.
 																"""
-							required: false
-							type: float: default: 0.9
-						}
-						ewma_alpha: {
-							description: """
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -155,11 +166,11 @@ base: components: sinks: datadog_logs: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-							required: false
-							type: float: default: 0.4
-						}
-						rtt_deviation_scale: {
-							description: """
+						required: false
+						type: float: default: 0.4
+					}
+					rtt_deviation_scale: {
+						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
@@ -169,9 +180,8 @@ base: components: sinks: datadog_logs: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-							required: false
-							type: float: default: 2.5
-						}
+						required: false
+						type: float: default: 2.5
 					}
 				}
 			}
@@ -179,11 +189,22 @@ base: components: sinks: datadog_logs: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: {
+							adaptive: """
+															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+
+															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															"""
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
+						}
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -238,7 +259,7 @@ base: components: sinks: datadog_logs: configuration: {
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -252,16 +273,16 @@ base: components: sinks: datadog_logs: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -273,7 +294,7 @@ base: components: sinks: datadog_logs: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -292,7 +313,7 @@ base: components: sinks: datadog_logs: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -301,7 +322,7 @@ base: components: sinks: datadog_logs: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

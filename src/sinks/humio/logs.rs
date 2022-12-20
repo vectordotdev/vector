@@ -182,6 +182,7 @@ impl HumioLogsConfig {
             },
             timestamp_key: timestamp_key(),
             endpoint_target: EndpointTarget::Event,
+            auto_extract_timestamp: None,
         }
     }
 }

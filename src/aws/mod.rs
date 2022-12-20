@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, SystemTime};
 
-pub use auth::AwsAuthentication;
+pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::meta::region::ProvideRegion;
 use aws_sigv4::http_request::{SignableRequest, SigningSettings};
 use aws_sigv4::SigningParams;
@@ -113,8 +113,8 @@ pub async fn create_smithy_client<T: ClientBuilder>(
     let mut client_builder = Builder::new()
         .connector(connector)
         .middleware(middleware)
-        .sleep_impl(Some(Arc::new(TokioSleep)));
-    client_builder.set_retry_config(retry_config.into());
+        .sleep_impl(Arc::new(TokioSleep));
+    client_builder.set_retry_config(Some(retry_config.into()));
 
     Ok(client_builder.build())
 }

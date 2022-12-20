@@ -22,10 +22,7 @@ base: components: sources: configuration: proxy: {
 				Must be a valid URI string.
 				"""
 			required: false
-			type: string: {
-				examples: ["http://foo.bar:3128"]
-				syntax: "literal"
-			}
+			type: string: examples: ["http://foo.bar:3128"]
 		}
 		https: {
 			description: """
@@ -34,10 +31,7 @@ base: components: sources: configuration: proxy: {
 				Must be a valid URI string.
 				"""
 			required: false
-			type: string: {
-				examples: ["http://foo.bar:3128"]
-				syntax: "literal"
-			}
+			type: string: examples: ["http://foo.bar:3128"]
 		}
 		no_proxy: {
 			description: """
@@ -47,18 +41,18 @@ base: components: sources: configuration: proxy: {
 
 				| Pattern             | Example match                                                               |
 				| ------------------- | --------------------------------------------------------------------------- |
-				| Domain names        | `**example.com**` matches requests to `**example.com**`                     |
-				| Wildcard domains    | `**.example.com**` matches requests to `**example.com**` and its subdomains |
-				| IP addresses        | `**127.0.0.1**` matches requests to `**127.0.0.1**`                         |
-				| [CIDR][cidr] blocks | `**192.168.0.0/16**` matches requests to any IP addresses in this range     |
-				| Splat               | `__*__` matches all hosts                                                   |
+				| Domain names        | `example.com` matches requests to `example.com`                     |
+				| Wildcard domains    | `.example.com` matches requests to `example.com` and its subdomains |
+				| IP addresses        | `127.0.0.1` matches requests to `127.0.0.1`                         |
+				| [CIDR][cidr] blocks | `192.168.0.0/16` matches requests to any IP addresses in this range     |
+				| Splat               | `*` matches all hosts                                                   |
 
 				[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 				"""
 			required: false
 			type: array: {
 				default: []
-				items: type: string: syntax: "literal"
+				items: type: string: {}
 			}
 		}
 	}

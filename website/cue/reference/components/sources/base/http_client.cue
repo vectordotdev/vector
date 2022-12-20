@@ -9,20 +9,23 @@ base: components: sources: http_client: configuration: {
 				description:   "The password to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					basic: """
 						Basic authentication.
 
-						The username and password are concatenated and encoded via base64.
+						The username and password are concatenated and encoded via [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
 						"""
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc) is passed as-is.
 						"""
 				}
 			}
@@ -30,13 +33,13 @@ base: components: sources: http_client: configuration: {
 				description:   "The bearer token to send."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
 				description:   "The username to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
@@ -44,16 +47,47 @@ base: components: sources: http_client: configuration: {
 		description: "Decoder to use on the HTTP responses."
 		required:    false
 		type: object: options: codec: {
-			required: false
+			description: "The codec to use for decoding events."
+			required:    false
 			type: string: {
 				default: "bytes"
 				enum: {
-					bytes:       "Configures the `BytesDeserializer`."
-					gelf:        "Configures the `GelfDeserializer`."
-					json:        "Configures the `JsonDeserializer`."
-					native:      "Configures the `NativeDeserializer`."
-					native_json: "Configures the `NativeJsonDeserializer`."
-					syslog:      "Configures the `SyslogDeserializer`."
+					bytes: "Uses the raw bytes as-is."
+					gelf: """
+						Decodes the raw bytes as a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: """
+						Decodes the raw bytes as [JSON][json].
+
+						[json]: https://www.json.org/
+						"""
+					native: """
+						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					syslog: """
+						Decodes the raw bytes as a Syslog message.
+
+						Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
+						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+
+						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
+						"""
 				}
 			}
 		}
@@ -64,7 +98,7 @@ base: components: sources: http_client: configuration: {
 			Example: "http://127.0.0.1:9898/logs"
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	framing: {
 		description: "Framing to use in the decoding."
@@ -92,15 +126,20 @@ base: components: sources: http_client: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Configures the `BytesDecoder`."
-						character_delimited: "Configures the `CharacterDelimitedDecoder`."
-						length_delimited:    "Configures the `LengthDelimitedDecoder`."
-						newline_delimited:   "Configures the `NewlineDelimitedDecoder`."
-						octet_counting:      "Configures the `OctetCountingDecoder`."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+						character_delimited: "Byte frames which are delimited by a chosen character."
+						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited:   "Byte frames which are delimited by a newline character."
+						octet_counting: """
+															Byte frames according to the [octet counting][octet_counting] format.
+
+															[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+															"""
 					}
 				}
 			}
@@ -137,18 +176,9 @@ base: components: sources: http_client: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Headers to apply to the HTTP requests.
-				One or more values for the same header can be provided.
-				"""
 			required: true
-			type: array: items: type: string: syntax: "literal"
+			type: array: items: type: string: {}
 		}
-	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global setting"
-		required:    false
-		type: bool: {}
 	}
 	method: {
 		description: "Specifies the action of the HTTP request."
@@ -174,14 +204,8 @@ base: components: sources: http_client: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: """
-				Custom parameters for the HTTP request query string.
-
-				One or more values for the same parameter key can be provided. The parameters provided in this option are
-				appended to any parameters manually provided in the `endpoint` option.
-				"""
 			required: true
-			type: array: items: type: string: syntax: "literal"
+			type: array: items: type: string: {}
 		}
 	}
 	scrape_interval_secs: {
@@ -201,16 +225,16 @@ base: components: sources: http_client: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -222,7 +246,7 @@ base: components: sources: http_client: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -231,7 +255,7 @@ base: components: sources: http_client: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -240,7 +264,7 @@ base: components: sources: http_client: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

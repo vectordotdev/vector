@@ -12,7 +12,12 @@ base: components: sources: dnstap: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
+	}
+	log_namespace: {
+		description: "The namespace to use for logs. This overrides the global settings."
+		required:    false
+		type: bool: {}
 	}
 	max_frame_handling_tasks: {
 		description: "Maximum number of frames that can be processed concurrently."
@@ -57,7 +62,7 @@ base: components: sources: dnstap: configuration: {
 			if it doesn't already exist, when the source first starts.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	socket_receive_buffer_size: {
 		description: """

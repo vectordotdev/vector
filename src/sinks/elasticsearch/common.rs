@@ -8,6 +8,7 @@ use hyper::{body, Body};
 use serde::Deserialize;
 use snafu::ResultExt;
 use vector_core::config::proxy::ProxyConfig;
+use vector_core::config::LogNamespace;
 
 use super::{
     request_builder::ElasticsearchRequestBuilder, ElasticsearchApiVersion, ElasticsearchEncoder,
@@ -117,8 +118,10 @@ impl ElasticsearchCommon {
 
         let metric_config = config.metrics.clone().unwrap_or_default();
         let metric_to_log = MetricToLog::new(
-            metric_config.host_tag,
+            metric_config.host_tag.as_deref(),
             metric_config.timezone.unwrap_or_default(),
+            LogNamespace::Legacy,
+            metric_config.enhanced_tags,
         );
 
         let region = config.aws.as_ref().and_then(|config| config.region());
@@ -131,7 +134,7 @@ impl ElasticsearchCommon {
                 ElasticsearchApiVersion::V7 => 7,
                 ElasticsearchApiVersion::V8 => 8,
                 ElasticsearchApiVersion::Auto => {
-                    get_version(
+                    match get_version(
                         &base_url,
                         &http_auth,
                         &aws_auth,
@@ -140,7 +143,21 @@ impl ElasticsearchCommon {
                         &tls_settings,
                         proxy_config,
                     )
-                    .await?
+                    .await
+                    {
+                        Ok(version) => version,
+                        // This error should be fatal, but for now we only emit it as a warning
+                        // to make the transition smoother.
+                        Err(error) => {
+                            // For now, estimate version.
+                            let assumed_version = match config.suppress_type_name {
+                                Some(true) => 8,
+                                _ => 6,
+                            };
+                            warn!(message = "Failed to determine Elasticsearch version from `/_cluster/state/version`. Please fix the reported error or set an API version explicitly via `api_version`.",%assumed_version, %error);
+                            assumed_version
+                        }
+                    }
                 }
             };
             *version = Some(ver);
@@ -252,7 +269,7 @@ async fn get_version(
 ) -> crate::Result<usize> {
     #[derive(Deserialize)]
     struct ClusterState {
-        version: usize,
+        version: Option<usize>,
     }
 
     let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
@@ -272,7 +289,7 @@ async fn get_version(
     let mut body = body::aggregate(body).await?;
     let body = body.copy_to_bytes(body.remaining());
     let ClusterState { version } = serde_json::from_slice(&body)?;
-    Ok(version)
+    version.ok_or_else(||"Unexpected response from Elasticsearch endpoint `/_cluster/state/version`. Missing `version`. Consider setting `api_version` option.".into())
 }
 
 async fn get(
