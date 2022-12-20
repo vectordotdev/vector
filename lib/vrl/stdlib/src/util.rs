@@ -45,6 +45,7 @@ pub(crate) fn capture_regex_to_map(
 }
 
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
+#[allow(dead_code)]
 pub(crate) fn regex_kind(
     regex: &regex::Regex,
 ) -> std::collections::BTreeMap<vrl::value::kind::Field, vrl::value::Kind> {

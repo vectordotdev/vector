@@ -1,17 +1,35 @@
 use ::value::Value;
 use regex::Regex;
-use vrl::prelude::*;
+use vrl::{prelude::*, state::TypeState};
 
 use crate::util;
 
-fn parse_regex(value: Value, numeric_groups: bool, pattern: &Regex) -> Resolved {
+fn parse_regex(value: Value, numeric_groups: bool, pattern: Value) -> Resolved {
     let bytes = value.try_bytes()?;
     let value = String::from_utf8_lossy(&bytes);
-    let parsed = pattern
-        .captures(&value)
-        .map(|capture| util::capture_regex_to_map(pattern, &capture, numeric_groups))
-        .ok_or("could not find any pattern matches")?;
-    Ok(parsed.into())
+
+    match pattern {
+        Value::Bytes(bytes) => {
+            let pattern = Regex::new(&String::from_utf8_lossy(&bytes)).unwrap();
+            let parsed = pattern
+                .captures(&value)
+                .map(|capture| util::capture_regex_to_map(&pattern, &capture, numeric_groups))
+                .ok_or("could not find any pattern matches")?;
+            Ok(parsed.into())
+        }
+        Value::Regex(regex) => {
+            let parsed = regex
+                .captures(&value)
+                .map(|capture| util::capture_regex_to_map(&regex, &capture, numeric_groups))
+                .ok_or("could not find any pattern matches")?;
+            Ok(parsed.into())
+        }
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::regex() | Kind::bytes(),
+        }
+        .into()),
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -31,7 +49,7 @@ impl Function for ParseRegex {
             },
             Parameter {
                 keyword: "pattern",
-                kind: kind::REGEX,
+                kind: kind::BYTES | kind::REGEX,
                 required: true,
             },
             Parameter {
@@ -44,22 +62,21 @@ impl Function for ParseRegex {
 
     fn compile(
         &self,
-        _state: &state::TypeState,
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let pattern = arguments.required_regex("pattern")?;
+        let pattern = arguments.required("pattern");
         let numeric_groups = arguments
             .optional("numeric_groups")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(ParseRegexFn {
+        Ok(Box::new(ParseRegexFn {
             value,
             pattern,
             numeric_groups,
-        }
-        .as_expr())
+        }))
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -67,6 +84,14 @@ impl Function for ParseRegex {
             Example {
                 title: "simple match",
                 source: r#"parse_regex!("8.7.6.5 - zorp", r'^(?P<host>[\w\.]+) - (?P<user>[\w]+)')"#,
+                result: Ok(indoc! { r#"{
+                "host": "8.7.6.5",
+                "user": "zorp"
+            }"# }),
+            },
+            Example {
+                title: "simpl match (pattern as parameter)",
+                source: r#"msg = "8.7.6.5 - zorp"; reg = r'^(?P<host>[\w\.]+) - (?P<user>[\w]+)'; parse_regex!(msg, reg)"#,
                 result: Ok(indoc! { r#"{
                 "host": "8.7.6.5",
                 "user": "zorp"
@@ -83,6 +108,17 @@ impl Function for ParseRegex {
                 "user": "zorp"
             }"# }),
             },
+            Example {
+                title: "numeric groups (pattern as parameter)",
+                source: r#"reg = r'^(?P<host>[\w\.]+) - (?P<user>[\w]+)'; parse_regex!("8.7.6.5 - zorp", reg, numeric_groups: true)"#,
+                result: Ok(indoc! { r#"{
+                "0": "8.7.6.5 - zorp",
+                "1": "8.7.6.5",
+                "2": "zorp",
+                "host": "8.7.6.5",
+                "user": "zorp"
+            }"# }),
+            },
         ]
     }
 }
@@ -90,29 +126,52 @@ impl Function for ParseRegex {
 #[derive(Debug, Clone)]
 pub(crate) struct ParseRegexFn {
     value: Box<dyn Expression>,
-    pattern: Regex,
+    pattern: Box<dyn Expression>,
     numeric_groups: Box<dyn Expression>,
+}
+
+impl Expression for ParseRegexFn {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
+        let numeric_groups = self.numeric_groups.resolve(ctx)?;
+        let pattern = self.pattern.resolve(ctx)?;
+
+        parse_regex(value, numeric_groups.try_boolean()?, pattern)
+    }
+
+    fn type_def(&self, _: &TypeState) -> TypeDef {
+        TypeDef::object(Collection::any()).fallible()
+    }
+
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let fallibility = true;
+        let state = state.clone();
+        TypeInfo::new(state, TypeDef::regex().with_fallibility(fallibility))
+    }
 }
 
 impl FunctionExpression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let numeric_groups = self.numeric_groups.resolve(ctx)?;
-        let pattern = &self.pattern;
+        let pattern = self.pattern.resolve(ctx)?;
 
         parse_regex(value, numeric_groups.try_boolean()?, pattern)
     }
 
-    fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        TypeDef::object(util::regex_kind(&self.pattern)).fallible()
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
+        //TypeDef::object(util::regex_kind(&self.pattern)).fallible()
+
+        //TypeDef::object(Collection::any()).fallible()
+
+        let k: value::Kind = state.external.target_kind().clone();
+        TypeDef::from(k).fallible()
     }
 }
 
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
-    use vector_common::btreemap;
-
     use super::*;
 
     test_function![
@@ -143,25 +202,7 @@ mod tests {
                              "7": "201",
                              "8": "20574",
             })),
-            tdef: TypeDef::object(btreemap! {
-                    Field::from("bytes_in") => Kind::bytes(),
-                    Field::from("host") => Kind::bytes(),
-                    Field::from("user") => Kind::bytes(),
-                    Field::from("timestamp") => Kind::bytes(),
-                    Field::from("method") => Kind::bytes(),
-                    Field::from("path") => Kind::bytes(),
-                    Field::from("status") => Kind::bytes(),
-                    Field::from("bytes_out") => Kind::bytes(),
-                    Field::from("0") => Kind::bytes() | Kind::null(),
-                    Field::from("1") => Kind::bytes() | Kind::null(),
-                    Field::from("2") => Kind::bytes() | Kind::null(),
-                    Field::from("3") => Kind::bytes() | Kind::null(),
-                    Field::from("4") => Kind::bytes() | Kind::null(),
-                    Field::from("5") => Kind::bytes() | Kind::null(),
-                    Field::from("6") => Kind::bytes() | Kind::null(),
-                    Field::from("7") => Kind::bytes() | Kind::null(),
-                    Field::from("8") => Kind::bytes() | Kind::null(),
-                }).fallible(),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         single_match {
@@ -170,11 +211,7 @@ mod tests {
                 pattern: Regex::new(r#"(?P<number>.*?) group"#).unwrap()
             ],
             want: Ok(value!({"number": "first"})),
-            tdef: TypeDef::object(btreemap! {
-                        Field::from("number") => Kind::bytes(),
-                        Field::from("0") => Kind::bytes() | Kind::null(),
-                        Field::from("1") => Kind::bytes() | Kind::null(),
-                }).fallible(),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         no_match {
@@ -184,25 +221,7 @@ mod tests {
                             .unwrap()
             ],
             want: Err("could not find any pattern matches"),
-            tdef: TypeDef::object(btreemap! {
-                    Field::from("host") => Kind::bytes(),
-                    Field::from("user") => Kind::bytes(),
-                    Field::from("bytes_in") => Kind::bytes(),
-                    Field::from("timestamp") => Kind::bytes(),
-                    Field::from("method") => Kind::bytes(),
-                    Field::from("path") => Kind::bytes(),
-                    Field::from("status") => Kind::bytes(),
-                    Field::from("bytes_out") => Kind::bytes(),
-                    Field::from("0") => Kind::bytes() | Kind::null(),
-                    Field::from("1") => Kind::bytes() | Kind::null(),
-                    Field::from("2") => Kind::bytes() | Kind::null(),
-                    Field::from("3") => Kind::bytes() | Kind::null(),
-                    Field::from("4") => Kind::bytes() | Kind::null(),
-                    Field::from("5") => Kind::bytes() | Kind::null(),
-                    Field::from("6") => Kind::bytes() | Kind::null(),
-                    Field::from("7") => Kind::bytes() | Kind::null(),
-                    Field::from("8") => Kind::bytes() | Kind::null(),
-                }).fallible(),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
     ];
 }
