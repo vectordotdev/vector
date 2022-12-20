@@ -2,6 +2,7 @@ use std::{collections::HashMap, error, pin::Pin};
 
 use futures::{Stream, StreamExt};
 use vector_common::{
+    config::SourceDetails,
     internal_event::{emit, EventsSent, DEFAULT_OUTPUT},
     EventDataEq,
 };
@@ -12,7 +13,6 @@ use crate::{
         into_event_stream, EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef,
     },
     fanout::{self, Fanout},
-    topology::builder::SourceDetails,
     ByteSizeOf,
 };
 
@@ -275,20 +275,22 @@ impl TransformOutputs {
         if let Some(primary) = self.primary_output.as_mut() {
             let primary_buffer = buf.primary_buffer.as_mut().expect("mismatched outputs");
 
-            let count = primary_buffer.len();
-            let byte_size = primary_buffer.estimated_json_encoded_size_of();
-
             primary_buffer.send(primary).await?;
 
-            let mut sources: HashMap<Option<usize>, usize> = HashMap::new();
+            let mut sources: HashMap<Option<usize>, (usize, usize)> = HashMap::new();
             primary_buffer.iter_events().for_each(|event| {
+                let size = event.estimated_json_encoded_size_of();
+
                 sources
                     .entry(event.metadata().source_id())
-                    .and_modify(|i| *i += 1)
-                    .or_insert(1);
+                    .and_modify(|(count, byte_size)| {
+                        *count += 1;
+                        *byte_size += size;
+                    })
+                    .or_insert((1, size));
             });
 
-            for (source_id, count) in sources {
+            for (source_id, (count, byte_size)) in sources {
                 emit(EventsSent {
                     count,
                     byte_size,
@@ -301,20 +303,23 @@ impl TransformOutputs {
         }
 
         for (key, buf) in &mut buf.named_buffers {
-            let count = buf.len();
-            let byte_size = buf.estimated_json_encoded_size_of();
             buf.send(self.named_outputs.get_mut(key).expect("unknown output"))
                 .await?;
 
-            let mut sources: HashMap<Option<usize>, usize> = HashMap::new();
+            let mut sources: HashMap<Option<usize>, (usize, usize)> = HashMap::new();
             buf.iter_events().for_each(|event| {
+                let size = event.estimated_json_encoded_size_of();
+
                 sources
                     .entry(event.metadata().source_id())
-                    .and_modify(|i| *i += 1)
-                    .or_insert(1);
+                    .and_modify(|(count, byte_size)| {
+                        *count += 1;
+                        *byte_size += size;
+                    })
+                    .or_insert((1, size));
             });
 
-            for (source_id, count) in sources {
+            for (source_id, (count, byte_size)) in sources {
                 emit(EventsSent {
                     count,
                     byte_size,

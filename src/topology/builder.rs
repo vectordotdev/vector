@@ -16,6 +16,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
+use vector_common::config::SourceDetails;
 use vector_config::NamedComponent;
 use vector_core::config::LogNamespace;
 use vector_core::{
@@ -26,7 +27,7 @@ use vector_core::{
         },
         BufferType, WhenFull,
     },
-    internal_event::EventsSent,
+    internal_event::{emit, EventsSent},
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
@@ -134,16 +135,6 @@ pub struct Pieces {
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
-}
-
-// #[derive(Debug, Clone, Default, Eq, PartialEq)]
-// pub struct PipelineDetails {
-//     pub sources: Vec<SourceDetails>,
-// }
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct SourceDetails {
-    pub key: ComponentKey,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -404,7 +395,8 @@ pub async fn build_pieces(
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
-        let (transform_task, transform_outputs) = build_transform(transform, node, input_rx);
+        let (transform_task, transform_outputs) =
+            build_transform(transform, node, input_rx, sources_details.clone());
 
         outputs.extend(transform_outputs);
         tasks.insert(key.clone(), transform_task);
@@ -640,17 +632,21 @@ fn build_transform(
     transform: Transform,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
+    sources_details: Vec<SourceDetails>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     match transform {
         // TODO: avoid the double boxing for function transforms here
-        Transform::Function(t) => build_sync_transform(Box::new(t), node, input_rx),
-        Transform::Synchronous(t) => build_sync_transform(t, node, input_rx),
+        Transform::Function(t) => {
+            build_sync_transform(Box::new(t), node, input_rx, sources_details)
+        }
+        Transform::Synchronous(t) => build_sync_transform(t, node, input_rx, sources_details),
         Transform::Task(t) => build_task_transform(
             t,
             input_rx,
             node.input_details.data_type(),
             node.typetag,
             &node.key,
+            sources_details,
         ),
     }
 }
@@ -659,8 +655,9 @@ fn build_sync_transform(
     t: Box<dyn SyncTransform>,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
+    sources_details: Vec<SourceDetails>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (outputs, controls) = TransformOutputs::new(node.outputs);
+    let (outputs, controls) = TransformOutputs::new(node.outputs, sources_details);
 
     let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
@@ -840,6 +837,7 @@ fn build_task_transform(
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
+    sources_details: Vec<SourceDetails>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 
@@ -855,13 +853,29 @@ fn build_task_transform(
         });
     let stream = t
         .transform(Box::pin(filtered))
-        .inspect(|events: &EventArray| {
-            emit!(EventsSent {
-                count: events.len(),
-                byte_size: events.estimated_json_encoded_size_of(),
-                output: None,
-                source: None,
+        .inspect(move |events: &EventArray| {
+            let mut sources: HashMap<Option<usize>, (usize, usize)> = HashMap::new();
+            events.iter_events().for_each(|event| {
+                let size = event.estimated_json_encoded_size_of();
+
+                sources
+                    .entry(event.metadata().source_id())
+                    .and_modify(|(count, byte_size)| {
+                        *count += 1;
+                        *byte_size += size;
+                    })
+                    .or_insert((1, size));
             });
+
+            for (source_id, (count, byte_size)) in sources {
+                emit(EventsSent {
+                    count,
+                    byte_size,
+                    output: None,
+                    source: source_id
+                        .and_then(|id| sources_details.get(id).map(|details| details.key.id())),
+                });
+            }
         });
     let transform = async move {
         debug!("Task transform starting.");

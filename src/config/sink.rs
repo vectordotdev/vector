@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use serde::Serialize;
 use vector_buffers::{BufferConfig, BufferType};
+use vector_common::config::SourceDetails;
 use vector_config::{configurable_component, Configurable, NamedComponent};
 use vector_core::{
     config::{AcknowledgementsConfig, GlobalOptions, Input},
@@ -11,7 +12,6 @@ use vector_core::{
 use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
 use crate::{
     sinks::{util::UriSerde, Healthcheck, Sinks},
-    topology::builder::SourceDetails,
 };
 
 /// Fully resolved sink component.

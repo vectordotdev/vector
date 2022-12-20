@@ -80,6 +80,11 @@ impl PartialOrd for ComponentKey {
 
 impl ConfigurableString for ComponentKey {}
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct SourceDetails {
+    pub key: ComponentKey,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
