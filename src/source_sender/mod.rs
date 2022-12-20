@@ -330,7 +330,7 @@ impl Inner {
                         count,
                         byte_size,
                         output: Some(self.output.as_ref()),
-                        source: None,
+                        source: Some(&self.source_id.1),
                     });
                     return Err(error.into());
                 }
@@ -341,7 +341,7 @@ impl Inner {
             count,
             byte_size,
             output: Some(self.output.as_ref()),
-            source: None,
+            source: Some(&self.source_id.1),
         });
 
         Ok(())
