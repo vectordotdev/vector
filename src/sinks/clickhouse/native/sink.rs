@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::{super::ClickhouseConfig, service::ClickhouseService, parse::parse_field_type};
+use super::{super::ClickhouseConfig, parse::parse_field_type, service::ClickhouseService};
 use crate::{
     config::{SinkContext, SinkHealthcheckOptions},
     event::Event,
