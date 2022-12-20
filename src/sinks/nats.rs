@@ -86,7 +86,7 @@ impl GenerateConfig for NatsSinkConfig {
             acknowledgements: Default::default(),
             auth: None,
             connection_name: "vector".into(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             subject: "from.vector".into(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),

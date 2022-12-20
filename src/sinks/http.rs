@@ -442,7 +442,7 @@ mod tests {
         let sink = default_sink(
             (
                 Some(NewlineDelimitedEncoderConfig::new()),
-                JsonSerializerConfig::new(),
+                JsonSerializerConfig::default(),
             )
                 .into(),
         );

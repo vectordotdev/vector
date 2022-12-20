@@ -194,7 +194,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Udp(UdpMode {
                 config: UdpSinkConfig::from_address(addr.to_string()),
-                encoding: JsonSerializerConfig::new().into(),
+                encoding: JsonSerializerConfig::default().into(),
             }),
             acknowledgements: Default::default(),
         };
@@ -244,7 +244,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(addr.to_string()),
-                encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };

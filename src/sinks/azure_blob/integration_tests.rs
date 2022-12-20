@@ -96,7 +96,7 @@ async fn azure_blob_insert_json_into_blob() {
         blob_prefix: Some(blob_prefix.clone()),
         encoding: (
             Some(NewlineDelimitedEncoderConfig::new()),
-            JsonSerializerConfig::new(),
+            JsonSerializerConfig::default(),
         )
             .into(),
         ..config
@@ -154,7 +154,7 @@ async fn azure_blob_insert_json_into_blob_gzip() {
         blob_prefix: Some(blob_prefix.clone()),
         encoding: (
             Some(NewlineDelimitedEncoderConfig::new()),
-            JsonSerializerConfig::new(),
+            JsonSerializerConfig::default(),
         )
             .into(),
         compression: Compression::gzip_default(),

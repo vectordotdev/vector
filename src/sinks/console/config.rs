@@ -51,7 +51,7 @@ impl GenerateConfig for ConsoleSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             target: Target::Stdout,
-            encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
+            encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             acknowledgements: Default::default(),
         })
         .unwrap()

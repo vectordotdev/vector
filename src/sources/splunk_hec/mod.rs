@@ -1463,7 +1463,7 @@ mod tests {
     async fn one_simple_json_event() {
         let message = "one_simple_json_event";
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1484,7 +1484,7 @@ mod tests {
     async fn multiple_simple_json_event() {
         let n = 200;
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1509,7 +1509,7 @@ mod tests {
     #[tokio::test]
     async fn json_event() {
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1531,7 +1531,7 @@ mod tests {
     #[tokio::test]
     async fn line_to_message() {
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )

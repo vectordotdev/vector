@@ -211,7 +211,7 @@ base: components: sinks: http: configuration: {
 					When set to `single`, only the last non-bare value of tags will be displayed with the
 					metric.  When set to `full`, all metric tags will be exposed as separate assignments.
 					"""
-				relevant_when: "codec = \"text\""
+				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"

@@ -204,7 +204,10 @@ pub enum SerializerConfig {
     /// Encodes an event as [JSON][json].
     ///
     /// [json]: https://www.json.org/
-    Json,
+    Json(
+        /// Encoding options specific to the text serializer.
+        JsonSerializerConfig,
+    ),
 
     /// Encodes an event as a [logfmt][logfmt] message.
     ///
@@ -263,8 +266,8 @@ impl From<GelfSerializerConfig> for SerializerConfig {
 }
 
 impl From<JsonSerializerConfig> for SerializerConfig {
-    fn from(_: JsonSerializerConfig) -> Self {
-        Self::Json
+    fn from(config: JsonSerializerConfig) -> Self {
+        Self::Json(config)
     }
 }
 
@@ -306,7 +309,7 @@ impl SerializerConfig {
                 AvroSerializerConfig::new(avro.schema.clone()).build()?,
             )),
             SerializerConfig::Gelf => Ok(Serializer::Gelf(GelfSerializerConfig::new().build())),
-            SerializerConfig::Json => Ok(Serializer::Json(JsonSerializerConfig.build())),
+            SerializerConfig::Json(config) => Ok(Serializer::Json(config.build())),
             SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
             SerializerConfig::Native => Ok(Serializer::Native(NativeSerializerConfig.build())),
             SerializerConfig::NativeJson => {
@@ -337,7 +340,7 @@ impl SerializerConfig {
                 FramingConfig::LengthDelimited
             }
             SerializerConfig::Gelf
-            | SerializerConfig::Json
+            | SerializerConfig::Json(_)
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
@@ -352,7 +355,7 @@ impl SerializerConfig {
                 AvroSerializerConfig::new(avro.schema.clone()).input_type()
             }
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::input_type(),
-            SerializerConfig::Json => JsonSerializerConfig.input_type(),
+            SerializerConfig::Json(config) => config.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
@@ -368,7 +371,7 @@ impl SerializerConfig {
                 AvroSerializerConfig::new(avro.schema.clone()).schema_requirement()
             }
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::schema_requirement(),
-            SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
+            SerializerConfig::Json(config) => config.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
