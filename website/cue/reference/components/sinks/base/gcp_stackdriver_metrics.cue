@@ -302,7 +302,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: examples: ["${KEY_PASS_ENV_VAR}"]
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

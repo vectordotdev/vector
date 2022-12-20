@@ -629,7 +629,8 @@ components: {
 						description: """
 							Whether or not to require TLS for incoming/outgoing connections.
 
-							When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for more information.
+							When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+							more information.
 							"""
 						required:    false
 						type: bool: default: Args.enabled_default
@@ -664,7 +665,8 @@ components: {
 						description: """
 							Absolute path to a certificate file used to identify this server.
 
-							The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as an inline string in PEM format.
+							The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+							an inline string in PEM format.
 
 							If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 							"""
@@ -704,7 +706,18 @@ components: {
 					if Args.can_verify_certificate {
 						verify_certificate: {
 							common:      false
-							description: "If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if the certificate is not valid. If `false` (the default), Vector will not request a certificate from the client."
+							description: """
+								Enables certificate verification.
+
+								If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
+								issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
+								certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
+								so on until reaching a root certificate.
+
+								Relevant for both incoming and outgoing connections.
+
+								Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+								"""
 							required:    false
 							type: bool: default: false
 						}
@@ -722,13 +735,18 @@ components: {
 				let Args = _args
 
 				common:      false
-				description: "Configures the TLS options for outgoing connections."
+				description: "Configures the TLS options for incoming/outgoing connections."
 				required:    false
 				type: object: options: {
 					if !Args.enabled_by_scheme {
 						enabled: {
 							common:      true
-							description: "Enable TLS during connections to the remote."
+							description: """
+								Whether or not to require TLS for incoming/outgoing connections.
+
+								When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+								more information.
+								"""
 							required:    false
 							type: bool: default: Args.enabled_default
 						}
@@ -736,7 +754,11 @@ components: {
 
 					ca_file: {
 						common:      false
-						description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an inline CA certificate in PEM format."
+						description: """
+							Absolute path to an additional CA certificate file.
+
+							The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+							"""
 						required:    false
 						type: string: {
 							default: null
@@ -745,7 +767,14 @@ components: {
 					}
 					crt_file: {
 						common:      true
-						description: "Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this is set and is not a PKCS#12 archive, `key_file` must also be set."
+						description: """
+							Absolute path to a certificate file used to identify this server.
+
+							The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+							an inline string in PEM format.
+
+							If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+							"""
 						required:    false
 						type: string: {
 							default: null
@@ -754,7 +783,11 @@ components: {
 					}
 					key_file: {
 						common:      true
-						description: "Absolute path to a private key file used to identify this connection, in DER or PEM format (PKCS#8), or an inline private key in PEM format. If this is set, `crt_file` must also be set."
+						description: """
+							Absolute path to a private key file used to identify this server.
+
+							The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+							"""
 						required:    false
 						type: string: {
 							default: null
@@ -763,7 +796,11 @@ components: {
 					}
 					key_pass: {
 						common:      false
-						description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
+						description: """
+							Passphrase used to unlock the encrypted key file.
+
+							This has no effect unless `key_file` is set.
+							"""
 						required:    false
 						type: string: {
 							default: null
@@ -775,7 +812,8 @@ components: {
 						description: """
 							Sets the list of supported ALPN protocols.
 
-							Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order they are defined.
+							Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
+							they are defined.
 							"""
 						required:    false
 						type: array: {
@@ -793,7 +831,10 @@ components: {
 							description: """
 								Enables certificate verification.
 
-								If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and so on until reaching a root certificate.
+								If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
+								issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
+								certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
+								so on until reaching a root certificate.
 
 								Relevant for both incoming and outgoing connections.
 
@@ -810,7 +851,8 @@ components: {
 							description: """
 								Enables hostname verification.
 
-								If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+								If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+								the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
 
 								Only relevant for outgoing connections.
 
