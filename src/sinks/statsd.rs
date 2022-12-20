@@ -10,10 +10,7 @@ use futures_util::FutureExt;
 use tokio_util::codec::Encoder;
 use tower::{Service, ServiceBuilder};
 use vector_config::configurable_component;
-use vector_core::{
-    event::metric::{TagValue, TagValueSet},
-    ByteSizeOf,
-};
+use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
 #[cfg(unix)]
@@ -174,28 +171,13 @@ impl SinkConfig for StatsdSinkConfig {
 // This is not an issue, but noting as it may be an observed behavior.
 fn encode_tags(tags: &MetricTags) -> String {
     let parts: Vec<_> = tags
-        .iter_sets()
-        .map(|(name, tag_value_set)| match tag_value_set {
-            TagValueSet::Empty => name.to_owned(),
-            TagValueSet::Single(tag_value) => match tag_value {
-                TagValue::Bare => name.to_owned(),
-                TagValue::Value(value) => format!("{}:{}", name, value),
-            },
-            TagValueSet::Set(index_set) => {
-                let parts: Vec<_> = index_set
-                    .iter()
-                    .map(|tag_value| match tag_value {
-                        TagValue::Bare => name.to_owned(),
-                        TagValue::Value(value) => {
-                            format!("{}:{}", name, value)
-                        }
-                    })
-                    .collect();
-
-                parts.join(",")
-            }
+        .iter_all()
+        .map(|(name, tag_value)| match tag_value {
+            Some(value) => format!("{}:{}", name, value),
+            None => name.to_owned(),
         })
         .collect();
+
     // `parts` is already sorted by key because of BTreeMap
     parts.join(",")
 }
