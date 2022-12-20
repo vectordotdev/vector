@@ -125,7 +125,7 @@ impl SourceConfig for NatsSourceConfig {
             .subject_key_field
             .clone()
             .path
-            .map(LegacyKey::Overwrite);
+            .map(LegacyKey::InsertIfEmpty);
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
