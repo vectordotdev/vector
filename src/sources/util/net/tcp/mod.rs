@@ -1,8 +1,6 @@
 mod request_limiter;
 
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
-use std::{io, mem::drop, time::Duration};
+use std::{collections::BTreeMap, io, mem::drop, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use codecs::StreamDecodingError;
@@ -19,8 +17,10 @@ use tokio::{
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
 use vector_common::finalization::AddBatchNotifier;
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::{config::SourceAcknowledgementsConfig, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;

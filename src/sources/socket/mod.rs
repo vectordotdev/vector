@@ -391,8 +391,7 @@ mod test {
     #[cfg(unix)]
     use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
     use futures::{stream, StreamExt};
-    use lookup::lookup_v2::OptionalValuePath;
-    use lookup::{owned_value_path, path};
+    use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
