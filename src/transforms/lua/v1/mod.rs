@@ -30,7 +30,7 @@ pub struct LuaConfig {
 
     /// A list of directories to search when loading a Lua file via the `require` function.
     ///
-    /// If not specified, the modules are looked up in the directories of Vector’s configs.
+    /// If not specified, the modules are looked up in the configuration directories.
     #[serde(default)]
     search_dirs: Vec<String>,
 }

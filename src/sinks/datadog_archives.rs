@@ -103,7 +103,7 @@ pub struct DatadogArchivesSinkConfig {
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
     /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
-    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
+    /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     pub key_prefix: Option<String>,
 
     #[configurable(derived)]

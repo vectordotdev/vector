@@ -59,7 +59,7 @@ base: components: sinks: honeycomb: configuration: {
 		}
 	}
 	dataset: {
-		description: "The dataset that Vector will send logs to."
+		description: "The dataset to which logs are sent."
 		required:    true
 		type: string: {}
 	}

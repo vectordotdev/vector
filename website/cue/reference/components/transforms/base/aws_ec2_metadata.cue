@@ -93,7 +93,7 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 		}
 	}
 	required: {
-		description: "Requires the transform to be able to successfully query the EC2 metadata before Vector can start."
+		description: "Requires the transform to be able to successfully query the EC2 metadata before starting to process the data."
 		required:    false
 		type: bool: default: true
 	}
