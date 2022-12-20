@@ -52,9 +52,7 @@ pub mod util {
         pub fn encode(self) -> Vec<u8> {
             let streams: Vec<logproto::StreamAdapter> =
                 self.0.into_iter().map(|stream| stream.into()).collect();
-            let push_request = logproto::PushRequest {
-                streams: streams,
-            };
+            let push_request = logproto::PushRequest { streams: streams };
             let buf = push_request.encode_to_vec();
             let mut encoder = snap::raw::Encoder::new();
             encoder.compress_vec(&buf).expect("out of memory")
@@ -79,7 +77,7 @@ pub mod util {
 #[cfg(test)]
 mod tests {
     use super::util;
-    use crate::util::{Batch, Stream, Entry};
+    use crate::util::{Batch, Entry, Stream};
     use chrono::prelude::*;
     use std::collections::HashMap;
 

@@ -38,20 +38,23 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
             LokiBatchEncoding::Protobuf => {
                 let streams: Vec<LokiStream> = batch.stream_by_labels.into_values().collect();
                 let batch = loki_logproto::util::Batch(
-                    streams.into_iter().map(|stream| {
-                        let labels = stream.stream;
-                        let entries = stream
-                            .values
-                            .iter()
-                            .map(|event| {
-                                loki_logproto::util::Entry(
-                                    event.timestamp,
-                                    String::from_utf8_lossy(&event.event).into_owned(),
-                                )
-                            })
-                            .collect();
-                        loki_logproto::util::Stream(labels, entries)
-                    }).collect()
+                    streams
+                        .into_iter()
+                        .map(|stream| {
+                            let labels = stream.stream;
+                            let entries = stream
+                                .values
+                                .iter()
+                                .map(|event| {
+                                    loki_logproto::util::Entry(
+                                        event.timestamp,
+                                        String::from_utf8_lossy(&event.event).into_owned(),
+                                    )
+                                })
+                                .collect();
+                            loki_logproto::util::Stream(labels, entries)
+                        })
+                        .collect(),
                 );
                 batch.encode()
             }
@@ -80,12 +83,19 @@ impl From<Vec<LokiRecord>> for LokiBatch {
             .fold(Self::default(), |mut res, mut item| {
                 res.finalizers.merge(item.take_finalizers());
                 item.labels.sort();
-                let labels: String = item.labels.iter().flat_map(|(a, b)| [a, "→", b, "∇"]).collect();
+                let labels: String = item
+                    .labels
+                    .iter()
+                    .flat_map(|(a, b)| [a, "→", b, "∇"])
+                    .collect();
                 if !res.stream_by_labels.contains_key(&labels) {
-                    res.stream_by_labels.insert(labels.clone(), LokiStream {
-                        stream: item.labels.into_iter().collect(),
-                        values: Vec::new(),
-                    });
+                    res.stream_by_labels.insert(
+                        labels.clone(),
+                        LokiStream {
+                            stream: item.labels.into_iter().collect(),
+                            values: Vec::new(),
+                        },
+                    );
                 }
                 let stream = res.stream_by_labels.get_mut(&labels).unwrap();
                 stream.values.push(item.event);
