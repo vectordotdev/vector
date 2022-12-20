@@ -170,7 +170,7 @@ impl TagValueSet {
                 *self = std::mem::take(set)
                     .into_iter()
                     .rfind(TagValue::is_value)
-                    .map_or(Self::Empty, |tag| Self::Single(tag.into()));
+                    .map_or(Self::Empty, Self::Single);
             }
         }
     }
