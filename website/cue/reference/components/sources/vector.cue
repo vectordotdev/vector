@@ -81,7 +81,6 @@ components: sources: vector: {
 		logs: event: {
 			description: "A Vector event"
 			fields: {
-				client_metadata: fields._client_metadata
 				source_type: {
 					description: "The name of the source type."
 					required:    true
