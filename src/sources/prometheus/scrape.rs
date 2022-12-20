@@ -65,10 +65,10 @@ pub struct PrometheusScrapeConfig {
     /// By default, `"endpoint"` is used.
     endpoint_tag: Option<String>,
 
-    /// Controls how tag conflicts are handled if the scraped source has tags that Vector would add.
+    /// Controls how tag conflicts are handled if the scraped source has tags to be added.
     ///
-    /// If `true`, Vector will not add the new tag if the scraped metric has the tag already. If `false`, Vector will
-    /// rename the conflicting tag by prepending `exported_` to the name.
+    /// If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
+    /// is renamed by prepending `exported_` to the original name.
     ///
     /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]

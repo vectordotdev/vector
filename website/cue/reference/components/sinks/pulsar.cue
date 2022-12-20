@@ -16,7 +16,12 @@ components: sinks: pulsar: {
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
-			compression: enabled: false
+			compression: {
+				enabled: true
+				default: "none"
+				algorithms: ["none", "lz4", "zlib", "zstd", "snappy"]
+				levels: ["none"]
+			}
 			encoding: {
 				enabled: true
 				codec: {

@@ -174,13 +174,12 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 			auto: """
 				Automatically attempt to determine the compression scheme.
 
-				Vector will try to determine the compression scheme of the object by looking at its file signature, also known
+				The compression scheme of the object is determined by looking at its file signature, also known
 				as [magic bytes](\\(urls.magic_bytes)).
 
-				Given that determining the encoding using magic bytes is not a perfect check, if the record fails to decompress
-				with the discovered format, the record will be forwarded as-is. Thus, if you know the records will always be
-				gzip encoded (for example if they are coming from AWS CloudWatch Logs) then you should prefer to set `gzip` here
-				to have Vector reject any records that are not-gziped.
+				If the record fails to decompress with the discovered format, the record is forwarded as is.
+				Thus, if you know the records are always gzip encoded (for example, if they are coming from AWS CloudWatch Logs),
+				set `gzip` in this field so that any records that are not-gzipped are rejected.
 				"""
 			gzip: "GZIP."
 			none: "Uncompressed."

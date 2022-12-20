@@ -33,7 +33,7 @@ base: components: sources: journald: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
+			By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
 			"""
 		required: false
 		type: string: {}
@@ -99,7 +99,7 @@ base: components: sources: journald: configuration: {
 		description: """
 			The full path of the `journalctl` executable.
 
-			If not set, Vector will search the path for `journalctl`.
+			If not set, a search is done for the journalctl` path.
 			"""
 		required: false
 		type: string: {}
@@ -114,7 +114,7 @@ base: components: sources: journald: configuration: {
 		type: bool: default: false
 	}
 	since_now: {
-		description: "Only include entries that appended to the journal after Vector starts reading it."
+		description: "Only include entries that appended to the journal after the entries have been read."
 		required:    false
 		type: bool: {}
 	}
