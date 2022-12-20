@@ -232,10 +232,7 @@ base: components: sources: nats: configuration: {
 	subject_key_field: {
 		description: "The `NATS` subject key."
 		required:    false
-		type: string: {
-			default: "subject"
-			syntax:  "literal"
-		}
+		type: string: default: "subject"
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
