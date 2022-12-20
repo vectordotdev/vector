@@ -19,6 +19,7 @@ use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
+use vector_common::config::SourceDetails;
 use vector_config::configurable_component;
 use vector_core::{
     internal_event::{
@@ -180,7 +181,7 @@ impl GenerateConfig for PrometheusExporterConfig {
 
 #[async_trait::async_trait]
 impl SinkConfig for PrometheusExporterConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, ctx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
                 min: MIN_FLUSH_PERIOD_SECS,
@@ -189,7 +190,8 @@ impl SinkConfig for PrometheusExporterConfig {
 
         validate_quantiles(&self.quantiles)?;
 
-        let sink = PrometheusExporter::new(self.clone());
+        let sources_details = ctx.sources_details;
+        let sink = PrometheusExporter::new(self.clone(), sources_details);
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -212,6 +214,7 @@ struct PrometheusExporter {
     server_shutdown_trigger: Option<Trigger>,
     config: PrometheusExporterConfig,
     metrics: Arc<RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>>,
+    sources_details: Vec<SourceDetails>,
 }
 
 /// Expiration metadata for a metric.
@@ -378,6 +381,7 @@ fn handle(
     quantiles: &[f64],
     metrics: &RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>,
     bytes_sent: &Registered<BytesSent>,
+    sources_details: &[SourceDetails],
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
@@ -400,8 +404,19 @@ fn handle(
                 .sum();
 
             let mut collector = StringCollector::new();
+            let mut sources: HashMap<Option<usize>, (usize, usize)> = HashMap::new();
 
             for (_, (metric, _)) in metrics.iter() {
+                let size = event.estimated_json_encoded_size_of();
+
+                sources
+                    .entry(event.metadata().source_id())
+                    .and_modify(|(count, byte_size)| {
+                        *count += 1;
+                        *byte_size += size;
+                    })
+                    .or_insert((1, size));
+
                 collector.encode_metric(default_namespace, buckets, quantiles, metric);
             }
 
@@ -419,12 +434,15 @@ fn handle(
 
             bytes_sent.emit(ByteSize(body_size));
 
-            emit!(EventsSent {
-                count,
-                byte_size,
-                output: None,
-                source: None,
-            });
+            for (source_id, (count, byte_size)) in sources {
+                emit(EventsSent {
+                    count,
+                    byte_size,
+                    output: None,
+                    source: source_id
+                        .and_then(|id| sources_details.get(id).map(|details| details.key.id())),
+                });
+            }
         }
 
         (true, _, _) => {
@@ -436,11 +454,12 @@ fn handle(
 }
 
 impl PrometheusExporter {
-    fn new(config: PrometheusExporterConfig) -> Self {
+    fn new(config: PrometheusExporterConfig, sources_details: Vec<SourceDetails>) -> Self {
         Self {
             server_shutdown_trigger: None,
             config,
             metrics: Arc::new(RwLock::new(IndexMap::new())),
+            sources_details,
         }
     }
 
@@ -457,6 +476,7 @@ impl PrometheusExporter {
         let buckets = self.config.buckets.clone();
         let quantiles = self.config.quantiles.clone();
         let auth = self.config.auth.clone();
+        let sources_details = self.sources_details.clone();
 
         let new_service = make_service_fn(move |_| {
             let span = Span::current();
@@ -466,6 +486,7 @@ impl PrometheusExporter {
             let quantiles = quantiles.clone();
             let bytes_sent = bytes_sent.clone();
             let auth = auth.clone();
+            let sources_details = sources_details.clone();
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
@@ -478,6 +499,7 @@ impl PrometheusExporter {
                             &quantiles,
                             &metrics,
                             &bytes_sent,
+                            &sources_details,
                         );
 
                         emit!(PrometheusServerRequestComplete {
