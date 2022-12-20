@@ -93,8 +93,7 @@ impl LogplexConfig {
             .with_source_metadata(
                 LogplexConfig::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!(
-                    log_schema().
-                    ()
+                    log_schema().host_key()
                 ))),
                 &owned_value_path!("host"),
                 Kind::bytes(),
