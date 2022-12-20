@@ -1,7 +1,9 @@
+use std::{net::{Ipv4Addr, SocketAddrV4, SocketAddr}, str::FromStr};
+
 use bytes::BytesMut;
 use codecs::encoding;
 use http::{Method, Request, Uri};
-use hyper::{Body, Client};
+use hyper::{Body, Client, Server};
 use tokio::sync::mpsc;
 use tokio_util::codec::Encoder as _;
 use vector_core::event::Event;
@@ -65,14 +67,49 @@ impl HttpConfig {
 
 #[allow(clippy::missing_const_for_fn)]
 fn spawn_input_http_server(
-    _config: HttpConfig,
-    _codec: ResourceCodec,
-    _input_rx: mpsc::Receiver<TestEvent>,
-    _task_coordinator: &TaskCoordinator<Configuring>,
+    config: HttpConfig,
+    codec: ResourceCodec,
+    input_rx: mpsc::Receiver<TestEvent>,
+    task_coordinator: &TaskCoordinator<Configuring>,
 ) {
     // Spin up an HTTP server that responds with all of the input data it has received since the
     // last request was responded to. Essentially, a client calling the server will never see data
     // more than once.
+    let started = task_coordinator.track_started();
+    let completed = task_coordinator.track_completed();
+    let mut encoder = codec.into_encoder();
+
+    tokio::spawn(async move {
+        // Mark ourselves as started. We don't actually do anything until we get our first input
+        // message, though.
+        started.mark_as_done();
+        debug!("HTTP server external input resource started.");
+
+        let uri_port = config.uri.port_u16().unwrap_or(80);
+        let uri_host = config.uri.host()
+            .ok_or("host must be present in URI".to_string())
+            .and_then(|host| Ipv4Addr::from_str(host)
+                .map_err(|_| "URI host must be valid IPv4 address".to_string()))
+            .expect("HTTP URI not valid");
+
+        let listen_addr = SocketAddr::from(SocketAddrV4::new(uri_host, uri_port));
+        let builder = Server::try_bind(&listen_addr)
+            .expect("failed to bind HTTP server external input listen address");
+
+        let request_path = config.uri.path().to_string();
+        let request_method = config.method.unwrap_or(Method::POST);
+
+        // TODO: Create a lock-wrapped vector of events, and then a loop around `select!` where when
+        // we receive input events, we add them to the aforementioned vector, and we drive a Hyper
+        // server such that each request to the endpoint consumes all events in the aforementioned
+        // vector and returns them to the caller until we're all done and all input events have been
+        // consumed by the downstream client.
+
+        // Mark ourselves as completed now that we've sent all inputs to the source.
+        completed.mark_as_done();
+
+        debug!("HTTP server external input resource completed.");
+    });
 }
 
 fn spawn_input_http_client(
