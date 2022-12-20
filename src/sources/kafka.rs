@@ -12,7 +12,7 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{Stream, StreamExt};
-use lookup::{owned_value_path, path};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use once_cell::sync::OnceCell;
 use rdkafka::{
     consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
@@ -23,11 +23,12 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 
 use value::{kind::Collection, Kind};
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
-
 use vector_common::finalizer::OrderedFinalizer;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -103,7 +104,7 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"message_key"` is used.
     #[serde(default = "default_key_field")]
-    key_field: String,
+    key_field: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the topic to each event.
     ///
@@ -111,7 +112,7 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"topic"` is used.
     #[serde(default = "default_topic_key")]
-    topic_key: String,
+    topic_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the partition to each event.
     ///
@@ -119,7 +120,7 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"partition"` is used.
     #[serde(default = "default_partition_key")]
-    partition_key: String,
+    partition_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the offset to each event.
     ///
@@ -127,7 +128,7 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"offset"` is used.
     #[serde(default = "default_offset_key")]
-    offset_key: String,
+    offset_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the headers to each event.
     ///
@@ -135,7 +136,7 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"headers"` is used.
     #[serde(default = "default_headers_key")]
-    headers_key: String,
+    headers_key: OptionalValuePath,
 
     /// Advanced options set directly on the underlying `librdkafka` client.
     ///
@@ -191,24 +192,24 @@ fn default_auto_offset_reset() -> String {
     "largest".into() // default in librdkafka
 }
 
-fn default_key_field() -> String {
-    "message_key".into()
+fn default_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("message_key"))
 }
 
-fn default_topic_key() -> String {
-    "topic".into()
+fn default_topic_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("topic"))
 }
 
-fn default_partition_key() -> String {
-    "partition".into()
+fn default_partition_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("partition"))
 }
 
-fn default_offset_key() -> String {
-    "offset".into()
+fn default_offset_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("offset"))
 }
 
-fn default_headers_key() -> String {
-    "headers".into()
+fn default_headers_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("headers"))
 }
 
 impl_generate_config_from_default!(KafkaSourceConfig);
@@ -251,36 +252,36 @@ impl SourceConfig for KafkaSourceConfig {
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(keys.topic))),
-                &owned_value_path!(default_topic_key().as_str()),
+                keys.topic.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("topic"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(keys.partition))),
-                &owned_value_path!(default_partition_key().as_str()),
+                keys.partition.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("partition"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(keys.offset))),
-                &owned_value_path!(default_offset_key().as_str()),
+                keys.offset.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("offset"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(keys.headers))),
-                &owned_value_path!(default_headers_key().as_str()),
+                keys.headers.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("headers"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(keys.key_field))),
-                &owned_value_path!(default_key_field().as_str()),
+                keys.key_field.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("message_key"),
                 Kind::bytes(),
                 None,
             );
@@ -437,22 +438,22 @@ fn parse_stream<'a>(
 #[derive(Clone, Copy, Debug)]
 struct Keys<'a> {
     timestamp: &'a str,
-    key_field: &'a str,
-    topic: &'a str,
-    partition: &'a str,
-    offset: &'a str,
-    headers: &'a str,
+    key_field: &'a Option<OwnedValuePath>,
+    topic: &'a Option<OwnedValuePath>,
+    partition: &'a Option<OwnedValuePath>,
+    offset: &'a Option<OwnedValuePath>,
+    headers: &'a Option<OwnedValuePath>,
 }
 
 impl<'a> Keys<'a> {
     fn from(schema: &'a LogSchema, config: &'a KafkaSourceConfig) -> Self {
         Self {
             timestamp: schema.timestamp_key(),
-            key_field: config.key_field.as_str(),
-            topic: config.topic_key.as_str(),
-            partition: config.partition_key.as_str(),
-            offset: config.offset_key.as_str(),
-            headers: config.headers_key.as_str(),
+            key_field: &config.key_field.path,
+            topic: &config.topic_key.path,
+            partition: &config.partition_key.path,
+            offset: &config.offset_key.path,
+            headers: &config.headers_key.path,
         }
     }
 }
@@ -523,7 +524,7 @@ impl ReceivedMessage {
             log_namespace.insert_source_metadata(
                 KafkaSourceConfig::NAME,
                 log,
-                Some(LegacyKey::Overwrite(keys.key_field)),
+                keys.key_field.as_ref().map(LegacyKey::Overwrite),
                 path!("message_key"),
                 self.key.clone(),
             );
@@ -539,7 +540,7 @@ impl ReceivedMessage {
             log_namespace.insert_source_metadata(
                 KafkaSourceConfig::NAME,
                 log,
-                Some(LegacyKey::Overwrite(keys.topic)),
+                keys.topic.as_ref().map(LegacyKey::Overwrite),
                 path!("topic"),
                 self.topic.clone(),
             );
@@ -547,7 +548,7 @@ impl ReceivedMessage {
             log_namespace.insert_source_metadata(
                 KafkaSourceConfig::NAME,
                 log,
-                Some(LegacyKey::Overwrite(keys.partition)),
+                keys.partition.as_ref().map(LegacyKey::Overwrite),
                 path!("partition"),
                 self.partition,
             );
@@ -555,7 +556,7 @@ impl ReceivedMessage {
             log_namespace.insert_source_metadata(
                 KafkaSourceConfig::NAME,
                 log,
-                Some(LegacyKey::Overwrite(keys.offset)),
+                keys.offset.as_ref().map(LegacyKey::Overwrite),
                 path!("offset"),
                 self.offset,
             );
@@ -563,7 +564,7 @@ impl ReceivedMessage {
             log_namespace.insert_source_metadata(
                 KafkaSourceConfig::NAME,
                 log,
-                Some(LegacyKey::Overwrite(keys.headers)),
+                keys.headers.as_ref().map(LegacyKey::Overwrite),
                 path!("headers"),
                 self.headers.clone(),
             );
@@ -678,11 +679,11 @@ mod test {
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: 6000,
             commit_interval_ms: 1,
-            key_field: "message_key".to_string(),
-            topic_key: "topic".to_string(),
-            partition_key: "partition".to_string(),
-            offset_key: "offset".to_string(),
-            headers_key: "headers".to_string(),
+            key_field: default_key_field(),
+            topic_key: default_topic_key(),
+            partition_key: default_partition_key(),
+            offset_key: default_offset_key(),
+            headers_key: default_headers_key(),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             log_namespace: Some(log_namespace == LogNamespace::Vector),
