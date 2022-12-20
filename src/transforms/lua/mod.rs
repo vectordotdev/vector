@@ -32,7 +32,7 @@ enum V1 {
 pub struct LuaConfigV1 {
     /// Transform API version.
     ///
-    /// Specifying this version ensures that Vector does not break backward compatibility.
+    /// Specifying this version ensures that backward compatibility is not broken.
     version: Option<V1>,
 
     #[serde(flatten)]
@@ -54,7 +54,7 @@ enum V2 {
 pub struct LuaConfigV2 {
     /// Transform API version.
     ///
-    /// Specifying this version ensures that Vector does not break backward compatibility.
+    /// Specifying this version ensures that backward compatibility is not broken.
     version: V2,
 
     #[serde(flatten)]

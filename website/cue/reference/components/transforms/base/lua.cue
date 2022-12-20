@@ -11,7 +11,7 @@ base: components: transforms: lua: configuration: {
 		type: object: options: {
 			init: {
 				description: """
-					A function which is called when the first event comes, before calling `hooks.process`.
+					The function called when the first event comes in, before `hooks.process` is called.
 
 					It can produce new events using the `emit` function.
 
@@ -27,7 +27,7 @@ base: components: transforms: lua: configuration: {
 			}
 			process: {
 				description: """
-					A function which is called for each incoming event.
+					The function called for each incoming event.
 
 					It can produce new events using the `emit` function.
 
@@ -48,7 +48,7 @@ base: components: transforms: lua: configuration: {
 			}
 			shutdown: {
 				description: """
-					A function which is called when Vector is stopped.
+					The function called when the transform is stopped.
 
 					It can produce new events using the `emit` function.
 
@@ -90,7 +90,7 @@ base: components: transforms: lua: configuration: {
 		description: """
 			A list of directories to search when loading a Lua file via the `require` function.
 
-			If not specified, the modules are looked up in the directories of Vector’s configs.
+			If not specified, the modules are looked up in the configuration directories.
 			"""
 		required: false
 		type: array: {
@@ -171,7 +171,7 @@ base: components: transforms: lua: configuration: {
 		description: """
 			Transform API version.
 
-			Specifying this version ensures that Vector does not break backward compatibility.
+			Specifying this version ensures that backward compatibility is not broken.
 			"""
 		required: true
 		type: string: enum: {

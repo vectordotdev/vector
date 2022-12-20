@@ -192,7 +192,7 @@ base: components: sinks: apex: configuration: {
 		description: """
 			The base URI of the Apex instance.
 
-			Vector will append `/add_events` to this.
+			`/add_events` is appended to this.
 			"""
 		required: true
 		type: string: {}
