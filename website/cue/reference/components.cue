@@ -621,19 +621,27 @@ components: {
 				let Args = _args
 
 				common:      false
-				description: "Configures the TLS options for incoming connections."
+				description: "Configures the TLS options for incoming/outgoing connections."
 				required:    false
 				type: object: options: {
 					enabled: {
 						common:      false
-						description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
+						description: """
+							Whether or not to require TLS for incoming/outgoing connections.
+
+							When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for more information.
+							"""
 						required:    false
 						type: bool: default: Args.enabled_default
 					}
 
 					ca_file: {
 						common:      false
-						description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an in-line CA certificate in PEM format."
+						description: """
+							Absolute path to an additional CA certificate file.
+
+							The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+							"""
 						required:    false
 						type: string: {
 							default: null
@@ -643,7 +651,7 @@ components: {
 					if Args.can_add_client_metadata {
 						client_metadata_key: {
 							common:      false
-							description: "The key name added to each event with the client certificate's metadata."
+							description: "Event field for client certificate metadata."
 							required:    false
 							type: string: {
 								default: null
@@ -653,7 +661,13 @@ components: {
 					}
 					crt_file: {
 						common:      false
-						description: "Absolute path to a certificate file used to identify this server, in DER or PEM format (X.509) or PKCS#12, or an in-line certificate in PEM format. If this is set, and is not a PKCS#12 archive, `key_file` must also be set. This is required if `enabled` is set to `true`."
+						description: """
+							Absolute path to a certificate file used to identify this server.
+
+							The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as an inline string in PEM format.
+
+							If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+							"""
 						required:    false
 						type: string: {
 							default: null
@@ -662,7 +676,11 @@ components: {
 					}
 					key_file: {
 						common:      false
-						description: "Absolute path to a private key file used to identify this server, in DER or PEM format (PKCS#8), or an in-line private key in PEM format."
+						description: """
+							Absolute path to a private key file used to identify this server.
+
+							The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+							"""
 						required:    false
 						type: string: {
 							default: null
@@ -671,7 +689,11 @@ components: {
 					}
 					key_pass: {
 						common:      false
-						description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
+						description: """
+							Passphrase used to unlock the encrypted key file.
+
+							This has no effect unless `key_file` is set.
+							"""
 						required:    false
 						type: string: {
 							default: null
@@ -750,7 +772,11 @@ components: {
 					}
 					alpn_protocols: {
 						common:      false
-						description: "Sets the list of supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order they are defined."
+						description: """
+							Sets the list of supported ALPN protocols.
+
+							Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order they are defined.
+							"""
 						required:    false
 						type: array: {
 							default: null
@@ -764,7 +790,15 @@ components: {
 					if Args.can_verify_certificate {
 						verify_certificate: {
 							common:      false
-							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Specifically the issuer is checked but not CRLs (Certificate Revocation Lists)."
+							description: """
+								Enables certificate verification.
+
+								If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and so on until reaching a root certificate.
+
+								Relevant for both incoming and outgoing connections.
+
+								Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+								"""
 							required:    false
 							type: bool: default: true
 						}
@@ -773,7 +807,15 @@ components: {
 					if Args.can_verify_hostname {
 						verify_hostname: {
 							common:      false
-							description: "If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname."
+							description: """
+								Enables hostname verification.
+
+								If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+
+								Only relevant for outgoing connections.
+
+								Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+								"""
 							required:    false
 							type: bool: default: true
 						}

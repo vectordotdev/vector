@@ -139,6 +139,7 @@ pub struct TlsConfig {
     ///
     /// This has no effect unless `key_file` is set.
     #[configurable(metadata(docs::examples = "${KEY_PASS_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "PassWord1"))]
     pub key_pass: Option<String>,
 }
 
