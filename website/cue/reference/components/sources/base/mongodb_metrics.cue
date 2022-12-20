@@ -8,7 +8,7 @@ base: components: sources: mongodb_metrics: configuration: {
 			Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
 			"""
 		required: true
-		type: array: items: type: string: syntax: "literal"
+		type: array: items: type: string: {}
 	}
 	namespace: {
 		description: """
@@ -19,10 +19,7 @@ base: components: sources: mongodb_metrics: configuration: {
 			By default, `mongodb` is used.
 			"""
 		required: false
-		type: string: {
-			default: "mongodb"
-			syntax:  "literal"
-		}
+		type: string: default: "mongodb"
 	}
 	scrape_interval_secs: {
 		description: "The interval between scrapes, in seconds."

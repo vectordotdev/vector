@@ -13,13 +13,10 @@ base: components: sources: journald: configuration: {
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: {
-			default: enabled: null
-			options: enabled: {
-				description: "Whether or not end-to-end acknowledgements are enabled for this source."
-				required:    false
-				type: bool: {}
-			}
+		type: object: options: enabled: {
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
+			required:    false
+			type: bool: {}
 		}
 	}
 	batch_size: {
@@ -36,10 +33,10 @@ base: components: sources: journald: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
+			By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	exclude_matches: {
 		description: """
@@ -48,17 +45,9 @@ base: components: sources: journald: configuration: {
 			If `exclude_units` is specified, it will be merged into this list.
 			"""
 		required: false
-		type: object: {
-			default: {}
-			options: "*": {
-				description: """
-					A list of sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source.
-
-					If `exclude_units` is specified, it will be merged into this list.
-					"""
-				required: true
-				type: array: items: type: string: syntax: "literal"
-			}
+		type: object: options: "*": {
+			required: true
+			type: array: items: type: string: {}
 		}
 	}
 	exclude_units: {
@@ -70,7 +59,7 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	include_matches: {
@@ -80,17 +69,9 @@ base: components: sources: journald: configuration: {
 			If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
 			"""
 		required: false
-		type: object: {
-			default: {}
-			options: "*": {
-				description: """
-					A list of sets of field/value pairs to monitor.
-
-					If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
-					"""
-				required: true
-				type: array: items: type: string: syntax: "literal"
-			}
+		type: object: options: "*": {
+			required: true
+			type: array: items: type: string: {}
 		}
 	}
 	include_units: {
@@ -102,7 +83,7 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 	journal_directory: {
@@ -112,16 +93,16 @@ base: components: sources: journald: configuration: {
 			If not set, `journalctl` will use the default system journal paths.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	journalctl_path: {
 		description: """
 			The full path of the `journalctl` executable.
 
-			If not set, Vector will search the path for `journalctl`.
+			If not set, a search is done for the journalctl` path.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	remap_priority: {
 		description: """
@@ -133,7 +114,7 @@ base: components: sources: journald: configuration: {
 		type: bool: default: false
 	}
 	since_now: {
-		description: "Only include entries that appended to the journal after Vector starts reading it."
+		description: "Only include entries that appended to the journal after the entries have been read."
 		required:    false
 		type: bool: {}
 	}
@@ -146,7 +127,7 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: syntax: "literal"
+			items: type: string: {}
 		}
 	}
 }

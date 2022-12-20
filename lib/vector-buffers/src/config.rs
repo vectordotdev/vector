@@ -357,13 +357,16 @@ impl BufferType {
 // defined, otherwise, for example, two instances of the same disk buffer type in a single chained
 // buffer topology would try to both open the same buffer files on disk, which wouldn't work or
 // would go horribly wrong.
-
-// TODO: We need a custom implementation of `Configurable` here, I think? in order to capture the
-// "deserialize as a single unnested `BufferType`, or as an array of them", but we might also be
-// able to encode that as an untagged enum as well?
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(untagged)]
+#[configurable(
+    title = "Configures the buffering behavior for this sink.",
+    description = r#"More information about the individual buffer types, and buffer behavior, can be found in the
+[Buffering Model][buffering_model] section.
+
+[buffering_model]: /docs/about/under-the-hood/architecture/buffering-model/"#
+)]
 pub enum BufferConfig {
     /// A single stage buffer topology.
     Single(#[configurable(transparent)] BufferType),

@@ -26,7 +26,6 @@ use crate::{
 pub struct InternalLogsConfig {
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///
-    /// The value will be the current hostname for wherever Vector is running.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
@@ -36,7 +35,6 @@ pub struct InternalLogsConfig {
 
     /// Overrides the name of the log field used to add the current process ID to each event.
     ///
-    /// The value will be the current process ID for Vector itself.
     ///
     /// By default, `"pid"` is used.
     #[serde(default)]

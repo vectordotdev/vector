@@ -66,7 +66,6 @@ static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 pub struct DockerLogsConfig {
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///
-    /// The value will be the current hostname for wherever Vector is running.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
@@ -78,7 +77,7 @@ pub struct DockerLogsConfig {
     ///
     /// Use an HTTPS URL to enable TLS encryption.
     ///
-    /// If absent, Vector will try to use `DOCKER_HOST` environment variable. If `DOCKER_HOST` is also absent, Vector will use default Docker local socket (`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows).
+    /// If absent, the `DOCKER_HOST` environment variable is used. If `DOCKER_HOST` is also absent, the default Docker local socket (`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows) is used.
     docker_host: Option<String>,
 
     /// A list of container IDs or names of containers to exclude from log collection.

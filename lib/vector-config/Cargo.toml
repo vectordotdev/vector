@@ -5,6 +5,10 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
+[[test]]
+name = "integration"
+path = "tests/integration/lib.rs"
+
 [dependencies]
 chrono = { version = "0.4.19", default-features = false }
 chrono-tz = { version = "0.8.1", default-features = false }
