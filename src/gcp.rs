@@ -1,19 +1,20 @@
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use futures::StreamExt;
 pub use goauth::scopes::Scope;
 use goauth::{
     auth::{JwtClaims, Token, TokenErr},
     credentials::Credentials,
     GoErr,
 };
+use http::{uri::PathAndQuery, Uri};
 use hyper::header::AUTHORIZATION;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
-use tokio_stream::wrappers::IntervalStream;
+use tokio::{sync::watch, time::Instant};
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 
 use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 
@@ -33,6 +34,8 @@ pub enum GcpError {
     MissingAuth,
     #[snafu(display("Invalid GCP credentials: {}", source))]
     InvalidCredentials { source: GoErr },
+    #[snafu(display("Invalid GCP API key: {}", source))]
+    InvalidApiKey { source: base64::DecodeError },
     #[snafu(display("Healthcheck endpoint forbidden"))]
     HealthcheckForbidden,
     #[snafu(display("Invalid RSA key in GCP credentials: {}", source))]
@@ -51,99 +54,197 @@ pub enum GcpError {
     BuildHttpClient { source: HttpError },
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration of the authentication strategy for interacting with GCP services.
+// TODO: We're duplicating the "either this or that" verbiage for each field because this struct gets flattened into the
+// component config types, which means all that's carried over are the fields, not the type itself.
+//
+// Seems like we really really have it as a nested field -- i.e. `auth.api_key` -- which is a closer fit to how we do
+// similar things in configuration (TLS, framing, decoding, etc.). Doing so would let us embed the type itself, and
+// hoist up the common documentation bits to the docs for the type rather than the fields.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct GcpAuthConfig {
-    pub api_key: Option<String>,
+    /// An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+    ///
+    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    ///
+    /// If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
+    /// filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
+    /// running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+    /// credentials JSON file.
+    pub api_key: Option<SensitiveString>,
+
+    /// Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+    ///
+    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    ///
+    /// If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
+    /// filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
+    /// running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+    /// credentials JSON file.
     pub credentials_path: Option<String>,
+
+    /// Skip all authentication handling. For use with integration tests only.
+    #[serde(default, skip_serializing)]
+    pub skip_authentication: bool,
 }
 
 impl GcpAuthConfig {
-    pub async fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
-        let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
-        let creds_path = self.credentials_path.as_ref().or_else(|| gap.as_ref());
-        Ok(match (&creds_path, &self.api_key) {
-            (Some(path), _) => Some(GcpCredentials::from_file(path, scope).await?),
-            (None, Some(_)) => None,
-            (None, None) => Some(GcpCredentials::new_implicit(scope).await?),
+    pub async fn build(&self, scope: Scope) -> crate::Result<GcpAuthenticator> {
+        Ok(if self.skip_authentication {
+            GcpAuthenticator::None
+        } else {
+            let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
+            let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
+            match (&creds_path, &self.api_key) {
+                (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
+                (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key.inner())?,
+                (None, None) => GcpAuthenticator::new_implicit().await?,
+            }
         })
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct GcpCredentials {
-    creds: Option<Credentials>,
-    scope: Scope,
-    token: Arc<RwLock<Token>>,
+pub enum GcpAuthenticator {
+    Credentials(Arc<InnerCreds>),
+    ApiKey(Box<str>),
+    None,
 }
 
-impl GcpCredentials {
+#[derive(Debug)]
+pub struct InnerCreds {
+    creds: Option<(Credentials, Scope)>,
+    token: RwLock<Token>,
+}
+
+impl GcpAuthenticator {
     async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentialsSnafu)?;
-        let jwt = make_jwt(&creds, &scope)?;
-        let token = goauth::get_token(&jwt, &creds)
-            .await
-            .context(GetTokenSnafu)?;
-        Ok(Self {
-            creds: Some(creds),
-            scope,
-            token: Arc::new(RwLock::new(token)),
-        })
+        let token = RwLock::new(fetch_token(&creds, &scope).await?);
+        let creds = Some((creds, scope));
+        Ok(Self::Credentials(Arc::new(InnerCreds { creds, token })))
     }
 
-    async fn new_implicit(scope: Scope) -> crate::Result<Self> {
-        let token = get_token_implicit().await?;
-        Ok(Self {
-            creds: None,
-            scope,
-            token: Arc::new(RwLock::new(token)),
-        })
+    async fn new_implicit() -> crate::Result<Self> {
+        let token = RwLock::new(get_token_implicit().await?);
+        let creds = None;
+        Ok(Self::Credentials(Arc::new(InnerCreds { creds, token })))
     }
 
-    pub fn make_token(&self) -> String {
-        let token = self.token.read().unwrap();
-        format!("{} {}", token.token_type(), token.access_token())
+    fn from_api_key(api_key: &str) -> crate::Result<Self> {
+        base64::decode_config(api_key, base64::URL_SAFE).context(InvalidApiKeySnafu)?;
+        Ok(Self::ApiKey(api_key.into()))
+    }
+
+    pub fn make_token(&self) -> Option<String> {
+        match self {
+            Self::Credentials(inner) => Some(inner.make_token()),
+            Self::ApiKey(_) | Self::None => None,
+        }
     }
 
     pub fn apply<T>(&self, request: &mut http::Request<T>) {
-        request
-            .headers_mut()
-            .insert(AUTHORIZATION, self.make_token().parse().unwrap());
+        if let Some(token) = self.make_token() {
+            request
+                .headers_mut()
+                .insert(AUTHORIZATION, token.parse().unwrap());
+        }
+        self.apply_uri(request.uri_mut());
     }
 
+    pub fn apply_uri(&self, uri: &mut Uri) {
+        match self {
+            Self::Credentials(_) | Self::None => (),
+            Self::ApiKey(api_key) => {
+                let mut parts = uri.clone().into_parts();
+                let path = parts
+                    .path_and_query
+                    .as_ref()
+                    .map_or("/", PathAndQuery::path);
+                let paq = format!("{path}?key={api_key}");
+                // The API key is verified above to only contain
+                // URL-safe characters. That key is added to a path
+                // that came from a successfully parsed URI. As such,
+                // re-parsing the string cannot fail.
+                parts.path_and_query =
+                    Some(paq.parse().expect("Could not re-parse path and query"));
+                *uri = Uri::from_parts(parts).expect("Could not re-parse URL");
+            }
+        }
+    }
+
+    pub fn spawn_regenerate_token(&self) -> watch::Receiver<()> {
+        let (sender, receiver) = watch::channel(());
+        tokio::spawn(self.clone().token_regenerator(sender));
+        receiver
+    }
+
+    async fn token_regenerator(self, sender: watch::Sender<()>) {
+        match self {
+            Self::Credentials(inner) => {
+                let period =
+                    Duration::from_secs(inner.token.read().unwrap().expires_in() as u64 / 2);
+                let mut interval = tokio::time::interval_at(Instant::now() + period, period);
+                loop {
+                    interval.tick().await;
+                    debug!("Renewing GCP authentication token.");
+                    match inner.regenerate_token().await {
+                        Ok(()) => sender.send_replace(()),
+                        Err(error) => {
+                            error!(
+                                message = "Failed to update GCP authentication token.",
+                                %error
+                            );
+                        }
+                    }
+                }
+            }
+            Self::ApiKey(_) | Self::None => {
+                // This keeps the sender end of the watch open without
+                // actually sending anything, effectively creating an
+                // empty watch stream.
+                sender.closed().await
+            }
+        }
+    }
+}
+
+impl InnerCreds {
     async fn regenerate_token(&self) -> crate::Result<()> {
         let token = match &self.creds {
-            Some(creds) => {
-                let jwt = make_jwt(creds, &self.scope).unwrap(); // Errors caught above
-                goauth::get_token(&jwt, creds).await?
-            }
+            Some((creds, scope)) => fetch_token(creds, scope).await?,
             None => get_token_implicit().await?,
         };
         *self.token.write().unwrap() = token;
         Ok(())
     }
 
-    pub fn spawn_regenerate_token(&self) {
-        let this = self.clone();
-
-        let period = this.token.read().unwrap().expires_in() as u64 / 2;
-        let interval = IntervalStream::new(tokio::time::interval(Duration::from_secs(period)));
-        let task = interval.for_each(move |_| {
-            let this = this.clone();
-            async move {
-                debug!("Renewing GCP authentication token.");
-                if let Err(error) = this.regenerate_token().await {
-                    error!(
-                        message = "Failed to update GCP authentication token.",
-                        %error
-                    );
-                }
-            }
-        });
-        tokio::spawn(task);
+    fn make_token(&self) -> String {
+        let token = self.token.read().unwrap();
+        format!("{} {}", token.token_type(), token.access_token())
     }
 }
 
+async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token> {
+    let claims = JwtClaims::new(creds.iss(), scope, creds.token_uri(), None, None);
+    let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
+    let jwt = Jwt::new(claims, rsa_key, None);
+
+    debug!(
+        message = "Fetching GCP authentication token.",
+        project = ?creds.project(),
+        iss = ?creds.iss(),
+        token_uri = ?creds.token_uri(),
+    );
+    goauth::get_token(&jwt, creds)
+        .await
+        .context(GetTokenSnafu)
+        .map_err(Into::into)
+}
+
 async fn get_token_implicit() -> Result<Token, GcpError> {
+    debug!("Fetching implicit GCP authentication token.");
     let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
         .header("Metadata-Flavor", "Google")
         .body(hyper::Body::empty())
@@ -171,24 +272,74 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
     }
 }
 
-fn make_jwt(creds: &Credentials, scope: &Scope) -> crate::Result<Jwt<JwtClaims>> {
-    let claims = JwtClaims::new(creds.iss(), scope, creds.token_uri(), None, None);
-    let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
-    Ok(Jwt::new(claims, rsa_key, None))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::assert_downcast_matches;
 
     #[tokio::test]
-    #[ignore]
     async fn fails_missing_creds() {
-        let config: GcpAuthConfig = toml::from_str("").unwrap();
-        match config.make_credentials(Scope::Compute).await {
-            Ok(_) => panic!("make_credentials failed to error"),
-            Err(err) => assert_downcast_matches!(err, GcpError, GcpError::GetImplicitToken { .. }), // This should be a more relevant error
-        }
+        let error = build_auth("").await.expect_err("build failed to error");
+        assert_downcast_matches!(error, GcpError, GcpError::GetImplicitToken { .. });
+        // This should be a more relevant error
+    }
+
+    #[tokio::test]
+    async fn skip_authentication() {
+        let auth = build_auth(
+            r#"
+                skip_authentication = true
+                api_key = "testing"
+            "#,
+        )
+        .await
+        .expect("build_auth failed");
+        assert!(matches!(auth, GcpAuthenticator::None));
+    }
+
+    #[tokio::test]
+    async fn uses_api_key() {
+        let key = crate::test_util::random_string(16);
+
+        let auth = build_auth(&format!(r#"api_key = "{key}""#))
+            .await
+            .expect("build_auth failed");
+        assert!(matches!(auth, GcpAuthenticator::ApiKey(..)));
+
+        assert_eq!(
+            apply_uri(&auth, "http://example.com"),
+            format!("http://example.com/?key={key}")
+        );
+        assert_eq!(
+            apply_uri(&auth, "http://example.com/"),
+            format!("http://example.com/?key={key}")
+        );
+        assert_eq!(
+            apply_uri(&auth, "http://example.com/path"),
+            format!("http://example.com/path?key={key}")
+        );
+        assert_eq!(
+            apply_uri(&auth, "http://example.com/path1/"),
+            format!("http://example.com/path1/?key={key}")
+        );
+    }
+
+    #[tokio::test]
+    async fn fails_bad_api_key() {
+        let error = build_auth(r#"api_key = "abc%xyz""#)
+            .await
+            .expect_err("build failed to error");
+        assert_downcast_matches!(error, GcpError, GcpError::InvalidApiKey { .. });
+    }
+
+    fn apply_uri(auth: &GcpAuthenticator, uri: &str) -> String {
+        let mut uri: Uri = uri.parse().unwrap();
+        auth.apply_uri(&mut uri);
+        uri.to_string()
+    }
+
+    async fn build_auth(toml: &str) -> crate::Result<GcpAuthenticator> {
+        let config: GcpAuthConfig = toml::from_str(toml).expect("Invalid TOML");
+        config.build(Scope::Compute).await
     }
 }

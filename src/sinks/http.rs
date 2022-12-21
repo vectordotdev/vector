@@ -1,12 +1,8 @@
 use std::io::Write;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use codecs::encoding::{
-    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, Framer, FramingConfig,
-    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    RawMessageSerializerConfig, Serializer, SerializerConfig,
-};
-use flate2::write::GzEncoder;
+use codecs::encoding::{CharacterDelimitedEncoder, Framer, Serializer};
+use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
     header::{self, HeaderName, HeaderValue},
@@ -14,23 +10,17 @@ use http::{
 };
 use hyper::Body;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
+use vector_config::configurable_component;
 
 use crate::{
-    codecs::Encoder,
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         self,
-        encoding::{
-            EncodingConfig, EncodingConfigWithFramingAdapter, EncodingConfigWithFramingMigrator,
-            Transformer,
-        },
         http::{BatchedHttpSink, HttpEventEncoder, RequestConfig},
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
         TowerRequestConfig, UriSerde,
@@ -52,43 +42,45 @@ enum BuildError {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Migrator;
-
-impl EncodingConfigWithFramingMigrator for Migrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
-        match codec {
-            Encoding::Text => (None, RawMessageSerializerConfig::new().into()),
-            Encoding::Ndjson => (
-                Some(NewlineDelimitedEncoderConfig::new().into()),
-                JsonSerializerConfig::new().into(),
-            ),
-            Encoding::Json => (
-                Some(CharacterDelimitedEncoderConfig::new(b',').into()),
-                JsonSerializerConfig::new().into(),
-            ),
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Configuration for the `http` sink.
+#[configurable_component(sink("http"))]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
+    /// The full URI to make HTTP requests to.
+    ///
+    /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     pub uri: UriSerde,
+
+    /// The HTTP method to use when making the request.
     pub method: Option<HttpMethod>,
+
+    #[configurable(derived)]
     pub auth: Option<Auth>,
-    // Deprecated, moved to request.
+
+    /// A list of custom headers to add to each request.
+    #[configurable(deprecated)]
     pub headers: Option<IndexMap<String, String>>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<EncodingConfig<Encoding>, Migrator>,
+    pub encoding: EncodingConfigWithFraming,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -97,31 +89,42 @@ pub struct HttpSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+/// HTTP method.
+///
+/// A subset of the HTTP methods described in [RFC 9110, section 9.1][rfc9110] are supported.
+///
+/// [rfc9110]: https://datatracker.ietf.org/doc/html/rfc9110#section-9.1
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum HttpMethod {
+    /// GET.
+    ///
+    /// This is the default.
     #[derivative(Default)]
     Get,
+
+    /// HEAD.
     Head,
+
+    /// POST.
     Post,
+
+    /// PUT.
     Put,
+
+    /// DELETE.
     Delete,
+
+    /// OPTIONS.
     Options,
+
+    /// TRACE.
     Trace,
+
+    /// PATCH.
     Patch,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Ndjson,
-    Json,
-}
-
-inventory::submit! {
-    SinkDescription::new::<HttpSinkConfig>("http")
 }
 
 impl GenerateConfig for HttpSinkConfig {
@@ -153,15 +156,8 @@ struct HttpSink {
 }
 
 #[cfg(test)]
-fn default_sink(encoding: Encoding) -> HttpSink {
-    let encoding = EncodingConfigWithFramingAdapter::<EncodingConfig<Encoding>, Migrator>::legacy(
-        encoding.into(),
-    )
-    .encoding();
-    let framing = encoding
-        .0
-        .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
-    let serializer = encoding.1;
+fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
+    let (framing, serializer) = encoding.build(SinkType::MessageBased).unwrap();
     let encoder = Encoder::<Framer>::new(framing, serializer);
 
     HttpSink {
@@ -177,7 +173,6 @@ fn default_sink(encoding: Encoding) -> HttpSink {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     async fn build(
         &self,
@@ -185,7 +180,7 @@ impl SinkConfig for HttpSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.build_http_client(&cx)?;
 
-        let healthcheck = match cx.healthcheck.uri.clone() {
+        let healthcheck = match cx.healthcheck.uri {
             Some(healthcheck_uri) => {
                 healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
             }
@@ -196,16 +191,12 @@ impl SinkConfig for HttpSinkConfig {
         request.add_old_option(self.headers.clone());
         validate_headers(&request.headers, &self.auth)?;
 
-        let encoding = self.encoding.encoding();
-        let framing = encoding
-            .0
-            .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
-        let serializer = encoding.1;
-        let encoder = Encoder::<Framer>::new(framing, serializer);
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let sink = HttpSink {
             uri: self.uri.with_default_parts(),
-            method: self.method.clone(),
+            method: self.method,
             auth: self.auth.choose_one(&self.uri.auth)?,
             compression: self.compression,
             transformer: self.encoding.transformer(),
@@ -226,7 +217,6 @@ impl SinkConfig for HttpSinkConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
@@ -239,12 +229,8 @@ impl SinkConfig for HttpSinkConfig {
         Input::new(self.encoding.config().1.input_type())
     }
 
-    fn sink_type(&self) -> &'static str {
-        "http"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -278,7 +264,7 @@ impl util::http::HttpSink for HttpSink {
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
-        let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
+        let method = match &self.method.unwrap_or(HttpMethod::Post) {
             HttpMethod::Get => Method::GET,
             HttpMethod::Head => Method::HEAD,
             HttpMethod::Post => Method::POST,
@@ -294,7 +280,7 @@ impl util::http::HttpSink for HttpSink {
             use Framer::*;
             use Serializer::*;
             match (self.encoder.serializer(), self.encoder.framer()) {
-                (RawMessage(_), _) => Some("text/plain"),
+                (RawMessage(_) | Text(_), _) => Some("text/plain"),
                 (Json(_), NewlineDelimited(_)) => {
                     if !body.is_empty() {
                         // Remove trailing newline for backwards-compatibility
@@ -333,7 +319,15 @@ impl util::http::HttpSink for HttpSink {
                 builder = builder.header("Content-Encoding", "gzip");
 
                 let buffer = BytesMut::new();
-                let mut w = GzEncoder::new(buffer.writer(), level);
+                let mut w = GzEncoder::new(buffer.writer(), level.as_flate2());
+                w.write_all(&body).expect("Writing to Vec can't fail");
+                body = w.finish().expect("Writing to Vec can't fail").into_inner();
+            }
+            Compression::Zlib(level) => {
+                builder = builder.header("Content-Encoding", "deflate");
+
+                let buffer = BytesMut::new();
+                let mut w = ZlibEncoder::new(buffer.writer(), level.as_flate2());
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
@@ -341,7 +335,11 @@ impl util::http::HttpSink for HttpSink {
         }
 
         for (header, value) in self.request.headers.iter() {
-            builder = builder.header(header.as_str(), value.as_str());
+            builder
+                .headers_mut()
+                // The request builder should not have errors at this point, and if it did it would fail in the call to `body()` also.
+                .expect("Failed to access headers in http::Request builder- builder has errors.")
+                .insert(HeaderName::try_from(header)?, HeaderValue::try_from(value)?);
         }
 
         let mut request = builder.body(body.freeze()).unwrap();
@@ -394,13 +392,17 @@ mod tests {
     };
 
     use bytes::{Buf, Bytes};
+    use codecs::{
+        encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+        TextSerializerConfig,
+    };
     use flate2::read::MultiGzDecoder;
     use futures::{channel::mpsc, stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use http::request::Parts;
     use hyper::{Method, Response, StatusCode};
     use serde::Deserialize;
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
 
     use super::*;
     use crate::{
@@ -410,7 +412,11 @@ mod tests {
             http::HttpSink,
             test::{build_test_server, build_test_server_generic, build_test_server_status},
         },
-        test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
+        test_util::{
+            components,
+            components::{COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
+            next_addr, random_lines_with_stream,
+        },
     };
 
     #[test]
@@ -420,9 +426,9 @@ mod tests {
 
     #[test]
     fn http_encode_event_text() {
-        let event = Event::from("hello world");
+        let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink(Encoding::Text);
+        let sink = default_sink((None::<FramingConfig>, TextSerializerConfig::new()).into());
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 
@@ -431,9 +437,15 @@ mod tests {
 
     #[test]
     fn http_encode_event_ndjson() {
-        let event = Event::from("hello world");
+        let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink(Encoding::Ndjson);
+        let sink = default_sink(
+            (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::new(),
+            )
+                .into(),
+        );
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 
@@ -454,7 +466,7 @@ mod tests {
     fn http_validates_normal_headers() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         Auth = "token:thing_and-stuff"
         X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
@@ -468,7 +480,7 @@ mod tests {
     fn http_catches_bad_header_names() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         "\u0001" = "bad"
         "#;
@@ -488,7 +500,7 @@ mod tests {
     async fn http_headers_auth_conflict() {
         let config = r#"
         uri = "http://$IN_ADDR/"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         Authorization = "Basic base64encodedstring"
         [auth]
@@ -573,159 +585,171 @@ mod tests {
 
     #[tokio::test]
     async fn retries_on_no_connection() {
-        let num_lines = 10;
+        components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
+            let num_lines = 10;
 
-        let (in_addr, sink) = build_sink("").await;
+            let (in_addr, sink) = build_sink("").await;
 
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        let pump = tokio::spawn(sink.run(events));
+            let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+            let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
+            let pump = tokio::spawn(sink.run(events));
 
-        // This ordering starts the sender before the server has built
-        // its accepting socket. The delay below ensures that the sink
-        // attempts to connect at least once before creating the
-        // listening socket.
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        let (rx, trigger, server) = build_test_server(in_addr);
-        tokio::spawn(server);
+            // This ordering starts the sender before the server has built
+            // its accepting socket. The delay below ensures that the sink
+            // attempts to connect at least once before creating the
+            // listening socket.
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            let (rx, trigger, server) = build_test_server(in_addr);
+            tokio::spawn(server);
 
-        pump.await.unwrap().unwrap();
-        drop(trigger);
+            pump.await.unwrap().unwrap();
+            drop(trigger);
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+            assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::POST, parts.method);
-            assert_eq!("/frames", parts.uri.path());
+            let output_lines = get_received(rx, |parts| {
+                assert_eq!(Method::POST, parts.method);
+                assert_eq!("/frames", parts.uri.path());
+            })
+            .await;
+
+            assert_eq!(num_lines, output_lines.len());
+            assert_eq!(input_lines, output_lines);
         })
         .await;
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 
     #[tokio::test]
     async fn retries_on_temporary_error() {
-        const NUM_LINES: usize = 1000;
-        const NUM_FAILURES: usize = 2;
+        components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
+            const NUM_LINES: usize = 1000;
+            const NUM_FAILURES: usize = 2;
 
-        let (in_addr, sink) = build_sink("").await;
+            let (in_addr, sink) = build_sink("").await;
 
-        let counter = Arc::new(atomic::AtomicUsize::new(0));
-        let in_counter = Arc::clone(&counter);
-        let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
-            let count = in_counter.fetch_add(1, atomic::Ordering::Relaxed);
-            if count < NUM_FAILURES {
-                // Send a temporary error for the first two responses
-                Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::empty())
-                    .unwrap_or_else(|_| unreachable!())
-            } else {
-                Response::new(Body::empty())
-            }
-        });
+            let counter = Arc::new(atomic::AtomicUsize::new(0));
+            let in_counter = Arc::clone(&counter);
+            let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
+                let count = in_counter.fetch_add(1, atomic::Ordering::Relaxed);
+                if count < NUM_FAILURES {
+                    // Send a temporary error for the first two responses
+                    Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::empty())
+                        .unwrap_or_else(|_| unreachable!())
+                } else {
+                    Response::new(Body::empty())
+                }
+            });
 
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (input_lines, events) = random_lines_with_stream(100, NUM_LINES, Some(batch));
-        let pump = sink.run(events);
+            let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+            let (input_lines, events) = random_lines_with_stream(100, NUM_LINES, Some(batch));
+            let pump = sink.run(events);
 
-        tokio::spawn(server);
+            tokio::spawn(server);
 
-        pump.await.unwrap();
-        drop(trigger);
+            pump.await.unwrap();
+            drop(trigger);
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+            assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::POST, parts.method);
-            assert_eq!("/frames", parts.uri.path());
+            let output_lines = get_received(rx, |parts| {
+                assert_eq!(Method::POST, parts.method);
+                assert_eq!("/frames", parts.uri.path());
+            })
+            .await;
+
+            let tries = counter.load(atomic::Ordering::Relaxed);
+            assert!(tries > NUM_FAILURES);
+            assert_eq!(NUM_LINES, output_lines.len());
+            assert_eq!(input_lines, output_lines);
         })
         .await;
-
-        let tries = counter.load(atomic::Ordering::Relaxed);
-        assert!(tries > NUM_FAILURES);
-        assert_eq!(NUM_LINES, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 
     #[tokio::test]
     async fn fails_on_permanent_error() {
-        let num_lines = 1000;
+        components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
+            let num_lines = 1000;
 
-        let (in_addr, sink) = build_sink("").await;
+            let (in_addr, sink) = build_sink("").await;
 
-        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
+            let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
 
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (_input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        let pump = sink.run(events);
+            let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+            let (_input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
+            let pump = sink.run(events);
 
-        tokio::spawn(server);
+            tokio::spawn(server);
 
-        pump.await.unwrap();
-        drop(trigger);
+            pump.await.unwrap();
+            drop(trigger);
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+            assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
-        let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
-        assert!(output_lines.is_empty());
+            let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
+            assert!(output_lines.is_empty());
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn json_compression() {
-        let num_lines = 1000;
+        components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
+            let num_lines = 1000;
 
-        let in_addr = next_addr();
+            let in_addr = next_addr();
 
-        let config = r#"
+            let config = r#"
         uri = "http://$IN_ADDR/frames"
         compression = "gzip"
-        encoding = "json"
+        encoding.codec = "json"
 
         [auth]
         strategy = "basic"
         user = "waldo"
         password = "hunter2"
     "#
-        .replace("$IN_ADDR", &in_addr.to_string());
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+            .replace("$IN_ADDR", &in_addr.to_string());
+            let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let cx = SinkContext::new_test();
+            let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr);
+            let (sink, _) = config.build(cx).await.unwrap();
+            let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        let pump = sink.run(events);
+            let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+            let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
+            let pump = sink.run(events);
 
-        tokio::spawn(server);
+            tokio::spawn(server);
 
-        pump.await.unwrap();
-        drop(trigger);
+            pump.await.unwrap();
+            drop(trigger);
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+            assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let output_lines = rx
-            .flat_map(|(parts, body)| {
-                assert_eq!(Method::POST, parts.method);
-                assert_eq!("/frames", parts.uri.path());
-                assert_eq!(
-                    Some(Authorization::basic("waldo", "hunter2")),
-                    parts.headers.typed_get()
-                );
+            let output_lines = rx
+                .flat_map(|(parts, body)| {
+                    assert_eq!(Method::POST, parts.method);
+                    assert_eq!("/frames", parts.uri.path());
+                    assert_eq!(
+                        Some(Authorization::basic("waldo", "hunter2")),
+                        parts.headers.typed_get()
+                    );
 
-                let lines: Vec<serde_json::Value> =
-                    serde_json::from_reader(MultiGzDecoder::new(body.reader())).unwrap();
-                stream::iter(lines)
-            })
-            .map(|line| line.get("message").unwrap().as_str().unwrap().to_owned())
-            .collect::<Vec<_>>()
-            .await;
+                    let lines: Vec<serde_json::Value> =
+                        serde_json::from_reader(MultiGzDecoder::new(body.reader())).unwrap();
+                    stream::iter(lines)
+                })
+                .map(|line| line.get("message").unwrap().as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+                .await;
 
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
+            assert_eq!(num_lines, output_lines.len());
+            assert_eq!(input_lines, output_lines);
+        })
+        .await;
     }
 
     async fn get_received(
@@ -755,7 +779,7 @@ mod tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -772,7 +796,8 @@ mod tests {
             r#"
                 uri = "http://{addr}/frames"
                 compression = "gzip"
-                encoding = "ndjson"
+                framing.method = "newline_delimited"
+                encoding.codec = "json"
                 {extras}
             "#,
             addr = in_addr,

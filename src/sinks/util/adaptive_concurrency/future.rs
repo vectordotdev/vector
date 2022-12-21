@@ -4,11 +4,10 @@ use std::{
     future::Future,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Instant,
 };
 
-use futures::ready;
 use pin_project::pin_project;
 use tokio::sync::OwnedSemaphorePermit;
 
@@ -27,7 +26,6 @@ use crate::sinks::util::retries::RetryLogic;
 /// spawning it) to prevent extraneous delays from causing discrepancies
 /// in the measurements.
 #[pin_project]
-#[derive(Debug)]
 pub struct ResponseFuture<F, L> {
     #[pin]
     inner: F,

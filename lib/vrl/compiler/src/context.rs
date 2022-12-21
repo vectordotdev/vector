@@ -19,6 +19,7 @@ impl<'a> Context<'a> {
     }
 
     /// Get a reference to the [`Target`].
+    #[must_use]
     pub fn target(&self) -> &dyn Target {
         self.target
     }
@@ -29,6 +30,7 @@ impl<'a> Context<'a> {
     }
 
     /// Get a reference to the [`runtime state`](Runtime).
+    #[must_use]
     pub fn state(&self) -> &Runtime {
         self.state
     }
@@ -39,6 +41,7 @@ impl<'a> Context<'a> {
     }
 
     /// Get a reference to the [`TimeZone`]
+    #[must_use]
     pub fn timezone(&self) -> &TimeZone {
         self.timezone
     }

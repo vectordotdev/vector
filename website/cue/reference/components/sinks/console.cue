@@ -13,7 +13,7 @@ components: sinks: console: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: true
 		healthcheck: enabled: false
 		send: {
 			compression: enabled: false
@@ -21,6 +21,7 @@ components: sinks: console: {
 				enabled: true
 				codec: {
 					enabled: true
+					framing: true
 					enum: ["json", "text"]
 				}
 			}

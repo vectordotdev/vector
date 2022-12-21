@@ -2,30 +2,23 @@ use std::path::Path;
 
 use crate::{
     config::Config,
-    sinks::{
-        console::{ConsoleSinkConfig, Target},
-        util::encoding::StandardEncodings,
+    test_util::{
+        mock::{basic_sink, basic_source},
+        start_topology, trace_init,
     },
-    sources::socket::SocketConfig,
-    test_util::{next_addr, start_topology},
 };
 
 #[tokio::test]
 async fn topology_doesnt_reload_new_data_dir() {
+    trace_init();
+
     let mut old_config = Config::builder();
-    old_config.add_source("in", SocketConfig::make_basic_tcp_config(next_addr()));
-    old_config.add_sink(
-        "out",
-        &["in"],
-        ConsoleSinkConfig {
-            target: Target::Stdout,
-            encoding: StandardEncodings::Text.into(),
-        },
-    );
+    old_config.add_source("in", basic_source().1);
+    old_config.add_sink("out", &["in"], basic_sink(1).1);
     old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
     let mut new_config = old_config.clone();
 
-    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
 
     new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 

@@ -1,30 +1,35 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use crate::emit;
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
-pub(crate) struct PulsarEncodeEventError<E> {
-    pub error: E,
+pub struct PulsarSendingError {
+    pub count: usize,
+    pub error: vector_common::Error,
 }
 
-impl<E: std::fmt::Display> InternalEvent for PulsarEncodeEventError<E> {
+impl InternalEvent for PulsarSendingError {
     fn emit(self) {
+        let reason = "A Pulsar sink generated an error.";
         error!(
-            message = "Event encode failed; dropping event.",
+            message = reason,
             error = %self.error,
-            error_code = "pulsar_encoding",
-            error_type = error_type::ENCODER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
-            "error_code" => "pulsar_encoding",
-            "error_type" => error_type::ENCODER_FAILED,
-            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::SENDING,
         );
-        // deprecated
-        counter!("encode_errors_total", 1);
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: self.count,
+            reason,
+        });
     }
 }

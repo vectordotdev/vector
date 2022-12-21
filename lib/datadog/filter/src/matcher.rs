@@ -32,7 +32,7 @@ where
     _phantom: PhantomData<V>, // Necessary to make generic over `V`.
 }
 
-impl<'a, V, T> Run<V, T>
+impl<V, T> Run<V, T>
 where
     V: fmt::Debug + Send + Sync + Clone,
     T: Fn(&V) -> bool + Send + Sync + Clone,
@@ -57,7 +57,7 @@ where
     }
 }
 
-impl<'a, V, T> fmt::Debug for Run<V, T>
+impl<V, T> fmt::Debug for Run<V, T>
 where
     V: fmt::Debug + Send + Sync + Clone,
     T: Fn(&V) -> bool + Send + Sync + Clone,

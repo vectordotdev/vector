@@ -1,12 +1,21 @@
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative, Copy)]
+/// Content encoding.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum Encoding {
+    /// Plaintext.
     #[derivative(Default)]
     Text,
+
+    /// Newline-delimited JSON.
     Ndjson,
+
+    /// JSON.
     Json,
+
+    /// Binary.
     Binary,
 }

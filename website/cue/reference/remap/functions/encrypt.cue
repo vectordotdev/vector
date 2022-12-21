@@ -70,13 +70,13 @@ remap: functions: encrypt: {
 		{
 			title: "Encrypt value"
 			source: #"""
-				plaintext = "super secret message";
-				iv = random_bytes(16);
-				key = "16_byte_keyxxxxx";
-				encrypted_message = encode_base64(encrypt!(plaintext, "AES-128-CBC-PKCS7", key, iv: iv));
+				plaintext = "super secret message"
+				iv = "1234567890123456" # typically you would call random_bytes(16)
+				key = "16_byte_keyxxxxx"
+				encrypted_message = encrypt!(plaintext, "AES-128-CBC-PKCS7", key, iv: iv)
 				encode_base64(encrypted_message)
 				"""#
-			return: "dFhRa3BtTFZ5dmNUYmMzVE5pRTQ0THVkOVlzb2VGSEJ3QmdKaFMvMHVkQT0="
+			return: "GBw8Mu00v0Kc38+/PvsVtGgWuUJ+ZNLgF8Opy8ohIYE="
 		},
 	]
 }

@@ -8,11 +8,12 @@ use http::{
 };
 use hyper::Body;
 use tower::Service;
-use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverResponse};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    gcp::GcpCredentials,
+    gcp::GcpAuthenticator,
     http::{HttpClient, HttpError},
 };
 
@@ -20,47 +21,37 @@ use crate::{
 pub struct GcsService {
     client: HttpClient,
     base_url: String,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
 }
 
 impl GcsService {
-    pub const fn new(
-        client: HttpClient,
-        base_url: String,
-        creds: Option<GcpCredentials>,
-    ) -> GcsService {
+    pub const fn new(client: HttpClient, base_url: String, auth: GcpAuthenticator) -> GcsService {
         GcsService {
             client,
             base_url,
-            creds,
+            auth,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct GcsRequest {
+    pub key: String,
     pub body: Bytes,
     pub settings: GcsRequestSettings,
-    pub metadata: GcsMetadata,
-}
-
-#[derive(Clone, Debug)]
-pub struct GcsMetadata {
-    pub key: String,
-    pub count: usize,
-    pub byte_size: usize,
     pub finalizers: EventFinalizers,
-}
-
-impl Ackable for GcsRequest {
-    fn ack_size(&self) -> usize {
-        self.metadata.count
-    }
+    pub metadata: RequestMetadata,
 }
 
 impl Finalizable for GcsRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.metadata.finalizers)
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for GcsRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -79,21 +70,29 @@ pub struct GcsRequestSettings {
 #[derive(Debug)]
 pub struct GcsResponse {
     pub inner: http::Response<Body>,
-    pub count: usize,
-    pub events_byte_size: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl DriverResponse for GcsResponse {
     fn event_status(&self) -> EventStatus {
-        EventStatus::Delivered
+        if self.inner.status().is_success() {
+            EventStatus::Delivered
+        } else if self.inner.status().is_server_error() {
+            EventStatus::Errored
+        } else {
+            EventStatus::Rejected
+        }
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(
+            self.metadata.event_count(),
+            self.metadata.events_estimated_json_encoded_byte_size(),
+        )
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.metadata.request_encoded_size())
     }
 }
 
@@ -102,16 +101,20 @@ impl Service<GcsRequest> for GcsService {
     type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: GcsRequest) -> Self::Future {
         let settings = request.settings;
+        let metadata = request.metadata;
 
-        let uri = format!("{}{}", self.base_url, request.metadata.key)
+        let uri = format!("{}{}", self.base_url, request.key)
             .parse::<Uri>()
             .unwrap();
+
         let mut builder = Request::put(uri);
         let headers = builder.headers_mut().unwrap();
         headers.insert("content-type", settings.content_type);
@@ -129,18 +132,12 @@ impl Service<GcsRequest> for GcsService {
         }
 
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut http_request);
-        }
+        self.auth.apply(&mut http_request);
 
         let mut client = self.client.clone();
         Box::pin(async move {
             let result = client.call(http_request).await;
-            result.map(|inner| GcsResponse {
-                inner,
-                count: request.metadata.count,
-                events_byte_size: request.metadata.byte_size,
-            })
+            result.map(|inner| GcsResponse { inner, metadata })
         })
     }
 }

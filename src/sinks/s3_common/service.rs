@@ -1,36 +1,33 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_s3::error::PutObjectError;
-use aws_sdk_s3::types::{ByteStream, SdkError};
-use aws_sdk_s3::{Client as S3Client, Region};
+use aws_sdk_s3::{
+    error::PutObjectError,
+    types::{ByteStream, SdkError},
+    Client as S3Client,
+};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
 use super::config::S3Options;
-use crate::internal_events::AwsBytesSent;
+use super::partitioner::S3PartitionKey;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
     pub body: Bytes,
     pub bucket: String,
     pub metadata: S3Metadata,
+    pub request_metadata: RequestMetadata,
     pub content_encoding: Option<&'static str>,
     pub options: S3Options,
-}
-
-impl Ackable for S3Request {
-    fn ack_size(&self) -> usize {
-        self.metadata.count
-    }
 }
 
 impl Finalizable for S3Request {
@@ -39,11 +36,16 @@ impl Finalizable for S3Request {
     }
 }
 
+impl MetaDescriptive for S3Request {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct S3Metadata {
-    pub partition_key: String,
-    pub count: usize,
-    pub byte_size: usize,
+    pub partition_key: S3PartitionKey,
+    pub s3_key: String,
     pub finalizers: EventFinalizers,
 }
 
@@ -58,12 +60,8 @@ impl DriverResponse for S3Response {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.count, self.events_byte_size)
     }
 }
 
@@ -76,12 +74,11 @@ impl DriverResponse for S3Response {
 #[derive(Clone)]
 pub struct S3Service {
     client: S3Client,
-    region: Option<Region>,
 }
 
 impl S3Service {
-    pub const fn new(client: S3Client, region: Option<Region>) -> S3Service {
-        S3Service { client, region }
+    pub const fn new(client: S3Client) -> S3Service {
+        S3Service { client }
     }
 
     pub fn client(&self) -> S3Client {
@@ -94,11 +91,16 @@ impl Service<S3Request> for S3Service {
     type Error = SdkError<PutObjectError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: S3Request) -> Self::Future {
+        let count = request.get_metadata().event_count();
+        let events_byte_size = request.get_metadata().events_byte_size();
+
         let options = request.options;
 
         let content_encoding = request.content_encoding;
@@ -113,24 +115,20 @@ impl Service<S3Request> for S3Service {
 
         let tagging = options.tags.map(|tags| {
             let mut tagging = url::form_urlencoded::Serializer::new(String::new());
-            for (p, v) in tags {
-                tagging.append_pair(&p, &v);
+            for (p, v) in &tags {
+                tagging.append_pair(p, v);
             }
             tagging.finish()
         });
-        let count = request.metadata.count;
-        let events_byte_size = request.metadata.byte_size;
 
-        let request_size = request.body.len();
         let client = self.client.clone();
 
-        let region = self.region.clone();
         Box::pin(async move {
-            let result = client
+            let request = client
                 .put_object()
                 .body(bytes_to_bytestream(request.body))
                 .bucket(request.bucket)
-                .key(request.metadata.partition_key)
+                .key(request.metadata.s3_key)
                 .set_content_encoding(content_encoding)
                 .set_content_type(content_type)
                 .set_acl(options.acl.map(Into::into))
@@ -142,20 +140,13 @@ impl Service<S3Request> for S3Service {
                 .set_ssekms_key_id(options.ssekms_key_id)
                 .set_storage_class(options.storage_class.map(Into::into))
                 .set_tagging(tagging)
-                .content_md5(content_md5)
-                .send()
-                .in_current_span()
-                .await;
+                .content_md5(content_md5);
 
-            result.map(|_inner| {
-                emit!(AwsBytesSent {
-                    byte_size: request_size,
-                    region,
-                });
-                S3Response {
-                    count,
-                    events_byte_size,
-                }
+            let result = request.send().in_current_span().await;
+
+            result.map(|_| S3Response {
+                count,
+                events_byte_size,
             })
         })
     }

@@ -3,41 +3,55 @@ use std::{collections::HashMap, net::SocketAddr};
 use bytes::Bytes;
 use prometheus_parser::proto;
 use prost::Message;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
 use crate::{
     config::{
-        self, AcknowledgementsConfig, GenerateConfig, Output, SourceConfig, SourceContext,
-        SourceDescription,
+        self, GenerateConfig, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
     },
     event::Event,
     internal_events::PrometheusRemoteWriteParseError,
     serde::bool_or_struct,
     sources::{
         self,
-        util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsEnableableConfig,
 };
 
-const SOURCE_NAME: &str = "prometheus_remote_write";
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct PrometheusRemoteWriteConfig {
+/// Configuration for the `prometheus_remote_write` source.
+#[configurable_component(source("prometheus_remote_write"))]
+#[derive(Clone, Debug)]
+pub struct PrometheusRemoteWriteConfig {
+    /// The address to accept connections on.
+    ///
+    /// The address _must_ include a port.
     address: SocketAddr,
 
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
+    #[configurable(derived)]
     auth: Option<HttpSourceAuthConfig>,
 
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SourceDescription::new::<PrometheusRemoteWriteConfig>(SOURCE_NAME)
+impl PrometheusRemoteWriteConfig {
+    #[cfg(test)]
+    pub fn from_address(address: SocketAddr) -> Self {
+        Self {
+            address,
+            tls: None,
+            auth: None,
+            acknowledgements: false.into(),
+        }
+    }
 }
 
 impl GenerateConfig for PrometheusRemoteWriteConfig {
@@ -46,20 +60,20 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
         })
         .unwrap()
     }
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_remote_write")]
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
         source.run(
             self.address,
             "",
+            HttpMethod::Post,
             true,
             &self.tls,
             &self.auth,
@@ -68,12 +82,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        SOURCE_NAME
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -129,7 +139,10 @@ impl HttpSource for RemoteWriteSource {
 #[cfg(test)]
 mod test {
     use chrono::{SubsecRound as _, Utc};
-    use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
+    use vector_core::{
+        event::{EventStatus, Metric, MetricKind, MetricValue},
+        metric_tags,
+    };
 
     use super::*;
     use crate::{
@@ -138,6 +151,7 @@ mod test {
         test_util::{
             self,
             components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            wait_for_tcp,
         },
         tls::MaybeTlsSettings,
         SourceSender,
@@ -170,13 +184,14 @@ mod test {
                 address,
                 auth: None,
                 tls: tls.clone(),
-                acknowledgements: AcknowledgementsConfig::default(),
+                acknowledgements: SourceAcknowledgementsConfig::default(),
             };
             let source = source
                 .build(SourceContext::new_test(tx, None))
                 .await
                 .unwrap();
             tokio::spawn(source);
+            wait_for_tcp(address).await;
 
             let sink = RemoteWriteConfig {
                 endpoint: format!("{}://localhost:{}/", proto, address.port()),
@@ -249,6 +264,77 @@ mod test {
             .into(),
         ]
     }
+
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we accept the metric, but take the last label in the list.
+    #[tokio::test]
+    async fn receives_metrics_duplicate_labels() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let address = test_util::next_addr();
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+            let source = PrometheusRemoteWriteConfig {
+                address,
+                auth: None,
+                tls: None,
+                acknowledgements: SourceAcknowledgementsConfig::default(),
+            };
+            let source = source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(source);
+            wait_for_tcp(address).await;
+
+            let sink = RemoteWriteConfig {
+                endpoint: format!("http://localhost:{}/", address.port()),
+                ..Default::default()
+            };
+            let (sink, _) = sink
+                .build(SinkContext::new_test())
+                .await
+                .expect("Error building config.");
+
+            let timestamp = Utc::now().trunc_subsecs(3);
+
+            let events = vec![Metric::new(
+                "gauge_2",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 41.0 },
+            )
+            .with_timestamp(Some(timestamp))
+            .with_tags(Some(metric_tags! {
+                "code" => "200".to_string(),
+                "code" => "success".to_string(),
+            }))
+            .into()];
+
+            let expected = vec![Metric::new(
+                "gauge_2",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 41.0 },
+            )
+            .with_timestamp(Some(timestamp))
+            .with_tags(Some(metric_tags! {
+                "code" => "success".to_string(),
+            }))
+            .into()];
+
+            let output = test_util::spawn_collect_ready(
+                async move {
+                    sink.run_events(events).await.unwrap();
+                },
+                rx,
+                1,
+            )
+            .await;
+
+            vector_common::assert_event_data_eq!(expected, output);
+        })
+        .await;
+    }
 }
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
@@ -275,7 +361,7 @@ mod integration_tests {
             address: source_receive_address().parse().unwrap(),
             auth: None,
             tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
         };
 
         let events = run_and_assert_source_compliance(

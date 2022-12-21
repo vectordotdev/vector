@@ -44,15 +44,15 @@ source = '''
 # Sample the data to save on cost
 [transforms.apache_sampler]
 inputs = ["apache_parser"]
-type   = "sampler"
-rate   = 50                   # only keep 50%
+type   = "sample"
+rate   = 2                    # only keep 50% (1/`rate`)
 
 # Send structured data to a short-term storage
 [sinks.es_cluster]
-inputs = ["apache_sampler"]             # only take sampled data
-type   = "elasticsearch"
-host   = "http://79.12.221.222:9200"    # local or external host
-index  = "vector-%Y-%m-%d"              # daily indices
+inputs     = ["apache_sampler"]             # only take sampled data
+type       = "elasticsearch"
+endpoints  = ["http://79.12.221.222:9200"]  # local or external host
+bulk.index = "vector-%Y-%m-%d"              # daily indices
 
 # Send structured data to a cost-effective long-term storage
 [sinks.s3_archives]
@@ -62,7 +62,8 @@ region          = "us-east-1"
 bucket          = "my-log-archives"
 key_prefix      = "date=%Y-%m-%d"      # daily partitions, hive friendly format
 compression     = "gzip"               # compress final objects
-encoding        = "ndjson"             # new line delimited JSON
+framing.method  = "newline_delimited"  # new line delimited...
+encoding.codec  = "json"               # ...JSON
 batch.max_bytes = 10000000             # 10mb uncompressed
 ```
 
@@ -78,7 +79,7 @@ sources:
       - /var/log/apache2/*.log
     ignore_older: 86400
 transforms:
-  remap:
+  apache_parser:
     inputs:
       - apache_logs
     type: remap
@@ -87,15 +88,16 @@ transforms:
   apache_sampler:
     inputs:
       - apache_parser
-    type: sampler
+    type: sample
     rate: 50
 sinks:
   es_cluster:
     inputs:
       - apache_sampler
     type: elasticsearch
-    host: 'http://79.12.221.222:9200'
-    index: vector-%Y-%m-%d
+    endpoints: ['http://79.12.221.222:9200']
+    bulk:
+      index: vector-%Y-%m-%d
   s3_archives:
     inputs:
       - apache_parser
@@ -104,7 +106,10 @@ sinks:
     bucket: my-log-archives
     key_prefix: date=%Y-%m-%d
     compression: gzip
-    encoding: ndjson
+    framing:
+      method: newline_delimited
+    encoding:
+      codec: json
     batch:
       max_bytes: 10000000
 ```
@@ -125,7 +130,7 @@ sinks:
     }
   },
   "transforms": {
-    "remap": {
+    "apache_parser": {
       "inputs": [
         "apache_logs"
       ],
@@ -136,7 +141,7 @@ sinks:
       "inputs": [
         "apache_parser"
       ],
-      "type": "sampler",
+      "type": "sample",
       "rate": 50
     }
   },
@@ -146,8 +151,10 @@ sinks:
         "apache_sampler"
       ],
       "type": "elasticsearch",
-      "host": "http://79.12.221.222:9200",
-      "index": "vector-%Y-%m-%d"
+      "endpoints": ["http://79.12.221.222:9200"],
+      "bulk": {
+        "index": "vector-%Y-%m-%d"
+      }
     },
     "s3_archives": {
       "inputs": [
@@ -158,7 +165,12 @@ sinks:
       "bucket": "my-log-archives",
       "key_prefix": "date=%Y-%m-%d",
       "compression": "gzip",
-      "encoding": "ndjson",
+      "framing": {
+        "method": "newline_delimited"
+      },
+      "encoding": {
+        "codec": "json"
+      },
       "batch": {
         "max_bytes": 10000000
       }
@@ -219,12 +231,17 @@ the following syntax:
 
 ```toml
 [transforms.add_host]
-type = "add_fields"
+type = "remap"
+source = '''
+# Basic usage. "$HOSTNAME" also works.
+.host = "${HOSTNAME}" # or "$HOSTNAME"
 
-[transforms.add_host.fields]
-host = "${HOSTNAME}" # or "$HOSTNAME"
-environment = "${ENV:-development}" # default value when not present
-tenant = "${TENANT:?tenant must be supplied}" # required environment variable
+# Setting a default value when not present.
+.environment = "${ENV:-development}"
+
+# Requiring an environment variable to be present.
+.tenant = "${TENANT:?tenant must be supplied}"
+'''
 ```
 
 #### Default values
@@ -293,8 +310,6 @@ data_dir = "/var/lib/vector"
 [api]
 enabled = false
 # address = "127.0.0.1:8686"
-
-'''
 ```
 
 {{< /tab >}}
@@ -324,9 +339,8 @@ source = '''
 ```toml
 # Sample the data to save on cost
 inputs = ["apache_parser"]
-type   = "sampler"
-rate   = 50                   # only keep 50%
-. = parse_apache_log(.message)
+type   = "sample"
+rate   = 2                    # only keep 50% (1/`rate`)
 ```
 
 {{< /tab >}}
@@ -334,10 +348,10 @@ rate   = 50                   # only keep 50%
 
 ```toml
 # Send structured data to a short-term storage
-inputs = ["apache_sampler"]             # only take sampled data
-type   = "elasticsearch"
-host   = "http://79.12.221.222:9200"    # local or external host
-index  = "vector-%Y-%m-%d"              # daily indices
+inputs     = ["apache_sampler"]             # only take sampled data
+type       = "elasticsearch"
+endpoints  = ["http://79.12.221.222:9200"]  # local or external host
+bulk.index = "vector-%Y-%m-%d"              # daily indices
 ```
 
 {{< /tab >}}
@@ -351,7 +365,8 @@ region          = "us-east-1"
 bucket          = "my-log-archives"
 key_prefix      = "date=%Y-%m-%d"      # daily partitions, hive friendly format
 compression     = "gzip"               # compress final objects
-encoding        = "ndjson"             # new line delimited JSON
+framing.method  = "newline_delimited"  # new line delimited...
+encoding.codec  = "json"               # ...JSON
 batch.max_bytes = 10000000             # 10mb uncompressed
 ```
 
@@ -364,7 +379,7 @@ Vector then needs to be started using the `--config-dir` argument to specify the
 vector --config-dir /etc/vector
 ```
 
-#### Wilcards in component IDs
+#### Wildcards in component IDs
 
 Vector supports wildcards (`*`) in component IDs when building your topology.
 For example:

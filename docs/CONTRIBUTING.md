@@ -6,38 +6,33 @@ following TOC is sorted progressively, starting with the basics and
 expanding into more specifics. Everyone from a first time contributor to a
 Vector team member will find this document useful.
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Introduction](#introduction)
-1. [Your First Contribution](#your-first-contribution)
-   1. [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
-1. [Workflow](#workflow)
-   1. [Git Branches](#git-branches)
-   1. [Git Commits](#git-commits)
-      1. [Style](#style)
-      1. [Signing-off](#signing-off)
-   1. [Github Pull Requests](#github-pull-requests)
-      1. [Title](#title)
-      1. [Reviews & Approvals](#reviews--approvals)
-      1. [Merge Style](#merge-style)
-   1. [CI](#ci)
-      1. [Releasing](#releasing)
-      1. [Testing](#testing)
-         1. [Skipping tests](#skipping-tests)
-         1. [Daily tests](#daily-tests)
-      1. [Flakey tests](#flakey-tests)
-         1. [Test harness](#test-harness)
-   1. [Deprecations](#deprecations)
-1. [Next steps](#next-steps)
-1. [Legal](#legal)
-   1. [CLA](#contributor-license-agreement)
-   1. [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
-
-<!-- /MarkdownTOC -->
+- [Introduction](#introduction)
+- [Your First Contribution](#your-first-contribution)
+  - [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
+- [Workflow](#workflow)
+  - [Git Branches](#git-branches)
+  - [Git Commits](#git-commits)
+    - [Style](#style)
+  - [Github Pull Requests](#github-pull-requests)
+    - [Title](#title)
+    - [Reviews & Approvals](#reviews--approvals)
+    - [Merge Style](#merge-style)
+  - [CI](#ci)
+    - [Releasing](#releasing)
+    - [Testing](#testing)
+      - [Skipping tests](#skipping-tests)
+      - [Daily tests](#daily-tests)
+    - [Flakey tests](#flakey-tests)
+      - [Test harness](#test-harness)
+  - [Deprecations](#deprecations)
+- [Next steps](#next-steps)
+- [Legal](#legal)
+  - [Contributor License Agreement](#contributor-license-agreement)
+  - [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
 
 ## Introduction
 
-1. **You're familiar with [Github](https://github.com) and the pull request
+1. **You're familiar with [GitHub](https://github.com) and the pull request
    workflow.**
 2. **You've read Vector's [docs](https://vector.dev/docs/).**
 3. **You know about the [Vector community](https://vector.dev/community/).
@@ -50,30 +45,32 @@ Vector team member will find this document useful.
    - This is where you can get a feel if the change will be accepted or not.
      Changes that are questionable will have a `needs: approval` label.
 2. Once approved, [fork the Vector repository][urls.fork_repo] in your own
-   Github account (only applicable to outside contributors).
+   GitHub account (only applicable to outside contributors).
 3. [Create a new Git branch][urls.create_branch].
-4. Review the Vector [change control](#change-control) and [development](#development) workflows.
-5. Make your changes.
-6. [Submit the branch as a pull request][urls.submit_pr] to the main Vector
+4. Make your changes.
+5. [Submit the branch as a pull request][urls.submit_pr] to the main Vector
    repo. A Vector team member should comment and/or review your pull request
    within a few days. Although, depending on the circumstances, it may take
    longer.
 
 ### New sources, sinks, and transforms
 
-If you're contributing a new source, sink, or transform to Vector, thank you that's way cool! There's a few steps you need think about if you want to make sure we can merge your contribution. We're here to help you along with these steps but they are a blocker to getting a new integration released.
+If you're contributing a new source, sink, or transform to Vector, thank you that's way cool! There's a few steps you
+need to think about if you want to make sure we can merge your contribution. We're here to help you along with these steps,
+but they are a blocker to getting a new integration released.
 
 To merge a new source, sink, or transform, you need to:
 
 - [ ] Add tests, especially integration tests if your contribution connects to an external service.
-- [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/vectordotdev/vector/tree/master/src/internal_events).
+- [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can
+see some [example of instrumentation in existing integrations](https://github.com/vectordotdev/vector/tree/master/src/internal_events).
 - [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/vectordotdev/vector/blob/master/docs).
 
 ## Workflow
 
 ### Git Branches
 
-_All_ changes must be made in a branch and submitted as [pull requests](#pull-requests).
+_All_ changes must be made in a branch and submitted as [pull requests](#github-pull-requests).
 Vector does not adopt any type of branch naming style, but please use something
 descriptive of your changes.
 
@@ -87,13 +84,11 @@ complex changes.
 
 ### Github Pull Requests
 
-Once your changes are ready you must submit your branch as a [pull \
-request](https://github.com/vectordotdev/vector/pulls).
+Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).
 
 #### Title
 
-The pull request title must follow the format outlined in the [conventional \
-commits spec](https://www.conventionalcommits.org).
+The pull request title must follow the format outlined in the [conventional commits spec](https://www.conventionalcommits.org).
 [Conventional commits](https://www.conventionalcommits.org) is a standardized
 format for commit messages. Vector only requires this format for commits on
 the `master` branch. And because Vector squashes commits before merging
@@ -139,12 +134,12 @@ process.
 
 ### CI
 
-Currently Vector uses Github Actions to run tests. The workflows are defined in
+Currently, Vector uses GitHub Actions to run tests. The workflows are defined in
 `.github/workflows`.
 
 #### Releasing
 
-Github Actions is responsible for releasing updated versions of Vector through
+GitHub Actions is responsible for releasing updated versions of Vector through
 various channels.
 
 #### Testing
@@ -159,7 +154,7 @@ ci-condition: skip
 
 ##### Daily tests
 
-Some long running tests are only run daily, rather than on every pull request.
+Some long-running tests are only run daily, rather than on every pull request.
 If needed, an administrator can kick off these tests manually via the button on
 the [nightly build action
 page](https://github.com/vectordotdev/vector/actions?query=workflow%3Anightly)
@@ -195,18 +190,18 @@ When deprecating functionality in Vector, see [DEPRECATION.md](DEPRECATION.md).
 As discussed in the [`README`](README.md), you should continue to the following
 documents:
 
-2. **[DEVELOPING.md](DEVELOPING.md)** - Everything necessary to develop
-3. **[DOCUMENTING.md](DOCUMENTING.md)** - Preparing your change for Vector users
+1. **[DEVELOPING.md](DEVELOPING.md)** - Everything necessary to develop
+2. **[DOCUMENTING.md](DOCUMENTING.md)** - Preparing your change for Vector users
 3. **[DEPRECATION.md](DEPRECATION.md)** - Deprecating functionality in Vector
 
 ## Legal
 
 To protect all users of Vector, the following legal requirements are made.
-If you have additional questions, please [contact us](#contact).
+If you have additional questions, please [contact us].
 
 ### Contributor License Agreement
 
-Vector requires all contributors to sign the a Contributor License Agreement
+Vector requires all contributors to sign the Contributor License Agreement
 (CLA). This gives Vector the right to use your contribution as well as ensuring
 that you own your contributions and can use them for other purposes.
 
@@ -216,6 +211,7 @@ The full text of the CLA can be found at [https://cla.datadoghq.com/vectordotdev
 
 This is covered by the CLA.
 
+[contact us]: https://vector.dev/community
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
 [urls.existing_issues]: https://github.com/vectordotdev/vector/issues
 [urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo

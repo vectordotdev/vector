@@ -99,7 +99,7 @@ pub fn parse<'a>(
         .and_then(|(rest, result)| {
             rest.trim()
                 .is_empty()
-                .then(|| result)
+                .then_some(result)
                 .ok_or_else(|| format!("could not parse '{}' as array", input))
         })?;
 

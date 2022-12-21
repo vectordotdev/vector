@@ -8,7 +8,10 @@ use quickcheck::{empty_shrinker, Arbitrary, Gen};
 
 use crate::{
     event::{
-        metric::{Bucket, MetricData, MetricName, MetricSeries, MetricSketch, Quantile, Sample},
+        metric::{
+            Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
+            Quantile, Sample,
+        },
         Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
         Value,
     },
@@ -81,14 +84,14 @@ impl Arbitrary for LogEvent {
         let mut gen = Gen::new(MAX_MAP_SIZE);
         let map: BTreeMap<String, Value> = BTreeMap::arbitrary(&mut gen);
         let metadata: EventMetadata = EventMetadata::arbitrary(g);
-        LogEvent::from_parts(map, metadata)
+        LogEvent::from_map(map, metadata)
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        let (fields, metadata) = self.clone().into_parts();
+        let (value, metadata) = self.clone().into_parts();
 
         Box::new(
-            fields
+            value
                 .shrink()
                 .map(move |x| LogEvent::from_parts(x, metadata.clone())),
         )
@@ -191,33 +194,32 @@ impl Arbitrary for MetricValue {
             },
             4 => MetricValue::AggregatedHistogram {
                 buckets: Vec::arbitrary(g),
-                count: u32::arbitrary(g),
+                count: u64::arbitrary(g),
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
             5 => MetricValue::AggregatedSummary {
                 quantiles: Vec::arbitrary(g),
-                count: u32::arbitrary(g),
+                count: u64::arbitrary(g),
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
             6 => {
-                let bin_keys = Vec::<i16>::arbitrary(g);
-                let bin_counts = bin_keys
-                    .iter()
-                    .map(|_| u16::arbitrary(g))
-                    .collect::<Vec<_>>();
+                // We're working around quickcheck's limitations here, and
+                // should really migrate the tests in question to use proptest
+                let num_samples = u8::arbitrary(g);
+                let samples = std::iter::repeat_with(|| loop {
+                    let f = f64::arbitrary(g);
+                    if f.is_normal() {
+                        return f;
+                    }
+                })
+                .take(num_samples as usize)
+                .collect::<Vec<_>>();
+
+                let mut sketch = AgentDDSketch::with_agent_defaults();
+                sketch.insert_many(&samples);
+
                 MetricValue::Sketch {
-                    sketch: MetricSketch::AgentDDSketch(
-                        AgentDDSketch::from_raw(
-                            u32::arbitrary(g),                // count
-                            f64::arbitrary(g) % MAX_F64_SIZE, // min
-                            f64::arbitrary(g) % MAX_F64_SIZE, // max
-                            f64::arbitrary(g) % MAX_F64_SIZE, // sum
-                            f64::arbitrary(g) % MAX_F64_SIZE, // avg
-                            bin_keys.as_slice(),
-                            bin_counts.as_slice(),
-                        )
-                        .unwrap(),
-                    ),
+                    sketch: MetricSketch::AgentDDSketch(sketch),
                 }
             }
 
@@ -425,7 +427,7 @@ impl Arbitrary for Bucket {
     fn arbitrary(g: &mut Gen) -> Self {
         Bucket {
             upper_limit: f64::arbitrary(g) % MAX_F64_SIZE,
-            count: u32::arbitrary(g),
+            count: u64::arbitrary(g),
         }
     }
 
@@ -471,11 +473,11 @@ impl Arbitrary for StatisticKind {
 impl Arbitrary for MetricSeries {
     fn arbitrary(g: &mut Gen) -> Self {
         let tags = if bool::arbitrary(g) {
-            let mut map: BTreeMap<String, String> = BTreeMap::new();
+            let mut map = MetricTags::default();
             for _ in 0..(usize::arbitrary(g) % MAX_MAP_SIZE) {
                 let key = String::from(Name::arbitrary(g));
                 let value = String::from(Name::arbitrary(g));
-                map.insert(key, value);
+                map.replace(key, value);
             }
             if map.is_empty() {
                 None
@@ -560,8 +562,15 @@ impl Arbitrary for MetricData {
             None
         };
 
+        let interval_ms = bool::arbitrary(g)
+            .then(|| u32::arbitrary(g))
+            .and_then(std::num::NonZeroU32::new);
+
         MetricData {
-            timestamp: dt,
+            time: MetricTime {
+                timestamp: dt,
+                interval_ms,
+            },
             kind: MetricKind::arbitrary(g),
             value: MetricValue::arbitrary(g),
         }
@@ -591,7 +600,9 @@ impl Arbitrary for MetricData {
 }
 
 impl Arbitrary for EventMetadata {
-    fn arbitrary(_g: &mut Gen) -> Self {
-        EventMetadata::default()
+    fn arbitrary(g: &mut Gen) -> Self {
+        let mut metadata = EventMetadata::default();
+        *metadata.value_mut() = Value::arbitrary(g);
+        metadata
     }
 }

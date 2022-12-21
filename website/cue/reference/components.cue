@@ -66,17 +66,23 @@ components: {
 		// `classes` represent the various classifications for this component
 		classes: #Classes & {_args: kind: Kind}
 
-		// `examples` demonstrates various ways to use the component using an
-		// input, output, and example configuration.
+		#Config: {
+			...
+			for k, v in configuration {
+				"\( k )"?: _ | *null
+			}
+		}
+
 		#ExampleConfig: {
-			title:           string
-			context?:        string
-			"configuration": {
-				...
-				for k, v in configuration {
-					"\( k )"?: _ | *null
-				}
-			} | string
+			title:         string
+			configuration: #Config
+			notes?:        string
+		}
+
+		#Example: {
+			title:         string
+			configuration: #Config
+			notes?:        string
 
 			if Kind == "source" {
 				input: string
@@ -93,11 +99,19 @@ components: {
 			if Kind != "sink" {
 				output: #Event | [#Event, ...#Event] | null
 			}
-
-			notes?: string
 		}
 
-		examples?: [#ExampleConfig, ...#ExampleConfig]
+		// `examples` demonstrates various ways to use the component using an
+		// input, output, and example configuration.
+		examples?: [#Example, ...#Example]
+
+		// `configuration_examples` demonstrates various ways configure the components. This differs
+		// from `examples` in that the list should be representative examples of how the component
+		// can be configured.
+		//
+		// This will be used to drive the config examples at the top of each component page in the
+		// future.
+		configuration_examples?: [#ExampleConfig, ...#ExampleConfig]
 
 		// `features` describes the various supported features of the component.
 		// Setting these helps to reduce boilerplate.
@@ -164,6 +178,8 @@ components: {
 		}
 		let Args = _args
 
+		auto_generated: bool | *false
+
 		if Args.kind == "source" {
 			acknowledgements: bool
 			collect?:         #FeaturesCollect
@@ -196,9 +212,10 @@ components: {
 				enabled: true
 			}
 
-			// `healtcheck` notes if a component offers a healthcheck on boot.
+			// `healthcheck` notes if a component offers a healthcheck on boot.
 			healthcheck: {
-				enabled: bool
+				enabled:   bool
+				uses_uri?: bool
 			}
 
 			exposes?: #FeaturesExpose
@@ -361,7 +378,7 @@ components: {
 					enabled: bool
 
 					if enabled {
-						batched: bool | *false
+						framing: bool | *false
 						enum:    [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
@@ -413,6 +430,10 @@ components: {
 			can_verify_certificate: bool
 			if Args.mode == "connect" {
 				can_verify_hostname: bool
+				enabled_by_scheme:   bool
+			}
+			if Args.mode == "accept" {
+				can_add_client_metadata: bool | *false
 			}
 			enabled_default: bool
 		}
@@ -535,8 +556,8 @@ components: {
 		// `warnings` describes any warnings the user should know about the
 		// component.
 		//
-		// For example, the `grok_parser` might offer a performance warning
-		// since the `regex_parser` and other transforms are faster.
+		// For example, a transform might be known to have performance issues
+		// or a lack of support for specific features, etc.
 		warnings: [...string] | null // Allow for empty list
 
 		// `notices` communicates useful information to the user that is neither
@@ -593,8 +614,9 @@ components: {
 
 			_tls_accept: {
 				_args: {
-					can_verify_certificate: bool | *true
-					enabled_default:        bool
+					can_verify_certificate:  bool | *true
+					can_add_client_metadata: bool | *false
+					enabled_default:         bool
 				}
 				let Args = _args
 
@@ -616,6 +638,17 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
+						}
+					}
+					if Args.can_add_client_metadata {
+						client_metadata_key: {
+							common:      false
+							description: "The key name added to each event with the client certificate's metadata."
+							required:    false
+							type: string: {
+								default: null
+								examples: ["client_cert"]
+							}
 						}
 					}
 					crt_file: {
@@ -662,6 +695,7 @@ components: {
 					can_verify_certificate: bool | *true
 					can_verify_hostname:    bool | *false
 					enabled_default:        bool
+					enabled_by_scheme:      bool
 				}
 				let Args = _args
 
@@ -669,11 +703,13 @@ components: {
 				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
-					enabled: {
-						common:      true
-						description: "Enable TLS during connections to the remote."
-						required:    false
-						type: bool: default: Args.enabled_default
+					if !Args.enabled_by_scheme {
+						enabled: {
+							common:      true
+							description: "Enable TLS during connections to the remote."
+							required:    false
+							type: bool: default: Args.enabled_default
+						}
 					}
 
 					ca_file: {
@@ -712,11 +748,23 @@ components: {
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 						}
 					}
+					alpn_protocols: {
+						common:      false
+						description: "Sets the list of supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order they are defined."
+						required:    false
+						type: array: {
+							default: null
+							items: type: string: {
+								examples: ["h2"]
+								syntax: "literal"
+							}
+						}
+					}
 
 					if Args.can_verify_certificate {
 						verify_certificate: {
 							common:      false
-							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host."
+							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Specifically the issuer is checked but not CRLs (Certificate Revocation Lists)."
 							required:    false
 							type: bool: default: true
 						}
@@ -889,25 +937,6 @@ components: {
 						},
 					]
 					options: {}
-				}
-			}
-
-			if Kind != "source" {
-				inputs: {
-					description: """
-						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))
-						IDs. Wildcards (`*`) are supported.
-
-						See [configuration](\(urls.vector_configuration)) for more info.
-						"""
-					required:    true
-					sort:        -1
-					type: array: items: type: string: {
-						examples: [
-							"my-source-or-transform-id",
-							"prefix-*",
-						]
-					}
 				}
 			}
 

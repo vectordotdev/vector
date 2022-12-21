@@ -18,7 +18,7 @@ use nom::{
 /// Parsers in this module should return this IResult instead of `nom::IResult`.
 type IResult<'a, O> = Result<(&'a str, O), nom::Err<ErrorKind>>;
 
-#[derive(Debug, snafu::Snafu, PartialEq)]
+#[derive(Debug, snafu::Snafu, PartialEq, Eq)]
 pub enum ErrorKind {
     #[snafu(display("invalid metric type, parsing: `{}`", input))]
     InvalidMetricKind { input: String },
@@ -88,7 +88,7 @@ pub enum MetricKind {
     Untyped,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Header {
     pub metric_name: String,
     pub kind: MetricKind,
@@ -560,6 +560,35 @@ mod test {
         assert_eq!(left, tail);
         assert!(r.is_nan());
 
+        let input = wrap(&(u64::MAX).to_string());
+        let (left, r) = Metric::parse_value(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r as u64, u64::MAX);
+
+        // This doesn't pass because we are parsing as f64 so we lose precision
+        // once the number is bigger than 2^53 (the mantissa for f64).
+        //
+        // let input = wrap(&(u64::MAX - 1).to_string());
+        // let (left, r) = Metric::parse_value(&input).unwrap();
+        // assert_eq!(left, tail);
+        // assert_eq!(r as u64, u64::MAX - 1);
+
+        // Precision is maintained up to 2^53
+        let input = wrap(&(2_u64.pow(53)).to_string());
+        let (left, r) = Metric::parse_value(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r as u64, 2_u64.pow(53));
+
+        let input = wrap(&(2_u64.pow(53) - 1).to_string());
+        let (left, r) = Metric::parse_value(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r as u64, 2_u64.pow(53) - 1);
+
+        let input = wrap(&(u32::MAX as u64 + 1).to_string());
+        let (left, r) = Metric::parse_value(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r as u64, u32::MAX as u64 + 1);
+
         let tests = [
             ("0", 0.0f64),
             ("0.25", 0.25f64),
@@ -587,17 +616,17 @@ mod test {
         let input = wrap("{}");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, btreemap! {});
+        assert_eq!(r, BTreeMap::new());
 
         let input = wrap(r#"{name="value"}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, btreemap! { "name" => "value" });
+        assert_eq!(r, BTreeMap::from([("name".into(), "value".into())]));
 
         let input = wrap(r#"{name="value",}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, btreemap! { "name" => "value" });
+        assert_eq!(r, BTreeMap::from([("name".into(), "value".into())]));
 
         let input = wrap(r#"{ name = "" ,b="a=b" , a="},", _c = "\""}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
@@ -610,7 +639,7 @@ mod test {
         let input = wrap("100");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, "100".to_owned() + tail);
-        assert_eq!(r, btreemap! {});
+        assert_eq!(r, BTreeMap::new());
 
         // We don't allow these values
 

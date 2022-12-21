@@ -151,8 +151,8 @@ impl Display for LevelTimeHistogram {
 /// Values are only recorded into the bucket that the value is less than or equal to.
 #[derive(Debug)]
 pub struct VariableHistogram {
-    buckets: Vec<(f64, u32)>,
-    count: u32,
+    buckets: Vec<(f64, u64)>,
+    count: u64,
     sum: f64,
 }
 
@@ -189,7 +189,7 @@ impl VariableHistogram {
         }
     }
 
-    pub const fn count(&self) -> u32 {
+    pub const fn count(&self) -> u64 {
         self.count
     }
 

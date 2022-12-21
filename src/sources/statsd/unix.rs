@@ -4,7 +4,7 @@ use codecs::{
     decoding::{Deserializer, Framer},
     NewlineDelimitedDecoder,
 };
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use super::StatsdDeserializer;
 use crate::{
@@ -14,8 +14,13 @@ use crate::{
     SourceSender,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Unix domain socket configuration for the `statsd` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UnixConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
     pub path: PathBuf,
 }
 

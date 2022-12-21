@@ -13,15 +13,20 @@ components: sinks: pulsar: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
-			compression: enabled: false
+			compression: {
+				enabled: true
+				default: "none"
+				algorithms: ["none", "lz4", "zlib", "zstd", "snappy"]
+				levels: ["none"]
+			}
 			encoding: {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["text", "json"]
+					enum: ["text", "json", "avro"]
 				}
 			}
 			request: enabled: false
@@ -76,6 +81,48 @@ components: sinks: pulsar: {
 							examples: ["${PULSAR_TOKEN}", "123456789"]
 						}
 					}
+					oauth2: {
+						common:      false
+						description: "Options for OAuth2 authentication."
+						required:    false
+						type: object: {
+							examples: []
+							options: {
+								issuer_url: {
+									description: "The issuer url."
+									required:    true
+									type: string: {
+										examples: ["${OAUTH2_ISSUER_URL}", "https://oauth2.issuer"]
+									}
+								}
+								credentials_url: {
+									description: "The url for credentials. The data url is also supported."
+									required:    true
+									type: string: {
+										examples: ["{OAUTH2_CREDENTIALS_URL}", "file:///oauth2_credentials", "data:application/json;base64,cHVsc2FyCg=="]
+									}
+								}
+								audience: {
+									common:      false
+									description: "OAuth2 audience."
+									required:    false
+									type: string: {
+										default: null
+										examples: ["${OAUTH2_AUDIENCE}", "pulsar"]
+									}
+								}
+								scope: {
+									common:      false
+									description: "OAuth2 scope."
+									required:    false
+									type: string: {
+										default: null
+										examples: ["${OAUTH2_SCOPE}", "admin"]
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -93,6 +140,15 @@ components: sinks: pulsar: {
 				examples: ["topic-1234"]
 			}
 		}
+		partition_key_field: {
+			common:      false
+			description: "Log field name to use as Pulsar message key."
+			required:    false
+			type: string: {
+				default: null
+				examples: ["message", "my_field"]
+			}
+		}
 	}
 
 	input: {
@@ -102,6 +158,8 @@ components: sinks: pulsar: {
 	}
 
 	telemetry: metrics: {
-		encode_errors_total: components.sources.internal_metrics.output.metrics.encode_errors_total
+		component_discarded_events_total: components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:           components.sources.internal_metrics.output.metrics.component_errors_total
+		encode_errors_total:              components.sources.internal_metrics.output.metrics.encode_errors_total
 	}
 }

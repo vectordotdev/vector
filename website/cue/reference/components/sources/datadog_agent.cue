@@ -57,11 +57,11 @@ components: sources: datadog_agent: {
 
 	configuration: {
 		acknowledgements: configuration._source_acknowledgements
-		address:          sources.http.configuration.address
+		address:          sources.http_server.configuration.address
 		multiple_outputs: {
 			common: false
 			description: """
-				If this setting is set to `true` logs, metrics and traces will be sent to different ouputs. For a source
+				If this setting is set to `true` logs, metrics and traces will be sent to different outputs. For a source
 				component named `agent` the received logs, metrics, and traces can then be accessed by specifying
 				`agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the input to another component.
 				"""
@@ -132,6 +132,13 @@ components: sources: datadog_agent: {
 						examples: ["Hi from erlang"]
 					}
 				}
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["datadog_agent"]
+					}
+				}
 				status: {
 					description: "The status field extracted from the event."
 					required:    true
@@ -156,7 +163,7 @@ components: sources: datadog_agent: {
 					}
 				}
 				ddtags: {
-					description: "The coma separated tags list extracted from the event."
+					description: "The comma separated tags list extracted from the event."
 					required:    true
 					type: string: {
 						examples: ["env:prod,region:ap-east-1"]
@@ -165,9 +172,22 @@ components: sources: datadog_agent: {
 			}
 		}
 		metrics: {
-			counter:      output._passthrough_counter
-			distribution: output._passthrough_distribution
-			gauge:        output._passthrough_gauge
+			_extra_tags: {
+				"source_type": {
+					description: "The name of the source type."
+					examples: ["datadog_agent"]
+					required: true
+				}
+			}
+			counter: output._passthrough_counter & {
+				tags: _extra_tags
+			}
+			distribution: output._passthrough_distribution & {
+				tags: _extra_tags
+			}
+			gauge: output._passthrough_gauge & {
+				tags: _extra_tags
+			}
 		}
 		traces: {
 			description: "A trace received through an HTTP POST request sent by a Datadog Trace Agent."
@@ -176,6 +196,13 @@ components: sources: datadog_agent: {
 					description: "The list of spans composing the trace."
 					required:    true
 					type: array: items: type: object: options: {}
+				}
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["datadog_agent"]
+					}
 				}
 			}
 		}
@@ -205,14 +232,24 @@ components: sources: datadog_agent: {
 					metrics.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
 				```
 
+				In order to send traces the [Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated with the
+				following options:
+
+				```yaml
+				vector:
+					traces.enabled: true
+					traces.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
+				```
 				"""
 		}
 		trace_support: {
-			title: "Trace support"
+			title: "Trace support caveats"
 			body: """
-				The `datadog_agent` source is capable of receiving traces from the Datadog Agent for versions < 6/7.33.
-				We are working on adding support for the newer agent versions as well as support for passing along APM
-				statistics used by Datadog.
+				The `datadog_agent` source is capable of receiving traces from the Datadog Agent and
+				forwarding them to Datadog. In order to have accurate APM statistics, you should
+				disable any sampling of traces within the Datadog Agent or client SDKs as Vector
+				calculates the metrics that drive the APM statistics (like span hit count and
+				duration distribution).
 				"""
 		}
 	}

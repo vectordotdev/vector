@@ -77,6 +77,13 @@ components: sources: internal_logs: {
 					examples: ["Vector has started."]
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["internal_logs"]
+				}
+			}
 			timestamp: fields._current_timestamp & {
 				description: "The exact time the log or trace was generated."
 			}

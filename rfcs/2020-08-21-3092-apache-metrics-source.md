@@ -221,5 +221,5 @@ common configuration options for their behavior.
 My recommendation is to implement this and the
 [`nginx`](https://github.com/vectordotdev/vector/issues/3091) metrics source and
 then figure out where the seams our to pull out an `HttpScrapeSource` module
-that could be used by this source, the `nginix` source, and the `prometheus`
+that could be used by this source, the `nginx` source, and the `prometheus`
 source.

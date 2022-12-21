@@ -1,6 +1,7 @@
 use nkeys::error::Error as NKeysError;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 
 use crate::tls::TlsEnableableConfig;
 
@@ -14,19 +15,36 @@ pub enum NatsConfigError {
     TlsMissingCert,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration of the authentication strategy when interacting with NATS.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case", tag = "strategy")]
 pub(crate) enum NatsAuthConfig {
+    /// Username and password authentication.
+    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password))
     UserPassword {
+        #[configurable(derived)]
         user_password: NatsAuthUserPassword,
     },
+
+    /// Token authentication.
+    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens))
     Token {
+        #[configurable(derived)]
         token: NatsAuthToken,
     },
+
+    /// Credentials file authentication.
+    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt))
     CredentialsFile {
+        #[configurable(derived)]
         credentials_file: NatsAuthCredentialsFile,
     },
+
+    /// NKey authentication.
+    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth))
     Nkey {
+        #[configurable(derived)]
         nkey: NatsAuthNKey,
     },
 }
@@ -44,38 +62,61 @@ impl std::fmt::Display for NatsAuthConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Username and password configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthUserPassword {
+    /// Username.
     pub(crate) user: String,
-    pub(crate) password: String,
+
+    /// Password.
+    pub(crate) password: SensitiveString,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Token configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthToken {
-    pub(crate) value: String,
+    /// Token.
+    pub(crate) value: SensitiveString,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Credentials file configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthCredentialsFile {
+    /// Path to credentials file.
     pub(crate) path: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// NKeys configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthNKey {
+    /// User.
+    ///
+    /// Conceptually, this is equivalent to a public key.
     pub(crate) nkey: String,
+
+    /// Seed.
+    ///
+    /// Conceptually, this is equivalent to a private key.
     pub(crate) seed: String,
 }
 
 impl NatsAuthConfig {
     pub(crate) fn to_nats_options(&self) -> Result<nats::asynk::Options, NatsConfigError> {
         match self {
-            NatsAuthConfig::UserPassword { user_password } => Ok(
-                nats::asynk::Options::with_user_pass(&user_password.user, &user_password.password),
-            ),
+            NatsAuthConfig::UserPassword { user_password } => {
+                Ok(nats::asynk::Options::with_user_pass(
+                    user_password.user.as_str(),
+                    user_password.password.inner(),
+                ))
+            }
             NatsAuthConfig::CredentialsFile { credentials_file } => Ok(
                 nats::asynk::Options::with_credentials(&credentials_file.path),
             ),
@@ -89,7 +130,9 @@ impl NatsAuthConfig {
                         kp.sign(nonce).unwrap()
                     })
                 }),
-            NatsAuthConfig::Token { token } => Ok(nats::asynk::Options::with_token(&token.value)),
+            NatsAuthConfig::Token { token } => {
+                Ok(nats::asynk::Options::with_token(token.value.inner()))
+            }
         }
     }
 }

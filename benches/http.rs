@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
 use futures::TryFutureExt;
 use hyper::{
@@ -9,7 +10,7 @@ use hyper::{
 use tokio::runtime::Runtime;
 use vector::{
     config, sinks,
-    sinks::util::{encoding::EncodingConfigWithFramingAdapter, BatchConfig, Compression},
+    sinks::util::{BatchConfig, Compression},
     sources,
     test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
     Error,
@@ -53,9 +54,8 @@ fn benchmark_http(c: &mut Criterion) {
                                 auth: Default::default(),
                                 headers: Default::default(),
                                 batch,
-                                encoding: EncodingConfigWithFramingAdapter::legacy(
-                                    sinks::http::Encoding::Text.into(),
-                                ),
+                                encoding: (None::<FramingConfig>, TextSerializerConfig::new())
+                                    .into(),
                                 request: Default::default(),
                                 tls: Default::default(),
                                 acknowledgements: Default::default(),

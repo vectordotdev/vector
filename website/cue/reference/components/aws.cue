@@ -39,6 +39,16 @@ components: _aws: {
 							examples: ["arn:aws:iam::123456789098:role/my_role"]
 						}
 					}
+					region: {
+						category:    "Auth"
+						common:      false
+						description: "The [AWS region](\(urls.aws_regions)) to send STS requests to. If not set, this will default to the configured region for the service itself."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["us-west-2"]
+						}
+					}
 					load_timeout_secs: {
 						category:    "Auth"
 						common:      false
@@ -48,6 +58,35 @@ components: _aws: {
 							unit:    "seconds"
 							default: 5
 							examples: [30]
+						}
+					}
+					imds: {
+						description: "Configuration for authenticating with AWS through IMDS."
+						required:    false
+						type: object: {
+							options: {
+								connect_timeout_seconds: {
+									description: "Connect timeout for IMDS."
+									required:    false
+									type: uint: {
+										default: 1
+										unit:    "seconds"
+									}
+								}
+								max_attempts: {
+									description: "Number of IMDS retries for fetching tokens and metadata."
+									required:    false
+									type: uint: default: 4
+								}
+								read_timeout_seconds: {
+									description: "Read timeout for IMDS."
+									required:    false
+									type: uint: {
+										default: 1
+										unit:    "seconds"
+									}
+								}
+							}
 						}
 					}
 					profile: {
@@ -95,14 +134,6 @@ components: _aws: {
 			description: "Specifies the location of the file that the AWS CLI uses to store configuration profiles."
 			type: string: {
 				default: "~/.aws/config"
-			}
-		}
-
-		AWS_CREDENTIAL_EXPIRATION: {
-			description: "Expiration time in RFC 3339 format. If unset, credentials won't expire."
-			type: string: {
-				default: null
-				examples: ["1996-12-19T16:39:57-08:00"]
 			}
 		}
 
@@ -167,11 +198,6 @@ components: _aws: {
 				4. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance
 				   with an instance profile/role). Requires IMDSv2 to be enabled. For EKS, you may need to increase the
 				   metadata token response hop limit to 2.
-
-				Note that use of
-				[`credentials_process`](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html)
-				in AWS credentials files is not supported as the underlying AWS SDK currently [lacks
-				support](https://github.com/awslabs/aws-sdk-rust/issues/261).
 
 				If no credentials are found, Vector's health check fails and an error is [logged](\(urls.vector_monitoring)).
 				If your AWS credentials expire, Vector will automatically search for up-to-date

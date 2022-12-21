@@ -5,6 +5,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
+use std::sync::Arc;
 
 use crate::value::regex::ValueRegex;
 use crate::{Kind, Value};
@@ -13,7 +14,7 @@ impl Value {
     /// Returns self as `NotNan<f64>`, only if self is `Value::Float`.
     pub fn as_float(&self) -> Option<NotNan<f64>> {
         match self {
-            Value::Float(f) => Some(*f),
+            Self::Float(f) => Some(*f),
             _ => None,
         }
     }
@@ -21,7 +22,7 @@ impl Value {
     /// Returns self as `BTreeMap<String, Value>`, only if self is `Value::Object`.
     pub fn into_object(self) -> Option<BTreeMap<String, Self>> {
         match self {
-            Value::Object(map) => Some(map),
+            Self::Object(map) => Some(map),
             _ => None,
         }
     }
@@ -29,8 +30,20 @@ impl Value {
     /// Returns self as `&DateTime<Utc>`, only if self is `Value::Timestamp`.
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
         match &self {
-            Value::Timestamp(ts) => Some(ts),
+            Self::Timestamp(ts) => Some(ts),
             _ => None,
+        }
+    }
+
+    /// Returns self as a `DateTime<Utc>`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Timestamp`.
+    pub fn as_timestamp_unwrap(&self) -> &DateTime<Utc> {
+        match self {
+            Self::Timestamp(ref timestamp) => timestamp,
+            _ => panic!("Tried to call `Value::as_timestamp_unwrap` on a non-timestamp value."),
         }
     }
 
@@ -41,7 +54,7 @@ impl Value {
     /// This function will panic if self is anything other than `Value::Object`.
     pub fn as_object_mut_unwrap(&mut self) -> &mut BTreeMap<String, Self> {
         match self {
-            Value::Object(ref mut m) => m,
+            Self::Object(ref mut m) => m,
             _ => panic!("Tried to call `Value::as_map` on a non-map value."),
         }
     }
@@ -53,7 +66,7 @@ impl Value {
     /// This function will panic if self is anything other than `Value::Array`.
     pub fn as_array_unwrap(&self) -> &[Self] {
         match self {
-            Value::Array(ref a) => a,
+            Self::Array(ref a) => a,
             _ => panic!("Tried to call `Value::as_array` on a non-array value."),
         }
     }
@@ -65,27 +78,27 @@ impl Value {
     /// This function will panic if self is anything other than `Value::Array`.
     pub fn as_array_mut_unwrap(&mut self) -> &mut Vec<Self> {
         match self {
-            Value::Array(ref mut a) => a,
+            Self::Array(ref mut a) => a,
             _ => panic!("Tried to call `Value::as_array` on a non-array value."),
         }
     }
 
     /// Returns true if self is `Value::Integer`.
     pub fn is_integer(&self) -> bool {
-        matches!(self, Value::Integer(_))
+        matches!(self, Self::Integer(_))
     }
 
     /// Returns self as `f64`, only if self is `Value::Integer`.
     pub fn as_integer(&self) -> Option<i64> {
         match self {
-            Value::Integer(v) => Some(*v),
+            Self::Integer(v) => Some(*v),
             _ => None,
         }
     }
 
     /// Returns true if self is `Value::Float`.
     pub fn is_float(&self) -> bool {
-        matches!(self, Value::Float(_))
+        matches!(self, Self::Float(_))
     }
 
     // This replaces the more implicit "From<f64>", but keeps the same behavior.
@@ -101,15 +114,21 @@ impl Value {
 
     /// Returns true if self is `Value::Bytes`.
     pub fn is_bytes(&self) -> bool {
-        matches!(self, Value::Bytes(_))
+        matches!(self, Self::Bytes(_))
     }
 
     /// Returns self as `&Bytes`, only if self is `Value::Bytes`.
     pub fn as_bytes(&self) -> Option<&Bytes> {
         match self {
-            Value::Bytes(v) => Some(v),
+            Self::Bytes(v) => Some(v),
             _ => None,
         }
+    }
+
+    /// Returns self as `Cow<str>`, only if self is `Value::Bytes`
+    pub fn as_str(&self) -> Option<Cow<'_, str>> {
+        self.as_bytes()
+            .map(|bytes| String::from_utf8_lossy(bytes.as_ref()))
     }
 
     /// Converts the Value into a byte representation regardless of its original type.
@@ -120,70 +139,70 @@ impl Value {
     /// If the type is Object or Array, and string error description will be returned
     pub fn encode_as_bytes(&self) -> Result<Bytes, String> {
         match self {
-            Value::Bytes(bytes) => Ok(bytes.clone()),
-            Value::Integer(i) => Ok(Bytes::copy_from_slice(&i.to_le_bytes())),
-            Value::Float(f) => Ok(Bytes::copy_from_slice(&f.into_inner().to_le_bytes())),
-            Value::Boolean(b) => Ok(if *b {
+            Self::Bytes(bytes) => Ok(bytes.clone()),
+            Self::Integer(i) => Ok(Bytes::copy_from_slice(&i.to_le_bytes())),
+            Self::Float(f) => Ok(Bytes::copy_from_slice(&f.into_inner().to_le_bytes())),
+            Self::Boolean(b) => Ok(if *b {
                 Bytes::copy_from_slice(&[1_u8])
             } else {
                 Bytes::copy_from_slice(&[0_u8])
             }),
-            Value::Object(_o) => Err("cannot convert object to bytes.".to_string()),
-            Value::Array(_a) => Err("cannot convert array to bytes.".to_string()),
-            Value::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
-            Value::Regex(r) => Ok(r.to_string().into()),
-            Value::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
+            Self::Object(_o) => Err("cannot convert object to bytes.".to_string()),
+            Self::Array(_a) => Err("cannot convert array to bytes.".to_string()),
+            Self::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
+            Self::Regex(r) => Ok(r.to_string().into()),
+            Self::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
         }
     }
 
     /// Returns true if self is `Value::Boolean`.
     pub fn is_boolean(&self) -> bool {
-        matches!(self, Value::Boolean(_))
+        matches!(self, Self::Boolean(_))
     }
 
     /// Returns self as `bool`, only if self is `Value::Boolean`.
     pub fn as_boolean(&self) -> Option<bool> {
         match self {
-            Value::Boolean(v) => Some(*v),
+            Self::Boolean(v) => Some(*v),
             _ => None,
         }
     }
 
     /// Returns true if self is `Value::Regex`.
     pub fn is_regex(&self) -> bool {
-        matches!(self, Value::Regex(_))
+        matches!(self, Self::Regex(_))
     }
 
     /// Returns self as `&ValueRegex`, only if self is `Value::Regex`.
     pub fn as_regex(&self) -> Option<&Regex> {
         match self {
-            Value::Regex(v) => Some(v),
+            Self::Regex(v) => Some(v),
             _ => None,
         }
     }
 
     /// Returns true if self is `Value::Null`.
     pub fn is_null(&self) -> bool {
-        matches!(self, Value::Null)
+        matches!(self, Self::Null)
     }
 
     /// Returns self as `())`, only if self is `Value::Null`.
     pub fn as_null(&self) -> Option<()> {
         match self {
-            Value::Null => Some(()),
+            Self::Null => Some(()),
             _ => None,
         }
     }
 
     /// Returns true if self is `Value::Array`.
     pub fn is_array(&self) -> bool {
-        matches!(self, Value::Array(_))
+        matches!(self, Self::Array(_))
     }
 
     /// Returns self as `&[Value]`, only if self is `Value::Array`.
     pub fn as_array(&self) -> Option<&[Self]> {
         match self {
-            Value::Array(v) => Some(v),
+            Self::Array(v) => Some(v),
             _ => None,
         }
     }
@@ -191,20 +210,20 @@ impl Value {
     /// Returns self as `&mut Vec<Value>`, only if self is `Value::Array`.
     pub fn as_array_mut(&mut self) -> Option<&mut Vec<Self>> {
         match self {
-            Value::Array(v) => Some(v),
+            Self::Array(v) => Some(v),
             _ => None,
         }
     }
 
     /// Returns true if self is `Value::Object`.
     pub fn is_object(&self) -> bool {
-        matches!(self, Value::Object(_))
+        matches!(self, Self::Object(_))
     }
 
     /// Returns self as `&BTreeMap<String, Value>`, only if self is `Value::Object`.
     pub fn as_object(&self) -> Option<&BTreeMap<String, Self>> {
         match self {
-            Value::Object(v) => Some(v),
+            Self::Object(v) => Some(v),
             _ => None,
         }
     }
@@ -212,14 +231,14 @@ impl Value {
     /// Returns self as `&mut BTreeMap<String, Value>`, only if self is `Value::Object`.
     pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Self>> {
         match self {
-            Value::Object(v) => Some(v),
+            Self::Object(v) => Some(v),
             _ => None,
         }
     }
 
     /// Returns true if self is `Value::Timestamp`.
     pub fn is_timestamp(&self) -> bool {
-        matches!(self, Value::Timestamp(_))
+        matches!(self, Self::Timestamp(_))
     }
 
     /// Returns the `Kind` of this `Value`
@@ -242,6 +261,12 @@ impl<const N: usize> From<[u8; N]> for Value {
 
 impl<const N: usize> From<&[u8; N]> for Value {
     fn from(data: &[u8; N]) -> Self {
+        Self::from(Bytes::copy_from_slice(data))
+    }
+}
+
+impl From<&[u8]> for Value {
+    fn from(data: &[u8]) -> Self {
         Self::from(Bytes::copy_from_slice(data))
     }
 }
@@ -331,9 +356,15 @@ impl FromIterator<(String, Self)> for Value {
     }
 }
 
+impl From<Arc<Regex>> for Value {
+    fn from(r: Arc<Regex>) -> Self {
+        Self::Regex(ValueRegex::new(r))
+    }
+}
+
 impl From<Regex> for Value {
     fn from(r: Regex) -> Self {
-        Self::Regex(ValueRegex::new(r))
+        Self::Regex(ValueRegex::new(Arc::new(r)))
     }
 }
 

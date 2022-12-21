@@ -141,6 +141,7 @@ impl Conversion {
     /// # Errors
     ///
     /// Returns errors from the underlying conversion functions. See `enum Error`.
+    #[allow(clippy::trait_duplication_in_bounds)] // appears to be a false positive
     pub fn convert<T>(&self, bytes: Bytes) -> Result<T, Error>
     where
         T: From<Bytes> + From<i64> + From<NotNan<f64>> + From<bool> + From<DateTime<Utc>>,

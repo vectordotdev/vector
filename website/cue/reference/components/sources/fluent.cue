@@ -93,6 +93,7 @@ components: sources: fluent: {
 					examples: ["dummy.0"]
 				}
 			}
+			client_metadata: fields._client_metadata
 			"*": {
 				description: "In addition to the defined fields, all fields from the fluent message are inserted as root level fields."
 				required:    true

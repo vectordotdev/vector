@@ -23,4 +23,4 @@ test-case = "2"
 lalrpop = { version = "0.19.8", default-features = false }
 
 [features]
-fuzz = ["arbitrary"]
+fuzz = ["dep:arbitrary"]

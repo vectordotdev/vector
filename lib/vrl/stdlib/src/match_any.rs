@@ -47,9 +47,9 @@ impl Function for MatchAny {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let patterns = arguments.required_array("patterns")?;
@@ -71,48 +71,7 @@ impl Function for MatchAny {
 
         let regex_set = RegexSet::new(re_strings).expect("regex were already valid");
 
-        Ok(Box::new(MatchAnyFn { value, regex_set }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("patterns", Some(expr)) => {
-                let patterns = expr
-                    .as_value()
-                    .and_then(|value| value.try_array().ok())
-                    .ok_or_else(|| vrl::function::Error::ExpectedStaticExpression {
-                        keyword: "patterns",
-                        expr: expr.clone(),
-                    })?;
-                let mut re_strings = Vec::with_capacity(patterns.len());
-                for value in patterns {
-                    let re = value
-                        .try_regex()
-                        .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
-                    re_strings.push(re.to_string());
-                }
-
-                let regex_set = RegexSet::new(re_strings).expect("regex were already valid");
-                Ok(Some(Box::new(regex_set) as _))
-            }
-            _ => Ok(None),
-        }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args
-            .required_any("patterns")
-            .downcast_ref::<RegexSet>()
-            .unwrap();
-
-        match_any(value, pattern)
+        Ok(MatchAnyFn { value, regex_set }.as_expr())
     }
 }
 
@@ -122,13 +81,13 @@ struct MatchAnyFn {
     regex_set: RegexSet,
 }
 
-impl Expression for MatchAnyFn {
+impl FunctionExpression for MatchAnyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         match_any(value, &self.regex_set)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

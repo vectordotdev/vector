@@ -80,6 +80,7 @@ components: sources: nginx_metrics: {
 			can_verify_certificate: true
 			can_verify_hostname:    true
 			enabled_default:        false
+			enabled_by_scheme:      true
 		}}
 		auth: configuration._http_auth & {_args: {
 			password_example: "${HTTP_PASSWORD}"

@@ -1,24 +1,26 @@
 use async_trait::async_trait;
+use bytes::BytesMut;
+use codecs::encoding::Framer;
 use futures::{stream::BoxStream, StreamExt};
 use tokio::{io, io::AsyncWriteExt};
+use tokio_util::codec::Encoder as _;
 use vector_core::{
-    buffers::Acker,
-    internal_event::{BytesSent, EventsSent},
-    ByteSizeOf,
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+    },
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
-    event::Event,
-    sinks::util::{
-        encoding::{Encoder, EncodingConfig, StandardEncodings},
-        StreamSink,
-    },
+    codecs::{Encoder, Transformer},
+    event::{Event, EventStatus, Finalizable},
+    sinks::util::StreamSink,
 };
 
 pub struct WriterSink<T> {
-    pub acker: Acker,
     pub output: T,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub transformer: Transformer,
+    pub encoder: Encoder<Framer>,
 }
 
 #[async_trait]
@@ -27,142 +29,73 @@ where
     T: io::AsyncWrite + Send + Sync + Unpin,
 {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(event) = input.next().await {
-            let event_byte_size = event.size_of();
-            if let Some(mut buf) = encode_event(event, &self.encoding) {
-                buf.push('\n');
-                if let Err(error) = self.output.write_all(buf.as_bytes()).await {
+        let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
+        let events_sent = register!(EventsSent::from(Output(None)));
+        while let Some(mut event) = input.next().await {
+            let event_byte_size = event.estimated_json_encoded_size_of();
+            self.transformer.transform(&mut event);
+
+            let finalizers = event.take_finalizers();
+            let mut bytes = BytesMut::new();
+            self.encoder.encode(event, &mut bytes).map_err(|_| {
+                // Error is handled by `Encoder`.
+                finalizers.update_status(EventStatus::Errored);
+            })?;
+
+            match self.output.write_all(&bytes).await {
+                Err(error) => {
                     // Error when writing to stdout/stderr is likely irrecoverable,
                     // so stop the sink.
                     error!(message = "Error writing to output. Stopping sink.", %error);
+                    finalizers.update_status(EventStatus::Errored);
                     return Err(());
                 }
-                self.acker.ack(1);
+                Ok(()) => {
+                    finalizers.update_status(EventStatus::Delivered);
 
-                emit!(EventsSent {
-                    byte_size: event_byte_size,
-                    count: 1,
-                    output: None,
-                });
-                emit!(BytesSent {
-                    byte_size: buf.len(),
-                    protocol: "console"
-                });
+                    events_sent.emit(CountByteSize(1, event_byte_size));
+                    bytes_sent.emit(ByteSize(bytes.len()));
+                }
             }
         }
+
         Ok(())
     }
 }
 
-fn encode_event(event: Event, encoding: &EncodingConfig<StandardEncodings>) -> Option<String> {
-    encoding.encode_input_to_string(event).ok()
-}
-
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, Utc};
-    use pretty_assertions::assert_eq;
+    use codecs::{JsonSerializer, NewlineDelimitedEncoder};
+    use futures::future::ready;
+    use futures_util::stream;
+    use vector_core::sink::VectorSink;
 
     use super::*;
     use crate::{
-        event::{
-            metric::{Metric, MetricKind, MetricValue, StatisticKind},
-            Event, Value,
-        },
-        sinks::util::encoding::StandardEncodings,
+        event::{Event, LogEvent},
+        test_util::components::{run_and_assert_sink_compliance, SINK_TAGS},
     };
 
-    #[test]
-    fn encodes_raw_logs() {
-        let event = Event::from("foo");
-        assert_eq!(
-            "foo",
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Text)).unwrap()
-        );
-    }
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let event = Event::Log(LogEvent::from("foo"));
 
-    #[test]
-    fn encodes_log_events() {
-        let mut event = Event::new_empty_log();
-        let log = event.as_mut_log();
-        log.insert("x", Value::from("23"));
-        log.insert("z", Value::from(25));
-        log.insert("a", Value::from("0"));
-
-        let encoded = encode_event(event, &EncodingConfig::from(StandardEncodings::Json));
-        let expected = r#"{"a":"0","x":"23","z":25}"#;
-        assert_eq!(encoded.unwrap(), expected);
-    }
-
-    #[test]
-    fn encodes_counter() {
-        let event = Event::Metric(
-            Metric::new(
-                "foos",
-                MetricKind::Incremental,
-                MetricValue::Counter { value: 100.0 },
-            )
-            .with_namespace(Some("vector"))
-            .with_tags(Some(
-                vec![
-                    ("key2".to_owned(), "value2".to_owned()),
-                    ("key1".to_owned(), "value1".to_owned()),
-                    ("Key3".to_owned(), "Value3".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
-            .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11))),
+        let encoder = Encoder::<Framer>::new(
+            NewlineDelimitedEncoder::new().into(),
+            JsonSerializer::new().into(),
         );
-        assert_eq!(
-            r#"{"name":"foos","namespace":"vector","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"timestamp":"2018-11-14T08:09:10.000000011Z","kind":"incremental","counter":{"value":100.0}}"#,
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Json)).unwrap()
-        );
-    }
 
-    #[test]
-    fn encodes_set() {
-        let event = Event::Metric(Metric::new(
-            "users",
-            MetricKind::Incremental,
-            MetricValue::Set {
-                values: vec!["bob".into()].into_iter().collect(),
-            },
-        ));
-        assert_eq!(
-            r#"{"name":"users","kind":"incremental","set":{"values":["bob"]}}"#,
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Json)).unwrap()
-        );
-    }
+        let sink = WriterSink {
+            output: Vec::new(),
+            transformer: Default::default(),
+            encoder,
+        };
 
-    #[test]
-    fn encodes_histogram_without_timestamp() {
-        let event = Event::Metric(Metric::new(
-            "glork",
-            MetricKind::Incremental,
-            MetricValue::Distribution {
-                samples: vector_core::samples![10.0 => 1],
-                statistic: StatisticKind::Histogram,
-            },
-        ));
-        assert_eq!(
-            r#"{"name":"glork","kind":"incremental","distribution":{"samples":[{"value":10.0,"rate":1}],"statistic":"histogram"}}"#,
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Json)).unwrap()
-        );
-    }
-
-    #[test]
-    fn encodes_metric_text() {
-        let event = Event::Metric(Metric::new(
-            "users",
-            MetricKind::Incremental,
-            MetricValue::Set {
-                values: vec!["bob".into()].into_iter().collect(),
-            },
-        ));
-        assert_eq!(
-            "users{} + bob",
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Text)).unwrap()
-        );
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_streamsink(sink),
+            stream::once(ready(event)),
+            &SINK_TAGS,
+        )
+        .await;
     }
 }

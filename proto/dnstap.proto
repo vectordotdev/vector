@@ -56,11 +56,59 @@ enum SocketFamily {
     INET6 = 2;  // IPv6 (RFC 2460)
 }
 
-// SocketProtocol: the transport protocol of a socket. This specifies how to
-// interpret "transport port" fields.
+// SocketProtocol: the protocol used to transport a DNS message.
 enum SocketProtocol {
-    UDP = 1;    // User Datagram Protocol (RFC 768)
-    TCP = 2;    // Transmission Control Protocol (RFC 793)
+    UDP = 1;         // DNS over UDP transport (RFC 1035 section 4.2.1)
+    TCP = 2;         // DNS over TCP transport (RFC 1035 section 4.2.2)
+    DOT = 3;         // DNS over TLS (RFC 7858)
+    DOH = 4;         // DNS over HTTPS (RFC 8484)
+    DNSCryptUDP = 5; // DNSCrypt over UDP (https://dnscrypt.info/protocol)
+    DNSCryptTCP = 6; // DNSCrypt over TCP (https://dnscrypt.info/protocol)
+}
+
+// Policy: information about any name server operator policy
+// applied to the processing of a DNS message.
+message Policy {
+
+    // Match: what aspect of the message or message exchange
+    // triggered the application of the Policy.
+    enum Match {
+        QNAME = 1;       // Name in question section of query
+        CLIENT_IP = 2;   // Client IP address
+        RESPONSE_IP = 3; // Address in A/AAAA RRSet
+        NS_NAME = 4;     // Authoritative name server, by name
+        NS_IP = 5;       // Authoritative name server, by IP address
+    }
+
+    // The Action taken to implement the Policy.
+    enum Action {
+        NXDOMAIN = 1;   // Respond with NXDOMAIN
+        NODATA = 2;     // Respond with empty answer section
+        PASS = 3;       // Do not alter the response (passthrough)
+        DROP = 4;       // Do not respond.
+        TRUNCATE = 5;   // Truncate UDP response, forcing TCP retry
+        LOCAL_DATA = 6; // Respond with local data from policy
+    }
+
+    // type: the type of policy applied, e.g. "RPZ" for a
+    // policy from a Response Policy Zone.
+    optional string type = 1;
+
+    // rule: the rule matched by the message.
+    //
+    // In a RPZ context, this is the owner name of the rule in
+    // the Reponse Policy Zone in wire format.
+    optional bytes rule = 2;
+
+    // action: the policy action taken in response to the
+    // rule match.
+    optional Action action = 3;
+
+    // match: the feature of the message exchange which matched the rule.
+    optional Match match = 4;
+
+    // The matched value. Format depends on the matched feature .
+    optional bytes value = 5;
 }
 
 // Message: a wire-format (RFC 1035 section 4) DNS message and associated
@@ -167,15 +215,15 @@ message Message {
         // tool from a DNS server, from the perspective of the tool.
         TOOL_RESPONSE = 12;
 
-	// UPDATE_QUERY is a DNS update query message received from a resolver
-	// by an authoritative name server, from the perspective of the
-	// authoritative name server.
-	UPDATE_QUERY = 13;
+        // UPDATE_QUERY is a Dynamic DNS Update request (RFC 2136) received
+        // by an authoritative name server, from the perspective of the
+        // authoritative name server.
+        UPDATE_QUERY = 13;
 
-	// UPDATE_RESPONSE is a DNS update response message sent from an
-	// authoritative name server to a resolver, from the perspective of the
-	// authoritative name server.
-	UPDATE_RESPONSE = 14;
+        // UPDATE_RESPONSE is a Dynamic DNS Update response (RFC 2136) sent
+        // from an authoritative name server, from the perspective of the
+        // authoritative name server.
+        UPDATE_RESPONSE = 14;
     }
 
     // One of the Type values described above.
@@ -233,6 +281,9 @@ message Message {
 
     // The responder's original wire-format DNS response message, verbatim.
     optional bytes              response_message = 14;
+
+    // Operator policy applied to the processing of this message, if any.
+    optional Policy             policy = 15;
 }
 
 // All fields except for 'type' in the Message schema are optional.

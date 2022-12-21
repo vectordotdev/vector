@@ -16,11 +16,13 @@ use tokio::runtime::Builder;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    test::common::install_tracing_helpers,
+    encoding::FixedEncodable,
+    test::install_tracing_helpers,
     variants::disk_v2::{
-        common::MAX_FILE_ID, writer::RecordWriter, Buffer, DiskBufferConfig, WriterError,
+        common::MAX_FILE_ID, record::RECORD_HEADER_LEN, writer::RecordWriter, Buffer,
+        DiskBufferConfig, WriterError,
     },
-    EventCount, WhenFull,
+    EventCount,
 };
 
 mod action;
@@ -316,9 +318,9 @@ impl ReaderModel {
             pending_data_file_acks: VecDeque::new(),
         };
 
-        // We do a dummy call to `is_ready` to simulate what happens when a real buffer is created,
+        // We do a dummy call to `check_ready` to simulate what happens when a real buffer is created,
         // as the real initialization process always ensures the current reader data file exists/is opened.
-        reader.is_ready();
+        reader.check_ready();
 
         reader
     }
@@ -344,12 +346,12 @@ impl ReaderModel {
         while self.unconsumed_event_acks > 0 && !self.pending_record_acks.is_empty() {
             let (required_event_acks, record_bytes) =
                 self.pending_record_acks.front().copied().unwrap();
-            if self.unconsumed_event_acks >= required_event_acks {
+            if self.unconsumed_event_acks > 0 {
                 // We have enough unconsumed event acknowledgements to fully acknowledge this
                 // record. Remove it, consume the event acknowledgements, add a record
                 // acknowledgement, and update the buffer size.
                 let _ = self.pending_record_acks.pop_front().unwrap();
-                self.unconsumed_event_acks -= required_event_acks;
+                self.unconsumed_event_acks -= 1;
                 self.unconsumed_record_acks += 1;
 
                 self.ledger.decrement_buffer_size(record_bytes);
@@ -404,7 +406,7 @@ impl ReaderModel {
             && reader_file_id == writer_file_id
     }
 
-    fn is_ready(&mut self) -> bool {
+    fn check_ready(&mut self) -> bool {
         // If we have a data file open already, then we're good:
         if self.current_file.is_some() {
             return true;
@@ -429,7 +431,7 @@ impl ReaderModel {
             self.handle_acks();
 
             // If we can't open our desired current data file, we wait.
-            if !self.is_ready() {
+            if !self.check_ready() {
                 return Progress::Blocked;
             }
 
@@ -463,7 +465,7 @@ impl ReaderModel {
         // records read vs the number of their events that have been acknowledged, as we only adjust
         // the buffer size when a record has been fully acknowledged, since one record may contain
         // multiple events.
-        self.outstanding_event_acks += event_count;
+        self.outstanding_event_acks += 1;
         self.pending_record_acks
             .push_back((event_count, bytes_read));
 
@@ -472,22 +474,21 @@ impl ReaderModel {
         self.current_file_bytes_read += bytes_read;
     }
 
-    fn acknowledge_reads(&mut self, amount: usize) {
+    fn acknowledge_read(&mut self) {
         // We check to make sure that we're not about to acknowledge more events than we actually
         // have read but have not yet been acknowledged, because that just should be possible.
         assert!(
-            amount <= self.outstanding_event_acks,
-            "invariant violation: {} events unacked, tried to ack {}",
+            self.outstanding_event_acks > 0,
+            "invariant violation: {} events unacked, tried to ack 1",
             self.outstanding_event_acks,
-            amount
         );
 
         // Update the outstanding count of events which have not yet been acknowledged, and also
         // update the total number of acknowledgements we've gotten but have not yet been consumed,
         // as a record may have multiple events and they all need to be acknowledged before we can
         // actually count the record as fully acknowledged and removed from the buffer, etc.
-        self.outstanding_event_acks -= amount;
-        self.unconsumed_event_acks += amount;
+        self.outstanding_event_acks -= 1;
+        self.unconsumed_event_acks += 1;
     }
 }
 
@@ -530,6 +531,7 @@ struct WriterModel {
     ledger: Arc<LedgerModel>,
     current_file: Option<FileModel>,
     current_file_size: u64,
+    current_file_full: bool,
     state: WriterModelState,
     record_writer: RecordWriter<Cursor<Vec<u8>>, Record>,
 }
@@ -549,13 +551,14 @@ impl WriterModel {
             ledger,
             current_file: None,
             current_file_size: 0,
+            current_file_full: false,
             state: WriterModelState::Idle,
             record_writer,
         };
 
-        // We do a dummy call to `is_ready` to simulate what happens when a real buffer is created,
+        // We do a dummy call to `check_ready` to simulate what happens when a real buffer is created,
         // as the real initialization process always ensures the current writer data file is created/exists.
-        writer.is_ready();
+        writer.check_ready();
 
         writer
     }
@@ -565,14 +568,31 @@ impl WriterModel {
         // writing the value anywhere.  `RecordWriter` clears its encoding/serialization buffers on
         // each call to `archive_record` so we don't have to do any pre/post-cleanup to avoid memory
         // growth, etc.
-        self.record_writer
-            .archive_record(1, record)
-            .expect("detached record archiving should not fail") as u64
+        let record_len = record.archived_len();
+
+        match self.record_writer.archive_record(1, record) {
+            Ok(token) => token.serialized_len() as u64,
+            Err(e) => panic!(
+                "unexpected encode error: archived_len={} max_record_size={} error={:?}",
+                record_len,
+                self.ledger.config().max_record_size,
+                e,
+            ),
+        }
+    }
+
+    fn get_current_buffer_size(&self) -> u64 {
+        let unflushed_bytes = self
+            .current_file
+            .as_ref()
+            .map_or(0, FileModel::unflushed_size);
+        self.ledger.get_buffer_size() + unflushed_bytes
     }
 
     fn reset(&mut self) {
         self.current_file = None;
         self.current_file_size = 0;
+        self.current_file_full = false;
     }
 
     fn try_finalize(&mut self) {
@@ -597,19 +617,17 @@ impl WriterModel {
         self.ledger.increment_buffer_size(flushed_bytes);
     }
 
-    fn is_ready(&mut self) -> bool {
+    fn check_ready(&mut self) -> bool {
         // If our buffer size is over the maximum buffer size, we have to wait for reader progress:
-        let unflushed_bytes = self
-            .current_file
-            .as_ref()
-            .map_or(0, FileModel::unflushed_size);
-        if self.ledger.get_buffer_size() + unflushed_bytes >= self.ledger.config().max_buffer_size {
+        if self.get_current_buffer_size() >= self.ledger.config().max_buffer_size {
             return false;
         }
 
         // If our current data file is at or above the limit, then flush it out, close it, and set
         // ourselves to open the next one:
-        if self.current_file_size >= self.ledger.config().max_data_file_size {
+        if self.current_file_full
+            || self.current_file_size >= self.ledger.config().max_data_file_size
+        {
             self.flush();
 
             let current_file = self.current_file.as_ref().unwrap();
@@ -648,7 +666,7 @@ impl WriterModel {
 
         loop {
             // If we can't open our desired current data file, or the buffer is full, we wait.
-            if !self.is_ready() {
+            if !self.check_ready() {
                 return Progress::Blocked;
             }
 
@@ -673,7 +691,11 @@ impl WriterModel {
             // record can't encode itself due to space limitations, so the differentiation on the
             // front end is more about providing an informative error, but the writer can't really
             // do anything different if they get "failed to encode" vs "record too large".
-            if record.len() > self.ledger.config().max_record_size {
+            let encoded_len = record
+                .encoded_size()
+                .expect("record used in model must provide this");
+            let encoded_len_limit = self.ledger.config().max_record_size - RECORD_HEADER_LEN;
+            if encoded_len > encoded_len_limit {
                 return Progress::WriteError(WriterError::FailedToEncode {
                     source: EncodeError,
                 });
@@ -682,6 +704,20 @@ impl WriterModel {
             // Write the record in the same way that the buffer would, which is the only way we can
             // calculate the true size that record occupies.
             let archived_len = self.get_archived_record_len(record.clone());
+
+            // If this record would cause us to exceed the maximum data file size of the current data file, mark the
+            // current data file full so that we can loop around and open the next one.
+            if self.current_file_size + archived_len > self.ledger.config().max_data_file_size {
+                self.current_file_full = true;
+                continue;
+            }
+
+            // If this record would cause us to exceed our maximum buffer size, then the writer would have to wait for
+            // the reader to make some sort of progress to try actually writing it.
+            if self.get_current_buffer_size() + archived_len > self.ledger.config().max_buffer_size
+            {
+                return Progress::Blocked;
+            }
 
             // Now try to "actually" write it, which may or may not fail depending on if the file is
             // full or not/could hold this record.  We archive the record manually, too, to get its true
@@ -714,7 +750,8 @@ impl WriterModel {
 
             self.state.transition_to_idle();
 
-            return Progress::RecordWritten(archived_len.try_into().unwrap());
+            let written = archived_len.try_into().unwrap();
+            return Progress::RecordWritten(written);
         }
     }
 
@@ -761,8 +798,8 @@ impl BufferModel {
         self.reader.read_record()
     }
 
-    fn acknowledge_reads(&mut self, amount: usize) {
-        self.reader.acknowledge_reads(amount);
+    fn acknowledge_read(&mut self) {
+        self.reader.acknowledge_read();
     }
 
     fn close_writer(&mut self) {
@@ -779,7 +816,13 @@ proptest! {
             .expect("should not fail to build runtime");
 
         let _a = install_tracing_helpers();
-        info!("New model.");
+        info!(
+            actions = actions.len(),
+            max_buffer_size = config.max_buffer_size,
+            max_data_file_size = config.max_data_file_size,
+            max_record_size = config.max_record_size,
+            "Starting model.",
+        );
 
         // We generate a new temporary directory and overwrite the data directory in the buffer
         // configuration. This allows us to use a utility that will generate a random directory each
@@ -829,17 +872,25 @@ proptest! {
             // actions that are coupled to one another, in a lockstep fashion, with the model.
             let mut model = BufferModel::from_config(&config);
 
-            let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
-            let (writer, reader, acker, ledger) =
+            let usage_handle = BufferUsageHandle::noop();
+            let (writer, reader, ledger) =
                 Buffer::<Record>::from_config_inner(config, usage_handle)
                     .await
                     .expect("should not fail to build buffer");
 
-            let mut sequencer = ActionSequencer::new(actions, reader, writer, acker);
+            let mut sequencer = ActionSequencer::new(actions, reader, writer);
 
             let mut closed_writers = false;
 
             loop {
+                // The model runs in a current-thread tokio runtime,
+                // but the acknowledgement handling runs in a
+                // background task. This yields to any such background
+                // task before returning in order to ensure
+                // acknowledgements are fully accounted for before
+                // doing the next operation.
+                tokio::task::yield_now().await;
+
                 // We manully check if the sequencer has any write operations left, either
                 // in-flight or yet-to-be-triggered, and if none are left, we mark the writer
                 // closed.  This allows us to properly inform the model that reads should start
@@ -856,9 +907,9 @@ proptest! {
                 // run against the model.  If it's an action that may be asynchronous/blocked on
                 // progress of another component, we try it later on, which lets us deduplicate some code.
                 if let Some(action) = sequencer.trigger_next_runnable_action() {
-                    if let Action::AcknowledgeRead(amount) = action {
+                    if let Action::AcknowledgeRead = action {
                         // Acknowledgements are based on atomics, so they never wait asynchronously.
-                        model.acknowledge_reads(amount);
+                        model.acknowledge_read();
                     }
                 } else {
                     let mut made_progress = false;

@@ -1,22 +1,26 @@
-use metrics::counter;
+use metrics::{register_counter, Counter};
 use tracing::trace;
 
-use crate::internal_event::InternalEvent;
+use super::{ByteSize, Protocol, SharedString};
 
-#[derive(Debug)]
-pub struct BytesSent<'a> {
-    pub byte_size: usize,
-    pub protocol: &'a str,
-}
-
-impl<'a> InternalEvent for BytesSent<'a> {
-    fn emit(self) {
-        trace!(message = "Bytes sent.", byte_size = %self.byte_size, protocol = %self.protocol);
-        counter!("component_sent_bytes_total", self.byte_size as u64,
-                 "protocol" => self.protocol.to_string());
+crate::registered_event!(
+    BytesSent {
+        protocol: SharedString,
+    } => {
+        bytes_sent: Counter = register_counter!("component_sent_bytes_total", "protocol" => self.protocol.clone()),
+        protocol: SharedString = self.protocol,
     }
 
-    fn name(&self) -> Option<&'static str> {
-        Some("BytesSent")
+    fn emit(&self, byte_size: ByteSize) {
+        trace!(message = "Bytes sent.", byte_size = %byte_size.0, protocol = %self.protocol);
+        self.bytes_sent.increment(byte_size.0 as u64);
+    }
+);
+
+impl From<Protocol> for BytesSent {
+    fn from(protocol: Protocol) -> Self {
+        Self {
+            protocol: protocol.0,
+        }
     }
 }

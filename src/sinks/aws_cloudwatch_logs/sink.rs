@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use futures::{future, stream::BoxStream, StreamExt};
 use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
-    buffers::{Ackable, Acker},
     partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
@@ -25,7 +25,6 @@ use crate::{
 pub struct CloudwatchSink<S> {
     pub batcher_settings: BatcherSettings,
     pub(super) request_builder: CloudwatchRequestBuilder,
-    pub acker: Acker,
     pub service: S,
 }
 
@@ -40,7 +39,6 @@ where
         let mut request_builder = self.request_builder;
         let batcher_settings = self.batcher_settings;
         let service = self.service;
-        let acker = self.acker;
 
         input
             .filter_map(|event| future::ready(request_builder.build(event)))
@@ -52,8 +50,17 @@ where
                 future::ready(age_range.contains(&req.timestamp))
             })
             .batched_partitioned(CloudwatchParititoner, batcher_settings)
-            .map(|(key, events)| BatchCloudwatchRequest { key, events })
-            .into_driver(service, acker)
+            .map(|(key, events)| {
+                let metadata =
+                    RequestMetadata::from_batch(events.iter().map(|req| req.get_metadata()));
+
+                BatchCloudwatchRequest {
+                    key,
+                    events,
+                    metadata,
+                }
+            })
+            .into_driver(service)
             .run()
             .await
     }
@@ -63,17 +70,18 @@ where
 pub struct BatchCloudwatchRequest {
     pub key: CloudwatchKey,
     pub events: Vec<CloudwatchRequest>,
-}
-
-impl Ackable for BatchCloudwatchRequest {
-    fn ack_size(&self) -> usize {
-        self.events.len()
-    }
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for BatchCloudwatchRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.events.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for BatchCloudwatchRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 

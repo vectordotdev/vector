@@ -1,15 +1,16 @@
-use vrl::prelude::*;
+use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
+use vrl::prelude::{TypeDef as VrlTypeDef, *};
+use vrl::state::TypeState;
 
-use vrl::prelude::TypeDef as VrlTypeDef;
-
-fn type_def(type_def: &VrlTypeDef) -> Resolved {
-    let mut tree = type_def.kind().debug_info();
+fn type_def(type_def: &VrlTypeDef) -> Value {
+    let mut tree = type_def.kind().canonicalize().debug_info();
 
     if type_def.is_fallible() {
         tree.insert("fallible".to_owned(), true.into());
     }
 
-    Ok(tree.into())
+    tree.into()
 }
 
 /// A debug function to print the type definition of an expression at runtime.
@@ -42,18 +43,13 @@ impl Function for TypeDef {
 
     fn compile(
         &self,
-        state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: &TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let type_def = value.type_def((&*state.0, &*state.1));
-
-        Ok(Box::new(TypeDefFn { type_def }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        Err("function not supported in VM runtime.".into())
+        let type_def = value.type_def(state);
+        Ok(TypeDefFn { type_def }.as_expr())
     }
 }
 
@@ -62,12 +58,12 @@ struct TypeDefFn {
     type_def: VrlTypeDef,
 }
 
-impl Expression for TypeDefFn {
+impl FunctionExpression for TypeDefFn {
     fn resolve(&self, _ctx: &mut Context) -> Resolved {
-        type_def(&self.type_def.clone())
+        Ok(type_def(&self.type_def.clone()))
     }
 
-    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> VrlTypeDef {
-        VrlTypeDef::any().infallible()
+    fn type_def(&self, _state: &state::TypeState) -> VrlTypeDef {
+        VrlTypeDef::any()
     }
 }

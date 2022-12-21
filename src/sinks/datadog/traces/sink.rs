@@ -5,9 +5,9 @@ use futures_util::{
     stream::{self, BoxStream},
     StreamExt,
 };
+use tokio::sync::oneshot::{channel, Sender};
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     config::log_schema,
     event::Event,
     partition::Partitioner,
@@ -17,25 +17,23 @@ use vector_core::{
 
 use super::service::TraceApiRequest;
 use crate::{
-    config::SinkContext,
     internal_events::DatadogTracesEncodingError,
-    sinks::{
-        datadog::traces::{
-            config::DatadogTracesEndpoint, request_builder::DatadogTracesRequestBuilder,
-        },
-        util::SinkBuilderExt,
-    },
+    sinks::{datadog::traces::request_builder::DatadogTracesRequestBuilder, util::SinkBuilderExt},
 };
 #[derive(Default)]
 struct EventPartitioner;
 
+// Use all fields from the top level protobuf contruct associated with the API key
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub(crate) struct PartitionKey {
     pub(crate) api_key: Option<Arc<str>>,
     pub(crate) env: Option<String>,
     pub(crate) hostname: Option<String>,
-    pub(crate) lang: Option<String>,
-    pub(crate) endpoint: DatadogTracesEndpoint,
+    pub(crate) agent_version: Option<String>,
+    // Those two last fields are configuration value and not a per-trace/span information, they come from the Datadog
+    // trace-agent config directly: https://github.com/DataDog/datadog-agent/blob/0f73a78/pkg/trace/config/config.go#L293-L294
+    pub(crate) target_tps: Option<i64>,
+    pub(crate) error_tps: Option<i64>,
 }
 
 impl Partitioner for EventPartitioner {
@@ -43,34 +41,39 @@ impl Partitioner for EventPartitioner {
     type Key = PartitionKey;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        let (endpoint, env, hostname, lang) = match item {
-            Event::Metric(_) => (DatadogTracesEndpoint::APMStats, None, None, None),
+        match item {
+            Event::Metric(_) => {
+                panic!("unexpected metric");
+            }
             Event::Log(_) => {
                 panic!("unexpected log");
             }
-            Event::Trace(t) => (
-                DatadogTracesEndpoint::Traces,
-                t.get("env").map(|s| s.to_string_lossy()),
-                t.get(log_schema().host_key()).map(|s| s.to_string_lossy()),
-                t.get("language").map(|s| s.to_string_lossy()),
-            ),
-        };
-
-        PartitionKey {
-            api_key: item.metadata().datadog_api_key().clone(),
-            env,
-            hostname,
-            lang,
-            endpoint,
+            Event::Trace(t) => PartitionKey {
+                api_key: item.metadata().datadog_api_key(),
+                env: t.get("env").map(|s| s.to_string_lossy().into_owned()),
+                hostname: t
+                    .get(log_schema().host_key())
+                    .map(|s| s.to_string_lossy().into_owned()),
+                agent_version: t
+                    .get("agent_version")
+                    .map(|s| s.to_string_lossy().into_owned()),
+                target_tps: t
+                    .get("target_tps")
+                    .and_then(|tps| tps.as_integer().map(Into::into)),
+                error_tps: t
+                    .get("error_tps")
+                    .and_then(|tps| tps.as_integer().map(Into::into)),
+            },
         }
     }
 }
 
 pub struct TracesSink<S> {
     service: S,
-    acker: Acker,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
+    shutdown: Sender<Sender<()>>,
+    protocol: String,
 }
 
 impl<S> TracesSink<S>
@@ -80,42 +83,58 @@ where
     S::Future: Send + 'static,
     S::Response: DriverResponse,
 {
-    pub fn new(
-        cx: SinkContext,
+    pub const fn new(
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
+        shutdown: Sender<Sender<()>>,
+        protocol: String,
     ) -> Self {
         TracesSink {
             service,
-            acker: cx.acker(),
             request_builder,
             batch_settings,
+            shutdown,
+            protocol,
         }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let sink = input
+        input
             .batched_partitioned(EventPartitioner, self.batch_settings)
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        let (message, reason, dropped_events) = e.into_parts();
+                        let (error_message, error_reason, dropped_events) = e.into_parts();
                         emit!(DatadogTracesEncodingError {
-                            message,
-                            dropped_events,
-                            reason,
+                            error_message,
+                            error_reason,
+                            dropped_events: dropped_events as usize,
                         });
                         None
                     }
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await?;
 
-        sink.run().await
+        // Create a channel for the stats flushing thread to communicate back that it has flushed
+        // remaining stats. This is necessary so that we do not terminate the process while the
+        // stats flushing thread is trying to complete the HTTP request.
+        let (sender, receiver) = channel();
+
+        // Signal the stats thread task to flush remaining payloads and shutdown.
+        let _ = self.shutdown.send(sender);
+
+        // The stats flushing thread has until the component shutdown grace period to end
+        // gracefully. Otherwise the sink + stats flushing thread will be killed and an error
+        // reported upstream.
+        receiver.await.map_err(|_| ())
     }
 }
 

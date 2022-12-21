@@ -1,8 +1,6 @@
 use std::cmp;
 
 use async_graphql::{Enum, InputObject, Object};
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 
 use super::{sink, state, transform, Component};
 use crate::{
@@ -15,7 +13,7 @@ use crate::{
     filter_check,
 };
 
-#[derive(Debug, Enum, EnumIter, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
+#[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 pub enum SourceOutputType {
     Log,
     Metric,
@@ -49,10 +47,15 @@ impl Source {
         self.0.component_type.as_str()
     }
     pub fn get_output_types(&self) -> Vec<SourceOutputType> {
-        SourceOutputType::iter()
-            .filter(|s| self.0.output_type.contains(s.into()))
-            .map(Into::into)
-            .collect()
+        [
+            SourceOutputType::Log,
+            SourceOutputType::Metric,
+            SourceOutputType::Trace,
+        ]
+        .iter()
+        .copied()
+        .filter(|s| self.0.output_type.contains(s.into()))
+        .collect()
     }
 
     pub fn get_outputs(&self) -> &[String] {

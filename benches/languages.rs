@@ -30,16 +30,6 @@ fn benchmark_add_fields(c: &mut Criterion) {
             "#},
         ),
         (
-            "native",
-            indoc! {r#"
-                [transforms.last]
-                  type = "add_fields"
-                  inputs = ["in"]
-                  fields.four = 4
-                  fields.five = 5
-            "#},
-        ),
-        (
             "lua",
             indoc! {r#"
                 [transforms.last]
@@ -75,15 +65,6 @@ fn benchmark_parse_json(c: &mut Criterion) {
                   source = """
                   . = parse_json!(string!(.message))
                   """
-            "#},
-        ),
-        (
-            "native",
-            indoc! {r#"
-                [transforms.last]
-                  type = "json_parser"
-                  inputs = ["in"]
-                  field = "message"
             "#},
         ),
         (
@@ -128,24 +109,6 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
             "#},
         ),
         (
-            "native",
-            indoc! {r#"
-                [transforms.last]
-                  type = "regex_parser"
-                  inputs = ["in"]
-                  field = "message"
-                  patterns = ['^<(?P<priority>\d+)>(?P<version>\d+) (?P<timestamp>\S+) (?P<hostname>\S+) (?P<appname>\S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<sdata>\S+) (?P<message>.+)$']
-                  types.appname = "string"
-                  types.hostname = "string"
-                  types.level = "string"
-                  types.message = "string"
-                  types.msgid = "string"
-                  types.version = "int"
-                  types.procid = "int"
-                  types.timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%.fZ"
-            "#},
-        ),
-        (
             "lua",
             indoc! {r#"
                 [transforms.last]
@@ -171,8 +134,6 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
     ];
 
     let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
-    // intentionally leaves out facility and severity as the native implementation, using
-    // `regex_parser`, is not able to capture this
     let output = serde_json::from_str(r#"{ "appname": "su", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "2020-12-19T21:48:09.004Z", "version": 3 }"#).unwrap();
 
     benchmark_configs(c, "parse_syslog", configs, "in", "last", input, &output);

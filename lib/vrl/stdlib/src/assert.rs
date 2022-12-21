@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Resolved {
@@ -68,21 +69,14 @@ impl Function for Assert {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let condition = arguments.required("condition");
         let message = arguments.optional("message");
 
-        Ok(Box::new(AssertFn { condition, message }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let condition = args.required("condition");
-        let message = args.optional("message");
-
-        assert(condition, message, None)
+        Ok(AssertFn { condition, message }.as_expr())
     }
 }
 
@@ -92,7 +86,7 @@ struct AssertFn {
     message: Option<Box<dyn Expression>>,
 }
 
-impl Expression for AssertFn {
+impl FunctionExpression for AssertFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self.condition.resolve(ctx)?;
         let format = self.condition.format();
@@ -101,7 +95,7 @@ impl Expression for AssertFn {
         assert(condition, message, format)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().fallible()
     }
 }

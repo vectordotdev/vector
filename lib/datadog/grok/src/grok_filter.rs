@@ -1,7 +1,6 @@
-use std::{convert::TryFrom, string::ToString};
+use std::{convert::TryFrom, fmt, string::ToString};
 
 use ordered_float::NotNan;
-use strum_macros::Display;
 use value::Value;
 
 use crate::{
@@ -12,7 +11,7 @@ use crate::{
     parse_grok_rules::Error as GrokStaticError,
 };
 
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Clone)]
 pub enum GrokFilter {
     Date(DateFilter),
     Integer,
@@ -32,6 +31,25 @@ pub enum GrokFilter {
         Box<Option<GrokFilter>>,
     ),
     KeyValue(KeyValueFilter),
+}
+
+impl fmt::Display for GrokFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GrokFilter::Date(..) => f.pad("Date(..)"),
+            GrokFilter::Integer => f.pad("Integer"),
+            GrokFilter::IntegerExt => f.pad("IntegerExt"),
+            GrokFilter::Number => f.pad("Number"),
+            GrokFilter::NumberExt => f.pad("NumberExt"),
+            GrokFilter::NullIf(..) => f.pad("NullIf(..)"),
+            GrokFilter::Scale(..) => f.pad("Scale(..)"),
+            GrokFilter::Lowercase => f.pad("Lowercase"),
+            GrokFilter::Uppercase => f.pad("Uppercase"),
+            GrokFilter::Json => f.pad("Json"),
+            GrokFilter::Array(..) => f.pad("Array(..)"),
+            GrokFilter::KeyValue(..) => f.pad("KeyValue(..)"),
+        }
+    }
 }
 
 impl TryFrom<&Function> for GrokFilter {

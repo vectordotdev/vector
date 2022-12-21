@@ -11,34 +11,32 @@ mod integration_test {
     };
 
     use bytes::Bytes;
+    use codecs::TextSerializerConfig;
     use futures::StreamExt;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
-    use vector_core::{
-        buffers::Acker,
-        event::{BatchNotifier, BatchStatus},
-    };
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     use crate::{
         event::Value,
-        kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig, KafkaTlsConfig},
+        kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig},
         sinks::{
             kafka::{
                 config::{KafkaRole, KafkaSinkConfig},
                 sink::KafkaSink,
                 *,
             },
-            util::{
-                encoding::{EncodingConfig, StandardEncodings},
-                BatchConfig, NoDefaultsBatchSettings,
-            },
+            util::{BatchConfig, NoDefaultsBatchSettings},
             VectorSink,
         },
-        test_util::{components, random_lines_with_stream, random_string, wait_for},
-        tls::TlsConfig,
+        test_util::{
+            components::{assert_sink_compliance, SINK_TAGS},
+            random_lines_with_stream, random_string, wait_for,
+        },
+        tls::{TlsConfig, TlsEnableableConfig, TEST_PEM_INTERMEDIATE_CA_PATH},
     };
 
     fn kafka_host() -> String {
@@ -59,7 +57,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: topic.clone(),
             key_field: None,
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
@@ -111,7 +109,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: format!("{}-%Y%m%d", topic),
             compression: KafkaCompression::None,
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             key_field: None,
             auth: KafkaAuthConfig {
                 sasl: None,
@@ -124,11 +122,10 @@ mod integration_test {
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        let (acker, _ack_counter) = Acker::basic();
         config.clone().to_rdkafka(KafkaRole::Consumer)?;
         config.clone().to_rdkafka(KafkaRole::Producer)?;
         self::sink::healthcheck(config.clone()).await?;
-        KafkaSink::new(config, acker)
+        KafkaSink::new(config)
     }
 
     #[tokio::test]
@@ -200,25 +197,14 @@ mod integration_test {
     #[tokio::test]
     async fn kafka_happy_path_tls() {
         crate::test_util::trace_init();
+        let mut options = TlsConfig::test_config();
+        // couldn't get Kafka to load and return a certificate chain, it only returns the leaf
+        // certificate
+        options.ca_file = Some(TEST_PEM_INTERMEDIATE_CA_PATH.into());
         kafka_happy_path(
             kafka_address(9092),
             None,
-            Some(KafkaTlsConfig {
-                enabled: Some(true),
-                options: TlsConfig::test_config(),
-            }),
-            KafkaCompression::None,
-        )
-        .await;
-    }
-
-    #[tokio::test]
-    async fn kafka_happy_path_tls_with_key() {
-        crate::test_util::trace_init();
-        kafka_happy_path(
-            kafka_address(9092),
-            None,
-            Some(KafkaTlsConfig {
+            Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig::test_config(),
             }),
@@ -234,8 +220,8 @@ mod integration_test {
             kafka_address(9093),
             Some(KafkaSaslConfig {
                 enabled: Some(true),
-                username: Some("admin".to_owned()),
-                password: Some("admin".to_owned()),
+                username: Some("admin".to_string()),
+                password: Some("admin".to_string().into()),
                 mechanism: Some("PLAIN".to_owned()),
             }),
             None,
@@ -247,7 +233,7 @@ mod integration_test {
     async fn kafka_happy_path(
         server: String,
         sasl: Option<KafkaSaslConfig>,
-        tls: Option<KafkaTlsConfig>,
+        tls: Option<TlsEnableableConfig>,
         compression: KafkaCompression,
     ) {
         let topic = format!("test-{}", random_string(10));
@@ -257,7 +243,7 @@ mod integration_test {
             bootstrap_servers: server.clone(),
             topic: format!("{}-%Y%m%d", topic),
             key_field: None,
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             batch: BatchConfig::default(),
             compression,
             auth: kafka_auth.clone(),
@@ -269,9 +255,6 @@ mod integration_test {
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);
-        let (acker, ack_counter) = Acker::basic();
-        let sink = KafkaSink::new(config, acker).unwrap();
-        let sink = VectorSink::from_event_streamsink(sink);
 
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -286,14 +269,18 @@ mod integration_test {
                 header_1_key.to_owned(),
                 Value::Bytes(Bytes::from(header_1_value)),
             );
-            events.for_each_log(move |log| {
+            events.iter_logs_mut().for_each(move |log| {
                 log.insert(headers_key.as_str(), header_values.clone());
             });
             events
         });
-        components::init_test();
-        sink.run(input_events).await.unwrap();
-        components::SINK_TESTS.assert(&["protocol"]);
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let sink = KafkaSink::new(config).unwrap();
+            let sink = VectorSink::from_event_streamsink(sink);
+            sink.run(input_events).await
+        })
+        .await
+        .expect("Running sink failed");
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // read back everything from the beginning
@@ -301,7 +288,7 @@ mod integration_test {
         client_config.set("bootstrap.servers", server.as_str());
         client_config.set("group.id", &random_string(10));
         client_config.set("enable.partition.eof", "true");
-        let _ = kafka_auth.apply(&mut client_config).unwrap();
+        kafka_auth.apply(&mut client_config).unwrap();
 
         let mut tpl = TopicPartitionList::new();
         tpl.add_partition(&topic, 0)
@@ -337,9 +324,9 @@ mod integration_test {
                 Some(Ok(msg)) => {
                     let s: &str = msg.payload_view().unwrap().unwrap();
                     out.push(s.to_owned());
-                    let (header_key, header_val) = msg.headers().unwrap().get(0).unwrap();
-                    assert_eq!(header_key, header_1_key);
-                    assert_eq!(header_val, header_1_value.as_bytes());
+                    let header = msg.headers().unwrap().get(0);
+                    assert_eq!(header.key, header_1_key);
+                    assert_eq!(header.value.unwrap(), header_1_value.as_bytes());
                 }
                 None if out.len() >= input.len() => break,
                 _ => {
@@ -351,10 +338,5 @@ mod integration_test {
 
         assert_eq!(out.len(), input.len());
         assert_eq!(out, input);
-
-        assert_eq!(
-            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_events
-        );
     }
 }

@@ -18,13 +18,16 @@ use vector_core::event_test_util;
 use crate::{
     config::{SourceConfig, SourceContext},
     event::{Event, EventArray, Metric, MetricValue},
-    metrics::{self, Controller},
+    metrics::Controller,
     sinks::VectorSink,
     SourceSender,
 };
 
 /// The most basic set of tags for sources, regardless of whether or not they pull data or have it pushed in.
 pub const SOURCE_TAGS: [&str; 1] = ["protocol"];
+
+/// The most basic set of error tags for components.
+pub const COMPONENT_ERROR_TAGS: [&str; 1] = ["error_type"];
 
 /// The standard set of tags for sources that have their data pushed in from an external source.
 pub const PUSH_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
@@ -52,6 +55,9 @@ pub const SOCKET_PULL_SOURCE_TAGS: [&str; 2] = ["remote_addr", "protocol"];
 /// The standard set of tags for all sources that read a file.
 pub const FILE_SOURCE_TAGS: [&str; 1] = ["file"];
 
+/// The most basic set of tags for sinks, regardless of whether or not they push data or have it pulled out.
+pub const SINK_TAGS: [&str; 1] = ["protocol"];
+
 /// The standard set of tags for all sinks that write a file.
 pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
 
@@ -71,7 +77,7 @@ pub struct ComponentTests {
     untagged_counters: &'static [&'static str],
 }
 
-/// The component test specification for all sources
+/// The component test specification for all sources.
 pub static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
     events: &["BytesReceived", "EventsReceived", "EventsSent"],
     tagged_counters: &["component_received_bytes_total"],
@@ -83,7 +89,14 @@ pub static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
     ],
 });
 
-/// The component test specification for all transforms
+/// The component error test specification (sources and sinks).
+pub static COMPONENT_TESTS_ERROR: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+    events: &["Error"],
+    tagged_counters: &["component_errors_total"],
+    untagged_counters: &[],
+});
+
+/// The component test specification for all transforms.
 pub static TRANSFORM_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
     events: &["EventsReceived", "EventsSent"],
     tagged_counters: &[],
@@ -95,10 +108,10 @@ pub static TRANSFORM_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
     ],
 });
 
-/// The component test specification for all sinks
+/// The component test specification for sinks that are push-based.
 pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
     ComponentTests {
-        events: &["EventsSent", "BytesSent"], // EventsReceived is emitted in the topology
+        events: &["BytesSent", "EventsSent"], // EventsReceived is emitted in the topology
         tagged_counters: &["component_sent_bytes_total"],
         untagged_counters: &[
             "component_sent_events_total",
@@ -107,7 +120,17 @@ pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
     }
 });
 
-/// The component test specification for components with multiple outputs
+/// The component test specification for sinks which simply expose data, or do not otherwise "send" it anywhere.
+pub static NONSENDING_SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+    events: &["EventsSent"],
+    tagged_counters: &[
+        "component_sent_events_total",
+        "component_sent_event_bytes_total",
+    ],
+    untagged_counters: &[],
+});
+
+/// The component test specification for components with multiple outputs.
 pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
     events: &["EventsSent"],
     tagged_counters: &[
@@ -118,7 +141,7 @@ pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> = Lazy::new(||
 });
 
 impl ComponentTests {
-    /// Run the test specification, and assert that all tests passed
+    /// Run the test specification, and assert that all tests passed.
     #[track_caller]
     pub fn assert(&self, tags: &[&str]) {
         let mut test = ComponentTester::new();
@@ -138,13 +161,6 @@ impl ComponentTests {
 pub fn init_test() {
     super::trace_init();
     event_test_util::clear_recorded_events();
-
-    // Handle multiple initializations.
-    if let Err(error) = metrics::init_test() {
-        if error != metrics::Error::AlreadyInitialized {
-            panic!("Failed to initialize metrics recorder: {:?}", error);
-        }
-    }
 }
 
 /// Tests if the given metric contains all the given tag names
@@ -201,10 +217,7 @@ impl ComponentTester {
                     .map(|m| {
                         let tags = m
                             .tags()
-                            .map(|t| {
-                                let tag_keys = t.keys().cloned().collect::<Vec<_>>();
-                                format!("{{{}}}", tag_keys.join(","))
-                            })
+                            .map(|t| format!("{{{}}}", itertools::join(t.keys(), ",")))
                             .unwrap_or_default();
                         format!("\n    -> Found similar metric `{}{}`", m.name(), tags)
                     })
@@ -221,25 +234,37 @@ impl ComponentTester {
 
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
-            if !event_test_util::contains_name(name) {
-                self.errors
-                    .push(format!("  - Missing emitted event `{}`", name));
+            if let Err(err_msg) = event_test_util::contains_name_once(name) {
+                self.errors.push(format!("  - {}", err_msg));
             }
         }
     }
 }
 
-/// Convenience wrapper for running source tests
-pub async fn assert_source_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+/// Runs and returns a future and asserts that the provided test specification passes.
+#[track_caller]
+pub async fn assert_source<T>(
+    tests: &Lazy<ComponentTests>,
+    tags: &[&str],
+    f: impl Future<Output = T>,
+) -> T {
     init_test();
 
     let result = f.await;
 
-    SOURCE_TESTS.assert(tags);
+    tests.assert(tags);
 
     result
 }
 
+/// Convenience wrapper for running source tests.
+#[track_caller]
+pub async fn assert_source_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    assert_source(&SOURCE_TESTS, tags, f).await
+}
+
+/// Runs source tests with timeout and asserts happy path compliance.
+#[track_caller]
 pub async fn run_and_assert_source_compliance<SC>(
     source: SC,
     timeout: Duration,
@@ -248,9 +273,11 @@ pub async fn run_and_assert_source_compliance<SC>(
 where
     SC: SourceConfig,
 {
-    run_and_assert_source_compliance_advanced(source, |_| {}, Some(timeout), None, tags).await
+    run_and_assert_source_advanced(source, |_| {}, Some(timeout), None, &SOURCE_TESTS, tags).await
 }
 
+/// Runs source tests with an event count limit and asserts happy path compliance.
+#[track_caller]
 pub async fn run_and_assert_source_compliance_n<SC>(
     source: SC,
     event_count: usize,
@@ -259,9 +286,44 @@ pub async fn run_and_assert_source_compliance_n<SC>(
 where
     SC: SourceConfig,
 {
-    run_and_assert_source_compliance_advanced(source, |_| {}, None, Some(event_count), tags).await
+    run_and_assert_source_advanced(source, |_| {}, None, Some(event_count), &SOURCE_TESTS, tags)
+        .await
 }
 
+/// Runs and returns a future and asserts that the provided test specification passes.
+#[track_caller]
+pub async fn assert_source_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    init_test();
+
+    let result = f.await;
+
+    COMPONENT_TESTS_ERROR.assert(tags);
+
+    result
+}
+
+/// Runs source tests with timeout and asserts error path compliance.
+#[track_caller]
+pub async fn run_and_assert_source_error<SC>(
+    source: SC,
+    timeout: Duration,
+    tags: &[&str],
+) -> Vec<Event>
+where
+    SC: SourceConfig,
+{
+    run_and_assert_source_advanced(
+        source,
+        |_| {},
+        Some(timeout),
+        None,
+        &COMPONENT_TESTS_ERROR,
+        tags,
+    )
+    .await
+}
+
+/// Runs source tests with setup, timeout, and event count limit and asserts happy path compliance.
 pub async fn run_and_assert_source_compliance_advanced<SC>(
     source: SC,
     setup: impl FnOnce(&mut SourceContext),
@@ -272,7 +334,22 @@ pub async fn run_and_assert_source_compliance_advanced<SC>(
 where
     SC: SourceConfig,
 {
-    assert_source_compliance(tags, async move {
+    run_and_assert_source_advanced(source, setup, timeout, event_count, &SOURCE_TESTS, tags).await
+}
+
+#[track_caller]
+pub async fn run_and_assert_source_advanced<SC>(
+    source: SC,
+    setup: impl FnOnce(&mut SourceContext),
+    timeout: Option<Duration>,
+    event_count: Option<usize>,
+    tests: &Lazy<ComponentTests>,
+    tags: &[&str],
+) -> Vec<Event>
+where
+    SC: SourceConfig,
+{
+    assert_source(tests, tags, async move {
         // Build the source and set ourselves up to both drive it to completion as well as collect all the events it sends out.
         let (tx, mut rx) = SourceSender::new_test();
         let mut context = SourceContext::new_test(tx, None);
@@ -329,6 +406,7 @@ where
     .await
 }
 
+#[track_caller]
 pub async fn assert_transform_compliance<T>(f: impl Future<Output = T>) -> T {
     init_test();
 
@@ -340,30 +418,80 @@ pub async fn assert_transform_compliance<T>(f: impl Future<Output = T>) -> T {
 }
 
 /// Convenience wrapper for running sink tests
-pub async fn run_sink<S>(sink: VectorSink, events: S, tags: &[&str])
-where
-    S: Stream<Item = EventArray> + Send,
-{
+#[track_caller]
+pub async fn assert_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
-    sink.run(events).await.expect("Running sink failed");
+
+    let result = f.await;
+
     SINK_TESTS.assert(tags);
+
+    result
 }
 
-/// Convenience wrapper for running sink tests with a stream of `Event`
-pub async fn run_sink_events<S>(sink: VectorSink, events: S, tags: &[&str])
+#[track_caller]
+pub async fn run_and_assert_sink_compliance<S, I>(sink: VectorSink, events: S, tags: &[&str])
 where
-    S: Stream<Item = Event> + Send,
+    S: Stream<Item = I> + Send,
+    I: Into<EventArray>,
 {
-    init_test();
-    let events = events.map(Into::into);
-    sink.run(events).await.expect("Running sink failed");
-    SINK_TESTS.assert(tags);
+    assert_sink_compliance(tags, async move {
+        let events = events.map(Into::into);
+        sink.run(events).await.expect("Running sink failed")
+    })
+    .await;
 }
 
-/// Convenience wrapper for running a sink with a single event
-pub async fn run_sink_event(sink: VectorSink, event: Event, tags: &[&str]) {
+#[track_caller]
+pub async fn assert_nonsending_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
-    run_sink(sink, stream::once(std::future::ready(event.into())), tags).await
+
+    let result = f.await;
+
+    NONSENDING_SINK_TESTS.assert(tags);
+
+    result
+}
+
+#[track_caller]
+pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
+    sink: VectorSink,
+    events: S,
+    tags: &[&str],
+) where
+    S: Stream<Item = I> + Send,
+    I: Into<EventArray>,
+{
+    assert_nonsending_sink_compliance(tags, async move {
+        let events = events.map(Into::into);
+        sink.run(events).await.expect("Running sink failed")
+    })
+    .await;
+}
+
+/// Convenience wrapper for running sink error tests
+#[track_caller]
+pub async fn assert_sink_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    init_test();
+
+    let result = f.await;
+
+    COMPONENT_TESTS_ERROR.assert(tags);
+
+    result
+}
+
+#[track_caller]
+pub async fn run_and_assert_sink_error<S, I>(sink: VectorSink, events: S, tags: &[&str])
+where
+    S: Stream<Item = I> + Send,
+    I: Into<EventArray>,
+{
+    assert_sink_error(tags, async move {
+        let events = events.map(Into::into);
+        sink.run(events).await.expect("Running sink failed")
+    })
+    .await;
 }
 
 /// Convenience wrapper for running sinks with `send_all`

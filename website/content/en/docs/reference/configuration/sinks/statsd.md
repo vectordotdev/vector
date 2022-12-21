@@ -1,9 +1,9 @@
 ---
 title: Statsd
-description: Deliver log data to a [StatsD](https://github.com/statsd/statsd) aggregator
+description: Deliver metric data to a [StatsD](https://github.com/statsd/statsd) aggregator
 kind: sink
 layout: component
-tags: ["statsd", "component", "sink", "logs"]
+tags: ["statsd", "component", "sink", "metrics"]
 ---
 
 {{/*

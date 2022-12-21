@@ -1,4 +1,3 @@
-use crate::kind::Unknown;
 use crate::{Kind, Value};
 use std::collections::BTreeMap;
 
@@ -14,8 +13,12 @@ impl Kind {
 }
 
 fn insert_kind(tree: &mut BTreeMap<String, Value>, kind: &Kind, show_unknown: bool) {
-    if kind.is_any() {
+    if kind.is_never() {
+        insert_if_true(tree, "never", true);
+    } else if kind.is_any() {
         insert_if_true(tree, "any", true);
+    } else if kind.is_json() {
+        insert_if_true(tree, "json", true);
     } else {
         insert_if_true(tree, "bytes", kind.contains_bytes());
         insert_if_true(tree, "integer", kind.contains_integer());
@@ -24,6 +27,7 @@ fn insert_kind(tree: &mut BTreeMap<String, Value>, kind: &Kind, show_unknown: bo
         insert_if_true(tree, "timestamp", kind.contains_timestamp());
         insert_if_true(tree, "regex", kind.contains_regex());
         insert_if_true(tree, "null", kind.contains_null());
+        insert_if_true(tree, "undefined", kind.contains_undefined());
 
         if let Some(fields) = &kind.object {
             let mut object_tree = BTreeMap::new();
@@ -34,7 +38,12 @@ fn insert_kind(tree: &mut BTreeMap<String, Value>, kind: &Kind, show_unknown: bo
             }
             tree.insert("object".to_owned(), Value::Object(object_tree));
             if show_unknown {
-                insert_unknown(tree, fields.unknown(), "object");
+                insert_unknown(
+                    tree,
+                    fields.unknown_kind(),
+                    fields.is_unknown_exact(),
+                    "object",
+                );
             }
         }
 
@@ -47,27 +56,40 @@ fn insert_kind(tree: &mut BTreeMap<String, Value>, kind: &Kind, show_unknown: bo
             }
             tree.insert("array".to_owned(), Value::Object(array_tree));
             if show_unknown {
-                insert_unknown(tree, indices.unknown(), "array");
+                insert_unknown(
+                    tree,
+                    indices.unknown_kind(),
+                    indices.is_unknown_exact(),
+                    "array",
+                );
             }
         }
     }
 }
 
-fn insert_unknown(tree: &mut BTreeMap<String, Value>, unknown: Option<&Unknown>, prefix: &str) {
-    if let Some(unknown) = unknown {
-        let mut unknown_tree = BTreeMap::new();
-        insert_kind(&mut unknown_tree, unknown.to_kind().as_ref(), false);
-        if unknown.is_exact() {
-            tree.insert(
-                format!("{}_unknown_exact", prefix),
-                Value::Object(unknown_tree),
-            );
-        } else {
-            tree.insert(
-                format!("{}_unknown_infinite", prefix),
-                Value::Object(unknown_tree),
-            );
-        }
+// Clippy complains with "needless_borrow" if you try to fix this.
+#[allow(clippy::needless_pass_by_value)]
+fn insert_unknown(
+    tree: &mut BTreeMap<String, Value>,
+    unknown: Kind,
+    unknown_exact: bool,
+    prefix: &str,
+) {
+    if unknown.is_undefined() {
+        return;
+    }
+    let mut unknown_tree = BTreeMap::new();
+    insert_kind(&mut unknown_tree, &unknown, unknown_exact);
+    if unknown.is_exact() {
+        tree.insert(
+            format!("{}_unknown_exact", prefix),
+            Value::Object(unknown_tree),
+        );
+    } else {
+        tree.insert(
+            format!("{}_unknown_infinite", prefix),
+            Value::Object(unknown_tree),
+        );
     }
 }
 

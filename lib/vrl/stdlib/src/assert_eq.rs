@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
@@ -71,27 +72,20 @@ impl Function for AssertEq {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let left = arguments.required("left");
         let right = arguments.required("right");
         let message = arguments.optional("message");
 
-        Ok(Box::new(AssertEqFn {
+        Ok(AssertEqFn {
             left,
             right,
             message,
-        }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let left = args.required("left");
-        let right = args.required("right");
-        let message = args.optional("message");
-
-        assert_eq(left, right, message)
+        }
+        .as_expr())
     }
 }
 
@@ -102,7 +96,7 @@ struct AssertEqFn {
     message: Option<Box<dyn Expression>>,
 }
 
-impl Expression for AssertEqFn {
+impl FunctionExpression for AssertEqFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let left = self.left.resolve(ctx)?;
         let right = self.right.resolve(ctx)?;
@@ -111,7 +105,7 @@ impl Expression for AssertEqFn {
         assert_eq(left, right, message)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().fallible()
     }
 }

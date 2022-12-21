@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
 use vector_common::encode_logfmt;
@@ -19,7 +21,7 @@ impl Log {
         Self { output, event }
     }
 
-    pub fn get_message(&self) -> Option<String> {
+    pub fn get_message(&self) -> Option<Cow<'_, str>> {
         Some(self.event.get("message")?.to_string_lossy())
     }
 
@@ -48,7 +50,7 @@ impl Log {
 
     /// Log message
     async fn message(&self) -> Option<String> {
-        self.get_message()
+        self.get_message().map(Into::into)
     }
 
     /// Log timestamp
@@ -63,7 +65,7 @@ impl Log {
                 .expect("JSON serialization of log event failed. Please report."),
             EventEncodingType::Yaml => serde_yaml::to_string(&self.event)
                 .expect("YAML serialization of log event failed. Please report."),
-            EventEncodingType::Logfmt => encode_logfmt::to_string(self.event.as_map())
+            EventEncodingType::Logfmt => encode_logfmt::encode_value(self.event.value())
                 .expect("logfmt serialization of log event failed. Please report."),
         }
     }

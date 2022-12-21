@@ -1,14 +1,14 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use futures::{stream::BoxStream, StreamExt};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
-use vector_common::encode_logfmt;
+use tokio_util::codec::Encoder as _;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
-    buffers::Acker,
-    event::{self, Event, EventFinalizers, Finalizable, Value},
+    event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
     stream::BatcherSettings,
@@ -16,20 +16,26 @@ use vector_core::{
 };
 
 use super::{
-    config::{Encoding, LokiConfig, OutOfOrderAction},
+    config::{LokiConfig, OutOfOrderAction},
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
+use crate::sinks::loki::event::LokiBatchEncoding;
+use crate::sinks::{
+    loki::config::{CompressionConfigAdapter, ExtendedCompression},
+    util::metadata::RequestMetadataBuilder,
+};
 use crate::{
-    config::{log_schema, SinkContext},
-    http::HttpClient,
+    codecs::{Encoder, Transformer},
+    config::log_schema,
+    http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
-        TemplateRenderingError,
+        SinkRequestBuildError, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
-        encoding::{EncodingConfig, EncodingConfiguration},
+        request_builder::EncodeResult,
         service::{ServiceBuilderExt, Svc},
         Compression, RequestBuilder,
     },
@@ -78,7 +84,7 @@ impl Partitioner for RecordPartitioner {
 
 #[derive(Clone)]
 pub struct LokiRequestBuilder {
-    compression: Compression,
+    compression: CompressionConfigAdapter,
     encoder: LokiBatchEncoder,
 }
 
@@ -97,7 +103,7 @@ impl From<std::io::Error> for RequestBuildError {
 }
 
 impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
-    type Metadata = (Option<String>, usize, EventFinalizers, usize);
+    type Metadata = (Option<String>, EventFinalizers);
     type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
     type Payload = Bytes;
@@ -105,7 +111,10 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Error = RequestBuildError;
 
     fn compression(&self) -> Compression {
-        self.compression
+        match self.compression {
+            CompressionConfigAdapter::Original(compression) => compression,
+            CompressionConfigAdapter::Extended(_) => Compression::None,
+        }
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -115,34 +124,30 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     fn split_input(
         &self,
         input: (PartitionKey, Vec<LokiRecord>),
-    ) -> (Self::Metadata, Self::Events) {
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (key, mut events) = input;
-        let batch_size = events.len();
-        let events_byte_size = events.size_of();
-        let finalizers = events
-            .iter_mut()
-            .fold(EventFinalizers::default(), |mut acc, x| {
-                acc.merge(x.take_finalizers());
-                acc
-            });
 
-        (
-            (key.tenant_id, batch_size, finalizers, events_byte_size),
-            events,
-        )
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
+        let finalizers = events.take_finalizers();
+
+        ((key.tenant_id, finalizers), metadata_builder, events)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (tenant_id, batch_size, finalizers, events_byte_size) = metadata;
-        let compression = self.compression();
+    fn build_request(
+        &self,
+        loki_metadata: Self::Metadata,
+        metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let (tenant_id, finalizers) = loki_metadata;
+        let compression = self.compression;
 
         LokiRequest {
             compression,
-            batch_size,
             finalizers,
-            payload,
+            payload: payload.into_payload(),
             tenant_id,
-            events_byte_size,
+            metadata,
         }
     }
 }
@@ -150,7 +155,8 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
 #[derive(Clone)]
 pub(super) struct EventEncoder {
     key_partitioner: KeyPartitioner,
-    encoding: EncodingConfig<Encoding>,
+    transformer: Transformer,
+    encoder: Encoder<()>,
     labels: HashMap<Template, Template>,
     remove_label_fields: bool,
     remove_timestamp: bool,
@@ -174,7 +180,7 @@ impl EventEncoder {
                         for (k, v) in output {
                             vec.push((
                                 slugify_text(format!("{}{}", opening_prefix, k)),
-                                Value::from(v).to_string_lossy(),
+                                Value::from(v).to_string_lossy().into_owned(),
                             ))
                         }
                     }
@@ -198,7 +204,7 @@ impl EventEncoder {
         }
     }
 
-    pub(super) fn encode_event(&self, mut event: Event) -> LokiRecord {
+    pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
         let tenant_id = self.key_partitioner.partition(&event);
         let finalizers = event.take_finalizers();
         let mut labels = self.build_labels(&event);
@@ -207,7 +213,7 @@ impl EventEncoder {
         let schema = log_schema();
         let timestamp_key = schema.timestamp_key();
         let timestamp = match event.as_log().get(timestamp_key) {
-            Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
+            Some(Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
 
@@ -215,22 +221,9 @@ impl EventEncoder {
             event.as_mut_log().remove(timestamp_key);
         }
 
-        self.encoding.apply_rules(&mut event);
-        let log = event.into_log();
-        let event = match &self.encoding.codec() {
-            Encoding::Json => {
-                serde_json::to_string(&log).expect("json encoding should never fail.")
-            }
-
-            Encoding::Text => log
-                .get(schema.message_key())
-                .map(Value::to_string_lossy)
-                .unwrap_or_default(),
-
-            Encoding::Logfmt => {
-                encode_logfmt::to_string(log.as_map()).expect("Logfmt encoding should never fail.")
-            }
-        };
+        self.transformer.transform(&mut event);
+        let mut bytes = BytesMut::new();
+        self.encoder.encode(event, &mut bytes).ok();
 
         // If no labels are provided we set our own default
         // `{agent="vector"}` label. This can happen if the only
@@ -242,12 +235,15 @@ impl EventEncoder {
 
         let partition = PartitionKey::new(tenant_id, &mut labels);
 
-        LokiRecord {
+        Some(LokiRecord {
             labels,
-            event: LokiEvent { timestamp, event },
+            event: LokiEvent {
+                timestamp,
+                event: bytes.freeze(),
+            },
             partition,
             finalizers,
-        }
+        })
     }
 }
 
@@ -277,12 +273,12 @@ impl FilteredRecord {
 }
 
 impl ByteSizeOf for FilteredRecord {
-    fn allocated_bytes(&self) -> usize {
-        self.inner.allocated_bytes()
-    }
-
     fn size_of(&self) -> usize {
         self.inner.size_of()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.inner.allocated_bytes()
     }
 }
 
@@ -325,17 +321,17 @@ impl RecordFilter {
 }
 
 pub struct LokiSink {
-    acker: Acker,
     request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
     batch_settings: BatcherSettings,
     out_of_order_action: OutOfOrderAction,
     service: Svc<LokiService, LokiRetryLogic>,
+    protocol: &'static str,
 }
 
 impl LokiSink {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
+    pub fn new(config: LokiConfig, client: HttpClient) -> crate::Result<Self> {
         let compression = config.compression;
 
         // if Vector is configured to allow events with out of order timestamps, then then we can
@@ -355,19 +351,35 @@ impl LokiSink {
             }
         };
 
+        let protocol = get_http_scheme_from_uri(&config.endpoint.uri);
         let service = tower::ServiceBuilder::new()
             .settings(request_limits, LokiRetryLogic)
-            .service(LokiService::new(client, config.endpoint, config.auth)?);
+            .service(LokiService::new(
+                client,
+                config.endpoint,
+                config.path,
+                config.auth,
+            )?);
+
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+        let batch_encoder = match config.compression {
+            CompressionConfigAdapter::Original(_) => LokiBatchEncoder(LokiBatchEncoding::Json),
+            CompressionConfigAdapter::Extended(ExtendedCompression::Snappy) => {
+                LokiBatchEncoder(LokiBatchEncoding::Protobuf)
+            }
+        };
 
         Ok(Self {
-            acker: cx.acker(),
             request_builder: LokiRequestBuilder {
                 compression,
-                encoder: Default::default(),
+                encoder: batch_encoder,
             },
             encoder: EventEncoder {
                 key_partitioner: KeyPartitioner::new(config.tenant_id),
-                encoding: config.encoding,
+                transformer,
+                encoder,
                 labels: config.labels,
                 remove_label_fields: config.remove_label_fields,
                 remove_timestamp: config.remove_timestamp,
@@ -375,11 +387,12 @@ impl LokiSink {
             batch_settings: config.batch.into_batcher_settings()?,
             out_of_order_action: config.out_of_order_action,
             service,
+            protocol,
         })
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let encoder = self.encoder.clone();
+        let mut encoder = self.encoder.clone();
         let mut filter = RecordFilter::new(self.out_of_order_action);
 
         // out_of_order_action's that require a complete ordering are limited to building 1 request
@@ -391,8 +404,9 @@ impl LokiSink {
             }
         };
 
-        let sink = input
+        input
             .map(|event| encoder.encode_event(event))
+            .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
             .batched_partitioned(RecordPartitioner::default(), self.batch_settings)
             .filter_map(|(partition, batch)| async {
@@ -420,16 +434,17 @@ impl LokiSink {
             .request_builder(Some(request_builder_concurrency), self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Loki request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
-
-        sink.run().await
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await
     }
 }
 
@@ -454,34 +469,31 @@ mod tests {
         convert::TryFrom,
     };
 
+    use codecs::JsonSerializer;
     use futures::stream::StreamExt;
-    use vector_core::event::{Event, Value};
+    use vector_core::event::{Event, LogEvent, Value};
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
-        config::log_schema,
-        sinks::{
-            loki::config::{Encoding, OutOfOrderAction},
-            util::encoding::EncodingConfig,
-        },
-        template::Template,
-        test_util::random_lines,
+        codecs::Encoder, config::log_schema, sinks::loki::config::OutOfOrderAction,
+        template::Template, test_util::random_lines,
     };
 
     #[test]
     fn encoder_no_labels() {
-        let encoder = EventEncoder {
+        let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
-            encoding: EncodingConfig::from(Encoding::Json),
+            transformer: Default::default(),
+            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: false,
         };
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(log_schema().timestamp_key(), chrono::Utc::now());
-        let record = encoder.encode_event(event);
-        assert!(record.event.event.contains(log_schema().timestamp_key()));
+        let record = encoder.encode_event(event).unwrap();
+        assert!(String::from_utf8_lossy(&record.event.event).contains(log_schema().timestamp_key()));
         assert_eq!(record.labels.len(), 1);
         assert_eq!(
             record.labels[0],
@@ -508,14 +520,15 @@ mod tests {
             Template::try_from("going_to_fail_*").unwrap(),
             Template::try_from("{{ value }}").unwrap(),
         );
-        let encoder = EventEncoder {
+        let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
-            encoding: EncodingConfig::from(Encoding::Json),
+            transformer: Default::default(),
+            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
             labels,
             remove_label_fields: false,
             remove_timestamp: false,
         };
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(log_schema().timestamp_key(), chrono::Utc::now());
         log.insert("name", "foo");
@@ -526,8 +539,8 @@ mod tests {
         test_dict.insert("two".to_string(), Value::from("baz"));
         log.insert("dict", Value::from(test_dict));
 
-        let record = encoder.encode_event(event);
-        assert!(record.event.event.contains(log_schema().timestamp_key()));
+        let record = encoder.encode_event(event).unwrap();
+        assert!(String::from_utf8_lossy(&record.event.event).contains(log_schema().timestamp_key()));
         assert_eq!(record.labels.len(), 4);
 
         let labels: HashMap<String, String> = record.labels.into_iter().collect();
@@ -539,18 +552,21 @@ mod tests {
 
     #[test]
     fn encoder_no_ts() {
-        let encoder = EventEncoder {
+        let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
-            encoding: EncodingConfig::from(Encoding::Json),
+            transformer: Default::default(),
+            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: true,
         };
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(log_schema().timestamp_key(), chrono::Utc::now());
-        let record = encoder.encode_event(event);
-        assert!(!record.event.event.contains(log_schema().timestamp_key()));
+        let record = encoder.encode_event(event).unwrap();
+        assert!(
+            !String::from_utf8_lossy(&record.event.event).contains(log_schema().timestamp_key())
+        );
     }
 
     #[test]
@@ -564,27 +580,29 @@ mod tests {
             Template::try_from("{{ name }}").unwrap(),
             Template::try_from("{{ value }}").unwrap(),
         );
-        let encoder = EventEncoder {
+        let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
-            encoding: EncodingConfig::from(Encoding::Json),
+            transformer: Default::default(),
+            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
             labels,
             remove_label_fields: true,
             remove_timestamp: false,
         };
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(log_schema().timestamp_key(), chrono::Utc::now());
         log.insert("name", "foo");
         log.insert("value", "bar");
-        let record = encoder.encode_event(event);
-        assert!(!record.event.event.contains("value"));
+        let record = encoder.encode_event(event).unwrap();
+        assert!(!String::from_utf8_lossy(&record.event.event).contains("value"));
     }
 
     #[tokio::test]
     async fn filter_encoder_drop() {
-        let encoder = EventEncoder {
+        let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
-            encoding: EncodingConfig::from(Encoding::Json),
+            transformer: Default::default(),
+            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: false,
@@ -592,7 +610,7 @@ mod tests {
         let base = chrono::Utc::now();
         let events = random_lines(100)
             .take(20)
-            .map(Event::from)
+            .map(|e| Event::Log(LogEvent::from(e)))
             .enumerate()
             .map(|(i, mut event)| {
                 let log = event.as_mut_log();
@@ -608,6 +626,7 @@ mod tests {
         let mut filter = RecordFilter::new(OutOfOrderAction::Drop);
         let stream = futures::stream::iter(events)
             .map(|event| encoder.encode_event(event))
+            .filter_map(|event| async { event })
             .filter_map(|event| {
                 let res = filter.filter_record(event);
                 async { res }

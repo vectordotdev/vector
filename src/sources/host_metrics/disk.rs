@@ -1,23 +1,25 @@
-use chrono::Utc;
-use futures::{stream, StreamExt};
+use crate::internal_events::HostMetricsScrapeDetailError;
+use futures::StreamExt;
 use heim::units::information::byte;
-use serde::{Deserialize, Serialize};
-use vector_common::btreemap;
+use vector_config::configurable_component;
+use vector_core::metric_tags;
 
 use super::{filter_result, FilterList, HostMetrics};
-use crate::event::metric::Metric;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Options for the “disk” metrics collector.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct DiskConfig {
+    /// Lists of device name patterns to include or exclude.
     #[serde(default)]
     devices: FilterList,
 }
 
 impl HostMetrics {
-    pub async fn disk_metrics(&self) -> Vec<Metric> {
+    pub async fn disk_metrics(&self, output: &mut super::MetricsBuffer) {
         match heim::disk::io_counters().await {
             Ok(counters) => {
-                counters
+                for counter in counters
                     .filter_map(|result| {
                         filter_result(result, "Failed to load/parse disk I/O data.")
                     })
@@ -26,51 +28,43 @@ impl HostMetrics {
                             .disk
                             .devices
                             .contains_path(Some(counter.device_name().as_ref()))
-                            .then(|| counter)
+                            .then_some(counter)
                     })
                     .filter_map(|counter| async { counter })
-                    .map(|counter| {
-                        let timestamp = Utc::now();
-                        let tags = btreemap! {
-                            "device" => counter.device_name().to_string_lossy()
-                        };
-                        stream::iter(
-                            vec![
-                                self.counter(
-                                    "disk_read_bytes_total",
-                                    timestamp,
-                                    counter.read_bytes().get::<byte>() as f64,
-                                    tags.clone(),
-                                ),
-                                self.counter(
-                                    "disk_reads_completed_total",
-                                    timestamp,
-                                    counter.read_count() as f64,
-                                    tags.clone(),
-                                ),
-                                self.counter(
-                                    "disk_written_bytes_total",
-                                    timestamp,
-                                    counter.write_bytes().get::<byte>() as f64,
-                                    tags.clone(),
-                                ),
-                                self.counter(
-                                    "disk_writes_completed_total",
-                                    timestamp,
-                                    counter.write_count() as f64,
-                                    tags,
-                                ),
-                            ]
-                            .into_iter(),
-                        )
-                    })
-                    .flatten()
                     .collect::<Vec<_>>()
                     .await
+                {
+                    let tags = metric_tags! {
+                        "device" => counter.device_name().to_string_lossy()
+                    };
+                    output.name = "disk";
+                    output.counter(
+                        "disk_read_bytes_total",
+                        counter.read_bytes().get::<byte>() as f64,
+                        tags.clone(),
+                    );
+                    output.counter(
+                        "disk_reads_completed_total",
+                        counter.read_count() as f64,
+                        tags.clone(),
+                    );
+                    output.counter(
+                        "disk_written_bytes_total",
+                        counter.write_bytes().get::<byte>() as f64,
+                        tags.clone(),
+                    );
+                    output.counter(
+                        "disk_writes_completed_total",
+                        counter.write_count() as f64,
+                        tags,
+                    );
+                }
             }
             Err(error) => {
-                error!(message = "Failed to load disk I/O info.", %error, internal_log_rate_secs = 60);
-                vec![]
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load disk I/O info.",
+                    error,
+                });
             }
         }
     }
@@ -81,18 +75,21 @@ mod tests {
     use super::{
         super::{
             tests::{all_counters, assert_filtered_metrics, count_name, count_tag},
-            HostMetrics, HostMetricsConfig,
+            HostMetrics, HostMetricsConfig, MetricsBuffer,
         },
         DiskConfig,
     };
 
     #[tokio::test]
     async fn generates_disk_metrics() {
-        let metrics = HostMetrics::new(HostMetricsConfig::default())
-            .disk_metrics()
+        let mut buffer = MetricsBuffer::new(None);
+        HostMetrics::new(HostMetricsConfig::default())
+            .disk_metrics(&mut buffer)
             .await;
+        let metrics = buffer.metrics;
+
         // The Windows test runner doesn't generate any disk metrics on the VM.
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(not(windows))]
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 4 == 0);
         assert!(all_counters(&metrics));
@@ -118,13 +115,15 @@ mod tests {
 
     #[tokio::test]
     async fn filters_disk_metrics_on_device() {
-        assert_filtered_metrics("device", |devices| async {
+        assert_filtered_metrics("device", |devices| async move {
+            let mut buffer = MetricsBuffer::new(None);
             HostMetrics::new(HostMetricsConfig {
                 disk: DiskConfig { devices },
                 ..Default::default()
             })
-            .disk_metrics()
-            .await
+            .disk_metrics(&mut buffer)
+            .await;
+            buffer.metrics
         })
         .await;
     }

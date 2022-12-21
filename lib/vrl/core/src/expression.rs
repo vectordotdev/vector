@@ -1,4 +1,4 @@
-use diagnostic::{DiagnosticMessage, Label, Note};
+use diagnostic::{Diagnostic, DiagnosticMessage, Label, Note, Severity};
 use value::Value;
 
 pub type Resolved = Result<Value, ExpressionError>;
@@ -29,13 +29,25 @@ impl std::error::Error for ExpressionError {
     }
 }
 
+impl From<ExpressionError> for Diagnostic {
+    fn from(error: ExpressionError) -> Self {
+        Self {
+            severity: Severity::Error,
+            code: error.code(),
+            message: error.message(),
+            labels: error.labels(),
+            notes: error.notes(),
+        }
+    }
+}
+
 impl DiagnosticMessage for ExpressionError {
     fn code(&self) -> usize {
         0
     }
 
     fn message(&self) -> String {
-        use ExpressionError::*;
+        use ExpressionError::{Abort, Error};
 
         match self {
             #[cfg(feature = "expr-abort")]
@@ -45,7 +57,7 @@ impl DiagnosticMessage for ExpressionError {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ExpressionError::*;
+        use ExpressionError::{Abort, Error};
 
         match self {
             #[cfg(feature = "expr-abort")]
@@ -57,7 +69,7 @@ impl DiagnosticMessage for ExpressionError {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ExpressionError::*;
+        use ExpressionError::{Abort, Error};
 
         match self {
             #[cfg(feature = "expr-abort")]

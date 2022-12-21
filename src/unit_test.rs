@@ -4,37 +4,38 @@ use clap::Parser;
 use colored::*;
 
 use crate::config::{self, UnitTestResult};
+use crate::signal;
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Vector config files in TOML format to test.
-    #[clap(name = "config-toml", long, use_value_delimiter(true))]
+    #[arg(id = "config-toml", long, value_delimiter(','))]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to test.
-    #[clap(name = "config-json", long, use_value_delimiter(true))]
+    #[arg(id = "config-json", long, value_delimiter(','))]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to test.
-    #[clap(name = "config-yaml", long, use_value_delimiter(true))]
+    #[arg(id = "config-yaml", long, value_delimiter(','))]
     paths_yaml: Vec<PathBuf>,
 
     /// Any number of Vector config files to test. If none are specified the
     /// default config path `/etc/vector/vector.toml` will be targeted.
-    #[clap(use_value_delimiter(true))]
+    #[arg(value_delimiter(','))]
     paths: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[clap(
-        name = "config-dir",
+    #[arg(
+        id = "config-dir",
         short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_value_delimiter(true)
+        value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
 }
@@ -57,7 +58,7 @@ impl Opts {
     }
 }
 
-pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exitcode::ExitCode {
     let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
     let paths = opts.paths_with_formats();
@@ -70,7 +71,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     {
         println!("Running tests");
     }
-    match config::build_unit_tests_main(&paths).await {
+    match config::build_unit_tests_main(&paths, signal_handler).await {
         Ok(tests) => {
             if tests.is_empty() {
                 #[allow(clippy::print_stdout)]

@@ -119,7 +119,6 @@ mod tests {
     // Here we test that the deserializations from various formats match
     // the TOML format.
     #[cfg(all(
-        feature = "enrichment-tables-file",
         feature = "sources-socket",
         feature = "transforms-sample",
         feature = "sinks-socket"
@@ -149,17 +148,17 @@ mod tests {
             type = "socket"
             mode = "tcp"
             inputs = ["sample"]
-            encoding = "text"
+            encoding.codec = "text"
             address = "127.0.0.1:9999"
         "#;
 
         let cases = vec![
-            // Valid empty inputs should resolve to default.
+            // Valid empty inputs should resolve to an empty, default value.
             ("", Format::Toml, Ok("")),
             ("{}", Format::Yaml, Ok("")),
             ("{}", Format::Json, Ok("")),
+            ("", Format::Yaml, Ok("")),
             // Invalid "empty" inputs should resolve to an error.
-            ("", Format::Yaml, Err(vec!["EOF while parsing a value"])),
             (
                 "",
                 Format::Json,
@@ -192,7 +191,8 @@ mod tests {
                     r#"    type: "socket""#,
                     r#"    mode: "tcp""#,
                     r#"    inputs: ["sample"]"#,
-                    r#"    encoding: "text""#,
+                    r#"    encoding:"#,
+                    r#"      codec: "text""#,
                     r#"    address: "127.0.0.1:9999""#,
                 ),
                 Format::Yaml,
@@ -231,7 +231,9 @@ mod tests {
                             "type": "socket",
                             "mode": "tcp",
                             "inputs": ["sample"],
-                            "encoding": "text",
+                            "encoding": {
+                                "codec": "text"
+                            },
                             "address": "127.0.0.1:9999"
                         }
                     }

@@ -1,14 +1,17 @@
 use std::{io, sync::Arc};
 
 use bytes::Bytes;
+use codecs::JsonSerializer;
 use lookup::lookup_v2::OwnedSegment;
-use vector_core::{buffers::Ackable, ByteSizeOf};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_core::ByteSizeOf;
 
 use crate::{
-    event::{EventFinalizers, Finalizable, LogEvent},
+    codecs::{Encoder, TimestampFormat, Transformer},
+    event::{Event, EventFinalizers, Finalizable},
     sinks::util::{
-        encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat},
-        Compression, ElementCount, RequestBuilder,
+        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression, ElementCount,
+        RequestBuilder,
     },
 };
 
@@ -16,17 +19,12 @@ use crate::{
 pub struct DatadogEventsRequest {
     pub body: Bytes,
     pub metadata: Metadata,
+    request_metadata: RequestMetadata,
 }
 
 impl Finalizable for DatadogEventsRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.metadata.finalizers)
-    }
-}
-
-impl Ackable for DatadogEventsRequest {
-    fn ack_size(&self) -> usize {
-        self.element_count()
     }
 }
 
@@ -43,16 +41,26 @@ impl ElementCount for DatadogEventsRequest {
     }
 }
 
+impl MetaDescriptive for DatadogEventsRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.request_metadata
+    }
+}
+
 #[derive(Clone)]
 pub struct Metadata {
     pub finalizers: EventFinalizers,
     pub api_key: Option<Arc<str>>,
-    pub event_byte_size: usize,
 }
 
-#[derive(Default)]
 pub struct DatadogEventsRequestBuilder {
-    encoder: EncodingConfigFixed<StandardJsonEncoding>,
+    encoder: (Transformer, Encoder<()>),
+}
+
+impl Default for DatadogEventsRequestBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DatadogEventsRequestBuilder {
@@ -61,10 +69,10 @@ impl DatadogEventsRequestBuilder {
     }
 }
 
-impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
+impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
     type Metadata = Metadata;
-    type Events = LogEvent;
-    type Encoder = EncodingConfigFixed<StandardJsonEncoding>;
+    type Events = Event;
+    type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
     type Request = DatadogEventsRequest;
     type Error = io::Error;
@@ -77,45 +85,59 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, mut log: LogEvent) -> (Self::Metadata, Self::Events) {
+    fn split_input(&self, event: Event) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let builder = RequestMetadataBuilder::from_events(&event);
+
+        let mut log = event.into_log();
         let metadata = Metadata {
             finalizers: log.take_finalizers(),
-            api_key: log.metadata_mut().datadog_api_key().clone(),
-            event_byte_size: log.size_of(),
+            api_key: log.metadata_mut().datadog_api_key(),
         };
-        (metadata, log)
+
+        (metadata, builder, Event::from(log))
     }
 
-    fn build_request(&self, metadata: Self::Metadata, body: Self::Payload) -> Self::Request {
-        DatadogEventsRequest { body, metadata }
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        DatadogEventsRequest {
+            body: payload.into_payload(),
+            metadata,
+            request_metadata,
+        }
     }
 }
 
-fn encoder() -> EncodingConfigFixed<StandardJsonEncoding> {
-    EncodingConfigFixed {
-        // DataDog Event API allows only some fields, and refuses
-        // to accept event if it contains any other field.
-        only_fields: Some(
-            [
-                "aggregation_key",
-                "alert_type",
-                "date_happened",
-                "device_name",
-                "host",
-                "priority",
-                "related_event_id",
-                "source_type_name",
-                "tags",
-                "text",
-                "title",
-            ]
-            .iter()
-            .map(|field| vec![OwnedSegment::Field((*field).into())].into())
-            .collect(),
-        ),
-        // DataDog Event API requires unix timestamp.
-        timestamp_format: Some(TimestampFormat::Unix),
-        codec: StandardJsonEncoding,
-        ..EncodingConfigFixed::default()
-    }
+fn encoder() -> (Transformer, Encoder<()>) {
+    // DataDog Event API allows only some fields, and refuses
+    // to accept event if it contains any other field.
+    let only_fields = Some(
+        [
+            "aggregation_key",
+            "alert_type",
+            "date_happened",
+            "device_name",
+            "host",
+            "priority",
+            "related_event_id",
+            "source_type_name",
+            "tags",
+            "text",
+            "title",
+        ]
+        .iter()
+        .map(|field| vec![OwnedSegment::Field((*field).into())].into())
+        .collect(),
+    );
+    // DataDog Event API requires unix timestamp.
+    let timestamp_format = Some(TimestampFormat::Unix);
+
+    (
+        Transformer::new(only_fields, None, timestamp_format)
+            .expect("transformer configuration must be valid"),
+        Encoder::<()>::new(JsonSerializer::new().into()),
+    )
 }

@@ -36,8 +36,8 @@ impl Value {
     ///   object itself are preserved.
     pub fn into_iter<'a>(self, recursive: bool) -> ValueIter<'a> {
         let data = match self {
-            Value::Object(object) => IterData::Object(object.into_iter().collect()),
-            Value::Array(array) => IterData::Array(array),
+            Self::Object(object) => IterData::Object(object.into_iter().collect()),
+            Self::Array(array) => IterData::Array(array),
             value => IterData::Value(value),
         };
 

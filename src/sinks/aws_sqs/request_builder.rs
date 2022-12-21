@@ -1,19 +1,22 @@
 use bytes::Bytes;
-use vector_core::buffers::Ackable;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use super::config::SqsSinkConfig;
-use crate::codecs::Encoder;
-use crate::event::{Event, EventFinalizers, Finalizable};
-use crate::internal_events::TemplateRenderingError;
-use crate::sinks::util::encoding::Transformer;
-use crate::sinks::util::{Compression, EncodedLength, RequestBuilder};
-use crate::template::Template;
+use crate::{
+    codecs::{Encoder, Transformer},
+    event::{Event, EventFinalizers, Finalizable},
+    internal_events::TemplateRenderingError,
+    sinks::util::{
+        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+        EncodedLength, RequestBuilder,
+    },
+    template::Template,
+};
 
 #[derive(Clone)]
-pub struct Metadata {
+pub struct SqsMetadata {
     pub finalizers: EventFinalizers,
-    pub event_byte_size: usize,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
 }
@@ -29,7 +32,7 @@ pub(crate) struct SqsRequestBuilder {
 impl SqsRequestBuilder {
     pub fn new(config: SqsSinkConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding();
+        let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
@@ -42,7 +45,7 @@ impl SqsRequestBuilder {
 }
 
 impl RequestBuilder<Event> for SqsRequestBuilder {
-    type Metadata = Metadata;
+    type Metadata = SqsMetadata;
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
@@ -57,9 +60,10 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, mut event: Event) -> (Self::Metadata, Self::Events) {
-        let event_byte_size = event.size_of();
-
+    fn split_input(
+        &self,
+        mut event: Event,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let message_group_id = match self.message_group_id {
             Some(ref tpl) => match tpl.render_string(&event) {
                 Ok(value) => Some(value),
@@ -89,23 +93,32 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
             None => None,
         };
 
-        let metadata = Metadata {
+        let builder = RequestMetadataBuilder::from_events(&event);
+
+        let sqs_metadata = SqsMetadata {
             finalizers: event.take_finalizers(),
-            event_byte_size,
             message_group_id,
             message_deduplication_id,
         };
-        (metadata, event)
+        (sqs_metadata, builder, event)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let message_body = String::from(std::str::from_utf8(&payload).unwrap());
+    fn build_request(
+        &self,
+        sqs_metadata: Self::Metadata,
+        metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let payload_bytes = payload.into_payload();
+        let message_body = String::from(std::str::from_utf8(&payload_bytes).unwrap());
+
         SendMessageEntry {
             message_body,
-            message_group_id: metadata.message_group_id,
-            message_deduplication_id: metadata.message_deduplication_id,
+            message_group_id: sqs_metadata.message_group_id,
+            message_deduplication_id: sqs_metadata.message_deduplication_id,
             queue_url: self.queue_url.clone(),
-            finalizers: metadata.finalizers,
+            finalizers: sqs_metadata.finalizers,
+            metadata,
         }
     }
 }
@@ -117,6 +130,7 @@ pub(crate) struct SendMessageEntry {
     pub message_deduplication_id: Option<String>,
     pub queue_url: String,
     finalizers: EventFinalizers,
+    metadata: RequestMetadata,
 }
 
 impl ByteSizeOf for SendMessageEntry {
@@ -133,14 +147,14 @@ impl EncodedLength for SendMessageEntry {
     }
 }
 
-impl Ackable for SendMessageEntry {
-    fn ack_size(&self) -> usize {
-        1
-    }
-}
-
 impl Finalizable for SendMessageEntry {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for SendMessageEntry {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }

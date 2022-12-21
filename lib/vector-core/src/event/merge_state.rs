@@ -39,10 +39,10 @@ impl LogEventMergeState {
 #[cfg(test)]
 mod test {
     use super::LogEventMergeState;
-    use crate::event::{Event, LogEvent};
+    use crate::event::LogEvent;
 
     fn log_event_with_message(message: &str) -> LogEvent {
-        Event::from(message).into_log()
+        LogEvent::from(message)
     }
 
     #[test]

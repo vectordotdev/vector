@@ -1,140 +1,209 @@
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
-use crate::{config::component::ComponentDescription, event::Event};
+use crate::event::Event;
 
-mod check_fields;
 pub(self) mod datadog_search;
 pub(crate) mod is_log;
 pub(crate) mod is_metric;
-pub mod not;
+pub(crate) mod is_trace;
 mod vrl;
 
 pub use self::vrl::VrlConfig;
+use self::{
+    datadog_search::{DatadogSearchConfig, DatadogSearchRunner},
+    is_log::{check_is_log, check_is_log_with_context},
+    is_metric::{check_is_metric, check_is_metric_with_context},
+    is_trace::{check_is_trace, check_is_trace_with_context},
+    vrl::Vrl,
+};
 
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Condition {
-    Not(not::Not),
-    IsLog(is_log::IsLog),
-    IsMetric(is_metric::IsMetric),
-    Vrl(vrl::Vrl),
-    VrlVm(vrl::VrlVm),
-    CheckFields(check_fields::CheckFields),
-    DatadogSearch(datadog_search::DatadogSearchRunner),
+    /// Matches an event if it is a log.
+    IsLog,
 
-    // used for benchmarks
+    /// Matches an event if it is a metric.
+    IsMetric,
+
+    /// Matches an event if it is a trace.
+    IsTrace,
+
+    /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
+    Vrl(Vrl),
+
+    /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
+    DatadogSearch(DatadogSearchRunner),
+
+    /// Matches any event.
+    ///
+    /// Used only for internal testing.
     AlwaysPass,
+
+    /// Matches no event.
+    ///
+    /// Used only for internal testing.
     AlwaysFail,
 }
 
 impl Condition {
-    pub(crate) const fn is_log() -> Self {
-        Self::IsLog(is_log::IsLog {})
-    }
-
-    pub(crate) const fn is_metric() -> Self {
-        Self::IsMetric(is_metric::IsMetric {})
-    }
-}
-
-impl Condition {
-    pub(crate) fn check(&self, e: &Event) -> bool {
+    /// Checks if a condition is true.
+    ///
+    /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.
+    #[allow(dead_code)]
+    pub(crate) fn check(&self, e: Event) -> (bool, Event) {
         match self {
-            Condition::IsLog(x) => x.check(e),
-            Condition::IsMetric(x) => x.check(e),
-            Condition::Not(x) => x.check(e),
-            Condition::CheckFields(x) => x.check(e),
-            Condition::DatadogSearch(x) => x.check(e),
+            Condition::IsLog => check_is_log(e),
+            Condition::IsMetric => check_is_metric(e),
+            Condition::IsTrace => check_is_trace(e),
             Condition::Vrl(x) => x.check(e),
-            Condition::VrlVm(x) => x.check(e),
-            Condition::AlwaysPass => true,
-            Condition::AlwaysFail => false,
+            Condition::DatadogSearch(x) => x.check(e),
+            Condition::AlwaysPass => (true, e),
+            Condition::AlwaysFail => (false, e),
         }
     }
 
-    /// Provides context for a failure. This is potentially mildly expensive if
-    /// it involves string building and so should be avoided in hot paths.
-    pub(crate) fn check_with_context(&self, e: &Event) -> Result<(), String> {
+    /// Checks if a condition is true, with a `Result`-oriented return for easier composition.
+    ///
+    /// This can be mildly expensive for conditions that do not often match, as it allocates a string for the error
+    /// case. As such, it should typically be avoided in hot paths.
+    pub(crate) fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
         match self {
-            Condition::IsLog(x) => x.check_with_context(e),
-            Condition::IsMetric(x) => x.check_with_context(e),
-            Condition::Not(x) => x.check_with_context(e),
-            Condition::CheckFields(x) => x.check_with_context(e),
-            Condition::DatadogSearch(x) => x.check_with_context(e),
+            Condition::IsLog => check_is_log_with_context(e),
+            Condition::IsMetric => check_is_metric_with_context(e),
+            Condition::IsTrace => check_is_trace_with_context(e),
             Condition::Vrl(x) => x.check_with_context(e),
-            Condition::VrlVm(x) => x.check_with_context(e),
-            Condition::AlwaysPass => Ok(()),
-            Condition::AlwaysFail => Ok(()),
+            Condition::DatadogSearch(x) => x.check_with_context(e),
+            Condition::AlwaysPass => (Ok(()), e),
+            Condition::AlwaysFail => (Ok(()), e),
         }
     }
 }
 
-pub trait Conditional {
-    fn check(&self, e: &Event) -> bool;
+/// An event matching condition.
+///
+/// Many methods exist for matching events, such as using a VRL expression, a Datadog Search query string,
+/// or hard-coded matchers like "must be a metric" or "fields A, B, and C must match these constraints".
+///
+/// They can specified with an enum-style notation:
+///
+/// ```toml
+/// condition.type = 'datadog_search'
+/// condition.source = 'NOT "foo"'
+/// ```
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ConditionConfig {
+    /// Matches an event if it is a log.
+    IsLog,
 
-    /// Provides context for a failure. This is potentially mildly expensive if
-    /// it involves string building and so should be avoided in hot paths.
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
-        if self.check(e) {
-            Ok(())
+    /// Matches an event if it is a metric.
+    IsMetric,
+
+    /// Matches an event if it is a trace.
+    IsTrace,
+
+    /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
+    Vrl(#[configurable(derived)] VrlConfig),
+
+    /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
+    DatadogSearch(#[configurable(derived)] DatadogSearchConfig),
+}
+
+impl ConditionConfig {
+    pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+        match self {
+            ConditionConfig::IsLog => Ok(Condition::IsLog),
+            ConditionConfig::IsMetric => Ok(Condition::IsMetric),
+            ConditionConfig::IsTrace => Ok(Condition::IsTrace),
+            ConditionConfig::Vrl(x) => x.build(enrichment_tables),
+            ConditionConfig::DatadogSearch(x) => x.build(enrichment_tables),
+        }
+    }
+}
+
+pub trait Conditional: std::fmt::Debug {
+    /// Checks if a condition is true.
+    ///
+    /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.
+    fn check(&self, event: Event) -> (bool, Event);
+
+    /// Checks if a condition is true, with a `Result`-oriented return for easier composition.
+    ///
+    /// This can be mildly expensive for conditions that do not often match, as it allocates a string for the error
+    /// case. As such, it should typically be avoided in hot paths.
+    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
+        let (result, event) = self.check(e);
+        if result {
+            (Ok(()), event)
         } else {
-            Err("condition failed".into())
+            (Err("condition failed".into()), event)
         }
     }
 }
 
-#[typetag::serde(tag = "type")]
-pub trait ConditionConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition>;
 }
 
-dyn_clone::clone_trait_object!(ConditionConfig);
+dyn_clone::clone_trait_object!(ConditionalConfig);
 
-type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
-
-inventory::collect!(ConditionDescription);
-
-/// A condition can either be a raw string such as
-/// `condition = '.message == "hooray"'`.
-/// In this case it is turned into a VRL condition.
-/// Otherwise it is a condition such as:
+/// An event matching condition.
 ///
-/// condition.type = 'check_fields'
-/// condition."message.equals" = 'hooray'
+/// Many methods exist for matching events, such as using a VRL expression, a Datadog Search query string,
+/// or hard-coded matchers like "must be a metric" or "fields A, B, and C must match these constraints".
 ///
+/// As VRL is the most common way to apply conditions to events, this type provides a shortcut to define VRL expressions
+/// directly in configuration by passing the VRL expression as a string:
 ///
-/// It is important to note that because the way this is
-/// structured, it is wrong to flatten a field that contains
-/// an AnyCondition:
+/// ```toml
+/// condition = '.message == "hooray"'
+/// ```
 ///
-/// #[serde(flatten)]
-/// condition: AnyCondition,
+/// When other condition types are required, they can specified with an enum-style notation:
 ///
-/// This will result in an error when serializing to json
-/// which we need to do when determining which transforms have changed
-/// when a config is reloaded.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+/// ```toml
+/// condition.type = 'datadog_search'
+/// condition.source = 'NOT "foo"'
+/// ```
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[configurable(metadata(docs::type_override = "condition"))]
 #[serde(untagged)]
 pub enum AnyCondition {
-    String(String),
-    Map(Box<dyn ConditionConfig>),
+    /// A [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
+    String(#[configurable(transparent)] String),
+
+    /// A fully-specified condition.
+    Map(#[configurable(derived)] ConditionConfig),
 }
 
 impl AnyCondition {
     pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         match self {
-            AnyCondition::String(s) => VrlConfig {
-                source: s.clone(),
-                runtime: Default::default(),
+            AnyCondition::String(s) => {
+                let vrl_config = VrlConfig {
+                    source: s.clone(),
+                    runtime: Default::default(),
+                };
+                vrl_config.build(enrichment_tables)
             }
-            .build(enrichment_tables),
             AnyCondition::Map(m) => m.build(enrichment_tables),
         }
+    }
+}
+
+impl From<ConditionConfig> for AnyCondition {
+    fn from(config: ConditionConfig) -> Self {
+        Self::Map(config)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use serde::Deserialize;
 
     use super::*;
 
@@ -153,20 +222,6 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_anycondition_check_fields() {
-        let conf: Test = toml::from_str(indoc! {r#"
-            condition.type = "check_fields"
-            condition."norg.equals" = "nork"
-        "#})
-        .unwrap();
-
-        assert_eq!(
-            r#"Map(CheckFieldsConfig { predicates: {"norg.equals": "nork"} })"#,
-            format!("{:?}", conf.condition)
-        )
-    }
-
-    #[test]
     fn deserialize_anycondition_vrl() {
         let conf: Test = toml::from_str(indoc! {r#"
             condition.type = "vrl"
@@ -175,7 +230,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            r#"Map(VrlConfig { source: ".nork == true", runtime: Ast })"#,
+            r#"Map(Vrl(VrlConfig { source: ".nork == true", runtime: Ast }))"#,
             format!("{:?}", conf.condition)
         )
     }

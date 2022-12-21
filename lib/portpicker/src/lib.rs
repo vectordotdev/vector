@@ -26,6 +26,8 @@
 
 // For more information, please refer to <http://unlicense.org>
 
+#![deny(warnings)]
+
 use std::net::{IpAddr, SocketAddr, TcpListener, ToSocketAddrs, UdpSocket};
 
 use rand::{thread_rng, Rng};

@@ -46,6 +46,7 @@ components: sinks: splunk_hec_logs: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.splunk
@@ -77,6 +78,25 @@ components: sinks: splunk_hec_logs: {
 			required:    true
 			type: string: {
 				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
+			}
+		}
+		endpoint_target: {
+			common:      false
+			description: """
+                                     The Splunk endpoint to send to. Either the [event endpoint](\(urls.splunk_hec_event_endpoint)) or the
+                                     [raw endpoint](\(urls.splunk_hec_raw_endpoint)). [metadata](\(urls.splunk_hec_metadata)) for the event
+                                     endpoint is sent with each event. For the `raw` endpoint, configured [event metadata](\(urls.splunk_hec_metadata))
+                                     is sent as query parameters - except the `timestamp` field.
+                                     """
+			required:    false
+			warnings: []
+			type: string: {
+				default: "event"
+				enum: {
+					event: "[Event endpoint](\(urls.splunk_hec_event_endpoint))"
+					raw:   "[Raw endpoint](\(urls.splunk_hec_raw_endpoint))"
+				}
+				syntax: "literal"
 			}
 		}
 		host_key: {
@@ -133,8 +153,32 @@ components: sinks: splunk_hec_logs: {
 				syntax: "template"
 			}
 		}
+		timestamp_key: {
+			common:      false
+			description: """
+				The name of the log field to be used as the timestamp sent to Splunk HEC. This overrides the
+				[global `timestamp_key` option](\(urls.vector_configuration)/global-options#log_schema.timestamp_key).
+				When set to "", vector omits setting a timestamp in the events sent to Splunk HEC.
+				"""
+			required:    false
+			type: string: {
+				default: null
+				examples: ["timestamp", ""]
+			}
+		}
+		auto_extract_timestamp: {
+			common: false
+			description: """
+				    Passes the auto_extract_timestamp option to Splunk.
+				    Note this option is only used by Version 8 and above of Splunk.
+				    This will cause Splunk to extract the timestamp from the message text rather than use
+				    the timestamp embedded in the event. The timestamp must be in the format yyyy-mm-dd hh:mm:ss.
+				    This option only applies for the `Event` endpoint target.
+				"""
+			required: false
+			type: bool: default: false
+		}
 	}
-
 	input: {
 		logs:    true
 		metrics: null

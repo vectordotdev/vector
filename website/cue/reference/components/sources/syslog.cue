@@ -170,6 +170,13 @@ components: sources: syslog: {
 					examples: ["127.0.0.1"]
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["syslog"]
+				}
+			}
 			timestamp: {
 				description: "The time extracted from the Syslog formatted line. If parsing fails, then the exact time the event was ingested into Vector is used."
 				required:    true
@@ -183,8 +190,9 @@ components: sources: syslog: {
 					unit: null
 				}
 			}
+			client_metadata: fields._client_metadata
 			"*": {
-				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields."
+				description: "In addition to the defined fields, any [Syslog 5424 structured fields](https://datatracker.ietf.org/doc/html/rfc5424#section-6.3) are parsed and inserted, namespaced under the name of each structured data section."
 				required:    true
 				type: string: {
 					examples: ["hello world"]
@@ -215,14 +223,17 @@ components: sources: syslog: {
 				timestamp:   _timestamp
 				host:        _values.local_host
 				source_ip:   _values.remote_host
+				source_type: "syslog"
 				hostname:    _hostname
 				appname:     _app_name
 				procid:      _procid
 				msgid:       _msgid
-				iut:         _iut
-				eventSource: _event_source
-				eventID:     _event_id
-				message:     _message
+				"exampleSDID@32473": {
+					iut:         _iut
+					eventSource: _event_source
+					eventID:     _event_id
+				}
+				message: _message
 			}
 		},
 	]
@@ -244,11 +255,11 @@ components: sources: syslog: {
 				Syslog style). It's unfortunate that the Syslog specification isn't more
 				accurately followed, but we hope that Vector insulates you from these deviations.
 
-				If parsing fails, Vector includes the entire Syslog line in the `message`
-				key. If you find this happening often, we recommend using the
-				[`socket` source](\(urls.vector_socket_source)) combined with
+				If parsing fails, Vector will raise an error. If you find this happening often,
+				we recommend using the [`socket` source](\(urls.vector_socket_source)) combined with
 				[regex parsing](\(urls.vrl_functions)/#parse_regex) to implement your own custom
-				ingestion and parsing scheme. Alternatively, you can [open an
+				ingestion and parsing scheme, or [syslog parsing](\(urls.vrl_functions)/#parse_syslog) and
+				manually handle any errors. Alternatively, you can [open an
 				issue](\(urls.new_feature_request)) to request support for your specific format.
 				"""
 		}

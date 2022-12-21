@@ -6,7 +6,7 @@ pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
 pub type Spanned<'input, Loc> = (Loc, Tok<'input>, Loc);
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Token<S> {
     LRule,
     RRule,
@@ -31,7 +31,7 @@ pub enum Token<S> {
     Invalid(char),
 }
 
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     #[error("invalid literal")]
     Literal { start: usize },
@@ -249,7 +249,7 @@ fn is_ident_continue(ch: char) -> bool {
 }
 
 fn is_digit(ch: char) -> bool {
-    ch.is_digit(10)
+    ch.is_ascii_digit()
 }
 
 fn unescape_string_literal(mut s: &str) -> Result<String, Error> {

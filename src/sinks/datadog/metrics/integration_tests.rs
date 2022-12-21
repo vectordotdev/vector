@@ -3,13 +3,17 @@ use flate2::read::ZlibDecoder;
 use futures::{channel::mpsc::Receiver, stream, StreamExt};
 use hyper::StatusCode;
 use indoc::indoc;
+use rand::{thread_rng, Rng};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue};
 
 use super::DatadogMetricsConfig;
 use crate::{
     config::SinkConfig,
     sinks::util::test::{build_test_server_status, load_sink},
-    test_util::{map_event_batch_stream, next_addr},
+    test_util::{
+        components::{assert_sink_compliance, SINK_TAGS},
+        map_event_batch_stream, next_addr,
+    },
 };
 
 enum ApiStatus {
@@ -70,7 +74,7 @@ async fn start_test(
     let events: Vec<_> = (0..10)
         .map(|index| {
             Event::Metric(Metric::new(
-                "counter",
+                &format!("counter_{}", thread_rng().gen::<u32>()),
                 MetricKind::Absolute,
                 MetricValue::Counter {
                     value: index as f64,
@@ -80,7 +84,7 @@ async fn start_test(
         .collect();
     let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
-    let _ = sink.run(stream).await.unwrap();
+    sink.run(stream).await.unwrap();
     assert_eq!(receiver.await, batch_status);
 
     (events, rx)
@@ -112,7 +116,8 @@ async fn smoke() {
         assert_eq!(val.0.headers.get("DD-API-KEY").unwrap(), "atoken");
         assert!(val.0.headers.contains_key("DD-Agent-Payload"));
 
-        let payload = decompress_payload(val.1.to_vec()).unwrap();
+        let compressed_payload = val.1.to_vec();
+        let payload = decompress_payload(compressed_payload).unwrap();
         let payload = std::str::from_utf8(&payload).unwrap();
         let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
 
@@ -124,6 +129,25 @@ async fn smoke() {
             .as_array()
             .unwrap();
         assert!(!series.is_empty());
+
+        // check metrics are sorted by name, which helps HTTP compression
+        let metric_names: Vec<String> = series
+            .iter()
+            .map(|value| {
+                value
+                    .as_object()
+                    .unwrap()
+                    .get("metric")
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect();
+        let mut sorted_names = metric_names.clone();
+        sorted_names.sort();
+        assert_eq!(metric_names, sorted_names);
+
         let entry = series.first().unwrap().as_object().unwrap();
         assert_eq!(
             entry.get("metric").unwrap().as_str().unwrap(),
@@ -146,29 +170,33 @@ async fn smoke() {
 
 #[tokio::test]
 async fn real_endpoint() {
-    let config = indoc! {r#"
+    assert_sink_compliance(&SINK_TAGS, async {
+        let config = indoc! {r#"
         default_api_key = "${TEST_DATADOG_API_KEY}"
         default_namespace = "fake.test.integration"
     "#};
-    let api_key = std::env::var("TEST_DATADOG_API_KEY").unwrap();
-    let config = config.replace("${TEST_DATADOG_API_KEY}", &api_key);
-    let (config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
+        let api_key = std::env::var("TEST_DATADOG_API_KEY").unwrap();
+        assert!(!api_key.is_empty(), "$TEST_DATADOG_API_KEY required");
+        let config = config.replace("${TEST_DATADOG_API_KEY}", &api_key);
+        let (config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
 
-    let (sink, _) = config.build(cx).await.unwrap();
-    let (batch, receiver) = BatchNotifier::new_with_receiver();
-    let events: Vec<_> = (0..10)
-        .map(|index| {
-            Event::Metric(Metric::new(
-                "counter",
-                MetricKind::Absolute,
-                MetricValue::Counter {
-                    value: index as f64,
-                },
-            ))
-        })
-        .collect();
-    let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
+        let (sink, _) = config.build(cx).await.unwrap();
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let events: Vec<_> = (0..10)
+            .map(|index| {
+                Event::Metric(Metric::new(
+                    "counter",
+                    MetricKind::Absolute,
+                    MetricValue::Counter {
+                        value: index as f64,
+                    },
+                ))
+            })
+            .collect();
+        let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
-    let _ = sink.run(stream).await.unwrap();
-    assert_eq!(receiver.await, BatchStatus::Delivered);
+        sink.run(stream).await.unwrap();
+        assert_eq!(receiver.await, BatchStatus::Delivered);
+    })
+    .await;
 }

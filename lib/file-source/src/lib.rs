@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![deny(clippy::all)]
 
 #[macro_use]
@@ -13,7 +14,7 @@ mod metadata_ext;
 pub mod paths_provider;
 
 pub use self::{
-    checkpointer::{Checkpointer, CheckpointsView},
+    checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
     file_server::{FileServer, Line, Shutdown as FileServerShutdown},
     fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter},
     internal_events::FileSourceInternalEvents,
@@ -21,7 +22,7 @@ pub use self::{
 
 pub type FilePosition = u64;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReadFrom {
     Beginning,
     End,

@@ -1,53 +1,51 @@
 use bytes::{BufMut, BytesMut};
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, RawMessageSerializerConfig};
-use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
+use vector_config::configurable_component;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig, Transformer},
     config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
+        SinkContext,
     },
     event::Event,
     internal_events::TemplateRenderingError,
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
-        tcp::TcpSinkConfig,
-        Encoding, UriSerde,
-    },
+    sinks::util::{tcp::TcpSinkConfig, UriSerde},
     tcp::TcpKeepaliveConfig,
     template::Template,
     tls::TlsEnableableConfig,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncodingMigrator;
-
-impl EncodingConfigMigrator for EncodingMigrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            Encoding::Text => RawMessageSerializerConfig::new().into(),
-            Encoding::Json => JsonSerializerConfig::new().into(),
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub(self) struct PapertrailConfig {
+/// Configuration for the `papertrail` sink.
+#[configurable_component(sink("papertrail"))]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct PapertrailConfig {
+    /// The endpoint to send logs to.
     endpoint: UriSerde,
-    #[serde(flatten)]
-    encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
-    keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsEnableableConfig>,
-    send_buffer_bytes: Option<usize>,
-    process: Option<Template>,
-}
 
-inventory::submit! {
-    SinkDescription::new::<PapertrailConfig>("papertrail")
+    #[configurable(derived)]
+    encoding: EncodingConfig,
+
+    #[configurable(derived)]
+    keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
+
+    /// Configures the send buffer size using the `SO_SNDBUF` option on the socket.
+    send_buffer_bytes: Option<usize>,
+
+    /// The value to use as the `process` in Papertrail.
+    process: Option<Template>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for PapertrailConfig {
@@ -61,11 +59,10 @@ impl GenerateConfig for PapertrailConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let host = self
             .endpoint
@@ -92,11 +89,10 @@ impl SinkConfig for PapertrailConfig {
         let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding();
+        let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         sink_config.build(
-            cx,
             Transformer::default(),
             PapertrailEncoder {
                 pid,
@@ -108,15 +104,11 @@ impl SinkConfig for PapertrailConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "papertrail"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -139,7 +131,7 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
         let host = event
             .as_mut_log()
             .remove(log_schema().host_key())
-            .map(|host| host.to_string_lossy());
+            .map(|host| host.to_string_lossy().into_owned());
 
         let process = self
             .process
@@ -187,7 +179,14 @@ mod tests {
 
     use bytes::BytesMut;
     use codecs::JsonSerializer;
+    use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
+    use vector_core::event::{Event, LogEvent};
+
+    use crate::test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        http::{always_200_response, spawn_blackhole_http_server},
+    };
 
     use super::*;
 
@@ -196,9 +195,26 @@ mod tests {
         crate::test_util::test_generate_config::<PapertrailConfig>();
     }
 
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let config = PapertrailConfig::generate_config().to_string();
+        let mut config =
+            toml::from_str::<PapertrailConfig>(&config).expect("config should be valid");
+        config.endpoint = mock_endpoint.into();
+        config.tls = Some(TlsEnableableConfig::default());
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::Log(LogEvent::from("simple message"));
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+    }
+
     #[test]
     fn encode_event_apply_rules() {
-        let mut evt = Event::from("vector");
+        let mut evt = Event::Log(LogEvent::from("vector"));
         evt.as_mut_log().insert("magic", "key");
         evt.as_mut_log().insert("process", "foo");
 

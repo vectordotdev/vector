@@ -1,9 +1,16 @@
-#![deny(clippy::all)]
-#![deny(unreachable_pub)]
-#![deny(unused_allocation)]
-#![deny(unused_extern_crates)]
-#![deny(unused_assignments)]
-#![deny(unused_comparisons)]
+#![deny(
+    warnings,
+    clippy::all,
+    clippy::pedantic,
+    unreachable_pub,
+    unused_allocation,
+    unused_extern_crates,
+    unused_assignments,
+    unused_comparisons
+)]
+#![allow(
+    clippy::semicolon_if_nothing_returned, // allowed in initial deny commit
+)]
 
 pub mod cmd;
 #[cfg(feature = "repl")]
@@ -28,4 +35,8 @@ pub enum Error {
 
     #[error("repl feature disabled, program input required")]
     ReplFeature,
+
+    #[cfg(feature = "repl")]
+    #[error("error setting up readline: {}", .0)]
+    Readline(#[from] rustyline::error::ReadlineError),
 }

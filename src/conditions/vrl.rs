@@ -1,33 +1,32 @@
-use std::sync::Arc;
-
-use serde::{Deserialize, Serialize};
 use value::Value;
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, Program, Runtime, Vm, VrlRuntime};
+use vector_config::configurable_component;
+use vector_core::compile_vrl;
+use vrl::{diagnostic::Formatter, CompilationResult, CompileConfig, Program, Runtime, VrlRuntime};
 
+use crate::event::TargetEvents;
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
+    conditions::{Condition, Conditional, ConditionalConfig},
     emit,
-    event::{Event, VrlImmutableTarget},
+    event::{Event, VrlTarget},
     internal_events::VrlConditionExecutionError,
 };
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
+/// A condition that uses the [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions) against an event.
+#[configurable_component]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct VrlConfig {
+    /// The VRL boolean expression.
     pub(crate) source: String,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub(crate) runtime: VrlRuntime,
 }
 
-inventory::submit! {
-    ConditionDescription::new::<VrlConfig>("vrl")
-}
-
 impl_generate_config_from_default!(VrlConfig);
 
-#[typetag::serde(name = "vrl")]
-impl ConditionConfig for VrlConfig {
+impl ConditionalConfig for VrlConfig {
     fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
@@ -39,27 +38,27 @@ impl ConditionConfig for VrlConfig {
         //     },
         // };
 
-        // Filter out functions that directly mutate the event.
-        //
-        // TODO(jean): expose this as a method on the `Function` trait, so we
-        // don't need to do this manually.
         let functions = vrl_stdlib::all()
             .into_iter()
-            .filter(|f| f.identifier() != "del")
-            .filter(|f| f.identifier() != "only_fields")
             .chain(enrichment::vrl_functions().into_iter())
             .chain(vector_vrl_functions::vrl_functions())
             .collect::<Vec<_>>();
 
-        let mut state = vrl::state::ExternalEnv::default();
-        state.set_external_context(enrichment_tables.clone());
+        let state = vrl::state::TypeState::default();
 
-        let (program, warnings) = vrl::compile_with_state(&self.source, &functions, &mut state)
-            .map_err(|diagnostics| {
-                Formatter::new(&self.source, diagnostics)
-                    .colored()
-                    .to_string()
-            })?;
+        let mut config = CompileConfig::default();
+        config.set_custom(enrichment_tables.clone());
+        config.set_read_only();
+
+        let CompilationResult {
+            program,
+            warnings,
+            config: _,
+        } = compile_vrl(&self.source, &functions, &state, config).map_err(|diagnostics| {
+            Formatter::new(&self.source, diagnostics)
+                .colored()
+                .to_string()
+        })?;
 
         if !warnings.is_empty() {
             let warnings = Formatter::new(&self.source, warnings).colored().to_string();
@@ -67,14 +66,6 @@ impl ConditionConfig for VrlConfig {
         }
 
         match self.runtime {
-            VrlRuntime::Vm => {
-                let vm = Arc::new(Runtime::default().compile(functions, &program, &mut state)?);
-                Ok(Condition::VrlVm(VrlVm {
-                    program,
-                    source: self.source.clone(),
-                    vm,
-                }))
-            }
             VrlRuntime::Ast => Ok(Condition::Vrl(Vrl {
                 program,
                 source: self.source.clone(),
@@ -83,8 +74,6 @@ impl ConditionConfig for VrlConfig {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 pub struct Vrl {
     pub(super) program: Program,
@@ -92,30 +81,25 @@ pub struct Vrl {
 }
 
 impl Vrl {
-    fn run(&self, event: &Event) -> vrl::RuntimeResult {
-        // TODO(jean): This clone exists until vrl-lang has an "immutable"
-        // mode.
-        //
-        // For now, mutability in reduce "vrl ends-when conditions" is
-        // allowed, but it won't mutate the original event, since we cloned it
-        // here.
-        //
-        // Having first-class immutability support in the language allows for
-        // more performance (one less clone), and boot-time errors when a
-        // program wants to mutate its events.
-        //
-        // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlImmutableTarget::new(event, self.program.info());
+    fn run(&self, event: Event) -> (Event, vrl::RuntimeResult) {
+        let mut target = VrlTarget::new(event, self.program.info(), false);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
-        Runtime::default().resolve(&mut target, &self.program, &timezone)
+        let result = Runtime::default().resolve(&mut target, &self.program, &timezone);
+        let original_event = match target.into_events() {
+            TargetEvents::One(event) => event,
+            _ => panic!("Event was modified in a condition. This is an internal compiler error."),
+        };
+        (original_event, result)
     }
 }
 
 impl Conditional for Vrl {
-    fn check(&self, event: &Event) -> bool {
-        self.run(event)
+    fn check(&self, event: Event) -> (bool, Event) {
+        let (event, result) = self.run(event);
+
+        let result = result
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
                 _ => false,
@@ -125,11 +109,14 @@ impl Conditional for Vrl {
                     error: err.to_string().as_ref()
                 });
                 false
-            })
+            });
+        (result, event)
     }
 
-    fn check_with_context(&self, event: &Event) -> Result<(), String> {
-        let value = self.run(event).map_err(|err| match err {
+    fn check_with_context(&self, event: Event) -> (Result<(), String>, Event) {
+        let (event, result) = self.run(event);
+
+        let value_result = result.map_err(|err| match err {
             vrl::Terminate::Abort(err) => {
                 let err = Formatter::new(
                     &self.source,
@@ -152,99 +139,27 @@ impl Conditional for Vrl {
                 .to_string();
                 format!("source execution failed: {}", err)
             }
-        })?;
+        });
 
-        match value {
+        let value = match value_result {
+            Ok(value) => value,
+            Err(err) => {
+                return (Err(err), event);
+            }
+        };
+
+        let result = match value {
             Value::Boolean(v) if v => Ok(()),
             Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
             _ => Err("source execution resolved to a non-boolean value".into()),
-        }
-    }
-}
-
-//------------------------------------------------------------------------------
-
-#[derive(Debug, Clone)]
-pub struct VrlVm {
-    pub(super) program: Program,
-    pub(super) source: String,
-    pub(super) vm: Arc<Vm>,
-}
-
-impl VrlVm {
-    fn run(&self, event: &Event) -> vrl::RuntimeResult {
-        // TODO(jean): This clone exists until vrl-lang has an "immutable"
-        // mode.
-        //
-        // For now, mutability in reduce "vrl ends-when conditions" is
-        // allowed, but it won't mutate the original event, since we cloned it
-        // here.
-        //
-        // Having first-class immutability support in the language allows for
-        // more performance (one less clone), and boot-time errors when a
-        // program wants to mutate its events.
-        //
-        // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlImmutableTarget::new(event, self.program.info());
-        // TODO: use timezone from remap config
-        let timezone = TimeZone::default();
-
-        Runtime::default().run_vm(&self.vm, &mut target, &timezone)
-    }
-}
-
-impl Conditional for VrlVm {
-    fn check(&self, event: &Event) -> bool {
-        self.run(event)
-            .map(|value| match value {
-                Value::Boolean(boolean) => boolean,
-                _ => false,
-            })
-            .unwrap_or_else(|err| {
-                emit!(VrlConditionExecutionError {
-                    error: err.to_string().as_ref()
-                });
-                false
-            })
-    }
-
-    fn check_with_context(&self, event: &Event) -> Result<(), String> {
-        let value = self.run(event).map_err(|err| match err {
-            vrl::Terminate::Abort(err) => {
-                let err = Formatter::new(
-                    &self.source,
-                    vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
-                    ),
-                )
-                .colored()
-                .to_string();
-                format!("source execution aborted: {}", err)
-            }
-            vrl::Terminate::Error(err) => {
-                let err = Formatter::new(
-                    &self.source,
-                    vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
-                    ),
-                )
-                .colored()
-                .to_string();
-                format!("source execution failed: {}", err)
-            }
-        })?;
-
-        match value {
-            Value::Boolean(v) if v => Ok(()),
-            Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
-            _ => Err("source execution resolved to a non-boolean value".into()),
-        }
+        };
+        (result, event)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -305,11 +220,7 @@ mod test {
                         MetricValue::Counter { value: 1.0 },
                     )
                     .with_namespace(Some("zerk"))
-                    .with_tags(Some({
-                        let mut tags = BTreeMap::new();
-                        tags.insert("host".into(), "zoobub".into());
-                        tags
-                    })),
+                    .with_tags(Some(metric_tags!("host" => "zoobub"))),
                 ),
                 r#".name == "zork" && .tags.host == "zoobub" && .kind == "incremental""#,
                 Ok(()),
@@ -334,7 +245,7 @@ mod test {
 
             if let Ok(cond) = config.build(&Default::default()) {
                 assert_eq!(
-                    cond.check_with_context(&event),
+                    cond.check_with_context(event.clone()).0,
                     check.map_err(|e| e.to_string())
                 );
             }

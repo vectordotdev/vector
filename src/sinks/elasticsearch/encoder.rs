@@ -1,15 +1,19 @@
 use std::{io, io::Write};
 
-use vector_core::ByteSizeOf;
+use serde::Serialize;
+use vector_buffers::EventCount;
+use vector_core::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
+    codecs::Transformer,
     event::{EventFinalizers, Finalizable, LogEvent},
     sinks::{
         elasticsearch::BulkAction,
-        util::encoding::{as_tracked_write, Encoder, VisitLogMut},
+        util::encoding::{as_tracked_write, Encoder},
     },
 };
 
+#[derive(Serialize)]
 pub struct ProcessedEvent {
     pub index: String,
     pub bulk_action: BulkAction,
@@ -29,8 +33,22 @@ impl ByteSizeOf for ProcessedEvent {
     }
 }
 
-#[derive(PartialEq, Default, Clone, Debug)]
+impl EstimatedJsonEncodedSizeOf for ProcessedEvent {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.log.estimated_json_encoded_size_of()
+    }
+}
+
+impl EventCount for ProcessedEvent {
+    fn event_count(&self) -> usize {
+        // An Elasticsearch ProcessedEvent is mapped one-to-one with an event.
+        1
+    }
+}
+
+#[derive(PartialEq, Eq, Default, Clone, Debug)]
 pub struct ElasticsearchEncoder {
+    pub transformer: Transformer,
     pub doc_type: String,
     pub suppress_type_name: bool,
 }
@@ -43,6 +61,11 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
     ) -> std::io::Result<usize> {
         let mut written_bytes = 0;
         for event in input {
+            let log = {
+                let mut event = Event::from(event.log);
+                self.transformer.transform(&mut event);
+                event.into_log()
+            };
             written_bytes += write_bulk_action(
                 writer,
                 event.bulk_action.as_str(),
@@ -52,7 +75,7 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
                 &event.id,
             )?;
             written_bytes +=
-                as_tracked_write::<_, _, io::Error>(writer, &event.log, |mut writer, log| {
+                as_tracked_write::<_, _, io::Error>(writer, &log, |mut writer, log| {
                     writer.write_all(&[b'\n'])?;
                     serde_json::to_writer(&mut writer, log)?;
                     writer.write_all(&[b'\n'])?;
@@ -101,15 +124,6 @@ fn write_bulk_action(
             }
         },
     )
-}
-
-impl VisitLogMut for ProcessedEvent {
-    fn visit_logs_mut<F>(&mut self, func: F)
-    where
-        F: Fn(&mut LogEvent),
-    {
-        func(&mut self.log);
-    }
 }
 
 #[cfg(test)]

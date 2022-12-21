@@ -30,7 +30,7 @@ impl RawMessageSerializerConfig {
 
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
-        schema::Requirement::empty().require_meaning(log_schema().message_key(), Kind::any())
+        schema::Requirement::empty().required_meaning(log_schema().message_key(), Kind::any())
     }
 }
 
@@ -46,21 +46,18 @@ impl RawMessageSerializer {
 }
 
 impl Encoder<Event> for RawMessageSerializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message_key = log_schema().message_key();
 
-        let bytes = match event {
-            Event::Log(log) => log
-                .get_by_meaning(message_key)
-                .or_else(|| log.get(message_key)) // backward compatibility
-                .map(|value| value.coerce_to_bytes()),
-            Event::Metric(_) => None,
-            Event::Trace(_) => None,
-        };
+        let log = event.as_log();
 
-        if let Some(bytes) = bytes {
+        if let Some(bytes) = log
+            .get_by_meaning(message_key)
+            .or_else(|| log.get(message_key))
+            .map(|value| value.coerce_to_bytes())
+        {
             buffer.put(bytes);
         }
 
@@ -71,12 +68,13 @@ impl Encoder<Event> for RawMessageSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
+    use vector_core::event::LogEvent;
 
     use super::*;
 
     #[test]
     fn serialize_bytes() {
-        let input = Event::from("foo");
+        let input = Event::from(LogEvent::from_str_legacy("foo"));
         let mut serializer = RawMessageSerializer;
 
         let mut buffer = BytesMut::new();

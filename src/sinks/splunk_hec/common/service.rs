@@ -1,24 +1,25 @@
 use std::{
     fmt,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use bytes::Bytes;
-use futures_util::{future::BoxFuture, ready};
+use futures_util::future::BoxFuture;
 use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use tokio::sync::{
-    mpsc::{self},
-    oneshot, OwnedSemaphorePermit, Semaphore,
-};
+use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
+use vector_common::request_metadata::MetaDescriptive;
 use vector_core::event::EventStatus;
 
-use super::acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig};
+use super::{
+    acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig},
+    EndpointTarget,
+};
 use crate::{
     http::HttpClient,
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
@@ -112,8 +113,8 @@ where
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
         let ack_slot = self.current_ack_slot.take();
 
-        let events_count = req.events_count;
-        let events_byte_size = req.events_byte_size;
+        let events_count = req.get_metadata().event_count();
+        let events_byte_size = req.get_metadata().events_byte_size();
         let response = self.inner.call(req);
 
         Box::pin(async move {
@@ -177,6 +178,7 @@ impl ResponseExt for http::Response<Bytes> {
 }
 
 pub struct HttpRequestBuilder {
+    pub endpoint_target: EndpointTarget,
     pub endpoint: String,
     pub default_token: String,
     pub compression: Compression,
@@ -185,24 +187,64 @@ pub struct HttpRequestBuilder {
     pub channel: String,
 }
 
+#[derive(Default)]
+pub(super) struct MetadataFields {
+    pub(super) source: Option<String>,
+    pub(super) sourcetype: Option<String>,
+    pub(super) index: Option<String>,
+    pub(super) host: Option<String>,
+}
+
 impl HttpRequestBuilder {
-    pub fn new(endpoint: String, default_token: String, compression: Compression) -> Self {
+    pub fn new(
+        endpoint: String,
+        endpoint_target: EndpointTarget,
+        default_token: String,
+        compression: Compression,
+    ) -> Self {
         let channel = Uuid::new_v4().hyphenated().to_string();
         Self {
             endpoint,
+            endpoint_target,
             default_token,
             compression,
             channel,
         }
     }
 
-    pub fn build_request(
+    pub(super) fn build_request(
         &self,
         body: Bytes,
         path: &str,
         passthrough_token: Option<Arc<str>>,
+        metadata_fields: MetadataFields,
+        auto_extract_timestamp: bool,
     ) -> Result<Request<Bytes>, crate::Error> {
-        let uri = build_uri(self.endpoint.as_str(), path).context(UriParseSnafu)?;
+        let uri = match self.endpoint_target {
+            EndpointTarget::Raw => {
+                // `auto_extract_timestamp` doesn't apply to the raw endpoint since the raw endpoint
+                // always does this anyway.
+                let metadata = [
+                    (super::SOURCE_FIELD, metadata_fields.source),
+                    (super::SOURCETYPE_FIELD, metadata_fields.sourcetype),
+                    (super::INDEX_FIELD, metadata_fields.index),
+                    (super::HOST_FIELD, metadata_fields.host),
+                ]
+                .into_iter()
+                .filter_map(|(key, value)| value.map(|value| (key, value)));
+                build_uri(self.endpoint.as_str(), path, metadata).context(UriParseSnafu)?
+            }
+            EndpointTarget::Event => build_uri(
+                self.endpoint.as_str(),
+                path,
+                if auto_extract_timestamp {
+                    Some((super::AUTO_EXTRACT_TIMESTAMP_FIELD, "true".to_string()))
+                } else {
+                    None
+                },
+            )
+            .context(UriParseSnafu)?,
+        };
 
         let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")
@@ -227,7 +269,8 @@ impl HttpRequestBuilder {
 mod tests {
     use std::{
         collections::HashMap,
-        num::{NonZeroU64, NonZeroU8},
+        future::poll_fn,
+        num::{NonZeroU64, NonZeroU8, NonZeroUsize},
         sync::{
             atomic::{AtomicU64, Ordering},
             Arc,
@@ -236,7 +279,7 @@ mod tests {
     };
 
     use bytes::Bytes;
-    use futures_util::{future::poll_fn, poll, stream::FuturesUnordered, StreamExt};
+    use futures_util::{poll, stream::FuturesUnordered, StreamExt};
     use tower::{util::BoxService, Service, ServiceExt};
     use vector_core::{
         config::proxy::ProxyConfig,
@@ -257,8 +300,9 @@ mod tests {
                 build_http_batch_service,
                 request::HecRequest,
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
+                EndpointTarget,
             },
-            util::Compression,
+            util::{metadata::RequestMetadataBuilder, Compression},
         },
     };
 
@@ -272,11 +316,16 @@ mod tests {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             endpoint,
+            EndpointTarget::default(),
             String::from(TOKEN),
             Compression::default(),
         ));
-        let http_service =
-            build_http_batch_service(client.clone(), Arc::clone(&http_request_builder));
+        let http_service = build_http_batch_service(
+            client.clone(),
+            Arc::clone(&http_request_builder),
+            EndpointTarget::Event,
+            false,
+        );
         HecService::new(
             BoxService::new(http_service),
             Some(client),
@@ -288,12 +337,21 @@ mod tests {
     fn get_hec_request() -> HecRequest {
         let body = Bytes::from("test-message");
         let events_byte_size = body.len();
+
+        let builder = RequestMetadataBuilder::new(1, events_byte_size, events_byte_size);
+        let bytes_len =
+            NonZeroUsize::new(events_byte_size).expect("payload should never be zero length");
+        let metadata = builder.with_request_size(bytes_len);
+
         HecRequest {
             body,
-            events_count: 1,
-            events_byte_size,
+            metadata,
             finalizers: EventFinalizers::default(),
             passthrough_token: None,
+            index: None,
+            source: None,
+            sourcetype: None,
+            host: None,
         }
     }
 

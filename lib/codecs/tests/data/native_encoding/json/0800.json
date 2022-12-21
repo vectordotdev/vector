@@ -1,1 +1,1 @@
-{"metric":{"name":"s","namespace":"p","tags":{"e":"q","m":"c","t":"m"},"kind":"incremental","aggregated_histogram":{"buckets":[{"upper_limit":-391104.0,"count":2620170858},{"upper_limit":465088.0,"count":2989016999},{"upper_limit":-689728.0,"count":1}],"count":1009554319,"sum":-950080.0}}}
+{"metric":{"name":"s","tags":{"_":"s","d":"x","j":"w"},"timestamp":"1970-01-01T04:02:12.000027566Z","kind":"incremental","gauge":{"value":-420352.0}}}

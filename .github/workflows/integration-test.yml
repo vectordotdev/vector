@@ -21,9 +21,17 @@ on:
       - "Makefile"
       - "rust-toolchain"
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+concurrency:
+  # For pull requests, cancel running workflows, for master, run all
+  #
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA
+  # for master
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
 
 env:
-  AUTOINSTALL: true
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
@@ -37,20 +45,9 @@ env:
   PROFILE: debug
 
 jobs:
-  cancel-previous:
-    name: Cancel redundant jobs
-    runs-on: ubuntu-20.04
-    timeout-minutes: 3
-    if: github.ref != 'refs/heads/master'
-    steps:
-      - uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          all_but_latest: true # can cancel workflows scheduled later
-
   test-integration:
     name: Integration - Linux, ${{ matrix.test }}
-    runs-on: ubuntu-20.04
+    runs-on: [linux, test-runner]
     if: |
       !github.event.pull_request
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
@@ -58,7 +55,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - test: 'amqp'
+          - test: 'apex'
           - test: 'aws'
+          # Database container currently fails to start due to failing to validate the license
+          #- test: 'axiom'
           - test: 'azure'
           - test: 'clickhouse'
           - test: 'datadog-agent'
@@ -72,21 +73,25 @@ jobs:
           - test: 'fluent'
           - test: 'gcp'
           - test: 'humio'
+          - test: 'http-client'
           - test: 'influxdb'
           - test: 'kafka'
           - test: 'logstash'
           - test: 'loki'
-          - test: 'mongo'
+          - test: 'mongodb'
+          - test: 'nats'
           - test: 'nginx'
+          - test: 'opentelemetry'
           - test: 'postgres'
           - test: 'prometheus'
           - test: 'pulsar'
           - test: 'redis'
+          - test: 'shutdown'
           - test: 'splunk'
             env:
               SPLUNK_VERSION: 7.3.9
           - test: 'splunk'
-          - test: 'shutdown'
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3
       - run: make ci-sweep
@@ -100,10 +105,13 @@ jobs:
         if: always()
       - run: make test-integration-${{ matrix.test }}-cleanup
         if: ${{ always() }}
+        env:
+          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+          SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
 
   test-integration-check:
     name: test-integration-check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs:
       - test-integration
     steps:
@@ -114,7 +122,6 @@ jobs:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
-      - cancel-previous
       - test-integration-check
     runs-on: ubuntu-20.04
     steps:

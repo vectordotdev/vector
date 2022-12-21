@@ -3,16 +3,16 @@ use std::num::NonZeroUsize;
 use aws_sdk_sqs::Client as SqsClient;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
-use vector_core::buffers::Acker;
 use vector_core::sink::StreamSink;
 
-use super::config::SqsSinkConfig;
-use super::request_builder::SqsRequestBuilder;
-use super::service::SqsService;
-use crate::config::SinkContext;
-use crate::event::Event;
-use crate::sinks::util::builder::SinkBuilderExt;
-use crate::sinks::util::{ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig};
+use super::{config::SqsSinkConfig, request_builder::SqsRequestBuilder, service::SqsService};
+use crate::internal_events::SinkRequestBuildError;
+use crate::{
+    event::Event,
+    sinks::util::{
+        builder::SinkBuilderExt, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+    },
+};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct SqsSinkDefaultBatchSettings;
@@ -25,17 +25,15 @@ impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
 
 #[derive(Clone)]
 pub(crate) struct SqsSink {
-    acker: Acker,
     request_builder: SqsRequestBuilder,
     service: SqsService,
     request: TowerRequestConfig,
 }
 
 impl SqsSink {
-    pub fn new(config: SqsSinkConfig, cx: SinkContext, client: SqsClient) -> crate::Result<Self> {
+    pub fn new(config: SqsSinkConfig, client: SqsClient) -> crate::Result<Self> {
         let request = config.request;
         Ok(SqsSink {
-            acker: cx.acker(),
             request_builder: SqsRequestBuilder::new(config)?,
             service: SqsService::new(client),
             request,
@@ -52,12 +50,17 @@ impl SqsSink {
             .settings(request, super::retry::SqsRetryLogic)
             .service(self.service);
 
-        let sink = input
+        input
             .request_builder(request_builder_concurrency_limit, self.request_builder)
-            .filter_map(|req| async move { req.ok() })
-            .into_driver(service, self.acker);
-
-        sink.run().await
+            .filter_map(|req| async move {
+                req.map_err(|error| {
+                    emit!(SinkRequestBuildError { error });
+                })
+                .ok()
+            })
+            .into_driver(service)
+            .run()
+            .await
     }
 }
 

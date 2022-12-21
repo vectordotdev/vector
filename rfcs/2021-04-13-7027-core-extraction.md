@@ -43,7 +43,7 @@ goals. It is our belief that by extracting a vector "core" we can:
 We want to push the vector project into new, more competitive spaces. This will
 mean integrating with more sources of data, allowing our users to do new things
 with their in-flight data and also consistently, release after release, use less
-resources to do it. As noted in the summary build times are long and growing,
+resources to do it. As noted in the summary, build times are long and growing,
 imposing a burden on development. It is _hard_ to benchmark and improve your
 code if the feedback cycle is 30 minutes. Our flat structure raises the barrier
 to entry for contributions; users on discord have referred to our compile times
@@ -53,10 +53,10 @@ for:
 * writing the sink and its correctness tests,
 * writing benchmarks,
 * resolving any incompatibilities between their new code and the existing vector
-  model and
+  model, and
 * waiting for CI to approve their changes.
 
-With regard to benchmarks we generally do not request contributors to add them
+With regard to benchmarks, we generally do not request contributors to add them
 as doing so is too complicated. Our flat structure promotes a conflation between
 unit and integrated benchmark tests, not to mention you need a fair bit of
 memory to _link_ vector to run these tests yourself. The feedback loop here is
@@ -225,7 +225,8 @@ remains when all feature flags are flipped off, though this will not be apparent
 in the structure of the code necessarily.
 
 This alternative does reduce iteration costs, potentially, but does not reduce
-the burden for casual development, lead to more focused testing or reduce
+the burden for casual development, does not lead to more focused testing,
+nor does it reduce
 overall experimentation costs. For instance, an engineer working on a single
 transform would still be responsible for linking all of vector if they were in a
 benchmark/optimize loop.
@@ -239,8 +240,8 @@ working on, improve iteration loop speed. We might make this the official
 default. This alternative would require us to modify our "release" build to flip
 on the specific features we intend to ship. However, while this alternative does
 potentially reduce iteration costs and experimentation costs depending on the
-area being worked it does nothing for reducing the burden for casual
-contributors nor does it lead to more focused tests. A non-representative
+area being worked on, it does nothing for reducing the burden for casual
+contributors, nor does it lead to more focused tests. A non-representative
 default may be surprising to casual contributors, leading to CI dings that would
 otherwise have happened locally.
 
@@ -263,7 +264,7 @@ through itself for testing purposes? Is that confusing to our users? I, at
 least, would find it so. Should configuration be a "core" issue or a package
 used exclusively by "core"? How granular should a package be? Must all sources
 go in a "sources" package or can `file-source` continue, or should it be a crate
-in a package? These are important questions and they'll need answered ahead of
+in a package? These are important questions and they'll need answers ahead of
 time in this alternative. That is, "core" is extracted by bulk movement of code
 in this approach.
 

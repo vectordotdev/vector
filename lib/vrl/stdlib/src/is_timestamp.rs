@@ -38,17 +38,13 @@ impl Function for IsTimestamp {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsTimestampFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        Ok(value!(args.required("value").is_timestamp()))
+        Ok(IsTimestampFn { value }.as_expr())
     }
 }
 
@@ -57,12 +53,12 @@ struct IsTimestampFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsTimestampFn {
+impl FunctionExpression for IsTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_timestamp()))
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

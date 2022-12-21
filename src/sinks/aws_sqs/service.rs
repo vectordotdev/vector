@@ -1,15 +1,12 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_sqs::error::SendMessageError;
-use aws_sdk_sqs::types::SdkError;
-use aws_sdk_sqs::Client as SqsClient;
+use aws_sdk_sqs::{error::SendMessageError, types::SdkError, Client as SqsClient};
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
-use vector_core::event::EventStatus;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
-use vector_core::ByteSizeOf;
+use vector_core::{
+    event::EventStatus, internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf,
+};
 
 use super::request_builder::SendMessageEntry;
 
@@ -29,10 +26,12 @@ impl Service<SendMessageEntry> for SqsService {
     type Error = SdkError<SendMessageError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, entry: SendMessageEntry) -> Self::Future {
         let byte_size = entry.size_of();
         let client = self.client.clone();
@@ -61,11 +60,7 @@ impl DriverResponse for SendMessageResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.byte_size)
     }
 }

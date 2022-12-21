@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim AS builder
+FROM docker.io/debian:bullseye-slim AS builder
 
 WORKDIR /vector
 

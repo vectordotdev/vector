@@ -1,50 +1,84 @@
 use std::collections::HashMap;
 
+use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use rdkafka::ClientConfig;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    codecs::EncodingConfig,
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
         kafka::sink::{healthcheck, KafkaSink},
-        util::{
-            encoding::{
-                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-            },
-            BatchConfig, NoDefaultsBatchSettings,
-        },
+        util::{BatchConfig, NoDefaultsBatchSettings},
         Healthcheck, VectorSink,
     },
 };
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct KafkaSinkConfig {
+/// Configuration for the `kafka` sink.
+#[configurable_component(sink("kafka"))]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct KafkaSinkConfig {
+    /// A comma-separated list of the initial Kafka brokers to connect to.
+    ///
+    /// Each value must be in the form of `<host>` or `<host>:<port>`, and separated by a comma.
     pub bootstrap_servers: String,
+
+    /// The Kafka topic name to write events to.
+    #[configurable(metadata(docs::templateable))]
     pub topic: String,
+
+    /// The log field name or tags key to use for the topic key.
+    ///
+    /// If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent.
+    ///
+    /// Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key.
     pub key_field: Option<String>,
-    #[serde(flatten)]
-    pub(crate) encoding:
-        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
-    /// These batching options will **not** override librdkafka_options values.
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    // These batching options will **not** override librdkafka_options values.
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: KafkaCompression,
+
+    #[configurable(derived)]
     #[serde(flatten)]
     pub auth: KafkaAuthConfig,
+
+    /// Default timeout, in milliseconds, for network requests.
     #[serde(default = "default_socket_timeout_ms")]
     pub socket_timeout_ms: u64,
+
+    /// Local message timeout, in milliseconds.
     #[serde(default = "default_message_timeout_ms")]
     pub message_timeout_ms: u64,
+
+    /// A map of advanced options to pass directly to the underlying `librdkafka` client.
+    ///
+    /// For more information on configuration options, see [Configuration properties][config_props_docs].
+    ///
+    /// [config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     #[serde(default)]
     pub librdkafka_options: HashMap<String, String>,
+
+    /// The log field name to use for the Kafka headers.
+    ///
+    /// If omitted, no headers will be written.
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
     pub headers_key: Option<String>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -63,7 +97,7 @@ const fn default_message_timeout_ms() -> u64 {
 
 /// Used to determine the options to set in configs, since both Kafka consumers and producers have
 /// unique options, they use the same struct, and the error if given the wrong options.
-#[derive(Debug, PartialOrd, PartialEq)]
+#[derive(Debug, PartialOrd, PartialEq, Eq)]
 pub enum KafkaRole {
     Consumer,
     Producer,
@@ -167,7 +201,7 @@ impl GenerateConfig for KafkaSinkConfig {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: "topic-1234".to_owned(),
             key_field: Some("user_id".to_owned()),
-            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             batch: Default::default(),
             compression: KafkaCompression::None,
             auth: Default::default(),
@@ -182,24 +216,19 @@ impl GenerateConfig for KafkaSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = KafkaSink::new(self.clone(), cx.acker())?;
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sink = KafkaSink::new(self.clone())?;
         let hc = healthcheck(self.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & (DataType::Log | DataType::Metric))
     }
 
-    fn sink_type(&self) -> &'static str {
-        "kafka"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

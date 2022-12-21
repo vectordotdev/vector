@@ -21,23 +21,37 @@ use vector_buffers::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    Acker, BufferType, Bufferable, EventCount, WhenFull,
+    BufferType, Bufferable, EventCount, WhenFull,
 };
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::finalization::{
+    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VariableMessage {
     id: u64,
     payload: Vec<u8>,
+    finalizers: EventFinalizers,
 }
 
 impl VariableMessage {
     pub fn new(id: u64, payload: Vec<u8>) -> Self {
-        VariableMessage { id, payload }
+        VariableMessage {
+            id,
+            payload,
+            finalizers: Default::default(),
+        }
     }
 
     pub fn id(&self) -> u64 {
         self.id
+    }
+}
+
+impl AddBatchNotifier for VariableMessage {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        self.finalizers.add(EventFinalizer::new(batch));
     }
 }
 
@@ -50,6 +64,12 @@ impl ByteSizeOf for VariableMessage {
 impl EventCount for VariableMessage {
     fn event_count(&self) -> usize {
         1
+    }
+}
+
+impl Finalizable for VariableMessage {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
     }
 }
 
@@ -128,7 +148,7 @@ impl Configuration {
                     .help("Sets the buffer type to use")
                     .short('t')
                     .long("buffer-type")
-                    .possible_values(&["disk-v1", "disk-v2", "in-memory"])
+                    .value_parser(["disk-v1", "disk-v2", "in-memory"])
                     .default_value("disk-v2"),
             )
             .arg(
@@ -165,35 +185,35 @@ impl Configuration {
             .get_matches();
 
         let buffer_type = matches
-            .value_of("buffer_type")
+            .get_one::<String>("buffer_type")
             .map(|s| s.to_string())
             .expect("default value for buffer_type should always be present");
         let read_total_records = matches
-            .value_of("read_total_records")
+            .get_one::<String>("read_total_records")
             .map(Ok)
             .expect("default value for read_total_records should always be present")
             .and_then(|s| s.parse::<usize>())
             .map_err(|e| e.to_string())?;
         let write_total_records = matches
-            .value_of("write_total_records")
+            .get_one::<String>("write_total_records")
             .map(Ok)
             .expect("default value for write_total_records should always be present")
             .and_then(|s| s.parse::<usize>())
             .map_err(|e| e.to_string())?;
         let write_batch_size = matches
-            .value_of("write_batch_size")
+            .get_one::<String>("write_batch_size")
             .map(Ok)
             .expect("default value for write_batch_size should always be present")
             .and_then(|s| s.parse::<usize>())
             .map_err(|e| e.to_string())?;
         let min_record_size = matches
-            .value_of("min_record_size")
+            .get_one::<String>("min_record_size")
             .map(Ok)
             .expect("default value for min_record_size should always be present")
             .and_then(|s| s.parse::<usize>())
             .map_err(|e| e.to_string())?;
         let max_record_size = matches
-            .value_of("max_record_size")
+            .get_one::<String>("max_record_size")
             .map(Ok)
             .expect("default value for max_record_size should always be present")
             .and_then(|s| s.parse::<usize>())
@@ -222,9 +242,9 @@ fn generate_record_cache(min: usize, max: usize) -> Vec<VariableMessage> {
     records
 }
 
-async fn generate_buffer<T>(buffer_type: &str) -> (BufferSender<T>, BufferReceiver<T>, Acker)
+async fn generate_buffer<T>(buffer_type: &str) -> (BufferSender<T>, BufferReceiver<T>)
 where
-    T: Bufferable + Clone,
+    T: Bufferable + Clone + Finalizable,
 {
     let data_dir = PathBuf::from("/tmp/vector");
     let id = format!("{}-buffer-perf-testing", buffer_type);
@@ -318,7 +338,7 @@ async fn main() {
     );
 
     let buffer_start = Instant::now();
-    let (mut writer, mut reader, acker) = generate_buffer(config.buffer_type.as_str()).await;
+    let (mut writer, mut reader) = generate_buffer(config.buffer_type.as_str()).await;
     let buffer_delta = buffer_start.elapsed();
 
     info!(
@@ -386,7 +406,9 @@ async fn main() {
             let read_start = Instant::now();
 
             match reader.next().await {
-                Some(_) => acker.ack(1),
+                Some(mut record) => record
+                    .take_finalizers()
+                    .update_status(EventStatus::Delivered),
                 None => {
                     info!("[buffer-perf] reader hit end of buffer, closing...");
                     break;

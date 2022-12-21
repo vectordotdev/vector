@@ -35,7 +35,7 @@ fn get(value: Value, path: Value) -> Resolved {
             .into())
         }
     };
-    Ok(value.target_get(&path)?.cloned().unwrap_or(Value::Null))
+    Ok(value.get_by_path(&path).cloned().unwrap_or(Value::Null))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -126,21 +126,14 @@ impl Function for Get {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let path = arguments.required("path");
 
-        Ok(Box::new(GetFn { value, path }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let path = args.required("path");
-
-        get(value, path)
+        Ok(GetFn { value, path }.as_expr())
     }
 }
 
@@ -150,7 +143,7 @@ pub(crate) struct GetFn {
     path: Box<dyn Expression>,
 }
 
-impl Expression for GetFn {
+impl FunctionExpression for GetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let path = self.path.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;
@@ -158,7 +151,7 @@ impl Expression for GetFn {
         get(value, path)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::any().fallible()
     }
 }

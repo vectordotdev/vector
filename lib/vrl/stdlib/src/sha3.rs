@@ -63,9 +63,9 @@ impl Function for Sha3 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let variant = arguments
@@ -74,38 +74,7 @@ impl Function for Sha3 {
             .try_bytes()
             .expect("variant not bytes");
 
-        Ok(Box::new(Sha3Fn { value, variant }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("variant", Some(expr)) => {
-                let variant = expr
-                    .as_enum("variant", variants())?
-                    .try_bytes()
-                    .expect("variant not bytes");
-
-                Ok(Some(Box::new(variant) as _))
-            }
-            ("variant", None) => Ok(Some(Box::new(Bytes::from("SHA3-512")) as _)),
-            _ => Ok(None),
-        }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let variant = args
-            .required_any("variant")
-            .downcast_ref::<Bytes>()
-            .unwrap();
-
-        sha3(value, variant)
+        Ok(Sha3Fn { value, variant }.as_expr())
     }
 }
 
@@ -115,7 +84,7 @@ struct Sha3Fn {
     variant: Bytes,
 }
 
-impl Expression for Sha3Fn {
+impl FunctionExpression for Sha3Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let variant = &self.variant;
@@ -123,7 +92,7 @@ impl Expression for Sha3Fn {
         sha3(value, variant)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

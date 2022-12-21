@@ -99,30 +99,22 @@ impl Function for Replace {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
         let with = arguments.required("with");
         let count = arguments.optional("count").unwrap_or(expr!(-1));
 
-        Ok(Box::new(ReplaceFn {
+        Ok(ReplaceFn {
             value,
             pattern,
             with,
             count,
-        }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let with = args.required("with");
-        let count = args.optional("count").unwrap_or_else(|| value!(-1));
-
-        replace(value, with, count, pattern)
+        }
+        .as_expr())
     }
 }
 
@@ -134,7 +126,7 @@ struct ReplaceFn {
     count: Box<dyn Expression>,
 }
 
-impl Expression for ReplaceFn {
+impl FunctionExpression for ReplaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let with_value = self.with.resolve(ctx)?;
@@ -144,7 +136,7 @@ impl Expression for ReplaceFn {
         replace(value, with_value, count, pattern)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

@@ -1,147 +1,29 @@
-use std::{
-    collections::{BinaryHeap, VecDeque},
-    fmt,
-    num::NonZeroUsize,
-    task::Poll,
-};
+use std::{collections::VecDeque, fmt, future::poll_fn, task::Poll};
 
 use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_buffers::{Ackable, Acker};
-use vector_common::internal_event::BytesSent;
-
-use super::FuturesUnorderedChunked;
-use crate::{
-    event::{EventStatus, Finalizable},
-    internal_event::{emit, EventsSent},
+use vector_common::internal_event::{
+    register, ByteSize, BytesSent, CallError, CountByteSize, EventsSent, InternalEventHandle as _,
+    Output, PollReadyError, Registered, SharedString,
 };
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 
-/// Newtype wrapper around sequence numbers to enforce misuse resistance.
-#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct SequenceNumber(u64);
-
-impl SequenceNumber {
-    /// Gets the actual integer value of this sequence number.
-    ///
-    /// This can be used trivially for correlating a given `SequenceNumber` in logs/metrics/tracing
-    /// without consuming the `SequenceNumber` itself.
-    fn id(&self) -> u64 {
-        self.0
-    }
-}
-
-/// An out-of-order acknowledgement waiting to become valid.
-struct PendingAcknowledgement {
-    seq_num: SequenceNumber,
-    ack_size: usize,
-}
-
-impl PartialEq for PendingAcknowledgement {
-    fn eq(&self, other: &Self) -> bool {
-        self.seq_num == other.seq_num
-    }
-}
-
-impl Eq for PendingAcknowledgement {}
-
-impl PartialOrd for PendingAcknowledgement {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // Reverse ordering so that in a `BinaryHeap`, the lowest sequence number is the highest priority.
-        Some(other.seq_num.cmp(&self.seq_num))
-    }
-}
-
-impl Ord for PendingAcknowledgement {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other
-            .partial_cmp(self)
-            .expect("PendingAcknowledgement should always return a valid comparison")
-    }
-}
-
-#[derive(Default)]
-struct AcknowledgementTracker {
-    out_of_order: BinaryHeap<PendingAcknowledgement>,
-    seq_head: u64,
-    seq_tail: u64,
-    ack_depth: usize,
-}
-
-impl AcknowledgementTracker {
-    /// Acquires the next available sequence number.
-    fn get_next_seq_num(&mut self) -> SequenceNumber {
-        let seq_num = self.seq_head;
-        self.seq_head += 1;
-        SequenceNumber(seq_num)
-    }
-
-    /// Marks the given sequence number as complete.
-    #[allow(clippy::needless_pass_by_value)]
-    fn mark_seq_num_complete(&mut self, seq_num: SequenceNumber, ack_size: usize) {
-        if seq_num.0 == self.seq_tail {
-            self.ack_depth += ack_size;
-            self.seq_tail += 1;
-        } else {
-            self.out_of_order
-                .push(PendingAcknowledgement { seq_num, ack_size });
-        }
-    }
-
-    /// Consumes the current acknowledgement "depth".
-    ///
-    /// When a sequence number is marked as complete, we either update our tail pointer if the
-    /// acknowledgement is "in order" -- essentially, it was the very next sequence number we
-    /// expected to see -- or store it for later if it's out-of-order.
-    ///
-    /// In this method, we see if any of the out-of-order sequence numbers can now be applied: maybe
-    /// 9 sequence numbers were marked complete, but one number that came before all of them was
-    /// still pending, so they had to be stored in the out-of-order list to be checked later.  This is
-    /// where we check them.
-    ///
-    /// For any sequence number -- whether it completed in order or had to be applied from the
-    /// out-of-order list -- there is an associated acknowledge "depth", which can be though of the
-    /// amount of items the sequence is acknowledging as complete.
-    ///
-    /// We accumulate that amount for every sequence number between calls to `consume_ack_depth`.
-    /// Thus, a fresh instance of `AcknowledgementTracker` has an acknowledgement depth of 0.  If we
-    /// create five sequence numbers, and mark them all complete with an acknowledge meant of 10, our
-    /// depth would then be 50.  Calling this method would return `Some(50)`, and if this method was
-    /// called again immediately after, it would return `None`.
-    fn consume_ack_depth(&mut self) -> Option<NonZeroUsize> {
-        // Drain any out-of-order acknowledgements that can now be ordered correctly.
-        while let Some(ack) = self.out_of_order.peek() {
-            if ack.seq_num.0 == self.seq_tail {
-                let PendingAcknowledgement { ack_size, .. } = self
-                    .out_of_order
-                    .pop()
-                    .expect("should not be here unless self.out_of_order is non-empty");
-                self.ack_depth += ack_size;
-                self.seq_tail += 1;
-            } else {
-                break;
-            }
-        }
-
-        match self.ack_depth {
-            0 => None,
-            n => {
-                self.ack_depth = 0;
-                NonZeroUsize::new(n)
-            }
-        }
-    }
-}
+use super::FuturesUnorderedCount;
+use crate::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::emit,
+};
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
-    fn events_sent(&self) -> EventsSent;
+    fn events_sent(&self) -> CountByteSize;
 
+    /// Return the number of bytes that were sent in the request that returned this response.
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
-    fn bytes_sent(&self) -> Option<BytesSent> {
+    fn bytes_sent(&self) -> Option<usize> {
         None
     }
 }
@@ -153,7 +35,8 @@ pub trait DriverResponse {
 /// through a `Service`, spawning each call to the service so that work can be run concurrently,
 /// managing waiting for the service to be ready before processing more items, and so on.
 ///
-/// Additionally, `Driver` handles two event-specific facilities: finalization and acknowledgement.
+/// Additionally, `Driver` handles event finalization, which triggers acknowledgements
+/// to the source or disk buffer.
 ///
 /// This capability is parameterized so any implementation which can define how to interpret the
 /// response for each request, as well as define how many events a request is compromised of, can be
@@ -161,23 +44,33 @@ pub trait DriverResponse {
 pub struct Driver<St, Svc> {
     input: St,
     service: Svc,
-    acker: Acker,
+    protocol: Option<SharedString>,
 }
 
 impl<St, Svc> Driver<St, Svc> {
-    pub fn new(input: St, service: Svc, acker: Acker) -> Self {
+    pub fn new(input: St, service: Svc) -> Self {
         Self {
             input,
             service,
-            acker,
+            protocol: None,
         }
+    }
+
+    /// Set the protocol name for this driver.
+    ///
+    /// If this is set, the driver will fetch and use the `bytes_sent` value from responses in a
+    /// `BytesSent` event.
+    #[must_use]
+    pub fn protocol(mut self, protocol: impl Into<SharedString>) -> Self {
+        self.protocol = Some(protocol.into());
+        self
     }
 }
 
 impl<St, Svc> Driver<St, Svc>
 where
     St: Stream,
-    St::Item: Ackable + Finalizable,
+    St::Item: Finalizable + MetaDescriptive,
     Svc: Service<St::Item>,
     Svc::Error: fmt::Debug + 'static,
     Svc::Future: Send + 'static,
@@ -192,18 +85,21 @@ where
     /// The return type is mostly to simplify caller code.
     /// An error is currently only returned if a service returns an error from `poll_ready`
     pub async fn run(self) -> Result<(), ()> {
-        let mut in_flight = FuturesUnorderedChunked::new(1024);
-        let mut ack_tracker = AcknowledgementTracker::default();
+        let mut in_flight = FuturesUnorderedCount::new();
         let mut next_batch: Option<VecDeque<St::Item>> = None;
+        let mut seq_num = 0usize;
 
         let Self {
             input,
             mut service,
-            acker,
+            protocol,
         } = self;
 
         let batched_input = input.ready_chunks(1024);
         pin!(batched_input);
+
+        let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
+        let events_sent = register(EventsSent::from(Output(None)));
 
         loop {
             // Core behavior of the loop:
@@ -223,7 +119,7 @@ where
             // progress, which necessitates a more complex weaving of logic.  Using `select!` is
             // more code, and requires a more careful eye than blindly doing
             // "get_next_batch().await; process_batch().await", but it does make doing the complex
-            // logic easier than if we tried to interleave it ourselves witgh an imperative-style loop.
+            // logic easier than if we tried to interleave it ourselves with an imperative-style loop.
 
             select! {
                 // Using `biased` ensures we check the branches in the order they're written, since
@@ -232,19 +128,7 @@ where
                 biased;
 
                 // One or more of our service calls have completed.
-                Some(acks) = in_flight.next(), if !in_flight.is_empty() => {
-                    for ack in acks {
-                        let (seq_num, ack_size): (SequenceNumber, usize) = ack;
-                        let request_id = seq_num.id();
-                        trace!(message = "Acknowledging service request.", request_id, ack_size);
-                        ack_tracker.mark_seq_num_complete(seq_num, ack_size);
-                    }
-
-                    if let Some(ack_depth) = ack_tracker.consume_ack_depth() {
-                        trace!(message = "Acking events.", ack_size = ack_depth);
-                        acker.ack(ack_depth.get());
-                    }
-                }
+                Some(_count) = in_flight.next(), if !in_flight.is_empty() => {}
 
                 // We've got an input batch to process and the service is ready to accept a request.
                 maybe_ready = poll_fn(|cx| service.poll_ready(cx)), if next_batch.is_some() => {
@@ -261,8 +145,8 @@ where
 
                         let svc = match maybe_ready {
                             Poll::Ready(Ok(())) => &mut service,
-                            Poll::Ready(Err(err)) => {
-                                error!(message = "Service return error from `poll_ready()`.", ?err);
+                            Poll::Ready(Err(error)) => {
+                                emit(PollReadyError{ error });
                                 return Err(())
                             }
                             Poll::Pending => {
@@ -272,38 +156,30 @@ where
                         };
 
                         let mut req = batch.pop_front().expect("batch should not be empty");
-                        let seq_num = ack_tracker.get_next_seq_num();
-                        let request_id = seq_num.id();
+                        seq_num += 1;
+                        let request_id = seq_num;
 
                         trace!(
                             message = "Submitting service request.",
                             in_flight_requests = in_flight.len(),
                             request_id,
                         );
-                        let ack_size = req.ack_size();
                         let finalizers = req.take_finalizers();
+                        let bytes_sent = bytes_sent.clone();
+                        let events_sent = events_sent.clone();
+
+                        let metadata = req.get_metadata();
 
                         let fut = svc.call(req)
                             .err_into()
-                            .map(move |result: Result<Svc::Response, Svc::Error>| {
-                                match result {
-                                    Err(error) => {
-                                        error!(message = "Service call failed.", ?error, request_id);
-                                        finalizers.update_status(EventStatus::Rejected);
-                                    },
-                                    Ok(response) => {
-                                        trace!(message = "Service call succeeded.", request_id);
-                                        finalizers.update_status(response.event_status());
-                                        if response.event_status() == EventStatus::Delivered {
-                                            if let Some(bytes_sent) = response.bytes_sent() {
-                                                emit(bytes_sent);
-                                            }
-                                            emit(response.events_sent());
-                                        }
-                                    }
-                                };
-                                (seq_num, ack_size)
-                            })
+                            .map(move |result| Self::handle_response(
+                                result,
+                                request_id,
+                                finalizers,
+                                &metadata,
+                                &bytes_sent,
+                                &events_sent,
+                            ))
                             .instrument(info_span!("request", request_id).or_current());
 
                         in_flight.push(fut);
@@ -312,7 +188,6 @@ where
 
                 // We've received some items from the input stream.
                 Some(reqs) = batched_input.next(), if next_batch.is_none() => {
-                    let reqs = reqs;
                     next_batch = Some(reqs.into());
                 }
 
@@ -322,23 +197,62 @@ where
 
         Ok(())
     }
+
+    fn handle_response(
+        result: Result<Svc::Response, Svc::Error>,
+        request_id: usize,
+        finalizers: EventFinalizers,
+        metadata: &RequestMetadata,
+        bytes_sent: &Option<Registered<BytesSent>>,
+        events_sent: &Registered<EventsSent>,
+    ) {
+        match result {
+            Err(error) => {
+                Self::emit_call_error(Some(error), request_id, metadata.event_count());
+                finalizers.update_status(EventStatus::Rejected);
+            }
+            Ok(response) => {
+                trace!(message = "Service call succeeded.", request_id);
+                finalizers.update_status(response.event_status());
+                if response.event_status() == EventStatus::Delivered {
+                    if let Some(bytes_sent) = bytes_sent {
+                        if let Some(byte_size) = response.bytes_sent() {
+                            bytes_sent.emit(ByteSize(byte_size));
+                        }
+                    }
+                    events_sent.emit(response.events_sent());
+                // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
+                } else if response.event_status() == EventStatus::Rejected {
+                    Self::emit_call_error(None, request_id, metadata.event_count());
+                    finalizers.update_status(EventStatus::Rejected);
+                }
+            }
+        };
+        drop(finalizers); // suppress "argument not consumed" warning
+    }
+
+    /// Emit the `Error` and `EventsDropped` internal events.
+    /// This scenario occurs after retries have been attempted.
+    fn emit_call_error(error: Option<Svc::Error>, request_id: usize, count: usize) {
+        emit(CallError {
+            error,
+            request_id,
+            count,
+        });
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::VecDeque,
         future::Future,
-        iter::repeat_with,
-        num::NonZeroUsize,
         pin::Pin,
-        sync::{atomic::Ordering, Arc},
-        task::{Context, Poll},
+        sync::{atomic::AtomicUsize, atomic::Ordering, Arc},
+        task::{ready, Context, Poll},
         time::Duration,
     };
 
-    use futures_util::{ready, stream};
-    use proptest::{collection::vec as arb_vec, prop_assert_eq, proptest, strategy::Strategy};
+    use futures_util::stream;
     use rand::{prelude::StdRng, SeedableRng};
     use rand_distr::{Distribution, Pareto};
     use tokio::{
@@ -347,26 +261,44 @@ mod tests {
     };
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
-    use vector_buffers::{Ackable, Acker};
-    use vector_common::internal_event::EventsSent;
+    use vector_common::{
+        finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
+        request_metadata::RequestMetadata,
+    };
+    use vector_common::{internal_event::CountByteSize, request_metadata::MetaDescriptive};
 
     use super::{Driver, DriverResponse};
-    use crate::{
-        event::{EventFinalizers, EventStatus, Finalizable},
-        stream::driver::AcknowledgementTracker,
-    };
 
-    struct DelayRequest(usize);
+    type Counter = Arc<AtomicUsize>;
 
-    impl Ackable for DelayRequest {
-        fn ack_size(&self) -> usize {
-            self.0
+    #[derive(Debug)]
+    struct DelayRequest(usize, EventFinalizers, RequestMetadata);
+
+    impl DelayRequest {
+        fn new(value: usize, counter: &Counter) -> Self {
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            let counter = Arc::clone(counter);
+            tokio::spawn(async move {
+                receiver.await;
+                counter.fetch_add(value, Ordering::Relaxed);
+            });
+            Self(
+                value,
+                EventFinalizers::new(EventFinalizer::new(batch)),
+                RequestMetadata::default(),
+            )
         }
     }
 
     impl Finalizable for DelayRequest {
         fn take_finalizers(&mut self) -> crate::event::EventFinalizers {
-            EventFinalizers::default()
+            std::mem::take(&mut self.1)
+        }
+    }
+
+    impl MetaDescriptive for DelayRequest {
+        fn get_metadata(&self) -> RequestMetadata {
+            self.2
         }
     }
 
@@ -377,18 +309,8 @@ mod tests {
             EventStatus::Delivered
         }
 
-        fn events_sent(&self) -> EventsSent {
-            EventsSent {
-                count: 1,
-                byte_size: 1,
-                output: None,
-            }
-        }
-    }
-
-    impl AsRef<EventStatus> for DelayResponse {
-        fn as_ref(&self) -> &EventStatus {
-            &EventStatus::Delivered
+        fn events_sent(&self) -> CountByteSize {
+            CountByteSize(1, 1)
         }
     }
 
@@ -458,7 +380,7 @@ mod tests {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _: DelayRequest) -> Self::Future {
+        fn call(&mut self, req: DelayRequest) -> Self::Future {
             let permit = self
                 .permit
                 .take()
@@ -471,126 +393,10 @@ mod tests {
                 // Manually drop our permit here so that we take ownership and then actually
                 // release the slot back to the semaphore.
                 drop(permit);
+                drop(req);
 
                 Ok(DelayResponse)
             })
-        }
-    }
-
-    fn arb_shuffled_seq_nums<S>(selector: S) -> impl Strategy<Value = Vec<u64>>
-    where
-        S: Strategy<Value = usize>,
-    {
-        selector
-            .prop_map(|len| (0..len).into_iter().map(|n| n as u64).collect())
-            .no_shrink()
-            .prop_shuffle()
-    }
-
-    #[test]
-    fn acknowledgement_tracker_simple() {
-        let mut ack_tracker = AcknowledgementTracker::default();
-
-        assert_eq!(ack_tracker.consume_ack_depth(), None);
-
-        let seq_num1 = ack_tracker.get_next_seq_num();
-        ack_tracker.mark_seq_num_complete(seq_num1, 42);
-
-        assert_eq!(ack_tracker.consume_ack_depth(), NonZeroUsize::new(42));
-        assert_eq!(ack_tracker.consume_ack_depth(), None);
-
-        let seq_num2 = ack_tracker.get_next_seq_num();
-        let seq_num3 = ack_tracker.get_next_seq_num();
-        ack_tracker.mark_seq_num_complete(seq_num3, 314);
-        assert_eq!(ack_tracker.consume_ack_depth(), None);
-
-        ack_tracker.mark_seq_num_complete(seq_num2, 86);
-        assert_eq!(ack_tracker.consume_ack_depth(), NonZeroUsize::new(400));
-    }
-
-    proptest! {
-        // This test occasionally hangs. Ignoring until it can be looked at more.
-        #[test]
-        #[ignore]
-        fn acknowledgement_tracker_gauntlet(
-            seq_ack_order in arb_shuffled_seq_nums(0..1000_usize),
-            batch_size_seed in arb_vec(0..100_usize, 5..=10),
-            max_batch_size in 2..=10_usize,
-        ) {
-            // `AcknowledgementTracker` uses a newtype wrapper, `SequenceNumber`, to dole out its
-            // sequence numbers in a way that ensures callers can't arbitrarily pass in sequence
-            // numbers that out outside of the valid numbers, or numbers we've already seen.
-            //
-            // This makes it harder to test since we want the order of sequence number
-            // acknowledgments to be driven by `proptest` itself.  Thus, we take a simple but
-            // slightly ugly approach: generate the raw numbers as part of the test inputs, and then
-            // transmute them by generating sequence numbers for each raw input number, and do a
-            // one-by-one replacement
-            //
-            // We know that generated sequence numbers will always start in order, and start from
-            // zero.  We can also grab the internal u64 that represents a sequence number.  With
-            // that, we can find each integer in `seq_ack_order` for each `SequenceNumber` we
-            // generate, and do a simple check at the end to make sure we've successfully mapped
-            // each one.
-            let mut ack_tracker = AcknowledgementTracker::default();
-            let mut total_ack_depth = 0;
-            let expected_total_ack_depth: usize = seq_ack_order.iter().sum::<u64>()
-                .try_into()
-                .expect("total ack depth should not exceed usize");
-
-            let mut seq_nums = (0..seq_ack_order.len())
-                .map(|_| ack_tracker.get_next_seq_num())
-                .collect::<Vec<_>>();
-
-            let mut reordered_seq_nums = seq_ack_order.iter()
-                .filter_map(|n| seq_nums.iter().position(|n2| n2.id() == *n)
-                    .map(|i| seq_nums.swap_remove(i)))
-                .collect::<VecDeque<_>>();
-
-            assert!(seq_nums.is_empty());
-            assert_eq!(seq_ack_order.len(), reordered_seq_nums.len());
-
-            // Generate our batch sizes.  We want to ensure that we're able to eventually drain all
-            // sequence numbers from the input, while still letting `proptest` drive the batch sizes
-            // used.  This is problematic because `proptest` has no way to ask for an infinite
-            // iterator natively.  We approximate this by having it give us a set of batch size
-            // "seeds", as well as a variable max batch size, which we use to construct our own
-            // infinite iterator.  This iterator is obviously not _directly_ shrinkable by
-            // `proptest`, because values will immediately diverge from the seeds rather than simply
-            // being cycled endlessly, but it should suffice for generating random values over time
-            // that are, essentially, deterministic based on the given seed.
-            let mut next_base = batch_size_seed.into_iter().cycle();
-
-            let mut last_output: usize = 0;
-            let mut batch_sizes = repeat_with(move || {
-                let base = next_base.next().expect("repeat iterator should never be empty");
-                let modified = base + last_output;
-                let next_output = modified % max_batch_size;
-                last_output = next_output;
-                next_output
-            });
-
-            // Now start acknowledging sequence numbers.  We do this in variable-sized chunks, based
-            // on `ack_batch_size`, and get the ack depth at the end of the every batch,
-            // accumulating it as part of the total.
-            while !reordered_seq_nums.is_empty() {
-                let batch_size = batch_sizes.next().expect("repeat iterator should never be empty");
-                for _ in 0..batch_size {
-                    match reordered_seq_nums.pop_front() {
-                        None => break,
-                        Some(seq_num) => {
-                            let ack_size = seq_num.id().try_into().expect("seq_num should not exceed usize");
-                            ack_tracker.mark_seq_num_complete(seq_num, ack_size);
-                        },
-                    }
-                }
-
-                if let Some(ack_depth) = ack_tracker.consume_ack_depth() {
-                    total_ack_depth += ack_depth.get();
-                }
-            }
-
-            prop_assert_eq!(expected_total_ack_depth, total_ack_depth);
         }
     }
 
@@ -598,8 +404,8 @@ mod tests {
     async fn driver_simple() {
         // This test uses a service which creates response futures that sleep for a variable, but
         // bounded, amount of time, giving the impression of work being completed.  Completion of
-        // all requests/responses is asserted by checking that the counter used by the acker matches
-        // the expected ack amount.  The delays themselves are deterministic based on a fixed-seed
+        // all requests/responses is asserted by checking that the shared counter matches the
+        // expected ack amount.  The delays themselves are deterministic based on a fixed-seed
         // RNG, so the test should always run in a fairly constant time between runs.
         //
         // TODO: Given the use of a deterministic RNG, we could likely transition this test to be
@@ -613,18 +419,23 @@ mod tests {
         // determines ack size) but the delay between messages, as well... simulating delays between
         // bursts of messages, similar to real sources.
 
+        let counter = Counter::default();
+
         // Set up our driver input stream, service, etc.
-        let input_requests = (0..2048).into_iter().collect::<Vec<_>>();
+        let input_requests = (1..=2048).into_iter().collect::<Vec<_>>();
         let input_total: usize = input_requests.iter().sum();
-        let input_stream = stream::iter(input_requests.into_iter().map(DelayRequest));
+        let input_stream = stream::iter(
+            input_requests
+                .into_iter()
+                .map(|i| DelayRequest::new(i, &counter)),
+        );
         let service = DelayService::new(10, Duration::from_millis(5), Duration::from_millis(150));
-        let (acker, counter) = Acker::basic();
-        let driver = Driver::new(input_stream, service, acker);
+        let driver = Driver::new(input_stream, service);
 
         // Now actually run the driver, consuming all of the input.
-        match driver.run().await {
-            Ok(()) => assert_eq!(input_total, counter.load(Ordering::SeqCst)),
-            Err(()) => panic!("driver unexpectedly returned with error!"),
-        }
+        assert_eq!(driver.run().await, Ok(()));
+        // Make sure the final finalizer task runs.
+        tokio::task::yield_now().await;
+        assert_eq!(input_total, counter.load(Ordering::SeqCst));
     }
 }

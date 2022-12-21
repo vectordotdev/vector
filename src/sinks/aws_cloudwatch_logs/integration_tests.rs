@@ -7,9 +7,10 @@ use std::str::FromStr;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use chrono::Duration;
-use futures::StreamExt;
+use codecs::TextSerializerConfig;
+use futures::{stream, StreamExt};
 use http::Uri;
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 
 use super::*;
 use crate::aws::create_client;
@@ -17,13 +18,13 @@ use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use crate::{
     config::{log_schema, ProxyConfig, SinkConfig, SinkContext},
-    event::{Event, Value},
-    sinks::util::{
-        encoding::{EncodingConfig, StandardEncodings},
-        BatchConfig,
-    },
+    event::{Event, LogEvent, Value},
+    sinks::util::BatchConfig,
     template::Template,
-    test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
+    test_util::{
+        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        random_lines, random_lines_with_stream, random_string, trace_init,
+    },
 };
 
 const GROUP_NAME: &str = "vector-cw";
@@ -43,7 +44,7 @@ async fn cloudwatch_insert_log_event() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+        encoding: TextSerializerConfig::new().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -60,7 +61,7 @@ async fn cloudwatch_insert_log_event() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -93,7 +94,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+        encoding: TextSerializerConfig::new().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -107,7 +108,7 @@ async fn cloudwatch_insert_log_events_sorted() {
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
-    let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
+    let timestamp = chrono::Utc::now() - Duration::days(1);
 
     let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
 
@@ -116,9 +117,9 @@ async fn cloudwatch_insert_log_events_sorted() {
     let mut doit = false;
     let events = events.map(move |mut events| {
         if doit {
-            let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
+            let timestamp = chrono::Utc::now() - Duration::days(1);
 
-            events.for_each_log(|log| {
+            events.iter_logs_mut().for_each(|log| {
                 log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
             });
         }
@@ -126,7 +127,7 @@ async fn cloudwatch_insert_log_events_sorted() {
 
         events
     });
-    let _ = sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -162,7 +163,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+        encoding: TextSerializerConfig::new().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -182,13 +183,11 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     let mut events = Vec::new();
     let mut lines = Vec::new();
 
-    let mut add_event = |offset: chrono::Duration| {
+    let mut add_event = |offset: Duration| {
         let line = input_lines.next().unwrap();
-        let mut event = Event::from(line.clone());
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), now + offset);
-        events.push(event);
+        let mut event = LogEvent::from(line.clone());
+        event.insert(log_schema().timestamp_key(), now + offset);
+        events.push(Event::Log(event));
         line
     };
 
@@ -204,7 +203,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     lines.push(add_event(Duration::days(-1)));
     lines.push(add_event(Duration::days(-13)));
 
-    sink.run_events(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -237,7 +236,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+        encoding: TextSerializerConfig::new().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -254,7 +253,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -292,7 +291,7 @@ async fn cloudwatch_insert_log_event_batched() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+        encoding: TextSerializerConfig::new().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -309,8 +308,7 @@ async fn cloudwatch_insert_log_event_batched() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    let stream = sink.into_stream(); //.send_all(&mut events).await.unwrap();
-    stream.run(events.map(Into::into).boxed()).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -343,7 +341,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+        encoding: TextSerializerConfig::new().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -366,13 +364,13 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .into_iter()
         .enumerate()
         .map(|(i, e)| {
-            let mut event = Event::from(e);
+            let mut event = LogEvent::from(e);
             let stream = (i % 2).to_string();
-            event.as_mut_log().insert("key", stream);
-            event
+            event.insert("key", stream);
+            Event::Log(event)
         })
         .collect::<Vec<_>>();
-    sink.run_events(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -435,7 +433,7 @@ async fn cloudwatch_healthcheck() {
         stream_name: Template::try_from("test-stream").unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+        encoding: TextSerializerConfig::new().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -460,7 +458,7 @@ async fn create_client_test() -> CloudwatchLogsClient {
     ));
     let proxy = ProxyConfig::default();
 
-    create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None)
+    create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None, true)
         .await
         .unwrap()
 }

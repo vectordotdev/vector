@@ -64,34 +64,22 @@ impl Function for ParseUrl {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let value = arguments.required("value");
-        let string = value.try_bytes_utf8_lossy()?;
-        let default_known_ports = arguments
-            .optional("default_known_ports")
-            .map(|val| val.as_boolean().unwrap_or(false))
-            .unwrap_or(false);
-
-        Url::parse(&string)
-            .map_err(|e| format!("unable to parse url: {}", e).into())
-            .map(|url| url_to_value(url, default_known_ports))
-    }
-
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let default_known_ports = arguments
             .optional("default_known_ports")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(ParseUrlFn {
+        Ok(ParseUrlFn {
             value,
             default_known_ports,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -101,7 +89,7 @@ struct ParseUrlFn {
     default_known_ports: Box<dyn Expression>,
 }
 
-impl Expression for ParseUrlFn {
+impl FunctionExpression for ParseUrlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let string = value.try_bytes_utf8_lossy()?;
@@ -113,7 +101,7 @@ impl Expression for ParseUrlFn {
             .map(|url| url_to_value(url, default_known_ports))
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
 }

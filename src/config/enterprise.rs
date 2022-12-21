@@ -3,13 +3,14 @@ use std::{
     fmt::{Display, Formatter},
 };
 
+use futures_util::{future::BoxFuture, stream::FuturesOrdered, Future, StreamExt};
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
 use indexmap::IndexMap;
-use rand::{prelude::ThreadRng, Rng};
-use serde::{Deserialize, Serialize};
+use rand::Rng;
+use serde::Serialize;
 use tokio::{
-    select,
+    sync::mpsc::{self},
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
@@ -21,66 +22,106 @@ use super::{
 };
 use crate::{
     common::datadog::{get_api_base_endpoint, Region},
+    conditions::AnyCondition,
     http::{HttpClient, HttpError},
-    signal::{SignalRx, SignalTo},
     sinks::{
         datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
         util::retries::ExponentialBackoff,
     },
     sources::{
-        host_metrics::{self, HostMetricsConfig},
+        host_metrics::{Collector, HostMetricsConfig},
         internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
     },
-    transforms::remap::RemapConfig,
+    transforms::{filter::FilterConfig, remap::RemapConfig},
 };
+use vector_config::configurable_component;
 
-static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
-static TAG_METRICS_KEY: &str = "#datadog_tag_metrics";
-static TAG_LOGS_KEY: &str = "#datadog_tag_logs";
-static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
-static INTERNAL_LOGS_KEY: &str = "#datadog_internal_logs";
-static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
-static DATADOG_LOGS_KEY: &str = "#datadog_logs";
+static HOST_METRICS_KEY: &str = "_datadog_host_metrics";
+static TAG_METRICS_KEY: &str = "_datadog_tag_metrics";
+static TAG_LOGS_KEY: &str = "_datadog_tag_logs";
+static FILTER_METRICS_KEY: &str = "_datadog_filter_metrics";
+static PIPELINES_NAMESPACE_METRICS_KEY: &str = "_datadog_pipelines_namespace_metrics";
+static INTERNAL_METRICS_KEY: &str = "_datadog_internal_metrics";
+static INTERNAL_LOGS_KEY: &str = "_datadog_internal_logs";
+static DATADOG_METRICS_KEY: &str = "_datadog_metrics";
+static DATADOG_LOGS_KEY: &str = "_datadog_logs";
 
 static DATADOG_REPORTING_PRODUCT: &str = "Datadog Observability Pipelines";
 static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipelines/configuration";
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+// Users can pass their Datadog API key through environment variables directly
+// rather than placing it in their configuration.
+pub static DATADOG_API_KEY_ENV_VAR_SHORT: &str = "DD_API_KEY";
+pub static DATADOG_API_KEY_ENV_VAR_FULL: &str = "DATADOG_API_KEY";
+
+/// Enterprise options for using Datadog's [Observability Pipelines][datadog_op].
+///
+/// [datadog_op]: https://www.datadoghq.com/product/observability-pipelines/
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
+    /// Whether or not Observability Pipelines support is enabled.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
+    /// Whether or not to report internal component logs to Observability Pipelines.
     #[serde(default = "default_enable_logs_reporting")]
     pub enable_logs_reporting: bool,
 
-    #[serde(default = "default_exit_on_fatal_error")]
-    pub exit_on_fatal_error: bool,
-
+    /// The Datadog [site][dd_site] to send data to.
+    ///
+    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     #[serde(default)]
     site: Option<String>,
+
+    /// The Datadog region to send data to.
+    ///
+    /// This option is deprecated, and the `site` field should be used instead.
+    #[configurable(deprecated)]
     region: Option<Region>,
+
+    /// The Datadog endpoint to send data to.
+    ///
+    /// This is an advanced setting that is generally meant only for testing, and overrides both
+    /// `site` and `region`.
+    ///
+    /// You should prefer to set `site`.
+    #[configurable(derived)]
     endpoint: Option<String>,
 
+    /// The Datadog [API key][api_key] to send data with.
+    ///
+    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(default)]
     pub api_key: Option<String>,
 
-    pub application_key: String,
+    /// The Datadog application key.
+    ///
+    /// This is deprecated.
+    #[configurable(deprecated)]
+    pub application_key: Option<String>,
+
+    /// The configuration key for Observability Pipelines.
     pub configuration_key: String,
 
+    /// The amount of time, in seconds, between reporting host metrics to Observability Pipelines.
     #[serde(default = "default_reporting_interval_secs")]
     pub reporting_interval_secs: f64,
 
+    /// The maximum number of retries to report Vector's configuration to Observability Pipelines at startup.
     #[serde(default = "default_max_retries")]
     pub max_retries: u32,
 
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
 
+    /// A map of additional tags for metrics sent to Observability Pipelines.
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -89,12 +130,11 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             enable_logs_reporting: default_enable_logs_reporting(),
-            exit_on_fatal_error: default_exit_on_fatal_error(),
             site: None,
             region: None,
             endpoint: None,
             api_key: None,
-            application_key: "".to_owned(),
+            application_key: None,
             configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
@@ -104,25 +144,40 @@ impl Default for Options {
     }
 }
 
-/// Pipelines error, relevant to an upstream caller. This abstracts away HTTP-specific error
-/// codes that are implementation details of whether we consider a request successful or not.
-pub enum PipelinesError {
+/// By default, the Datadog feature is enabled.
+const fn default_enabled() -> bool {
+    true
+}
+
+/// By default, internal logs are reported to Datadog.
+const fn default_enable_logs_reporting() -> bool {
+    true
+}
+
+/// By default, scrape internal metrics and report to Datadog every 1 seconds.
+const fn default_reporting_interval_secs() -> f64 {
+    1.0
+}
+
+/// By default, keep retrying (recoverable) failed reporting
+const fn default_max_retries() -> u32 {
+    u32::MAX
+}
+
+/// Enterprise error, relevant to an upstream caller.
+pub enum EnterpriseError {
     Disabled,
     MissingApiKey,
-    FatalCouldNotReportConfig,
-    CouldNotReportConfig,
-    Interrupt,
 }
 
 /// Holds data required to authorize a request to the Datadog OP reporting endpoint.
 struct PipelinesAuth<'a> {
     api_key: &'a str,
-    application_key: &'a str,
 }
 
 /// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
 struct PipelinesStrFields<'a> {
-    config_version: &'a str,
+    configuration_version_hash: &'a str,
     vector_version: &'a str,
 }
 
@@ -179,22 +234,17 @@ impl Display for ReportingError {
 /// Exponential backoff with random jitter for retrying configuration reporting
 struct ReportingRetryBackoff {
     backoff: ExponentialBackoff,
-    jitter_rng: ThreadRng,
 }
 
 impl ReportingRetryBackoff {
     /// Retry every 2^n seconds with a maximum delay of 60 seconds (and any
     /// additional jitter)
-    fn new() -> Self {
+    const fn new() -> Self {
         let backoff = ExponentialBackoff::from_millis(2)
             .factor(1000)
             .max_delay(Duration::from_secs(60));
-        let jitter_rng = rand::thread_rng();
 
-        Self {
-            backoff,
-            jitter_rng,
-        }
+        Self { backoff }
     }
 
     /// Wait before retrying as determined by the backoff and jitter
@@ -213,7 +263,7 @@ impl Iterator for ReportingRetryBackoff {
     type Item = Duration;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let jitter_milliseconds = Duration::from_millis(self.jitter_rng.gen_range(0..1000));
+        let jitter_milliseconds = Duration::from_millis(rand::thread_rng().gen_range(0..1000));
         Some(
             self.backoff
                 .next()
@@ -229,7 +279,7 @@ impl<'a> PipelinesVersionPayload<'a> {
         Self {
             data: PipelinesData {
                 attributes: PipelinesAttributes {
-                    config_hash: fields.config_version,
+                    config_hash: fields.configuration_version_hash,
                     vector_version: fields.vector_version,
                     config,
                 },
@@ -245,154 +295,194 @@ impl<'a> PipelinesVersionPayload<'a> {
     }
 }
 
-/// Augment configuration with observability via Datadog if the feature is enabled and
-/// an API key is provided.
-pub async fn try_attach(
-    config: &mut Config,
-    config_paths: &[ConfigPath],
-    mut signal_rx: SignalRx,
-) -> Result<(), PipelinesError> {
-    // Only valid if a [enterprise] section is present in config.
-    let datadog = match config.enterprise.clone() {
-        Some(datadog) => datadog,
-        _ => return Err(PipelinesError::Disabled),
-    };
+#[derive(Clone)]
+pub(crate) struct EnterpriseMetadata {
+    pub opts: Options,
+    pub api_key: String,
+    pub configuration_version_hash: String,
+}
 
-    // Return early if an API key is missing, or the feature isn't enabled.
-    let api_key = match (&datadog.api_key, datadog.enabled) {
-        // API key provided explicitly.
-        (Some(api_key), true) => api_key.clone(),
-        // No API key; attempt to get it from the environment.
-        (None, true) => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
-            Ok(api_key) => api_key,
-            _ => return Err(PipelinesError::MissingApiKey),
-        },
-        _ => return Err(PipelinesError::MissingApiKey),
-    };
+impl TryFrom<&Config> for EnterpriseMetadata {
+    type Error = EnterpriseError;
 
-    info!(
-        "Datadog API key provided. Integration with {} is enabled.",
-        DATADOG_REPORTING_PRODUCT
-    );
+    fn try_from(value: &Config) -> Result<Self, Self::Error> {
+        // Only valid if a [enterprise] section is present in config.
+        let opts = match value.enterprise.clone() {
+            Some(opts) => opts,
+            _ => return Err(EnterpriseError::Disabled),
+        };
 
-    // Get the configuration version. In DD Pipelines, this is referred to as the 'config hash'.
-    let config_version = config.version.clone().expect("Config should be versioned");
+        // Return early if the feature isn't enabled.
+        if !opts.enabled {
+            return Err(EnterpriseError::Disabled);
+        }
 
-    // Get the Vector version. This is reported to Pipelines along with a config hash.
-    let vector_version = crate::get_version();
+        let api_key = match &opts.api_key {
+            // API key provided explicitly.
+            Some(api_key) => api_key.clone(),
+            // No API key; attempt to get it from the environment.
+            None => match env::var(DATADOG_API_KEY_ENV_VAR_FULL)
+                .or_else(|_| env::var(DATADOG_API_KEY_ENV_VAR_SHORT))
+            {
+                Ok(api_key) => api_key,
+                _ => return Err(EnterpriseError::MissingApiKey),
+            },
+        };
 
-    // Report the internal configuration to Datadog Observability Pipelines.
-    // First, we need to create a JSON representation of config, based on the original files
-    // that Vector was spawned with.
-    let (table, _) = process_paths(config_paths)
-        .map(|paths| load_source_from_paths(&paths).ok())
-        .flatten()
-        .expect("Couldn't load source from config paths. Please report.");
+        if opts.application_key.is_some() {
+            warn!(
+                "Datadog application key is deprecated. You can safely remove `application_key` from the config."
+            );
+        }
 
-    // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
-    // exploding as func arguments to avoid confusion with multiple &str fields.
-    let fields = PipelinesStrFields {
-        config_version: config_version.as_ref(),
-        vector_version: &vector_version,
-    };
+        info!(
+            "Datadog API key provided. Integration with {} is enabled.",
+            DATADOG_REPORTING_PRODUCT
+        );
 
-    // Set the Datadog authorization fields. There's an API and app key, to allow read/write
-    // access in tandem with RBAC on the Datadog side.
-    let auth = PipelinesAuth {
-        api_key: &api_key,
-        application_key: &datadog.application_key,
-    };
+        // Get the configuration version hash. In DD Pipelines, this is referred to as the 'config hash'.
+        let configuration_version_hash = value.hash.clone().expect("Config should be versioned");
 
-    // Create a HTTP client for posting a Vector version to Datadog OP. This will
-    // respect any proxy settings provided in top-level config.
-    let client = HttpClient::new(None, &datadog.proxy)
-        .expect("couldn't instrument Datadog HTTP client. Please report");
+        Ok(Self {
+            opts,
+            api_key,
+            configuration_version_hash,
+        })
+    }
+}
 
-    // Endpoint to report a config to Datadog OP.
-    let endpoint = get_reporting_endpoint(
-        datadog.endpoint.as_ref(),
-        datadog.site.as_ref(),
-        datadog.region,
-        &datadog.configuration_key,
-    );
+pub struct EnterpriseReporter<T> {
+    reporting_tx: mpsc::UnboundedSender<T>,
+}
 
-    // Datadog uses a JSON:API, so we'll serialize the config to a JSON
-    let payload = PipelinesVersionPayload::new(&table, &fields);
+impl<T> EnterpriseReporter<T>
+where
+    T: Future<Output = ()> + Send + 'static,
+{
+    pub fn new() -> Self {
+        let (reporting_tx, mut reporting_rx) = mpsc::unbounded_channel();
 
-    select! {
-        biased;
-        Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(PipelinesError::Interrupt),
-        report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload, datadog.max_retries) => {
-            match report {
-                Ok(()) => {
-                    info!(
-                        "Vector config {} successfully reported to {}.",
-                        &config_version, DATADOG_REPORTING_PRODUCT
-                    );
-                }
-                Err(err) => {
-                    error!(
-                        err = ?err.to_string(),
-                        "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
-                    );
-
-                    if datadog.exit_on_fatal_error {
-                        return Err(PipelinesError::FatalCouldNotReportConfig);
-                    } else {
-                        return Err(PipelinesError::CouldNotReportConfig);
+        // A long running task to report configurations in order
+        tokio::spawn(async move {
+            let mut pending_reports = FuturesOrdered::new();
+            loop {
+                tokio::select! {
+                    maybe_report = reporting_rx.recv() => {
+                        match maybe_report {
+                            Some(report) => pending_reports.push_back(report),
+                            None => break,
+                        }
+                    }
+                    _ = pending_reports.next(), if !pending_reports.is_empty() => {
                     }
                 }
             }
+        });
+
+        Self { reporting_tx }
+    }
+
+    pub fn send(&self, reporting_task: T) {
+        if let Err(err) = self.reporting_tx.send(reporting_task) {
+            error!(
+                %err,
+                "Unable to report configuration due to internal Vector issue.",
+            );
         }
     }
+}
 
-    setup_metrics_reporting(config, &datadog, api_key.clone(), config_version.clone());
-
-    if datadog.enable_logs_reporting {
-        setup_logs_reporting(config, &datadog, api_key, config_version);
+impl<T> Default for EnterpriseReporter<T>
+where
+    T: Future<Output = ()> + Send + 'static,
+{
+    fn default() -> Self {
+        Self::new()
     }
+}
 
-    Ok(())
+/// Report a configuration in a reloading context.
+///
+/// Returns an [`EnterpriseReporter`] if one was not provided.
+pub(crate) fn report_on_reload(
+    config: &mut Config,
+    metadata: EnterpriseMetadata,
+    config_paths: Vec<ConfigPath>,
+    enterprise: Option<&EnterpriseReporter<BoxFuture<'static, ()>>>,
+) -> Option<EnterpriseReporter<BoxFuture<'static, ()>>> {
+    attach_enterprise_components(config, &metadata);
+
+    let enterprise = match enterprise {
+        Some(enterprise) => {
+            enterprise.send(report_configuration(config_paths, metadata));
+            None
+        }
+        None => {
+            let enterprise = EnterpriseReporter::new();
+            enterprise.send(report_configuration(config_paths, metadata));
+            Some(enterprise)
+        }
+    };
+
+    enterprise
+}
+
+pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
+    let api_key = metadata.api_key.clone();
+    let configuration_version_hash = metadata.configuration_version_hash.clone();
+
+    setup_metrics_reporting(
+        config,
+        &metadata.opts,
+        api_key.clone(),
+        configuration_version_hash.clone(),
+    );
+
+    if metadata.opts.enable_logs_reporting {
+        setup_logs_reporting(config, &metadata.opts, api_key, configuration_version_hash);
+    }
 }
 
 fn setup_logs_reporting(
     config: &mut Config,
     datadog: &Options,
     api_key: String,
-    config_version: String,
+    configuration_version_hash: String,
 ) {
     let tag_logs_id = OutputId::from(ComponentKey::from(TAG_LOGS_KEY));
     let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
     let datadog_logs_id = ComponentKey::from(DATADOG_LOGS_KEY);
 
-    let internal_logs = InternalLogsConfig {
-        ..Default::default()
-    };
+    let internal_logs = InternalLogsConfig::default();
 
     let custom_logs_tags_vrl = datadog
         .tags
         .as_ref()
         .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, false));
 
+    let configuration_key = &datadog.configuration_key;
+    let vector_version = crate::vector_version();
     let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
-            .version = "{}"
-            .configuration_key = "{}"
             .ddsource = "vector"
+            .vector.configuration_key = "{configuration_key}"
+            .vector.configuration_version_hash = "{configuration_version_hash}"
+            .vector.version = "{vector_version}"
             {}
         "#,
-            &config_version, &datadog.configuration_key, custom_logs_tags_vrl,
+            custom_logs_tags_vrl,
         )),
         ..Default::default()
     };
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        default_api_key: api_key,
+        default_api_key: api_key.into(),
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
+        enterprise: true,
         ..Default::default()
     };
 
@@ -408,7 +498,7 @@ fn setup_logs_reporting(
 
     config.sinks.insert(
         datadog_logs_id,
-        SinkOuter::new(vec![tag_logs_id], Box::new(datadog_logs)),
+        SinkOuter::new(vec![tag_logs_id], datadog_logs),
     );
 }
 
@@ -416,23 +506,41 @@ fn setup_metrics_reporting(
     config: &mut Config,
     datadog: &Options,
     api_key: String,
-    config_version: String,
+    configuration_version_hash: String,
 ) {
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let tag_metrics_id = OutputId::from(ComponentKey::from(TAG_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
+    let filter_metrics_id = OutputId::from(ComponentKey::from(FILTER_METRICS_KEY));
+    let pipelines_namespace_metrics_id =
+        OutputId::from(ComponentKey::from(PIPELINES_NAMESPACE_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
+
+    // By default, host_metrics generates many metrics and some with high
+    // cardinality which can negatively impact customers' costs and downstream
+    // systems' performance. To avoid this, we explicitly set `collectors`.
     let host_metrics = HostMetricsConfig {
-        namespace: host_metrics::Namespace::from(Some("pipelines".to_owned())),
+        namespace: Some("vector.host".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
+        collectors: Some(vec![
+            Collector::Cpu,
+            Collector::Disk,
+            Collector::Load,
+            Collector::Host,
+            Collector::Memory,
+            Collector::Network,
+        ]),
         ..Default::default()
     };
 
     let internal_metrics = InternalMetricsConfig {
-        namespace: Some("pipelines".to_owned()),
+        // While the default namespace for internal metrics is already "vector",
+        // setting the namespace here is meant for clarity and resistance
+        // against any future or accidental changes.
+        namespace: Some("vector".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         ..Default::default()
     };
@@ -442,21 +550,34 @@ fn setup_metrics_reporting(
         .as_ref()
         .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, true));
 
+    let configuration_key = &datadog.configuration_key;
+    let vector_version = crate::vector_version();
     let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
-            .tags.version = "{}"
-            .tags.configuration_key = "{}"
+            .tags.configuration_version_hash = "{configuration_version_hash}"
+            .tags.configuration_key = "{configuration_key}"
+            .tags.vector_version = "{vector_version}"
             {}
         "#,
-            &config_version, &datadog.configuration_key, custom_metric_tags_vrl
+            custom_metric_tags_vrl
         )),
+        ..Default::default()
+    };
+
+    // Preserve the `pipelines` namespace for specific metrics
+    let filter_metrics = FilterConfig::from(AnyCondition::String(
+        r#".name == "component_received_bytes_total""#.to_string(),
+    ));
+
+    let pipelines_namespace_metrics = RemapConfig {
+        source: Some(r#".namespace = "pipelines""#.to_string()),
         ..Default::default()
     };
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        default_api_key: api_key,
+        default_api_key: api_key.into(),
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
@@ -477,40 +598,23 @@ fn setup_metrics_reporting(
         TransformOuter::new(vec![host_metrics_id, internal_metrics_id], tag_metrics),
     );
 
+    config.transforms.insert(
+        filter_metrics_id.component.clone(),
+        TransformOuter::new(vec![tag_metrics_id.clone()], filter_metrics),
+    );
+
+    config.transforms.insert(
+        pipelines_namespace_metrics_id.component.clone(),
+        TransformOuter::new(vec![filter_metrics_id], pipelines_namespace_metrics),
+    );
+
     config.sinks.insert(
         datadog_metrics_id,
-        SinkOuter::new(vec![tag_metrics_id], Box::new(datadog_metrics)),
+        SinkOuter::new(
+            vec![tag_metrics_id, pipelines_namespace_metrics_id],
+            datadog_metrics,
+        ),
     );
-}
-
-/// By default, the Datadog feature is enabled.
-const fn default_enabled() -> bool {
-    true
-}
-
-/// By default, internal logs are reported to Datadog.
-const fn default_enable_logs_reporting() -> bool {
-    true
-}
-
-/// By default, Vector should not exit when a fatal reporting error is encountered.
-const fn default_exit_on_fatal_error() -> bool {
-    false
-}
-
-/// By default, report to Datadog every 5 seconds.
-const fn default_reporting_interval_secs() -> f64 {
-    5.0
-}
-
-/// By default, keep retrying (recoverable) failed reporting
-///
-/// This is set to 8 attempts which, with the exponential backoff strategy and
-/// maximum of 60 second delay (see [`ReportingRetryBackoff`]), works out to
-/// roughly 3 minutes of retrying before giving up and allowing the rest of
-/// Vector to start.
-const fn default_max_retries() -> u32 {
-    8
 }
 
 /// Converts user configured tags to VRL source code for adding tags/fields to
@@ -522,6 +626,80 @@ fn convert_tags_to_vrl(tags: &IndexMap<String, String>, is_metric: bool) -> Stri
     } else {
         format!(r#". = merge(., {}, deep: true)"#, json_tags)
     }
+}
+
+/// Report the internal configuration to Datadog Observability Pipelines.
+pub(crate) fn report_configuration(
+    config_paths: Vec<ConfigPath>,
+    metadata: EnterpriseMetadata,
+) -> BoxFuture<'static, ()> {
+    let fut = async move {
+        let EnterpriseMetadata {
+            api_key,
+            configuration_version_hash,
+            opts,
+        } = metadata;
+
+        // Get the Vector version. This is reported to Pipelines along with a config hash.
+        let vector_version = crate::get_version();
+
+        // We need to create a JSON representation of config, based on the original files
+        // that Vector was spawned with.
+        let (table, _) = process_paths(&config_paths)
+            .and_then(|paths| load_source_from_paths(&paths).ok())
+            .expect("Couldn't load source from config paths. Please report.");
+
+        // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
+        // exploding as func arguments to avoid confusion with multiple &str fields.
+        let fields = PipelinesStrFields {
+            configuration_version_hash: &configuration_version_hash,
+            vector_version: &vector_version,
+        };
+
+        // Set the Datadog authorization fields. There's an API and app key, to allow read/write
+        // access in tandem with RBAC on the Datadog side.
+        let auth = PipelinesAuth { api_key: &api_key };
+
+        // Create a HTTP client for posting a Vector version to Datadog OP. This will
+        // respect any proxy settings provided in top-level config.
+        let client = HttpClient::new(None, &opts.proxy)
+            .expect("couldn't instrument Datadog HTTP client. Please report");
+
+        // Endpoint to report a config to Datadog OP.
+        let endpoint = get_reporting_endpoint(
+            opts.endpoint.as_ref(),
+            opts.site.as_ref(),
+            opts.region,
+            &opts.configuration_key,
+        );
+        // Datadog uses a JSON:API, so we'll serialize the config to a JSON
+        let payload = PipelinesVersionPayload::new(&table, &fields);
+
+        match report_serialized_config_to_datadog(
+            &client,
+            &endpoint,
+            &auth,
+            &payload,
+            opts.max_retries,
+        )
+        .await
+        {
+            Ok(()) => {
+                info!(
+                    "Vector config {} successfully reported to {}.",
+                    &configuration_version_hash, DATADOG_REPORTING_PRODUCT
+                );
+            }
+            Err(err) => {
+                error!(
+                    err = ?err.to_string(),
+                    "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
+                );
+            }
+        }
+    };
+
+    Box::pin(fut)
 }
 
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
@@ -547,7 +725,6 @@ fn build_request<'a>(
 ) -> Request<Body> {
     Request::post(endpoint.to_string())
         .header("DD-API-KEY", auth.api_key)
-        .header("DD-APPLICATION-KEY", auth.application_key)
         .body(Body::from(payload.json_string()))
         .unwrap_or_else(|_| {
             panic!(
@@ -580,8 +757,13 @@ async fn report_serialized_config_to_datadog<'a>(
         let req = build_request(&endpoint, auth, payload);
         let res = client.send(req).await;
         if let Err(HttpError::CallRequest { source: error }) = &res {
+            // Retry on request timeouts and network issues
             if error.is_timeout() {
                 info!(message = "Configuration reporting request timed out.", error = %error);
+                backoff.wait().await;
+                continue;
+            } else if error.is_connect() {
+                warn!(error = %error, "Configuration reporting connection issue.");
                 backoff.wait().await;
                 continue;
             }
@@ -621,16 +803,23 @@ async fn report_serialized_config_to_datadog<'a>(
     Err(ReportingError::MaxRetriesReached)
 }
 
-#[cfg(all(test, feature = "enterprise-tests"))]
+#[cfg(all(
+    test,
+    feature = "enterprise",
+    feature = "sources-demo_logs",
+    feature = "sinks-blackhole"
+))]
 mod test {
-    use std::{io::Write, path::PathBuf, str::FromStr, thread};
+    use std::{collections::BTreeMap, net::TcpListener, time::Duration};
 
     use http::StatusCode;
     use indexmap::IndexMap;
-    use indoc::formatdoc;
+    use tokio::time::sleep;
     use value::Kind;
     use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
+    use vrl::prelude::Collection;
+    use vrl::CompileConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use super::{
@@ -638,22 +827,18 @@ mod test {
         PipelinesVersionPayload,
     };
     use crate::{
-        app::Application,
-        cli::{Color, LogFormat, Opts, RootOpts},
         config::enterprise::{convert_tags_to_vrl, default_max_retries},
         http::HttpClient,
+        test_util::next_addr,
     };
 
     const fn get_pipelines_auth() -> PipelinesAuth<'static> {
-        PipelinesAuth {
-            api_key: "api_key",
-            application_key: "application_key",
-        }
+        PipelinesAuth { api_key: "api_key" }
     }
 
     const fn get_pipelines_fields() -> PipelinesStrFields<'static> {
         PipelinesStrFields {
-            config_version: "config_version",
+            configuration_version_hash: "configuration_version_hash",
             vector_version: "vector_version",
         }
     }
@@ -677,29 +862,6 @@ mod test {
             .await;
 
         mock_server
-    }
-
-    fn get_vector_config_file(config: impl Into<String>) -> tempfile::NamedTempFile {
-        let mut file = tempfile::NamedTempFile::new().unwrap();
-        let _ = writeln!(file, "{}", config.into());
-        file
-    }
-
-    fn get_root_opts(config_path: PathBuf) -> RootOpts {
-        RootOpts {
-            config_paths: vec![config_path],
-            config_dirs: vec![],
-            config_paths_toml: vec![],
-            config_paths_json: vec![],
-            config_paths_yaml: vec![],
-            require_healthy: None,
-            threads: None,
-            verbose: 0,
-            quiet: 3,
-            log_format: LogFormat::from_str("text").unwrap(),
-            color: Color::from_str("auto").unwrap(),
-            watch_config: false,
-        }
     }
 
     #[tokio::test]
@@ -749,6 +911,43 @@ mod test {
     }
 
     #[tokio::test]
+    async fn retry_on_loss_of_network_connection() {
+        let addr = next_addr();
+        let endpoint = format!("http://{}:{}", addr.ip(), addr.port());
+
+        let report = tokio::spawn(async move {
+            let client = HttpClient::new(None, &ProxyConfig::default())
+                .expect("Failed to create http client");
+            let auth = get_pipelines_auth();
+            let fields = get_pipelines_fields();
+            let config = toml::map::Map::new();
+            let payload = PipelinesVersionPayload::new(&config, &fields);
+
+            report_serialized_config_to_datadog(
+                &client,
+                endpoint.as_ref(),
+                &auth,
+                &payload,
+                default_max_retries(),
+            )
+            .await
+        });
+        sleep(Duration::from_secs(2)).await;
+
+        // The server is completely unavailable when initially reporting to
+        // simulate a network/connection failure
+        let listener = TcpListener::bind(addr).unwrap();
+        let server = MockServer::builder().listener(listener).start().await;
+        Mock::given(matchers::method("POST"))
+            .respond_with(ResponseTemplate::new(StatusCode::OK))
+            .mount(&server)
+            .await;
+
+        let res = report.await.unwrap();
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
     async fn error_exceed_max_retries() {
         let server = build_test_server_error_and_recover(StatusCode::INTERNAL_SERVER_ERROR).await;
 
@@ -771,107 +970,6 @@ mod test {
         .is_err());
     }
 
-    /// This test asserts that configuration reporting errors, by default, do
-    /// NOT impact the rest of Vector starting and running. To exit on errors,
-    /// an explicit option must be set in the [enterprise] configuration (see
-    /// [`super::Options`]).
-    ///
-    /// In general, Vector should continue operating even in the event that the
-    /// enterprise API is down/having issues. Do not modify this behavior
-    /// without prior approval.
-    #[tokio::test]
-    async fn vector_continues_on_reporting_error() {
-        let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
-        let endpoint = server.uri();
-
-        let vector_config = formatdoc! {r#"
-            [enterprise]
-            application_key = "application_key"
-            api_key = "api_key"
-            configuration_key = "configuration_key"
-            endpoint = "{endpoint}"
-            max_retries = 1
-
-            [sources.in]
-            type = "demo_logs"
-            format = "syslog"
-            count = 1
-            interval = 0.0
-
-            [sinks.out]
-            type = "blackhole"
-            inputs = ["*"]
-        "#, endpoint=endpoint};
-
-        let config_file = get_vector_config_file(vector_config);
-
-        let opts = Opts {
-            root: get_root_opts(config_file.path().to_path_buf()),
-            sub_command: None,
-        };
-
-        // Spawn a separate thread to avoid nested async runtime errors
-        let vector_continued = thread::spawn(|| {
-            // Configuration reporting is guaranteed to fail here. However, the
-            // app should still start up and run since `exit_on_fatal_error =
-            // false` by default
-            Application::prepare_from_opts(opts).map_or(false, |app| {
-                // Finish running the topology to avoid error logs
-                app.run();
-                true
-            })
-        })
-        .join()
-        .unwrap();
-
-        assert!(vector_continued);
-    }
-
-    #[tokio::test]
-    async fn vector_exits_on_reporting_error_when_configured() {
-        let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
-        let endpoint = server.uri();
-
-        let vector_config = formatdoc! {r#"
-            [enterprise]
-            application_key = "application_key"
-            api_key = "api_key"
-            configuration_key = "configuration_key"
-            endpoint = "{endpoint}"
-            exit_on_fatal_error = true
-            max_retries = 1
-
-            [sources.in]
-            type = "demo_logs"
-            format = "syslog"
-            count = 1
-            interval = 0.0
-
-            [sinks.out]
-            type = "blackhole"
-            inputs = ["*"]
-        "#, endpoint=endpoint};
-
-        let config_file = get_vector_config_file(vector_config);
-
-        let opts = Opts {
-            root: get_root_opts(config_file.path().to_path_buf()),
-            sub_command: None,
-        };
-
-        let vector_continued = thread::spawn(|| {
-            // With `exit_on_fatal_error = true`, starting the app should fail
-            Application::prepare_from_opts(opts).map_or(false, |app| {
-                app.run();
-                true
-            })
-        })
-        .join()
-        .unwrap();
-
-        assert!(!vector_continued);
-    }
-
     #[test]
     fn dynamic_tags_to_remap_config_for_metrics() {
         let tags = IndexMap::from([
@@ -888,12 +986,19 @@ mod test {
         // We need to set up some state here to inform the VRL compiler that
         // .tags is an object and merge() is thus a safe operation (mimicking
         // the environment this code will actually run in).
-        let mut state = vrl::state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
-            "tags" => Kind::object(btreemap! {}),
-        }));
-        assert!(
-            vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok()
+        let state = vrl::state::ExternalEnv::new_with_kind(
+            Kind::object(btreemap! {
+                "tags" => Kind::object(BTreeMap::new()),
+            }),
+            Kind::object(Collection::empty()),
         );
+        assert!(vrl::compile_with_external(
+            vrl.as_str(),
+            vrl_stdlib::all().as_ref(),
+            &state,
+            CompileConfig::default()
+        )
+        .is_ok());
     }
 
     #[test]

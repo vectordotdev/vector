@@ -1,3 +1,5 @@
+pub mod sort;
+
 use std::cmp::Ordering;
 
 use vector_core::event::metric::{Metric, MetricValue, Sample};
@@ -20,6 +22,8 @@ pub use self::split::*;
 /// incremental metrics are summed into the output buffer. Any conversion of metrics is handled by the normalization
 /// type `N: MetricNormalize`. Further, distribution metrics have their their samples compressed with
 /// `compress_distribution` below.
+///
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 pub struct MetricsBuffer {
     metrics: Option<MetricSet>,
     max_events: usize,
@@ -43,7 +47,7 @@ impl Batch for MetricsBuffer {
     type Input = Metric;
     type Output = Vec<Metric>;
 
-    fn get_settings_defaults<D: SinkBatchSettings>(
+    fn get_settings_defaults<D: SinkBatchSettings + Clone>(
         config: BatchConfig<D, Merged>,
     ) -> Result<BatchConfig<D, Merged>, BatchError> {
         config.disallow_max_bytes()
@@ -122,14 +126,12 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 
 #[cfg(test)]
 pub(self) mod tests {
-    use std::collections::BTreeMap;
-
-    use pretty_assertions::assert_eq;
-    use vector_core::event::MetricKind;
+    use similar_asserts::assert_eq;
+    use vector_core::event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind};
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
-        event::metric::{MetricKind::*, MetricValue, StatisticKind},
         sinks::util::BatchSettings,
         test_util::metrics::{AbsoluteMetricNormalizer, IncrementalMetricNormalizer},
     };
@@ -142,7 +144,7 @@ pub(self) mod tests {
             kind,
             MetricValue::Counter { value },
         )
-        .with_tags(Some(tag(tagstr)))
+        .with_tags(Some(metric_tags!(tagstr => "true")))
     }
 
     pub fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
@@ -174,7 +176,7 @@ pub(self) mod tests {
         num: usize,
         kind: MetricKind,
         bpower: f64,
-        cfactor: u32,
+        cfactor: u64,
         sum: f64,
     ) -> Metric {
         Metric::new(
@@ -202,16 +204,10 @@ pub(self) mod tests {
                     0.5 => factor * 2.0,
                     1.0 => factor * 4.0
                 ],
-                count: factor as u32 * 10,
+                count: factor as u64 * 10,
                 sum: factor * 7.0,
             },
         )
-    }
-
-    fn tag(name: &str) -> BTreeMap<String, String> {
-        vec![(name.to_owned(), "true".to_owned())]
-            .into_iter()
-            .collect()
     }
 
     fn rebuffer<State: MetricNormalize + Default>(metrics: Vec<Metric>) -> Buffer {
@@ -598,7 +594,7 @@ pub(self) mod tests {
                 i,
                 Absolute,
                 1.0,
-                i as u32,
+                i as u64,
                 i as f64 * 10.0,
             ));
         }

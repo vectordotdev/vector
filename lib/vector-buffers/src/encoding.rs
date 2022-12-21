@@ -135,7 +135,7 @@ pub trait Encodable: Sized {
 ///
 /// For any types that will potentially be encoded in real use cases, `Encodable` should be
 /// preferred as it requires an upfront decision to be made about metadata and how it's dealt with.
-pub trait FixedEncodable: Sized {
+pub trait FixedEncodable {
     type EncodeError: error::Error + Send + Sync + 'static;
     type DecodeError: error::Error + Send + Sync + 'static;
 
@@ -165,7 +165,9 @@ pub trait FixedEncodable: Sized {
     ///
     /// If there is an error while attempting to decode a value from the given buffer, an error
     /// variant will be returned describing the error.
-    fn decode<B: Buf + Clone>(buffer: B) -> Result<Self, Self::DecodeError>;
+    fn decode<B: Buf + Clone>(buffer: B) -> Result<Self, Self::DecodeError>
+    where
+        Self: Sized;
 }
 
 impl<T: FixedEncodable> Encodable for T {

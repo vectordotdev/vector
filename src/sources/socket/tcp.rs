@@ -1,34 +1,78 @@
-use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use serde::{Deserialize, Serialize};
+use lookup::{lookup_v2::BorrowedSegment, path};
 use smallvec::SmallVec;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
     codecs::Decoder,
     config::log_schema,
     event::Event,
     serde::default_decoding,
-    sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
+    sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
-    tls::TlsEnableableConfig,
+    tls::TlsSourceConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+use super::SocketConfig;
+
+/// TCP configuration for the `socket` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct TcpConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// The maximum buffer size, in bytes, of incoming messages.
+    ///
+    /// Messages larger than this are truncated.
     max_length: Option<usize>,
+
+    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
+
+    /// Overrides the name of the log field used to add the peer host to each event.
+    ///
+    /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     host_key: Option<String>,
+
+    /// Overrides the name of the log field used to add the peer host's port to each event.
+    ///
+    /// The value will be the peer host's port i.e. `9000`.
+    ///
+    /// By default, `"port"` is used.
     port_key: Option<String>,
-    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    tls: Option<TlsSourceConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
+    pub connection_limit: Option<u32>,
+
+    #[configurable(derived)]
     framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
-    pub connection_limit: Option<u32>,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -49,6 +93,7 @@ impl TcpConfig {
             framing: None,
             decoding: default_decoding(),
             connection_limit: None,
+            log_namespace: None,
         }
     }
 
@@ -56,7 +101,11 @@ impl TcpConfig {
         &self.host_key
     }
 
-    pub const fn tls(&self) -> &Option<TlsEnableableConfig> {
+    pub const fn port_key(&self) -> &Option<String> {
+        &self.port_key
+    }
+
+    pub const fn tls(&self) -> &Option<TlsSourceConfig> {
         &self.tls
     }
 
@@ -98,7 +147,7 @@ impl TcpConfig {
         self
     }
 
-    pub fn set_tls(&mut self, val: Option<TlsEnableableConfig>) -> &mut Self {
+    pub fn set_tls(&mut self, val: Option<TlsSourceConfig>) -> &mut Self {
         self.tls = val;
         self
     }
@@ -112,17 +161,27 @@ impl TcpConfig {
         self.decoding = val;
         self
     }
+
+    pub fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
+        self.log_namespace = val;
+        self
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RawTcpSource {
     config: TcpConfig,
     decoder: Decoder,
+    log_namespace: LogNamespace,
 }
 
 impl RawTcpSource {
-    pub const fn new(config: TcpConfig, decoder: Decoder) -> Self {
-        Self { config, decoder }
+    pub const fn new(config: TcpConfig, decoder: Decoder, log_namespace: LogNamespace) -> Self {
+        Self {
+            config,
+            decoder,
+            log_namespace,
+        }
     }
 }
 
@@ -141,19 +200,37 @@ impl TcpSource for RawTcpSource {
 
         for event in events {
             if let Event::Log(ref mut log) = event {
-                log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
-                log.try_insert(log_schema().timestamp_key(), now);
+                self.log_namespace.insert_standard_vector_source_metadata(
+                    log,
+                    SocketConfig::NAME,
+                    now,
+                );
 
-                let host_key = self
-                    .config
-                    .host_key
-                    .as_deref()
-                    .unwrap_or_else(|| log_schema().host_key());
+                let host_key_path = self.config.host_key.as_ref().map_or_else(
+                    || [BorrowedSegment::from(log_schema().host_key())],
+                    |key| [BorrowedSegment::from(key)],
+                );
 
-                log.try_insert(host_key, host.ip().to_string());
-                if let Some(port_key) = &self.config.port_key {
-                    log.try_insert(port_key.as_str(), host.port());
-                }
+                self.log_namespace.insert_source_metadata(
+                    SocketConfig::NAME,
+                    log,
+                    Some(LegacyKey::InsertIfEmpty(&host_key_path)),
+                    path!("host"),
+                    host.ip().to_string(),
+                );
+
+                let port_key_path = self.config.port_key.as_ref().map_or_else(
+                    || [BorrowedSegment::from("port")],
+                    |key| [BorrowedSegment::from(key)],
+                );
+
+                self.log_namespace.insert_source_metadata(
+                    SocketConfig::NAME,
+                    log,
+                    Some(LegacyKey::InsertIfEmpty(&port_key_path)),
+                    path!("port"),
+                    host.port(),
+                );
             }
         }
     }

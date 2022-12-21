@@ -19,7 +19,7 @@ pub struct OutputEventsByComponentIdPatternsSubscription;
 
 /// Tap encoding format type that is more convenient to use for public clients than the
 /// generated `output_events_by_component_id_patterns_subscription::EventEncodingType`.
-#[derive(Debug, Clone, Copy)]
+#[derive(clap::ValueEnum, Debug, Clone, Copy)]
 pub enum TapEncodingFormat {
     Json,
     Yaml,

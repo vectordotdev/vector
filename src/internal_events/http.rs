@@ -3,7 +3,7 @@ use std::error::Error;
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct HttpBytesReceived<'a> {
@@ -89,7 +89,7 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
             error_type = error_type::REQUEST_FAILED,
             error_stage = error_stage::RECEIVING,
             http_code = %self.code,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -117,7 +117,7 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
             encoding = %self.encoding,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -127,5 +127,25 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
         );
         // deprecated
         counter!("parse_errors_total", 1);
+    }
+}
+
+pub struct HttpInternalError {
+    pub message: &'static str,
+}
+
+impl InternalEvent for HttpInternalError {
+    fn emit(self) {
+        error!(
+            message = %self.message,
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
     }
 }

@@ -50,7 +50,7 @@ components: sources: internal_metrics: {
 			common:      true
 			required:    false
 			type: float: {
-				default: 2.0
+				default: 1.0
 				unit:    "seconds"
 			}
 		}
@@ -63,14 +63,17 @@ components: sources: internal_metrics: {
 				examples: []
 				options: {
 					host_key: {
-						category: "Context"
-						common:   false
+						category:    "Context"
+						common:      false
 						description: """
-							If set, will add a tag using the provided key name with a value of the current the current host.
+							The key name added to each event representing the current host. This can also be globally set via the
+							[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
+
+							Set to "" to suppress this key.
 							"""
-						required: false
+						required:    false
 						type: string: {
-							default: null
+							default: "host"
 						}
 					}
 					pid_key: {
@@ -214,25 +217,25 @@ components: sources: internal_metrics: {
 			description:       "The average round-trip time (RTT) for the current window."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		adaptive_concurrency_in_flight: {
 			description:       "The number of outbound requests currently awaiting a response."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		adaptive_concurrency_limit: {
 			description:       "The concurrency limit that the adaptive concurrency feature has decided on for this current window."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		adaptive_concurrency_observed_rtt: {
 			description:       "The observed round-trip time (RTT) for requests."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		checkpoint_write_errors_total: {
 			description:       "The total number of errors writing checkpoints. This metric is deprecated in favor of `component_errors_total`."
@@ -511,6 +514,15 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_errors_total: {
+			description:       "The total number of errors encountered by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				error_type: _error_type
+				stage:      _stage
+			}
+		}
 		component_received_bytes_total: {
 			description:       string | *"The number of raw bytes accepted by this component from source origins."
 			type:              "counter"
@@ -523,6 +535,43 @@ components: sources: internal_metrics: {
 				origins like file and uri, or cumulatively from other origins.
 				"""
 			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				file: {
+					description: "The file from which the data originated."
+					required:    false
+				}
+				uri: {
+					description: "The sanitized URI from which the data originated."
+					required:    false
+				}
+				container_name: {
+					description: "The name of the container from which the data originated."
+					required:    false
+				}
+				pod_name: {
+					description: "The name of the pod from which the data originated."
+					required:    false
+				}
+				peer_addr: {
+					description: "The IP from which the data originated."
+					required:    false
+				}
+				peer_path: {
+					description: "The pathname from which the data originated."
+					required:    false
+				}
+				mode: _mode
+			}
+		}
+		component_received_events_count: {
+			description: """
+				A histogram of the number of events passed in each internal batch in Vector's internal topology.
+
+				Note that this is separate than sink-level batching. It is mostly useful for low level debugging
+				performance issues in Vector due to small internal batches.
+				"""
+			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags & {
 				file: {
@@ -607,6 +656,18 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		internal_metrics_cardinality: {
+			description:       "The total number of metrics emitted from the internal metrics registry."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: {}
+		}
+		internal_metrics_cardinality_total: {
+			description:       "The total number of metrics emitted from the internal metrics registry. This metric is deprecated in favor of `internal_metrics_cardinality`."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              internal_metrics_cardinality.tags
 		}
 		kafka_queue_messages: {
 			description:       "Current number of messages in producer queues."
@@ -861,17 +922,8 @@ components: sources: internal_metrics: {
 				mode: _mode
 			}
 		}
-		component_errors_total: {
-			description:       "The total number of errors encountered by this component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags & {
-				error_type: _error_type
-				stage:      _stage
-			}
-		}
 		processing_errors_total: {
-			description:       "The total number of processing errors encountered by this component."
+			description:       "The total number of processing errors encountered by this component. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags & {
@@ -923,6 +975,12 @@ components: sources: internal_metrics: {
 		send_errors_total: {
 			description:       "The total number of errors sending messages."
 			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		source_lag_time_seconds: {
+			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
+			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
@@ -1026,7 +1084,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of seconds the Vector instance has been up."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _internal_metrics_tags
 		}
 		utf8_convert_errors_total: {
 			description:       "The total number of errors converting bytes to a UTF-8 string in UDP mode."
@@ -1047,6 +1105,33 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		build_info: {
+			description:       "Has a fixed value of 1.0. Contains build information such as Rust and Vector versions."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags & {
+				debug: {
+					description: "Whether this is a debug build of Vector"
+					required:    true
+				}
+				version: {
+					description: "Vector version."
+					required:    true
+				}
+				rust_version: {
+					description: "The Rust version from the package manifest."
+					required:    true
+				}
+				arch: {
+					description: "The target architecture being compiled for. (e.g. x86_64)"
+					required:    true
+				}
+				revision: {
+					description: "Revision identifer, related to versioned releases."
+					required:    true
+				}
+			}
 		}
 		value_limit_reached_total: {
 			description: """
@@ -1226,6 +1311,21 @@ components: sources: internal_metrics: {
 				"out_of_order": "The event was out of order."
 				"oversized":    "The event was too large."
 			}
+		}
+	}
+
+	how_it_works: {
+		unique_series: {
+			title: "Sending metrics from multiple Vector instances"
+			body: """
+				When sending `internal_metrics` from multiple Vector instances
+				to the same destination, you will typically want to tag the
+				metrics with a tag that is unique to the Vector instance sending
+				the metrics to avoid the metric series conflicting. The
+				`tags.host_key` option can be used for this, but you can also
+				use a subsequent `remap` transform to add a different unique
+				tag from the environment.
+				"""
 		}
 	}
 

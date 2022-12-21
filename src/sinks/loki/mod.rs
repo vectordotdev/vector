@@ -1,9 +1,9 @@
 //! Loki sink
 //!
 //! This sink provides downstream support for `Loki` via
-//! the v1 http json endpoint.
+//! the (configurable) `/loki/api/v1/push` endpoint.
 //!
-//! <https://github.com/grafana/loki/tree/v1.6.1/docs>
+//! <https://grafana.com/docs/loki/v2.6.x/api/>
 //!
 //! This sink uses `PartitionBatching` to partition events
 //! by streams. There must be at least one valid set of labels.
@@ -22,12 +22,5 @@ mod sink;
 mod tests;
 
 #[cfg(feature = "loki-benches")]
-pub use config::valid_label_name;
-use config::LokiConfig;
-pub use config::OutOfOrderAction;
-
-use crate::config::SinkDescription;
-
-inventory::submit! {
-    SinkDescription::new::<LokiConfig>("loki")
-}
+pub use self::config::valid_label_name;
+pub use self::config::{LokiConfig, OutOfOrderAction};

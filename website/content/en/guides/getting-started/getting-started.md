@@ -167,7 +167,7 @@ observability data. You can then route and output your events to dozens of desti
 
 ## What's next?
 
-We're just scatching the surface in this post. To get your hands dirty with Vector
+We're just scratching the surface in this post. To get your hands dirty with Vector
 check out:
 
 * All of Vector's [sources][docs.sources], [transforms][docs.transforms], and [sinks][docs.sinks].

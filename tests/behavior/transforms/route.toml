@@ -16,9 +16,10 @@
 
 [transforms.bar]
   inputs = ["foo.first"]
-  type = "add_fields"
-  [transforms.bar.fields]
-    new_field = "new field added"
+  type = "remap"
+  source = '''
+  .new_field = "new field added"
+  '''
 
 [[tests]]
   name = "route test 1"

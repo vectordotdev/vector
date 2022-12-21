@@ -4,6 +4,7 @@
 #![deny(unused_allocation)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
+#![deny(warnings)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]
@@ -12,7 +13,7 @@
 #![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
-#![deny(clippy::disallowed_method)] // [nursery] mark some functions as verboten
+#![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten
 #![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer,
                                        // but may produce false positives
 
@@ -21,23 +22,38 @@ extern crate tracing;
 #[macro_use]
 extern crate derivative;
 
-#[cfg(feature = "tikv-jemallocator")]
+#[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracing")))]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+#[cfg(all(feature = "tikv-jemallocator", feature = "allocation-tracing"))]
+#[global_allocator]
+static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
+    self::internal_telemetry::allocations::get_grouped_tracing_allocator(
+        tikv_jemallocator::Jemalloc,
+    );
+
+#[allow(unreachable_pub)]
+pub mod internal_telemetry;
 
 #[macro_use]
 #[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
+#[allow(unreachable_pub)]
+pub mod components;
 pub mod conditions;
 pub mod dns;
 #[cfg(feature = "docker")]
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
+pub mod generate_schema;
 #[macro_use]
 #[allow(unreachable_pub)]
 pub mod internal_events;
+#[cfg(feature = "lapin")]
+pub mod amqp;
 #[cfg(feature = "api")]
 #[allow(unreachable_pub)]
 pub mod api;
@@ -45,6 +61,7 @@ pub mod app;
 pub mod async_read;
 #[cfg(feature = "aws-config")]
 pub mod aws;
+#[allow(unreachable_pub)]
 pub mod codecs;
 pub(crate) mod common;
 pub mod encoding_transcode;
@@ -54,8 +71,9 @@ pub mod gcp;
 pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
+#[allow(unreachable_pub)]
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
-pub(crate) mod kafka;
+pub mod kafka;
 #[allow(unreachable_pub)]
 pub mod kubernetes;
 pub mod line_agg;
@@ -65,10 +83,10 @@ pub(crate) mod nats;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
+pub mod secrets;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
-pub mod shutdown;
 pub mod signal;
 pub(crate) mod sink;
 #[allow(unreachable_pub)]
@@ -77,15 +95,11 @@ pub mod source_sender;
 #[allow(unreachable_pub)]
 pub mod sources;
 pub mod stats;
-pub(crate) mod stream;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 mod tap;
-pub(crate) mod tcp;
 pub mod template;
 pub mod test_util;
-#[allow(unreachable_pub)]
-pub(crate) mod tls;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 pub(crate) mod top;
@@ -94,7 +108,6 @@ pub mod topology;
 pub mod trace;
 #[allow(unreachable_pub)]
 pub mod transforms;
-pub mod trigger;
 pub mod types;
 pub mod udp;
 pub mod unit_test;
@@ -104,7 +117,8 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_core::{event, metrics, schema, Error, Result};
+pub use vector_common::{shutdown, Error, Result};
+pub use vector_core::{event, metrics, schema, tcp, tls};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
@@ -136,7 +150,7 @@ pub fn get_version() -> String {
     format!("{} ({})", pkg_version, build_string)
 }
 
-#[allow(unused)]
+#[allow(warnings)]
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
@@ -158,4 +172,15 @@ where
 
     #[cfg(not(tokio_unstable))]
     tokio::spawn(task)
+}
+
+pub fn num_threads() -> usize {
+    let count = match std::thread::available_parallelism() {
+        Ok(count) => count,
+        Err(error) => {
+            warn!(message = "Failed to determine available parallelism for thread count, defaulting to 1.", %error);
+            std::num::NonZeroUsize::new(1).unwrap()
+        }
+    };
+    usize::from(count)
 }

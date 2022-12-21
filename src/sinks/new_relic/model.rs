@@ -57,7 +57,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
 
         for buf_event in buf_events {
             if let Event::Metric(metric) = buf_event {
-                // Future improvement: put metric type. If type = count, NR metric model requiere an interval.ms field, that is not provided by the Vector Metric model.
+                // Future improvement: put metric type. If type = count, NR metric model requires an interval.ms field, that is not provided by the Vector Metric model.
                 match metric.value() {
                     MetricValue::Gauge { value } => {
                         metric_array.push((
@@ -113,7 +113,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
         for buf_event in buf_events {
             if let Event::Log(log) = buf_event {
                 let mut event_model = KeyValData::new();
-                for (k, v) in log.all_fields() {
+                for (k, v) in log.convert_to_fields() {
                     event_model.insert(k, v.clone());
                 }
 
@@ -186,7 +186,7 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
         for buf_event in buf_events {
             if let Event::Log(log) = buf_event {
                 let mut log_model = KeyValData::new();
-                for (k, v) in log.all_fields() {
+                for (k, v) in log.convert_to_fields() {
                     log_model.insert(k, v.clone());
                 }
                 if log.get("message").is_none() {

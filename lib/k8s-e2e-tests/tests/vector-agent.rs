@@ -43,7 +43,7 @@ const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
         [sinks.stdout]
             type = "console"
             inputs = ["kubernetes_logs"]
-            encoding = "json"
+            encoding.codec = "json"
 "#};
 
 /// This test validates that vector picks up logs at the simplest case
@@ -81,6 +81,26 @@ async fn default_agent() -> Result<(), Box<dyn std::error::Error>> {
             vec!["--timeout=60s"],
         )
         .await?;
+
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
 
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
@@ -142,8 +162,12 @@ async fn default_agent() -> Result<(), Box<dyn std::error::Error>> {
 
     assert!(got_marker);
 
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
+
     drop(test_pod);
     drop(test_namespace);
+    drop(vector_metrics_port_forward);
     drop(vector);
     Ok(())
 }
@@ -182,6 +206,26 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
             vec!["--timeout=60s"],
         )
         .await?;
+
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
 
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
@@ -242,10 +286,13 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     })
     .await?;
 
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
     assert!(got_expected_line);
 
     drop(test_pod);
     drop(test_namespace);
+    drop(vector_metrics_port_forward);
     drop(vector);
     Ok(())
 }
@@ -312,6 +359,26 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
+
     // Make sure we read the correct nodes logs.
     let vector_pod = framework
         .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
@@ -346,10 +413,14 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     })
     .await?;
 
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
+
     assert!(got_marker);
 
     drop(test_pod);
     drop(test_namespace);
+    drop(vector_metrics_port_forward);
     drop(vector);
     Ok(())
 }
@@ -389,6 +460,26 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
             vec!["--timeout=60s"],
         )
         .await?;
+
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
 
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
@@ -450,10 +541,14 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     })
     .await?;
 
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
+
     assert!(test_messages_iter.next().is_none());
 
     drop(test_pod);
     drop(test_namespace);
+    drop(vector_metrics_port_forward);
     drop(vector);
     Ok(())
 }
@@ -492,6 +587,29 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             vec!["--timeout=60s"],
         )
         .await?;
+
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
+
+    // Set label on all nodes to check it later.
+    framework.label_nodes("label5=foobazbar").await?;
 
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
@@ -574,6 +692,7 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(val["kubernetes"]["pod_labels"]["label2"], "world");
         assert_eq!(val["kubernetes"]["namespace_labels"]["label3"], "foobar");
         assert_eq!(val["kubernetes"]["namespace_labels"]["label4"], "fizzbuzz");
+        assert_eq!(val["kubernetes"]["node_labels"]["label5"], "foobazbar");
 
         if minor < 16 {
             assert!(val["kubernetes"]["pod_ip"].is_string());
@@ -602,10 +721,14 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     })
     .await?;
 
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
+
     assert!(got_marker);
 
     drop(test_pod);
     drop(test_namespace);
+    drop(vector_metrics_port_forward);
     drop(vector);
     Ok(())
 }
@@ -645,6 +768,26 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             vec!["--timeout=60s"],
         )
         .await?;
+
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
 
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
@@ -796,6 +939,9 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure log reader exited.
     log_reader.wait().await.expect("log reader wait failed");
 
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
+
     assert!(got_control_marker);
 
     drop(excluded_test_pod);
@@ -803,6 +949,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     drop(affinity_pod);
     drop(affinity_ns);
     drop(test_namespace);
+    drop(vector_metrics_port_forward);
     drop(vector);
     Ok(())
 }
@@ -1058,6 +1205,26 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
+
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
             &namespace::make_namespace(pod_namespace.clone(), None),
@@ -1178,10 +1345,14 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure log reader exited.
     log_reader.wait().await.expect("log reader wait failed");
 
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
+
     assert!(got_control_marker);
 
     drop(test_pod);
     drop(test_namespace);
+    drop(vector_metrics_port_forward);
     drop(vector);
     Ok(())
 }
@@ -1401,6 +1572,26 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
+
     let mut test_namespaces = vec![];
     let mut expected_namespaces = HashSet::new();
     for i in 0..10 {
@@ -1492,6 +1683,9 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     })
     .await?;
 
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
+
     // Ensure that we have collected messages from all the namespaces.
     assert!(expected_namespaces.is_empty());
 
@@ -1499,6 +1693,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     drop(affinity_ns);
     drop(test_pods);
     drop(test_namespaces);
+    drop(vector_metrics_port_forward);
     drop(vector);
     Ok(())
 }
@@ -1753,6 +1948,9 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         processed_events_after
     );
 
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
+
     drop(test_pod);
     drop(test_namespace);
     drop(vector_metrics_port_forward);
@@ -1822,7 +2020,10 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     debug!("Done waiting for Vector bootstrap");
 
     // Ensure the host metrics are exposed in the Prometheus endpoint.
-    metrics::assert_host_metrics_present(&vector_metrics_url).await?;
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::HOST_METRICS).await?;
+
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
 
     drop(vector_metrics_port_forward);
     drop(vector);

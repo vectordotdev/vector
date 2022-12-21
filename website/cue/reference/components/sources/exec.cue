@@ -13,6 +13,7 @@ components: sources: exec: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		multiline: enabled: false
 		codecs: {
@@ -38,94 +39,7 @@ components: sources: exec: {
 		platform_name: null
 	}
 
-	configuration: {
-		mode: {
-			description: "The type of exec mechanism."
-			required:    true
-			type: string: {
-				enum: {
-					scheduled: "Scheduled exec mechanism."
-					streaming: "Streaming exec mechanism."
-				}
-			}
-		}
-		command: {
-			required:    true
-			description: "The command to be run, plus any arguments required."
-			type: array: {
-				examples: [["echo", "Hello World!"], ["ls", "-la"]]
-				items: type: string: {}
-			}
-		}
-		working_directory: {
-			common:      false
-			required:    false
-			description: "The directory in which to run the command."
-			type: string: default: null
-		}
-		include_stderr: {
-			common:      false
-			description: "Include the output of stderr when generating events."
-			required:    false
-			type: bool: default: true
-		}
-		maximum_buffer_size_bytes: {
-			common:      false
-			description: "The maximum buffer size allowed before a log event will be generated."
-			required:    false
-			type: uint: {
-				default: 1000000
-				unit:    "bytes"
-			}
-		}
-		scheduled: {
-			common:      true
-			description: "The scheduled options."
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					exec_interval_secs: {
-						common:        true
-						description:   "The interval in seconds between scheduled command runs. The command will be killed if it takes longer than exec_interval_secs to run."
-						relevant_when: "mode = `scheduled`"
-						required:      false
-						type: uint: {
-							default: 60
-							unit:    "seconds"
-						}
-					}
-				}
-			}
-		}
-		streaming: {
-			common:      true
-			description: "The streaming options."
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					respawn_on_exit: {
-						common:        true
-						description:   "Determine if a streaming command should be restarted if it exits."
-						relevant_when: "mode = `streaming`"
-						required:      false
-						type: bool: default: true
-					}
-					respawn_interval_secs: {
-						common:        false
-						description:   "The interval in seconds between restarting streaming commands if needed."
-						relevant_when: "mode = `streaming`"
-						required:      false
-						type: uint: {
-							default: 5
-							unit:    "seconds"
-						}
-					}
-				}
-			}
-		}
-	}
+	configuration: base.components.sources.exec.configuration
 
 	output: logs: line: {
 		description: "An individual event from exec."
@@ -159,6 +73,13 @@ components: sources: exec: {
 					}
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["exec"]
+				}
+			}
 		}
 	}
 
@@ -175,6 +96,7 @@ components: sources: exec: {
 				timestamp:   _timestamp
 				host:        _values.local_host
 				message:     _line
+				source_type: "exec"
 			}
 		},
 	]
@@ -185,6 +107,20 @@ components: sources: exec: {
 			body: """
 				Each line is read until a new line delimiter, the `0xA` byte, is found or the end of the
 				[`maximum_buffer_size_bytes`](#maximum_buffer_size_bytes) is reached.
+				"""
+		}
+		shutdown: {
+			title: "Shutting Down"
+			body: """
+				When Vector begins shutting down (typically due to a SIGTERM), this source will
+				signal to the child process to terminate, if it is running, to shut down.
+
+				On *nix platforms, Vector will issue a SIGTERM to the child process, allowing it to
+				gracefully shutdown, and the source will continue reading until the process exits or
+				Vector's shutdown grace period expires.
+
+				On Windows, the subprocess will be issued a SIGKILL and terminate abruptly. In the
+				future we hope to support graceful shutdown of Windows processes as well.
 				"""
 		}
 	}

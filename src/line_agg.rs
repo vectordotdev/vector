@@ -14,53 +14,58 @@ use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
-use serde::{Deserialize, Serialize};
 use tokio_util::time::delay_queue::{DelayQueue, Key};
+use vector_config::configurable_component;
 
-/// The mode of operation of the line aggregator.
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Deserialize, Serialize)]
+/// Mode of operation of the line aggregator.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// All consecutive lines matching this pattern are included in the group.
-    /// The first line (the line that matched the start pattern) does not need
-    /// to match the `ContinueThrough` pattern.
-    /// This is useful in cases such as a Java stack trace, where some indicator
-    /// in the line (such as leading whitespace) indicates that it is an
-    /// extension of the proceeding line.
+    ///
+    /// The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
+    ///
+    /// This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading
+    /// whitespace) indicates that it is an extension of the proceeding line.
     ContinueThrough,
 
-    /// All consecutive lines matching this pattern, plus one additional line,
-    /// are included in the group.
-    /// This is useful in cases where a log message ends with a continuation
-    /// marker, such as a backslash, indicating that the following line is part
-    /// of the same message.
+    /// All consecutive lines matching this pattern, plus one additional line, are included in the group.
+    ///
+    /// This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
+    /// that the following line is part of the same message.
     ContinuePast,
 
-    /// All consecutive lines not matching this pattern are included in the
-    /// group.
-    /// This is useful where a log line contains a marker indicating that it
-    /// begins a new message.
+    /// All consecutive lines not matching this pattern are included in the group.
+    ///
+    /// This is useful where a log line contains a marker indicating that it begins a new message.
     HaltBefore,
 
-    /// All consecutive lines, up to and including the first line matching this
-    /// pattern, are included in the group.
-    /// This is useful where a log line ends with a termination marker, such as
-    /// a semicolon.
+    /// All consecutive lines, up to and including the first line matching this pattern, are included in the group.
+    ///
+    /// This is useful where a log line ends with a termination marker, such as a semicolon.
     HaltWith,
 }
 
-/// Configuration parameters of the line aggregator.
-#[derive(Debug, Clone)]
+/// Configuration of multi-line aggregation.
+#[derive(Clone, Debug)]
 pub struct Config {
-    /// Start pattern to look for as a beginning of the message.
+    /// Regular expression pattern that is used to match the start of a new message.
     pub start_pattern: Regex,
-    /// Condition pattern to look for. Exact behavior is configured via `mode`.
+
+    /// Regular expression pattern that is used to determine whether or not more lines should be read.
+    ///
+    /// This setting must be configured in conjunction with `mode`.
     pub condition_pattern: Regex,
-    /// Mode of operation, specifies how the condition pattern is interpreted.
+
+    /// Aggregation mode.
+    ///
+    /// This setting must be configured in conjunction with `condition_pattern`.
     pub mode: Mode,
-    /// The maximum time to wait for the continuation. Once this timeout is
-    /// reached, the buffered message is guaranteed to be flushed, even if
-    /// incomplete.
+
+    /// The maximum amount of time to wait for the next additional line, in milliseconds.
+    ///
+    /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
     pub timeout: Duration,
 }
 
@@ -140,7 +145,7 @@ where
 {
     /// Create a new `LineAgg` using the specified `inner` stream and
     /// preconfigured `logic`.
-    pub fn new(inner: T, logic: Logic<K, C>) -> Self {
+    pub const fn new(inner: T, logic: Logic<K, C>) -> Self {
         Self {
             inner,
             logic,
@@ -317,13 +322,13 @@ where
                     Decision::Continue => {
                         let buffered = entry.get_mut();
                         self.timeouts.reset(&buffered.0, self.config.timeout);
-                        buffered.1.add_next_line(line);
+                        buffered.1.add_next_line(line, context);
                         None
                     }
                     Decision::EndInclude => {
                         let (src, (key, mut buffered)) = entry.remove_entry();
                         self.timeouts.remove(&key);
-                        buffered.add_next_line(line);
+                        buffered.add_next_line(line, context);
                         Some((src, Emit::One(buffered.merge())))
                     }
                     Decision::EndExclude => {
@@ -365,7 +370,8 @@ impl<C> Aggregate<C> {
         }
     }
 
-    fn add_next_line(&mut self, line: Bytes) {
+    fn add_next_line(&mut self, line: Bytes, context: C) {
+        self.context = context;
         self.lines.push(line);
     }
 
@@ -389,7 +395,8 @@ impl<C> Aggregate<C> {
 mod tests {
     use bytes::Bytes;
     use futures::SinkExt;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
+    use std::fmt::Write as _;
 
     use super::*;
 
@@ -412,13 +419,16 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            "some usual line",
-            "some other usual line",
-            concat!("first part\n", " second part\n", " last part"),
-            "another normal message",
-            concat!(
-                "finishing message\n",
-                " last part of the incomplete finishing message"
+            ("some usual line", 0),
+            ("some other usual line", 1),
+            (concat!("first part\n", " second part\n", " last part"), 4),
+            ("another normal message", 5),
+            (
+                concat!(
+                    "finishing message\n",
+                    " last part of the incomplete finishing message"
+                ),
+                7,
             ),
         ];
         run_and_assert(&lines, config, &expected).await;
@@ -443,13 +453,19 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            "some usual line",
-            "some other usual line",
-            concat!("first part \\\n", "second part \\\n", "last part"),
-            "another normal message",
-            concat!(
-                "finishing message \\\n",
-                "last part of the incomplete finishing message \\"
+            ("some usual line", 0),
+            ("some other usual line", 1),
+            (
+                concat!("first part \\\n", "second part \\\n", "last part"),
+                4,
+            ),
+            ("another normal message", 5),
+            (
+                concat!(
+                    "finishing message \\\n",
+                    "last part of the incomplete finishing message \\"
+                ),
+                7,
             ),
         ];
         run_and_assert(&lines, config, &expected).await;
@@ -474,13 +490,19 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            "INFO some usual line",
-            "INFO some other usual line",
-            concat!("INFO first part\n", "second part\n", "last part"),
-            "ERROR another normal message",
-            concat!(
-                "ERROR finishing message\n",
-                "last part of the incomplete finishing message"
+            ("INFO some usual line", 0),
+            ("INFO some other usual line", 1),
+            (
+                concat!("INFO first part\n", "second part\n", "last part"),
+                4,
+            ),
+            ("ERROR another normal message", 5),
+            (
+                concat!(
+                    "ERROR finishing message\n",
+                    "last part of the incomplete finishing message"
+                ),
+                7,
             ),
         ];
         run_and_assert(&lines, config, &expected).await;
@@ -505,13 +527,16 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            "some usual line;",
-            "some other usual line;",
-            concat!("first part\n", "second part\n", "last part;"),
-            "another normal message;",
-            concat!(
-                "finishing message\n",
-                "last part of the incomplete finishing message"
+            ("some usual line;", 0),
+            ("some other usual line;", 1),
+            (concat!("first part\n", "second part\n", "last part;"), 4),
+            ("another normal message;", 5),
+            (
+                concat!(
+                    "finishing message\n",
+                    "last part of the incomplete finishing message"
+                ),
+                7,
             ),
         ];
         run_and_assert(&lines, config, &expected).await;
@@ -530,10 +555,13 @@ mod tests {
             mode: Mode::ContinueThrough,
             timeout: Duration::from_millis(10),
         };
-        let expected = vec![concat!(
-            "java.lang.Exception\n",
-            "    at com.foo.bar(bar.java:123)\n",
-            "    at com.foo.baz(baz.java:456)",
+        let expected = vec![(
+            concat!(
+                "java.lang.Exception\n",
+                "    at com.foo.bar(bar.java:123)\n",
+                "    at com.foo.baz(baz.java:456)",
+            ),
+            2,
         )];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -552,11 +580,14 @@ mod tests {
             mode: Mode::ContinueThrough,
             timeout: Duration::from_millis(10),
         };
-        let expected = vec![concat!(
-            "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n",
-            "\tfrom foobar.rb:6:in `bar'\n",
-            "\tfrom foobar.rb:2:in `foo'\n",
-            "\tfrom foobar.rb:9:in `<main>'",
+        let expected = vec![(
+            concat!(
+                "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n",
+                "\tfrom foobar.rb:6:in `bar'\n",
+                "\tfrom foobar.rb:2:in `foo'\n",
+                "\tfrom foobar.rb:9:in `<main>'",
+            ),
+            3,
         )];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -587,16 +618,16 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            "not merged 1",
-            " merged 1\n merged 2",
-            "not merged 2",
-            " merged 3\n merged 4",
-            "not merged 3",
-            "not merged 4",
-            " merged 5",
-            "not merged 5",
-            " merged 6\n merged 7\n merged 8",
-            "not merged 6",
+            ("not merged 1", 0),
+            (" merged 1\n merged 2", 2),
+            ("not merged 2", 3),
+            (" merged 3\n merged 4", 5),
+            ("not merged 3", 6),
+            ("not merged 4", 7),
+            (" merged 5", 8),
+            ("not merged 5", 9),
+            (" merged 6\n merged 7\n merged 8", 12),
+            ("not merged 6", 13),
         ];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -625,12 +656,12 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            "part 0.1\npart 0.2",
-            "START msg 1\npart 1.1\npart 1.2",
-            "START msg 2",
-            "START msg 3\npart 3.1",
-            "START msg 4\npart 4.1\npart 4.2\npart 4.3",
-            "START msg 5",
+            ("part 0.1\npart 0.2", 1),
+            ("START msg 1\npart 1.1\npart 1.2", 4),
+            ("START msg 2", 5),
+            ("START msg 3\npart 3.1", 7),
+            ("START msg 4\npart 4.1\npart 4.2\npart 4.3", 11),
+            ("START msg 5", 12),
         ];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -648,13 +679,19 @@ mod tests {
             "last part of the incomplete finishing message",
         ];
         let expected = vec![
-            "INFO some usual line",
-            "INFO some other usual line",
-            concat!("INFO first part\n", "second part\n", "last part"),
-            "ERROR another normal message",
-            concat!(
-                "ERROR finishing message\n",
-                "last part of the incomplete finishing message"
+            ("INFO some usual line", 0),
+            ("INFO some other usual line", 1),
+            (
+                concat!("INFO first part\n", "second part\n", "last part"),
+                4,
+            ),
+            ("ERROR another normal message", 5),
+            (
+                concat!(
+                    "ERROR finishing message\n",
+                    "last part of the incomplete finishing message"
+                ),
+                7,
             ),
         ];
 
@@ -694,7 +731,7 @@ mod tests {
 
         let mut expected = "START msg 1".to_string();
         for i in 0..n {
-            expected.push_str(&format!("\nline {}", i));
+            write!(expected, "\nline {}", i).expect("write to String never fails");
         }
 
         let (mut send, recv) = futures::channel::mpsc::unbounded();
@@ -703,18 +740,21 @@ mod tests {
         let line_agg = LineAgg::new(recv, logic);
         let results = tokio::spawn(line_agg.collect());
 
-        for line in lines {
+        for (index, line) in lines.iter().enumerate() {
             let data = (
                 "test.log".to_owned(),
                 Bytes::copy_from_slice(line.as_bytes()),
-                (),
+                index,
             );
             send.send(data).await.unwrap();
             tokio::time::sleep(Duration::from_millis(1)).await;
         }
         drop(send);
 
-        assert_results(results.await.unwrap(), &[expected.as_str()]);
+        assert_results(
+            results.await.unwrap(),
+            &[(expected.as_str(), lines.len() - 1)],
+        );
     }
 
     // Test helpers.
@@ -724,24 +764,25 @@ mod tests {
 
     fn stream_from_lines<'a>(
         lines: &'a [&'static str],
-    ) -> impl Stream<Item = (Filename, Bytes, ())> + 'a {
-        futures::stream::iter(lines.iter().map(|line| {
+    ) -> impl Stream<Item = (Filename, Bytes, usize)> + 'a {
+        futures::stream::iter(lines.iter().enumerate().map(|(index, line)| {
             (
                 "test.log".to_owned(),
                 Bytes::from_static(line.as_bytes()),
-                (),
+                index,
             )
         }))
     }
 
-    fn assert_results(actual: Vec<(Filename, Bytes, ())>, expected: &[&str]) {
-        let expected_mapped: Vec<(Filename, Bytes, ())> = expected
+    /// Compare actual output to expected; expected is a list of the expected strings and context
+    fn assert_results(actual: Vec<(Filename, Bytes, usize)>, expected: &[(&str, usize)]) {
+        let expected_mapped: Vec<(Filename, Bytes, usize)> = expected
             .iter()
-            .map(|line| {
+            .map(|(line, context)| {
                 (
                     "test.log".to_owned(),
                     Bytes::copy_from_slice(line.as_bytes()),
-                    (),
+                    *context,
                 )
             })
             .collect();
@@ -752,7 +793,11 @@ mod tests {
         );
     }
 
-    async fn run_and_assert(lines: &[&'static str], config: Config, expected: &[&'static str]) {
+    async fn run_and_assert(
+        lines: &[&'static str],
+        config: Config,
+        expected: &[(&'static str, usize)],
+    ) {
         let stream = stream_from_lines(lines);
         let logic = Logic::new(config);
         let line_agg = LineAgg::new(stream, logic);

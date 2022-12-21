@@ -54,7 +54,7 @@ CUSTOM_HELM_REPO_LOCAL_NAME="${CUSTOM_HELM_REPO_LOCAL_NAME:-"local_repo"}"
 split-container-image() {
   local INPUT="$1"
   CONTAINER_IMAGE_REPOSITORY="${INPUT%:*}"
-  CONTAINER_IMAGE_TAG="${INPUT#*:}"
+  CONTAINER_IMAGE_TAG="${INPUT##*:}"
 }
 
 up() {

@@ -49,14 +49,14 @@ impl Function for FormatInt {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let base = arguments.optional("base");
 
-        Ok(Box::new(FormatIntFn { value, base }))
+        Ok(FormatIntFn { value, base }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -79,13 +79,6 @@ impl Function for FormatInt {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let base = args.optional("base");
-
-        format_int(value, base)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -94,7 +87,7 @@ struct FormatIntFn {
     base: Option<Box<dyn Expression>>,
 }
 
-impl Expression for FormatIntFn {
+impl FunctionExpression for FormatIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
@@ -107,7 +100,7 @@ impl Expression for FormatIntFn {
         format_int(value, base)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::integer().fallible()
     }
 }
@@ -125,8 +118,8 @@ fn format_radix(x: i64, radix: u32) -> String {
     };
 
     loop {
-        let m = (x % radix as u64) as u32; // max of 35
-        x /= radix as u64;
+        let m = (x % u64::from(radix)) as u32; // max of 35
+        x /= u64::from(radix);
 
         result.push_front(std::char::from_digit(m, radix).unwrap());
         if x == 0 {

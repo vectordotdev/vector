@@ -1,1 +1,1 @@
-{"metric":{"name":"u","tags":{"a":"k","q":"a"},"kind":"absolute","gauge":{"value":-858368.0}}}
+{"metric":{"name":"t","tags":{"_":"x","r":"v"},"kind":"incremental","aggregated_summary":{"quantiles":[{"quantile":-474560.0,"value":-773248.0},{"quantile":-183232.0,"value":259712.0},{"quantile":787784.9684,"value":858368.0}],"count":4067159593884976096,"sum":-723200.0}}}

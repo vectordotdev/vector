@@ -37,12 +37,6 @@ You can also specify multiple configuration files to test:
 vector test /etc/vector/pipeline1.toml /etc/vector/pipeline2.toml
 ```
 
-Glob patterns are also supported:
-
-```bash
-vector test /etc/vector/*.toml
-```
-
 Specifying multiple files is useful if you want to, for example, keep your unit tests in a separate
 file from your pipeline configuration. Vector always treats multiple files as a single, unified
 configuration.
@@ -223,7 +217,7 @@ Inside each test definition, you need to specify two things:
 
 ### Inputs
 
-In in the `inputs` array for the test, you have these options:
+In the `inputs` array for the test, you have these options:
 
 Parameter | Type | Description
 :---------|:-----|:-----------
@@ -250,7 +244,7 @@ message = "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Somet
 
 ### Outputs
 
-In the `outputs` array of your unit testing configuration you specify two things:
+In the `outputs` array of your unit testing configuration, you specify two things:
 
 Parameter | Type | Description
 :---------|:-----|:-----------
@@ -261,7 +255,7 @@ Each condition in the `conditions` array has two fields:
 
 Parameter | Type | Description
 :---------|:-----|:-----------
-`type` | string | The type of condition you're providing. As the original `check_fields` syntax is now deprecated, [`vrl`][vrl] is currently the only valid value.
+`type` | string | The type of condition you're providing. [`vrl`][vrl] is currently the only valid value.
 `source` | string (VRL Boolean expression) | Explained in detail [above](#verifying).
 
 Here's an example `outputs` declaration:
@@ -278,12 +272,6 @@ assert!(exists(.tags))
 '''
 ```
 
-{{< danger title="`check_fields` conditions now deprecated" >}}
-Vector initially provided a `check_fields` condition type that enabled you to specify Boolean
-test conditions using a special configuration-based system. `check_fields` is now deprecated. We
-strongly recommend converting any existing `check_fields` tests to `vrl` conditions.
-{{< /danger >}}
-
 #### Asserting no output
 
 In some cases, you may need to assert that _no_ event is output by a transform. You can specify
@@ -297,7 +285,7 @@ no_outputs_from = ["log_filter", "metric_filter"]
 ```
 
 In this test configuration, Vector would expect that the `log_filter` and `metric_filter` transforms
-dont't output _any_ events.
+not to output _any_ events.
 
 Some examples of use cases for `no_outputs_from`:
 
@@ -343,8 +331,8 @@ There are currently two event types that you can unit test in Vector:
 
 #### Logs
 
-As explained in the section on [inputs](#inputs) above, when testing log events you have can specify
-either a structured event [object] or a raw [string].
+As explained in the section on [inputs](#inputs) above, when testing log events, you can specify
+either a structured event [object](#object) or a raw [string](#raw-string-value).
 
 ##### Object
 
@@ -355,6 +343,17 @@ To specify a structured log event as your test input, use `log_fields`:
 message = "successful transaction"
 code = 200
 id = "38c5b0d0-5e7e-42aa-ae86-2b642ad2d1b8"
+```
+
+If there are hyphens in the field name, you will need to quote this part (at least in YAML):
+
+```yaml
+  - name: hyphens
+    inputs:
+      - insert_at: hyphens
+        type: log
+        log_fields:
+          labels."this-has-hyphens": "this is a test"
 ```
 
 ##### Raw string value
@@ -380,6 +379,22 @@ type = "metric"
 name = "count"
 kind = "absolute"
 counter = { value = 1 }
+```
+
+Aggregated metrics are a little different:
+
+```yaml
+tests:
+  inputs:
+    insert_at: my_aggregate_metrics_transform
+    type: metric
+    metric:
+      name: http_rtt
+      kind: incremental
+      aggregated_histogram:
+        buckets: []
+        sum: 0
+        count: 0
 ```
 
 Here's a full end-to-end example of unit testing a metric through a transform:

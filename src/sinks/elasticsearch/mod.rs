@@ -1,6 +1,7 @@
 mod common;
 mod config;
 mod encoder;
+mod health;
 mod request_builder;
 mod retry;
 mod service;
@@ -19,29 +20,47 @@ pub use common::*;
 pub use config::*;
 pub use encoder::ElasticsearchEncoder;
 use http::{uri::InvalidUri, Request};
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 
 use crate::aws::AwsAuthentication;
 use crate::{
-    config::SinkDescription,
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
     template::{Template, TemplateParseError},
 };
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Authentication strategies.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticsearchAuth {
-    Basic { user: String, password: String },
-    Aws(AwsAuthentication),
+    /// HTTP Basic Authentication.
+    Basic {
+        /// Basic authentication username.
+        user: String,
+
+        /// Basic authentication password.
+        password: SensitiveString,
+    },
+
+    /// Amazon OpenSearch Service-specific authentication.
+    Aws(#[configurable(derived)] AwsAuthentication),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+/// Indexing mode.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchMode {
+    /// Ingests documents in bulk, via the bulk API `index` action.
     #[serde(alias = "normal")]
     Bulk,
+
+    /// Ingests documents in bulk, via the bulk API `create` action.
+    ///
+    /// Elasticsearch Data Streams only support the `create` action.
     DataStream,
 }
 
@@ -51,10 +70,15 @@ impl Default for ElasticsearchMode {
     }
 }
 
-#[derive(Derivative, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// Bulk API actions.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BulkAction {
+    /// The `index` action.
     Index,
+
+    /// The `create` action.
     Create,
 }
 
@@ -85,10 +109,6 @@ impl TryFrom<&str> for BulkAction {
             _ => Err(format!("Invalid bulk action: {}", input)),
         }
     }
-}
-
-inventory::submit! {
-    SinkDescription::new::<ElasticsearchConfig>("elasticsearch")
 }
 
 impl_generate_config_from_default!(ElasticsearchConfig);
@@ -151,6 +171,27 @@ impl ElasticsearchCommonMode {
     }
 }
 
+/// Configuration for api version.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum ElasticsearchApiVersion {
+    /// Auto-detect the api version. Will fail if endpoint isn't reachable.
+    Auto,
+    /// Use the Elasticsearch 6.x API.
+    V6,
+    /// Use the Elasticsearch 7.x API.
+    V7,
+    /// Use the Elasticsearch 8.x API.
+    V8,
+}
+
+impl Default for ElasticsearchApiVersion {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum ParseError {
@@ -164,4 +205,10 @@ pub enum ParseError {
     BatchActionTemplate { source: TemplateParseError },
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     RegionRequired,
+    #[snafu(display("Endpoints option must be specified"))]
+    EndpointRequired,
+    #[snafu(display(
+        "`endpoint` and `endpoints` options are mutually exclusive. Please use `endpoints` option."
+    ))]
+    EndpointsExclusive,
 }

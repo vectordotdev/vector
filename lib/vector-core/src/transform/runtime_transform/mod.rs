@@ -1,6 +1,6 @@
 mod vec_stream;
 
-use std::{future::ready, pin::Pin};
+use std::{future::ready, pin::Pin, time::Duration};
 
 use futures::{
     stream::{self, BoxStream},
@@ -17,7 +17,7 @@ use crate::event::Event;
 #[derive(Clone, Copy, Debug)]
 pub struct Timer {
     pub id: u32,
-    pub interval_seconds: u64,
+    pub interval: Duration,
 }
 
 /// A trait representing a runtime running user-defined code.
@@ -145,8 +145,7 @@ where
 
 fn make_timer_msgs_stream(timers: Vec<Timer>) -> BoxStream<'static, Message> {
     let streams = timers.into_iter().map(|timer| {
-        let period = time::Duration::from_secs(timer.interval_seconds);
-        IntervalStream::new(time::interval(period)).map(move |_| Message::Timer(timer))
+        IntervalStream::new(time::interval(timer.interval)).map(move |_| Message::Timer(timer))
     });
     stream::select_all(streams).boxed()
 }

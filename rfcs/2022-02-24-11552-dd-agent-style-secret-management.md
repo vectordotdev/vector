@@ -49,7 +49,7 @@ and the syntax to retrieve encrypted config value.
 
 Datadog Secret API, as per the official [doc][dd-secret-backend-exec-api]:
 
-- Communication happens on stdout/sdin
+- Communication happens on stdout/stdin
 - It uses plain text json
 
 Vector would run the user-provided executable and feed its standard input with the list of secrets to retrieve:
@@ -105,7 +105,7 @@ inputs = ["system_logs"]
 The first implementation would only support the `exec` backend but with extensibility point clearly identified to easily
 implement additional backend if needed.
 
-Overall the behaviour for corner cases should follow what's in place for environmment variable interpolation as this is
+Overall the behaviour for corner cases should follow what's in place for environment variable interpolation as this is
 a very close feature. When a configuration reload happens, secrets shall also be refreshed.
 
 ### Implementation
@@ -124,7 +124,7 @@ interpolation][env-var-hook]:
 
 - All `SECRET[<backend>.<key>]` placeholders present in config will be collected.
 - Every backend that is specified in this secret list will be queried for all the secrets it should be used for retrieval.
-- And then the interpolation will actually happen (only if all secret were retrieved sucessfully).
+- And then the interpolation will actually happen (only if all secret were retrieved successfully).
 
 **Note**: As shown in the aforementioned config sample a secret backend shall itself be able to use other secret backend for its own initialisation.
 
@@ -145,7 +145,7 @@ secret provider that may see other implementation like: `exec` (the one we will 
 
 ## Prior Art
 
-- The Datadog Agent has exactly the same feature, despite its simple approach it works reasonnably well, but it is
+- The Datadog Agent has exactly the same feature, despite its simple approach it works reasonably well, but it is
   cannot easily support advanced secret management like certificate distribution/revocation, key rotation, etc.
 - Vault is the standard in the industry, and it comes with all kind of advanced features that cannot really supported
   by the user-provided executable solution.
@@ -164,10 +164,10 @@ users.
 
 ## Outstanding Questions
 
-- Sticking to env var from K8s secret still seems a reasonnable approach as K8s is the reference deployement in many
+- Sticking to env var from K8s secret still seems a reasonable approach as K8s is the reference deployment in many
   situations.
 - Specific security constraints that may have been missed (enforcing the same set of constraints the Datadog Agent uses
-  sound like a reasonnable approach to start with, [windows][dd-agent-win-user-constraints] /
+  sound like a reasonable approach to start with, [windows][dd-agent-win-user-constraints] /
   [others][dd-agent-unix-user-constraints]).
 
 ## Plan Of Attack
@@ -180,7 +180,7 @@ users.
 
 - Support additional backend.
 - Embed/implement helpers like the [Agent][dd-agent-secret-helper].
-- Possible extention to the API, it will mostly depends on user feedback
+- Possible extension to the API, it will mostly depends on user feedback
 
 
 [dd-agent-secret-mgmt]: https://docs.datadoghq.com/agent/guide/secrets-management/

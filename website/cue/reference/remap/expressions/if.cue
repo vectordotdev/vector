@@ -30,9 +30,8 @@ remap: expressions: if: {
 	examples: [
 		{
 			title: "True if expression"
-			input: log: foo: true
 			source: #"""
-				if .foo == true {
+				if true {
 					"Hello, World!"
 				}
 				"""#
@@ -40,20 +39,18 @@ remap: expressions: if: {
 		},
 		{
 			title: "False if expression"
-			input: log: foo: false
 			source: #"""
-				if .foo == true {
+				if false {
 					# not evaluated
-					"Hello, World!"
+					null
 				}
 				"""#
 			return: null
 		},
 		{
 			title: "If/else expression"
-			input: log: foo: false
 			source: #"""
-				if .foo == true {
+				if false {
 					# not evaluated
 					null
 				} else {
@@ -64,12 +61,11 @@ remap: expressions: if: {
 		},
 		{
 			title: "If/else if/else expression"
-			input: log: foo: true
 			source: #"""
-				if .foo == false {
+				if false {
 					# not evaluated
 					null
-				} else if .foo == false {
+				} else if false {
 					# not evaluated
 					null
 				} else {

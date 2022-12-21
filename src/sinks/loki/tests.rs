@@ -3,7 +3,7 @@ use futures::StreamExt;
 use super::{config::LokiConfig, healthcheck::healthcheck, sink::LokiSink};
 use crate::{
     config::ProxyConfig,
-    event::Event,
+    event::{Event, LogEvent},
     http::HttpClient,
     sinks::util::test::{build_test_server, load_sink},
     test_util,
@@ -12,7 +12,7 @@ use crate::{
 
 #[test]
 fn generate_config() {
-    crate::test_util::test_generate_config::<LokiConfig>();
+    test_util::test_generate_config::<LokiConfig>();
 }
 
 #[tokio::test]
@@ -21,19 +21,19 @@ async fn interpolate_labels() {
         r#"
         endpoint = "http://localhost:3100"
         labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}", "{{ foo }}" = "{{ foo }}"}
-        encoding = "json"
+        encoding.codec = "json"
         remove_label_fields = true
     "#,
     )
     .unwrap();
-    let client = config.build_client(cx.clone()).unwrap();
-    let sink = LokiSink::new(config, client, cx).unwrap();
+    let client = config.build_client(cx).unwrap();
+    let mut sink = LokiSink::new(config, client).unwrap();
 
-    let mut e1 = Event::from("hello world");
+    let mut e1 = Event::Log(LogEvent::from("hello world"));
 
     e1.as_mut_log().insert("foo", "bar");
 
-    let mut record = sink.encoder.encode_event(e1);
+    let mut record = sink.encoder.encode_event(e1).unwrap();
 
     // HashMap -> Vec doesn't like keeping ordering
     record.labels.sort();
@@ -67,14 +67,14 @@ async fn use_label_from_dropped_fields() {
         "#,
     )
     .unwrap();
-    let client = config.build_client(cx.clone()).unwrap();
-    let sink = LokiSink::new(config, client, cx).unwrap();
+    let client = config.build_client(cx).unwrap();
+    let mut sink = LokiSink::new(config, client).unwrap();
 
-    let mut e1 = Event::from("hello world");
+    let mut e1 = Event::Log(LogEvent::from("hello world"));
 
     e1.as_mut_log().insert("foo", "bar");
 
-    let record = sink.encoder.encode_event(e1);
+    let record = sink.encoder.encode_event(e1).unwrap();
 
     let expected_line = serde_json::to_string(&serde_json::json!({
         "message": "hello world",
@@ -92,7 +92,7 @@ async fn healthcheck_includes_auth() {
         r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
-            encoding = "json"
+            encoding.codec = "json"
 			auth.strategy = "basic"
 			auth.user = "username"
 			auth.password = "some_password"
@@ -134,7 +134,7 @@ async fn healthcheck_grafana_cloud() {
     let (config, _cx) = load_sink::<LokiConfig>(
         r#"
             endpoint = "http://logs-prod-us-central1.grafana.net"
-            encoding = "json"
+            encoding.codec = "json"
             labels = {test_name = "placeholder"}
         "#,
     )

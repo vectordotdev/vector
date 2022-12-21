@@ -1,74 +1,76 @@
-use std::collections::BTreeMap;
-
-use chrono::Utc;
-use futures::{stream, StreamExt};
+use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeError};
+use futures::StreamExt;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
+use vector_core::{event::MetricTags, metric_tags};
 
 use super::{filter_result, HostMetrics};
-use crate::event::metric::Metric;
+
+const MODE: &str = "mode";
+const CPU_SECS_TOTAL: &str = "cpu_seconds_total";
+const LOGICAL_CPUS: &str = "logical_cpus";
+const PHYSICAL_CPUS: &str = "physical_cpus";
 
 impl HostMetrics {
-    pub async fn cpu_metrics(&self) -> Vec<Metric> {
+    pub async fn cpu_metrics(&self, output: &mut super::MetricsBuffer) {
+        // adds the metrics from cpu time for each cpu
         match heim::cpu::times().await {
             Ok(times) => {
-                times
+                let times: Vec<_> = times
                     .filter_map(|result| filter_result(result, "Failed to load/parse CPU time."))
-                    .enumerate()
-                    .map(|(index, times)| {
-                        let timestamp = Utc::now();
-                        let name = "cpu_seconds_total";
-                        stream::iter(
-                            vec![
-                                self.counter(
-                                    name,
-                                    timestamp,
-                                    times.idle().get::<second>(),
-                                    BTreeMap::from([
-                                        (String::from("mode"), String::from("idle")),
-                                        (String::from("cpu"), index.to_string()),
-                                    ]),
-                                ),
-                                #[cfg(target_os = "linux")]
-                                self.counter(
-                                    name,
-                                    timestamp,
-                                    times.nice().get::<second>(),
-                                    BTreeMap::from([
-                                        (String::from("mode"), String::from("nice")),
-                                        (String::from("cpu"), index.to_string()),
-                                    ]),
-                                ),
-                                self.counter(
-                                    name,
-                                    timestamp,
-                                    times.system().get::<second>(),
-                                    BTreeMap::from([
-                                        (String::from("mode"), String::from("system")),
-                                        (String::from("cpu"), index.to_string()),
-                                    ]),
-                                ),
-                                self.counter(
-                                    name,
-                                    timestamp,
-                                    times.user().get::<second>(),
-                                    BTreeMap::from([
-                                        (String::from("mode"), String::from("user")),
-                                        (String::from("cpu"), index.to_string()),
-                                    ]),
-                                ),
-                            ]
-                            .into_iter(),
-                        )
-                    })
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .await
+                    .collect()
+                    .await;
+                output.name = "cpu";
+                for (index, times) in times.into_iter().enumerate() {
+                    let tags = |name: &str| metric_tags!(MODE => name, "cpu" => index.to_string());
+                    output.counter(CPU_SECS_TOTAL, times.idle().get::<second>(), tags("idle"));
+                    #[cfg(target_os = "linux")]
+                    output.counter(
+                        CPU_SECS_TOTAL,
+                        times.io_wait().get::<second>(),
+                        tags("io_wait"),
+                    );
+                    #[cfg(target_os = "linux")]
+                    output.counter(CPU_SECS_TOTAL, times.nice().get::<second>(), tags("nice"));
+                    output.counter(
+                        CPU_SECS_TOTAL,
+                        times.system().get::<second>(),
+                        tags("system"),
+                    );
+                    output.counter(CPU_SECS_TOTAL, times.user().get::<second>(), tags("user"));
+                }
             }
             Err(error) => {
-                error!(message = "Failed to load CPU times.", %error, internal_log_rate_secs = 60);
-                vec![]
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load CPU times.",
+                    error,
+                });
+            }
+        }
+        // adds the logical cpu count gauge
+        match heim::cpu::logical_count().await {
+            Ok(count) => output.gauge(LOGICAL_CPUS, count as f64, MetricTags::default()),
+            Err(error) => {
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load logical CPU count.",
+                    error,
+                });
+            }
+        }
+        // adds the physical cpu count gauge
+        match heim::cpu::physical_count().await {
+            Ok(Some(count)) => output.gauge(PHYSICAL_CPUS, count as f64, MetricTags::default()),
+            Ok(None) => {
+                emit!(HostMetricsScrapeError {
+                    message: "Unable to determine physical CPU count.",
+                });
+            }
+            Err(error) => {
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load physical CPU count.",
+                    error,
+                });
             }
         }
     }
@@ -76,23 +78,53 @@ impl HostMetrics {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{
-        tests::{all_counters, count_name, count_tag},
-        HostMetrics, HostMetricsConfig,
-    };
+    use super::super::{HostMetrics, HostMetricsConfig, MetricsBuffer};
+    use super::{CPU_SECS_TOTAL, LOGICAL_CPUS, MODE, PHYSICAL_CPUS};
 
     #[tokio::test]
     async fn generates_cpu_metrics() {
-        let metrics = HostMetrics::new(HostMetricsConfig::default())
-            .cpu_metrics()
+        let mut buffer = MetricsBuffer::new(None);
+        HostMetrics::new(HostMetricsConfig::default())
+            .cpu_metrics(&mut buffer)
             .await;
+        let metrics = buffer.metrics;
+
         assert!(!metrics.is_empty());
-        assert!(all_counters(&metrics));
 
-        // They should all be named cpu_seconds_total
-        assert_eq!(metrics.len(), count_name(&metrics, "cpu_seconds_total"));
+        let mut n_physical_cpus = 0;
+        let mut n_logical_cpus = 0;
 
-        // They should all have a "mode" tag
-        assert_eq!(count_tag(&metrics, "mode"), metrics.len());
+        for metric in metrics {
+            // the cpu_seconds_total metrics must have mode
+            if metric.name() == CPU_SECS_TOTAL {
+                let tags = metric.tags();
+                assert!(
+                    tags.is_some(),
+                    "Metric cpu_seconds_total must have a mode tag"
+                );
+                let tags = tags.unwrap();
+                assert!(
+                    tags.contains_key(MODE),
+                    "Metric cpu_seconds_total must have a mode tag"
+                );
+            } else if metric.name() == PHYSICAL_CPUS {
+                n_physical_cpus += 1;
+            } else if metric.name() == LOGICAL_CPUS {
+                n_logical_cpus += 1;
+            } else {
+                // catch any bogey
+                panic!("unrecognized metric name");
+            }
+        }
+
+        // cpu count metrics should each be present once
+        assert_eq!(
+            n_logical_cpus, 1,
+            "There can only be one! (logical_cpus metric)"
+        );
+        assert_eq!(
+            n_physical_cpus, 1,
+            "There can only be one! (physical_cpus metric)"
+        );
     }
 }

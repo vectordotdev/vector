@@ -71,9 +71,9 @@ remap: functions: decrypt: {
 		{
 			title: "Decrypt value"
 			source: #"""
-				ciphertext = decode_base64!("5fLGcu1VHdzsPcGNDio7asLqE1P43QrVfPfmP4i4zOU=");
-				iv = decode_base64!("fVEIRkIiczCRWNxaarsyxA==");
-				key = "16_byte_keyxxxxx";
+				ciphertext = decode_base64!("5fLGcu1VHdzsPcGNDio7asLqE1P43QrVfPfmP4i4zOU=")
+				iv = decode_base64!("fVEIRkIiczCRWNxaarsyxA==")
+				key = "16_byte_keyxxxxx"
 				decrypt!(ciphertext, "AES-128-CBC-PKCS7", key, iv: iv)
 				"""#
 			return: "super_secret_message"

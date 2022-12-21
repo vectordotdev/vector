@@ -3,6 +3,7 @@
 //! This library implements a channel like functionality, one variant which is
 //! solely in-memory and the other that is on-disk. Both variants are bounded.
 
+#![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
@@ -12,14 +13,14 @@
 #[macro_use]
 extern crate tracing;
 
-mod acknowledgements;
-pub use acknowledgements::{Ackable, Acker};
-
 mod buffer_usage_data;
 
 pub mod config;
 pub use config::{BufferConfig, BufferType};
 use encoding::Encodable;
+use vector_config::configurable_component;
+
+pub(crate) use vector_common::Result;
 
 pub mod encoding;
 
@@ -35,14 +36,36 @@ use std::fmt::Debug;
 
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
-use serde::{Deserialize, Serialize};
-use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::{byte_size_of::ByteSizeOf, finalization::AddBatchNotifier};
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
+/// Event handling behavior when a buffer is full.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum WhenFull {
+    /// Wait for free space in the buffer.
+    ///
+    /// This applies backpressure up the topology, signalling that sources should slow down
+    /// the acceptance/consumption of events. This means that while no data is lost, data will pile
+    /// up at the edge.
     Block,
+
+    /// Drops the event instead of waiting for free space in buffer.
+    ///
+    /// The event will be intentionally dropped. This mode is typically used when performance is the
+    /// highest priority, and it is preferable to temporarily lose events rather than cause a
+    /// slowdown in the acceptance/consumption of events.
     DropNewest,
+
+    /// Overflows to the next stage in the buffer topology.
+    ///
+    /// If the current buffer stage is full, attempt to send this event to the next buffer stage.
+    /// That stage may also be configured overflow, and so on, but ultimately the last stage in a
+    /// buffer topology must use one of the other handling behaviors. This means that next stage may
+    /// potentially be able to buffer the event, but it may also block or drop the event.
+    ///
+    /// This mode can only be used when two or more buffer stages are configured.
+    #[configurable(metadata(docs::hidden))]
     Overflow,
 }
 
@@ -70,18 +93,54 @@ impl Arbitrary for WhenFull {
 ///
 /// This supertrait serves as the base trait for any item that can be pushed into a buffer.
 pub trait Bufferable:
-    ByteSizeOf + Encodable + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
+    AddBatchNotifier
+    + ByteSizeOf
+    + Encodable
+    + EventCount
+    + Debug
+    + Send
+    + Sync
+    + Unpin
+    + Sized
+    + 'static
 {
 }
 
 // Blanket implementation for anything that is already bufferable.
 impl<T> Bufferable for T where
-    T: ByteSizeOf + Encodable + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
+    T: AddBatchNotifier
+        + ByteSizeOf
+        + Encodable
+        + EventCount
+        + Debug
+        + Send
+        + Sync
+        + Unpin
+        + Sized
+        + 'static
 {
 }
 
 pub trait EventCount {
     fn event_count(&self) -> usize;
+}
+
+impl<T> EventCount for Vec<T>
+where
+    T: EventCount,
+{
+    fn event_count(&self) -> usize {
+        self.iter().map(EventCount::event_count).sum()
+    }
+}
+
+impl<'a, T> EventCount for &'a T
+where
+    T: EventCount,
+{
+    fn event_count(&self) -> usize {
+        (*self).event_count()
+    }
 }
 
 #[track_caller]

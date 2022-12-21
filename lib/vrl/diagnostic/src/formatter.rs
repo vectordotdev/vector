@@ -18,6 +18,7 @@ impl<'a> Formatter<'a> {
         }
     }
 
+    #[must_use]
     pub fn colored(mut self) -> Self {
         self.color = true;
         self
@@ -27,6 +28,7 @@ impl<'a> Formatter<'a> {
         self.color = color
     }
 
+    #[must_use]
     pub fn diagnostics(&self) -> &DiagnosticList {
         &self.diagnostics
     }
@@ -54,7 +56,7 @@ impl<'a> fmt::Display for Formatter<'a> {
         f.write_str("\n")?;
 
         for diagnostic in self.diagnostics.iter() {
-            term::emit(&mut buffer, &config, &file, &diagnostic.to_owned().into())
+            term::emit(&mut buffer, &config, &file, &diagnostic.clone().into())
                 .map_err(|_| fmt::Error)?;
         }
 
@@ -65,7 +67,7 @@ impl<'a> fmt::Display for Formatter<'a> {
         let string = from_utf8(buffer.as_slice())
             .map_err(|_| fmt::Error)?
             .lines()
-            .map(|line| line.trim_end())
+            .map(str::trim_end)
             .collect::<Vec<_>>()
             .join("\n");
 

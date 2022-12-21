@@ -63,9 +63,9 @@ components: sources: heroku_logs: {
 
 	configuration: {
 		acknowledgements: configuration._source_acknowledgements
-		address:          sources.http.configuration.address
-		auth:             sources.http.configuration.auth
-		query_parameters: sources.http.configuration.query_parameters
+		address:          sources.http_server.configuration.address
+		auth:             sources.http_server.configuration.auth
+		query_parameters: sources.http_server.configuration.query_parameters
 	}
 
 	output: logs: line: {
@@ -91,6 +91,13 @@ components: sources: heroku_logs: {
 				required:    true
 				type: string: {
 					examples: ["console"]
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["heroku_logs"]
 				}
 			}
 			timestamp: fields._current_timestamp

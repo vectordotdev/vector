@@ -2,11 +2,11 @@
 
 mkdir -p /ssl
 
-cp /certs/postgres.key /ssl/postgres.key
+cp /certs/intermediate_server/private/postgres.key.pem /ssl/postgres.key
 chown postgres:postgres /ssl/postgres.key
 chmod 600 /ssl/postgres.key
 
-cp /certs/postgres.crt /ssl/postgres.crt
+cp /certs/intermediate_server/certs/postgres-chain.cert.pem /ssl/postgres.crt
 
 /docker-entrypoint.sh postgres \
     -c ssl=on \

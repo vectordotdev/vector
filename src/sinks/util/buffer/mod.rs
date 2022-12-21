@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use bytes::{BufMut, BytesMut};
-use flate2::write::GzEncoder;
+use flate2::write::{GzEncoder, ZlibEncoder};
 
 use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
 
@@ -11,7 +11,7 @@ pub mod metrics;
 pub mod partition;
 pub mod vec;
 
-pub use compression::{Compression, GZIP_FAST};
+pub use compression::Compression;
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
 #[derive(Debug)]
@@ -27,6 +27,7 @@ pub struct Buffer {
 pub enum InnerBuffer {
     Plain(bytes::buf::Writer<BytesMut>),
     Gzip(GzEncoder<bytes::buf::Writer<BytesMut>>),
+    Zlib(ZlibEncoder<bytes::buf::Writer<BytesMut>>),
 }
 
 impl Buffer {
@@ -47,7 +48,12 @@ impl Buffer {
             let writer = BytesMut::with_capacity(bytes).writer();
             match compression {
                 Compression::None => InnerBuffer::Plain(writer),
-                Compression::Gzip(level) => InnerBuffer::Gzip(GzEncoder::new(writer, level)),
+                Compression::Gzip(level) => {
+                    InnerBuffer::Gzip(GzEncoder::new(writer, level.as_flate2()))
+                }
+                Compression::Zlib(level) => {
+                    InnerBuffer::Zlib(ZlibEncoder::new(writer, level.as_flate2()))
+                }
             }
         })
     }
@@ -61,6 +67,9 @@ impl Buffer {
             InnerBuffer::Gzip(inner) => {
                 inner.write_all(input).unwrap();
             }
+            InnerBuffer::Zlib(inner) => {
+                inner.write_all(input).unwrap();
+            }
         }
     }
 
@@ -70,6 +79,7 @@ impl Buffer {
             .map(|inner| match inner {
                 InnerBuffer::Plain(inner) => inner.get_ref().is_empty(),
                 InnerBuffer::Gzip(inner) => inner.get_ref().get_ref().is_empty(),
+                InnerBuffer::Zlib(inner) => inner.get_ref().get_ref().is_empty(),
             })
             .unwrap_or(true)
     }
@@ -112,6 +122,10 @@ impl Batch for Buffer {
                 .finish()
                 .expect("This can't fail because the inner writer is a Vec")
                 .into_inner(),
+            Some(InnerBuffer::Zlib(inner)) => inner
+                .finish()
+                .expect("This can't fail because the inner writer is a Vec")
+                .into_inner(),
             None => BytesMut::new(),
         }
     }
@@ -131,7 +145,6 @@ mod test {
     use bytes::{Buf, BytesMut};
     use futures::{future, stream, SinkExt, StreamExt};
     use tokio::time::Duration;
-    use vector_buffers::Acker;
 
     use super::{Buffer, Compression};
     use crate::sinks::util::{BatchSettings, BatchSink, EncodedEvent};
@@ -140,7 +153,6 @@ mod test {
     async fn gzip() {
         use flate2::read::MultiGzDecoder;
 
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -158,7 +170,6 @@ mod test {
             svc,
             Buffer::new(batch_settings.size, Compression::gzip_default()),
             batch_settings.timeout,
-            acker,
         );
 
         let input = std::iter::repeat(BytesMut::from(
@@ -166,7 +177,7 @@ mod test {
         ))
         .take(100_000);
 
-        let _ = buffered
+        buffered
             .sink_map_err(drop)
             .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
@@ -178,7 +189,7 @@ mod test {
             .unwrap();
 
         assert!(output.len() > 1);
-        assert!(dbg!(output.iter().map(|o| o.len()).sum::<usize>()) < 80_000);
+        assert!(output.iter().map(|o| o.len()).sum::<usize>() < 80_000);
 
         let decompressed = output.into_iter().flat_map(|batch| {
             let mut decompressed = vec![];

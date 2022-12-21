@@ -6,6 +6,7 @@ pub trait EncodedLength {
     fn encoded_length(&self) -> usize;
 }
 
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 #[derive(Clone)]
 pub struct VecBuffer<T> {
     batch: Option<Vec<T>>,

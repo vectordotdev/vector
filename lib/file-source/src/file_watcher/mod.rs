@@ -16,6 +16,17 @@ use crate::{
 #[cfg(test)]
 mod tests;
 
+/// The `RawLine` struct is a thin wrapper around the bytes that have been read
+/// in order to retain the context of where in the file they have been read from.
+///
+/// The offset field contains the byte offset of the beginning of the line within
+/// the file that it was read from.
+#[derive(Debug)]
+pub(super) struct RawLine {
+    pub offset: u64,
+    pub bytes: Bytes,
+}
+
 /// The `FileWatcher` struct defines the polling based state machine which reads
 /// from a file path, transparently updating the underlying file descriptor when
 /// the file has been rolled over, as is common for logs.
@@ -188,11 +199,12 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler as needed, transparently to the caller.
-    pub fn read_line(&mut self) -> io::Result<Option<Bytes>> {
+    pub(super) fn read_line(&mut self) -> io::Result<Option<RawLine>> {
         self.track_read_attempt();
 
         let reader = &mut self.reader;
         let file_position = &mut self.file_position;
+        let initial_position = *file_position;
         match read_until_with_max_size(
             reader,
             file_position,
@@ -202,7 +214,10 @@ impl FileWatcher {
         ) {
             Ok(Some(_)) => {
                 self.track_read_success();
-                Ok(Some(self.buf.split().freeze()))
+                Ok(Some(RawLine {
+                    offset: initial_position,
+                    bytes: self.buf.split().freeze(),
+                }))
             }
             Ok(None) => {
                 if !self.file_findable() {
@@ -215,7 +230,10 @@ impl FileWatcher {
                         // EOF
                         Ok(None)
                     } else {
-                        Ok(Some(buf))
+                        Ok(Some(RawLine {
+                            offset: initial_position,
+                            bytes: buf,
+                        }))
                     }
                 } else {
                     Ok(None)

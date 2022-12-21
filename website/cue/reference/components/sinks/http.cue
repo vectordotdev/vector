@@ -14,7 +14,10 @@ components: sinks: http: {
 
 	features: {
 		acknowledgements: true
-		healthcheck: enabled: true
+		healthcheck: {
+			enabled:  true
+			uses_uri: true
+		}
 		send: {
 			batch: {
 				enabled:      true
@@ -32,8 +35,8 @@ components: sinks: http: {
 				enabled: true
 				codec: {
 					enabled: true
-					batched: true
-					enum: ["json", "ndjson", "text"]
+					framing: true
+					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true
@@ -46,6 +49,7 @@ components: sinks: http: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: {
@@ -69,7 +73,7 @@ components: sinks: http: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
+		notices: ["Input type support can depend on configured `encoding.codec`"]
 	}
 
 	configuration: {
@@ -87,24 +91,31 @@ components: sinks: http: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
 			}
 		}
-		healthcheck: type: object: options: uri: {
-			common: false
-			description: """
-				The full URI to make HTTP health check request to. This should include the protocol and host,
-				but can also include the port, path, and any other valid part of a URI.
-				"""
-			required: false
+		method: {
+			description: "The HTTP method to use."
+			required:    false
+			common:      false
 			type: string: {
-				default: null
-				examples: ["https://10.22.212.22:9000/health"]
+				default: "POST"
+				enum: {
+					PUT:  "PUT"
+					POST: "POST"
+				}
 			}
 		}
 	}
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			summary:      true
+			set:          true
+		}
+		traces: true
 	}
 
 	telemetry: metrics: {

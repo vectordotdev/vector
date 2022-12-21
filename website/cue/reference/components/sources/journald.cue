@@ -172,6 +172,13 @@ components: sources: journald: {
 						examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 					}
 				}
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["journald"]
+					}
+				}
 				timestamp: fields._current_timestamp
 				"*": {
 					common:      false
@@ -197,6 +204,7 @@ components: sources: journald: {
 			output: [{
 				log: {
 					timestamp:                _values.current_timestamp
+					source_type:              "journald"
 					message:                  "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s"
 					host:                     _values.local_host
 					"__REALTIME_TIMESTAMP":   "1564173027000443"
@@ -234,7 +242,7 @@ components: sources: journald: {
 				with. If the `journalctl` command is not in the environment path you can
 				specify the exact location via the `journalctl_path` option. For more
 				information on this communication strategy please see
-				[issue #1473](\(urls.vector_issues)/1437).
+				[issue #1473](\(urls.vector_issues)/1473).
 				"""
 		}
 		non_ascii: {

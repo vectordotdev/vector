@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn encode_json(value: Value) -> Resolved {
@@ -27,13 +28,13 @@ impl Function for EncodeJson {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(EncodeJsonFn { value }))
+        Ok(EncodeJsonFn { value }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -43,11 +44,6 @@ impl Function for EncodeJson {
             result: Ok(r#"s'{"another":[1,2,3],"field":"value"}'"#),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        encode_json(value)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -55,13 +51,13 @@ struct EncodeJsonFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for EncodeJsonFn {
+impl FunctionExpression for EncodeJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         encode_json(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

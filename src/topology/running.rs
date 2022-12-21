@@ -13,10 +13,14 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_buffers::topology::channel::BufferSender;
+use vector_common::trigger::DisabledTrigger;
 
 use super::{TapOutput, TapResource};
 use crate::{
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
+    config::{
+        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource,
+        SourceConfig,
+    },
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
     spawn_named,
@@ -28,13 +32,14 @@ use crate::{
         task::TaskOutput,
         BuiltBuffer, TaskHandle, WatchRx, WatchTx,
     },
-    trigger::DisabledTrigger,
 };
 
 #[allow(dead_code)]
 pub struct RunningTopology {
     inputs: HashMap<ComponentKey, BufferSender<EventArray>>,
+    inputs_tap_metadata: HashMap<ComponentKey, Inputs<OutputId>>,
     outputs: HashMap<OutputId, ControlChannel>,
+    outputs_tap_metadata: HashMap<ComponentKey, (&'static str, String)>,
     source_tasks: HashMap<ComponentKey, TaskHandle>,
     tasks: HashMap<ComponentKey, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
@@ -49,7 +54,9 @@ impl RunningTopology {
     pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<()>) -> Self {
         Self {
             inputs: HashMap::new(),
+            inputs_tap_metadata: HashMap::new(),
             outputs: HashMap::new(),
+            outputs_tap_metadata: HashMap::new(),
             config,
             shutdown_coordinator: SourceShutdownCoordinator::default(),
             detach_triggers: HashMap::new(),
@@ -370,14 +377,14 @@ impl RunningTopology {
             let previous = self.tasks.remove(key).unwrap();
             drop(previous); // detach and forget
 
-            self.remove_inputs(key, diff).await;
+            self.remove_inputs(key, diff, new_config).await;
             self.remove_outputs(key);
         }
 
         for key in &diff.transforms.to_change {
             debug!(component = %key, "Changing transform.");
 
-            self.remove_inputs(key, diff).await;
+            self.remove_inputs(key, diff, new_config).await;
             self.remove_outputs(key);
         }
 
@@ -435,7 +442,7 @@ impl RunningTopology {
         // First, we remove any inputs to removed sinks so they can naturally shut down.
         for key in &diff.sinks.to_remove {
             debug!(component = %key, "Removing sink.");
-            self.remove_inputs(key, diff).await;
+            self.remove_inputs(key, diff, new_config).await;
         }
 
         // After that, for any changed sinks, we temporarily detach their inputs (not remove) so
@@ -463,7 +470,7 @@ impl RunningTopology {
                 // at other stages.
                 buffer_tx.insert(key.clone(), self.inputs.get(key).unwrap().clone());
             }
-            self.remove_inputs(key, diff).await;
+            self.remove_inputs(key, diff, new_config).await;
         }
 
         // Now that we've disconnected or temporarily detached the inputs to all changed/removed
@@ -498,12 +505,12 @@ impl RunningTopology {
                     // buffer) than it is to pass around info about which sinks are having their
                     // buffers reused and treat them differently at other stages.
                     let tx = buffer_tx.remove(key).unwrap();
-                    let (rx, acker) = match buffer {
-                        TaskOutput::Sink(rx, acker) => (rx.into_inner(), acker),
+                    let rx = match buffer {
+                        TaskOutput::Sink(rx) => rx.into_inner(),
                         _ => unreachable!(),
                     };
 
-                    buffers.insert(key.clone(), (tx, Arc::new(Mutex::new(Some(rx))), acker));
+                    buffers.insert(key.clone(), (tx, Arc::new(Mutex::new(Some(rx)))));
                 }
             }
         }
@@ -515,25 +522,48 @@ impl RunningTopology {
     pub(crate) async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
         debug!("Connecting changed/added component(s).");
 
-        // We keep track of all new components so that we can report the topology changes to the tap
-        // API once we're done wiring everything up.
-        let mut tap_metadata = HashMap::new();
-        let mut watch_inputs = HashMap::new();
+        // Update tap metadata
         if !self.watch.0.is_closed() {
-            watch_inputs = new_pieces
-                .inputs
-                .iter()
-                .map(|(key, (_, inputs))| (key.clone(), inputs.clone()))
-                .collect();
+            for key in &diff.sources.to_remove {
+                // Sources only have outputs
+                self.outputs_tap_metadata.remove(key);
+            }
+
+            for key in &diff.transforms.to_remove {
+                // Transforms can have both inputs and outputs
+                self.outputs_tap_metadata.remove(key);
+                self.inputs_tap_metadata.remove(key);
+            }
+
+            for key in &diff.sinks.to_remove {
+                // Sinks only have inputs
+                self.inputs_tap_metadata.remove(key);
+            }
+
+            for key in diff.sources.changed_and_added() {
+                if let Some(task) = new_pieces.tasks.get(key) {
+                    self.outputs_tap_metadata
+                        .insert(key.clone(), ("source", task.typetag().to_string()));
+                }
+            }
+
+            for key in diff.transforms.changed_and_added() {
+                if let Some(task) = new_pieces.tasks.get(key) {
+                    self.outputs_tap_metadata
+                        .insert(key.clone(), ("transform", task.typetag().to_string()));
+                }
+            }
+
+            for (key, input) in &new_pieces.inputs {
+                self.inputs_tap_metadata
+                    .insert(key.clone(), input.1.clone());
+            }
         }
 
         // We configure the outputs of any changed/added sources first, so they're available to any
         // transforms and sinks that come afterwards.
         for key in diff.sources.changed_and_added() {
             debug!(component = %key, "Configuring outputs for source.");
-            if let Some(task) = new_pieces.tasks.get(key) {
-                tap_metadata.insert(key, ("source", task.typetag().to_string()));
-            }
             self.setup_outputs(key, new_pieces).await;
         }
 
@@ -541,9 +571,6 @@ impl RunningTopology {
         // need them to be available to any transforms and sinks that come afterwards.
         for key in diff.transforms.changed_and_added() {
             debug!(component = %key, "Configuring outputs for transform.");
-            if let Some(task) = new_pieces.tasks.get(key) {
-                tap_metadata.insert(key, ("transform", task.typetag().to_string()));
-            }
             self.setup_outputs(key, new_pieces).await;
         }
 
@@ -579,7 +606,7 @@ impl RunningTopology {
                 .clone()
                 .into_iter()
                 .flat_map(|(output_id, control_tx)| {
-                    tap_metadata.get(&output_id.component).map(
+                    self.outputs_tap_metadata.get(&output_id.component).map(
                         |(component_kind, component_type)| {
                             (
                                 TapOutput {
@@ -593,13 +620,14 @@ impl RunningTopology {
                     )
                 })
                 .collect::<HashMap<_, _>>();
+
             let mut removals = diff.sources.to_remove.clone();
             removals.extend(diff.transforms.to_remove.iter().cloned());
             self.watch
                 .0
                 .send(TapResource {
                     outputs,
-                    inputs: watch_inputs,
+                    inputs: self.inputs_tap_metadata.clone(),
                     source_keys: diff
                         .sources
                         .changed_and_added()
@@ -668,7 +696,7 @@ impl RunningTopology {
                 // now:
                 debug!(component = %key, fanout_id = %input, "Replacing component input in fanout.");
 
-                let _ = output.send(ControlMessage::Replace(key.clone(), Some(tx.clone())));
+                let _ = output.send(ControlMessage::Replace(key.clone(), tx.clone()));
             }
         }
 
@@ -683,19 +711,33 @@ impl RunningTopology {
         self.outputs.retain(|id, _output| &id.component != key);
     }
 
-    async fn remove_inputs(&mut self, key: &ComponentKey, diff: &ConfigDiff) {
+    async fn remove_inputs(&mut self, key: &ComponentKey, diff: &ConfigDiff, new_config: &Config) {
         self.inputs.remove(key);
         self.detach_triggers.remove(key);
 
         let old_inputs = self.config.inputs_for_node(key).expect("node exists");
+        let new_inputs = new_config
+            .inputs_for_node(key)
+            .unwrap_or_default()
+            .iter()
+            .collect::<HashSet<_>>();
 
         for input in old_inputs {
             if let Some(output) = self.outputs.get_mut(input) {
-                if diff.contains(&input.component) || diff.is_removed(key) {
-                    // If the input we're removing ourselves from is changing, that means its outputs will be
-                    // recreated, so instead of pausing the sink, we just delete it outright to
-                    // ensure things are clean.  Additionally, if this component itself is being
-                    // removed, then pausing makes no sense because it isn't coming back.
+                if diff.contains(&input.component)
+                    || diff.is_removed(key)
+                    || !new_inputs.contains(input)
+                {
+                    // 3 cases to remove the input:
+                    //
+                    // Case 1: If the input we're removing ourselves from is changing, that means its
+                    // outputs will be recreated, so instead of pausing the sink, we just delete it
+                    // outright to ensure things are clean.
+                    //
+                    // Case 2: If this component itself is being removed, then pausing makes no sense
+                    // because it isn't coming back.
+                    //
+                    // Case 3: This component is no longer connected to the input from new config.
                     debug!(component = %key, fanout_id = %input, "Removing component input from fanout.");
 
                     let _ = output.send(ControlMessage::Remove(key.clone()));
@@ -705,7 +747,7 @@ impl RunningTopology {
                     // now to pause further sends through that component until we reconnect:
                     debug!(component = %key, fanout_id = %input, "Pausing component input in fanout.");
 
-                    let _ = output.send(ControlMessage::Replace(key.clone(), None));
+                    let _ = output.send(ControlMessage::Pause(key.clone()));
                 }
             }
         }
@@ -786,8 +828,27 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
+
+        let task_span = span.or_current();
+        #[cfg(feature = "allocation-tracing")]
+        {
+            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
+                task.id().to_string(),
+                "sink".to_string(),
+                task.typetag().to_string(),
+            );
+            debug!(
+                component_kind = "sink",
+                component_type = task.typetag(),
+                component_id = task.id(),
+                group_id = group_id.as_raw().to_string(),
+                "Registered new allocation group."
+            );
+            group_id.attach_to_span(&task_span);
+        }
+
         let task_name = format!(">> {} ({})", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.or_current());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -804,8 +865,27 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
+
+        let task_span = span.or_current();
+        #[cfg(feature = "allocation-tracing")]
+        {
+            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
+                task.id().to_string(),
+                "transform".to_string(),
+                task.typetag().to_string(),
+            );
+            debug!(
+                component_kind = "transform",
+                component_type = task.typetag(),
+                component_id = task.id(),
+                group_id = group_id.as_raw().to_string(),
+                "Registered new allocation group."
+            );
+            group_id.attach_to_span(&task_span);
+        }
+
         let task_name = format!(">> {} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.or_current());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -822,8 +902,28 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
+
+        let task_span = span.or_current();
+        #[cfg(feature = "allocation-tracing")]
+        {
+            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
+                task.id().to_string(),
+                "source".to_string(),
+                task.typetag().to_string(),
+            );
+
+            debug!(
+                component_kind = "source",
+                component_type = task.typetag(),
+                component_id = task.id(),
+                group_id = group_id.as_raw().to_string(),
+                "Registered new allocation group."
+            );
+            group_id.attach_to_span(&task_span);
+        }
+
         let task_name = format!("{} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone().or_current());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span.clone());
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -832,15 +932,15 @@ impl RunningTopology {
         self.shutdown_coordinator
             .takeover_source(key, &mut new_pieces.shutdown_coordinator);
 
+        // Now spawn the actual source task.
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task =
-            handle_errors(source_task, self.abort_tx.clone()).instrument(span.or_current());
+        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(task_span);
         self.source_tasks
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }
 }
 
-fn get_changed_outputs(diff: &ConfigDiff, output_ids: Vec<OutputId>) -> Vec<OutputId> {
+fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<OutputId> {
     let mut changed_outputs = Vec::new();
 
     for source_key in &diff.sources.to_change {

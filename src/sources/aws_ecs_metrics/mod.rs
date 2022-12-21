@@ -2,16 +2,18 @@ use std::{env, time::Instant};
 
 use futures::StreamExt;
 use hyper::{Body, Client, Request};
-use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_core::ByteSizeOf;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsResponseError, BytesReceived, RequestCompleted, StreamClosedError,
+        AwsEcsMetricsResponseError, RequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -19,23 +21,67 @@ use crate::{
 
 mod parser;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Version of the AWS ECS task metadata endpoint to use.
+///
+/// More information about the different versions can be found
+/// (here)[https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint.html].
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Version {
+    /// Version 2.
+    ///
+    /// More information about version 2 of the task metadata endpoint can be found
+    /// (here)[https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v2.html].
     V2,
+    /// Version 3.
+    ///
+    /// More information about version 3 of the task metadata endpoint can be found
+    /// (here)[https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v3.html].
     V3,
+    /// Version 4.
+    ///
+    /// More information about version 4 of the task metadata endpoint can be found
+    /// (here)[https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v4.html].
     V4,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Configuration for the `aws_ecs_metrics` source.
+#[configurable_component(source("aws_ecs_metrics"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-struct AwsEcsMetricsSourceConfig {
+pub struct AwsEcsMetricsSourceConfig {
+    /// Base URI of the task metadata endpoint.
+    ///
+    /// If empty, the URI will be automatically discovered based on the latest version detected.
+    ///
+    /// By default:
+    /// - The version 2 endpoint base URI is `169.254.170.2/v2/`.
+    /// - The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
+    /// - The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
     #[serde(default = "default_endpoint")]
     endpoint: String,
+
+    /// The version of the task metadata endpoint to use.
+    ///
+    /// If empty, the version is automatically discovered based on environment variables.
+    ///
+    /// By default:
+    /// - Version 4 is used if the environment variable `ECS_CONTAINER_METADATA_URI_V4` is defined.
+    /// - Version 3 is used if the environment variable `ECS_CONTAINER_METADATA_URI_V4` is not defined, but the
+    ///   environment variable `ECS_CONTAINER_METADATA_URI` _is_ defined.
+    /// - Version 2 is used if neither of the environment variables `ECS_CONTAINER_METADATA_URI_V4` or
+    ///   `ECS_CONTAINER_METADATA_URI` are defined.
     #[serde(default = "default_version")]
     version: Version,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// The namespace of the metric.
+    ///
+    /// Disabled if empty.
     #[serde(default = "default_namespace")]
     namespace: String,
 }
@@ -67,10 +113,6 @@ pub fn default_namespace() -> String {
     "awsecs".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<AwsEcsMetricsSourceConfig>("aws_ecs_metrics")
-}
-
 impl AwsEcsMetricsSourceConfig {
     fn stats_endpoint(&self) -> String {
         match self.version {
@@ -93,7 +135,6 @@ impl GenerateConfig for AwsEcsMetricsSourceConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_ecs_metrics")]
 impl SourceConfig for AwsEcsMetricsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
@@ -107,12 +148,8 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "aws_ecs_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -129,6 +166,7 @@ async fn aws_ecs_metrics(
 ) -> Result<(), ()> {
     let interval = time::Duration::from_secs(interval);
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
+    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     while interval.next().await.is_some() {
         let client = Client::new();
 
@@ -147,16 +185,13 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        emit!(BytesReceived {
-                            byte_size: body.len(),
-                            protocol: "http",
-                        });
+                        bytes_received.emit(ByteSize(body.len()));
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
                                 let count = metrics.len();
                                 emit!(AwsEcsMetricsEventsReceived {
-                                    byte_size: metrics.size_of(),
+                                    byte_size: metrics.estimated_json_encoded_size_of(),
                                     count,
                                     endpoint: uri.path(),
                                 });
@@ -554,9 +589,7 @@ mod test {
                 assert_eq!(m.namespace(), Some("awsecs"));
 
                 match m.tags() {
-                    Some(tags) => {
-                        assert_eq!(tags.get("device"), Some(&"eth1".to_string()));
-                    }
+                    Some(tags) => assert_eq!(tags.get("device"), Some("eth1")),
                     None => panic!("No tags for metric. {:?}", m),
                 }
             }

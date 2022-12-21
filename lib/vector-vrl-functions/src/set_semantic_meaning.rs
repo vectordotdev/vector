@@ -1,13 +1,15 @@
 use std::ops::{Deref, DerefMut};
 
 use ::value::Value;
-use lookup::LookupBuf;
-use vrl::prelude::*;
+use lookup::OwnedValuePath;
+use vrl::state::TypeState;
+use vrl::{diagnostic::Label, prelude::*};
 
-pub struct MeaningList(pub BTreeMap<String, LookupBuf>);
+#[derive(Debug, Default, Clone)]
+pub struct MeaningList(pub BTreeMap<String, OwnedValuePath>);
 
 impl Deref for MeaningList {
-    type Target = BTreeMap<String, LookupBuf>;
+    type Target = BTreeMap<String, OwnedValuePath>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -53,10 +55,11 @@ impl Function for SetSemanticMeaning {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: &TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
+        let span = ctx.span();
         let query = arguments.required_query("target")?;
 
         let meaning = arguments
@@ -66,34 +69,97 @@ impl Function for SetSemanticMeaning {
             .expect("meaning not bytes")
             .into_owned();
 
+        // Semantic meaning can only be assigned to external fields.
         if !query.is_external() {
-            return Err(Box::new(ExpressionError::from(format!(
-                "meaning must be set on an external field: {}",
-                query
-            ))) as Box<dyn DiagnosticMessage>);
+            let mut labels = vec![Label::primary(
+                "the target of this semantic meaning is non-external",
+                span,
+            )];
+
+            if let Some(variable) = query.as_variable() {
+                labels.push(Label::context(
+                    format!("maybe you meant \".{}\"?", variable.ident()),
+                    span,
+                ));
+            }
+
+            let error = ExpressionError::Error {
+                message: "semantic meaning defined for non-external target".to_owned(),
+                labels,
+                notes: vec![],
+            };
+
+            return Err(Box::new(error) as Box<dyn DiagnosticMessage>);
+        }
+
+        let path = query.path().clone();
+
+        let exists = state
+            .external
+            .target_kind()
+            .at_path(&path)
+            .contains_any_defined();
+
+        // Reject assigning meaning to non-existing field.
+        if !exists {
+            let error = ExpressionError::Error {
+                message: "semantic meaning defined for non-existing field".to_owned(),
+                labels: vec![
+                    Label::primary("cannot assign semantic meaning to non-existing field", span),
+                    Label::context(
+                        format!("field \".{}\" is not known to exist for all events", &path),
+                        span,
+                    ),
+                ],
+                notes: vec![],
+            };
+
+            return Err(Box::new(error) as Box<dyn DiagnosticMessage>);
         }
 
         if let Some(list) = ctx.get_external_context_mut::<MeaningList>() {
-            list.insert(meaning, query.path().clone());
+            let duplicate = list.get(&meaning).filter(|&p| p != &path);
+
+            // Disallow a single VRL program from assigning the same semantic meaning to two
+            // different fields.
+            if let Some(duplicate) = duplicate {
+                let error = ExpressionError::Error {
+                    message: "semantic meaning referencing two different fields".to_owned(),
+                    labels: vec![
+                        Label::primary(
+                            format!(
+                                "semantic meaning \"{}\" must reference a single field",
+                                &meaning
+                            ),
+                            span,
+                        ),
+                        Label::context(
+                            format!("already referencing field \".{}\"", &duplicate),
+                            span,
+                        ),
+                    ],
+                    notes: vec![],
+                };
+
+                return Err(Box::new(error) as Box<dyn DiagnosticMessage>);
+            }
+
+            list.insert(meaning, path);
         };
 
-        Ok(Box::new(SetSemanticMeaningFn))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        Ok(Value::Null)
+        Ok(SetSemanticMeaningFn.as_expr())
     }
 }
 
 #[derive(Debug, Clone)]
 struct SetSemanticMeaningFn;
 
-impl Expression for SetSemanticMeaningFn {
+impl FunctionExpression for SetSemanticMeaningFn {
     fn resolve(&self, _ctx: &mut Context) -> Resolved {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

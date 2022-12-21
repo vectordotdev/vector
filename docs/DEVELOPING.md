@@ -1,46 +1,39 @@
 # Developing
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Setup](#setup)
-   1. [Using a Docker or Podman environment](#using-a-docker-or-podman-environment)
-   1. [Bring your own toolbox](#bring-your-own-toolbox)
-1. [The basics](#the-basics)
-   1. [Directory structure](#directory-structure)
-   1. [Makefile](#makefile)
-   1. [Code style](#code-style)
-      1. [Logging style](#logging-style)
-   1. [Feature flags](#feature-flags)
-   1. [Dependencies](#dependencies)
-1. [Guidelines](#guidelines)
-   1. [Sink healthchecks](#sink-healthchecks)
-1. [Testing](#testing)
-   1. [Unit tests](#unit-tests)
-   1. [Integration tests](#integration-tests)
-   1. [Blackbox tests](#blackbox-tests)
-   1. [Tips and tricks](#tips-and-tricks)
-      1. [Faster builds With `sccache`](#faster-builds-with-sccache)
-      1. [Testing specific components](#testing-specific-components)
-      1. [Generating sample logs](#generating-sample-logs)
-1. [Benchmarking](#benchmarking)
-1. [Profiling](#profiling)
-1. [Domains](#domains)
-   1. [Kubernetes](#kubernetes)
-      1. [Architecture](#architecture)
-         1. [The operation logic](#the-operation-logic)
-         1. [Where to find things](#where-to-find-things)
-      1. [Development](#development)
-         1. [Requirements](#requirements)
-         1. [Automatic](#automatic)
-         1. [Manual](#manual)
-         1. [Troubleshooting](#troubleshooting)
-      1. [Testing](#testing-1)
-         1. [Integration tests](#integration-tests-1)
-            1. [Requirements](#requirements-1)
-            1. [Tutorial](#tutorial)
-
-<!-- /MarkdownTOC -->
-
+- [Setup](#setup)
+  - [Using a Docker or Podman environment](#using-a-docker-or-podman-environment)
+  - [Bring your own toolbox](#bring-your-own-toolbox)
+- [The basics](#the-basics)
+  - [Directory structure](#directory-structure)
+  - [Makefile](#makefile)
+  - [Code style](#code-style)
+    - [Logging style](#logging-style)
+  - [Feature flags](#feature-flags)
+  - [Dependencies](#dependencies)
+- [Guidelines](#guidelines)
+  - [Sink healthchecks](#sink-healthchecks)
+- [Testing](#testing)
+  - [Unit tests](#unit-tests)
+  - [Integration tests](#integration-tests)
+  - [Blackbox tests](#blackbox-tests)
+  - [Tips and tricks](#tips-and-tricks)
+    - [Faster builds With `sccache`](#faster-builds-with-sccache)
+    - [Testing specific components](#testing-specific-components)
+    - [Generating sample logs](#generating-sample-logs)
+- [Benchmarking](#benchmarking)
+- [Profiling](#profiling)
+- [Domains](#domains)
+  - [Kubernetes](#kubernetes)
+    - [Architecture](#architecture)
+      - [The operation logic](#the-operation-logic)
+      - [Where to find things](#where-to-find-things)
+    - [Development](#development)
+      - [Requirements](#requirements)
+      - [Automatic](#automatic)
+    - [Testing](#testing-1)
+      - [Integration tests](#integration-tests-1)
+        - [Requirements](#requirements-1)
+        - [Tutorial](#tutorial)
 
 ## Setup
 
@@ -63,7 +56,15 @@ This is ideal for users who want it to "Just work" and just want to start contri
 export CONTAINER_TOOL="podman"
 ```
 
-By default, `make environment` style tasks will do a `docker pull` from Github's container repository, you can **optionally** build your own environment while you make your morning coffee ☕:
+If your Linux environment runs SELinux in Enforcing mode, you will need to relabel the vector source code checkout with `container_home_t` context. Otherwise, the container environment cannot read/write the code:
+
+```bash
+cd your/checkout/of/vector/
+sudo semanage fcontext -a "${PWD}(/.*)?" -t container_file_t
+sudo restorecon . -R
+```
+
+By default, `make environment` style tasks will do a `docker pull` from GitHub's container repository, you can **optionally** build your own environment while you make your morning coffee ☕:
 
 ```bash
 # Optional: Only if you want to go make a coffee
@@ -117,7 +118,7 @@ To build Vector on your own host will require a fairly complete development envi
 
 Loosely, you'll need the following:
 
-- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`.
+- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
 
@@ -161,22 +162,22 @@ If you run `make` you'll see a full list of all our tasks. Some of these will st
 
 ### Directory structure
 
-- [`/.github`](/github) - Github & CI related configuration.
-- [`/benches`](/benches) - Internal benchmarks.
-- [`/config`](/config) - Public facing Vector config, included in releases.
-- [`/distribution`](/distribution) - Distribution artifacts for various targets.
-- [`/docs`](/docs) - Internal documentation for Vector contributors.
-- [`/lib`](/lib) - External libraries that do not depend on `vector` but are used within the project.
-- [`/proto`](/proto) - Protobuf definitions.
-- [`/rfcs`](/rfcs) - Previous Vector proposals, a great place to build context on previous decisions.
-- [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
-- [`/src`](/src) - Vector source.
-- [`/tests`](/tests) - Various high-level test cases.
-- [`/website`](/website) - Vector's website and external documentation for Vector users.
+- [`/.github`](../.github) - GitHub & CI related configuration.
+- [`/benches`](../benches) - Internal benchmarks.
+- [`/config`](../config) - Public facing Vector config, included in releases.
+- [`/distribution`](../distribution) - Distribution artifacts for various targets.
+- [`/docs`](../docs) - Internal documentation for Vector contributors.
+- [`/lib`](../lib) - External libraries that do not depend on `vector` but are used within the project.
+- [`/proto`](../proto) - Protobuf definitions.
+- [`/rfcs`](../rfcs) - Previous Vector proposals, a great place to build context on previous decisions.
+- [`/scripts`](../scripts) - Scripts used to generate docs and maintain the repo.
+- [`/src`](../src) - Vector source.
+- [`/tests`](../tests) - Various high-level test cases.
+- [`/website`](../website) - Vector's website and external documentation for Vector users.
 
 ### Makefile
 
-Vector includes a [`Makefile`](/Makefile) in the root of the repo. This serves
+Vector includes a [`Makefile`](../Makefile) in the root of the repo. This serves
 as a high-level interface for common commands. Running `make` will produce
 a list of make targets with descriptions. These targets will be referenced
 throughout this document.
@@ -197,7 +198,6 @@ make fmt
 ```
 
 #### Logging style
-
 
 - Always use the [Tracing crate](https://tracing.rs/tracing/)'s key/value style for log events.
 - Events should be capitalized and end with a period, `.`.
@@ -239,7 +239,7 @@ is around 4 times faster than rebuilding tests with all features.
 
 Dependencies should be _carefully_ selected and avoided if possible. You can
 see how dependencies are reviewed in the
-[Reviewing guide](/REVIEWING.md#dependencies).
+[Reviewing guide](/docs/REVIEWING.md#dependencies).
 
 If a dependency is required only by one or multiple components, but not by
 Vector's core, make it optional and add it to the list of dependencies of
@@ -261,7 +261,7 @@ to have the health check fail when the sink would have been able to run
 successfully.
 
 A common cause of false negatives in health checks is performing an operation
-that the sink itself does not need. For example, listing all of the available S3
+that the sink itself does not need. For example, listing all the available S3
 buckets and checking that the configured bucket is on that list. The S3 sink
 doesn't need the ability to list all buckets, and a user that knows that may not
 have permitted it to do so. In that case, the health check will fail due
@@ -274,7 +274,7 @@ them leads to some limitations here. The most obvious example of this is with
 sinks where the exact target of a write depends on the value of some field in
 the event (e.g. an interpolated Kinesis stream name). It also pops up for sinks
 where incoming events are expected to conform to a specific schema. In both
-cases, random test data is reasonably likely to trigger a potentially
+cases, random test data is reasonably likely to trigger a potential
 false-negative result. Even in simpler cases, we need to think about the effects
 of writing test data and whether the user would find that surprising or
 invasive. The answer usually depends on the system we're interfacing with.
@@ -293,7 +293,7 @@ health check:
 - [ ] Does this check have side effects the user would consider undesirable (e.g. data pollution)?
 - [ ] Are there situations where this check would fail but the sink would operate normally?
 
-Not all of the answers need to be a hard "no", but we should think about the
+Not all the answers need to be a hard "no", but we should think about the
 likelihood that any "yes" would lead to false negatives and balance that against
 the usefulness of the check as a whole for finding problems. Because we have the
 option to disable individual health checks, there's an escape hatch for users
@@ -329,9 +329,8 @@ to run. A few rules when setting up integration tests:
       an environment variable.
 - [ ] Add a `test-integration-<name>` to Vector's [`Makefile`](/Makefile) and
       ensure that it starts the service before running the integration test.
-- [ ] Add a `test-integration-<name>` job to Vector's
-      [`.github/workflows/test.yml`](.github/workflows/test.yml) workflow and
-      call your make target accordingly.
+- [ ] Add the name of your integration to the include matrix of the `test-integration` job to Vector's
+      [`.github/workflows/integration-test.yml`](../.github/workflows/integration-test.yml) workflow.
 
 Once complete, you can run your integration tests with:
 
@@ -347,32 +346,32 @@ is a complex testing suite that tests Vector's performance in real-world
 environments. It is typically used for benchmarking, but also correctness
 testing.
 
-You can run these tests within a PR as described in the [CI section](#ci).
+You can run these tests within a PR as described in the [CI section](CONTRIBUTING.md).
 
 ### Tips and tricks
 
 #### Faster builds With `sccache`
 
-Vector is a large project with a plethora of dependencies.  Changing to a different branch, or
+Vector is a large project with a plethora of dependencies. Changing to a different branch, or
 running `cargo clean`, can sometimes necessitate rebuilding many of those dependencies, which has an
-impact on productivity.  One way to reduce some of this cycle time is to use `sccache`, which caches
+impact on productivity. One way to reduce some of this cycle time is to use `sccache`, which caches
 compilation assets to avoid recompiling them over and over.
 
 `sccache` works by being configured to sit in front of `rustc`, taking compilation requests from
-Cargo and checking the cache to see if it already has the cached compilation unit.  It handles
-making sure that different compiler flags, versions of Rust, etc, are taken into consideration
+Cargo and checking the cache to see if it already has the cached compilation unit. It handles
+making sure that different compiler flags, versions of Rust, etc., are taken into consideration
 before using a cached asset.
 
 In order to use `sccache`, you must first [install](https://github.com/mozilla/sccache#installation)
-it.  There are pre-built binaries for all major platforms to get you going quickly. The
+it. There are pre-built binaries for all major platforms to get you going quickly. The
 [usage](https://github.com/mozilla/sccache#usage) documentation also explains how to set up your
-environment to actually use it.  We recommend using the `.cargo/config` approach as this can help
+environment to actually use it. We recommend using the `$HOME/.cargo/config` approach as this can help
 speed up all of your Rust development work, and not just developing on Vector.
 
 While `sccache` was originally designed to cache compilation assets in cloud storage, maximizing
 reusability amongst CI workers, `sccache` actually supports storing assets locally by default.
 Local mode works well for local development as it is much easier to delete the cache directory if
-you ever encounter issues with the cached assets.  It also involves no extra infrastructure or
+you ever encounter issues with the cached assets. It also involves no extra infrastructure or
 spending.
 
 #### Testing specific components
@@ -396,18 +395,18 @@ times:
      'cargo test --lib --no-default-features --features=<component type>-<component id> <component type>::<component id>'
    ```
 
-   For example, if the component is `add_fields` transform, the command above
+   For example, if the component is `reduce` transform, the command above
    turns into
 
    ```sh
    cargo watch -s clear -s \
-     'cargo test --lib --no-default-features --features=transforms-add_fields transforms::add_fields'
+     'cargo test --lib --no-default-features --features=transforms-reduce transforms::reduce'
    ```
 
 #### Generating sample logs
 
 We use `flog` to build a sample set of log files to test sending logs from a
-file. This can be done with the following commands on mac with homebrew.
+file. This can be done with the following commands on Mac with `homebrew`.
 Installation instruction for flog can be found
 [here](https://github.com/mingrammer/flog#installation).
 
@@ -486,7 +485,7 @@ including startup, shutdown, and idle time. By telling `perf` to collect data
 only while the load generation command is running we get a more focused dataset
 and don't have to worry about timing different commands in quick succession.
 
-You'll now find a `perf.data` file in your current directory with all of the
+You'll now find a `perf.data` file in your current directory with all the
 information that was collected. There are different ways to process this, but
 one of the most useful is to create
 a [flamegraph](http://www.brendangregg.com/flamegraphs.html). For this we can
@@ -510,8 +509,8 @@ development area.
 
 #### Architecture
 
-Kubernetes integration architecture is largely inspired by
-the [RFC 2221](rfcs/2020-04-04-2221-kubernetes-integration.md), so this
+The Kubernetes integration architecture is largely inspired by
+the [RFC 2221](../rfcs/2020-04-04-2221-kubernetes-integration.md), so this
 is a concise outline of the effective design, rather than a deep dive into
 the concepts.
 
@@ -595,7 +594,7 @@ is required too, see Vector [docs](https://vector.dev) for more details.
 Notes:
 
 > - `minikube` had a bug in the versions `1.12.x` that affected our test
->   process - see https://github.com/kubernetes/minikube/issues/8799.
+>   process - see <https://github.com/kubernetes/minikube/issues/8799>.
 >   Use version `1.13.0+` that has this bug fixed.
 > - `minikube` has troubles running on ZFS systems. If you're using ZFS, we
 >   suggest using a cloud cluster or [`minik8s`](https://microk8s.io/) with local
@@ -617,7 +616,7 @@ after the `:`. Replace `<your name>` with your Docker Hub username.
 
 You can also pass additional parameters to adjust the behavior of the test:
 
-- `QUICK_BUILD=true` - use development build and a image from the dev
+- `QUICK_BUILD=true` - use development build and an image from the dev
   flow instead of a production docker image. Significantly speeds up the
   preparation process, but doesn't guarantee the correctness in the release
   build. Useful for development of the tests or Vector code to speed up the

@@ -1,4 +1,4 @@
-use std::{io, mem, task::Poll};
+use std::{collections::VecDeque, io, mem, task::Poll};
 
 use futures::{future::BoxFuture, Future, FutureExt};
 use tokio_test::task::{spawn, Spawn};
@@ -8,7 +8,6 @@ use super::{
     common::{ReaderResult, TestReader, TestWriter, WriterResult},
     record::Record,
 };
-use crate::{Acker, EventCount};
 
 /// A wrapper that can track whether or not a future has already been polled.
 ///
@@ -202,19 +201,17 @@ pub struct ActionSequencer {
     actions: Vec<Action>,
     read_state: ReadState,
     write_state: WriteState,
-    acker: Acker,
-    unacked_events: usize,
+    unacked_events: VecDeque<Record>,
 }
 
 impl ActionSequencer {
     /// Creates a new `ActionSequencer` for the given SUT components.
-    pub fn new(actions: Vec<Action>, reader: TestReader, writer: TestWriter, acker: Acker) -> Self {
+    pub fn new(actions: Vec<Action>, reader: TestReader, writer: TestWriter) -> Self {
         Self {
             actions,
             read_state: ReadState::Idle(reader),
             write_state: WriteState::Idle(writer),
-            acker,
-            unacked_events: 0,
+            unacked_events: VecDeque::default(),
         }
     }
 
@@ -239,7 +236,7 @@ impl ActionSequencer {
         self.actions.iter().position(|a| match a {
             Action::WriteRecord(_) | Action::FlushWrites => allow_write,
             Action::ReadRecord => allow_read,
-            Action::AcknowledgeRead(amount) => self.unacked_events >= *amount,
+            Action::AcknowledgeRead => !self.unacked_events.is_empty(),
         })
     }
 
@@ -289,10 +286,9 @@ impl ActionSequencer {
                     self.read_state.transition_to_read();
                     Some(a)
                 }
-                Action::AcknowledgeRead(amount) => {
-                    self.unacked_events -= amount;
-                    self.acker.ack(amount);
-                    Some(Action::AcknowledgeRead(amount))
+                Action::AcknowledgeRead => {
+                    drop(self.unacked_events.pop_front().expect("FIXME"));
+                    Some(Action::AcknowledgeRead)
                 }
             }
         } else {
@@ -382,7 +378,7 @@ impl ActionSequencer {
                         Poll::Ready((reader, result)) => {
                             // If a record was actually read back, track it as an unacknowledged read.
                             if let Ok(Some(record)) = &result {
-                                self.unacked_events += record.event_count();
+                                self.unacked_events.push_back(record.clone());
                             }
 
                             (

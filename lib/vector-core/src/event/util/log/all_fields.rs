@@ -1,5 +1,6 @@
 use std::{
     collections::{btree_map, BTreeMap},
+    fmt::Write as _,
     iter, slice,
 };
 
@@ -9,14 +10,18 @@ use super::Value;
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
-pub fn all_fields(
-    fields: &BTreeMap<String, Value>,
-) -> impl Iterator<Item = (String, &Value)> + Serialize {
+pub fn all_fields(fields: &BTreeMap<String, Value>) -> FieldsIter {
     FieldsIter::new(fields)
+}
+
+/// An iterator with a single "message" element
+pub fn all_fields_non_object_root(value: &Value) -> FieldsIter {
+    FieldsIter::non_object(value)
 }
 
 #[derive(Clone)]
 enum LeafIter<'a> {
+    Root(&'a Value),
     Map(btree_map::Iter<'a, String, Value>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
@@ -31,7 +36,7 @@ enum PathComponent<'a> {
 ///
 /// If a key maps to an empty collection, the key and the empty collection will be returned.
 #[derive(Clone)]
-struct FieldsIter<'a> {
+pub struct FieldsIter<'a> {
     /// Stack of iterators used for the depth-first traversal.
     stack: Vec<LeafIter<'a>>,
     /// Path components from the root up to the top of the stack.
@@ -42,6 +47,15 @@ impl<'a> FieldsIter<'a> {
     fn new(fields: &'a BTreeMap<String, Value>) -> FieldsIter<'a> {
         FieldsIter {
             stack: vec![LeafIter::Map(fields.iter())],
+            path: vec![],
+        }
+    }
+
+    /// This is for backwards compatibility. An event where the root is not an object
+    /// will be treated as an object with a single "message" key
+    fn non_object(value: &'a Value) -> FieldsIter<'a> {
+        FieldsIter {
+            stack: vec![LeafIter::Root(value)],
             path: vec![],
         }
     }
@@ -80,7 +94,9 @@ impl<'a> FieldsIter<'a> {
                         res.push_str(key);
                     }
                 }
-                Some(PathComponent::Index(index)) => res.push_str(&format!("[{}]", index)),
+                Some(PathComponent::Index(index)) => {
+                    write!(res, "[{}]", index).expect("write to String never fails");
+                }
             }
             if let Some(PathComponent::Key(_)) = path_iter.peek() {
                 res.push('.');
@@ -115,6 +131,9 @@ impl<'a> Iterator for FieldsIter<'a> {
                         }
                     }
                 },
+                Some(LeafIter::Root(value)) => {
+                    return Some(("message".to_owned(), value));
+                }
             };
         }
     }
@@ -131,8 +150,8 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use pretty_assertions::assert_eq;
     use serde_json::json;
+    use similar_asserts::assert_eq;
 
     use super::{super::test::fields_from_json, *};
 

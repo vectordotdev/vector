@@ -1,6 +1,9 @@
+use std::num::NonZeroUsize;
+
 use bytes::BytesMut;
 use chrono::Utc;
 use tokio_util::codec::Encoder as _;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
@@ -8,11 +11,11 @@ use vector_core::{
 
 use super::TemplateRenderingError;
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     config::LogSchema,
     event::{Event, Value},
-    internal_events::{AwsCloudwatchLogsEncoderError, AwsCloudwatchLogsMessageSizeError},
-    sinks::{aws_cloudwatch_logs::CloudwatchKey, util::encoding::Transformer},
+    internal_events::AwsCloudwatchLogsMessageSizeError,
+    sinks::{aws_cloudwatch_logs::CloudwatchKey, util::metadata::RequestMetadataBuilder},
     template::Template,
 };
 
@@ -25,14 +28,20 @@ const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
 pub struct CloudwatchRequest {
     pub key: CloudwatchKey,
     pub(super) message: String,
-    pub event_byte_size: usize,
     pub timestamp: i64,
     pub finalizers: EventFinalizers,
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for CloudwatchRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for CloudwatchRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -77,11 +86,13 @@ impl CloudwatchRequestBuilder {
         };
 
         let finalizers = event.take_finalizers();
-        let event_byte_size = event.size_of();
         self.transformer.transform(&mut event);
         let mut message_bytes = BytesMut::new();
-        if let Err(error) = self.encoder.encode(event, &mut message_bytes) {
-            emit!(AwsCloudwatchLogsEncoderError { error });
+
+        let builder = RequestMetadataBuilder::from_events(&event);
+
+        if self.encoder.encode(event, &mut message_bytes).is_err() {
+            // The encoder handles internal event emission for Error and EventsDropped.
             return None;
         }
         let message = String::from_utf8_lossy(&message_bytes).to_string();
@@ -93,12 +104,17 @@ impl CloudwatchRequestBuilder {
             });
             return None;
         }
+
+        let bytes_len =
+            NonZeroUsize::new(message_bytes.len()).expect("payload should never be zero length");
+        let metadata = builder.with_request_size(bytes_len);
+
         Some(CloudwatchRequest {
             key,
             message,
-            event_byte_size,
             timestamp,
             finalizers,
+            metadata,
         })
     }
 }
@@ -119,6 +135,8 @@ impl ByteSizeOf for CloudwatchRequest {
 
 #[cfg(test)]
 mod tests {
+    use vector_core::event::LogEvent;
+
     use super::*;
     use crate::config::log_schema;
 
@@ -133,12 +151,10 @@ mod tests {
         };
         let timestamp = Utc::now();
         let message = "event message";
-        let mut event = Event::from(message);
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), timestamp);
+        let mut event = LogEvent::from(message);
+        event.insert(log_schema().timestamp_key(), timestamp);
 
-        let request = request_builder.build(event).unwrap();
+        let request = request_builder.build(event.into()).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());
         assert_eq!(&request.message, message);
     }

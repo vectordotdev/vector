@@ -11,14 +11,13 @@ fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, ctx: &Context
         None => "%d/%b/%Y:%T %z".to_owned(),
         Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
     };
-    let captures = log_util::REGEX_APACHE_COMMON_LOG
-        .captures(&message)
-        .ok_or("failed parsing common log line")?;
-    log_util::log_fields(
-        &log_util::REGEX_APACHE_COMMON_LOG,
-        &captures,
+
+    log_util::parse_message(
+        &*log_util::REGEX_APACHE_COMMON_LOG,
+        &message,
         &timestamp_format,
         ctx.timezone(),
+        "common",
     )
     .map_err(Into::into)
 }
@@ -48,17 +47,18 @@ impl Function for ParseCommonLog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let timestamp_format = arguments.optional("timestamp_format");
 
-        Ok(Box::new(ParseCommonLogFn {
+        Ok(ParseCommonLogFn {
             value,
             timestamp_format,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -81,13 +81,6 @@ impl Function for ParseCommonLog {
             }),
         }]
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let timestamp_format = args.optional("timestamp_format");
-
-        parse_common_log(value, timestamp_format, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -96,7 +89,7 @@ struct ParseCommonLogFn {
     timestamp_format: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseCommonLogFn {
+impl FunctionExpression for ParseCommonLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let timestamp_format = self
@@ -108,7 +101,7 @@ impl Expression for ParseCommonLogFn {
         parse_common_log(bytes, timestamp_format, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
 }
@@ -157,13 +150,13 @@ mod tests {
 
         log_line_valid_empty {
             args: func_args![value: "- - - - - - -"],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_empty_variant {
             args: func_args![value: r#"- - - [-] "-" - -"#],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
 

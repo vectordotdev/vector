@@ -30,7 +30,7 @@ use std::{
 use futures::{stream::Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 
-impl<T: ?Sized> VecStreamExt for T where T: Stream {}
+impl<T: Stream + ?Sized> VecStreamExt for T {}
 
 pub(crate) trait VecStreamExt: Stream {
     /// Creates a stream that selects the next element from either this stream

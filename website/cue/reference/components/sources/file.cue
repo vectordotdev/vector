@@ -50,9 +50,14 @@ components: sources: file: {
 	configuration: {
 		acknowledgements: configuration._source_acknowledgements
 		exclude: {
-			common:      false
-			description: "Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*"
-			required:    false
+			common: false
+			description: """
+				Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*
+				Note that the `exclude` patterns are applied _after_ Vector attempts to glob everything in `include`. That is, Vector will still
+				try to list all of the files matched by `include` and then filter them by the `exclude` patterns. This can be impactful if
+				`include` includes directories with contents that vector does not have access to."
+				"""
+			required: false
 			type: array: {
 				default: null
 				items: type: string: {
@@ -83,7 +88,7 @@ components: sources: file: {
 						default: "checksum"
 						enum: {
 							checksum:         "Read first N lines of the file, skipping the first `ignored_header_bytes` bytes, to uniquely identify files via a checksum."
-							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
+							device_and_inode: "Uses the [device and inode](\(urls.inode)) to uniquely identify files."
 						}
 					}
 				}
@@ -172,7 +177,7 @@ components: sources: file: {
 		}
 		max_line_bytes: {
 			common:      false
-			description: "The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
+			description: "The maximum number of bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
 			required:    false
 			type: uint: {
 				default: 102_400
@@ -188,6 +193,16 @@ components: sources: file: {
 				default: 2048
 				examples: [2048]
 				unit: "bytes"
+			}
+		}
+		offset_key: {
+			category:    "Context"
+			common:      false
+			description: "Enables adding the byte offset within the file of the start of each line to each event and sets the name of the log field used. Off by default, the offset is only added to the event if this is set."
+			required:    false
+			type: string: {
+				default: null
+				examples: ["offset"]
 			}
 		}
 		oldest_first: {
@@ -246,6 +261,13 @@ components: sources: file: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["file"]
+				}
+			}
 			timestamp: fields._current_timestamp
 		}
 	}
@@ -261,10 +283,11 @@ components: sources: file: {
 			}
 			input: _line
 			output: log: {
-				file:      _file
-				host:      _values.local_host
-				message:   _line
-				timestamp: _values.current_timestamp
+				file:        _file
+				host:        _values.local_host
+				message:     _line
+				source_type: "file"
+				timestamp:   _values.current_timestamp
 			}
 		},
 	]

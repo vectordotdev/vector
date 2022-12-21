@@ -38,9 +38,11 @@ impl Function for ParseSyslog {
             source: r#"parse_syslog!(s'<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!')"#,
             result: Ok(indoc! {r#"{
                 "appname": "non",
-                "exampleSDID@32473.eventID": "1011",
-                "exampleSDID@32473.eventSource": "Application",
-                "exampleSDID@32473.iut": "3",
+                "exampleSDID@32473": {
+                    "eventID": "1011",
+                    "eventSource": "Application",
+                    "iut": "3"
+                },
                 "facility": "user",
                 "hostname": "dynamicwireless.name",
                 "message": "Try to override the THX port, maybe it will reboot the neural interface!",
@@ -55,18 +57,13 @@ impl Function for ParseSyslog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseSyslogFn { value }))
-    }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_syslog(value, ctx)
+        Ok(ParseSyslogFn { value }.as_expr())
     }
 }
 
@@ -75,14 +72,14 @@ pub(crate) struct ParseSyslogFn {
     pub(crate) value: Box<dyn Expression>,
 }
 
-impl Expression for ParseSyslogFn {
+impl FunctionExpression for ParseSyslogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         parse_syslog(value, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
 }
@@ -99,7 +96,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
     }
 }
 
-/// Create a Value::Map from the fields of the given syslog message.
+/// Create a `Value::Map` from the fields of the given syslog message.
 fn message_to_value(message: Message<&str>) -> Value {
     let mut result = BTreeMap::new();
 
@@ -142,11 +139,12 @@ fn message_to_value(message: Message<&str>) -> Value {
         result.insert("procid".to_string(), value);
     }
 
-    for element in message.structured_data.into_iter() {
+    for element in message.structured_data {
+        let mut sdata = BTreeMap::new();
         for (name, value) in element.params() {
-            let key = format!("{}.{}", element.id, name);
-            result.insert(key, value.into());
+            sdata.insert(name.to_string(), value.into());
         }
+        result.insert(element.id.to_string(), sdata.into());
     }
 
     result.into()
@@ -186,9 +184,11 @@ mod tests {
                 "appname" => "non",
                 "procid" => 2426,
                 "msgid" => "ID931",
-                "exampleSDID@32473.iut" => "3",
-                "exampleSDID@32473.eventSource" => "Application",
-                "exampleSDID@32473.eventID" => "1011",
+                "exampleSDID@32473" => btreemap! {
+                    "iut" => "3",
+                    "eventSource" => "Application",
+                    "eventID" => "1011",
+                },
                 "message" => "Try to override the THX port, maybe it will reboot the neural interface!",
                 "version" => 1,
             }),
@@ -237,6 +237,7 @@ mod tests {
                 "severity" => "notice",
                 "timestamp" => chrono::Utc.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0),
                 "version" => 1,
+                "empty" => btreemap! {},
             }),
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
@@ -253,7 +254,30 @@ mod tests {
                 "severity" => "notice",
                 "timestamp" => chrono::Utc.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0),
                 "version" => 1,
-                "non_empty.x" => "1",
+                "non_empty" => btreemap! {
+                    "x" => "1",
+                },
+                "empty" => btreemap! {},
+            }),
+            tdef: TypeDef::object(inner_kind()).fallible(),
+        }
+
+        empty_sd_value {
+            args: func_args![value: r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [non_empty x=""][empty] qwerty"#],
+            want: Ok(btreemap!{
+                "message" => "qwerty",
+                "appname" => "root",
+                "facility" => "user",
+                "hostname" => "74794bfb6795",
+                "message" => "qwerty",
+                "procid" => 8449,
+                "severity" => "notice",
+                "timestamp" => chrono::Utc.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0),
+                "version" => 1,
+                "empty" => btreemap! {},
+                "non_empty" => btreemap! {
+                    "x" => "",
+                },
             }),
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
@@ -275,7 +299,9 @@ mod tests {
             args: func_args![value: r#"<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 key="hello \"test\""] An application event log entry..."#],
             want: Ok(btreemap!{
                 "appname" => "evntslog",
-                "exampleSDID@32473.key" => r#"hello "test""#,
+                "exampleSDID@32473" => btreemap! {
+                    "key" => r#"hello "test""#,
+                },
                 "facility" => "local4",
                 "hostname" => "mymachine.example.com",
                 "message" => "An application event log entry...",
@@ -291,7 +317,9 @@ mod tests {
             args: func_args![value: r#"<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 key="hello a\\b"] An application event log entry..."#],
             want: Ok(btreemap!{
                 "appname" => "evntslog",
-                "exampleSDID@32473.key" => r#"hello a\b"#,
+                "exampleSDID@32473" => btreemap! {
+                    "key" => r#"hello a\b"#,
+                },
                 "facility" => "local4",
                 "hostname" => "mymachine.example.com",
                 "message" => "An application event log entry...",
@@ -307,7 +335,9 @@ mod tests {
             args: func_args![value: r#"<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 key="hello [bye\]"] An application event log entry..."#],
             want: Ok(btreemap!{
                 "appname" => "evntslog",
-                "exampleSDID@32473.key" => "hello [bye]",
+                "exampleSDID@32473" => btreemap! {
+                    "key" => "hello [bye]",
+                },
                 "facility" => "local4",
                 "hostname" => "mymachine.example.com",
                 "message" => "An application event log entry...",

@@ -3,6 +3,7 @@ use memchr::memchr;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 use tracing::{trace, warn};
+use vector_config::configurable_component;
 
 use super::BoxedFramingError;
 
@@ -28,16 +29,17 @@ impl CharacterDelimitedDecoderConfig {
 }
 
 /// Options for building a `CharacterDelimitedDecoder`.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
     #[serde(with = "vector_core::serde::ascii_char")]
-    delimiter: u8,
+    pub delimiter: u8,
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
     #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
-    max_length: Option<usize>,
+    pub max_length: Option<usize>,
 }
 
 impl CharacterDelimitedDecoderOptions {
@@ -54,9 +56,9 @@ impl CharacterDelimitedDecoderOptions {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CharacterDelimitedDecoder {
     /// The delimiter used to separate byte sequences.
-    delimiter: u8,
+    pub delimiter: u8,
     /// The maximum length of the byte buffer.
-    max_length: usize,
+    pub max_length: usize,
 }
 
 impl CharacterDelimitedDecoder {
@@ -106,14 +108,14 @@ impl Decoder for CharacterDelimitedDecoder {
                             message = "Discarding frame larger than max_length.",
                             buf_len = buf.len(),
                             max_length = self.max_length,
-                            internal_log_rate_secs = 30
+                            internal_log_rate_limit = true
                         );
                         buf.advance(next_delimiter_idx + 1);
                     } else {
                         let frame = buf.split_to(next_delimiter_idx).freeze();
                         trace!(
                             message = "Decoding the frame.",
-                            bytes_proccesed = frame.len()
+                            bytes_processed = frame.len()
                         );
                         buf.advance(1); // scoot past the delimiter
                         return Ok(Some(frame));
@@ -134,7 +136,7 @@ impl Decoder for CharacterDelimitedDecoder {
                         message = "Discarding frame larger than max_length.",
                         buf_len = buf.len(),
                         max_length = self.max_length,
-                        internal_log_rate_secs = 30
+                        internal_log_rate_limit = true
                     );
                     Ok(None)
                 } else {

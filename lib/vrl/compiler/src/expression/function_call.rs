@@ -1,26 +1,24 @@
+use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use std::{fmt, sync::Arc};
 
-use anymap::AnyMap;
-use diagnostic::{DiagnosticMessage, Label, Note, Urls};
-
 use super::Block;
+use crate::state::{TypeInfo, TypeState};
 use crate::{
-    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
+    expression::{levenstein, ExpressionError, FunctionArgument},
     function::{
         closure::{self, VariableKind},
         ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
     },
     parser::{Ident, Node},
-    state::{ExternalEnv, LocalEnv},
+    state::LocalEnv,
     type_def::Details,
     value::Kind,
-    vm::{OpCode, VmFunctionClosure},
-    Context, Expression, Function, Resolved, Span, TypeDef,
+    CompileConfig, Context, Expression, Function, Resolved, Span, TypeDef,
 };
 
 pub(crate) struct Builder<'a> {
     abort_on_error: bool,
-    maybe_fallible_arguments: bool,
+    arguments_with_unknown_type_validity: Vec<(Parameter, Node<FunctionArgument>)>,
     call_span: Span,
     ident_span: Span,
     function_id: usize,
@@ -31,6 +29,10 @@ pub(crate) struct Builder<'a> {
 }
 
 impl<'a> Builder<'a> {
+    pub(crate) fn get_arg_list(&self) -> &ArgumentList {
+        &self.list
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         call_span: Span,
@@ -38,31 +40,30 @@ impl<'a> Builder<'a> {
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
         funcs: &'a [Box<dyn Function>],
-        local: &mut LocalEnv,
-        external: &mut ExternalEnv,
+        state_before_function_args: &TypeState,
+        state: &mut TypeState,
         closure_variables: Option<Node<Vec<Node<Ident>>>>,
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();
 
         // Check if function exists.
-        let (function_id, function) = match funcs
+        let (function_id, function) = if let Some(function) = funcs
             .iter()
             .enumerate()
             .find(|(_pos, f)| f.identifier() == ident.as_ref())
         {
-            Some(function) => function,
-            None => {
-                let idents = funcs
-                    .iter()
-                    .map(|func| func.identifier())
-                    .collect::<Vec<_>>();
+            function
+        } else {
+            let idents = funcs
+                .iter()
+                .map(|func| func.identifier())
+                .collect::<Vec<_>>();
 
-                return Err(Error::Undefined {
-                    ident_span,
-                    ident: ident.clone(),
-                    idents,
-                });
-            }
+            return Err(Error::Undefined {
+                ident_span,
+                ident: ident.clone(),
+                idents,
+            });
         };
 
         // Check function arity.
@@ -88,7 +89,7 @@ impl<'a> Builder<'a> {
         let mut index = 0;
         let mut list = ArgumentList::default();
 
-        let mut maybe_fallible_arguments = false;
+        let mut arguments_with_unknown_type_validity = vec![];
         for node in &arguments {
             let (argument_span, argument) = node.clone().take();
 
@@ -120,7 +121,7 @@ impl<'a> Builder<'a> {
             })?;
 
             // Check if the argument is of the expected type.
-            let argument_type_def = argument.type_def((local, external));
+            let argument_type_def = argument.expr().type_def(state_before_function_args);
             let expr_kind = argument_type_def.kind();
             let param_kind = parameter.kind();
 
@@ -137,8 +138,8 @@ impl<'a> Builder<'a> {
                     argument,
                     argument_span,
                 });
-            } else if !param_kind.is_superset(expr_kind) {
-                maybe_fallible_arguments = true;
+            } else if param_kind.is_superset(expr_kind).is_err() {
+                arguments_with_unknown_type_validity.push((*parameter, node.clone()));
             }
 
             // Check if the argument is infallible.
@@ -167,6 +168,36 @@ impl<'a> Builder<'a> {
             })?;
 
         // Check function closure validity.
+        let closure = Self::check_closure(
+            function.as_ref(),
+            closure_variables,
+            call_span,
+            &list,
+            state,
+            ident_span,
+        )?;
+
+        Ok(Self {
+            abort_on_error,
+            arguments_with_unknown_type_validity,
+            call_span,
+            ident_span,
+            function_id,
+            arguments: Arc::new(arguments),
+            closure,
+            list,
+            function: function.as_ref(),
+        })
+    }
+
+    fn check_closure(
+        function: &dyn Function,
+        closure_variables: Option<Node<Vec<Node<Ident>>>>,
+        call_span: Span,
+        list: &ArgumentList,
+        state: &mut TypeState,
+        ident_span: Span,
+    ) -> Result<Option<(Vec<Ident>, closure::Input)>, Error> {
         let closure = match (function.closure(), closure_variables) {
             // Error if closure is provided for function that doesn't support
             // any.
@@ -205,8 +236,7 @@ impl<'a> Builder<'a> {
                         // closure is going to resolve. We need to ensure the
                         // type of this argument is as expected by the closure.
                         Some(expr) => {
-                            let type_def = expr.type_def((local, external));
-
+                            let type_def = expr.type_def(state);
                             // The type definition of the value does not match
                             // the expected closure type, continue to check if
                             // the closure eventually accepts this definition.
@@ -214,12 +244,12 @@ impl<'a> Builder<'a> {
                             // Keep track of the type information, so that we
                             // can report these in a diagnostic error if no
                             // other input definition matches.
-                            if !input.kind.is_superset(type_def.kind()) {
+                            if input.kind.is_superset(type_def.kind()).is_err() {
                                 err_found_type_def = Some(type_def.kind().clone());
                                 continue;
                             }
 
-                            matched = Some((input.clone(), expr));
+                            matched = Some((input, expr));
                             break;
                         }
                     };
@@ -272,7 +302,7 @@ impl<'a> Builder<'a> {
                         // integer.
                         for (index, input_var) in input.variables.clone().into_iter().enumerate() {
                             let call_ident = &variables[index];
-                            let type_def = target.type_def((local, external));
+                            let type_def = target.type_info(state).result;
 
                             let (type_def, value) = match input_var.kind {
                                 // The variable kind is expected to be exactly
@@ -282,11 +312,11 @@ impl<'a> Builder<'a> {
                                 // The variable kind is expected to be equal to
                                 // the ind of the target of the closure.
                                 VariableKind::Target => {
-                                    (target.type_def((local, external)), target.as_value())
+                                    (target.type_info(state).result, target.as_value())
                                 }
 
                                 // The variable kind is expected to be equal to
-                                // the recuded kind of all values within the
+                                // the reduced kind of all values within the
                                 // target collection type.
                                 //
                                 // This assumes the target is a collection type,
@@ -315,7 +345,7 @@ impl<'a> Builder<'a> {
                                 // If the target can resolve to a non-collection
                                 // type, this again returns "any".
                                 VariableKind::TargetInnerKey => {
-                                    let mut kind = Kind::empty();
+                                    let mut kind = Kind::never();
 
                                     if !type_def.is_collection() {
                                         kind = Kind::any()
@@ -334,7 +364,9 @@ impl<'a> Builder<'a> {
 
                             let details = Details { type_def, value };
 
-                            local.insert_variable(call_ident.to_owned().into_inner(), details);
+                            state
+                                .local
+                                .insert_variable(call_ident.clone().into_inner(), details);
                         }
 
                         let variables = variables
@@ -350,66 +382,20 @@ impl<'a> Builder<'a> {
 
             _ => None,
         };
-
-        Ok(Self {
-            abort_on_error,
-            maybe_fallible_arguments,
-            call_span,
-            ident_span,
-            function_id,
-            arguments: Arc::new(arguments),
-            closure,
-            list,
-            function: function.as_ref(),
-        })
+        Ok(closure)
     }
 
     pub(crate) fn compile(
         mut self,
-        local: &mut LocalEnv,
-        external: &mut ExternalEnv,
-        closure_block: Option<Node<Block>>,
-        mut local_snapshot: LocalEnv,
+        state_before_function_args: &TypeState,
+        state: &mut TypeState,
+        closure_block: Option<Node<(Block, TypeDef)>>,
+        local_snapshot: LocalEnv,
+        fallible_expression_error: &mut Option<Box<dyn DiagnosticMessage>>,
+        config: &mut CompileConfig,
     ) -> Result<FunctionCall, Error> {
-        let mut closure_fallible = false;
-        let mut closure = None;
-
-        // Check if we have a closure we need to compile.
-        if let Some((variables, input)) = self.closure.clone() {
-            let block = closure_block.expect("closure must contain block");
-
-            // At this point, we've compiled the block, so we can remove the
-            // closure variables from the compiler's local environment.
-            variables
-                .iter()
-                .for_each(|ident| match local_snapshot.remove_variable(ident) {
-                    Some(details) => local.insert_variable(ident.clone(), details),
-                    None => {
-                        local.remove_variable(ident);
-                    }
-                });
-
-            closure_fallible = block.type_def((local, external)).is_fallible();
-
-            let (block_span, block) = block.take();
-
-            // Check the type definition of the resulting block.This needs to match
-            // whatever is configured by the closure input type.
-            let found_kind = block.type_def((local, external)).into();
-            let expected_kind = input.output.into_kind();
-            if !expected_kind.is_superset(&found_kind) {
-                return Err(Error::ReturnTypeMismatch {
-                    block_span,
-                    found_kind,
-                    expected_kind,
-                });
-            }
-
-            let fnclosure = FunctionClosure::new(variables, block);
-            self.list.set_closure(fnclosure.clone());
-
-            closure = Some(fnclosure);
-        };
+        let (closure, closure_fallible) =
+            self.compile_closure(closure_block, local_snapshot, state)?;
 
         let call_span = self.call_span;
         let ident_span = self.ident_span;
@@ -417,25 +403,31 @@ impl<'a> Builder<'a> {
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
         // an immutable reference, to ensure compiler state correctness.
-        let external_context = external.swap_external_context(AnyMap::new());
+        let temp_config = std::mem::take(config);
 
-        let mut compile_ctx =
-            FunctionCompileContext::new(self.call_span).with_external_context(external_context);
+        let mut compile_ctx = FunctionCompileContext::new(self.call_span, temp_config);
 
-        let mut expr = self
+        let expr = self
             .function
-            .compile((local, external), &mut compile_ctx, self.list.clone())
+            .compile(
+                state_before_function_args,
+                &mut compile_ctx,
+                self.list.clone(),
+            )
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Re-insert the external context into the compiler state.
-        let _ = external.swap_external_context(compile_ctx.into_external_context());
+        let _ = std::mem::replace(config, compile_ctx.into_config());
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
         if self.abort_on_error
-            && !self.maybe_fallible_arguments
-            && !expr.type_def((local, external)).is_fallible()
+            && self.arguments_with_unknown_type_validity.is_empty()
+            && !expr
+                .type_info(state_before_function_args)
+                .result
+                .is_fallible()
         {
             return Err(Error::AbortInfallible {
                 ident_span,
@@ -443,17 +435,41 @@ impl<'a> Builder<'a> {
             });
         }
 
-        // Update the state if necessary.
-        expr.update_state(local, external)
-            .map_err(|err| Error::UpdateState {
-                call_span,
-                error: err.to_string(),
-            })?;
+        // The function is expected to abort at boot-time if any error occurred,
+        // and one or more arguments are of an invalid type, so we'll return the
+        // appropriate error.
+        if let Some((parameter, argument)) =
+            self.arguments_with_unknown_type_validity.first().cloned()
+        {
+            if !self.abort_on_error {
+                let error = Error::InvalidArgumentKind {
+                    function_ident: self.function.identifier(),
+                    abort_on_error: self.abort_on_error,
+                    arguments_fmt: self
+                        .arguments
+                        .iter()
+                        .map(|arg| arg.inner().to_string())
+                        .collect::<Vec<_>>(),
+                    parameter,
+                    got: argument
+                        .expr()
+                        .type_info(state_before_function_args)
+                        .result
+                        .into(),
+                    argument: argument.clone().into_inner(),
+                    argument_span: argument
+                        .keyword_span()
+                        .unwrap_or_else(|| argument.expr_span()),
+                };
+
+                *fallible_expression_error = Some(Box::new(error) as _);
+            }
+        }
 
         Ok(FunctionCall {
             abort_on_error: self.abort_on_error,
             expr,
-            maybe_fallible_arguments: self.maybe_fallible_arguments,
+            arguments_with_unknown_type_validity: self.arguments_with_unknown_type_validity,
             closure_fallible,
             closure,
             span: call_span,
@@ -462,26 +478,77 @@ impl<'a> Builder<'a> {
             arguments: self.arguments.clone(),
         })
     }
+
+    fn compile_closure(
+        &mut self,
+        closure_block: Option<Node<(Block, TypeDef)>>,
+        mut locals: LocalEnv,
+        state: &mut TypeState,
+    ) -> Result<(Option<FunctionClosure>, bool), Error> {
+        // Check if we have a closure we need to compile.
+        if let Some((variables, input)) = self.closure.clone() {
+            // TODO: This assumes the closure will run exactly once, which is incorrect.
+            // see: https://github.com/vectordotdev/vector/issues/13782
+
+            let block = closure_block.expect("closure must contain block");
+
+            // At this point, we've compiled the block, so we can remove the
+            // closure variables from the compiler's local environment.
+            variables
+                .iter()
+                .for_each(|ident| match locals.remove_variable(ident) {
+                    Some(details) => state.local.insert_variable(ident.clone(), details),
+                    None => {
+                        state.local.remove_variable(ident);
+                    }
+                });
+
+            let (block_span, (block, block_type_def)) = block.take();
+
+            let closure_fallible = block_type_def.is_fallible();
+
+            // Check the type definition of the resulting block.This needs to match
+            // whatever is configured by the closure input type.
+            let expected_kind = input.output.into_kind();
+            if expected_kind.is_superset(block_type_def.kind()).is_err() {
+                return Err(Error::ReturnTypeMismatch {
+                    block_span,
+                    found_kind: block_type_def.kind().clone(),
+                    expected_kind,
+                });
+            }
+
+            let fnclosure = FunctionClosure::new(variables, block, block_type_def);
+            self.list.set_closure(fnclosure.clone());
+
+            // closure = Some(fnclosure);
+            Ok((Some(fnclosure), closure_fallible))
+        } else {
+            Ok((None, false))
+        }
+    }
 }
 
 #[derive(Clone)]
 pub struct FunctionCall {
     abort_on_error: bool,
     expr: Box<dyn Expression>,
-    maybe_fallible_arguments: bool,
+    arguments_with_unknown_type_validity: Vec<(Parameter, Node<FunctionArgument>)>,
     closure_fallible: bool,
+    // will be used with: https://github.com/vectordotdev/vector/issues/13782
+    #[allow(dead_code)]
     closure: Option<FunctionClosure>,
 
     // used for enhancing runtime error messages (using abort-instruction).
     //
     // TODO: have span store line/col details to further improve this.
-    span: Span,
+    pub(crate) span: Span,
 
     // used for equality check
-    ident: &'static str,
+    pub(crate) ident: &'static str,
 
-    // The index of the function in the list of stdlib functions.
-    // Used by the VM to identify this function when called.
+    // May be used by the LLVM runtime. If not, it should be removed
+    #[allow(dead_code)]
     function_id: usize,
     arguments: Arc<Vec<Node<FunctionArgument>>>,
 }
@@ -491,6 +558,8 @@ impl FunctionCall {
     /// in the function
     /// The error path in this function should never really be hit as the compiler should
     /// catch these whilst creating the AST.
+    // May be used by the LLVM runtime. If not, it should be removed
+    #[allow(dead_code)]
     fn resolve_arguments(
         &self,
         function: &(dyn Function),
@@ -538,22 +607,7 @@ impl FunctionCall {
         Ok(result)
     }
 
-    pub fn noop() -> Self {
-        let expr = Box::new(Noop) as _;
-
-        Self {
-            abort_on_error: false,
-            expr,
-            maybe_fallible_arguments: false,
-            closure_fallible: false,
-            closure: None,
-            span: Span::default(),
-            ident: "noop",
-            arguments: Arc::new(Vec::new()),
-            function_id: 0,
-        }
-    }
-
+    #[must_use]
     pub fn arguments_fmt(&self) -> Vec<String> {
         self.arguments
             .iter()
@@ -561,6 +615,7 @@ impl FunctionCall {
             .collect::<Vec<_>>()
     }
 
+    #[must_use]
     pub fn arguments_dbg(&self) -> Vec<String> {
         self.arguments
             .iter()
@@ -598,8 +653,21 @@ impl Expression for FunctionCall {
         })
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        let mut type_def = self.expr.type_def(state);
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
+
+        // TODO: functions with a closure do not correctly calculate type definitions
+        // see: https://github.com/vectordotdev/vector/issues/13782
+
+        // Evaluate arguments to correctly calculate any side-effects from them.
+        // This doesn't actually match current runtime behavior in some cases,
+        // but that will be changed.
+        // see: https://github.com/vectordotdev/vector/issues/13752
+        for arg_node in &*self.arguments {
+            let _result = arg_node.inner().expr().apply_type_info(&mut state);
+        }
+
+        let mut expr_result = self.expr.apply_type_info(&mut state);
 
         // If one of the arguments only partially matches the function type
         // definition, then we mark the entire function as fallible.
@@ -657,8 +725,9 @@ impl Expression for FunctionCall {
         // For the second event, only the `slice` function succeeds.
         // For the third event, both functions fail.
         //
-        if self.maybe_fallible_arguments {
-            type_def = type_def.with_fallibility(true);
+
+        if !self.arguments_with_unknown_type_validity.is_empty() {
+            expr_result = expr_result.with_fallibility(true);
         }
 
         // If the function has a closure attached, and that closure is fallible,
@@ -674,93 +743,14 @@ impl Expression for FunctionCall {
         // possible to silence potential closure errors using the "abort on
         // error" function-call feature (see below).
         if self.closure_fallible {
-            type_def = type_def.with_fallibility(true);
+            expr_result = expr_result.with_fallibility(true);
         }
 
         if self.abort_on_error {
-            type_def = type_def.with_fallibility(false);
+            expr_result = expr_result.with_fallibility(false);
         }
 
-        type_def
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        (local, external): (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        // Resolve the arguments so they are in the order defined in the function.
-        let args = match vm.function(self.function_id) {
-            Some(fun) => self.resolve_arguments(fun)?,
-            None => return Err(format!("Function {} not found.", self.function_id)),
-        };
-
-        // We take the external context, and pass it to the function compile context, this allows
-        // functions mutable access to external state, but keeps the internal compiler state behind
-        // an immutable reference, to ensure compiler state correctness.
-        let external_context = external.swap_external_context(AnyMap::new());
-
-        let mut compile_ctx =
-            FunctionCompileContext::new(self.span).with_external_context(external_context);
-
-        for (keyword, argument) in &args {
-            let fun = vm.function(self.function_id).unwrap();
-            let argument = argument.as_ref().map(|argument| argument.inner());
-
-            // Call `compile_argument` for functions that need to perform any compile time processing
-            // on the argument.
-            match fun
-                .compile_argument(&args, &mut compile_ctx, keyword, argument)
-                .map_err(|err| err.to_string())?
-            {
-                Some(stat) => {
-                    // The function has compiled this argument as a static.
-                    let stat = vm.add_static(stat);
-                    vm.write_opcode(OpCode::MoveStaticParameter);
-                    vm.write_primitive(stat);
-                }
-                None => match argument {
-                    Some(argument) => {
-                        // Compile the argument, `MoveParameter` will move the result of the expression onto the
-                        // parameter stack to be passed into the function.
-                        argument.compile_to_vm(vm, (local, external))?;
-                        vm.write_opcode(OpCode::MoveParameter);
-                    }
-                    None => {
-                        // The parameter hasn't been specified, so just move an empty parameter onto the
-                        // parameter stack.
-                        vm.write_opcode(OpCode::EmptyParameter);
-                    }
-                },
-            }
-        }
-
-        if let Some(FunctionClosure { variables, block }) = self.closure.as_ref().cloned() {
-            let mut closure_vm = crate::vm::Vm::new(vm.functions());
-            block.compile_to_vm(&mut closure_vm, (local, external))?;
-            closure_vm.write_opcode(OpCode::Return);
-
-            let closure = vm.write_closure(VmFunctionClosure {
-                vm: closure_vm,
-                variables,
-            });
-
-            vm.write_opcode(OpCode::MoveClosure);
-            vm.write_primitive(closure);
-        }
-
-        // Re-insert the external context into the compiler state.
-        let _ = external.swap_external_context(compile_ctx.into_external_context());
-
-        // Call the function with the given id.
-        vm.write_opcode(OpCode::Call);
-        vm.write_primitive(self.function_id);
-
-        // We need to write the spans for error reporting.
-        vm.write_primitive(self.span.start());
-        vm.write_primitive(self.span.end());
-
-        Ok(())
+        TypeInfo::new(state, expr_result)
     }
 }
 
@@ -862,9 +852,6 @@ pub(crate) enum Error {
     #[error("fallible argument")]
     FallibleArgument { expr_span: Span },
 
-    #[error("error updating state {}", error)]
-    UpdateState { call_span: Span, error: String },
-
     #[error("unexpected closure")]
     UnexpectedClosure { call_span: Span, closure_span: Span },
 
@@ -893,7 +880,11 @@ pub(crate) enum Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{
+            AbortInfallible, ClosureArityMismatch, ClosureParameterTypeMismatch, Compilation,
+            FallibleArgument, InvalidArgumentKind, MissingArgument, MissingClosure,
+            ReturnTypeMismatch, Undefined, UnexpectedClosure, UnknownKeyword, WrongNumberOfArgs,
+        };
 
         match self {
             Undefined { .. } => 105,
@@ -904,7 +895,6 @@ impl DiagnosticMessage for Error {
             AbortInfallible { .. } => 620,
             InvalidArgumentKind { .. } => 110,
             FallibleArgument { .. } => 630,
-            UpdateState { .. } => 640,
             UnexpectedClosure { .. } => 109,
             MissingClosure { .. } => 111,
             ClosureArityMismatch { .. } => 120,
@@ -914,7 +904,11 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{
+            AbortInfallible, ClosureArityMismatch, ClosureParameterTypeMismatch, Compilation,
+            FallibleArgument, InvalidArgumentKind, MissingArgument, MissingClosure,
+            ReturnTypeMismatch, Undefined, UnexpectedClosure, UnknownKeyword, WrongNumberOfArgs,
+        };
 
         match self {
             Undefined {
@@ -1058,11 +1052,6 @@ impl DiagnosticMessage for Error {
                     expr_span,
                 ),
             ],
-
-            UpdateState { call_span, error } => vec![Label::primary(
-                format!("an error occurred updating the compiler state: {}", error),
-                call_span,
-            )],
             UnexpectedClosure { call_span, closure_span } => vec![
                 Label::primary("unexpected closure", closure_span),
                 Label::context("this function does not accept a closure", call_span)
@@ -1090,7 +1079,10 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use Error::*;
+        use Error::{
+            AbortInfallible, Compilation, FallibleArgument, InvalidArgumentKind, MissingClosure,
+            WrongNumberOfArgs,
+        };
 
         match self {
             WrongNumberOfArgs { .. } => vec![Note::SeeDocs(
@@ -1191,17 +1183,17 @@ impl DiagnosticMessage for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{state::ExternalEnv, value::kind};
+    use crate::{value::kind, FunctionExpression};
 
     #[derive(Clone, Debug)]
     struct Fn;
 
-    impl Expression for Fn {
+    impl FunctionExpression for Fn {
         fn resolve(&self, _ctx: &mut Context) -> Resolved {
             todo!()
         }
 
-        fn type_def(&self, _state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+        fn type_def(&self, _state: &TypeState) -> TypeDef {
             TypeDef::null().infallible()
         }
     }
@@ -1240,19 +1232,11 @@ mod tests {
 
         fn compile(
             &self,
-            _state: (&mut LocalEnv, &mut ExternalEnv),
+            _state: &TypeState,
             _ctx: &mut FunctionCompileContext,
             _arguments: ArgumentList,
         ) -> crate::function::Compiled {
-            Ok(Box::new(Fn))
-        }
-
-        fn call_by_vm(
-            &self,
-            _ctx: &mut Context,
-            _args: &mut crate::vm::VmArgumentList,
-        ) -> Result<value::Value, ExpressionError> {
-            unimplemented!()
+            Ok(Fn.as_expr())
         }
     }
 
@@ -1273,21 +1257,28 @@ mod tests {
 
     #[cfg(feature = "expr-literal")]
     fn create_function_call(arguments: Vec<Node<FunctionArgument>>) -> FunctionCall {
-        let mut local = LocalEnv::default();
-        let mut external = ExternalEnv::default();
-
+        let mut state = TypeState::default();
+        let original_state = state.clone();
+        let mut config = CompileConfig::default();
         Builder::new(
             Span::new(0, 0),
             Node::new(Span::new(0, 0), Ident::new("test")),
             false,
             arguments,
             &[Box::new(TestFn) as _],
-            &mut local,
-            &mut external,
+            &original_state,
+            &mut state,
             None,
         )
         .unwrap()
-        .compile(&mut local, &mut external, None, LocalEnv::default())
+        .compile(
+            &original_state,
+            &mut state,
+            None,
+            LocalEnv::default(),
+            &mut None,
+            &mut config,
+        )
         .unwrap()
     }
 

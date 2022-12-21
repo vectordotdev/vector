@@ -7,11 +7,14 @@ on:
       - master
 
 concurrency:
-  group: ${{ github.ref }}
+  # For pull requests, cancel running workflows, for master, run all
+  #
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA
+  # for master
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
   cancel-in-progress: true
 
 env:
-  AUTOINSTALL: true
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
@@ -23,7 +26,9 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
-  RUSTFLAGS: "-D warnings"
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   changes:
@@ -34,6 +39,7 @@ jobs:
         dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         cue: ${{ steps.filter.outputs.cue }}
+        component_docs: ${{ steps.filter.outputs.component_docs }}
         markdown: ${{ steps.filter.outputs.markdown }}
       steps:
       - uses: actions/checkout@v3
@@ -68,6 +74,8 @@ jobs:
               - 'scripts/cross/**'
             cue:
               - 'website/cue/**'
+            component_docs:
+              - 'scripts/generate-component-docs.rb'
             markdown:
               - '**/**.md'
             internal_events:
@@ -206,7 +214,7 @@ jobs:
 
   cross-linux-check:
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Cross - Linux
     needs: cross-linux
     steps:
@@ -219,7 +227,7 @@ jobs:
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
-    runs-on: macos-latest
+    runs-on: macos-11
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -265,6 +273,19 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: make test-vrl
 
+  test-vrl-wasm:
+    name: VRL WASM - Linux
+    continue-on-error: true
+    runs-on: [linux, test-runner]
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
+    steps:
+      - uses: actions/checkout@v3
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/ensure-wasm-target-installed.sh
+      - run: make compile-vrl-wasm
+
   check-component-features:
     name: Component Features - Linux
     runs-on: [linux, test-runner]
@@ -275,7 +296,6 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: cargo install cargo-hack
       - run: make check-component-features
 
   check-msrv:
@@ -330,22 +350,18 @@ jobs:
       - name: Check events
         if: needs.changes.outputs.source == 'true'
         run: make check-events
-      - name: Check cargo deny advisories
+      - name: Check cargo deny advisories/licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.2.17
-        with:
-          command: check advisories
-      - name: Check cargo deny licenses
-        if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.2.17
-        with:
-          command: check licenses
+        run: make check-deny
       - name: Check Cue docs
         if: needs.changes.outputs.cue == 'true'
         run: make check-docs
       - name: Check Markdown
         if: needs.changes.outputs.markdown == 'true'
         run: make check-markdown
+      - name: Check Component Docs
+        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
+        run: make check-component-docs
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'

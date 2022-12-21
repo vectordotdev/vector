@@ -8,6 +8,13 @@ components: sources: nats: {
 		collect: {
 			checkpoint: enabled: false
 			from: components._nats.features.collect.from
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+				enabled_by_scheme:      true
+			}
 		}
 		multiline: enabled: false
 		codecs: {
@@ -51,6 +58,20 @@ components: sources: nats: {
 				required:    true
 				type: string: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["nats"]
+				}
+			}
+			subject: {
+				description: "The subject from the NATS message."
+				required:    true
+				type: string: {
+					examples: ["nats.subject"]
 				}
 			}
 		}

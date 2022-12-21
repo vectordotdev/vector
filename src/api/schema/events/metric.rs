@@ -109,7 +109,7 @@ impl Metric {
     /// Metric tags
     async fn tags(&self) -> Option<Vec<MetricTag>> {
         self.event.tags().map(|tags| {
-            tags.iter()
+            tags.iter_single()
                 .map(|(key, value)| MetricTag {
                     key: key.to_owned(),
                     value: value.to_owned(),
@@ -129,7 +129,7 @@ impl Metric {
                 let json = serde_json::to_value(&self.event)
                     .expect("logfmt serialization of metric event failed: conversion to serde Value failed. Please report.");
                 match json {
-                    Value::Object(map) => encode_logfmt::to_string(
+                    Value::Object(map) => encode_logfmt::encode_map(
                         &map.into_iter().collect::<BTreeMap<String, Value>>(),
                     )
                     .expect("logfmt serialization of metric event failed. Please report."),

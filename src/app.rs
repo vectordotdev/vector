@@ -1,6 +1,8 @@
 use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use futures::StreamExt;
+#[cfg(feature = "enterprise")]
+use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::{
     runtime::{self, Runtime},
@@ -9,7 +11,10 @@ use tokio::{
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
-use crate::config::enterprise::PipelinesError;
+use crate::config::enterprise::{
+    attach_enterprise_components, report_configuration, report_on_reload, EnterpriseError,
+    EnterpriseMetadata, EnterpriseReporter,
+};
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
 #[cfg(windows)]
@@ -18,7 +23,8 @@ use crate::service;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, graph, heartbeat, list,
+    config::{self},
+    generate, generate_schema, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -33,12 +39,17 @@ use crate::internal_events::{
     VectorStarted, VectorStopped,
 };
 
+use tokio::sync::broadcast::error::RecvError;
+
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
-    pub graceful_crash: mpsc::UnboundedReceiver<()>,
+    pub graceful_crash_sender: mpsc::UnboundedSender<()>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
+    #[cfg(feature = "enterprise")]
+    pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
     pub signal_handler: signal::SignalHandler,
     pub signal_rx: signal::SignalRx,
 }
@@ -78,13 +89,13 @@ impl Application {
                     "tower_limit=trace".to_owned(),
                     format!("rdkafka={}", level),
                     format!("buffers={}", level),
+                    format!("lapin={}", level),
                     format!("kube={}", level),
                 ]
                 .join(","),
             });
 
         let root_opts = opts.root;
-
         let sub_command = opts.sub_command;
 
         let color = match root_opts.color {
@@ -109,7 +120,10 @@ impl Application {
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
-                error!("The `threads` argument must be greater or equal to 1.");
+                #[allow(clippy::print_stderr)]
+                {
+                    eprintln!("The `threads` argument must be greater or equal to 1.");
+                }
                 return Err(exitcode::CONFIG);
             } else {
                 WORKER_THREADS
@@ -127,7 +141,11 @@ impl Application {
             let require_healthy = root_opts.require_healthy;
 
             rt.block_on(async move {
-                trace::init(color, json, &level);
+                trace::init(color, json, &level, root_opts.internal_log_rate_limit);
+                info!(
+                    message = "Internal log rate limit configured.",
+                    internal_log_rate_secs = root_opts.internal_log_rate_limit
+                );
                 // Signal handler for OS and provider messages.
                 let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
                 signal_handler.forever(signal::os_signals());
@@ -135,10 +153,11 @@ impl Application {
                 if let Some(s) = sub_command {
                     let code = match s {
                         SubCommand::Generate(g) => generate::cmd(&g),
+                        SubCommand::GenerateSchema => generate_schema::cmd(),
                         SubCommand::Graph(g) => graph::cmd(&g),
                         SubCommand::Config(c) => config::cmd(&c),
                         SubCommand::List(l) => list::cmd(&l),
-                        SubCommand::Test(t) => unit_test::cmd(&t).await,
+                        SubCommand::Test(t) => unit_test::cmd(&t, &mut signal_handler).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "api-client")]
@@ -175,10 +194,12 @@ impl Application {
                 #[cfg(not(feature = "enterprise-tests"))]
                 config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
-                let mut config =
-                    config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
-                        .await
-                        .map_err(handle_config_errors)?;
+                let mut config = config::load_from_paths_with_provider_and_secrets(
+                    &config_paths,
+                    &mut signal_handler,
+                )
+                .await
+                .map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
@@ -186,18 +207,22 @@ impl Application {
                 config.healthchecks.set_require_healthy(require_healthy);
 
                 #[cfg(feature = "enterprise")]
-                // Augment config to enable observability within Datadog, if applicable.
-                if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                    config::enterprise::try_attach(
-                        &mut config,
-                        &config_paths,
-                        signal_handler.subscribe(),
-                    )
-                    .await
-                {
-                    error!(message = "Exiting due to configuration reporting failure.");
-                    return Err(exitcode::UNAVAILABLE);
-                }
+                // Enable enterprise features, if applicable.
+                let enterprise = match EnterpriseMetadata::try_from(&config) {
+                    Ok(metadata) => {
+                        let enterprise = EnterpriseReporter::new();
+
+                        attach_enterprise_components(&mut config, &metadata);
+                        enterprise.send(report_configuration(config_paths.clone(), metadata));
+
+                        Some(enterprise)
+                    }
+                    Err(EnterpriseError::MissingApiKey) => {
+                        error!("Enterprise configuration incomplete: missing API key.");
+                        return Err(exitcode::CONFIG);
+                    }
+                    Err(_) => None,
+                };
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -208,14 +233,18 @@ impl Application {
                 let api = config.api;
 
                 let result = topology::start_validated(config, diff, pieces).await;
-                let (topology, graceful_crash) = result.ok_or(exitcode::CONFIG)?;
+                let (topology, (graceful_crash_sender, graceful_crash_receiver)) =
+                    result.ok_or(exitcode::CONFIG)?;
 
                 Ok(ApplicationConfig {
                     config_paths,
                     topology,
-                    graceful_crash,
+                    graceful_crash_sender,
+                    graceful_crash_receiver,
                     #[cfg(feature = "api")]
                     api,
+                    #[cfg(feature = "enterprise")]
+                    enterprise,
                     signal_handler,
                     signal_rx,
                 })
@@ -232,7 +261,7 @@ impl Application {
     pub fn run(self) {
         let rt = self.runtime;
 
-        let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash);
+        let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash_receiver);
         let mut topology = self.config.topology;
 
         let mut config_paths = self.config.config_paths;
@@ -241,6 +270,9 @@ impl Application {
 
         #[cfg(feature = "api")]
         let api_config = self.config.api;
+
+        #[cfg(feature = "enterprise")]
+        let mut enterprise = self.config.enterprise;
 
         let mut signal_handler = self.config.signal_handler;
         let mut signal_rx = self.config.signal_rx;
@@ -258,12 +290,24 @@ impl Application {
             // Assigned to prevent the API terminating when falling out of scope.
             let api_server = if api_config.enabled {
                 use std::sync::{Arc, atomic::AtomicBool};
-                emit!(ApiStarted {
-                    addr: api_config.address.unwrap(),
-                    playground: api_config.playground
-                });
 
-                Some(api::Server::start(topology.config(), topology.watch(), Arc::<AtomicBool>::clone(&topology.running)))
+                let api_server = api::Server::start(topology.config(), topology.watch(), Arc::<AtomicBool>::clone(&topology.running));
+
+                match api_server {
+                    Ok(api_server) => {
+                        emit!(ApiStarted {
+                            addr: api_config.address.unwrap(),
+                            playground: api_config.playground
+                        });
+
+                        Some(api_server)
+                    }
+                    Err(e) => {
+                        error!("An error occurred that Vector couldn't handle: {}.", e);
+                        let _ = self.config.graceful_crash_sender.send(());
+                        None
+                    }
+                }
             } else {
                 info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None
@@ -273,19 +317,27 @@ impl Application {
 
             let signal = loop {
                 tokio::select! {
-                    Ok(signal) = signal_rx.recv() => {
+                    signal = signal_rx.recv() => {
                         match signal {
-                            SignalTo::ReloadFromConfigBuilder(config_builder) => {
+                            Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
                                 match config_builder.build().map_err(handle_config_errors) {
                                     Ok(mut new_config) => {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                         #[cfg(feature = "enterprise")]
-                                        if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                                            config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
-                                        {
-                                            error!(message = "Shutting down due to configuration reporting failure.");
-                                            break SignalTo::Shutdown;
+                                        // Augment config to enable observability within Datadog, if applicable.
+                                        match EnterpriseMetadata::try_from(&new_config) {
+                                            Ok(metadata) => {
+                                                if let Some(e) = report_on_reload(&mut new_config, metadata, config_paths.clone(), enterprise.as_ref()) {
+                                                    enterprise = Some(e);
+                                                }
+                                            },
+                                            Err(err) => {
+                                                if let EnterpriseError::MissingApiKey = err {
+                                                    emit!(VectorReloadError);
+                                                    continue;
+                                                }
+                                            },
                                         }
 
                                         match topology
@@ -316,12 +368,12 @@ impl Application {
                                     }
                                 }
                             }
-                            SignalTo::ReloadFromDisk => {
+                            Ok(SignalTo::ReloadFromDisk) => {
                                 // Reload paths
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
 
                                 // Reload config
-                                let new_config = config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
+                                let new_config = config::load_from_paths_with_provider_and_secrets(&config_paths, &mut signal_handler)
                                     .await
                                     .map_err(handle_config_errors).ok();
 
@@ -329,12 +381,18 @@ impl Application {
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                     #[cfg(feature = "enterprise")]
-                                    // Augment config to enable observability within Datadog, if applicable.
-                                    if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                                        config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
-                                    {
-                                        error!(message = "Shutting down due to configuration reporting failure.");
-                                        break SignalTo::Shutdown;
+                                    match EnterpriseMetadata::try_from(&new_config) {
+                                        Ok(metadata) => {
+                                            if let Some(e) = report_on_reload(&mut new_config, metadata, config_paths.clone(), enterprise.as_ref()) {
+                                                enterprise = Some(e);
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let EnterpriseError::MissingApiKey = err {
+                                                emit!(VectorReloadError);
+                                                continue;
+                                            }
+                                        },
                                     }
 
                                     match topology
@@ -362,8 +420,10 @@ impl Application {
                                 } else {
                                     emit!(VectorConfigLoadError);
                                 }
-                            }
-                            _ => break signal,
+                            },
+                            Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
+                            Err(RecvError::Closed) => break SignalTo::Shutdown,
+                            Ok(signal) => break signal,
                         }
                     }
                     // Trigger graceful shutdown if a component crashed, or all sources have ended.

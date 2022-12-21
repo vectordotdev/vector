@@ -29,7 +29,7 @@ pub enum DecodeError {
 /// used flags cannot have their meaning changed/repurposed after-the-fact.
 #[bitflags]
 #[repr(u32)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventEncodableMetadataFlags {
     /// Chained encoding scheme that first tries to decode as `EventArray` and then as `Event`, as a
     /// way to support gracefully migrating existing v1-based disk buffers to the new
@@ -39,7 +39,7 @@ pub enum EventEncodableMetadataFlags {
     DiskBufferV1CompatibilityMode = 0b1,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EventEncodableMetadata(BitFlags<EventEncodableMetadataFlags>);
 
 impl EventEncodableMetadata {

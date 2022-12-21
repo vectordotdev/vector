@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
@@ -5,6 +7,7 @@ use std::{
 
 pub use error::LookupError;
 pub use lookup_buf::{FieldBuf, LookupBuf, SegmentBuf};
+pub use lookup_v2::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 pub use lookup_view::{Field, Lookup, Segment};
 
 mod error;

@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn ends_with(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
@@ -52,19 +53,20 @@ impl Function for EndsWith {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
         let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(true));
 
-        Ok(Box::new(EndsWithFn {
+        Ok(EndsWithFn {
             value,
             substring,
             case_sensitive,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -86,18 +88,6 @@ impl Function for EndsWith {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let substring = args.required("substring");
-        let case_sensitive = args
-            .optional("case_sensitive")
-            .map(|value| value.try_boolean())
-            .transpose()?
-            .unwrap_or(true);
-
-        ends_with(value, substring, case_sensitive)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -107,7 +97,7 @@ struct EndsWithFn {
     case_sensitive: Box<dyn Expression>,
 }
 
-impl Expression for EndsWithFn {
+impl FunctionExpression for EndsWithFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let case_sensitive = self.case_sensitive.resolve(ctx)?;
         let case_sensitive = case_sensitive.try_boolean()?;
@@ -117,7 +107,7 @@ impl Expression for EndsWithFn {
         ends_with(value, substring, case_sensitive)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

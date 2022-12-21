@@ -1,8 +1,8 @@
 use bytes::{Buf, BufMut, BytesMut};
-use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
+use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
 use vector_common::btreemap;
 
@@ -46,7 +46,7 @@ fn eventarray_can_go_from_raw_prost_to_encodable_and_vice_versa() {
         "key2" => "value2",
         "key3" => "value3",
     };
-    let event: Event = LogEvent::from_parts(event_fields, EventMetadata::default()).into();
+    let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
     let events = EventArray::from(event);
 
     // First test: raw Prost encode -> `Encodable::decode`.
@@ -92,7 +92,7 @@ fn event_can_go_from_raw_prost_to_eventarray_encodable() {
         "key2" => "value2",
         "key3" => "value3",
     };
-    let event: Event = LogEvent::from_parts(event_fields, EventMetadata::default()).into();
+    let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
 
     let mut encode_buf = BytesMut::with_capacity(4096);
     proto::EventWrapper::from(event.clone())
@@ -145,13 +145,7 @@ fn back_and_forth_through_bytes() {
 
         let actual = decode_value::<EventArray, _>(buffer);
 
-        // While Event does implement PartialEq we prefer to use PartialOrd
-        // instead. This is done because Event is populated with a number
-        // f64 instances, meaning two Event instances might differ by less
-        // than f64::EPSILON -- and are equal enough -- but are not
-        // partially equal.
-        assert!(!(expected > actual));
-        assert!(!(expected < actual));
+        assert_eq!(expected, actual);
 
         TestResult::passed()
     }
@@ -164,18 +158,18 @@ fn back_and_forth_through_bytes() {
 
 #[test]
 fn serialization() {
-    let mut event = Event::from("raw log line");
-    event.as_mut_log().insert("foo", "bar");
-    event.as_mut_log().insert("bar", "baz");
+    let mut event = LogEvent::from("raw log line");
+    event.insert("foo", "bar");
+    event.insert("bar", "baz");
 
     let expected_all = serde_json::json!({
         "message": "raw log line",
         "foo": "bar",
         "bar": "baz",
-        "timestamp": event.as_log().get(log_schema().timestamp_key()),
+        "timestamp": event.get(log_schema().timestamp_key()),
     });
 
-    let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();
+    let actual_all = serde_json::to_value(event.all_fields().unwrap()).unwrap();
     assert_eq!(expected_all, actual_all);
 
     let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
@@ -186,13 +180,13 @@ fn serialization() {
 fn type_serialization() {
     use serde_json::json;
 
-    let mut event = Event::from("hello world");
-    event.as_mut_log().insert("int", 4);
-    event.as_mut_log().insert("float", 5.5);
-    event.as_mut_log().insert("bool", true);
-    event.as_mut_log().insert("string", "thisisastring");
+    let mut event = LogEvent::from("hello world");
+    event.insert("int", 4);
+    event.insert("float", 5.5);
+    event.insert("bool", true);
+    event.insert("string", "thisisastring");
 
-    let map = serde_json::to_value(event.as_log().all_fields()).unwrap();
+    let map = serde_json::to_value(event.all_fields().unwrap()).unwrap();
     assert_eq!(map["float"], json!(5.5));
     assert_eq!(map["int"], json!(4));
     assert_eq!(map["bool"], json!(true));

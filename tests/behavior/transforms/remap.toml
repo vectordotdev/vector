@@ -1217,7 +1217,6 @@
 #   type = "remap"
 #   source = """
 #     .grokked = parse_grok!(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}")
-#     .grokked2 = parse_grok!(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}", remove_empty: true)
 #     """
 # [[tests]]
 #   name = "remap_function_parse_grok"

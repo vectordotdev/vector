@@ -10,7 +10,8 @@ pub Lookup: Lookup<'input> = {
       l.push_front(s);
       l
     }
-  }
+  },
+  "." => Lookup::root(),
 }
 
 PathSegment: Segment<'input> = {
@@ -24,7 +25,7 @@ PathSegment: Segment<'input> = {
 }
 
 Field: Field<'input> = {
-   <s:r"[0-9]*[a-zA-Z_][0-9a-zA-Z_]*"> => Field::from(s),
+   <s:r"[0-9]*[a-zA-Z_@][0-9a-zA-Z_@]*"> => Field::from(s),
    <s:r#""(\\"|[^"])+""#> => Field::from(s),
 }
 

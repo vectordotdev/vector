@@ -7,6 +7,9 @@ _values: {
 	local_host:        "my-host.local"
 	remote_host:       "34.33.222.212"
 	instance:          "vector:9598"
+	client_metadata: {
+		subject: "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
+	}
 }
 
 // `#Any` allows for any value.
@@ -18,7 +21,7 @@ _values: {
 //
 // * `none` - compression is not applied
 // * `gzip` - gzip compression applied
-#CompressionAlgorithm: "none" | "gzip" | "lz4" | "snappy" | "zstd"
+#CompressionAlgorithm: "none" | "gzip" | "lz4" | "snappy" | "zstd" | "zlib"
 
 #CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
 
@@ -52,7 +55,7 @@ _values: {
 // * `removed` - The component has been removed.
 #DevelopmentStatus: "beta" | "stable" | "deprecated" | "removed"
 
-#EncodingCodec: "json" | "logfmt" | "ndjson" | "text" | "native" | "native_json"
+#EncodingCodec: "json" | "logfmt" | "text" | "native" | "native_json" | "avro" | "gelf"
 
 #Endpoint: {
 	description: string
@@ -329,7 +332,7 @@ _values: {
 		// `common` specifes that the option is commonly used. It will bring the
 		// option to the top of the documents, surfacing it from other
 		// less common, options.
-		common: bool
+		common?: bool
 	}
 
 	// `sort` sorts the option, otherwise options will be sorted alphabetically.
@@ -465,14 +468,14 @@ _values: {
 	//
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
-	{"*": {}} |
-	{"bool": #TypeBool & {_args: required: Args.required}} |
-	{"float": #TypeFloat & {_args: required: Args.required}} |
-	{"object": #TypeObject & {_args: required: Args.required}} |
-	{"string": #TypeString & {_args: required: Args.required}} |
-	{"ascii_char": #TypeAsciiChar & {_args: required: Args.required}} |
-	{"timestamp": #TypeTimestamp & {_args: required: Args.required}} |
-	{"uint": #TypeUint & {_args: required: Args.required}}
+	"*"?: {}
+	"bool"?:       #TypeBool & {_args: required:      Args.required}
+	"float"?:      #TypeFloat & {_args: required:     Args.required}
+	"object"?:     #TypeObject & {_args: required:    Args.required}
+	"string"?:     #TypeString & {_args: required:    Args.required}
+	"ascii_char"?: #TypeAsciiChar & {_args: required: Args.required}
+	"timestamp"?:  #TypeTimestamp & {_args: required: Args.required}
+	"uint"?:       #TypeUint & {_args: required:      Args.required}
 }
 
 #TypeArray: {
@@ -483,7 +486,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: [...] | null
+		default: [...] | *null
 	}
 
 	examples?: [...[...Type.items.type]]
@@ -499,7 +502,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: bool | null
+		default: bool | *null
 	}
 }
 
@@ -509,7 +512,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: float | null
+		default: float | *null
 	}
 
 	// `examples` clarify values through examples. This should be used
@@ -519,14 +522,14 @@ _values: {
 
 	// `unit` clarifies the value's unit. While this should be included
 	// as the suffix in the name, this helps to explicitly clarify that.
-	unit: #Unit | *null
+	unit?: #Unit | null
 }
 
 #TypeObject: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples: [#Object] | *[]
+	examples: [#Object, ...#Object] | *[]
 
 	// `options` represent the child options for this option.
 	options: #Schema
@@ -538,7 +541,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: string | null
+		default: string | *null
 	}
 
 	// `enum` restricts the value to a set of values.
@@ -570,7 +573,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: string | null
+		default: string | *null
 	}
 
 	examples?: [string, ...string]
@@ -582,7 +585,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: #Timestamp | null
+		default: #Timestamp | *null
 	}
 
 	// `examples` clarify values through examples. This should be used
@@ -597,7 +600,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: uint | null
+		default: uint | *null
 	}
 
 	// `examples` clarify values through examples. This should be used
@@ -607,10 +610,10 @@ _values: {
 
 	// `unit` clarifies the value's unit. While this should be included
 	// as the suffix in the name, this helps to explicitly clarify that.
-	unit: #Unit | null
+	unit?: #Unit | null
 }
 
-#Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds" | "lines" | "concurrency"
+#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency"
 
 administration: _
 components:     _

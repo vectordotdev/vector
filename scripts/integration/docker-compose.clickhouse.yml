@@ -2,7 +2,7 @@ version: "3"
 
 services:
   clickhouse:
-    image: yandex/clickhouse-server:19
+    image: docker.io/yandex/clickhouse-server:19
 
   runner:
     build:
@@ -21,17 +21,17 @@ services:
       - "clickhouse-integration-tests"
       - "--lib"
       - "::clickhouse::"
-      - "--"
-      - "--nocapture"
     environment:
       - CLICKHOUSE_ADDRESS=http://clickhouse:8123
     depends_on:
       - clickhouse
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

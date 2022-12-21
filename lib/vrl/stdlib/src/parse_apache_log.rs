@@ -16,16 +16,21 @@ fn parse_apache_log(
         None => "%d/%b/%Y:%T %z".to_owned(),
         Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
     };
-    let regex = match format.as_ref() {
+    let regexes = match format.as_ref() {
         b"common" => &*log_util::REGEX_APACHE_COMMON_LOG,
         b"combined" => &*log_util::REGEX_APACHE_COMBINED_LOG,
         b"error" => &*log_util::REGEX_APACHE_ERROR_LOG,
         _ => unreachable!(),
     };
-    let captures = regex
-        .captures(&message)
-        .ok_or("failed parsing common log line")?;
-    log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone()).map_err(Into::into)
+
+    log_util::parse_message(
+        regexes,
+        &message,
+        &timestamp_format,
+        ctx.timezone(),
+        std::str::from_utf8(format.as_ref()).unwrap(),
+    )
+    .map_err(Into::into)
 }
 
 fn variants() -> Vec<Value> {
@@ -62,9 +67,9 @@ impl Function for ParseApacheLog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments
@@ -74,30 +79,12 @@ impl Function for ParseApacheLog {
 
         let timestamp_format = arguments.optional("timestamp_format");
 
-        Ok(Box::new(ParseApacheLogFn {
+        Ok(ParseApacheLogFn {
             value,
             format,
             timestamp_format,
-        }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("format", Some(expr)) => {
-                let format = expr
-                    .as_enum("format", variants())?
-                    .try_bytes()
-                    .expect("format not bytes");
-                Ok(Some(Box::new(format) as _))
-            }
-            _ => Ok(None),
         }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -125,14 +112,6 @@ impl Function for ParseApacheLog {
             },
         ]
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
-        let timestamp_format = args.optional("timestamp_format");
-
-        parse_apache_log(value, timestamp_format, format, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -142,7 +121,7 @@ struct ParseApacheLogFn {
     timestamp_format: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseApacheLogFn {
+impl FunctionExpression for ParseApacheLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let timestamp_format = self
@@ -154,7 +133,7 @@ impl Expression for ParseApacheLogFn {
         parse_apache_log(bytes, timestamp_format, &self.format, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"common" => kind_common(),
             b"combined" => kind_combined(),
@@ -336,11 +315,27 @@ mod tests {
             tz: vector_common::TimeZone::Named(chrono_tz::Tz::UTC),
         }
 
+        error_line_threaded_mpms_valid {
+            args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [proxy:error] [pid 23964] (113)No route to host: AH00957: HTTP: attempt to connect to 10.1.0.244:9000 (hostname.domain.com) failed"#,
+                             format: "error"
+                             ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-03-01T12:00:19Z").unwrap().into()),
+                "message1" => "(113)No route to host: AH00957: ",
+                "message2" => "HTTP: attempt to connect to 10.1.0.244:9000 (hostname.domain.com) failed",
+                "module" => "proxy",
+                "severity" => "error",
+                "pid" => 23964,
+            }),
+            tdef: TypeDef::object(kind_error()).fallible(),
+            tz: vector_common::TimeZone::default(),
+        }
+
         log_line_valid_empty {
             args: func_args![value: "- - - - - - -",
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
@@ -349,7 +344,7 @@ mod tests {
             args: func_args![value: r#"- - - [-] "-" - -"#,
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }

@@ -11,13 +11,20 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
+pub(crate) mod apm_stats;
 mod config;
 mod request_builder;
 mod service;
 mod sink;
 
-use crate::{config::SinkDescription, sinks::datadog::traces::config::DatadogTracesConfig};
-
-inventory::submit! {
-    SinkDescription::new::<DatadogTracesConfig>("datadog_traces")
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
+pub(crate) mod ddsketch_full {
+    include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }
+
+#[allow(warnings)]
+pub(crate) mod dd_proto {
+    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
+}
+
+pub use self::config::DatadogTracesConfig;

@@ -1,34 +1,32 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    sync::Arc,
 };
 
+use crate::ByteSizeOf;
 pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
-use bytes::Bytes;
+pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
 };
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
-pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
+pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
-use vector_common::EventDataEq;
+use vector_common::{finalization, EventDataEq};
 #[cfg(feature = "vrl")]
-pub use vrl_target::{TargetEvents, VrlImmutableTarget, VrlTarget};
-
-use crate::ByteSizeOf;
+pub use vrl_target::{TargetEvents, VrlTarget};
 
 pub mod array;
 pub mod discriminant;
 pub mod error;
-mod finalization;
+mod estimated_json_encoded_size_of;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
@@ -47,8 +45,9 @@ mod vrl_target;
 
 pub const PARTIAL: &str = "_partial";
 
-#[derive(PartialEq, PartialOrd, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
@@ -61,6 +60,16 @@ impl ByteSizeOf for Event {
             Event::Log(log_event) => log_event.allocated_bytes(),
             Event::Metric(metric_event) => metric_event.allocated_bytes(),
             Event::Trace(trace_event) => trace_event.allocated_bytes(),
+        }
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for Event {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        match self {
+            Event::Log(log_event) => log_event.estimated_json_encoded_size_of(),
+            Event::Metric(metric_event) => metric_event.estimated_json_encoded_size_of(),
+            Event::Trace(trace_event) => trace_event.estimated_json_encoded_size_of(),
         }
     }
 }
@@ -82,11 +91,6 @@ impl Finalizable for Event {
 }
 
 impl Event {
-    #[must_use]
-    pub fn new_empty_log() -> Self {
-        Event::Log(LogEvent::default())
-    }
-
     /// Return self as a `LogEvent`
     ///
     /// # Panics
@@ -127,6 +131,16 @@ impl Event {
     ///
     /// If the event is a `LogEvent`, then `Some(log_event)` is returned, otherwise `None`.
     pub fn try_into_log(self) -> Option<LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            _ => None,
+        }
+    }
+
+    /// Return self as a `LogEvent` if possible
+    ///
+    /// If the event is a `LogEvent`, then `Some(&log_event)` is returned, otherwise `None`.
+    pub fn maybe_as_log(&self) -> Option<&LogEvent> {
         match self {
             Event::Log(log) => Some(log),
             _ => None,
@@ -250,17 +264,8 @@ impl Event {
         }
     }
 
-    pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
-        let finalizer = EventFinalizer::new(batch);
-        match self {
-            Self::Log(log) => log.add_finalizer(finalizer),
-            Self::Metric(metric) => metric.add_finalizer(finalizer),
-            Self::Trace(trace) => trace.add_finalizer(finalizer),
-        }
-    }
-
     #[must_use]
-    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
+    pub fn with_batch_notifier(self, batch: &BatchNotifier) -> Self {
         match self {
             Self::Log(log) => log.with_batch_notifier(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
@@ -269,7 +274,7 @@ impl Event {
     }
 
     #[must_use]
-    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(self, batch: &Option<BatchNotifier>) -> Self {
         match self {
             Self::Log(log) => log.with_batch_notifier_option(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier_option(batch).into(),
@@ -289,15 +294,14 @@ impl EventDataEq for Event {
     }
 }
 
-impl From<BTreeMap<String, Value>> for Event {
-    fn from(map: BTreeMap<String, Value>) -> Self {
-        Self::Log(LogEvent::from(map))
-    }
-}
-
-impl From<HashMap<String, Value>> for Event {
-    fn from(map: HashMap<String, Value>) -> Self {
-        Self::Log(LogEvent::from(map))
+impl finalization::AddBatchNotifier for Event {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        let finalizer = EventFinalizer::new(batch);
+        match self {
+            Self::Log(log) => log.add_finalizer(finalizer),
+            Self::Metric(metric) => metric.add_finalizer(finalizer),
+            Self::Trace(trace) => trace.add_finalizer(finalizer),
+        }
     }
 }
 
@@ -306,12 +310,13 @@ impl TryFrom<serde_json::Value> for Event {
 
     fn try_from(map: serde_json::Value) -> Result<Self, Self::Error> {
         match map {
-            serde_json::Value::Object(fields) => Ok(Event::from(
+            serde_json::Value::Object(fields) => Ok(LogEvent::from(
                 fields
                     .into_iter()
                     .map(|(k, v)| (k, v.into()))
                     .collect::<BTreeMap<_, _>>(),
-            )),
+            )
+            .into()),
             _ => Err(crate::Error::from(
                 "Attempted to convert non-Object JSON into an Event.",
             )),
@@ -358,7 +363,16 @@ impl From<proto::DistributionSample> for metric::Sample {
     }
 }
 
-impl From<metric::Bucket> for proto::HistogramBucket {
+impl From<proto::HistogramBucket> for metric::Bucket {
+    fn from(bucket: proto::HistogramBucket) -> Self {
+        Self {
+            upper_limit: bucket.upper_limit,
+            count: u64::from(bucket.count),
+        }
+    }
+}
+
+impl From<metric::Bucket> for proto::HistogramBucket3 {
     fn from(bucket: metric::Bucket) -> Self {
         Self {
             upper_limit: bucket.upper_limit,
@@ -367,8 +381,8 @@ impl From<metric::Bucket> for proto::HistogramBucket {
     }
 }
 
-impl From<proto::HistogramBucket> for metric::Bucket {
-    fn from(bucket: proto::HistogramBucket) -> Self {
+impl From<proto::HistogramBucket3> for metric::Bucket {
+    fn from(bucket: proto::HistogramBucket3) -> Self {
         Self {
             upper_limit: bucket.upper_limit,
             count: bucket.count,
@@ -391,24 +405,6 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
             quantile: quantile.quantile,
             value: quantile.value,
         }
-    }
-}
-
-impl From<Bytes> for Event {
-    fn from(message: Bytes) -> Self {
-        Event::Log(LogEvent::from(message))
-    }
-}
-
-impl From<&str> for Event {
-    fn from(line: &str) -> Self {
-        LogEvent::from(line).into()
-    }
-}
-
-impl From<String> for Event {
-    fn from(line: String) -> Self {
-        LogEvent::from(line).into()
     }
 }
 

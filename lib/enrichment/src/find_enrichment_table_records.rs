@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
+    vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
@@ -89,9 +90,9 @@ impl Function for FindEnrichmentTableRecords {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let registry = ctx
             .get_external_context_mut::<TableRegistry>()
@@ -132,74 +133,15 @@ impl Function for FindEnrichmentTableRecords {
                 .map_err(|err| Box::new(err) as Box<_>)?,
         );
 
-        Ok(Box::new(FindEnrichmentTableRecordsFn {
+        Ok(FindEnrichmentTableRecordsFn {
             table,
             condition,
             index,
             select,
             case_sensitive,
             enrichment_tables: registry.as_readonly(),
-        }))
-    }
-
-    fn compile_argument(
-        &self,
-        args: &[(&'static str, Option<FunctionArgument>)],
-        ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("table", Some(expr)) => {
-                let registry =
-                    ctx.get_external_context_mut::<TableRegistry>()
-                        .ok_or(Box::new(vrl_util::Error::TablesNotLoaded)
-                            as Box<dyn DiagnosticMessage>)?;
-
-                let tables = registry
-                    .table_ids()
-                    .into_iter()
-                    .map(Value::from)
-                    .collect::<Vec<_>>();
-
-                let table = expr
-                    .as_enum("table", tables)?
-                    .try_bytes_utf8_lossy()
-                    .expect("table is not valid utf8")
-                    .into_owned();
-
-                let record = index_from_args(table, registry, args)?;
-
-                Ok(Some(Box::new(record) as _))
-            }
-            _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let condition = args.required("condition");
-        let condition = condition
-            .into_object()
-            .expect("condition should be an object");
-        let condition = condition
-            .iter()
-            .map(|(key, value)| evaluate_condition(key, value.clone()))
-            .collect::<Result<Vec<Condition>>>()?;
-
-        let record = args
-            .required_any("table")
-            .downcast_ref::<EnrichmentTableRecord>()
-            .unwrap();
-        let select = args.optional("select");
-
-        find_enrichment_table_records(
-            select,
-            &record.enrichment_tables,
-            &record.table,
-            record.case_sensitive,
-            &condition,
-            record.index,
-        )
+        .as_expr())
     }
 }
 
@@ -213,7 +155,7 @@ pub struct FindEnrichmentTableRecordsFn {
     enrichment_tables: TableSearch,
 }
 
-impl Expression for FindEnrichmentTableRecordsFn {
+impl FunctionExpression for FindEnrichmentTableRecordsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self
             .condition
@@ -245,14 +187,16 @@ impl Expression for FindEnrichmentTableRecordsFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::object(Collection::any()))).fallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use vector_common::{btreemap, TimeZone};
+    use ::value::Secrets;
+    use vector_common::TimeZone;
+    use vrl::TargetValue;
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -262,9 +206,10 @@ mod tests {
         let registry = get_table_registry();
         let func = FindEnrichmentTableRecordsFn {
             table: "dummy1".to_string(),
-            condition: btreemap! {
-                "field" =>  expression::Literal::from("value"),
-            },
+            condition: BTreeMap::from([(
+                "field".into(),
+                expression::Literal::from("value").into(),
+            )]),
             index: Some(IndexHandle(999)),
             select: None,
             case_sensitive: Case::Sensitive,
@@ -272,9 +217,14 @@ mod tests {
         };
 
         let tz = TimeZone::default();
-        let mut object: Value = BTreeMap::new().into();
+        let object: Value = BTreeMap::new().into();
+        let mut target = TargetValue {
+            value: object,
+            metadata: value!({}),
+            secrets: Secrets::new(),
+        };
         let mut runtime_state = vrl::state::Runtime::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+        let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
 
         registry.finish_load();
 

@@ -103,7 +103,7 @@
             </strong>
           </div>
           <div>
-            Vector receives data from another upstream Vector instance
+            Vector forwards the data to one or more downstream services
           </div>
         </div>
       </foreignObject>

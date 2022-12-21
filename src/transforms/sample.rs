@@ -1,31 +1,37 @@
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::SampleEventDiscarded,
     schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `sample` transform.
+#[configurable_component(transform("sample"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SampleConfig {
+    /// The rate at which events will be forwarded, expressed as `1/N`.
+    ///
+    /// For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will
+    /// be dropped.
     pub rate: u64,
+
+    /// The name of the log field whose value will be hashed to determine if the event should be
+    /// passed.
+    ///
+    /// Consistently samples the same events. Actual rate of sampling may differ from the configured
+    /// one if values in the field are not uniformly distributed. If left unspecified, or if the
+    /// event doesn’t have `key_field`, events will be count rated.
+    #[configurable(metadata(docs::examples = "message",))]
     pub key_field: Option<String>,
+
+    /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
-}
-
-inventory::submit! {
-    TransformDescription::new::<SampleConfig>("sampler")
-}
-
-inventory::submit! {
-    TransformDescription::new::<SampleConfig>("sample")
 }
 
 impl GenerateConfig for SampleConfig {
@@ -40,7 +46,6 @@ impl GenerateConfig for SampleConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Sample::new(
@@ -54,39 +59,12 @@ impl TransformConfig for SampleConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "sample"
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct SampleCompatConfig(SampleConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "sampler")]
-impl TransformConfig for SampleCompatConfig {
-    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        self.0.build(context).await
-    }
-
-    fn input(&self) -> Input {
-        self.0.input()
-    }
-
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        self.0.outputs(merged_definition)
-    }
-
-    fn transform_type(&self) -> &'static str {
-        self.0.transform_type()
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::Log | DataType::Trace)
+            .with_schema_definition(merged_definition.clone())]
     }
 }
 
@@ -110,18 +88,29 @@ impl Sample {
 }
 
 impl FunctionTransform for Sample {
-    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        if let Some(condition) = self.exclude.as_ref() {
-            if condition.check(&event) {
-                output.push(event);
-                return;
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+        let mut event = {
+            if let Some(condition) = self.exclude.as_ref() {
+                let (result, event) = condition.check(event);
+                if result {
+                    output.push(event);
+                    return;
+                } else {
+                    event
+                }
+            } else {
+                event
             }
-        }
+        };
 
         let value = self
             .key_field
             .as_ref()
-            .and_then(|key_field| event.as_log().get(key_field.as_str()))
+            .and_then(|key_field| match &event {
+                Event::Log(event) => event.get(key_field.as_str()),
+                Event::Trace(event) => event.get(key_field.as_str()),
+                Event::Metric(_) => panic!("component can never receive metric events"),
+            })
             .map(|v| v.to_string_lossy());
 
         let num = if let Some(value) = value {
@@ -133,9 +122,11 @@ impl FunctionTransform for Sample {
         self.count = (self.count + 1) % self.rate;
 
         if num % self.rate == 0 {
-            event
-                .as_mut_log()
-                .insert("sample_rate", self.rate.to_string());
+            match event {
+                Event::Log(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
+                Event::Trace(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
+                Event::Metric(_) => panic!("component can never receive metric events"),
+            };
             output.push(event);
         } else {
             emit!(SampleEventDiscarded);
@@ -149,20 +140,24 @@ mod tests {
 
     use super::*;
     use crate::{
-        conditions::{ConditionConfig, VrlConfig},
+        conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
-        event::Event,
-        test_util::random_lines,
-        transforms::test::transform_one,
+        event::{Event, LogEvent, TraceEvent},
+        test_util::{components::assert_transform_compliance, random_lines},
+        transforms::test::{create_topology, transform_one},
     };
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     fn condition_contains(key: &str, needle: &str) -> Condition {
-        VrlConfig {
+        let vrl_config = VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
             runtime: Default::default(),
-        }
-        .build(&Default::default())
-        .unwrap()
+        };
+
+        vrl_config
+            .build(&Default::default())
+            .expect("should not fail to build VRL condition")
     }
 
     #[test]
@@ -244,7 +239,7 @@ mod tests {
     #[test]
     fn always_passes_events_matching_pass_list() {
         for key_field in &[None, Some(log_schema().message_key().into())] {
-            let event = Event::from("i am important");
+            let event = Event::Log(LogEvent::from("i am important"));
             let mut sampler = Sample::new(
                 0,
                 key_field.clone(),
@@ -264,7 +259,7 @@ mod tests {
     #[test]
     fn handles_key_field() {
         for key_field in &[None, Some("other_field".into())] {
-            let mut event = Event::from("nananana");
+            let mut event = Event::Log(LogEvent::from("nananana"));
             let log = event.as_mut_log();
             log.insert("other_field", "foo");
             let mut sampler = Sample::new(
@@ -326,13 +321,51 @@ mod tests {
                 key_field.clone(),
                 Some(condition_contains(log_schema().message_key(), "na")),
             );
-            let event = Event::from("nananana");
+            let event = Event::Log(LogEvent::from("nananana"));
             let passing = transform_one(&mut sampler, event).unwrap();
             assert!(passing.as_log().get("sample_rate").is_none());
         }
     }
 
+    #[test]
+    fn handles_trace_event() {
+        let event: TraceEvent = LogEvent::from("trace").into();
+        let trace = Event::Trace(event);
+        let mut sampler = Sample::new(2, None, None);
+        let iterations = 0..2;
+        let total_passed = iterations
+            .filter_map(|_| transform_one(&mut sampler, trace.clone()))
+            .count();
+        assert_eq!(total_passed, 1);
+    }
+
+    #[tokio::test]
+    async fn emits_internal_events() {
+        assert_transform_compliance(async move {
+            let config = SampleConfig {
+                rate: 1,
+                key_field: None,
+                exclude: None,
+            };
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let log = LogEvent::from("hello world");
+            tx.send(log.into()).await.unwrap();
+
+            _ = out.recv().await;
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
+    }
+
     fn random_events(n: usize) -> Vec<Event> {
-        random_lines(10).take(n).map(Event::from).collect()
+        random_lines(10)
+            .take(n)
+            .map(|e| Event::Log(LogEvent::from(e)))
+            .collect()
     }
 }

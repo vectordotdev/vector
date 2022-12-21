@@ -8,9 +8,10 @@ use std::{
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
+use vector_config::configurable_component;
 use vector_core::event::EventStatus;
 
-use super::service::HttpRequestBuilder;
+use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
     config::AcknowledgementsConfig,
     http::HttpClient,
@@ -20,13 +21,27 @@ use crate::{
     },
 };
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// Splunk HEC acknowledgement configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(default)]
 pub struct HecClientAcknowledgementsConfig {
+    /// Controls if the sink will integrate with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
+    ///
+    /// [splunk_indexer_ack_docs]: https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck
     pub indexer_acknowledgements_enabled: bool,
+
+    /// The amount of time, in seconds, to wait in between queries to the Splunk HEC indexer acknowledgement endpoint.
     pub query_interval: NonZeroU8,
+
+    /// The maximum number of times an acknowledgement ID will be queried for its status.
     pub retry_limit: NonZeroU8,
+
+    /// The maximum number of pending acknowledgements from events sent to the Splunk HEC collector.
+    ///
+    /// Once reached, the sink will begin applying backpressure.
     pub max_pending_acks: NonZeroU64,
+
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -176,7 +191,7 @@ impl HecAckClient {
         let expired_ack_ids = self
             .acks
             .iter()
-            .filter_map(|(ack_id, (retries, _))| (*retries == 0).then(|| *ack_id))
+            .filter_map(|(ack_id, (retries, _))| (*retries == 0).then_some(*ack_id))
             .collect::<Vec<_>>();
         let mut removed_count = 0.0;
         for ack_id in expired_ack_ids {
@@ -201,7 +216,13 @@ impl HecAckClient {
             .freeze();
         let request = self
             .http_request_builder
-            .build_request(request_body_bytes, "/services/collector/ack", None)
+            .build_request(
+                request_body_bytes,
+                "/services/collector/ack",
+                None,
+                MetadataFields::default(),
+                false,
+            )
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 
         let response = self
@@ -271,7 +292,7 @@ mod tests {
         http::HttpClient,
         sinks::{
             splunk_hec::common::{
-                acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder,
+                acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder, EndpointTarget,
             },
             util::Compression,
         },
@@ -279,8 +300,12 @@ mod tests {
 
     fn get_ack_client(retry_limit: u8) -> HecAckClient {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
-        let http_request_builder =
-            HttpRequestBuilder::new(String::from(""), String::from(""), Compression::default());
+        let http_request_builder = HttpRequestBuilder::new(
+            String::from(""),
+            EndpointTarget::default(),
+            String::from(""),
+            Compression::default(),
+        );
         HecAckClient::new(retry_limit, client, Arc::new(http_request_builder))
     }
 

@@ -8,7 +8,7 @@ use futures::{
 };
 use hyper::StatusCode;
 use indoc::indoc;
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 use vector_core::event::{BatchNotifier, BatchStatus};
 
 use super::*;
@@ -17,7 +17,7 @@ use crate::{
     event::EventArray,
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
-        components::{self, HTTP_SINK_TAGS},
+        components::{self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
         next_addr, random_lines_with_stream,
     },
 };
@@ -25,13 +25,13 @@ use crate::{
 fn random_events_with_stream(
     len: usize,
     count: usize,
-    batch: Option<Arc<BatchNotifier>>,
+    batch: Option<BatchNotifier>,
 ) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let (lines, stream) = random_lines_with_stream(len, count, batch);
     (
         lines,
         stream.map(|mut events| {
-            events.for_each_log(|log| {
+            events.iter_logs_mut().for_each(|log| {
                 log.insert("title", "All!");
                 log.insert("invalid", "Tik");
             });
@@ -63,10 +63,10 @@ async fn start_test(
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_events_with_stream(100, 10, Some(batch));
 
-    components::init_test();
-    sink.run(events).await.unwrap();
     if batch_status == BatchStatus::Delivered {
-        components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
+        components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+    } else {
+        components::run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
     }
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));
@@ -128,14 +128,14 @@ async fn api_key_in_metadata() {
     let (expected, events) = random_events_with_stream(100, 10, None);
 
     let events = events.map(|mut events| {
-        events.for_each_log(|log| {
+        events.iter_logs_mut().for_each(|log| {
             log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from("from_metadata")));
+                .set_datadog_api_key(Arc::from("from_metadata"));
         });
         events
     });
 
-    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+    components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
     for (i, val) in output.iter().enumerate() {

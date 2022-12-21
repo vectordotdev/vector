@@ -1,24 +1,35 @@
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_core::ByteSizeOf;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    internal_events::{EventsReceived, StreamClosedError},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+/// Configuration for the `internal_metrics` source.
+#[configurable_component(source("internal_metrics"))]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
-    #[derivative(Default(value = "2.0"))]
+    /// The interval between metric gathering, in seconds.
+    #[derivative(Default(value = "1.0"))]
     pub scrape_interval_secs: f64,
+
+    #[configurable(derived)]
     pub tags: TagsConfig,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `vector` is used.
     pub namespace: Option<String>,
 }
 
@@ -29,22 +40,28 @@ impl InternalMetricsConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+/// Tag configuration for the `internal_metrics` source.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct TagsConfig {
-    host_key: Option<String>,
-    pid_key: Option<String>,
-}
+    /// Sets the name of the tag to use to add the current hostname to each metric.
+    ///
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    pub host_key: Option<String>,
 
-inventory::submit! {
-    SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
+    /// Sets the name of the tag to use to add the current process ID to each metric.
+    ///
+    ///
+    /// By default, this is not set and the tag will not be automatically added.
+    pub pid_key: Option<String>,
 }
 
 impl_generate_config_from_default!(InternalMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.scrape_interval_secs == 0.0 {
@@ -55,11 +72,15 @@ impl SourceConfig for InternalMetricsConfig {
         let interval = time::Duration::from_secs_f64(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
 
-        let host_key = self
+        let host_key = match self
             .tags
             .host_key
             .as_deref()
-            .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
+            .unwrap_or_else(|| log_schema().host_key())
+        {
+            "" => None,
+            s => Some(s.to_owned()),
+        };
         let pid_key = self
             .tags
             .pid_key
@@ -79,12 +100,8 @@ impl SourceConfig for InternalMetricsConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "internal_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -104,6 +121,7 @@ struct InternalMetrics<'a> {
 
 impl<'a> InternalMetrics<'a> {
     async fn run(mut self) -> Result<(), ()> {
+        let events_received = register!(EventsReceived);
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
         while interval.next().await.is_some() {
@@ -112,8 +130,10 @@ impl<'a> InternalMetrics<'a> {
 
             let metrics = self.controller.capture_metrics();
             let count = metrics.len();
-            let byte_size = metrics.size_of();
-            emit!(EventsReceived { count, byte_size });
+            let byte_size = metrics.estimated_json_encoded_size_of();
+
+            emit!(InternalMetricsBytesReceived { byte_size });
+            events_received.emit(CountByteSize(count, byte_size));
 
             let batch = metrics.into_iter().map(|mut metric| {
                 // A metric starts out with a default "vector" namespace, but will be overridden
@@ -124,11 +144,11 @@ impl<'a> InternalMetrics<'a> {
 
                 if let Some(host_key) = &self.host_key {
                     if let Ok(hostname) = &hostname {
-                        metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+                        metric.replace_tag(host_key.to_owned(), hostname.to_owned());
                     }
                 }
                 if let Some(pid_key) = &self.pid_key {
-                    metric.insert_tag(pid_key.to_owned(), pid.clone());
+                    metric.replace_tag(pid_key.to_owned(), pid.clone());
                 }
                 metric
             });
@@ -148,6 +168,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use metrics::{counter, gauge, histogram};
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -156,17 +177,20 @@ mod tests {
             Event,
         },
         metrics::Controller,
-        SourceSender,
+        test_util::{
+            self,
+            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+        },
     };
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<InternalMetricsConfig>();
+        test_util::test_generate_config::<InternalMetricsConfig>();
     }
 
     #[test]
     fn captures_internal_metrics() {
-        let _ = crate::metrics::init_test();
+        test_util::trace_init();
 
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
@@ -229,29 +253,20 @@ mod tests {
             _ => panic!("wrong type"),
         }
 
-        let mut labels = BTreeMap::new();
-        labels.insert(String::from("host"), String::from("foo"));
+        let labels = metric_tags!("host" => "foo");
         assert_eq!(Some(&labels), output["quux"].tags());
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
-        let _ = crate::metrics::init_test();
+        let mut events = run_and_assert_source_compliance(
+            config,
+            time::Duration::from_millis(100),
+            &SOURCE_TAGS,
+        )
+        .await;
 
-        let (sender, mut recv) = SourceSender::new_test();
-
-        tokio::spawn(async move {
-            config
-                .build(SourceContext::new_test(sender, None))
-                .await
-                .unwrap()
-                .await
-                .unwrap()
-        });
-
-        time::timeout(time::Duration::from_millis(100), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream")
+        assert!(!events.is_empty());
+        events.remove(0)
     }
 
     #[tokio::test]
@@ -279,13 +294,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn no_tags_by_default() {
+    async fn only_host_tags_by_default() {
         let event = event_from_config(InternalMetricsConfig::default()).await;
 
         let metric = event.as_metric();
 
-        assert!(metric.tag_value("my_host_key").is_none());
-        assert!(metric.tag_value("my_pid_key").is_none());
+        assert!(metric.tag_value("host").is_some());
+        assert!(metric.tag_value("pid").is_none());
     }
 
     #[tokio::test]

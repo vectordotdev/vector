@@ -8,12 +8,12 @@ components: sinks: prometheus_remote_write: {
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
-		service_providers: []
+		service_providers: ["AWS"]
 		stateful: false
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -40,6 +40,7 @@ components: sinks: prometheus_remote_write: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.prometheus_remote_write
@@ -83,10 +84,59 @@ components: sinks: prometheus_remote_write: {
 				examples: ["https://localhost:8087/"]
 			}
 		}
-		auth: configuration._http_auth & {_args: {
-			password_example: "${HTTP_PASSWORD}"
-			username_example: "${HTTP_USERNAME}"
-		}}
+		auth: {
+			common:      false
+			description: "Options for authentication."
+			required:    false
+			type: object: {
+				examples: []
+				options: components._aws.configuration.auth.type.object.options & {
+					password: {
+						description: "The basic authentication password."
+						required:    true
+						type: string: {
+							examples: ["${PROMETHEUS_PASSWORD}", "password"]
+						}
+					}
+					strategy: {
+						description: "The authentication strategy to use."
+						required:    true
+						type: string: {
+							enum: {
+								aws:   "Authentication strategy used for the [AWS managed Prometheus service](\(urls.aws_prometheus))."
+								basic: "The [basic authentication strategy](\(urls.basic_auth))."
+							}
+						}
+					}
+					user: {
+						description: "The basic authentication user name."
+						required:    true
+						type: string: {
+							examples: ["${PROMETHEUS_USERNAME}", "username"]
+						}
+					}
+				}
+			}
+		}
+		aws: {
+			common:      false
+			description: "Options for the AWS connections."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					region: {
+						common:      true
+						description: "The [AWS region](\(urls.aws_regions)) of the target service. This defaults to the region named in the endpoint parameter, or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or \"us-east-1\"."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["us-east-1"]
+						}
+					}
+				}
+			}
+		}
 		default_namespace: {
 			common:      true
 			description: """
@@ -141,6 +191,17 @@ components: sinks: prometheus_remote_write: {
 			summary:      true
 		}
 		traces: false
+	}
+
+	how_it_works: {
+		duplicate_tag_names: {
+			title: "Duplicate tag names"
+			body: """
+				Multiple tags with the same name are invalid within Prometheus and Prometheus
+				will reject a metric with duplicate tag names. When sending a tag with multiple
+				values for each name, Vector will only send the last value specified.
+				"""
+		}
 	}
 
 	telemetry: metrics: {

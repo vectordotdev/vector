@@ -117,6 +117,11 @@ impl Difference {
         self.to_change.contains(key)
     }
 
+    /// Checks whether the given component is present as an addition.
+    pub fn is_added(&self, id: &ComponentKey) -> bool {
+        self.to_add.contains(id)
+    }
+
     /// Checks whether or not the given component is removed.
     pub fn is_removed(&self, key: &ComponentKey) -> bool {
         self.to_remove.contains(key)

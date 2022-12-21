@@ -1,76 +1,46 @@
+#[allow(unused_imports)]
+use std::collections::HashSet;
+
+use enum_dispatch::enum_dispatch;
 use snafu::Snafu;
 
-#[cfg(feature = "transforms-add_fields")]
-pub mod add_fields;
-#[cfg(feature = "transforms-add_tags")]
-pub mod add_tags;
 #[cfg(feature = "transforms-aggregate")]
 pub mod aggregate;
-#[cfg(feature = "transforms-ansi_stripper")]
-pub mod ansi_stripper;
-#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
-pub mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub mod aws_ec2_metadata;
-#[cfg(feature = "transforms-coercer")]
-pub mod coercer;
-#[cfg(feature = "transforms-concat")]
-pub mod concat;
 #[cfg(feature = "transforms-dedupe")]
 pub mod dedupe;
-#[cfg(feature = "transforms-field_filter")]
-pub mod field_filter;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
-#[cfg(feature = "transforms-geoip")]
-pub mod geoip;
-#[cfg(feature = "transforms-grok_parser")]
-pub mod grok_parser;
-#[cfg(feature = "transforms-json_parser")]
-pub mod json_parser;
-#[cfg(feature = "transforms-key_value_parser")]
-pub mod key_value_parser;
-#[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
-#[cfg(feature = "transforms-logfmt_parser")]
-pub mod logfmt_parser;
 #[cfg(feature = "transforms-lua")]
 pub mod lua;
-#[cfg(feature = "transforms-merge")]
-pub mod merge;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
-#[cfg(feature = "transforms-pipelines")]
-pub mod pipelines;
 #[cfg(feature = "transforms-reduce")]
 pub mod reduce;
-#[cfg(feature = "transforms-regex_parser")]
-pub mod regex_parser;
 #[cfg(feature = "transforms-remap")]
 pub mod remap;
-#[cfg(feature = "transforms-remove_fields")]
-pub mod remove_fields;
-#[cfg(feature = "transforms-remove_tags")]
-pub mod remove_tags;
-#[cfg(feature = "transforms-rename_fields")]
-pub mod rename_fields;
 #[cfg(feature = "transforms-route")]
 pub mod route;
 #[cfg(feature = "transforms-sample")]
 pub mod sample;
-#[cfg(feature = "transforms-split")]
-pub mod split;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
-#[cfg(feature = "transforms-tokenizer")]
-pub mod tokenizer;
 
+use vector_config::{configurable_component, NamedComponent};
 pub use vector_core::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
     TransformOutputsBuf,
 };
+use vector_core::{
+    config::{Input, LogNamespace, Output},
+    schema,
+};
+
+use crate::config::{TransformConfig, TransformContext};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -81,11 +51,146 @@ enum BuildError {
     InvalidSubstring { name: String },
 }
 
+/// The user configuration to choose the metric tag strategy.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MetricTagsValues {
+    /// Tag values will be exposed as single strings, the
+    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+    /// will be ignored.
+    #[default]
+    Single,
+    /// All tags will be exposed as arrays of either string or null values.
+    Full,
+}
+
+/// Configurable transforms in Vector.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[enum_dispatch(TransformConfig)]
+pub enum Transforms {
+    /// Aggregate.
+    #[cfg(feature = "transforms-aggregate")]
+    Aggregate(#[configurable(derived)] aggregate::AggregateConfig),
+
+    /// AWS EC2 metadata.
+    #[cfg(feature = "transforms-aws_ec2_metadata")]
+    AwsEc2Metadata(#[configurable(derived)] aws_ec2_metadata::Ec2Metadata),
+
+    /// Dedupe.
+    #[cfg(feature = "transforms-dedupe")]
+    Dedupe(#[configurable(derived)] dedupe::DedupeConfig),
+
+    /// Filter.
+    #[cfg(feature = "transforms-filter")]
+    Filter(#[configurable(derived)] filter::FilterConfig),
+
+    /// Log to metric.
+    LogToMetric(#[configurable(derived)] log_to_metric::LogToMetricConfig),
+
+    /// Lua.
+    #[cfg(feature = "transforms-lua")]
+    Lua(#[configurable(derived)] lua::LuaConfig),
+
+    /// Metric to log.
+    #[cfg(feature = "transforms-metric_to_log")]
+    MetricToLog(#[configurable(derived)] metric_to_log::MetricToLogConfig),
+
+    /// Reduce.
+    #[cfg(feature = "transforms-reduce")]
+    Reduce(#[configurable(derived)] reduce::ReduceConfig),
+
+    /// Remap.
+    #[cfg(feature = "transforms-remap")]
+    Remap(#[configurable(derived)] remap::RemapConfig),
+
+    /// Route.
+    #[cfg(feature = "transforms-route")]
+    Route(#[configurable(derived)] route::RouteConfig),
+
+    /// Sample.
+    #[cfg(feature = "transforms-sample")]
+    Sample(#[configurable(derived)] sample::SampleConfig),
+
+    /// Tag cardinality limit.
+    #[cfg(feature = "transforms-tag_cardinality_limit")]
+    TagCardinalityLimit(#[configurable(derived)] tag_cardinality_limit::TagCardinalityLimitConfig),
+
+    /// Test (basic).
+    #[cfg(test)]
+    TestBasic(#[configurable(derived)] crate::test_util::mock::transforms::BasicTransformConfig),
+
+    /// Test (noop).
+    #[cfg(test)]
+    TestNoop(#[configurable(derived)] crate::test_util::mock::transforms::NoopTransformConfig),
+
+    /// Throttle.
+    #[cfg(feature = "transforms-throttle")]
+    Throttle(#[configurable(derived)] throttle::ThrottleConfig),
+}
+
+// We can't use `enum_dispatch` here because it doesn't support associated constants.
+impl NamedComponent for Transforms {
+    const NAME: &'static str = "_invalid_usage";
+
+    fn get_component_name(&self) -> &'static str {
+        match self {
+            #[cfg(feature = "transforms-aggregate")]
+            Transforms::Aggregate(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-aws_ec2_metadata")]
+            Transforms::AwsEc2Metadata(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-dedupe")]
+            Transforms::Dedupe(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-filter")]
+            Transforms::Filter(config) => config.get_component_name(),
+            Transforms::LogToMetric(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-lua")]
+            Transforms::Lua(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-metric_to_log")]
+            Transforms::MetricToLog(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-reduce")]
+            Transforms::Reduce(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-remap")]
+            Transforms::Remap(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-route")]
+            Transforms::Route(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-sample")]
+            Transforms::Sample(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-tag_cardinality_limit")]
+            Transforms::TagCardinalityLimit(config) => config.get_component_name(),
+            #[cfg(test)]
+            Transforms::TestBasic(config) => config.get_component_name(),
+            #[cfg(test)]
+            Transforms::TestNoop(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-throttle")]
+            Transforms::Throttle(config) => config.get_component_name(),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use futures::Stream;
+    use futures_util::SinkExt;
+    use tokio::sync::mpsc;
+    use tokio_util::sync::PollSender;
     use vector_core::transform::FunctionTransform;
 
-    use crate::{event::Event, transforms::OutputBuffer};
+    use super::Transforms;
+    use crate::{
+        config::{
+            unit_test::{UnitTestStreamSinkConfig, UnitTestStreamSourceConfig},
+            ConfigBuilder,
+        },
+        event::Event,
+        test_util::start_topology,
+        topology::RunningTopology,
+        transforms::OutputBuffer,
+    };
 
     /// Transform a single `Event` through the `FunctionTransform`
     ///
@@ -103,5 +208,30 @@ mod test {
         ft.transform(&mut buf, event);
         assert!(buf.len() <= 1);
         buf.into_events().next()
+    }
+
+    #[allow(dead_code)]
+    pub async fn create_topology<T: Into<Transforms>>(
+        events: impl Stream<Item = Event> + Send + 'static,
+        transform_config: T,
+    ) -> (RunningTopology, mpsc::Receiver<Event>) {
+        let mut builder = ConfigBuilder::default();
+
+        let (tx, rx) = mpsc::channel(1);
+
+        builder.add_source("in", UnitTestStreamSourceConfig::new(events));
+        builder.add_transform("transform", &["in"], transform_config);
+        builder.add_sink(
+            "out",
+            &["transform"],
+            UnitTestStreamSinkConfig::new(
+                PollSender::new(tx).sink_map_err(|error| panic!("{}", error)),
+            ),
+        );
+
+        let config = builder.build().expect("building config should not fail");
+        let (topology, _) = start_topology(config, false).await;
+
+        (topology, rx)
     }
 }

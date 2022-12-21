@@ -2,7 +2,7 @@ version: "3"
 
 services:
   postgres:
-    image: postgres:13.1
+    image: docker.io/postgres:13.1
     command: /postgres-init.sh
     environment:
       - POSTGRES_USER=vector
@@ -10,7 +10,7 @@ services:
     volumes:
       - socket:/var/run/postgresql
       - ${PWD}/tests/data/postgres-init.sh:/postgres-init.sh:ro
-      - ${PWD}/tests/data:/certs:ro
+      - ${PWD}/tests/data/ca:/certs:ro
   runner:
     build:
       context: ${PWD}
@@ -28,8 +28,6 @@ services:
       - "postgresql_metrics-integration-tests"
       - "--lib"
       - "${FILTER:-::postgres}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - postgres
     environment:
@@ -37,11 +35,13 @@ services:
       - PG_HOST=postgres
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
       - socket:/socket
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}
   socket: {}

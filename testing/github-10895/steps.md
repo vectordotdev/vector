@@ -1,7 +1,7 @@
 ## Enhancement
 
 As part of the fallout of #10379, we wanted to further shore up our testing around buffers to
-ideally prevent us (me) for inadvertantly changing things and not noticing... like the buffer data
+ideally prevent us (me) for inadvertently changing things and not noticing... like the buffer data
 directory.
 
 To that end, the PR to address #10895 is simple, but we're doing our due diligence here by

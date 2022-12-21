@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM docker.io/debian:bullseye-slim
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \

@@ -1,27 +1,48 @@
 use async_trait::async_trait;
-use component::ComponentDescription;
-use serde::{Deserialize, Serialize};
-use vector_buffers::{Acker, BufferConfig, BufferType};
-use vector_core::config::{AcknowledgementsConfig, GlobalOptions, Input};
+use enum_dispatch::enum_dispatch;
+use serde::Serialize;
+use vector_buffers::{BufferConfig, BufferType};
+use vector_config::{configurable_component, Configurable, NamedComponent};
+use vector_core::{
+    config::{AcknowledgementsConfig, GlobalOptions, Input},
+    sink::VectorSink,
+};
 
-use super::{component, ComponentKey, ProxyConfig, Resource};
-use crate::sinks::{self, util::UriSerde};
+use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
+use crate::sinks::{util::UriSerde, Healthcheck, Sinks};
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SinkOuter<T> {
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
-    pub inputs: Vec<T>,
-    // We are accepting this option for backward compatibility.
+/// Fully resolved sink component.
+#[configurable_component]
+#[configurable(metadata(docs::component_base_type = "sink"))]
+#[derive(Clone, Debug)]
+pub struct SinkOuter<T>
+where
+    T: Configurable + Serialize,
+{
+    #[configurable(derived)]
+    pub inputs: Inputs<T>,
+
+    /// The full URI to make HTTP healthcheck requests to.
+    ///
+    /// This must be a valid URI, which requires at least the scheme and host. All other
+    /// components -- port, path, etc -- are allowed as well.
+    #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
+    #[configurable(validation(format = "uri"))]
     healthcheck_uri: Option<UriSerde>,
 
-    // We are accepting bool for backward compatibility.
-    #[serde(deserialize_with = "crate::serde::bool_or_struct")]
-    #[serde(default)]
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     healthcheck: SinkHealthcheckOptions,
 
-    #[serde(default)]
+    #[configurable(derived)]
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
     pub buffer: BufferConfig,
 
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
@@ -29,17 +50,25 @@ pub struct SinkOuter<T> {
     proxy: ProxyConfig,
 
     #[serde(flatten)]
-    pub inner: Box<dyn SinkConfig>,
+    #[configurable(metadata(docs::hidden))]
+    pub inner: Sinks,
 }
 
-impl<T> SinkOuter<T> {
-    pub fn new(inputs: Vec<T>, inner: Box<dyn SinkConfig>) -> SinkOuter<T> {
+impl<T> SinkOuter<T>
+where
+    T: Configurable + Serialize,
+{
+    pub fn new<I, IS>(inputs: I, inner: IS) -> SinkOuter<T>
+    where
+        I: IntoIterator<Item = T>,
+        IS: Into<Sinks>,
+    {
         SinkOuter {
-            inputs,
+            inputs: Inputs::from_iter(inputs),
             buffer: Default::default(),
             healthcheck: SinkHealthcheckOptions::default(),
             healthcheck_uri: None,
-            inner,
+            inner: inner.into(),
             proxy: Default::default(),
         }
     }
@@ -79,14 +108,21 @@ impl<T> SinkOuter<T> {
         &self.proxy
     }
 
-    pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> SinkOuter<U> {
-        let inputs = self.inputs.iter().map(f).collect();
+    pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> SinkOuter<U>
+    where
+        U: Configurable + Serialize,
+    {
+        let inputs = self.inputs.iter().map(f).collect::<Vec<_>>();
         self.with_inputs(inputs)
     }
 
-    pub(super) fn with_inputs<U>(self, inputs: Vec<U>) -> SinkOuter<U> {
+    pub(crate) fn with_inputs<I, U>(self, inputs: I) -> SinkOuter<U>
+    where
+        I: IntoIterator<Item = U>,
+        U: Configurable + Serialize,
+    {
         SinkOuter {
-            inputs,
+            inputs: Inputs::from_iter(inputs),
             inner: self.inner,
             buffer: self.buffer,
             healthcheck: self.healthcheck,
@@ -96,10 +132,19 @@ impl<T> SinkOuter<T> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Healthcheck configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(default)]
 pub struct SinkHealthcheckOptions {
+    /// Whether or not to check the health of the sink when Vector starts up.
     pub enabled: bool,
+
+    /// The full URI to make HTTP healthcheck requests to.
+    ///
+    /// This must be a valid URI, which requires at least the scheme and host. All other
+    /// components -- port, path, etc -- are allowed as well.
+    #[configurable(validation(format = "uri"))]
     pub uri: Option<UriSerde>,
 }
 
@@ -127,47 +172,56 @@ impl From<UriSerde> for SinkHealthcheckOptions {
     }
 }
 
+/// Generalized interface for describing and building sink components.
 #[async_trait]
-#[typetag::serde(tag = "type")]
-pub trait SinkConfig: core::fmt::Debug + Send + Sync {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
+#[enum_dispatch]
+pub trait SinkConfig: NamedComponent + core::fmt::Debug + Send + Sync {
+    /// Builds the sink with the given context.
+    ///
+    /// If the sink is built successfully, `Ok(...)` is returned containing the sink and the sink's
+    /// healthcheck.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs while building the sink, an error variant explaining the issue is
+    /// returned.
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)>;
 
+    /// Gets the input configuration for this sink.
     fn input(&self) -> Input;
 
-    fn sink_type(&self) -> &'static str;
-
-    /// Resources that the sink is using.
+    /// Gets the list of resources, if any, used by this sink.
+    ///
+    /// Resources represent dependencies -- network ports, file descriptors, and so on -- that
+    /// cannot be shared between components at runtime. This ensures that components can not be
+    /// configured in a way that would deadlock the spawning of a topology, and as well, allows
+    /// Vector to determine the correct order for rebuilding a topology during configuration reload
+    /// when resources must first be reclaimed before being reassigned, and so on.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig>;
+    /// Gets the acknowledgements configuration for this sink.
+    fn acknowledgements(&self) -> &AcknowledgementsConfig;
 }
 
 #[derive(Debug, Clone)]
 pub struct SinkContext {
-    pub acker: Acker,
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
     pub proxy: ProxyConfig,
+    pub schema: schema::Options,
 }
 
 impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
         Self {
-            acker: Acker::passthrough(),
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),
+            schema: schema::Options::default(),
         }
-    }
-
-    pub fn acker(&self) -> Acker {
-        self.acker.clone()
     }
 
     pub const fn globals(&self) -> &GlobalOptions {
@@ -178,7 +232,3 @@ impl SinkContext {
         &self.proxy
     }
 }
-
-pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
-
-inventory::collect!(SinkDescription);

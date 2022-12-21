@@ -4,6 +4,7 @@ use codecs::{
 };
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
 
 pub const fn default_true() -> bool {
@@ -63,14 +64,19 @@ pub mod json {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// A field reference or value.
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum FieldsOrValue<V> {
+    /// A set of fields mapped by to either another field or a value.
     Fields(Fields<V>),
+
+    /// A value.
     Value(V),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Mapping of field names to either a value or another field.
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Fields<V>(IndexMap<String, FieldsOrValue<V>>);
 
 impl<V: 'static> Fields<V> {
@@ -90,30 +96,17 @@ impl<V: 'static> Fields<V> {
     }
 }
 
-/// Structure to handle when a configuration field can be a value
-/// or a list of values.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
+/// A value which can be (de)serialized from one or many instances of `T`.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
-    One(T),
-    Many(Vec<T>),
-}
-
-impl<T: ToString> OneOrMany<T> {
-    pub fn stringify(&self) -> OneOrMany<String> {
-        match self {
-            Self::One(value) => value.to_string().into(),
-            Self::Many(values) => values
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .into(),
-        }
-    }
+    One(#[configurable(transparent)] T),
+    Many(#[configurable(transparent)] Vec<T>),
 }
 
 impl<T> OneOrMany<T> {
-    pub fn into_vec(self) -> Vec<T> {
+    pub fn to_vec(self) -> Vec<T> {
         match self {
             Self::One(value) => vec![value],
             Self::Many(list) => list,

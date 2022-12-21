@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::str::Utf8Error;
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
@@ -204,7 +205,8 @@ impl DnsMessageParser {
                 }
                 for _i in 0..8 {
                     if current_byte & 0b1000_0000 == 0b1000_0000 {
-                        port_string.push_str(&format!("{} ", current_bit));
+                        write!(port_string, "{} ", current_bit)
+                            .expect("can always write to String");
                     }
                     current_byte <<= 1;
                     current_bit += 1;
@@ -324,10 +326,12 @@ impl DnsMessageParser {
                 let mut dec = BinDecoder::new(&address_vec);
                 parse_ipv6_address(&mut dec)?
             };
-            apl_rdata.push_str(&format!(
+            write!(
+                apl_rdata,
                 "{}{}:{}/{}",
                 negation, address_family, address, prefix
-            ));
+            )
+            .expect("can always write to String");
             apl_rdata.push(' ');
         }
         Ok((Some(apl_rdata.trim_end().to_string()), None))
@@ -819,13 +823,16 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
 }
 
 fn parse_edns(dns_message: &TrustDnsMessage) -> Option<OptPseudoSection> {
-    dns_message.edns().map(|edns| OptPseudoSection {
-        extended_rcode: edns.rcode_high(),
-        version: edns.version(),
-        dnssec_ok: edns.dnssec_ok(),
-        udp_max_payload_size: edns.max_payload(),
-        options: parse_edns_options(edns),
-    })
+    dns_message
+        .extensions()
+        .as_ref()
+        .map(|edns| OptPseudoSection {
+            extended_rcode: edns.rcode_high(),
+            version: edns.version(),
+            dnssec_ok: edns.dnssec_ok(),
+            udp_max_payload_size: edns.max_payload(),
+            options: parse_edns_options(edns),
+        })
 }
 
 fn parse_edns_options(edns: &Edns) -> Vec<EdnsOptionEntry> {

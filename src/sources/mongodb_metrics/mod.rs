@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, time::Instant};
+use std::time::Instant;
 
 use chrono::Utc;
 use futures::{
@@ -11,15 +11,15 @@ use mongodb::{
     options::ClientOptions,
     Client,
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_core::ByteSizeOf;
+use vector_config::configurable_component;
+use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
+    config::{self, Output, SourceConfig, SourceContext},
+    event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
         MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
@@ -28,6 +28,7 @@ use crate::{
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
+use vector_core::config::LogNamespace;
 
 macro_rules! tags {
     ($tags:expr) => { $tags.clone() };
@@ -35,7 +36,7 @@ macro_rules! tags {
         {
             let mut tags = $tags.clone();
             $(
-                tags.insert($key.into(), $value.into());
+                tags.replace($key.into(), $value.to_string());
             )*
             tags
         }
@@ -72,12 +73,25 @@ enum CollectError {
     Bson(bson::de::Error),
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+/// Configuration for the `mongodb_metrics` source.
+#[configurable_component(source("mongodb_metrics"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-struct MongoDbMetricsConfig {
+pub struct MongoDbMetricsConfig {
+    /// A list of MongoDB instances to scrape.
+    ///
+    /// Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// If set to an empty string, no namespace is added to the metrics.
+    ///
+    /// By default, `mongodb` is used.
     #[serde(default = "default_namespace")]
     namespace: String,
 }
@@ -87,7 +101,7 @@ struct MongoDbMetrics {
     client: Client,
     endpoint: String,
     namespace: Option<String>,
-    tags: BTreeMap<String, String>,
+    tags: MetricTags,
 }
 
 pub const fn default_scrape_interval_secs() -> u64 {
@@ -98,14 +112,9 @@ pub fn default_namespace() -> String {
     "mongodb".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<MongoDbMetricsConfig>("mongodb_metrics")
-}
-
 impl_generate_config_from_default!(MongoDbMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "mongodb_metrics")]
 impl SourceConfig for MongoDbMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
@@ -142,12 +151,8 @@ impl SourceConfig for MongoDbMetricsConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "mongodb_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -159,16 +164,16 @@ impl MongoDbMetrics {
     /// Works only with Standalone connection-string. Collect metrics only from specified instance.
     /// https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format
     async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDbMetrics, BuildError> {
-        let mut tags: BTreeMap<String, String> = BTreeMap::new();
-
         let mut client_options = ClientOptions::parse(endpoint)
             .await
             .context(InvalidEndpointSnafu)?;
         client_options.direct_connection = Some(true);
 
         let endpoint = sanitize_endpoint(endpoint, &client_options);
-        tags.insert("endpoint".into(), endpoint.clone());
-        tags.insert("host".into(), client_options.hosts[0].to_string());
+        let tags = metric_tags!(
+            "endpoint" => endpoint.clone(),
+            "host" => client_options.hosts[0].to_string(),
+        );
 
         Ok(Self {
             client: Client::with_options(client_options).context(InvalidClientOptionsSnafu)?,
@@ -222,12 +227,7 @@ impl MongoDbMetrics {
         Ok(())
     }
 
-    fn create_metric(
-        &self,
-        name: &str,
-        value: MetricValue,
-        tags: BTreeMap<String, String>,
-    ) -> Metric {
+    fn create_metric(&self, name: &str, value: MetricValue, tags: MetricTags) -> Metric {
         Metric::new(name, MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(tags))
@@ -257,7 +257,7 @@ impl MongoDbMetrics {
         metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
 
         emit!(MongoDbMetricsEventsReceived {
-            byte_size: metrics.size_of(),
+            byte_size: metrics.estimated_json_encoded_size_of(),
             count: metrics.len(),
             endpoint: &self.endpoint,
         });
@@ -537,11 +537,13 @@ impl MongoDbMetrics {
         }
 
         // mongod_metrics_record_moves_total
-        metrics.push(self.create_metric(
-            "mongod_metrics_record_moves_total",
-            counter!(status.metrics.record.moves),
-            tags!(self.tags),
-        ));
+        if let Some(record) = status.metrics.record {
+            metrics.push(self.create_metric(
+                "mongod_metrics_record_moves_total",
+                counter!(record.moves),
+                tags!(self.tags),
+            ));
+        }
 
         // mongod_metrics_repl_apply_
         metrics.push(self.create_metric(
@@ -1155,8 +1157,8 @@ mod integration_tests {
                 assert!((timestamp - Utc::now()).num_seconds() < 1);
                 // validate basic tags
                 let tags = metric.tags().expect("existed tags");
-                assert_eq!(tags.get("endpoint"), Some(&clean_endpoint));
-                assert_eq!(tags.get("host"), Some(&host));
+                assert_eq!(tags.get("endpoint"), Some(&clean_endpoint[..]));
+                assert_eq!(tags.get("host"), Some(&host[..]));
             }
         })
         .await;

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     marker::PhantomData,
     str::FromStr,
     sync::{
@@ -8,6 +9,7 @@ use std::{
 };
 
 use futures_util::{future::ready, Stream, StreamExt};
+use lookup::event_path;
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
 use tokio::sync::{
@@ -18,11 +20,14 @@ use tokio_stream::wrappers::BroadcastStream;
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
+    filter::LevelFilter,
     layer::{Context, SubscriberExt},
+    registry::LookupSpan,
     util::SubscriberInitExt,
     Layer,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
+use value::Value;
 
 use crate::event::LogEvent;
 
@@ -32,7 +37,7 @@ use crate::event::LogEvent;
 /// This means that callers must subscribe during the configuration phase of their components, and not in the core loop
 /// of the component, as the topology can only report when a component has been spawned, but not necessarily always
 /// when it has started doing, or waiting, for input.
-static BUFFER: OnceCell<Mutex<Option<Vec<LogEvent>>>> = OnceCell::new();
+static BUFFER: Mutex<Option<Vec<LogEvent>>> = Mutex::new(Some(Vec::new()));
 
 /// SHOULD_BUFFER controls whether or not internal log events should be buffered or sent directly to the trace broadcast
 /// channel.
@@ -40,7 +45,8 @@ static SHOULD_BUFFER: AtomicBool = AtomicBool::new(true);
 
 /// SUBSCRIBERS contains a list of callers interested in internal log events who will be notified when early buffering
 /// is disabled, by receiving a copy of all buffered internal log events.
-static SUBSCRIBERS: OnceCell<Mutex<Option<Vec<oneshot::Sender<Vec<LogEvent>>>>>> = OnceCell::new();
+static SUBSCRIBERS: Mutex<Option<Vec<oneshot::Sender<Vec<LogEvent>>>>> =
+    Mutex::new(Some(Vec::new()));
 
 /// SENDER holds the sender/receiver handle that will receive a copy of all the internal log events *after* the topology
 /// has been initialized.
@@ -50,18 +56,21 @@ fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
-pub fn init(color: bool, json: bool, levels: &str) {
-    let _ = BUFFER.set(Mutex::new(Some(Vec::new())));
+pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64) {
     let fmt_filter = tracing_subscriber::filter::Targets::from_str(levels).expect(
         "logging filter targets were not formatted correctly or did not specify a valid level",
     );
 
-    let metrics_layer = metrics_layer_enabled()
-        .then(|| MetricsLayer::new().with_filter(tracing_subscriber::filter::LevelFilter::INFO));
+    let metrics_layer =
+        metrics_layer_enabled().then(|| MetricsLayer::new().with_filter(LevelFilter::INFO));
+
+    let broadcast_layer = RateLimitedLayer::new(BroadcastLayer::new())
+        .with_default_limit(internal_log_rate_limit)
+        .with_filter(fmt_filter.clone());
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)
-        .with(BroadcastLayer::new().with_filter(fmt_filter.clone()));
+        .with(broadcast_layer);
 
     #[cfg(feature = "tokio-console")]
     let subscriber = {
@@ -72,13 +81,22 @@ pub fn init(color: bool, json: bool, levels: &str) {
         subscriber.with(console_layer)
     };
 
+    #[cfg(feature = "allocation-tracing")]
+    let subscriber = {
+        let allocation_layer = crate::internal_telemetry::allocations::AllocationLayer::new()
+            .with_filter(LevelFilter::ERROR);
+
+        subscriber.with(allocation_layer)
+    };
+
     if json {
         let formatter = tracing_subscriber::fmt::layer().json().flatten_event(true);
 
         #[cfg(test)]
         let formatter = formatter.with_test_writer();
 
-        let rate_limited = RateLimitedLayer::new(formatter);
+        let rate_limited =
+            RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let _ = subscriber.try_init();
@@ -90,7 +108,8 @@ pub fn init(color: bool, json: bool, levels: &str) {
         #[cfg(test)]
         let formatter = formatter.with_test_writer();
 
-        let rate_limited = RateLimitedLayer::new(formatter);
+        let rate_limited =
+            RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let _ = subscriber.try_init();
@@ -105,20 +124,23 @@ pub fn reset_early_buffer() -> Option<Vec<LogEvent>> {
 /// Gets a  mutable reference to the early buffer.
 fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
     BUFFER
-        .get()
-        .expect("Internal logs buffer not initialized")
         .lock()
         .expect("Couldn't acquire lock on internal logs buffer")
 }
 
-/// Attempts to buffer an event into the early buffer.
+/// Determines whether tracing events should be processed (e.g. converted to log
+/// events) to avoid unnecessary performance overhead.
 ///
-/// If early buffering is stopped, `Some(event)` is returned with the original event. Otherwise, the event has been
-/// successfully buffered and `None` is returned.
-fn try_buffer_event(event: &Event<'_>) -> bool {
+/// Checks if [`BUFFER`] is set or if a trace sender exists
+fn should_process_tracing_event() -> bool {
+    get_early_buffer().is_some() || maybe_get_trace_sender().is_some()
+}
+
+/// Attempts to buffer an event into the early buffer.
+fn try_buffer_event(log: &LogEvent) -> bool {
     if SHOULD_BUFFER.load(Ordering::Acquire) {
         if let Some(buffer) = get_early_buffer().as_mut() {
-            buffer.push(event.into());
+            buffer.push(log.clone());
             return true;
         }
     }
@@ -129,9 +151,9 @@ fn try_buffer_event(event: &Event<'_>) -> bool {
 /// Attempts to broadcast an event to subscribers.
 ///
 /// If no subscribers are connected, this does nothing.
-fn try_broadcast_event(event: &Event<'_>) {
+fn try_broadcast_event(log: LogEvent) {
     if let Some(sender) = maybe_get_trace_sender() {
-        let _ = sender.send(event.into());
+        let _ = sender.send(log);
     }
 }
 
@@ -139,7 +161,7 @@ fn try_broadcast_event(event: &Event<'_>) {
 ///
 /// # Panics
 ///
-/// If the early buffered events have already been consumes, this function will panic.
+/// If the early buffered events have already been consumed, this function will panic.
 fn consume_early_buffer() -> Vec<LogEvent> {
     get_early_buffer()
         .take()
@@ -167,10 +189,7 @@ fn get_trace_receiver() -> broadcast::Receiver<LogEvent> {
 
 /// Gets a mutable reference to the list of waiting subscribers, if it exists.
 fn get_trace_subscriber_list() -> MutexGuard<'static, Option<Vec<oneshot::Sender<Vec<LogEvent>>>>> {
-    SUBSCRIBERS
-        .get_or_init(|| Mutex::new(Some(Vec::new())))
-        .lock()
-        .expect("poisoned locks are dumb")
+    SUBSCRIBERS.lock().expect("poisoned locks are dumb")
 }
 
 /// Attempts to register for early buffered events.
@@ -199,17 +218,26 @@ fn try_register_for_early_events() -> Option<oneshot::Receiver<Vec<LogEvent>>> {
 /// This flushes any buffered log events to waiting subscribers and redirects log events from the buffer to the
 /// broadcast stream.
 pub fn stop_early_buffering() {
-    // First, consume any waiting subscribers. This causes new subscriptions to simply receive from
-    // the broadcast channel, and not bother trying to receive the early buffered events.
-    let subscribers = get_trace_subscriber_list().take();
+    // Try and disable early buffering.
+    //
+    // If it was already disabled, or we lost the race to disable it, just return.
+    if SHOULD_BUFFER
+        .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
 
-    // Now that we have any waiting subscribers, actually disable early buffering and consume any
-    // buffered log events. Once we have the buffered events, send them to each subscriber.
-    SHOULD_BUFFER.store(false, Ordering::Release);
-    let buffered_events = consume_early_buffer();
-    for subscriber_tx in subscribers.into_iter().flatten() {
-        // Ignore any errors sending since the caller may have dropped or something else.
-        let _ = subscriber_tx.send(buffered_events.clone());
+    // We won the right to capture all buffered events and forward them to any waiting subscribers,
+    // so let's grab the subscriber list and see if there's actually anyone waiting.
+    let subscribers = get_trace_subscriber_list().take();
+    if let Some(subscribers_tx) = subscribers {
+        // Consume the early buffer, and send a copy of it to every waiting subscriber.
+        let buffered_events = consume_early_buffer();
+        for subscriber_tx in subscribers_tx {
+            // Ignore any errors sending since the caller may have dropped or something else.
+            let _ = subscriber_tx.send(buffered_events.clone());
+        }
     }
 }
 
@@ -271,13 +299,78 @@ impl<S> BroadcastLayer<S> {
 
 impl<S> Layer<S> for BroadcastLayer<S>
 where
-    S: Subscriber + 'static,
+    S: Subscriber + 'static + for<'lookup> LookupSpan<'lookup>,
 {
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        // Try buffering the event, and if we're not buffering anymore, try to send it along via the
-        // trace sender if it's been established.
-        if !try_buffer_event(event) {
-            try_broadcast_event(event);
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
+        if should_process_tracing_event() {
+            let mut log = LogEvent::from(event);
+            // Add span fields if available
+            if let Some(parent_span) = ctx.event_span(event) {
+                for span in parent_span.scope().from_root() {
+                    if let Some(fields) = span.extensions().get::<SpanFields>() {
+                        for (k, v) in &fields.0 {
+                            log.insert(event_path!("vector", *k), v.clone());
+                        }
+                    }
+                }
+            }
+            // Try buffering the event, and if we're not buffering anymore, try to
+            // send it along via the trace sender if it's been established.
+            if !try_buffer_event(&log) {
+                try_broadcast_event(log);
+            }
         }
+    }
+
+    fn on_new_span(
+        &self,
+        attrs: &tracing_core::span::Attributes<'_>,
+        id: &tracing_core::span::Id,
+        ctx: Context<'_, S>,
+    ) {
+        let span = ctx.span(id).expect("span must already exist!");
+        let mut fields = SpanFields::default();
+        attrs.values().record(&mut fields);
+        span.extensions_mut().insert(fields);
+    }
+}
+
+#[derive(Default, Debug)]
+struct SpanFields(HashMap<&'static str, Value>);
+
+impl SpanFields {
+    fn record(&mut self, field: &tracing_core::Field, value: impl Into<Value>) {
+        let name = field.name();
+        // Filter for span fields such as component_id, component_type, etc.
+        //
+        // This captures all the basic component information provided in the
+        // span that each component is spawned with. We don't capture all fields
+        // to avoid adding unintentional noise and to prevent accidental
+        // security/privacy issues (e.g. leaking sensitive data).
+        if name.starts_with("component_") {
+            self.0.insert(name, value.into());
+        }
+    }
+}
+
+impl tracing::field::Visit for SpanFields {
+    fn record_i64(&mut self, field: &tracing_core::Field, value: i64) {
+        self.record(field, value);
+    }
+
+    fn record_u64(&mut self, field: &tracing_core::Field, value: u64) {
+        self.record(field, value);
+    }
+
+    fn record_bool(&mut self, field: &tracing_core::Field, value: bool) {
+        self.record(field, value);
+    }
+
+    fn record_str(&mut self, field: &tracing_core::Field, value: &str) {
+        self.record(field, value);
+    }
+
+    fn record_debug(&mut self, field: &tracing_core::Field, value: &dyn std::fmt::Debug) {
+        self.record(field, format!("{:?}", value));
     }
 }

@@ -1,0 +1,1 @@
+{ "metric" : { "name" : "a_metric", "kind" : "absolute" , "counter" : { "value" : 1 } } }

@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::fmt;
+use std::{borrow::Cow, collections::BTreeMap, fmt};
 
 use bytes::Bytes;
 use ordered_float::NotNan;
@@ -13,35 +12,38 @@ impl Value {
     /// Converts self into a `Bytes`, using JSON for Map/Array.
     pub fn coerce_to_bytes(&self) -> Bytes {
         match self {
-            Value::Bytes(bytes) => bytes.clone(), // cloning `Bytes` is cheap
-            Value::Regex(regex) => regex.as_bytes(),
-            Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
-            Value::Integer(num) => Bytes::from(num.to_string()),
-            Value::Float(num) => Bytes::from(num.to_string()),
-            Value::Boolean(b) => Bytes::from(b.to_string()),
-            Value::Object(map) => {
+            Self::Bytes(bytes) => bytes.clone(), // cloning `Bytes` is cheap
+            Self::Regex(regex) => regex.as_bytes(),
+            Self::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
+            Self::Integer(num) => Bytes::from(num.to_string()),
+            Self::Float(num) => Bytes::from(num.to_string()),
+            Self::Boolean(b) => Bytes::from(b.to_string()),
+            Self::Object(map) => {
                 Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map"))
             }
-            Value::Array(arr) => {
+            Self::Array(arr) => {
                 Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
             }
-            Value::Null => Bytes::from("<null>"),
+            Self::Null => Bytes::from("<null>"),
         }
     }
 
-    // TODO: return Cow 🐄
     /// Converts self into a `String` representation, using JSON for `Map`/`Array`.
-    pub fn to_string_lossy(&self) -> String {
+    pub fn to_string_lossy(&self) -> Cow<'_, str> {
         match self {
-            Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
-            Value::Regex(regex) => regex.as_str().to_string(),
-            Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
-            Value::Integer(num) => num.to_string(),
-            Value::Float(num) => num.to_string(),
-            Value::Boolean(b) => b.to_string(),
-            Value::Object(map) => serde_json::to_string(map).expect("Cannot serialize map"),
-            Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
-            Value::Null => "<null>".to_string(),
+            Self::Bytes(bytes) => String::from_utf8_lossy(bytes),
+            Self::Regex(regex) => regex.as_str().into(),
+            Self::Timestamp(timestamp) => timestamp_to_string(timestamp).into(),
+            Self::Integer(num) => num.to_string().into(),
+            Self::Float(num) => num.to_string().into(),
+            Self::Boolean(b) => b.to_string().into(),
+            Self::Object(map) => serde_json::to_string(map)
+                .expect("Cannot serialize map")
+                .into(),
+            Self::Array(arr) => serde_json::to_string(arr)
+                .expect("Cannot serialize array")
+                .into(),
+            Self::Null => "<null>".into(),
         }
     }
 }
@@ -52,16 +54,15 @@ impl Serialize for Value {
         S: Serializer,
     {
         match &self {
-            Value::Integer(i) => serializer.serialize_i64(*i),
-            Value::Float(f) => serializer.serialize_f64(f.into_inner()),
-            Value::Boolean(b) => serializer.serialize_bool(*b),
-            Value::Bytes(_) | Value::Timestamp(_) => {
-                serializer.serialize_str(&self.to_string_lossy())
-            }
-            Value::Regex(regex) => serializer.serialize_str(regex.as_str()),
-            Value::Object(m) => serializer.collect_map(m),
-            Value::Array(a) => serializer.collect_seq(a),
-            Value::Null => serializer.serialize_none(),
+            Self::Integer(i) => serializer.serialize_i64(*i),
+            Self::Float(f) => serializer.serialize_f64(f.into_inner()),
+            Self::Boolean(b) => serializer.serialize_bool(*b),
+            Self::Bytes(b) => serializer.serialize_str(String::from_utf8_lossy(b).as_ref()),
+            Self::Timestamp(ts) => serializer.serialize_str(&timestamp_to_string(ts)),
+            Self::Regex(regex) => serializer.serialize_str(regex.as_str()),
+            Self::Object(m) => serializer.collect_map(m),
+            Self::Array(a) => serializer.collect_seq(a),
+            Self::Null => serializer.serialize_none(),
         }
     }
 }
@@ -190,20 +191,26 @@ impl From<serde_json::Value> for Value {
     }
 }
 
+impl From<&serde_json::Value> for Value {
+    fn from(json_value: &serde_json::Value) -> Self {
+        json_value.clone().into()
+    }
+}
+
 impl TryInto<serde_json::Value> for Value {
     type Error = StdError;
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
         match self {
-            Value::Boolean(v) => Ok(serde_json::Value::from(v)),
-            Value::Integer(v) => Ok(serde_json::Value::from(v)),
-            Value::Float(v) => Ok(serde_json::Value::from(v.into_inner())),
-            Value::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
-            Value::Regex(regex) => Ok(serde_json::Value::from(regex.as_str().to_string())),
-            Value::Object(v) => Ok(serde_json::to_value(v)?),
-            Value::Array(v) => Ok(serde_json::to_value(v)?),
-            Value::Null => Ok(serde_json::Value::Null),
-            Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
+            Self::Boolean(v) => Ok(serde_json::Value::from(v)),
+            Self::Integer(v) => Ok(serde_json::Value::from(v)),
+            Self::Float(v) => Ok(serde_json::Value::from(v.into_inner())),
+            Self::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
+            Self::Regex(regex) => Ok(serde_json::Value::from(regex.as_str().to_string())),
+            Self::Object(v) => Ok(serde_json::to_value(v)?),
+            Self::Array(v) => Ok(serde_json::to_value(v)?),
+            Self::Null => Ok(serde_json::Value::Null),
+            Self::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
         }
     }
 }
@@ -250,7 +257,7 @@ mod test {
                                 let buf = parse_artifact(&path).unwrap();
 
                                 let serde_value: serde_json::Value =
-                                    serde_json::from_slice(&*buf).unwrap();
+                                    serde_json::from_slice(&buf).unwrap();
                                 let vector_value = Value::from(serde_value);
 
                                 // Validate type

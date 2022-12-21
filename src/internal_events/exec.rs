@@ -1,10 +1,14 @@
 use std::time::Duration;
 
+use crate::emit;
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type, io_error_code};
+use super::prelude::io_error_code;
 
 #[derive(Debug)]
 pub struct ExecEventsReceived<'a> {
@@ -52,6 +56,7 @@ impl InternalEvent for ExecFailedError<'_> {
             error_type = error_type::COMMAND_FAILED,
             error_code = %io_error_code(&self.error),
             stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -86,6 +91,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
             error = %self.error,
             error_type = error_type::TIMED_OUT,
             stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -127,6 +133,7 @@ impl InternalEvent for ExecCommandExecuted<'_> {
             command = %self.command,
             exit_status = %exit_status,
             elapsed_millis = %self.exec_duration.as_millis(),
+            internal_log_rate_limit = true,
         );
         counter!(
             "command_executed_total", 1,
@@ -139,5 +146,106 @@ impl InternalEvent for ExecCommandExecuted<'_> {
             "command" => self.command.to_owned(),
             "exit_status" => exit_status,
         );
+    }
+}
+
+pub enum ExecFailedToSignalChild {
+    #[cfg(unix)]
+    SignalError(nix::errno::Errno),
+    #[cfg(unix)]
+    FailedToMarshalPid(std::num::TryFromIntError),
+    #[cfg(unix)]
+    NoPid,
+    #[cfg(windows)]
+    IoError(std::io::Error),
+}
+
+impl ExecFailedToSignalChild {
+    fn to_error_code(&self) -> String {
+        use ExecFailedToSignalChild::*;
+
+        match self {
+            #[cfg(unix)]
+            SignalError(err) => format!("errno_{}", err),
+            #[cfg(unix)]
+            FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
+            #[cfg(unix)]
+            NoPid => String::from("no_pid"),
+            #[cfg(windows)]
+            IoError(err) => err.to_string(),
+        }
+    }
+}
+
+impl std::fmt::Display for ExecFailedToSignalChild {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use ExecFailedToSignalChild::*;
+
+        match self {
+            #[cfg(unix)]
+            SignalError(err) => write!(f, "errno: {}", err),
+            #[cfg(unix)]
+            FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {}", err),
+            #[cfg(unix)]
+            NoPid => write!(f, "child had no pid"),
+            #[cfg(windows)]
+            IoError(err) => write!(f, "io error: {}", err),
+        }
+    }
+}
+
+pub struct ExecFailedToSignalChildError<'a> {
+    pub command: &'a tokio::process::Command,
+    pub error: ExecFailedToSignalChild,
+}
+
+impl InternalEvent for ExecFailedToSignalChildError<'_> {
+    fn emit(self) {
+        error!(
+            message = %format!("Failed to send SIGTERM to child, aborting early: {}", self.error),
+            command = ?self.command.as_std(),
+            error_code = %self.error.to_error_code(),
+            error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "command" => format!("{:?}", self.command.as_std()),
+            "error_code" => self.error.to_error_code(),
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
+        counter!(
+            "processing_errors_total", 1,
+            "command_code" => format!("{:?}", self.command.as_std()),
+            "error" => self.error.to_error_code(),
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+    }
+}
+
+pub struct ExecChannelClosedError;
+
+impl InternalEvent for ExecChannelClosedError {
+    fn emit(self) {
+        let exec_reason = "Receive channel closed, unable to send.";
+        error!(
+            message = exec_reason,
+            error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: exec_reason
+        });
     }
 }

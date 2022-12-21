@@ -13,10 +13,10 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -25,17 +25,11 @@ use crate::{http::HttpClient, sinks::util::Compression};
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiRequest {
-    pub batch_size: usize,
+    pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
     pub credentials: Arc<NewRelicCredentials>,
     pub payload: Bytes,
     pub compression: Compression,
-}
-
-impl Ackable for NewRelicApiRequest {
-    fn ack_size(&self) -> usize {
-        self.batch_size
-    }
 }
 
 impl Finalizable for NewRelicApiRequest {
@@ -44,11 +38,16 @@ impl Finalizable for NewRelicApiRequest {
     }
 }
 
+impl MetaDescriptive for NewRelicApiRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
+    }
+}
+
 #[derive(Debug)]
 pub struct NewRelicApiResponse {
     event_status: EventStatus,
-    count: usize,
-    events_byte_size: usize,
+    metadata: RequestMetadata,
 }
 
 impl DriverResponse for NewRelicApiResponse {
@@ -56,12 +55,15 @@ impl DriverResponse for NewRelicApiResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(
+            self.metadata.event_count(),
+            self.metadata.events_estimated_json_encoded_byte_size(),
+        )
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.metadata.request_encoded_size())
     }
 }
 
@@ -80,8 +82,6 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
     }
 
     fn call(&mut self, request: NewRelicApiRequest) -> Self::Future {
-        debug!("Sending {} events.", request.batch_size);
-
         let mut client = self.client.clone();
 
         let uri = request.credentials.get_uri();
@@ -97,6 +97,7 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
         };
 
         let payload_len = request.payload.len();
+        let metadata = request.get_metadata();
         let http_request = http_request
             .header(CONTENT_LENGTH, payload_len)
             .body(Body::from(request.payload))
@@ -106,8 +107,7 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
             match client.call(http_request).in_current_span().await {
                 Ok(_) => Ok(NewRelicApiResponse {
                     event_status: EventStatus::Delivered,
-                    count: request.batch_size,
-                    events_byte_size: payload_len,
+                    metadata,
                 }),
                 Err(_) => Err(NewRelicSinkError::new("HTTP request error")),
             }

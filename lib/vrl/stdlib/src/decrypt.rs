@@ -1,11 +1,13 @@
 use ::value::Value;
-use aes::cipher::block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7};
-use aes::cipher::generic_array::GenericArray;
-use aes::cipher::KeyIvInit;
-use aes::cipher::{AsyncStreamCipher, BlockDecryptMut, StreamCipher};
+use aes::cipher::{
+    block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7},
+    generic_array::GenericArray,
+    AsyncStreamCipher, BlockDecryptMut, KeyIvInit, StreamCipher,
+};
 use cfb_mode::Decryptor as Cfb;
 use ctr::Ctr64LE;
 use ofb::Ofb;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 use crate::encrypt::{get_iv_bytes, get_key_bytes, is_valid_algorithm};
@@ -125,9 +127,9 @@ impl Function for Decrypt {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let ciphertext = arguments.required("ciphertext");
         let algorithm = arguments.required("algorithm");
@@ -145,20 +147,13 @@ impl Function for Decrypt {
             }
         }
 
-        Ok(Box::new(DecryptFn {
+        Ok(DecryptFn {
             ciphertext,
             algorithm,
             key,
             iv,
-        }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let ciphertext = args.required("ciphertext");
-        let algorithm = args.required("algorithm");
-        let key = args.required("key");
-        let iv = args.required("iv");
-        decrypt(ciphertext, algorithm, key, iv)
+        }
+        .as_expr())
     }
 }
 
@@ -170,7 +165,7 @@ struct DecryptFn {
     iv: Box<dyn Expression>,
 }
 
-impl Expression for DecryptFn {
+impl FunctionExpression for DecryptFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let ciphertext = self.ciphertext.resolve(ctx)?;
         let algorithm = self.algorithm.resolve(ctx)?;
@@ -179,7 +174,7 @@ impl Expression for DecryptFn {
         decrypt(ciphertext, algorithm, key, iv)
     }
 
-    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _state: &state::TypeState) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

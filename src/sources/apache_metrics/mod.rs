@@ -1,5 +1,4 @@
 use std::{
-    collections::BTreeMap,
     future::ready,
     time::{Duration, Instant},
 };
@@ -8,20 +7,18 @@ use chrono::Utc;
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::uri::Scheme;
 use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
-use vector_core::ByteSizeOf;
+use vector_config::configurable_component;
+use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{
-        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
-    },
+    config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted,
+        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -30,12 +27,22 @@ use crate::{
 mod parser;
 
 pub use parser::ParseError;
+use vector_core::config::LogNamespace;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-struct ApacheMetricsConfig {
+/// Configuration for the `apache_metrics` source.
+#[configurable_component(source("apache_metrics"))]
+#[derive(Clone, Debug)]
+pub struct ApacheMetricsConfig {
+    /// The list of `mod_status` endpoints to scrape metrics from.
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// The namespace of the metric.
+    ///
+    /// Disabled if empty.
     #[serde(default = "default_namespace")]
     namespace: String,
 }
@@ -46,10 +53,6 @@ pub const fn default_scrape_interval_secs() -> u64 {
 
 pub fn default_namespace() -> String {
     "apache".to_string()
-}
-
-inventory::submit! {
-    SourceDescription::new::<ApacheMetricsConfig>("apache_metrics")
 }
 
 impl GenerateConfig for ApacheMetricsConfig {
@@ -64,7 +67,6 @@ impl GenerateConfig for ApacheMetricsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "apache_metrics")]
 impl SourceConfig for ApacheMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let urls = self
@@ -86,12 +88,8 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "apache_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -162,9 +160,10 @@ fn apache_metrics(
                     .body(Body::empty())
                     .expect("error creating request");
 
-                let mut tags: BTreeMap<String, String> = BTreeMap::new();
-                tags.insert("endpoint".into(), sanitized_url.to_string());
-                tags.insert("host".into(), url.sanitized_authority());
+                let tags = metric_tags! {
+                    "endpoint" => sanitized_url.to_string(),
+                    "host" => url.sanitized_authority(),
+                };
 
                 let start = Instant::now();
                 let namespace = namespace.clone();
@@ -222,7 +221,7 @@ fn apache_metrics(
                                     .collect::<Vec<_>>();
 
                                 emit!(ApacheMetricsEventsReceived {
-                                    byte_size: metrics.size_of(),
+                                    byte_size: metrics.estimated_json_encoded_size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
                                 });
@@ -265,11 +264,12 @@ fn apache_metrics(
 
         match out.send_event_stream(&mut stream).await {
             Ok(()) => {
-                info!("Finished sending.");
+                debug!("Finished sending.");
                 Ok(())
             }
             Err(error) => {
-                error!(message = "Error sending metric.", %error);
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { error, count });
                 Err(())
             }
         }
@@ -282,7 +282,7 @@ mod test {
         service::{make_service_fn, service_fn},
         Body, Response, Server,
     };
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
 
     use super::*;
@@ -383,9 +383,9 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     Some(tags) => {
                         assert_eq!(
                             tags.get("endpoint"),
-                            Some(&format!("http://{}/metrics", in_addr))
+                            Some(&format!("http://{}/metrics", in_addr)[..])
                         );
-                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()));
+                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()[..]));
                     }
                     None => error!(message = "No tags for metric.", metric = ?m),
                 }

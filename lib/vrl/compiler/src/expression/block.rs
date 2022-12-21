@@ -1,11 +1,8 @@
 use std::fmt;
 
-use value::Value;
-
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
-    state::{ExternalEnv, LocalEnv},
-    vm::OpCode,
     Context, Expression, TypeDef,
 };
 
@@ -13,37 +10,42 @@ use crate::{
 pub struct Block {
     inner: Vec<Expr>,
 
-    /// The local environment of the block.
-    ///
-    /// This allows any expressions within the block to mutate the local
-    /// environment, but once the block ends, the environment is reset to the
-    /// state of the parent expression of the block.
-    pub(crate) local_env: LocalEnv,
+    // false - This is just an inline block of code
+    // true - This is a block of code nested in a child scope
+    new_scope: bool,
 }
 
 impl Block {
-    pub fn new(inner: Vec<Expr>, local_env: LocalEnv) -> Self {
-        Self { inner, local_env }
+    #[must_use]
+    fn new(inner: Vec<Expr>, new_scope: bool) -> Self {
+        Self { inner, new_scope }
     }
 
+    #[must_use]
+    pub fn new_scoped(inner: Vec<Expr>) -> Self {
+        Self::new(inner, true)
+    }
+
+    #[must_use]
+    pub fn new_inline(inner: Vec<Expr>) -> Self {
+        Self::new(inner, false)
+    }
+
+    #[must_use]
     pub fn into_inner(self) -> Vec<Expr> {
         self.inner
+    }
+
+    #[must_use]
+    pub fn exprs(&self) -> &Vec<Expr> {
+        &self.inner
     }
 }
 
 impl Expression for Block {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        // NOTE:
-        //
-        // Technically, this invalidates the scoping invariant of variables
-        // defined in child scopes to not be accessible in parrent scopes.
-        //
-        // However, because we guard against this (using the "undefined
-        // variable" check) at compile-time, we can omit any (costly) run-time
-        // operations to track/restore variables across scopes.
-        //
-        // This also means we don't need to make any changes to the VM runtime,
-        // as it uses the same compiler as this AST runtime.
+        // Variables are checked at compile-time to ensure only variables
+        // in scope can be accessed here, so it doesn't need to be checked at runtime.
         let (last, other) = self.inner.split_last().expect("at least one expression");
 
         other
@@ -53,58 +55,29 @@ impl Expression for Block {
         last.resolve(ctx)
     }
 
-    fn type_def(&self, (_, external): (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        let mut type_defs = self
-            .inner
-            .iter()
-            .map(|expr| expr.type_def((&self.local_env, external)))
-            .collect::<Vec<_>>();
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let parent_locals = state.local.clone();
 
-        // If any of the stored expressions is fallible, the entire block is
-        // fallible.
-        let fallible = type_defs.iter().any(TypeDef::is_fallible);
+        let mut state = state.clone();
+        let mut result = TypeDef::null();
+        let mut fallible = false;
 
-        // The last expression determines the resulting value of the block.
-        let type_def = type_defs.pop().unwrap_or_else(TypeDef::null);
+        for expr in &self.inner {
+            result = expr.apply_type_info(&mut state);
 
-        type_def.with_fallibility(fallible)
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        let (local, external) = state;
-        let mut jumps = Vec::new();
-
-        // An empty block should resolve to Null.
-        if self.inner.is_empty() {
-            let null = vm.add_constant(Value::Null);
-            vm.write_opcode(OpCode::Constant);
-            vm.write_primitive(null);
-        }
-
-        let mut expressions = self.inner.iter().peekable();
-
-        while let Some(expr) = expressions.next() {
-            // Write each of the inner expressions
-            expr.compile_to_vm(vm, (local, external))?;
-
-            if expressions.peek().is_some() {
-                // At the end of each statement (apart from the last one) we need to clean up
-                // This involves popping the value remaining on the stack, and jumping to the end
-                // of the block if we are in error.
-                jumps.push(vm.emit_jump(OpCode::EndStatement));
+            if result.is_fallible() {
+                fallible = true;
+            }
+            if result.is_never() {
+                break;
             }
         }
 
-        // Update all the jumps to jump to the end of the block.
-        for jump in jumps {
-            vm.patch_jump(jump);
+        if self.new_scope {
+            state.local = parent_locals.apply_child_scope(state.local);
         }
 
-        Ok(())
+        TypeInfo::new(state, result.with_fallibility(fallible))
     }
 }
 

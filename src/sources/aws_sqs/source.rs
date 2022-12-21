@@ -6,14 +6,20 @@ use aws_sdk_sqs::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
-use tokio::{pin, select, time::Duration};
+use tokio::{pin, select};
+use tracing_futures::Instrument;
+use vector_common::finalizer::UnorderedFinalizer;
+use vector_common::internal_event::{EventsReceived, Registered};
+use vector_core::config::LogNamespace;
 
 use crate::{
     codecs::Decoder,
     event::{BatchNotifier, BatchStatus},
-    internal_events::{EndpointBytesReceived, SqsMessageDeleteError, StreamClosedError},
+    internal_events::{
+        EndpointBytesReceived, SqsMessageDeleteError, SqsMessageReceiveError, StreamClosedError,
+    },
     shutdown::ShutdownSignal,
-    sources::util::{self, finalizer::UnorderedFinalizer},
+    sources::util,
     SourceSender,
 };
 
@@ -30,8 +36,9 @@ pub struct SqsSource {
     pub poll_secs: u32,
     pub visibility_timeout_secs: u32,
     pub delete_message: bool,
-    pub concurrency: u32,
+    pub concurrency: usize,
     pub(super) acknowledgements: bool,
+    pub(super) log_namespace: LogNamespace,
 }
 
 impl SqsSource {
@@ -41,31 +48,39 @@ impl SqsSource {
             let (finalizer, mut ack_stream) = Finalizer::new(shutdown.clone());
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();
-            tokio::spawn(async move {
-                while let Some((status, receipts)) = ack_stream.next().await {
-                    if status == BatchStatus::Delivered {
-                        delete_messages(client.clone(), receipts, queue_url.clone()).await;
+            tokio::spawn(
+                async move {
+                    while let Some((status, receipts)) = ack_stream.next().await {
+                        if status == BatchStatus::Delivered {
+                            delete_messages(client.clone(), receipts, queue_url.clone()).await;
+                        }
                     }
                 }
-            });
+                .in_current_span(),
+            );
             Arc::new(finalizer)
         });
+        let events_received = register!(EventsReceived);
 
         for _ in 0..self.concurrency {
             let source = self.clone();
             let shutdown = shutdown.clone().fuse();
             let mut out = out.clone();
             let finalizer = finalizer.clone();
-            task_handles.push(tokio::spawn(async move {
-                let finalizer = finalizer.as_ref();
-                pin!(shutdown);
-                loop {
-                    select! {
-                        _ = &mut shutdown => break,
-                        _ = source.run_once(&mut out, finalizer) => {},
+            let events_received = events_received.clone();
+            task_handles.push(tokio::spawn(
+                async move {
+                    let finalizer = finalizer.as_ref();
+                    pin!(shutdown);
+                    loop {
+                        select! {
+                            _ = &mut shutdown => break,
+                            _ = source.run_once(&mut out, finalizer, events_received.clone()) => {},
+                        }
                     }
                 }
-            }));
+                .in_current_span(),
+            ));
         }
 
         // Wait for all of the processes to finish.  If any one of them panics, we resume
@@ -80,7 +95,12 @@ impl SqsSource {
         Ok(())
     }
 
-    async fn run_once(&self, out: &mut SourceSender, finalizer: Option<&Arc<Finalizer>>) {
+    async fn run_once(
+        &self,
+        out: &mut SourceSender,
+        finalizer: Option<&Arc<Finalizer>>,
+        events_received: Registered<EventsReceived>,
+    ) {
         let result = self
             .client
             .receive_message()
@@ -97,9 +117,7 @@ impl SqsSource {
         let receive_message_output = match result {
             Ok(output) => output,
             Err(err) => {
-                error!("SQS receive message error: {:?}.", err);
-                // prevent rapid errors from flooding the logs
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                emit!(SqsMessageReceiveError { error: &err });
                 return;
             }
         };
@@ -127,12 +145,16 @@ impl SqsSource {
                         receipts_to_ack.push(receipt_handle);
                     }
                     let timestamp = get_timestamp(&message.attributes);
+                    // Error is logged by `crate::codecs::Decoder`, no further handling
+                    // is needed here.
                     let decoded = util::decode_message(
                         self.decoder.clone(),
                         "aws_sqs",
                         body.as_bytes(),
                         timestamp,
                         &batch,
+                        self.log_namespace,
+                        &events_received,
                     );
                     events.extend(decoded);
                 }
@@ -193,18 +215,95 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
 
 #[cfg(test)]
 mod tests {
+    use crate::codecs::DecodingConfig;
     use chrono::SecondsFormat;
+    use lookup::path;
+    use vector_config::NamedComponent;
 
     use super::*;
-    use crate::config::log_schema;
+    use crate::config::{log_schema, SourceConfig};
+    use crate::sources::aws_sqs::AwsSqsConfig;
 
     #[tokio::test]
-    async fn test_decode() {
+    async fn test_decode_vector_namespace() {
+        let config = AwsSqsConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
         let message = "test";
         let now = Utc::now();
-        let events: Vec<_> =
-            util::decode_message(Decoder::default(), "aws_sqs", b"test", Some(now), &None)
-                .collect();
+        let events: Vec<_> = util::decode_message(
+            DecodingConfig::new(
+                config.framing.clone(),
+                config.decoding,
+                LogNamespace::Vector,
+            )
+            .build(),
+            "aws_sqs",
+            b"test",
+            Some(now),
+            &None,
+            LogNamespace::Vector,
+            &register!(EventsReceived),
+        )
+        .collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0]
+                .clone()
+                .as_log()
+                .get(".")
+                .unwrap()
+                .to_string_lossy(),
+            message
+        );
+        assert_eq!(
+            events[0]
+                .clone()
+                .as_log()
+                .metadata()
+                .value()
+                .get(path!(AwsSqsConfig::NAME, "timestamp"))
+                .unwrap()
+                .to_string_lossy(),
+            now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
+        );
+        definition.assert_valid_for_event(&events[0]);
+    }
+
+    #[tokio::test]
+    async fn test_decode_legacy_namespace() {
+        let config = AwsSqsConfig {
+            log_namespace: None,
+            ..Default::default()
+        };
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let message = "test";
+        let now = Utc::now();
+        let events: Vec<_> = util::decode_message(
+            DecodingConfig::new(
+                config.framing.clone(),
+                config.decoding,
+                LogNamespace::Legacy,
+            )
+            .build(),
+            "aws_sqs",
+            b"test",
+            Some(now),
+            &None,
+            LogNamespace::Legacy,
+            &register!(EventsReceived),
+        )
+        .collect();
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0]
@@ -224,6 +323,7 @@ mod tests {
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
+        definition.assert_valid_for_event(&events[0]);
     }
 
     #[test]

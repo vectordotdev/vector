@@ -38,6 +38,7 @@ components: sinks: datadog_traces: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.datadog_traces
@@ -59,12 +60,12 @@ components: sinks: datadog_traces: {
 
 	support: {
 		requirements: []
-		warnings: ["APM stats are not yet supported, so they will dropped when using Vector to send traces received from the Datadog Trace agent to Datadog."]
+		warnings: ["APM stats are in Beta. Currently the sink does not support the Datadog Agent sampling feature. This must be disabled in the Agent in order for APM stats output from vector to be accurate."]
 		notices: []
 	}
 
 	configuration: {
-		default_api_key: sinks._datadog.configuration.api_key
+		default_api_key: sinks._datadog.configuration.default_api_key
 		endpoint:        sinks._datadog.configuration.endpoint
 		site:            sinks._datadog.configuration.site
 	}

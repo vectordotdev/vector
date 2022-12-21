@@ -3,7 +3,7 @@ use vrl::prelude::*;
 
 fn to_string(value: Value) -> Resolved {
     use chrono::SecondsFormat;
-    use Value::*;
+    use Value::{Boolean, Bytes, Float, Integer, Null, Timestamp};
     let value = match value {
         v @ Bytes(_) => v,
         Integer(v) => v.to_string().into(),
@@ -95,19 +95,13 @@ impl Function for ToString {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToStringFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        to_string(value)
+        Ok(ToStringFn { value }.as_expr())
     }
 }
 
@@ -116,14 +110,14 @@ struct ToStringFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToStringFn {
+impl FunctionExpression for ToStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         to_string(value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let td = self.value.type_def(state);
 
         TypeDef::bytes()

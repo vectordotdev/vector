@@ -14,13 +14,15 @@ pub const ARRAY: u16 = 1 << 6;
 pub const TIMESTAMP: u16 = 1 << 7;
 pub const REGEX: u16 = 1 << 8;
 pub const NULL: u16 = 1 << 9;
+pub const UNDEFINED: u16 = 1 << 10;
 
-pub const ANY: u16 = BYTES | INTEGER | FLOAT | BOOLEAN | OBJECT | ARRAY | TIMESTAMP | REGEX | NULL;
+pub const ANY: u16 =
+    BYTES | INTEGER | FLOAT | BOOLEAN | OBJECT | ARRAY | TIMESTAMP | REGEX | NULL | UNDEFINED;
 pub const SCALAR: u16 = BYTES | INTEGER | FLOAT | BOOLEAN | TIMESTAMP | REGEX | NULL;
 pub const CONTAINER: u16 = OBJECT | ARRAY;
 
 pub use ::value::{
-    kind::{find, insert, merge, nest, remove, Collection, Field, Index},
+    kind::{get, insert, merge, remove, Collection, Field, Index},
     Kind,
 };
 

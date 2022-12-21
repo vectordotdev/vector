@@ -74,27 +74,20 @@ impl Function for Truncate {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let limit = arguments.required("limit");
         let ellipsis = arguments.optional("ellipsis").unwrap_or(expr!(false));
 
-        Ok(Box::new(TruncateFn {
+        Ok(TruncateFn {
             value,
             limit,
             ellipsis,
-        }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let limit = args.required("limit");
-        let ellipsis = args.optional("ellipsis").unwrap_or_else(|| value!(false));
-
-        truncate(value, limit, ellipsis)
+        }
+        .as_expr())
     }
 }
 
@@ -105,7 +98,7 @@ struct TruncateFn {
     ellipsis: Box<dyn Expression>,
 }
 
-impl Expression for TruncateFn {
+impl FunctionExpression for TruncateFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let limit = self.limit.resolve(ctx)?;
@@ -114,7 +107,7 @@ impl Expression for TruncateFn {
         truncate(value, limit, ellipsis)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

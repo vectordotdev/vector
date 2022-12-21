@@ -9,7 +9,7 @@ use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
 use vrl::prelude::*;
 
-/// Used to keep Clippy's too_many_argument check happy.
+/// Used to keep Clippy's `too_many_argument` check happy.
 #[derive(Debug)]
 struct ParseOptions {
     trim: Option<Value>,
@@ -113,9 +113,9 @@ impl Function for ParseXml {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -128,7 +128,7 @@ impl Function for ParseXml {
         let parse_null = arguments.optional("parse_null");
         let parse_number = arguments.optional("parse_number");
 
-        Ok(Box::new(ParseXmlFn {
+        Ok(ParseXmlFn {
             value,
             trim,
             include_attr,
@@ -138,7 +138,8 @@ impl Function for ParseXml {
             parse_bool,
             parse_null,
             parse_number,
-        }))
+        }
+        .as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -190,23 +191,6 @@ impl Function for ParseXml {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        let options = ParseOptions {
-            trim: args.optional("trim"),
-            include_attr: args.optional("include_attr"),
-            attr_prefix: args.optional("attr_prefix"),
-            text_key: args.optional("text_key"),
-            always_use_text_key: args.optional("always_use_text_key"),
-            parse_bool: args.optional("parse_bool"),
-            parse_null: args.optional("parse_null"),
-            parse_number: args.optional("parse_number"),
-        };
-
-        parse_xml(value, options)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -223,7 +207,7 @@ struct ParseXmlFn {
     parse_number: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseXmlFn {
+impl FunctionExpression for ParseXmlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
@@ -280,14 +264,14 @@ impl Expression for ParseXmlFn {
         parse_xml(value, options)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         type_def()
     }
 }
 
 fn type_def() -> TypeDef {
     TypeDef::bytes()
-        .add_object(Collection::from_unknown(inner_kind()))
+        .or_object(Collection::from_unknown(inner_kind()))
         .fallible()
 }
 
@@ -311,7 +295,11 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
             }
         }
 
-        for n in node.children().into_iter().filter(|n| !n.is_comment()) {
+        for n in node
+            .children()
+            .into_iter()
+            .filter(|n| n.is_element() || n.is_text())
+        {
             let name = match n.node_type() {
                 NodeType::Element => n.tag_name().name().to_string(),
                 NodeType::Text => config.text_key.to_string(),
@@ -515,6 +503,18 @@ mod tests {
             tdef: type_def(),
         }
 
+        header_inside_element {
+            args: func_args![ value: r#"<p><?xml?>text123</p>"# ],
+            want: Ok(value!(
+                {
+                    "p": {
+                        "text": "text123"
+                    }
+                }
+            )),
+            tdef: type_def(),
+        }
+
         mixed_types {
             args: func_args![ value: indoc!{r#"
                 <?xml version="1.0" encoding="ISO-8859-1"?>
@@ -698,8 +698,7 @@ mod tests {
 
     #[test]
     fn test_kind() {
-        let local = state::LocalEnv::default();
-        let external = state::ExternalEnv::default();
+        let state = state::TypeState::default();
 
         let func = ParseXmlFn {
             value: value!(true).into_expression(),
@@ -713,7 +712,7 @@ mod tests {
             parse_number: None,
         };
 
-        let type_def = func.type_def((&local, &external));
+        let type_def = func.type_def(&state);
 
         assert!(type_def.is_fallible());
         assert!(!type_def.is_exact());
@@ -723,17 +722,11 @@ mod tests {
         let object1 = type_def.as_object().unwrap();
 
         assert!(object1.known().is_empty());
-        assert!(object1.unknown().unwrap().as_exact().unwrap().is_object());
+        assert!(object1.unknown_kind().contains_object());
 
-        let object2 = object1
-            .unknown()
-            .unwrap()
-            .as_exact()
-            .unwrap()
-            .as_object()
-            .unwrap();
+        let object2 = object1.unknown_kind().as_object().cloned().unwrap();
 
         assert!(object2.known().is_empty());
-        assert!(object2.unknown().unwrap().is_any());
+        assert!(object2.unknown_kind().is_any());
     }
 }

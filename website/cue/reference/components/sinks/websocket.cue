@@ -13,7 +13,7 @@ components: sinks: websocket: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -30,6 +30,7 @@ components: sinks: websocket: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.websocket
@@ -61,6 +62,10 @@ components: sinks: websocket: {
 	}
 
 	configuration: {
+		auth: configuration._http_auth & {_args: {
+			password_example: "${HTTP_PASSWORD}"
+			username_example: "${HTTP_USERNAME}"
+		}}
 		uri: {
 			description: """
 				The WebSocket URI to connect to. This should include the protocol and host,

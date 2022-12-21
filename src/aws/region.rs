@@ -3,12 +3,17 @@ use std::str::FromStr;
 use aws_smithy_http::endpoint::Endpoint;
 use aws_types::region::Region;
 use http::Uri;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+/// Configuration of the region/endpoint to use when interacting with an AWS service.
+#[configurable_component]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(default)]
 pub struct RegionOrEndpoint {
+    /// The AWS region to use.
     pub region: Option<String>,
+
+    /// The API endpoint of the service.
     pub endpoint: Option<String>,
 }
 
@@ -28,11 +33,8 @@ impl RegionOrEndpoint {
     }
 
     pub fn endpoint(&self) -> crate::Result<Option<Endpoint>> {
-        if let Some(endpoint) = &self.endpoint {
-            Ok(Some(Endpoint::immutable(Uri::from_str(endpoint)?)))
-        } else {
-            Ok(None)
-        }
+        let uri = self.endpoint.as_deref().map(Uri::from_str).transpose()?;
+        Ok(uri.map(Endpoint::immutable))
     }
 
     pub fn region(&self) -> Option<Region> {

@@ -6,7 +6,7 @@ fn parse_timestamp(value: Value, format: Value, ctx: &Context) -> Resolved {
     match value {
         Value::Bytes(v) => {
             let format = format.try_bytes_utf8_lossy()?;
-            Conversion::parse(format!("timestamp|{}", format), ctx.timezone().to_owned())
+            Conversion::parse(format!("timestamp|{}", format), *ctx.timezone())
                 .map_err(|e| e.to_string())?
                 .convert(v)
                 .map_err(|e| e.to_string().into())
@@ -34,14 +34,14 @@ impl Function for ParseTimestamp {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments.required("format");
 
-        Ok(Box::new(ParseTimestampFn { value, format }))
+        Ok(ParseTimestampFn { value, format }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -58,12 +58,6 @@ impl Function for ParseTimestamp {
             },
         ]
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required("format");
-        parse_timestamp(value, format, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -72,14 +66,14 @@ struct ParseTimestampFn {
     format: Box<dyn Expression>,
 }
 
-impl Expression for ParseTimestampFn {
+impl FunctionExpression for ParseTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let format = self.format.resolve(ctx)?;
         parse_timestamp(value, format, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::timestamp().fallible(/* always fallible because the format needs to be parsed at runtime */)
     }
 }

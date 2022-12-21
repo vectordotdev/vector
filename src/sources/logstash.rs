@@ -6,86 +6,170 @@ use std::{
 };
 
 use bytes::{Buf, Bytes, BytesMut};
-use codecs::StreamDecodingError;
+use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::ZlibDecoder;
-use serde::{Deserialize, Serialize};
+use lookup::lookup_v2::parse_value_path;
+use lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
+use value::kind::Collection;
+use value::Kind;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    schema::Definition,
+};
 
-use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
+        SourceConfig, SourceContext,
     },
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
     types,
 };
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `logstash` source.
+#[configurable_component(source("logstash"))]
+#[derive(Clone, Debug)]
 pub struct LogstashConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    tls: Option<TlsSourceConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
-    #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
     connection_limit: Option<u32>,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
-inventory::submit! {
-    SourceDescription::new::<LogstashConfig>("logstash")
+impl LogstashConfig {
+    /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
+    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+        // `host_key` is only inserted if not present already.
+        let host_key = parse_value_path(log_schema().host_key())
+            .ok()
+            .map(LegacyKey::InsertIfEmpty);
+
+        let tls_client_metadata_path = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.as_ref())
+            .and_then(|k| k.path.clone())
+            .map(LegacyKey::Overwrite);
+
+        BytesDeserializerConfig
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                LogstashConfig::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp().or_undefined(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                LogstashConfig::NAME,
+                host_key,
+                &owned_value_path!("host"),
+                Kind::bytes(),
+                Some("host"),
+            )
+            .with_source_metadata(
+                Self::NAME,
+                tls_client_metadata_path,
+                &owned_value_path!("tls_client_metadata"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+    }
 }
 
-impl GenerateConfig for LogstashConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+impl Default for LogstashConfig {
+    fn default() -> Self {
+        Self {
             address: SocketListenAddr::SocketAddr("0.0.0.0:5044".parse().unwrap()),
             keepalive: None,
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
             connection_limit: None,
-        })
-        .unwrap()
+            log_namespace: None,
+        }
+    }
+}
+
+impl GenerateConfig for LogstashConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(LogstashConfig::default()).unwrap()
     }
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "logstash")]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let source = LogstashSource {
-            timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone),
+            timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone()),
+            legacy_host_key_path: parse_value_path(log_schema().host_key()).ok(),
+            log_namespace,
         };
         let shutdown_secs = 30;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
+        let tls_client_metadata_key = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.clone())
+            .and_then(|k| k.path);
+
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
             self.keepalive,
             shutdown_secs,
             tls,
+            tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
             self.connection_limit,
+            LogstashConfig::NAME,
+            log_namespace,
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "logstash"
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // There is a global and per-source `log_namespace` config.
+        // The source config overrides the global setting and is merged here.
+        vec![Output::default(DataType::Log).with_schema_definition(
+            self.schema_definition(global_log_namespace.merge(self.log_namespace)),
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![self.address.into()]
+        vec![self.address.as_tcp_resource()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -95,7 +179,9 @@ impl SourceConfig for LogstashConfig {
 
 #[derive(Debug, Clone)]
 struct LogstashSource {
-    timestamp_converter: crate::types::Conversion,
+    timestamp_converter: types::Conversion,
+    log_namespace: LogNamespace,
+    legacy_host_key_path: Option<OwnedValuePath>,
 }
 
 impl TcpSource for LogstashSource {
@@ -109,23 +195,51 @@ impl TcpSource for LogstashSource {
     }
 
     fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
-        let now = Value::from(chrono::Utc::now());
+        let now = chrono::Utc::now();
         for event in events {
             let log = event.as_mut_log();
-            log.try_insert(log_schema().source_type_key(), "logstash");
-            if log.get(log_schema().timestamp_key()).is_none() {
-                // Attempt to parse @timestamp if it exists; otherwise set to receipt time.
-                let timestamp = log
-                    .get_flat("@timestamp")
-                    .and_then(|timestamp| {
-                        self.timestamp_converter
-                            .convert::<Value>(timestamp.coerce_to_bytes())
-                            .ok()
-                    })
-                    .unwrap_or_else(|| now.clone());
-                log.insert(log_schema().timestamp_key(), timestamp);
+
+            self.log_namespace.insert_vector_metadata(
+                log,
+                log_schema().source_type_key(),
+                path!("source_type"),
+                Bytes::from_static(LogstashConfig::NAME.as_bytes()),
+            );
+
+            let log_timestamp = log.get(event_path!("@timestamp")).and_then(|timestamp| {
+                self.timestamp_converter
+                    .convert::<Value>(timestamp.coerce_to_bytes())
+                    .ok()
+            });
+
+            // Vector: always insert `ingest_timestamp`. Insert `timestamp` if found in event.
+            //
+            // Legacy: always insert the global log schema timestamp key- use timestamp from
+            //         event if present, otherwise use ingest.
+            match self.log_namespace {
+                LogNamespace::Vector => {
+                    if let Some(timestamp) = log_timestamp {
+                        log.insert(metadata_path!(LogstashConfig::NAME, "timestamp"), timestamp);
+                    }
+                    log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+                }
+                LogNamespace::Legacy => {
+                    log.insert(
+                        (PathPrefix::Event, log_schema().timestamp_key()),
+                        log_timestamp.unwrap_or_else(|| Value::from(now)),
+                    );
+                }
             }
-            log.try_insert(log_schema().host_key(), host.ip().to_string());
+
+            self.log_namespace.insert_source_metadata(
+                LogstashConfig::NAME,
+                log,
+                self.legacy_host_key_path
+                    .as_ref()
+                    .map(LegacyKey::InsertIfEmpty),
+                path!("host"),
+                host.ip().to_string(),
+            );
         }
     }
 
@@ -343,8 +457,8 @@ impl Decoder for LogstashDecoder {
                     use LogstashProtocolVersion::*;
 
                     match LogstashProtocolVersion::try_from(src.get_u8())? {
-                        V1 => LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V1),
-                        V2 => LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V2),
+                        V1 => LogstashDecoderReadState::ReadType(V1),
+                        V2 => LogstashDecoderReadState::ReadType(V2),
                     }
                 }
                 LogstashDecoderReadState::ReadType(protocol) => {
@@ -355,23 +469,11 @@ impl Decoder for LogstashDecoder {
                     use LogstashFrameType::*;
 
                     match LogstashFrameType::try_from(src.get_u8())? {
-                        WindowSize => LogstashDecoderReadState::ReadFrame(
-                            protocol,
-                            LogstashFrameType::WindowSize,
-                        ),
-                        Data => {
-                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Data)
-                        }
-                        Json => {
-                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Json)
-                        }
-                        Compressed => LogstashDecoderReadState::ReadFrame(
-                            protocol,
-                            LogstashFrameType::Compressed,
-                        ),
-                        Ack => {
-                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Ack)
-                        }
+                        WindowSize => LogstashDecoderReadState::ReadFrame(protocol, WindowSize),
+                        Data => LogstashDecoderReadState::ReadFrame(protocol, Data),
+                        Json => LogstashDecoderReadState::ReadFrame(protocol, Json),
+                        Compressed => LogstashDecoderReadState::ReadFrame(protocol, Compressed),
+                        Ack => LogstashDecoderReadState::ReadFrame(protocol, Ack),
                     }
                 }
                 // The window size indicates how many events the writer will send before waiting
@@ -548,12 +650,13 @@ impl Decoder for LogstashDecoder {
 
 impl From<LogstashEventFrame> for Event {
     fn from(frame: LogstashEventFrame) -> Self {
-        frame
-            .fields
-            .into_iter()
-            .map(|(key, value)| (key, Value::from(value)))
-            .collect::<BTreeMap<_, _>>()
-            .into()
+        Event::Log(LogEvent::from(
+            frame
+                .fields
+                .into_iter()
+                .map(|(key, value)| (key, Value::from(value)))
+                .collect::<BTreeMap<_, _>>(),
+        ))
     }
 }
 
@@ -566,8 +669,10 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 #[cfg(test)]
 mod test {
     use bytes::BufMut;
+    use lookup::LookupBuf;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use value::kind::Collection;
 
     use super::*;
     use crate::{
@@ -605,6 +710,7 @@ mod test {
                 receive_buffer_bytes: None,
                 acknowledgements: true.into(),
                 connection_limit: None,
+                log_namespace: None,
             }
             .build(SourceContext::new_test(sender, None))
             .await
@@ -650,7 +756,7 @@ mod test {
         req.into()
     }
 
-    async fn send_req(address: std::net::SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
+    async fn send_req(address: SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
         let seq = thread_rng().gen_range(1..u32::MAX);
         let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
 
@@ -666,6 +772,67 @@ mod test {
             assert_eq!(output.get_u32(), seq);
         }
         assert_eq!(output.len(), 0);
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = LogstashConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogstashConfig::NAME, "timestamp"),
+                    Kind::timestamp().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogstashConfig::NAME, "host"),
+                    Kind::bytes(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!(LogstashConfig::NAME, "tls_client_metadata"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                );
+
+        assert_eq!(definition, expected_definition)
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = LogstashConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"));
+
+        assert_eq!(definition, expected_definition)
     }
 }
 
@@ -685,12 +852,13 @@ mod integration_tests {
             components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
             wait_for_tcp,
         },
-        tls::TlsConfig,
+        tls::{TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
 
     fn heartbeat_address() -> String {
-        std::env::var("HEARTBEAT_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8080".into())
+        std::env::var("HEARTBEAT_ADDRESS")
+            .expect("Address of Beats Heartbeat service must be specified.")
     }
 
     #[tokio::test]
@@ -717,7 +885,8 @@ mod integration_tests {
     }
 
     fn logstash_address() -> String {
-        std::env::var("LOGSTASH_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8081".into())
+        std::env::var("LOGSTASH_ADDRESS")
+            .expect("Listen address for `logstash` source must be specified.")
     }
 
     #[tokio::test]
@@ -756,17 +925,26 @@ mod integration_tests {
     async fn source(
         address: String,
         tls: Option<TlsEnableableConfig>,
-    ) -> impl Stream<Item = Event> {
+    ) -> impl Stream<Item = Event> + Unpin {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let address: std::net::SocketAddr = address.parse().unwrap();
+        let address: SocketAddr = address.parse().unwrap();
+        let tls_options = match tls {
+            Some(options) => options,
+            None => TlsEnableableConfig::default(),
+        };
+        let tls_config = TlsSourceConfig {
+            client_metadata_key: None,
+            tls_config: tls_options,
+        };
         tokio::spawn(async move {
             LogstashConfig {
                 address: address.into(),
-                tls,
+                tls: Some(tls_config),
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
+                log_namespace: None,
             }
             .build(SourceContext::new_test(sender, None))
             .await

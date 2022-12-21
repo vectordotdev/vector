@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use futures_util::FutureExt;
-use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
@@ -14,7 +15,7 @@ use crate::{
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
-            SplunkHecDefaultBatchSettings,
+            EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
             http::HttpRetryLogic, BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
@@ -25,26 +26,67 @@ use crate::{
     tls::TlsConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration of the `splunk_hec_metrics` sink.
+#[configurable_component(sink("splunk_hec_metrics"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecMetricsSinkConfig {
+    /// Sets the default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     pub default_namespace: Option<String>,
-    // Deprecated name
+
+    /// Default Splunk HEC token.
+    ///
+    /// If an event has a token set in its metadata, it will prevail over the one set here.
     #[serde(alias = "token")]
-    pub default_token: String,
+    pub default_token: SensitiveString,
+
+    /// The base URL of the Splunk instance.
     pub endpoint: String,
-    #[serde(default = "crate::sinks::splunk_hec::common::host_key")]
+
+    /// Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    #[serde(default = "host_key")]
     pub host_key: String,
+
+    /// The name of the index where to send the events to.
+    ///
+    /// If not specified, the default index is used.
     pub index: Option<Template>,
+
+    /// The sourcetype of events sent to this sink.
+    ///
+    /// If unset, Splunk will default to `httpevent`.
     pub sourcetype: Option<Template>,
+
+    /// The source of events sent to this sink.
+    ///
+    /// This is typically the filename the logs originated from.
+    ///
+    /// If unset, the Splunk collector will set it.
     pub source: Option<Template>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub acknowledgements: HecClientAcknowledgementsConfig,
 }
@@ -53,7 +95,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             default_namespace: None,
-            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "http://localhost:8088".to_owned(),
             host_key: host_key(),
             index: None,
@@ -70,13 +112,12 @@ impl GenerateConfig for HecMetricsSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec_metrics")]
 impl SinkConfig for HecMetricsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(&self.tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             client.clone(),
         )
         .boxed();
@@ -88,12 +129,8 @@ impl SinkConfig for HecMetricsSinkConfig {
         Input::metric()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "splunk_hec_metrics"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements.inner)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements.inner
     }
 }
 
@@ -116,7 +153,8 @@ impl HecMetricsSinkConfig {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
-            self.default_token.clone(),
+            EndpointTarget::default(),
+            self.default_token.inner().to_owned(),
             self.compression,
         ));
         let http_service = ServiceBuilder::new()
@@ -124,6 +162,8 @@ impl HecMetricsSinkConfig {
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),
+                EndpointTarget::Event,
+                false,
             ));
 
         let service = HecService::new(

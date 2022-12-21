@@ -7,13 +7,10 @@ use std::{
     mem::{drop, replace},
     pin::Pin,
     sync::{Arc, Mutex},
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
-use futures::{
-    future::{BoxFuture, FutureExt},
-    ready,
-};
+use futures::future::{BoxFuture, FutureExt};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Wrapper for `tokio::sync::Semaphore` that allows for shrinking the

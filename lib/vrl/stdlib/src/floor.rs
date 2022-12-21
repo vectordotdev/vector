@@ -48,14 +48,14 @@ impl Function for Floor {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let precision = arguments.optional("precision");
 
-        Ok(Box::new(FloorFn { value, precision }))
+        Ok(FloorFn { value, precision }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -65,13 +65,6 @@ impl Function for Floor {
             result: Ok("9.0"),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let precision = args.optional("precision");
-
-        floor(precision, value)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -80,7 +73,7 @@ struct FloorFn {
     precision: Option<Box<dyn Expression>>,
 }
 
-impl Expression for FloorFn {
+impl FunctionExpression for FloorFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let precision = self
             .precision
@@ -92,7 +85,7 @@ impl Expression for FloorFn {
         floor(precision, value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         match Kind::from(self.value.type_def(state)) {
             v if v.is_float() || v.is_integer() => v.into(),
             _ => Kind::integer().or_float().into(),
@@ -140,9 +133,9 @@ mod tests {
         }
 
         huge_number {
-            args: func_args![value: 9876543210123456789098765432101234567890987654321.987654321,
+            args: func_args![value: 9_876_543_210_123_456_789_098_765_432_101_234_567_890_987_654_321.987_654_321,
                              precision: 5],
-            want: Ok(value!(9876543210123456789098765432101234567890987654321.98765)),
+            want: Ok(value!(9_876_543_210_123_456_789_098_765_432_101_234_567_890_987_654_321.987_65)),
             tdef: TypeDef::float(),
         }
     ];

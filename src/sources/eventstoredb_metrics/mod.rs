@@ -3,29 +3,42 @@ use std::time::Duration;
 use futures::{FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::IntervalStream;
-use vector_core::ByteSizeOf;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::types::Stats;
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{self, Output, SourceConfig, SourceContext},
     http::HttpClient,
     internal_events::{
-        BytesReceived, EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError,
-        OldEventsReceived, StreamClosedError,
+        EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError, EventsReceived,
+        StreamClosedError,
     },
     tls::TlsSettings,
 };
 
 pub mod types;
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-struct EventStoreDbConfig {
+/// Configuration for the `eventstoredb_metrics` source.
+#[configurable_component(source("eventstoredb_metrics"))]
+#[derive(Clone, Debug, Default)]
+pub struct EventStoreDbConfig {
+    /// Endpoints to scrape stats from.
     #[serde(default = "default_endpoint")]
     endpoint: String,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `eventstoredb` is used.
     default_namespace: Option<String>,
 }
 
@@ -37,14 +50,9 @@ pub fn default_endpoint() -> String {
     "https://localhost:2113/stats".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<EventStoreDbConfig>("eventstoredb_metrics")
-}
-
 impl_generate_config_from_default!(EventStoreDbConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "eventstoredb_metrics")]
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         eventstoredb(
@@ -55,12 +63,8 @@ impl SourceConfig for EventStoreDbConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "eventstoredb_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -79,6 +83,9 @@ fn eventstoredb(
     let tls_settings = TlsSettings::from_options(&None)?;
     let client = HttpClient::new(tls_settings, &cx.proxy)?;
     let url: Uri = endpoint.as_str().parse()?;
+
+    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+    let events_received = register!(EventsReceived);
 
     Ok(Box::pin(
         async move {
@@ -106,10 +113,7 @@ fn eventstoredb(
                                 continue;
                             }
                         };
-                        emit!(BytesReceived {
-                            byte_size: bytes.len(),
-                            protocol: "http",
-                        });
+                        bytes_received.emit(ByteSize(bytes.len()));
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {
@@ -120,9 +124,9 @@ fn eventstoredb(
                             Ok(stats) => {
                                 let metrics = stats.metrics(namespace.clone());
                                 let count = metrics.len();
-                                let byte_size = metrics.size_of();
+                                let byte_size = metrics.estimated_json_encoded_size_of();
 
-                                emit!(OldEventsReceived { count, byte_size });
+                                events_received.emit(CountByteSize(count, byte_size));
 
                                 if let Err(error) = cx.out.send_batch(metrics).await {
                                     emit!(StreamClosedError { count, error });

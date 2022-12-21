@@ -12,7 +12,7 @@ where
 }
 
 /// Takes a set of captures that have resulted from matching a regular expression
-/// against some text and fills a BTreeMap with the result.
+/// against some text and fills a `BTreeMap` with the result.
 ///
 /// All captures are inserted with a key as the numeric index of that capture
 /// "0" is the overall match.
@@ -21,7 +21,7 @@ where
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
 pub(crate) fn capture_regex_to_map(
     regex: &regex::Regex,
-    capture: regex::Captures,
+    capture: &regex::Captures,
     numeric_groups: bool,
 ) -> std::collections::BTreeMap<String, ::value::Value> {
     let names = regex.capture_names().flatten().map(|name| {
@@ -99,7 +99,7 @@ impl Default for Base64Charset {
 #[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
 impl From<Base64Charset> for base64::CharacterSet {
     fn from(charset: Base64Charset) -> base64::CharacterSet {
-        use Base64Charset::*;
+        use Base64Charset::{Standard, UrlSafe};
 
         match charset {
             Standard => base64::CharacterSet::Standard,
@@ -113,7 +113,7 @@ impl std::str::FromStr for Base64Charset {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Base64Charset::*;
+        use Base64Charset::{Standard, UrlSafe};
 
         match s {
             "standard" => Ok(Standard),

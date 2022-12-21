@@ -2,9 +2,10 @@ use std::{future::ready, pin::Pin};
 
 use futures::{stream, Stream, StreamExt};
 use ordered_float::NotNan;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 
+use crate::schema::Definition;
 use crate::{
     config::{DataType, Input, Output},
     event::{Event, Value},
@@ -19,22 +20,26 @@ enum BuildError {
     InvalidLua { source: mlua::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the version one of the `lua` transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
+    /// The Lua program to execute for each event.
     source: String,
+
+    /// A list of directories to search when loading a Lua file via the `require` function.
+    ///
+    /// If not specified, the modules are looked up in the configuration directories.
     #[serde(default)]
     search_dirs: Vec<String>,
 }
 
-// Implementation of methods from `TransformConfig`
-// Note that they are implemented as struct methods instead of trait implementation methods
-// because `TransformConfig` trait requires specification of a unique `typetag::serde` name.
-// Specifying some name (for example, "lua_v*") results in this name being listed among
-// possible configuration options for `transforms` section, but such internal name should not
-// be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
+        warn!(
+            "DEPRECATED The `lua` transform API version 1 is deprecated. Please convert your script to version 2."
+        );
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
 
@@ -42,12 +47,11 @@ impl LuaConfig {
         Input::log()
     }
 
-    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
-    }
+    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        // Lua causes the type definition to be reset
+        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
 
-    pub const fn transform_type(&self) -> &'static str {
-        "lua"
+        vec![Output::default(DataType::Log).with_schema_definition(definition)]
     }
 }
 
@@ -223,7 +227,7 @@ impl mlua::UserData for LuaEvent {
                             message =
                                 "Could not set field to Lua value of invalid type, dropping field.",
                             field = key.as_str(),
-                            internal_log_rate_secs = 30
+                            internal_log_rate_limit = true
                         );
                         this.inner.as_mut_log().remove(key.as_str());
                     }
@@ -245,9 +249,11 @@ impl mlua::UserData for LuaEvent {
         methods.add_meta_function(mlua::MetaMethod::Pairs, |lua, event: LuaEvent| {
             let state = lua.create_table()?;
             {
-                let keys = lua.create_table_from(event.inner.as_log().keys().map(|k| (k, true)))?;
+                if let Some(keys) = event.inner.as_log().keys() {
+                    let keys = lua.create_table_from(keys.map(|k| (k, true)))?;
+                    state.raw_set("keys", keys)?;
+                }
                 state.raw_set("event", event)?;
-                state.raw_set("keys", keys)?;
             }
             let function =
                 lua.create_function(|lua, (state, prev): (mlua::Table, Option<String>)| {
@@ -280,7 +286,7 @@ pub fn format_error(error: &mlua::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Event, Value};
+    use crate::event::{Event, LogEvent, Value};
 
     #[test]
     fn lua_add_field() {
@@ -294,7 +300,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("program me");
+        let event = Event::Log(LogEvent::from("program me"));
 
         let event = transform.transform_one(event).unwrap();
 
@@ -314,7 +320,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("Hello, my name is Bob.");
+        let event = Event::Log(LogEvent::from("Hello, my name is Bob."));
 
         let event = transform.transform_one(event).unwrap();
 
@@ -333,9 +339,9 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
-        let event = transform.transform_one(event).unwrap();
+        let mut log = LogEvent::default();
+        log.insert("name", "Bob");
+        let event = transform.transform_one(log.into()).unwrap();
 
         assert!(event.as_log().get("name").is_none());
     }
@@ -351,9 +357,9 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
-        let event = transform.transform_one(event);
+        let mut log = LogEvent::default();
+        log.insert("name", "Bob");
+        let event = transform.transform_one(log.into());
 
         assert!(event.is_none());
     }
@@ -374,8 +380,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
-        let event = transform.transform_one(event).unwrap();
+        let event = transform.transform_one(LogEvent::default().into()).unwrap();
 
         assert_eq!(event.as_log()["result"], "empty".into());
     }
@@ -392,7 +397,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform.transform_one(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(LogEvent::default().into()).unwrap();
         assert_eq!(event.as_log()["number"], Value::Integer(3));
     }
 
@@ -408,7 +413,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform.transform_one(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(LogEvent::default().into()).unwrap();
         assert_eq!(event.as_log()["number"], Value::from(3.14159));
     }
 
@@ -424,7 +429,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform.transform_one(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(LogEvent::default().into()).unwrap();
         assert_eq!(event.as_log()["bool"], Value::Boolean(true));
     }
 
@@ -440,7 +445,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform.transform_one(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(LogEvent::default().into()).unwrap();
         assert_eq!(event.as_log().get("junk"), None);
     }
 
@@ -456,7 +461,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = transform.process(Event::new_empty_log()).unwrap_err();
+        let err = transform.process(LogEvent::default().into()).unwrap_err();
         let err = format_error(&err);
         assert!(
             err.contains("error converting Lua boolean to String"),
@@ -477,7 +482,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = transform.process(Event::new_empty_log()).unwrap_err();
+        let err = transform.process(LogEvent::default().into()).unwrap_err();
         let err = format_error(&err);
         assert!(
             err.contains("error converting Lua boolean to String"),
@@ -498,7 +503,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = transform.process(Event::new_empty_log()).unwrap_err();
+        let err = transform.process(LogEvent::default().into()).unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("this is an error"), "{}", err);
     }
@@ -551,7 +556,7 @@ mod tests {
 
         let mut transform =
             Lua::new(source, vec![dir.path().to_string_lossy().into_owned()]).unwrap();
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let event = transform.transform_one(event).unwrap();
         assert_eq!(event.as_log()["\"new field\""], "new value".into());
     }
@@ -570,11 +575,11 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
-        event.as_mut_log().insert("friend", "Alice");
+        let mut event = LogEvent::default();
+        event.insert("name", "Bob");
+        event.insert("friend", "Alice");
 
-        let event = transform.transform_one(event).unwrap();
+        let event = transform.transform_one(event.into()).unwrap();
 
         assert_eq!(event.as_log()["name"], "nameBob".into());
         assert_eq!(event.as_log()["friend"], "friendAlice".into());

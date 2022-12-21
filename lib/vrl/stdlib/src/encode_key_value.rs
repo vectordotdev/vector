@@ -2,6 +2,7 @@ use std::result::Result;
 
 use ::value::Value;
 use vector_common::encode_key_value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 /// Also used by `encode_logfmt`.
@@ -71,9 +72,9 @@ impl Function for EncodeKeyValue {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let fields = arguments.optional("fields_ordering");
@@ -90,13 +91,14 @@ impl Function for EncodeKeyValue {
             .optional("flatten_boolean")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(EncodeKeyValueFn {
+        Ok(EncodeKeyValueFn {
             value,
             fields,
             key_value_delimiter,
             field_delimiter,
             flatten_boolean,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -117,31 +119,6 @@ impl Function for EncodeKeyValue {
                 result: Ok(r#"s'end:kul,start:ool,stop1:yyc,stop2:gdx'"#),
             },
         ]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let fields = args.optional("fields_ordering");
-
-        let key_value_delimiter = args
-            .optional("key_value_delimiter")
-            .unwrap_or_else(|| Value::from("="));
-
-        let field_delimiter = args
-            .optional("field_delimiter")
-            .unwrap_or_else(|| Value::from(" "));
-
-        let flatten_boolean = args
-            .optional("flatten_boolean")
-            .unwrap_or_else(|| Value::from(false));
-
-        encode_key_value(
-            fields,
-            value,
-            key_value_delimiter,
-            field_delimiter,
-            flatten_boolean,
-        )
     }
 }
 
@@ -166,7 +143,7 @@ fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
         .collect()
 }
 
-impl Expression for EncodeKeyValueFn {
+impl FunctionExpression for EncodeKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let fields = self
@@ -187,7 +164,7 @@ impl Expression for EncodeKeyValueFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().with_fallibility(self.fields.is_some())
     }
 }
@@ -229,6 +206,16 @@ mod tests {
                     "msg" => "This is a log message"
                 }],
             want: Ok(r#"lvl=info msg="This is a log message""#),
+            tdef: TypeDef::bytes().infallible(),
+        }
+
+        string_with_quotes {
+            args: func_args![value:
+                btreemap! {
+                    "lvl" => "info",
+                    "msg" => "{\"key\":\"value\"}"
+                }],
+            want: Ok(r#"lvl=info msg="{\"key\":\"value\"}""#),
             tdef: TypeDef::bytes().infallible(),
         }
 

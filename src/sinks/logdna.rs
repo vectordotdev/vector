@@ -4,17 +4,16 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    codecs::Transformer,
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
         RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
@@ -26,43 +25,57 @@ static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://logs.logdna.com"
 
 const PATH: &str = "/logs/ingest";
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) struct LogdnaConfig {
-    api_key: String,
-    // Deprecated name
+/// Configuration for the `logdna` sink.
+#[configurable_component(sink("logdna"))]
+#[derive(Clone, Debug)]
+pub struct LogdnaConfig {
+    /// The Ingestion API key.
+    api_key: SensitiveString,
+
+    /// The endpoint to send logs to.
     #[serde(alias = "host")]
     endpoint: Option<UriSerde>,
 
+    /// The hostname that will be attached to each batch of events.
     hostname: Template,
+
+    /// The MAC address that will be attached to each batch of events.
     mac: Option<String>,
+
+    /// The IP address that will be attached to each batch of events.
     ip: Option<String>,
+
+    /// The tags that will be attached to each batch of events.
     tags: Option<Vec<Template>>,
 
+    #[configurable(derived)]
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
 
+    /// The default app that will be set for events that do not contain a `file` or `app` field.
     default_app: Option<String>,
+
+    /// The default environment that will be set for events that do not contain an `env` field.
     default_env: Option<String>,
 
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<LogdnaConfig>("logdna")
 }
 
 impl GenerateConfig for LogdnaConfig {
@@ -75,16 +88,7 @@ impl GenerateConfig for LogdnaConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
     async fn build(
         &self,
@@ -100,7 +104,6 @@ impl SinkConfig for LogdnaConfig {
             request_settings,
             batch_settings.timeout,
             client.clone(),
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal logdna sink error.", %error));
 
@@ -113,12 +116,8 @@ impl SinkConfig for LogdnaConfig {
         Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "logdna"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -131,7 +130,7 @@ pub struct PartitionKey {
 pub struct LogdnaEventEncoder {
     hostname: Template,
     tags: Option<Vec<Template>>,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
     default_app: Option<String>,
     default_env: Option<String>,
 }
@@ -178,7 +177,7 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
             })
             .ok()?;
 
-        self.encoding.apply_rules(&mut event);
+        self.transformer.transform(&mut event);
         let mut log = event.into_log();
 
         let line = log
@@ -220,7 +219,7 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
             }
         }
 
-        if !log.is_empty() {
+        if !log.is_empty_object() {
             map.insert("meta".into(), json!(&log));
         }
 
@@ -238,7 +237,7 @@ impl HttpSink for LogdnaConfig {
         LogdnaEventEncoder {
             hostname: self.hostname.clone(),
             tags: self.tags.clone(),
-            encoding: self.encoding.clone(),
+            transformer: self.encoding.clone(),
             default_app: self.default_app.clone(),
             default_env: self.default_env.clone(),
         }
@@ -287,8 +286,8 @@ impl HttpSink for LogdnaConfig {
             .unwrap();
 
         let auth = Auth::Basic {
-            user: self.api_key.clone(),
-            password: "".to_string(),
+            user: self.api_key.inner().to_string(),
+            password: SensitiveString::default(),
         };
 
         auth.apply(&mut request);
@@ -333,6 +332,7 @@ async fn healthcheck(config: LogdnaConfig, client: HttpClient) -> crate::Result<
 #[cfg(test)]
 mod tests {
     use futures::{channel::mpsc, StreamExt};
+    use futures_util::stream;
     use http::{request::Parts, StatusCode};
     use serde_json::json;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -342,7 +342,7 @@ mod tests {
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
         test_util::{
-            components::{self, HTTP_SINK_TAGS},
+            components::{assert_sink_compliance, HTTP_SINK_TAGS},
             next_addr, random_lines,
         },
     };
@@ -365,16 +365,16 @@ mod tests {
         .unwrap();
         let mut encoder = config.build_encoder();
 
-        let mut event1 = Event::from("hello world");
+        let mut event1 = Event::Log(LogEvent::from("hello world"));
         event1.as_mut_log().insert("app", "notvector");
         event1.as_mut_log().insert("magic", "vector");
 
-        let mut event2 = Event::from("hello world");
+        let mut event2 = Event::Log(LogEvent::from("hello world"));
         event2.as_mut_log().insert("file", "log.txt");
 
-        let event3 = Event::from("hello world");
+        let event3 = Event::Log(LogEvent::from("hello world"));
 
-        let mut event4 = Event::from("hello world");
+        let mut event4 = Event::Log(LogEvent::from("hello world"));
         event4.as_mut_log().insert("env", "staging");
 
         let event1_out = encoder.encode_event(event1).unwrap().into_parts().0;
@@ -401,8 +401,6 @@ mod tests {
         Vec<Vec<String>>,
         mpsc::Receiver<(Parts, bytes::Bytes)>,
     ) {
-        components::init_test();
-
         let (mut config, cx) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
@@ -446,10 +444,8 @@ mod tests {
         }
         drop(batch);
 
-        sink.run_events(events).await.unwrap();
-        if batch_status == BatchStatus::Delivered {
-            components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
-        }
+        let events = stream::iter(events).map(Into::into);
+        sink.run(events).await.expect("Running sink failed");
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
 
@@ -465,50 +461,54 @@ mod tests {
 
     #[tokio::test]
     async fn smoke() {
-        let (hosts, partitions, mut rx) = smoke_start(StatusCode::OK, BatchStatus::Delivered).await;
+        assert_sink_compliance(&HTTP_SINK_TAGS, async {
+            let (hosts, partitions, mut rx) =
+                smoke_start(StatusCode::OK, BatchStatus::Delivered).await;
 
-        for _ in 0..partitions.len() {
-            let output = rx.next().await.unwrap();
+            for _ in 0..partitions.len() {
+                let output = rx.next().await.unwrap();
 
-            let request = &output.0;
-            let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
+                let request = &output.0;
+                let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
 
-            let query = request.uri.query().unwrap();
+                let query = request.uri.query().unwrap();
 
-            let (p, host) = hosts
-                .iter()
-                .enumerate()
-                .find(|(_, host)| query.contains(&format!("hostname={}", host)))
-                .expect("invalid hostname");
-            let lines = &partitions[p];
+                let (p, host) = hosts
+                    .iter()
+                    .enumerate()
+                    .find(|(_, host)| query.contains(&format!("hostname={}", host)))
+                    .expect("invalid hostname");
+                let lines = &partitions[p];
 
-            assert!(query.contains("ip=127.0.0.1"));
-            assert!(query.contains("mac=some-mac-addr"));
-            assert!(query.contains("tags=test%2Cmaybeanothertest"));
+                assert!(query.contains("ip=127.0.0.1"));
+                assert!(query.contains("mac=some-mac-addr"));
+                assert!(query.contains("tags=test%2Cmaybeanothertest"));
 
-            let output = body
-                .as_object()
-                .unwrap()
-                .get("lines")
-                .unwrap()
-                .as_array()
-                .unwrap();
+                let output = body
+                    .as_object()
+                    .unwrap()
+                    .get("lines")
+                    .unwrap()
+                    .as_array()
+                    .unwrap();
 
-            for (i, line) in output.iter().enumerate() {
-                // All lines are json objects
-                let line = line.as_object().unwrap();
+                for (i, line) in output.iter().enumerate() {
+                    // All lines are json objects
+                    let line = line.as_object().unwrap();
 
-                assert_eq!(line.get("app").unwrap(), &json!("vector"));
-                assert_eq!(line.get("env").unwrap(), &json!("production"));
-                assert_eq!(line.get("line").unwrap(), &json!(lines[i]));
+                    assert_eq!(line.get("app").unwrap(), &json!("vector"));
+                    assert_eq!(line.get("env").unwrap(), &json!("production"));
+                    assert_eq!(line.get("line").unwrap(), &json!(lines[i]));
 
-                assert_eq!(
-                    line.get("meta").unwrap(),
-                    &json!({
-                        "hostname": host,
-                    })
-                );
+                    assert_eq!(
+                        line.get("meta").unwrap(),
+                        &json!({
+                            "hostname": host,
+                        })
+                    );
+                }
             }
-        }
+        })
+        .await;
     }
 }

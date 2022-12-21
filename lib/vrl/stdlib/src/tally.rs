@@ -7,7 +7,7 @@ fn tally(value: Value) -> Resolved {
     let value = value.try_array()?;
     #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
     let mut map: HashMap<Bytes, usize> = HashMap::new();
-    for value in value.into_iter() {
+    for value in value {
         if let Value::Bytes(value) = value {
             *map.entry(value).or_insert(0) += 1;
         } else {
@@ -39,13 +39,13 @@ impl Function for Tally {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(TallyFn { value }))
+        Ok(TallyFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -55,11 +55,6 @@ impl Function for Tally {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        tally(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -67,13 +62,13 @@ pub(crate) struct TallyFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for TallyFn {
+impl FunctionExpression for TallyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         tally(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(Collection::from_unknown(Kind::integer())).fallible()
     }
 }

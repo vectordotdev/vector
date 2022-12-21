@@ -38,7 +38,9 @@ Vector wouldn't be very useful if it couldn't ingest data. A **source** defines 
 
 ### Transforms
 
-A **transform** is responsible for mutating events as they are transported by Vector. This might involve parsing, filtering, sampling, or aggregating. You can have any number of transforms in your pipeline and how they are composed is up to you.
+A **transform** is responsible for mutating events as they are transported by Vector.
+This might involve parsing, filtering, sampling, or aggregating.
+You can have any number of transforms in your pipeline, and how they are composed is up to you.
 
 {{< jump "/transforms" >}}
 

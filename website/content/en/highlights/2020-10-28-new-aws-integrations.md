@@ -18,7 +18,7 @@ and hoping it all works in the end. We want to make this easier with Vector,
 and 0.11 includes our initial efforts:
 
 1. **A new [`aws_kinesis_firehose` source][aws_kinesis_firehose_source]**
-2. **A new [`aws_cloudwatch_logs_subscription_parser` transform][aws_cloudwatch_logs_subscription_parser_transform]**
+2. **A new `aws_cloudwatch_logs_subscription_parser` transform (Removed in v0.23.0)**
 3. **A new [`aws_s3` source][aws_s3_source]**
 4. **A new [`aws_sqs` sink][aws_sqs_sink]**
 5. **A new [`aws_ecs_metrics` source][aws_ecs_metrics_source]**
@@ -32,7 +32,6 @@ CloudWatch logs to any supported Vector [sink][sinks].
 We're eager to hear what you think about these sources! [Join our chat][chat]
 and let us know.
 
-[aws_cloudwatch_logs_subscription_parser_transform]: /docs/reference/configuration/transforms/aws_cloudwatch_logs_subscription_parser/
 [aws_ecs_metrics_source]: /docs/reference/configuration/sources/aws_ecs_metrics/
 [aws_kinesis_firehose_source]: /docs/reference/configuration/sources/aws_kinesis_firehose/
 [aws_s3_source]: /docs/reference/configuration/sources/aws_s3/

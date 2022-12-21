@@ -1,7 +1,8 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use lookup::OwnedValuePath;
+use std::collections::BTreeMap;
 
 use super::Collection;
-use crate::{kind::merge, Kind};
+use crate::Kind;
 
 /// The type-state of "unknown" values in a collection.
 ///
@@ -10,6 +11,10 @@ use crate::{kind::merge, Kind};
 /// (e.g. the array collection has an integer value at index 0, and is 3 values in size. We don't
 /// know the exact values for indices 1 and 2, but we do know that it has to be the type defined by
 /// `Unknown`).
+///
+/// "unknown" values can either be "undefined" or the "unknown" type.
+/// For example, an array with an infinite unknown of "integer" doesn't imply that _every_
+/// index contains an array. Rather, it says every index contains an "integer" or is "undefined".
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct Unknown(pub(super) Inner);
 
@@ -27,6 +32,12 @@ pub(super) enum Inner {
 }
 
 impl Unknown {
+    /// Returns a standard representation of an "unknown" type.
+    #[must_use]
+    pub(crate) fn canonicalize(&self) -> Self {
+        self.to_kind().or_undefined().into()
+    }
+
     /// Get the `any` state for `Unknown`.
     #[must_use]
     pub(crate) fn any() -> Self {
@@ -71,63 +82,72 @@ impl Unknown {
         matches!(self.0, Inner::Exact(_))
     }
 
-    /// Get a reference to the "exact" `Kind` this `Unknown` represents.
-    ///
-    /// Returns `None` if this `Unknown` is marked as "any".
+    /// Get the `Kind` stored in this `Unknown`.
+    /// This represents the kind of any type not "known".
+    /// It will always include "undefined", since unknown
+    /// values are not guaranteed to exist.
     #[must_use]
-    pub fn as_exact(&self) -> Option<&Kind> {
-        match &self.0 {
-            Inner::Infinite(..) => None,
-            Inner::Exact(kind) => Some(kind.as_ref()),
-        }
+    pub fn to_kind(&self) -> Kind {
+        self.to_existing_kind().or_undefined()
     }
 
     /// Get the `Kind` stored in this `Unknown`.
     ///
-    /// This returns an owned `Kind`.
+    /// This represents the kind of any _EXISTING_ type not "known".
+    /// This function assumes the type you are accessing actually exists.
+    /// If it's an optional field, `to_kind` should be used instead.
+    ///
+    /// This will never have "undefined" as part of the type
     #[must_use]
-    pub fn to_kind(&self) -> Cow<'_, Kind> {
-        match &self.0 {
-            Inner::Infinite(infinite) => Cow::Owned((*infinite).into()),
-            Inner::Exact(kind) => Cow::Borrowed(kind.as_ref()),
-        }
+    pub fn to_existing_kind(&self) -> Kind {
+        let mut result = match &self.0 {
+            Inner::Infinite(infinite) => (*infinite).into(),
+            Inner::Exact(kind) => kind.as_ref().clone(),
+        };
+        result.remove_undefined();
+        result
     }
 
     /// Check if `self` is a superset of `other`.
     ///
     /// Meaning, if `self` is `Any`, then it's always a superset of `other`, otherwise its
     /// accumulative types need to be a superset of `other`.
-    #[must_use]
-    pub(crate) fn is_superset(&self, other: &Self) -> bool {
+    pub(crate) fn is_superset(&self, other: &Self) -> Result<(), OwnedValuePath> {
         match (&self.0, &other.0) {
-            (Inner::Infinite(infinite), _) if infinite.is_any() => true,
+            (Inner::Infinite(infinite), _) if infinite.is_any() => Ok(()),
             (Inner::Infinite(infinite), Inner::Exact(rhs)) => {
                 Kind::from(*infinite).is_superset(rhs)
             }
-            (Inner::Exact(lhs), Inner::Exact(rhs)) => lhs.is_superset(rhs),
-            (Inner::Exact(lhs), Inner::Infinite(..)) => lhs.is_any(),
-            (Inner::Infinite(lhs), Inner::Infinite(rhs)) => lhs.is_superset(rhs),
+            (Inner::Exact(lhs), Inner::Exact(rhs)) => lhs
+                .clone()
+                .without_undefined()
+                .is_superset(&rhs.clone().without_undefined()),
+            (Inner::Exact(lhs), Inner::Infinite(..)) => {
+                if lhs.is_any() {
+                    Ok(())
+                } else {
+                    Err(OwnedValuePath::root())
+                }
+            }
+            (Inner::Infinite(lhs), Inner::Infinite(rhs)) => {
+                if lhs.is_superset(rhs) {
+                    Ok(())
+                } else {
+                    Err(OwnedValuePath::root())
+                }
+            }
         }
     }
 
     /// Merge `other` into `self`, using the provided `Strategy`.
     ///
     /// If any of the two `Unknown`s is marked as "infinite", it will overwrite the finite variant.
-    pub(crate) fn merge(&mut self, other: Self, strategy: merge::Strategy) {
+    pub(crate) fn merge(&mut self, other: Self, overwrite: bool) {
         match (&mut self.0, other.0) {
-            (Inner::Exact(lhs), Inner::Exact(rhs)) => lhs.merge(*rhs, strategy),
+            (Inner::Exact(lhs), Inner::Exact(rhs)) => lhs.merge_keep(*rhs, overwrite),
             (Inner::Infinite(lhs), Inner::Infinite(rhs)) => lhs.merge(rhs),
             (_, rhs @ Inner::Infinite(_)) => self.0 = rhs,
             (Inner::Infinite(_), _) => {}
-        }
-    }
-}
-
-impl From<Unknown> for Kind {
-    fn from(unknown: Unknown) -> Self {
-        match unknown.0 {
-            Inner::Infinite(infinite) => infinite.into(),
-            Inner::Exact(exact) => *exact,
         }
     }
 }
@@ -281,7 +301,7 @@ impl Infinite {
 
 impl From<Infinite> for Kind {
     fn from(infinite: Infinite) -> Self {
-        let mut kind = Self::empty();
+        let mut kind = Self::never();
 
         if infinite.bytes.is_some() {
             kind.add_bytes();
@@ -327,7 +347,7 @@ impl<T: Ord> From<Infinite> for Collection<T> {
     fn from(infinite: Infinite) -> Self {
         Self {
             known: BTreeMap::default(),
-            unknown: Some(Unknown::infinite(infinite)),
+            unknown: Unknown::infinite(infinite),
         }
     }
 }
@@ -389,7 +409,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.is_superset(&other), want, "{}", title);
+            assert_eq!(this.is_superset(&other).is_ok(), want, "{}", title);
         }
     }
 }

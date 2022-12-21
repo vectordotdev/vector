@@ -1,6 +1,3 @@
-use std::task::Poll;
-
-use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -9,36 +6,60 @@ use codecs::{
 use fakedata::logs::*;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
-use vector_core::ByteSizeOf;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
-    internal_events::{BytesReceived, DemoLogsEventProcessed, EventsReceived, StreamClosedError},
+    config::{Output, SourceConfig, SourceContext},
+    internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     SourceSender,
 };
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Configuration for the `demo_logs` source.
+#[configurable_component(source("demo_logs"))]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(default)]
 pub struct DemoLogsConfig {
+    /// The amount of time, in seconds, to pause between each batch of output lines.
+    ///
+    /// The default is one batch per second. In order to remove the delay and output batches as quickly as possible, set
+    /// `interval` to `0.0`.
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
     pub interval: f64,
+
+    /// The total number of lines to output.
+    ///
+    /// By default, the source continuously prints logs (infinitely).
     #[derivative(Default(value = "default_count()"))]
     pub count: usize,
+
     #[serde(flatten)]
     pub format: OutputFormat,
+
+    #[configurable(derived)]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
+
+    #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
+    pub log_namespace: Option<bool>,
 }
 
 const fn default_interval() -> f64 {
@@ -49,27 +70,42 @@ const fn default_count() -> usize {
     isize::MAX as usize
 }
 
-#[derive(Debug, PartialEq, Snafu)]
+#[derive(Debug, PartialEq, Eq, Snafu)]
 pub enum DemoLogsConfigError {
     #[snafu(display("A non-empty list of lines is required for the shuffle format"))]
     ShuffleDemoLogsItemsEmpty,
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Output format configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(tag = "format", rename_all = "snake_case")]
 pub enum OutputFormat {
+    /// Lines are chosen at random from the list specified using `lines`.
     Shuffle {
+        /// If `true`, each output line starts with an increasing sequence number, beginning with 0.
         #[serde(default)]
         sequence: bool,
+        /// The list of lines to output.
         lines: Vec<String>,
     },
+
+    /// Randomly generated logs in [Apache common](\(urls.apache_common)) format.
     ApacheCommon,
+
+    /// Randomly generated logs in [Apache error](\(urls.apache_error)) format.
     ApacheError,
+
+    /// Randomly generated logs in Syslog format ([RFC 5424](\(urls.syslog_5424))).
     #[serde(alias = "rfc5424")]
     Syslog,
+
+    /// Randomly generated logs in Syslog format ([RFC 3164](\(urls.syslog_3164))).
     #[serde(alias = "rfc3164")]
     BsdSyslog,
+
+    /// Randomly generated HTTP server logs in [JSON](\(urls.json)) format.
     #[derivative(Default)]
     Json,
 }
@@ -118,8 +154,13 @@ impl OutputFormat {
 }
 
 impl DemoLogsConfig {
-    #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(lines: Vec<String>, count: usize, interval: f64) -> Self {
+    #[cfg(test)]
+    pub fn repeat(
+        lines: Vec<String>,
+        count: usize,
+        interval: f64,
+        log_namespace: Option<bool>,
+    ) -> Self {
         Self {
             count,
             interval,
@@ -129,6 +170,7 @@ impl DemoLogsConfig {
             },
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            log_namespace,
         }
     }
 }
@@ -140,10 +182,14 @@ async fn demo_logs_source(
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = (interval != 0.0).then(|| interval);
+    let maybe_interval: Option<f64> = (interval != 0.0).then_some(interval);
 
     let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
+
+    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+    let events_received = register!(EventsReceived);
 
     for n in 0..count {
         if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
@@ -153,10 +199,7 @@ async fn demo_logs_source(
         if let Some(interval) = &mut interval {
             interval.tick().await;
         }
-        emit!(BytesReceived {
-            byte_size: 0,
-            protocol: "none",
-        });
+        bytes_received.emit(ByteSize(0));
 
         let line = format.generate_line(n);
 
@@ -165,17 +208,17 @@ async fn demo_logs_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(EventsReceived {
-                        count,
-                        byte_size: events.size_of()
-                    });
+                    let byte_size = events.estimated_json_encoded_size_of();
+                    events_received.emit(CountByteSize(count, byte_size));
                     let now = Utc::now();
 
                     let events = events.into_iter().map(|mut event| {
                         let log = event.as_mut_log();
-
-                        log.try_insert(log_schema().source_type_key(), Bytes::from("demo_logs"));
-                        log.try_insert(log_schema().timestamp_key(), now);
+                        log_namespace.insert_standard_vector_source_metadata(
+                            log,
+                            DemoLogsConfig::NAME,
+                            now,
+                        );
 
                         event
                     });
@@ -197,22 +240,16 @@ async fn demo_logs_source(
     Ok(())
 }
 
-inventory::submit! {
-    SourceDescription::new::<DemoLogsConfig>("demo_logs")
-}
-
-inventory::submit! {
-    SourceDescription::new::<DemoLogsConfig>("generator")
-}
-
 impl_generate_config_from_default!(DemoLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "demo_logs")]
 impl SourceConfig for DemoLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         self.format.validate()?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
         Ok(Box::pin(demo_logs_source(
             self.interval,
             self.count,
@@ -220,39 +257,21 @@ impl SourceConfig for DemoLogsConfig {
             decoder,
             cx.shutdown,
             cx.out,
+            log_namespace,
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
-    }
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
+        // and is merged here.
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-    fn source_type(&self) -> &'static str {
-        "demo_logs"
-    }
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
 
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct DemoLogsCompatConfig(DemoLogsConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "generator")]
-impl SourceConfig for DemoLogsCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
-    }
-
-    fn source_type(&self) -> &'static str {
-        self.0.source_type()
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -267,7 +286,13 @@ mod tests {
     use futures::{poll, Stream, StreamExt};
 
     use super::*;
-    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, SourceSender};
+    use crate::{
+        config::log_schema,
+        event::Event,
+        shutdown::ShutdownSignal,
+        test_util::components::{assert_source_compliance, SOURCE_TAGS},
+        SourceSender,
+    };
 
     #[test]
     fn generate_config() {
@@ -275,21 +300,30 @@ mod tests {
     }
 
     async fn runit(config: &str) -> impl Stream<Item = Event> {
-        let (tx, rx) = SourceSender::new_test();
-        let config: DemoLogsConfig = toml::from_str(config).unwrap();
-        let decoder =
-            DecodingConfig::new(default_framing_message_based(), default_decoding()).build();
-        demo_logs_source(
-            config.interval,
-            config.count,
-            config.format,
-            decoder,
-            ShutdownSignal::noop(),
-            tx,
-        )
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let config: DemoLogsConfig = toml::from_str(config).unwrap();
+            let decoder = DecodingConfig::new(
+                default_framing_message_based(),
+                default_decoding(),
+                LogNamespace::Legacy,
+            )
+            .build();
+            demo_logs_source(
+                config.interval,
+                config.count,
+                config.format,
+                decoder,
+                ShutdownSignal::noop(),
+                tx,
+                LogNamespace::Legacy,
+            )
+            .await
+            .unwrap();
+
+            rx
+        })
         .await
-        .unwrap();
-        rx
     }
 
     #[test]

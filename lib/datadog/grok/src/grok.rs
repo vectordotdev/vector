@@ -235,7 +235,7 @@ impl Grok {
 }
 
 /// An error that occurred when using this library.
-#[derive(Clone, Error, Debug, PartialEq)]
+#[derive(Clone, Error, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
     /// The recursion while compiling has exhausted the limit.

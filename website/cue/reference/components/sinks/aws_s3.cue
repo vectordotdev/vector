@@ -32,8 +32,8 @@ components: sinks: aws_s3: components._aws & {
 				enabled: true
 				codec: {
 					enabled: true
-					batched: true
-					enum: ["ndjson", "text"]
+					framing: true
+					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true
@@ -45,7 +45,8 @@ components: sinks: aws_s3: components._aws & {
 				enabled:                true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        false
+				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.aws_s3
@@ -367,7 +368,7 @@ components: sinks: aws_s3: components._aws & {
 
 			policies: [
 				{
-					_action: "HeadBucket"
+					_action: "ListBucket"
 					required_for: ["healthcheck"]
 				},
 				{

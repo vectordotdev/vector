@@ -1,21 +1,19 @@
-use std::sync::Arc;
-
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_sdk_cloudwatchlogs::{Endpoint, Region};
-use aws_smithy_async::rt::sleep::AsyncSleep;
-use aws_smithy_client::erase::DynConnector;
 use aws_smithy_types::retry::RetryConfig;
-use aws_types::credentials::SharedCredentialsProvider;
+use codecs::JsonSerializerConfig;
 use futures::FutureExt;
-use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 
 use crate::{
-    aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
-    codecs::Encoder,
+    aws::{
+        create_client, create_smithy_client, resolve_region, AwsAuthentication, ClientBuilder,
+        RegionOrEndpoint,
+    },
+    codecs::{Encoder, EncodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig,
+        SinkConfig, SinkContext,
     },
     sinks::{
         aws_cloudwatch_logs::{
@@ -23,10 +21,8 @@ use crate::{
             retry::CloudwatchRetryLogic, service::CloudwatchLogsPartitionSvc, sink::CloudwatchSink,
         },
         util::{
-            encoding::{
-                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-            },
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            http::RequestConfig, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -37,70 +33,89 @@ use crate::{
 pub struct CloudwatchLogsClientBuilder;
 
 impl ClientBuilder for CloudwatchLogsClientBuilder {
-    type ConfigBuilder = aws_sdk_cloudwatchlogs::config::Builder;
-    type Client = CloudwatchLogsClient;
+    type Config = aws_sdk_cloudwatchlogs::config::Config;
+    type Client = aws_sdk_cloudwatchlogs::client::Client;
+    type DefaultMiddleware = aws_sdk_cloudwatchlogs::middleware::DefaultMiddleware;
 
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        aws_sdk_cloudwatchlogs::config::Builder::new().credentials_provider(credentials_provider)
+    fn default_middleware() -> Self::DefaultMiddleware {
+        aws_sdk_cloudwatchlogs::middleware::DefaultMiddleware::new()
     }
 
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn with_sleep_impl(
-        builder: Self::ConfigBuilder,
-        sleep_impl: Arc<dyn AsyncSleep>,
-    ) -> Self::ConfigBuilder {
-        builder.sleep_impl(sleep_impl)
-    }
-
-    fn with_retry_config(
-        builder: Self::ConfigBuilder,
-        retry_config: RetryConfig,
-    ) -> Self::ConfigBuilder {
-        builder.retry_config(retry_config)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
+    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_cloudwatchlogs::client::Client::with_config(client, config.into())
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `aws_cloudwatch_logs` sink.
+#[configurable_component(sink("aws_cloudwatch_logs"))]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
+    /// The [group name][group_name] of the target CloudWatch Logs stream.
+    ///
+    /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub group_name: Template,
+
+    /// The [stream name][stream_name] of the target CloudWatch Logs stream.
+    ///
+    /// There can only be one writer to a log stream at a time. If you have multiple
+    /// instances writing to the same log group, you must include an identifier in the
+    /// stream name that is guaranteed to be unique per instance.
+    ///
+    /// For example, you might choose `host`.
+    ///
+    /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub stream_name: Template,
+
+    /// The [AWS region][aws_region] of the target service.
+    ///
+    /// [aws_region]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
-    pub encoding:
-        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
+
+    /// Dynamically create a [log group][log_group] if it does not already exist.
+    ///
+    /// This will ignore `create_missing_stream` directly after creating the group and will create
+    /// the first stream.
+    ///
+    /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub create_missing_group: Option<bool>,
+
+    /// Dynamically create a [log stream][log_stream] if it does not already exist.
+    ///
+    /// [log_stream]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub create_missing_stream: Option<bool>,
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<CloudwatchLogsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
-    // Deprecated name. Moved to auth.
+
+    /// The ARN of an [IAM role][iam_role] to assume at startup.
+    ///
+    /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+    #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     pub assume_role: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -117,26 +132,46 @@ impl CloudwatchLogsSinkConfig {
             self.region.endpoint()?,
             proxy,
             &self.tls,
+            true,
+        )
+        .await
+    }
+
+    pub async fn create_smithy_client(
+        &self,
+        proxy: &ProxyConfig,
+    ) -> crate::Result<aws_smithy_client::Client> {
+        let region = resolve_region(self.region.region()).await?;
+        create_smithy_client::<CloudwatchLogsClientBuilder>(
+            region,
+            proxy,
+            &self.tls,
+            true,
+            RetryConfig::disabled(),
         )
         .await
     }
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
         let client = self.create_client(cx.proxy()).await?;
+        let smithy_client = self.create_smithy_client(cx.proxy()).await?;
         let svc = ServiceBuilder::new()
             .settings(request_settings, CloudwatchRetryLogic::new())
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 client.clone(),
+                std::sync::Arc::new(smithy_client),
             ));
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.clone().encoding();
+        let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let healthcheck = healthcheck(self.clone(), client).boxed();
         let sink = CloudwatchSink {
@@ -148,7 +183,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
                 transformer,
                 encoder,
             },
-            acker: cx.acker(),
+
             service: svc,
         };
 
@@ -156,31 +191,26 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "aws_cloudwatch_logs"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(default_config(StandardEncodings::Json)).unwrap()
+        toml::Value::try_from(default_config(JsonSerializerConfig::new().into())).unwrap()
     }
 }
 
-fn default_config(e: StandardEncodings) -> CloudwatchLogsSinkConfig {
+fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
-        encoding: EncodingConfig::from(e).into(),
+        encoding,
         group_name: Default::default(),
         stream_name: Default::default(),
         region: Default::default(),
-
         create_missing_group: Default::default(),
         create_missing_stream: Default::default(),
         compression: Default::default(),

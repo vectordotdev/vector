@@ -24,53 +24,7 @@ components: transforms: throttle: {
 		notices: []
 	}
 
-	configuration: {
-		exclude: {
-			common: true
-			description: """
-				The set of logical conditions to exclude events from rate limiting.
-				"""
-			required: false
-			type: condition: {}
-		}
-		key_field: {
-			common: false
-			description: """
-				The name of the log field whose value will be hashed to determine if the event should be rate limited.
-
-				Each unique key will create a buckets of related events to be rate limited separately. If left unspecified,
-				or if the event doesn’t have `key_field`, the event be will not be rate limited separately.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["message", "{{ hostname }}"]
-				syntax: "template"
-			}
-		}
-		threshold: {
-			description: """
-				The number of events allowed for a given bucket per configured `window_secs`.
-
-				Each unique key will have its own `threshold`.
-				"""
-			required: true
-			type: uint: {
-				examples: [100, 10000]
-				unit: null
-			}
-		}
-		window_secs: {
-			description: """
-				The time frame in which the configured `threshold` is applied.
-				"""
-			required: true
-			type: uint: {
-				examples: [1, 60, 86400]
-				unit: "seconds"
-			}
-		}
-	}
+	configuration: base.components.transforms.throttle.configuration
 
 	input: {
 		logs:    true
