@@ -156,7 +156,7 @@ base: components: sinks: clickhouse: configuration: {
 	endpoint: {
 		description: "The endpoint of the Clickhouse server."
 		required:    true
-		type: string: examples: ["http://localhost:8123", "tcp://localhost:9223"]
+		type: string: examples: ["http://localhost:8123", "tcp://localhost:9000"]
 	}
 	use_native_proto: {
 		description: "If `true`, ClickHouse Native Protocol is used. Defaults to `false`, using `JSONEachRow` over HTTP."

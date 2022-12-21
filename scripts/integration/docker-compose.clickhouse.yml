@@ -23,6 +23,7 @@ services:
       - "::clickhouse::"
     environment:
       - CLICKHOUSE_ADDRESS=http://clickhouse:8123
+      - CLICKHOUSE_NATIVE_ADDRESS=tcp://clickhouse:9000
     depends_on:
       - clickhouse
     volumes:
