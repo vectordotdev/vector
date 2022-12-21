@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -13,8 +14,12 @@ use tokio::{
     sync::watch,
     time::{interval, sleep_until},
 };
-use vector_common::internal_event::{
-    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+use vector_common::{
+    config::ComponentKey,
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        Source,
+    },
 };
 use vector_core::EstimatedJsonEncodedSizeOf;
 
@@ -28,15 +33,17 @@ pub struct BlackholeSink {
     total_raw_bytes: Arc<AtomicUsize>,
     config: BlackholeConfig,
     last: Option<Instant>,
+    sources_details: Vec<ComponentKey>,
 }
 
 impl BlackholeSink {
-    pub fn new(config: BlackholeConfig) -> Self {
+    pub fn new(config: BlackholeConfig, sources_details: Vec<ComponentKey>) -> Self {
         BlackholeSink {
             config,
             total_events: Arc::new(AtomicUsize::new(0)),
             total_raw_bytes: Arc::new(AtomicUsize::new(0)),
             last: None,
+            sources_details,
         }
     }
 }
@@ -50,7 +57,26 @@ impl StreamSink<EventArray> for BlackholeSink {
         let total_events = Arc::clone(&self.total_events);
         let total_raw_bytes = Arc::clone(&self.total_raw_bytes);
         let (shutdown, mut tripwire) = watch::channel(());
-        let events_sent = register!(EventsSent::from(Output(None)));
+
+        let mut events_sent: HashMap<_, _> = self
+            .sources_details
+            .into_iter()
+            .enumerate()
+            .map(|(id, key)| {
+                let handle = register!(EventsSent::from((
+                    Output(None),
+                    Source(Some(key.into_id().into()))
+                )));
+
+                (Some(id), handle)
+            })
+            .collect();
+
+        events_sent.insert(
+            None,
+            register!(EventsSent::from((Output(None), Source(None)))),
+        );
+
         let bytes_sent = register!(BytesSent::from(Protocol("blackhole".into())));
 
         if self.config.print_interval_secs.as_secs() > 0 {
@@ -87,15 +113,17 @@ impl StreamSink<EventArray> for BlackholeSink {
                 self.last = Some(until);
             }
 
-            let message_len = events.estimated_json_encoded_size_of();
-
             let _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
-            let _ = self
-                .total_raw_bytes
-                .fetch_add(message_len, Ordering::AcqRel);
 
-            events_sent.emit(CountByteSize(events.len(), message_len));
-            bytes_sent.emit(ByteSize(message_len));
+            for event in events.iter_events() {
+                let bytes = event.estimated_json_encoded_size_of();
+                let _ = self.total_raw_bytes.fetch_add(bytes, Ordering::AcqRel);
+                bytes_sent.emit(ByteSize(bytes));
+
+                if let Some(handle) = events_sent.get(&event.metadata().source_id()) {
+                    handle.emit(CountByteSize(1, bytes));
+                }
+            }
         }
 
         // Notify the reporting task to shutdown.

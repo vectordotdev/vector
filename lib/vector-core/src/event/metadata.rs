@@ -35,6 +35,14 @@ pub struct EventMetadata {
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
     #[serde(default = "default_schema_definition", skip)]
     schema_definition: Arc<schema::Definition>,
+
+    /// A unique identifier of the originating source of this event.
+    ///
+    /// Can be used internally to refer back to source details such as its `ComponentKey`.
+    ///
+    /// If `None`, then the event has no originating source (e.g. it was created internally, such
+    /// as in the Lua or Remap transforms).
+    source_id: Option<usize>,
 }
 
 fn default_metadata_value() -> Value {
@@ -98,6 +106,7 @@ impl Default for EventMetadata {
             secrets: Secrets::new(),
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
+            source_id: None,
         }
     }
 }
@@ -201,6 +210,16 @@ impl EventMetadata {
     /// Set the schema definition.
     pub fn set_schema_definition(&mut self, definition: &Arc<schema::Definition>) {
         self.schema_definition = Arc::clone(definition);
+    }
+
+    /// set the source ID.
+    pub fn set_source_id(&mut self, source_id: usize) {
+        self.source_id = Some(source_id);
+    }
+
+    /// Get the source ID.
+    pub fn source_id(&self) -> Option<usize> {
+        self.source_id
     }
 }
 

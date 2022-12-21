@@ -116,6 +116,8 @@ pub struct Output(pub Option<SharedString>);
 
 pub struct Protocol(pub SharedString);
 
+pub struct Source(pub Option<SharedString>);
+
 impl Protocol {
     pub const HTTP: Protocol = Protocol(SharedString::const_str("http"));
     pub const HTTPS: Protocol = Protocol(SharedString::const_str("https"));

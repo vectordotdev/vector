@@ -153,6 +153,7 @@ pub async fn build_pieces(
     let mut detach_triggers = HashMap::new();
 
     let mut errors = vec![];
+    let mut source_keys = vec![];
 
     let (enrichment_tables, enrichment_errors) = load_enrichment_tables(config, diff).await;
     errors.extend(enrichment_errors);
@@ -183,7 +184,13 @@ pub async fn build_pieces(
             key.id()
         );
 
-        let mut builder = SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE);
+        source_keys.push(key.clone());
+
+        let mut builder = {
+            let _span = span.enter();
+            SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+        };
+
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -466,6 +473,7 @@ pub async fn build_pieces(
             globals: config.global.clone(),
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
             schema: config.schema,
+            source_keys: source_keys.clone(),
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {

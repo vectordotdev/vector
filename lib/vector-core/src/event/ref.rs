@@ -2,6 +2,8 @@
 
 use vector_common::EventDataEq;
 
+use crate::EstimatedJsonEncodedSizeOf;
+
 use super::{Event, EventMetadata, LogEvent, Metric, TraceEvent};
 
 /// A wrapper for references to inner event types, where reconstituting
@@ -64,6 +66,15 @@ impl<'a> EventRef<'a> {
             _ => panic!("Failed type coercion, {self:?} is not a metric reference"),
         }
     }
+
+    /// Access the metadata in this reference.
+    pub fn metadata(&self) -> &EventMetadata {
+        match self {
+            Self::Log(event) => event.metadata(),
+            Self::Metric(event) => event.metadata(),
+            Self::Trace(event) => event.metadata(),
+        }
+    }
 }
 
 impl<'a> From<&'a Event> for EventRef<'a> {
@@ -101,6 +112,16 @@ impl<'a> EventDataEq<Event> for EventRef<'a> {
             (Self::Metric(a), Event::Metric(b)) => a.event_data_eq(b),
             (Self::Trace(a), Event::Trace(b)) => a.event_data_eq(b),
             _ => false,
+        }
+    }
+}
+
+impl<'a> EstimatedJsonEncodedSizeOf for EventRef<'a> {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        match self {
+            EventRef::Log(v) => v.estimated_json_encoded_size_of(),
+            EventRef::Metric(v) => v.estimated_json_encoded_size_of(),
+            EventRef::Trace(v) => v.estimated_json_encoded_size_of(),
         }
     }
 }

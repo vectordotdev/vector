@@ -207,6 +207,13 @@ pub struct SinkContext {
     pub globals: GlobalOptions,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
+
+    /// A list of all known source keys.
+    ///
+    /// Each event has an optional `source_id` attached to its metadata. This id can be used to
+    /// fetch the correct component key from this list, to get the originating source name of the
+    /// event.
+    pub source_keys: Vec<ComponentKey>,
 }
 
 impl SinkContext {
@@ -217,6 +224,7 @@ impl SinkContext {
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),
             schema: schema::Options::default(),
+            source_keys: vec![],
         }
     }
 
