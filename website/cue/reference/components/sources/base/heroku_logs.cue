@@ -22,7 +22,7 @@ base: components: sources: heroku_logs: configuration: {
 	address: {
 		description: "The address to listen for connections on."
 		required:    true
-		type: string: examples: ["0.0.0.0:80", "localhost:8888"]
+		type: string: examples: ["0.0.0.0:80", "localhost:8080"]
 	}
 	auth: {
 		description: "HTTP Basic authentication configuration."
