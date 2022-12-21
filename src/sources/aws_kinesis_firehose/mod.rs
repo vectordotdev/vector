@@ -29,12 +29,15 @@ mod models;
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
     /// The address to listen for connections on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:443"))]
+    #[configurable(metadata(docs::examples = "localhost:443"))]
     address: SocketAddr,
 
     /// An optional access key to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+    #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
     /// The compression scheme to use for decompressing records within the Firehose message.

@@ -9,7 +9,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 			configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
 	}
 	acknowledgements: {
 		description: """
@@ -32,7 +32,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 	address: {
 		description: "The address to listen for connections on."
 		required:    true
-		type: string: {}
+		type: string: examples: ["0.0.0.0:443", "localhost:443"]
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
