@@ -25,7 +25,7 @@ mod tests {
             rate: None,
             acknowledgements: Default::default(),
         };
-        let sink = BlackholeSink::new(config);
+        let sink = BlackholeSink::new(config, vec![]);
         let sink = VectorSink::Stream(Box::new(sink));
 
         let (_input_lines, events) = random_events_with_stream(100, 10, None);
