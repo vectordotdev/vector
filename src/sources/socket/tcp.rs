@@ -1,7 +1,9 @@
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
-use lookup::{owned_value_path, path};
+use lookup::{
+    lookup_v2::{parse_value_path, OptionalValuePath},
+    owned_value_path, path,
+};
 use smallvec::SmallVec;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
