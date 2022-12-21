@@ -625,25 +625,25 @@ components: {
 				required:    false
 				type: object: options: {
 					enabled: {
-						common:      false
+						common: false
 						description: """
 							Whether or not to require TLS for incoming/outgoing connections.
 
 							When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 							more information.
 							"""
-						required:    false
+						required: false
 						type: bool: default: Args.enabled_default
 					}
 
 					ca_file: {
-						common:      false
+						common: false
 						description: """
 							Absolute path to an additional CA certificate file.
 
 							The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 							"""
-						required:    false
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
@@ -651,9 +651,9 @@ components: {
 					}
 					if Args.can_add_client_metadata {
 						client_metadata_key: {
-							common:      false
+							common: false
 							description: "Event field for client certificate metadata."
-							required:    false
+							required: false
 							type: string: {
 								default: null
 								examples: ["client_cert"]
@@ -661,7 +661,7 @@ components: {
 						}
 					}
 					crt_file: {
-						common:      false
+						common: false
 						description: """
 							Absolute path to a certificate file used to identify this server.
 
@@ -670,33 +670,33 @@ components: {
 
 							If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 							"""
-						required:    false
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
 						}
 					}
 					key_file: {
-						common:      false
+						common: false
 						description: """
 							Absolute path to a private key file used to identify this server.
 
 							The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 							"""
-						required:    false
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
 						}
 					}
 					key_pass: {
-						common:      false
+						common: false
 						description: """
 							Passphrase used to unlock the encrypted key file.
 
 							This has no effect unless `key_file` is set.
 							"""
-						required:    false
+						required: false
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
@@ -705,7 +705,7 @@ components: {
 
 					if Args.can_verify_certificate {
 						verify_certificate: {
-							common:      false
+							common: false
 							description: """
 								Enables certificate verification.
 
@@ -718,7 +718,7 @@ components: {
 
 								Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 								"""
-							required:    false
+							required: false
 							type: bool: default: false
 						}
 					}
@@ -734,39 +734,39 @@ components: {
 				}
 				let Args = _args
 
-				common:      false
+				common: false
 				description: "Configures the TLS options for incoming/outgoing connections."
-				required:    false
+				required: false
 				type: object: options: {
 					if !Args.enabled_by_scheme {
 						enabled: {
-							common:      true
+							common: true
 							description: """
 								Whether or not to require TLS for incoming/outgoing connections.
 
 								When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 								more information.
 								"""
-							required:    false
+							required: false
 							type: bool: default: Args.enabled_default
 						}
 					}
 
 					ca_file: {
-						common:      false
+						common: false
 						description: """
 							Absolute path to an additional CA certificate file.
 
 							The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 							"""
-						required:    false
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
 						}
 					}
 					crt_file: {
-						common:      true
+						common: true
 						description: """
 							Absolute path to a certificate file used to identify this server.
 
@@ -775,47 +775,47 @@ components: {
 
 							If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 							"""
-						required:    false
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
 						}
 					}
 					key_file: {
-						common:      true
+						common: true
 						description: """
 							Absolute path to a private key file used to identify this server.
 
 							The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 							"""
-						required:    false
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
 						}
 					}
 					key_pass: {
-						common:      false
+						common: false
 						description: """
 							Passphrase used to unlock the encrypted key file.
 
 							This has no effect unless `key_file` is set.
 							"""
-						required:    false
+						required: false
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 						}
 					}
 					alpn_protocols: {
-						common:      false
+						common: false
 						description: """
 							Sets the list of supported ALPN protocols.
 
 							Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
 							they are defined.
 							"""
-						required:    false
+						required: false
 						type: array: {
 							default: null
 							items: type: string: {
@@ -827,7 +827,7 @@ components: {
 
 					if Args.can_verify_certificate {
 						verify_certificate: {
-							common:      false
+							common: false
 							description: """
 								Enables certificate verification.
 
@@ -840,14 +840,14 @@ components: {
 
 								Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 								"""
-							required:    false
+							required: false
 							type: bool: default: true
 						}
 					}
 
 					if Args.can_verify_hostname {
 						verify_hostname: {
-							common:      false
+							common: false
 							description: """
 								Enables hostname verification.
 
@@ -858,7 +858,7 @@ components: {
 
 								Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 								"""
-							required:    false
+							required: false
 							type: bool: default: true
 						}
 					}
