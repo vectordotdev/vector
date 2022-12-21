@@ -7,7 +7,9 @@ use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
 use lookup::{lookup_v2::parse_value_path, owned_value_path};
 use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{log_schema, LegacyKey, LogNamespace};
+#[cfg(unix)]
+use vector_core::config::log_schema;
+use vector_core::{config::LegacyKey, config::LogNamespace};
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
