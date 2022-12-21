@@ -735,7 +735,7 @@ components: {
 				let Args = _args
 
 				common:      false
-				description: "Configures the TLS options for incoming/outgoing connections."
+				description: "Configures the TLS options for incoming/outgoing connections. TEMP REMOVE ME TODO"
 				required:    false
 				type: object: options: {
 					if !Args.enabled_by_scheme {
