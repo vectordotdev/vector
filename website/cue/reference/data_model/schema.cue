@@ -210,6 +210,12 @@ data_model: schema: {
 					}
 				}
 
+				interval_ms: {
+					description: "The time interval represented by the value of this metric."
+					required:    false
+					type: uint: {}
+				}
+
 				"kind": {
 					description: "The metric value kind."
 					required:    true
@@ -321,7 +327,7 @@ data_model: schema: {
 				}
 
 				tags: {
-					description: "The metric tags. Key/value pairs, nesting is not allowed."
+					description: "The metric tags, represented as a mapping of tag names to either a single value or a list of values, where each value is either a string or `null`."
 					required:    true
 					type: object: {
 						examples: [
@@ -333,7 +339,7 @@ data_model: schema: {
 						options: {
 							"*": {
 								common:      true
-								description: "Key/value pairs, nesting is not allowed."
+								description: "A mapping of tag names to either a single value or a list of values, where each value is either a string or `null`."
 								required:    false
 								type: "*": {}
 							}
