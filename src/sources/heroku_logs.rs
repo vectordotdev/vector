@@ -44,12 +44,15 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct LogplexConfig {
     /// The address to listen for connections on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
+    #[configurable(metadata(docs::examples = "localhost:8080"))]
     address: SocketAddr,
 
     /// A list of URL query parameters to include in the log event.
     ///
     /// These will override any values included in the body with conflicting names.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "application", docs::examples = "source"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
