@@ -137,7 +137,7 @@ async fn collected_metrics_native_json() {
         metric
             .tags()
             .unwrap()
-            .get(log_schema().source_type_key())
+            .get_single(log_schema().source_type_key())
             .map(AsRef::as_ref),
         Some(HttpClientConfig::NAME)
     );

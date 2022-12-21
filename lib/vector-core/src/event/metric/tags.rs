@@ -481,11 +481,21 @@ impl MetricTags {
             .filter_map(|(name, tags)| tags.into_single().map(|tag| (name, tag)))
     }
 
+    /// Determine if the tags contains a particular name.
+    #[inline]
     pub fn contains_key(&self, name: &str) -> bool {
         self.0.contains_key(name)
     }
 
-    pub fn get(&self, name: &str) -> Option<&str> {
+    /// Get the full set of values for a given tag name.
+    #[inline]
+    pub fn get_set(&self, name: &str) -> Option<&TagValueSet> {
+        self.0.get(name)
+    }
+
+    /// Get the single value for a given tag name.
+    #[inline]
+    pub fn get_single(&self, name: &str) -> Option<&str> {
         self.0.get(name).and_then(TagValueSet::as_single)
     }
 

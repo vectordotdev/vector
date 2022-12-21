@@ -323,7 +323,7 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     match key {
         "name" => Some(metric.name()),
         "namespace" => metric.namespace().map(Into::into),
-        _ if key.starts_with("tags.") => metric.tags().and_then(|tags| tags.get(&key[5..])),
+        _ if key.starts_with("tags.") => metric.tags().and_then(|tags| tags.get_single(&key[5..])),
         _ => None,
     }
 }

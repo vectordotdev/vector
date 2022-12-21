@@ -1157,8 +1157,8 @@ mod integration_tests {
                 assert!((timestamp - Utc::now()).num_seconds() < 1);
                 // validate basic tags
                 let tags = metric.tags().expect("existed tags");
-                assert_eq!(tags.get("endpoint"), Some(&clean_endpoint[..]));
-                assert_eq!(tags.get("host"), Some(&host[..]));
+                assert_eq!(tags.get_single("endpoint"), Some(&clean_endpoint[..]));
+                assert_eq!(tags.get_single("host"), Some(&host[..]));
             }
         })
         .await;

@@ -329,14 +329,16 @@ impl Metric {
 
     /// Returns `true` if `name` tag is present, and matches the provided `value`
     pub fn tag_matches(&self, name: &str, value: &str) -> bool {
-        self.tags()
-            .filter(|t| t.get(name).filter(|v| *v == value).is_some())
-            .is_some()
+        self.tags().map_or(false, |tags| {
+            tags.get_single(name).map_or(false, |v| v == value)
+        })
     }
 
     /// Returns the string value of a tag, if it exists
     pub fn tag_value(&self, name: &str) -> Option<String> {
-        self.tags().and_then(|t| t.get(name)).map(ToOwned::to_owned)
+        self.tags()
+            .and_then(|t| t.get_single(name))
+            .map(ToOwned::to_owned)
     }
 
     /// Inserts a tag into this metric.

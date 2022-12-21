@@ -691,7 +691,7 @@ mod tests {
                 metric
                     .tags()
                     .expect("The metrics should have tags")
-                    .get(tag)
+                    .get_single(tag)
                     .expect("The metric is missing the specified tag")
                     .to_string()
             })

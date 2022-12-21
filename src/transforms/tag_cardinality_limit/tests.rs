@@ -134,7 +134,12 @@ async fn drop_tag(config: TagCardinalityLimitConfig) {
         assert!(!new_event3.as_metric().tags().unwrap().contains_key("tag1"));
         assert_eq!(
             "val1",
-            new_event3.as_metric().tags().unwrap().get("tag2").unwrap()
+            new_event3
+                .as_metric()
+                .tags()
+                .unwrap()
+                .get_single("tag2")
+                .unwrap()
         );
     })
     .await;

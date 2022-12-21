@@ -2083,11 +2083,7 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
 
 fn assert_tag(metric: &Metric, tag: &str, value: &str) {
     assert_eq!(
-        metric
-            .tags()
-            .expect("Missing tags")
-            .get(tag)
-            .map(AsRef::as_ref),
+        metric.tags().expect("Missing tags").get_single(tag),
         Some(value)
     );
 }

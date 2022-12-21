@@ -1050,10 +1050,13 @@ mod integration_tests {
 
                 assert_eq!(metric.namespace(), Some("postgresql"));
                 assert_eq!(
-                    metric.tags().unwrap().get("endpoint").unwrap(),
+                    metric.tags().unwrap().get_single("endpoint").unwrap(),
                     &tags_endpoint
                 );
-                assert_eq!(metric.tags().unwrap().get("host").unwrap(), &tags_host);
+                assert_eq!(
+                    metric.tags().unwrap().get_single("host").unwrap(),
+                    &tags_host
+                );
             }
 
             // test metrics from different queries
@@ -1111,7 +1114,7 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
 
-            if let Some(db) = metric.tags().unwrap().get("db") {
+            if let Some(db) = metric.tags().unwrap().get_single("db") {
                 assert!(db == "vector" || db == "postgres");
             }
         }
@@ -1130,7 +1133,7 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
 
-            if let Some(db) = metric.tags().unwrap().get("db") {
+            if let Some(db) = metric.tags().unwrap().get_single("db") {
                 assert!(db != "vector" && db != "postgres");
             }
         }
@@ -1154,7 +1157,7 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
 
-            if let Some(db) = metric.tags().unwrap().get("db") {
+            if let Some(db) = metric.tags().unwrap().get_single("db") {
                 assert!(db == "template1");
             }
         }

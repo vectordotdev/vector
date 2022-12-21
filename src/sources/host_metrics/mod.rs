@@ -599,7 +599,7 @@ pub(self) mod tests {
         assert!(!metrics.into_iter().any(|event| event
             .tags()
             .expect("Missing tags")
-            .get("host")
+            .get_single("host")
             .expect("Missing \"host\" tag")
             != hostname));
     }
@@ -675,7 +675,7 @@ pub(self) mod tests {
             metric
                 .tags()
                 .unwrap()
-                .get(tag)
+                .get_single(tag)
                 .map(|value| !matches(value))
                 .unwrap_or(false)
         })
@@ -703,7 +703,13 @@ pub(self) mod tests {
     fn collect_tag_values(metrics: &[Metric], tag: &str) -> HashSet<String> {
         metrics
             .iter()
-            .filter_map(|metric| metric.tags().unwrap().get(tag).map(ToOwned::to_owned))
+            .filter_map(|metric| {
+                metric
+                    .tags()
+                    .unwrap()
+                    .get_single(tag)
+                    .map(ToOwned::to_owned)
+            })
             .collect::<HashSet<_>>()
     }
 

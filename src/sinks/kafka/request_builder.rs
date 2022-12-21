@@ -71,7 +71,7 @@ fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
             .map(|value| value.coerce_to_bytes()),
         Event::Metric(metric) => metric
             .tags()
-            .and_then(|tags| tags.get(key_field))
+            .and_then(|tags| tags.get_single(key_field))
             .map(|value| value.to_owned().into()),
         _ => None,
     })
