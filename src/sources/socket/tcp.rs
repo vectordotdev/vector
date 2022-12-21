@@ -209,7 +209,7 @@ impl TcpSource for RawTcpSource {
                     now,
                 );
 
-                let host_key_path = self.config.host_key.as_ref().map_or_else(
+                let legacy_host_key = self.config.host_key.as_ref().map_or_else(
                     || parse_value_path(log_schema().host_key()).ok(),
                     |k| k.path.clone(),
                 );
@@ -217,12 +217,12 @@ impl TcpSource for RawTcpSource {
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,
                     log,
-                    host_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                    legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
                     path!("host"),
                     host.ip().to_string(),
                 );
 
-                let port_key_path = self
+                let legacy_port_key = self
                     .config
                     .port_key
                     .as_ref()
@@ -231,7 +231,7 @@ impl TcpSource for RawTcpSource {
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,
                     log,
-                    port_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                    legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
                     path!("port"),
                     host.port(),
                 );
