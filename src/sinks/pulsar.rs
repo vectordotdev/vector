@@ -32,7 +32,7 @@ use vector_common::{
     sensitive_string::SensitiveString,
 };
 use vector_config::configurable_component;
-use vector_core::{config::log_schema, event::EventMetadata};
+use vector_core::config::log_schema;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -363,7 +363,7 @@ impl Sink<Event> for PulsarSink {
                     builder = builder.with_key(key);
                 };
                 let result = builder.send().await;
-                (producer, result, metadata, finalizers, source_key)
+                (producer, result, metadata, finalizers, source_id)
             })),
         );
 
@@ -390,7 +390,7 @@ impl Sink<Event> for PulsarSink {
                         count: metadata.event_count(),
                         byte_size: metadata.events_estimated_json_encoded_byte_size(),
                         output: None,
-                        source,
+                        source: source.as_deref(),
                     });
 
                     this.bytes_sent

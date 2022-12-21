@@ -39,8 +39,9 @@ pub struct BlackholeConfig {
 
 #[async_trait::async_trait]
 impl SinkConfig for BlackholeConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = BlackholeSink::new(self.clone());
+    async fn build(&self, ctx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sources_details = ctx.sources_details.clone();
+        let sink = BlackholeSink::new(self.clone(), sources_details);
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))

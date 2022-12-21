@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     convert::Infallible,
     hash::Hash,
     mem::{discriminant, Discriminant},
@@ -23,7 +24,7 @@ use vector_common::config::SourceDetails;
 use vector_config::configurable_component;
 use vector_core::{
     internal_event::{
-        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+        emit, ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
     },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
@@ -397,20 +398,14 @@ fn handle(
         (true, &Method::GET, "/metrics") => {
             let metrics = metrics.read().expect(LOCK_FAILED);
 
-            let count = metrics.len();
-            let byte_size = metrics
-                .iter()
-                .map(|(_, (metric, _))| metric.estimated_json_encoded_size_of())
-                .sum();
-
             let mut collector = StringCollector::new();
             let mut sources: HashMap<Option<usize>, (usize, usize)> = HashMap::new();
 
             for (_, (metric, _)) in metrics.iter() {
-                let size = event.estimated_json_encoded_size_of();
+                let size = metric.estimated_json_encoded_size_of();
 
                 sources
-                    .entry(event.metadata().source_id())
+                    .entry(metric.metadata().source_id())
                     .and_modify(|(count, byte_size)| {
                         *count += 1;
                         *byte_size += size;

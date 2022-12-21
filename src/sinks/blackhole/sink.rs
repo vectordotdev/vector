@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -13,6 +14,7 @@ use tokio::{
     sync::watch,
     time::{interval, sleep_until},
 };
+use vector_common::config::SourceDetails;
 use vector_core::{
     internal_event::{BytesSent, EventsSent},
     EstimatedJsonEncodedSizeOf,
@@ -28,15 +30,17 @@ pub struct BlackholeSink {
     total_raw_bytes: Arc<AtomicUsize>,
     config: BlackholeConfig,
     last: Option<Instant>,
+    sources_details: Vec<SourceDetails>,
 }
 
 impl BlackholeSink {
-    pub fn new(config: BlackholeConfig) -> Self {
+    pub fn new(config: BlackholeConfig, sources_details: Vec<SourceDetails>) -> Self {
         BlackholeSink {
             config,
             total_events: Arc::new(AtomicUsize::new(0)),
             total_raw_bytes: Arc::new(AtomicUsize::new(0)),
             last: None,
+            sources_details,
         }
     }
 }
@@ -85,24 +89,37 @@ impl StreamSink<EventArray> for BlackholeSink {
                 self.last = Some(until);
             }
 
-            let message_len = events.estimated_json_encoded_size_of();
+            let mut sources: HashMap<Option<usize>, (usize, usize)> = HashMap::new();
+            events.iter_events().for_each(|event| {
+                let size = event.estimated_json_encoded_size_of();
 
-            let _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
-            let _ = self
-                .total_raw_bytes
-                .fetch_add(message_len, Ordering::AcqRel);
-
-            emit!(EventsSent {
-                count: events.len(),
-                byte_size: message_len,
-                output: None,
-                source: None,
+                sources
+                    .entry(event.metadata().source_id())
+                    .and_modify(|(count, byte_size)| {
+                        *count += 1;
+                        *byte_size += size;
+                    })
+                    .or_insert((1, size));
             });
 
-            emit!(BytesSent {
-                byte_size: message_len,
-                protocol: "blackhole".to_string().into(),
-            });
+            for (source_id, (count, byte_size)) in sources {
+                let _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
+                let _ = self.total_raw_bytes.fetch_add(byte_size, Ordering::AcqRel);
+
+                emit!(EventsSent {
+                    count,
+                    byte_size,
+                    output: None,
+                    source: source_id.and_then(|id| {
+                        self.sources_details.get(id).map(|details| details.key.id())
+                    }),
+                });
+
+                emit!(BytesSent {
+                    byte_size,
+                    protocol: "blackhole".to_string().into(),
+                });
+            }
         }
 
         // Notify the reporting task to shutdown.

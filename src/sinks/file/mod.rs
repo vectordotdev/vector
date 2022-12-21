@@ -17,6 +17,7 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
+use vector_common::config::SourceDetails;
 use vector_config::configurable_component;
 use vector_core::{internal_event::EventsSent, EstimatedJsonEncodedSizeOf};
 
@@ -28,7 +29,6 @@ use crate::{
     internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
     sinks::util::StreamSink,
     template::Template,
-    topology::builder::SourceDetails,
 };
 mod bytes_path;
 use std::convert::TryFrom;

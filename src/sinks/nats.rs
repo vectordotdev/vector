@@ -6,8 +6,9 @@ use codecs::JsonSerializerConfig;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol,
+use vector_common::{
+    config::SourceDetails,
+    internal_event::{ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol},
 };
 use vector_config::configurable_component;
 
@@ -20,7 +21,6 @@ use crate::{
     sinks::util::StreamSink,
     template::{Template, TemplateParseError},
     tls::TlsEnableableConfig,
-    topology::builder::SourceDetails,
 };
 
 #[derive(Debug, Snafu)]

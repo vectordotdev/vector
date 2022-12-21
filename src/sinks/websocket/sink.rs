@@ -23,6 +23,7 @@ use tokio_tungstenite::{
     WebSocketStream as WsStream,
 };
 use tokio_util::codec::Encoder as _;
+use vector_common::config::SourceDetails;
 use vector_core::{
     internal_event::{ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol},
     EstimatedJsonEncodedSizeOf,
@@ -41,7 +42,6 @@ use crate::{
     sinks::util::{retries::ExponentialBackoff, StreamSink},
     sinks::websocket::config::WebSocketSinkConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
-    topology::builder::SourceDetails,
 };
 
 #[derive(Debug, Snafu)]
