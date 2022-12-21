@@ -227,7 +227,7 @@ pub(super) fn udp(
                                             now,
                                         );
 
-                                        let host_key_path = config.host_key.as_ref().map_or_else(
+                                        let legacy_host_key = config.host_key.as_ref().map_or_else(
                                             || parse_value_path(log_schema().host_key()).ok(),
                                             |k| k.path.clone(),
                                         );
@@ -235,12 +235,12 @@ pub(super) fn udp(
                                         log_namespace.insert_source_metadata(
                                             SocketConfig::NAME,
                                             log,
-                                            host_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                                            legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
                                             path!("host"),
                                             address.ip().to_string()
                                         );
 
-                                        let port_key_path = config
+                                        let legacy_port_key = config
                                             .port_key
                                             .as_ref()
                                             .map_or_else(|| parse_value_path("path").ok(), |k| k.path.clone());
@@ -248,7 +248,7 @@ pub(super) fn udp(
                                         log_namespace.insert_source_metadata(
                                             SocketConfig::NAME,
                                             log,
-                                            port_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
+                                            legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
                                             path!("port"),
                                             address.port()
                                         );
