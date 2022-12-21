@@ -242,7 +242,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 # External libs
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.15", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
-avro-rs = { version = "0.13.0", default-features = false, optional = true }
+apache-avro = { version = "0.14.0", default-features = false, optional = true }
 axum = { version = "0.6.1", default-features = false }
 base64 = { version = "0.13.1", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
@@ -696,7 +696,7 @@ sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["aws-core", "dep:base64", "dep:prometheus-parser", "dep:snap", "dep:serde_with"]
-sinks-pulsar = ["dep:avro-rs", "dep:pulsar"]
+sinks-pulsar = ["dep:apache-avro", "dep:pulsar"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
