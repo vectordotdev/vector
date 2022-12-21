@@ -450,7 +450,7 @@ mod tests {
         let result = encode_event(
             evt.into(),
             &Template::try_from("key").unwrap(),
-            &Transformer::new(None, Some(vec!["key".into()]), None).unwrap(),
+            &Transformer::new(None, Some(vec!["key".into()]), None, Default::default()).unwrap(),
             &mut Encoder::<()>::new(JsonSerializer::new().into()),
         )
         .unwrap()

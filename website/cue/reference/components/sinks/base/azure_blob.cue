@@ -220,6 +220,27 @@ base: components: sinks: azure_blob: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			metric_tag_values: {
+				description: """
+					Controls how metric tag values are encoded.
+
+					When set to `single`, metric tag values will be exposed as single strings. Tags with
+					multiple values will show the last assigned value, and null values will be ignored. When set
+					to `full`, all metric tag values will be exposed.
+					"""
+				required: false
+				type: string: {
+					default: "single"
+					enum: {
+						full: "All tags will be exposed as arrays of either string or null values."
+						single: """
+															Tag values will be exposed as single strings, the
+															same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+															will be ignored.
+															"""
+					}
+				}
+			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false

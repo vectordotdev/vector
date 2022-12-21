@@ -289,6 +289,7 @@ async fn allows_using_except_fields() {
             None,
             Some(vec!["idx".to_string(), "timestamp".to_string()]),
             None,
+            Default::default(),
         )
         .unwrap(),
         endpoints: vec![String::from("https://example.com")],
@@ -325,7 +326,13 @@ async fn allows_using_only_fields() {
             action: None,
             index: Some(String::from("{{ idx }}")),
         }),
-        encoding: Transformer::new(Some(vec![owned_value_path!("foo")]), None, None).unwrap(),
+        encoding: Transformer::new(
+            Some(vec![owned_value_path!("foo")]),
+            None,
+            None,
+            Default::default(),
+        )
+        .unwrap(),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()

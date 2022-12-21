@@ -150,7 +150,8 @@ async fn insert_events_unix_timestamps() {
         endpoint: host.parse().unwrap(),
         table: table.clone(),
         compression: Compression::None,
-        encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
+        encoding: Transformer::new(None, None, Some(TimestampFormat::Unix), Default::default())
+            .unwrap(),
         batch,
         request: TowerRequestConfig {
             retry_attempts: Some(1),

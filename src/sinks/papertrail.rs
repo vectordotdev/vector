@@ -221,7 +221,13 @@ mod tests {
         let mut encoder = PapertrailEncoder {
             pid: 0,
             process: Some(Template::try_from("{{ process }}").unwrap()),
-            transformer: Transformer::new(None, Some(vec!["magic".into()]), None).unwrap(),
+            transformer: Transformer::new(
+                None,
+                Some(vec!["magic".into()]),
+                None,
+                Default::default(),
+            )
+            .unwrap(),
             encoder: Encoder::<()>::new(JsonSerializer::new().into()),
         };
 

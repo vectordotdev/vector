@@ -11,9 +11,9 @@ use lookup::{
 use serde::{Deserialize, Deserializer};
 use value::Value;
 use vector_config::configurable_component;
-use vector_core::event::{LogEvent, MaybeAsLogMut};
+use vector_core::event::{LogEvent, Metric};
 
-use crate::{event::Event, serde::skip_serializing_if_default};
+use crate::{event::Event, serde::skip_serializing_if_default, transforms::MetricTagsValues};
 
 /// Transformations to prepare an event for serialization.
 #[configurable_component(no_deser)]
@@ -30,6 +30,14 @@ pub struct Transformer {
     /// Format used for timestamp fields.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     timestamp_format: Option<TimestampFormat>,
+
+    /// Controls how metric tag values are encoded.
+    ///
+    /// When set to `single`, metric tag values will be exposed as single strings. Tags with
+    /// multiple values will show the last assigned value, and null values will be ignored. When set
+    /// to `full`, all metric tag values will be exposed.
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    metric_tag_values: MetricTagsValues,
 }
 
 impl<'de> Deserialize<'de> for Transformer {
@@ -46,6 +54,8 @@ impl<'de> Deserialize<'de> for Transformer {
             except_fields: Option<Vec<String>>,
             #[serde(default)]
             timestamp_format: Option<TimestampFormat>,
+            #[serde(default)]
+            metric_tag_values: MetricTagsValues,
         }
 
         let inner: TransformerInner = Deserialize::deserialize(deserializer)?;
@@ -53,6 +63,7 @@ impl<'de> Deserialize<'de> for Transformer {
             inner.only_fields,
             inner.except_fields,
             inner.timestamp_format,
+            inner.metric_tag_values,
         )
         .map_err(serde::de::Error::custom)
     }
@@ -67,6 +78,7 @@ impl Transformer {
         only_fields: Option<Vec<OwnedValuePath>>,
         except_fields: Option<Vec<String>>,
         timestamp_format: Option<TimestampFormat>,
+        metric_tag_values: MetricTagsValues,
     ) -> Result<Self, crate::Error> {
         Self::validate_fields(only_fields.as_ref(), except_fields.as_ref())?;
 
@@ -74,6 +86,7 @@ impl Transformer {
             only_fields,
             except_fields,
             timestamp_format,
+            metric_tag_values,
         })
     }
 
@@ -114,12 +127,17 @@ impl Transformer {
 
     /// Prepare an event for serialization by the given transformation rules.
     pub fn transform(&self, event: &mut Event) {
-        // Rules are currently applied to logs only.
-        if let Some(log) = event.maybe_as_log_mut() {
-            // Ordering in here should not matter.
-            self.apply_except_fields(log);
-            self.apply_only_fields(log);
-            self.apply_timestamp_format(log);
+        match event {
+            Event::Log(log) => {
+                // Ordering in here should not matter.
+                self.apply_except_fields(log);
+                self.apply_only_fields(log);
+                self.apply_timestamp_format(log);
+            }
+            Event::Metric(metric) => {
+                self.reduce_tag_values(metric);
+            }
+            Event::Trace(_) => (),
         }
     }
 
@@ -186,6 +204,12 @@ impl Transformer {
 
         Ok(())
     }
+
+    fn reduce_tag_values(&self, metric: &mut Metric) {
+        if self.metric_tag_values == MetricTagsValues::Single {
+            metric.reduce_tags_to_single();
+        }
+    }
 }
 
 #[configurable_component]
@@ -203,7 +227,8 @@ pub enum TimestampFormat {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use vector_core::config::log_schema;
+    use vector_core::event::{metric::TagValue, Metric, MetricKind, MetricValue};
+    use vector_core::{config::log_schema, metric_tags};
 
     use super::*;
     use std::collections::BTreeMap;
@@ -336,6 +361,52 @@ mod tests {
                 e
             ),
         }
+    }
+
+    #[test]
+    fn deserialize_and_transform_tags_full() {
+        let metric = deserialize_and_transform_tags(r#"metric_tag_values = "full""#);
+        assert_eq!(
+            metric.tags().unwrap().get_set("a"),
+            Some(
+                &[
+                    TagValue::Value("first".into()),
+                    TagValue::Bare,
+                    TagValue::Value("second".into())
+                ]
+                .into_iter()
+                .collect()
+            )
+        );
+    }
+
+    #[test]
+    fn deserialize_and_transform_tags_single() {
+        let metric = deserialize_and_transform_tags(r#"metric_tag_values = "single""#);
+        assert_eq!(
+            metric.tags().unwrap().get_set("a"),
+            Some(&[TagValue::Value("second".into())].into_iter().collect())
+        );
+    }
+
+    fn deserialize_and_transform_tags(config: &str) -> Metric {
+        let transformer: Transformer = toml::from_str(config).unwrap();
+        let mut event = Event::Metric(
+            Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags!(
+            "a" => "first",
+            "a" => None,
+            "a" => "second",
+            ))),
+        );
+
+        transformer.transform(&mut event);
+
+        event.into_metric()
     }
 
     #[test]
