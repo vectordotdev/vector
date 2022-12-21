@@ -280,18 +280,18 @@ impl PulsarSink {
         if let PulsarSinkState::Sending(fut) = &mut self.state {
             let (producer, result, metadata, finalizers, source_id) = ready!(fut.as_mut().poll(cx));
 
+            let source = source_id.and_then(|id| {
+                self.sources_details
+                    .get(id)
+                    .map(|details| details.key.id().to_owned())
+            });
+
             self.state = PulsarSinkState::Ready(producer);
             self.in_flight.push(Box::pin(async move {
                 let result = match result {
                     Ok(fut) => fut.await,
                     Err(error) => Err(error),
                 };
-
-                let source = source_id.and_then(|id| {
-                    self.sources_details
-                        .get(id)
-                        .map(|details| details.key.id().to_owned())
-                });
 
                 (result, metadata, finalizers, source)
             }));
