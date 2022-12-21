@@ -312,11 +312,11 @@ components: sources: docker_logs: {
 					type: timestamp: {}
 				}
 				host: fields._local_host
-				"*": {
+				label: {
 					description: "Each container label is inserted with it's exact key/value pair."
 					required:    true
-					type: string: {
-						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+					type: object: {
+						examples: [{"mylabel": "myvalue"}]
 					}
 				}
 			}

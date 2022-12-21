@@ -1,14 +1,27 @@
 use mlua::prelude::*;
 
+use crate::event::lua::metric::LuaMetric;
 use crate::event::{Event, LogEvent, Metric};
 
-impl<'a> ToLua<'a> for Event {
+pub struct LuaEvent {
+    pub event: Event,
+    pub metric_multi_value_tags: bool,
+}
+
+impl<'a> ToLua<'a> for LuaEvent {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
-        match self {
+        match self.event {
             Event::Log(log) => table.raw_set("log", log.to_lua(lua)?)?,
-            Event::Metric(metric) => table.raw_set("metric", metric.to_lua(lua)?)?,
+            Event::Metric(metric) => table.raw_set(
+                "metric",
+                LuaMetric {
+                    metric,
+                    multi_value_tags: self.metric_multi_value_tags,
+                }
+                .to_lua(lua)?,
+            )?,
             Event::Trace(_) => {
                 return Err(LuaError::ToLuaConversionError {
                     from: "Event",
@@ -63,7 +76,15 @@ mod test {
 
     fn assert_event(event: Event, assertions: Vec<&'static str>) {
         let lua = Lua::new();
-        lua.globals().set("event", event).unwrap();
+        lua.globals()
+            .set(
+                "event",
+                LuaEvent {
+                    event,
+                    metric_multi_value_tags: false,
+                },
+            )
+            .unwrap();
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),

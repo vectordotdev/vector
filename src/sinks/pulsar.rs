@@ -15,6 +15,7 @@ use bytes::BytesMut;
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
+use pulsar::compression;
 use pulsar::error::AuthenticationError;
 use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
@@ -25,7 +26,8 @@ use tokio_util::codec::Encoder as _;
 use value::Value;
 use vector_common::{
     internal_event::{
-        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        Registered,
     },
     request_metadata::RequestMetadata,
     sensitive_string::SensitiveString,
@@ -50,8 +52,15 @@ pub struct PulsarSinkConfig {
     /// The Pulsar topic name to write events to.
     topic: String,
 
+    /// The name of the producer. If not specified, the default name assigned by Pulsar will be used.
+    producer_name: Option<String>,
+
     #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    compression: PulsarCompression,
 
     #[configurable(derived)]
     auth: Option<AuthConfig>,
@@ -64,7 +73,7 @@ pub struct PulsarSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    /// Log field to use as Pulsar message key
+    /// Log field to use as Pulsar message key.
     partition_key_field: Option<String>,
 }
 
@@ -88,7 +97,7 @@ struct AuthConfig {
     oauth2: Option<OAuth2Config>,
 }
 
-/// OAuth2-specific authenticatgion configuration.
+/// OAuth2-specific authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct OAuth2Config {
@@ -105,6 +114,29 @@ pub struct OAuth2Config {
 
     /// The OAuth2 scope.
     scope: Option<String>,
+}
+
+/// Supported compression types for Pulsar.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PulsarCompression {
+    /// No compression.
+    #[derivative(Default)]
+    None,
+
+    /// LZ4.
+    Lz4,
+
+    /// Zlib.
+    Zlib,
+
+    /// Zstandard.
+    Zstd,
+
+    /// Snappy.
+    Snappy,
 }
 
 type PulsarProducer = Producer<TokioExecutor>;
@@ -142,6 +174,7 @@ struct PulsarSink {
         >,
     >,
     bytes_sent: Registered<BytesSent>,
+    events_sent: Registered<EventsSent>,
 }
 
 impl GenerateConfig for PulsarSinkConfig {
@@ -151,8 +184,10 @@ impl GenerateConfig for PulsarSinkConfig {
             topic: "topic-1234".to_string(),
             partition_key_field: Some("message".to_string()),
             encoding: TextSerializerConfig::new().into(),
+            compression: Default::default(),
             auth: None,
             acknowledgements: Default::default(),
+            producer_name: None,
         })
         .unwrap()
     }
@@ -165,7 +200,7 @@ impl SinkConfig for PulsarSinkConfig {
         _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let producer = self
-            .create_pulsar_producer()
+            .create_pulsar_producer(false)
             .await
             .context(CreatePulsarSinkSnafu)?;
 
@@ -181,7 +216,7 @@ impl SinkConfig for PulsarSinkConfig {
         )?;
 
         let producer = self
-            .create_pulsar_producer()
+            .create_pulsar_producer(true)
             .await
             .context(CreatePulsarSinkSnafu)?;
         let healthcheck = healthcheck(producer).boxed();
@@ -199,7 +234,10 @@ impl SinkConfig for PulsarSinkConfig {
 }
 
 impl PulsarSinkConfig {
-    async fn create_pulsar_producer(&self) -> Result<PulsarProducer, PulsarError> {
+    async fn create_pulsar_producer(
+        &self,
+        is_healthcheck: bool,
+    ) -> Result<PulsarProducer, PulsarError> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
             builder = match (
@@ -227,23 +265,44 @@ impl PulsarSinkConfig {
         }
 
         let pulsar = builder.build().await?;
-        if let SerializerConfig::Avro { avro } = self.encoding.config() {
-            pulsar
-                .producer()
-                .with_options(pulsar::producer::ProducerOptions {
-                    schema: Some(proto::Schema {
-                        schema_data: avro.schema.as_bytes().into(),
-                        r#type: proto::schema::Type::Avro as i32,
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                })
-                .with_topic(&self.topic)
-                .build()
-                .await
-        } else {
-            pulsar.producer().with_topic(&self.topic).build().await
+        let mut pulsar_builder = pulsar.producer().with_topic(&self.topic);
+
+        if let Some(producer_name) = self.producer_name.clone() {
+            pulsar_builder = pulsar_builder.with_name(if is_healthcheck {
+                format!("{}-healthcheck", producer_name)
+            } else {
+                producer_name
+            });
         }
+
+        let mut producer_options = pulsar::ProducerOptions {
+            compression: Some(match self.compression {
+                PulsarCompression::None => compression::Compression::None,
+                PulsarCompression::Lz4 => {
+                    compression::Compression::Lz4(compression::CompressionLz4::default())
+                }
+                PulsarCompression::Zlib => {
+                    compression::Compression::Zlib(compression::CompressionZlib::default())
+                }
+                PulsarCompression::Zstd => {
+                    compression::Compression::Zstd(compression::CompressionZstd::default())
+                }
+                PulsarCompression::Snappy => {
+                    compression::Compression::Snappy(compression::CompressionSnappy::default())
+                }
+            }),
+            ..Default::default()
+        };
+
+        if let SerializerConfig::Avro { avro } = self.encoding.config() {
+            producer_options.schema = Some(proto::Schema {
+                schema_data: avro.schema.as_bytes().into(),
+                r#type: proto::schema::Type::Avro as i32,
+                ..Default::default()
+            });
+        }
+
+        pulsar_builder.with_options(producer_options).build().await
     }
 }
 
@@ -264,6 +323,7 @@ impl PulsarSink {
             state: PulsarSinkState::Ready(Box::new(producer)),
             in_flight: FuturesUnordered::new(),
             bytes_sent: register!(BytesSent::from(Protocol::TCP)),
+            events_sent: register!(EventsSent::from(Output(None))),
             partition_key_field,
         })
     }
@@ -369,12 +429,10 @@ impl Sink<Event> for PulsarSink {
 
                     finalizers.update_status(EventStatus::Delivered);
 
-                    emit!(EventsSent {
-                        count: metadata.event_count(),
-                        byte_size: metadata.events_estimated_json_encoded_byte_size(),
-                        output: None,
-                    });
-
+                    this.events_sent.emit(CountByteSize(
+                        metadata.event_count(),
+                        metadata.events_estimated_json_encoded_byte_size(),
+                    ));
                     this.bytes_sent
                         .emit(ByteSize(metadata.request_encoded_size()));
                 }
@@ -436,7 +494,9 @@ mod integration_tests {
         let cnf = PulsarSinkConfig {
             endpoint: pulsar_address(),
             topic: topic.clone(),
+            producer_name: None,
             encoding: TextSerializerConfig::new().into(),
+            compression: PulsarCompression::None,
             auth: None,
             acknowledgements: Default::default(),
             partition_key_field: Some("message".to_string()),
@@ -460,7 +520,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let producer = cnf.create_pulsar_producer().await.unwrap();
+        let producer = cnf.create_pulsar_producer(false).await.unwrap();
         let transformer = cnf.encoding.transformer();
         let serializer = cnf.encoding.build().unwrap();
         let encoder = Encoder::<()>::new(serializer);

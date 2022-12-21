@@ -85,7 +85,7 @@ where
         let id_key_field = self.id_key_field;
         let transformer = self.transformer.clone();
 
-        let sink = input
+        input
             .scan(self.metric_to_log, |metric_to_log, event| {
                 future::ready(Some(match event {
                     Event::Metric(metric) => metric_to_log.transform_one(metric),
@@ -113,9 +113,9 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .run()
+            .await
     }
 }
 

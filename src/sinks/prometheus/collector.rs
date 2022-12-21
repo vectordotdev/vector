@@ -334,9 +334,9 @@ impl TimeSeries {
         // label for the actual metric name. For convenience below, an
         // optional extra tag is added.
         let mut labels = tags.cloned().unwrap_or_default();
-        labels.insert(METRIC_NAME_LABEL.into(), [name, suffix].join(""));
+        labels.replace(METRIC_NAME_LABEL.into(), [name, suffix].join(""));
         if let Some((name, value)) = extra {
-            labels.insert(name.into(), value);
+            labels.replace(name.into(), value);
         }
 
         // Extract the labels into a vec and sort to produce a
@@ -935,6 +935,33 @@ mod tests {
                 # HELP something something
                 # TYPE something counter
                 something{code="200",path="c:\\Windows",quoted="host\"1\""} 1
+            "#}
+        );
+    }
+
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we only publish the last tag in the list.
+    #[test]
+    fn encodes_duplicate_tags() {
+        let tags = metric_tags!(
+            "code" => "200",
+            "code" => "success",
+        );
+        let metric = Metric::new(
+            "something".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags));
+        let encoded = encode_one::<StringCollector>(None, &[], &[], &metric);
+        assert_eq!(
+            encoded,
+            indoc! {r#"
+                # HELP something something
+                # TYPE something counter
+                something{code="success"} 1
             "#}
         );
     }

@@ -8,15 +8,12 @@ base: components: sources: eventstoredb_metrics: configuration: {
 			By default, `eventstoredb` is used.
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	endpoint: {
 		description: "Endpoints to scrape stats from."
 		required:    false
-		type: string: {
-			default: "https://localhost:2113/stats"
-			syntax:  "literal"
-		}
+		type: string: default: "https://localhost:2113/stats"
 	}
 	scrape_interval_secs: {
 		description: "The interval between scrapes, in seconds."

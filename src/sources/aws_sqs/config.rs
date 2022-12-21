@@ -1,8 +1,10 @@
 use std::num::NonZeroUsize;
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use lookup::owned_value_path;
+use value::Kind;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::aws::create_client;
 use crate::codecs::DecodingConfig;
@@ -40,21 +42,21 @@ pub struct AwsSqsConfig {
     #[derivative(Default(value = "default_poll_secs()"))]
     pub poll_secs: u32,
 
-    /// The visibility timeout to use for messages, in secords.
+    /// The visibility timeout to use for messages, in seconds.
     ///
-    /// This controls how long a message is left unavailable after Vector receives it. If Vector receives a message, and
-    /// takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it will be made reavailable for another consumer.
+    /// This controls how long a message is left unavailable after it is received. If a message is received, and
+    /// takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it is made available again for another consumer.
     ///
-    /// This can happen if, for example, if Vector crashes between consuming a message and deleting it.
+    /// This can happen if there is an issue between consuming a message and deleting it.
     // NOTE: We restrict this to u32 for safe conversion to i64 later.
     // restricted to u32 for safe conversion to i64 later
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     pub(super) visibility_timeout_secs: u32,
 
-    /// Whether to delete the message once Vector processes it.
+    /// Whether to delete the message once it is processed.
     ///
-    /// It can be useful to set this to `false` to debug or during initial Vector setup.
+    /// It can be useful to set this to `false` for debugging or during the initial setup.
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
@@ -65,7 +67,7 @@ pub struct AwsSqsConfig {
     ///
     /// Should not typically need to be changed, but it can sometimes be beneficial to raise this value when there is a
     /// high rate of messages being pushed into the queue and the messages being fetched are small. In these cases,
-    /// Vector may not fully utilize system resources without fetching more messages per second, as it spends more time
+    /// System resources may not be fully utilized without fetching more messages per second, as it spends more time
     /// fetching the messages than processing them.
     pub client_concurrency: Option<NonZeroUsize>,
 
@@ -85,18 +87,21 @@ pub struct AwsSqsConfig {
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 #[async_trait::async_trait]
 impl SourceConfig for AwsSqsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let client = self.build_client(&cx).await?;
-        let decoder = DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            LogNamespace::Legacy,
-        )
-        .build();
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(
@@ -112,13 +117,26 @@ impl SourceConfig for AwsSqsConfig {
                 visibility_timeout_secs: self.visibility_timeout_secs,
                 delete_message: self.delete_message,
                 acknowledgements,
+                log_namespace,
             }
             .run(cx.out, cx.shutdown),
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let schema_definition = self
+            .decoding
+            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp().or_undefined(),
+                Some("timestamp"),
+            );
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {

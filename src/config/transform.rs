@@ -2,9 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use indexmap::IndexMap;
 use serde::Serialize;
 use vector_config::{configurable_component, Configurable, NamedComponent};
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{GlobalOptions, Input, Output},
     schema,
@@ -13,6 +13,7 @@ use vector_core::{
 
 use crate::transforms::Transforms;
 
+use super::schema::Options as SchemaOptions;
 use super::{id::Inputs, ComponentKey};
 
 /// Fully resolved transform component.
@@ -66,57 +67,6 @@ where
     }
 }
 
-impl TransformOuter<String> {
-    pub(crate) fn expand(
-        mut self,
-        key: ComponentKey,
-        parent_types: &HashSet<&'static str>,
-        transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
-        expansions: &mut IndexMap<ComponentKey, Vec<ComponentKey>>,
-    ) -> Result<(), String> {
-        if !self.inner.nestable(parent_types) {
-            return Err(format!(
-                "the component {} cannot be nested in {:?}",
-                self.inner.get_component_name(),
-                parent_types
-            ));
-        }
-
-        let expansion = self
-            .inner
-            .expand(&key, &self.inputs)
-            .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
-
-        let mut ptypes = parent_types.clone();
-        ptypes.insert(self.inner.get_component_name());
-
-        if let Some(inner_topology) = expansion {
-            let mut children = Vec::new();
-
-            expansions.insert(
-                key,
-                inner_topology
-                    .outputs()
-                    .into_iter()
-                    .map(ComponentKey::from)
-                    .collect(),
-            );
-
-            for (inner_name, inner_transform) in inner_topology.inner {
-                let child = TransformOuter {
-                    inputs: inner_transform.inputs,
-                    inner: inner_transform.inner,
-                };
-                children.push(inner_name.clone());
-                transforms.insert(inner_name, child);
-            }
-        } else {
-            transforms.insert(key, self);
-        }
-        Ok(())
-    }
-}
-
 #[derive(Debug)]
 pub struct TransformContext {
     // This is optional because currently there are a lot of places we use `TransformContext` that
@@ -140,6 +90,8 @@ pub struct TransformContext {
     /// information, such as the `remap` transform, which passes this information along to the VRL
     /// compiler such that type coercion becomes less of a need for operators writing VRL programs.
     pub merged_schema_definition: schema::Definition,
+
+    pub schema: SchemaOptions,
 }
 
 impl Default for TransformContext {
@@ -150,6 +102,7 @@ impl Default for TransformContext {
             enrichment_tables: Default::default(),
             schema_definitions: HashMap::from([(None, schema::Definition::any())]),
             merged_schema_definition: schema::Definition::any(),
+            schema: SchemaOptions::default(),
         }
     }
 }
@@ -171,6 +124,18 @@ impl TransformContext {
             schema_definitions,
             ..Default::default()
         }
+    }
+
+    /// Gets the log namespacing to use. The passed in value is from the transform itself
+    /// and will override any global default if it's set.
+    ///
+    /// This should only be used for transforms that don't originate from a log (eg: `metric_to_log`)
+    /// Most transforms will keep the log_namespace value that already exists on the event.
+    pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
+        namespace
+            .or(self.schema.log_namespace)
+            .unwrap_or(false)
+            .into()
     }
 }
 
@@ -195,7 +160,11 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     ///
     /// The provided `merged_definition` can be used by transforms to understand the expected shape
     /// of events flowing through the transform.
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output>;
+    fn outputs(
+        &self,
+        merged_definition: &schema::Definition,
+        global_log_namespace: LogNamespace,
+    ) -> Vec<Output>;
 
     /// Validates that the configuration of the transform is valid.
     ///
@@ -232,52 +201,5 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// nested under transforms of a specific type, or if such nesting is fundamentally disallowed.
     fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
         true
-    }
-
-    /// Attempts to expand the transform into a subtopology of transforms.
-    ///
-    /// This mechanism allows a transform to act like a macro pattern, where only one transform is
-    /// configured from the user's perspective, but multiple transforms can be created, and
-    /// connected, and returned back to the topology in a seamless way.
-    ///
-    /// If the transform supports expansion, `Ok(Some(...))` is returned containing the inner
-    /// topology that represents an organized subtopology consisting of the set of expanded
-    /// transforms. Otherwise, if expansion is not supported for this transform, `Ok(None)` is returned.
-    ///
-    /// # Errors
-    ///
-    /// If there is an error during expansion, an error variant explaining the issue is returned.
-    fn expand(
-        &mut self,
-        _name: &ComponentKey,
-        _inputs: &[String],
-    ) -> crate::Result<Option<InnerTopology>> {
-        Ok(None)
-    }
-}
-
-#[derive(Debug, Serialize)]
-pub struct InnerTopologyTransform {
-    pub inputs: Inputs<String>,
-    pub inner: Transforms,
-}
-
-#[derive(Debug, Default)]
-pub struct InnerTopology {
-    pub inner: IndexMap<ComponentKey, InnerTopologyTransform>,
-    pub outputs: Vec<(ComponentKey, Vec<Output>)>,
-}
-
-impl InnerTopology {
-    pub fn outputs(&self) -> Vec<String> {
-        self.outputs
-            .iter()
-            .flat_map(|(name, outputs)| {
-                outputs.iter().map(|output| match output.port {
-                    Some(ref port) => name.port(port),
-                    None => name.id().to_string(),
-                })
-            })
-            .collect()
     }
 }

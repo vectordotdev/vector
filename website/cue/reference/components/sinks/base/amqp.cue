@@ -27,156 +27,105 @@ base: components: sinks: amqp: configuration: {
 			type: bool: {}
 		}
 	}
-	connection: {
-		description: "Connection options for the `amqp` sink."
-		required:    true
-		type: object: options: {
-			connection_string: {
-				description: """
-					URI for the `AMQP` server.
+	connection_string: {
+		description: """
+			URI for the AMQP server.
 
-					Format: amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>
-					"""
-				required: true
-				type: string: syntax: "literal"
-			}
-			tls: {
-				description: "Standard TLS options."
-				required:    false
-				type: object: options: {
-					alpn_protocols: {
-						description: """
-																Sets the list of supported ALPN protocols.
+			The URI has the format of
+			`amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>`.
 
-																Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-																they are defined.
-																"""
-						required: false
-						type: array: items: type: string: syntax: "literal"
-					}
-					ca_file: {
-						description: """
-																Absolute path to an additional CA certificate file.
+			The default vhost can be specified by using a value of `%2f`.
 
-																The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-																"""
-						required: false
-						type: string: syntax: "literal"
-					}
-					crt_file: {
-						description: """
-																Absolute path to a certificate file used to identify this server.
-
-																The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-																an inline string in PEM format.
-
-																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
-																"""
-						required: false
-						type: string: syntax: "literal"
-					}
-					key_file: {
-						description: """
-																Absolute path to a private key file used to identify this server.
-
-																The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-																"""
-						required: false
-						type: string: syntax: "literal"
-					}
-					key_pass: {
-						description: """
-																Passphrase used to unlock the encrypted key file.
-
-																This has no effect unless `key_file` is set.
-																"""
-						required: false
-						type: string: syntax: "literal"
-					}
-					verify_certificate: {
-						description: """
-																Enables certificate verification.
-
-																If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-																issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-																certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-																so on until reaching a root certificate.
-
-																Relevant for both incoming and outgoing connections.
-
-																Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
-																"""
-						required: false
-						type: bool: {}
-					}
-					verify_hostname: {
-						description: """
-																Enables hostname verification.
-
-																If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
-																the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
-
-																Only relevant for outgoing connections.
-
-																Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-																"""
-						required: false
-						type: bool: {}
-					}
-				}
-			}
-		}
+			In order to connect over TLS, a scheme of `amqps` can be specified instead i.e.
+			`amqps://...`. Additional TLS settings, such as client certificate verification, etc, can be
+			configured under the `tls` section.
+			"""
+		required: true
+		type: string: examples: ["amqp://user:password@127.0.0.1:5672/%2f?timeout=10"]
 	}
 	encoding: {
-		description: "Encoding configuration."
+		description: "Configures how events are encoded into raw bytes."
 		required:    true
 		type: object: options: {
 			avro: {
-				description:   "Apache Avro serializer options."
+				description:   "Apache Avro-specific encoder options."
 				relevant_when: "codec = \"avro\""
 				required:      true
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
-					avro:        "Apache Avro serialization."
-					gelf:        "GELF serialization."
-					json:        "JSON serialization."
-					logfmt:      "Logfmt serialization."
-					native:      "Native Vector serialization based on Protocol Buffers."
-					native_json: "Native Vector serialization based on JSON."
-					raw_message: """
-						No serialization.
+					avro: """
+						Encodes an event as an [Apache Avro][apache_avro] message.
 
-						This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-						they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-						while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-						event.
+						[apache_avro]: https://avro.apache.org/
+						"""
+					gelf: """
+						Encodes an event as a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: """
+						Encodes an event as [JSON][json].
+
+						[json]: https://www.json.org/
+						"""
+					logfmt: """
+						Encodes an event as a [logfmt][logfmt] message.
+
+						[logfmt]: https://brandur.org/logfmt
+						"""
+					native: """
+						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Encodes an event in Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					raw_message: """
+						No encoding.
+
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
-						Plaintext serialization.
+						Plaintext encoding.
 
-						This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-						they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-						while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-						event.
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -197,5 +146,90 @@ base: components: sinks: amqp: configuration: {
 		description: "Template used to generate a routing key which corresponds to a queue binding."
 		required:    false
 		type: string: syntax: "template"
+	}
+	tls: {
+		description: "TLS configuration."
+		required:    false
+		type: object: options: {
+			alpn_protocols: {
+				description: """
+					Sets the list of supported ALPN protocols.
+
+					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
+					they are defined.
+					"""
+				required: false
+				type: array: items: type: string: {}
+			}
+			ca_file: {
+				description: """
+					Absolute path to an additional CA certificate file.
+
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: {}
+			}
+			crt_file: {
+				description: """
+					Absolute path to a certificate file used to identify this server.
+
+					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+					an inline string in PEM format.
+
+					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					"""
+				required: false
+				type: string: {}
+			}
+			key_file: {
+				description: """
+					Absolute path to a private key file used to identify this server.
+
+					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: {}
+			}
+			key_pass: {
+				description: """
+					Passphrase used to unlock the encrypted key file.
+
+					This has no effect unless `key_file` is set.
+					"""
+				required: false
+				type: string: {}
+			}
+			verify_certificate: {
+				description: """
+					Enables certificate verification.
+
+					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
+					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
+					so on until reaching a root certificate.
+
+					Relevant for both incoming and outgoing connections.
+
+					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+					"""
+				required: false
+				type: bool: {}
+			}
+			verify_hostname: {
+				description: """
+					Enables hostname verification.
+
+					If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+					the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+
+					Only relevant for outgoing connections.
+
+					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+					"""
+				required: false
+				type: bool: {}
+			}
+		}
 	}
 }

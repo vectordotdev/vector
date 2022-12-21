@@ -2,6 +2,7 @@
 name = "vector-config-macros"
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2.0"
 
 [lib]
 proc-macro = true
@@ -15,5 +16,5 @@ syn = { version = "1.0", default-features = false, features = ["full", "extra-tr
 vector-config-common = { path = "../vector-config-common" }
 
 [dev-dependencies]
-serde = { version = "1.0.148", default-features = false }
+serde = { version = "1.0.150", default-features = false }
 vector-config = { path = "../vector-config" }

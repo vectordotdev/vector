@@ -2,6 +2,7 @@ pub mod v1;
 pub mod v2;
 
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{GenerateConfig, Input, Output, TransformConfig, TransformContext},
@@ -31,7 +32,7 @@ enum V1 {
 pub struct LuaConfigV1 {
     /// Transform API version.
     ///
-    /// Specifying this version ensures that Vector does not break backward compatibility.
+    /// Specifying this version ensures that backward compatibility is not broken.
     version: Option<V1>,
 
     #[serde(flatten)]
@@ -53,7 +54,7 @@ enum V2 {
 pub struct LuaConfigV2 {
     /// Transform API version.
     ///
-    /// Specifying this version ensures that Vector does not break backward compatibility.
+    /// Specifying this version ensures that backward compatibility is not broken.
     version: V2,
 
     #[serde(flatten)]
@@ -98,7 +99,7 @@ impl TransformConfig for LuaConfig {
         }
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         match self {
             LuaConfig::V1(v1) => v1.config.outputs(merged_definition),
             LuaConfig::V2(v2) => v2.config.outputs(merged_definition),

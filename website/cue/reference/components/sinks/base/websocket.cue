@@ -40,20 +40,23 @@ base: components: sinks: websocket: configuration: {
 				description:   "The password to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					basic: """
 						Basic authentication.
 
-						The username and password are concatenated and encoded via base64.
+						The username and password are concatenated and encoded via [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
 						"""
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc) is passed as-is.
 						"""
 				}
 			}
@@ -61,66 +64,99 @@ base: components: sinks: websocket: configuration: {
 				description:   "The bearer token to send."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			user: {
 				description:   "The username to send."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 		}
 	}
 	encoding: {
-		description: "Encoding configuration."
+		description: "Configures how events are encoded into raw bytes."
 		required:    true
 		type: object: options: {
 			avro: {
-				description:   "Apache Avro serializer options."
+				description:   "Apache Avro-specific encoder options."
 				relevant_when: "codec = \"avro\""
 				required:      true
 				type: object: options: schema: {
 					description: "The Avro schema."
 					required:    true
-					type: string: syntax: "literal"
+					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
 			}
 			codec: {
-				required: true
+				description: "The codec to use for encoding events."
+				required:    true
 				type: string: enum: {
-					avro:        "Apache Avro serialization."
-					gelf:        "GELF serialization."
-					json:        "JSON serialization."
-					logfmt:      "Logfmt serialization."
-					native:      "Native Vector serialization based on Protocol Buffers."
-					native_json: "Native Vector serialization based on JSON."
-					raw_message: """
-						No serialization.
+					avro: """
+						Encodes an event as an [Apache Avro][apache_avro] message.
 
-						This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-						they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-						while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-						event.
+						[apache_avro]: https://avro.apache.org/
+						"""
+					gelf: """
+						Encodes an event as a [GELF][gelf] message.
+
+						[gelf]: https://docs.graylog.org/docs/gelf
+						"""
+					json: """
+						Encodes an event as [JSON][json].
+
+						[json]: https://www.json.org/
+						"""
+					logfmt: """
+						Encodes an event as a [logfmt][logfmt] message.
+
+						[logfmt]: https://brandur.org/logfmt
+						"""
+					native: """
+						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					native_json: """
+						Encodes an event in Vector’s [native JSON format][vector_native_json].
+
+						This codec is **[experimental][experimental]**.
+
+						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						"""
+					raw_message: """
+						No encoding.
+
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
-						Plaintext serialization.
+						Plaintext encoding.
 
-						This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-						they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-						while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-						event.
+						This "encoding" simply uses the `message` field of a log event.
+
+						Users should take care if they're modifying their log events (such as by using a `remap`
+						transform, etc) and removing the message field while doing additional parsing on it, as this
+						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}
 			except_fields: {
 				description: "List of fields that will be excluded from the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			only_fields: {
 				description: "List of fields that will be included in the encoded event."
 				required:    false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
@@ -158,16 +194,16 @@ base: components: sinks: websocket: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -179,7 +215,7 @@ base: components: sinks: websocket: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			enabled: {
 				description: """
@@ -198,7 +234,7 @@ base: components: sinks: websocket: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -207,7 +243,7 @@ base: components: sinks: websocket: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """
@@ -248,6 +284,6 @@ base: components: sinks: websocket: configuration: {
 			This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 }

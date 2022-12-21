@@ -37,28 +37,24 @@ impl Graph {
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
-        expansions: &IndexMap<String, Vec<String>>,
         schema: schema::Options,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, expansions, false, schema)
+        Self::new_inner(sources, transforms, sinks, false, schema)
     }
 
     pub fn new_unchecked(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
-        expansions: &IndexMap<String, Vec<String>>,
         schema: schema::Options,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, expansions, true, schema)
-            .expect("errors ignored")
+        Self::new_inner(sources, transforms, sinks, true, schema).expect("errors ignored")
     }
 
     fn new_inner(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
-        expansions: &IndexMap<String, Vec<String>>,
         ignore_errors: bool,
         schema: schema::Options,
     ) -> Result<Self, Vec<String>> {
@@ -80,7 +76,9 @@ impl Graph {
                 id.clone(),
                 Node::Transform {
                     in_ty: transform.inner.input().data_type(),
-                    outputs: transform.inner.outputs(&schema::Definition::any()),
+                    outputs: transform
+                        .inner
+                        .outputs(&schema::Definition::any(), schema.log_namespace()),
                 },
             );
         }
@@ -100,7 +98,7 @@ impl Graph {
 
         for (id, config) in transforms.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs, expansions) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs) {
                     errors.push(e);
                 }
             }
@@ -108,7 +106,7 @@ impl Graph {
 
         for (id, config) in sinks.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs, expansions) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs) {
                     errors.push(e);
                 }
             }
@@ -126,18 +124,12 @@ impl Graph {
         from: &str,
         to: &ComponentKey,
         available_inputs: &HashMap<String, OutputId>,
-        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<(), String> {
         if let Some(output_id) = available_inputs.get(from) {
             self.edges.push(Edge {
                 from: output_id.clone(),
                 to: to.clone(),
             });
-            Ok(())
-        } else if let Some(expanded) = expansions.get(from) {
-            for item in expanded {
-                self.add_input(item, to, available_inputs, expansions)?;
-            }
             Ok(())
         } else {
             let output_type = match self.nodes.get(to) {
@@ -422,8 +414,7 @@ mod test {
 
         fn test_add_input(&mut self, node: &str, input: &str) -> Result<(), String> {
             let available_inputs = self.input_map().unwrap();
-            let expansions = IndexMap::new();
-            self.add_input(input, &node.into(), &available_inputs, &expansions)
+            self.add_input(input, &node.into(), &available_inputs)
         }
     }
 

@@ -3,7 +3,7 @@
 mod allocator;
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicI64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex,
     },
     thread,
@@ -11,7 +11,7 @@ use std::{
 };
 
 use arr_macro::arr;
-use metrics::gauge;
+use metrics::{counter, decrement_gauge, increment_gauge};
 use rand_distr::num_traits::ToPrimitive;
 
 use self::allocator::Tracer;
@@ -21,25 +21,38 @@ pub(crate) use self::allocator::{
 };
 
 const NUM_GROUPS: usize = 128;
+// Allocations are not tracked during startup.
+// We use the Relaxed ordering for both stores and loads of this atomic as no other threads exist when
+// this code is running, and all future threads will have a happens-after relationship with
+// this thread -- the main thread -- ensuring that they see the latest value of TRACK_ALLOCATIONS.
 pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
 
-type GroupMemStatsArray = [AtomicI64; NUM_GROUPS];
+/// Track allocations and deallocations separately.
+struct GroupMemStatsStorage {
+    allocations: [AtomicU64; NUM_GROUPS],
+    deallocations: [AtomicU64; NUM_GROUPS],
+}
+
+// Reporting interval in milliseconds.
+pub static REPORTING_INTERVAL_MS: AtomicU64 = AtomicU64::new(5000);
 
 /// A registry for tracking each thread's group memory statistics.
-static THREAD_LOCAL_REFS: Mutex<Vec<&'static GroupMemStatsArray>> = Mutex::new(Vec::new());
+static THREAD_LOCAL_REFS: Mutex<Vec<&'static GroupMemStatsStorage>> = Mutex::new(Vec::new());
 
 /// Group memory statistics per thread.
 struct GroupMemStats {
-    stats: &'static GroupMemStatsArray,
+    stats: &'static GroupMemStatsStorage,
 }
 
 impl GroupMemStats {
-    /// Allocates a [`GroupMemStatsArray`], and updates the global [`THREAD_LOCAL_REFS`] registry
+    /// Allocates a [`GroupMemStatsStorage`], and updates the global [`THREAD_LOCAL_REFS`] registry
     /// with a reference to this newly allocated memory.
     pub fn new() -> Self {
         let mut mutex = THREAD_LOCAL_REFS.lock().unwrap();
-        let stats_ref: &'static GroupMemStatsArray =
-            Box::leak(Box::new(arr![AtomicI64::new(0) ; 128]));
+        let stats_ref: &'static GroupMemStatsStorage = Box::leak(Box::new(GroupMemStatsStorage {
+            allocations: arr![AtomicU64::new(0) ; 128],
+            deallocations: arr![AtomicU64::new(0) ; 128],
+        }));
         let group_mem_stats = GroupMemStats { stats: stats_ref };
         mutex.push(stats_ref);
         group_mem_stats
@@ -81,7 +94,8 @@ impl Tracer for MainTracer {
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
         let _ = GROUP_MEM_STATS.try_with(|t| {
-            t.stats[group_id.as_raw() as usize].fetch_add(object_size as i64, Ordering::Relaxed)
+            t.stats.allocations[group_id.as_raw() as usize]
+                .fetch_add(object_size as u64, Ordering::Relaxed)
         });
     }
 
@@ -89,8 +103,8 @@ impl Tracer for MainTracer {
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
         let _ = GROUP_MEM_STATS.try_with(|t| {
-            t.stats[source_group_id.as_raw() as usize]
-                .fetch_sub(object_size as i64, Ordering::Relaxed)
+            t.stats.deallocations[source_group_id.as_raw() as usize]
+                .fetch_add(object_size as u64, Ordering::Relaxed)
         });
     }
 }
@@ -107,29 +121,60 @@ pub fn init_allocation_tracing() {
     }
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
-        .spawn(|| loop {
-            if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-                without_allocation_tracing(|| {
-                    for (group_idx, group) in GROUP_INFO.iter().enumerate() {
-                        let mut mem_used = 0;
-                        let mutex = THREAD_LOCAL_REFS.lock().unwrap();
-                        for idx in 0..mutex.len() {
-                            mem_used += mutex[idx][group_idx].load(Ordering::Relaxed);
-                        }
-                        if mem_used == 0 {
-                            continue;
-                        }
-                        let group_info = group.lock().unwrap();
-                        gauge!(
-                        "component_allocated_bytes",
-                        mem_used.to_f64().expect("failed to convert group_id from int to float"),
-                        "component_kind" => group_info.component_kind.clone(),
-                        "component_type" => group_info.component_type.clone(),
-                        "component_id" => group_info.component_id.clone());
+        .spawn(|| {
+            without_allocation_tracing(|| loop {
+                for (group_idx, group) in GROUP_INFO.iter().enumerate() {
+                    let mut allocations_diff = 0;
+                    let mut deallocations_diff = 0;
+                    let mutex = THREAD_LOCAL_REFS.lock().unwrap();
+                    for idx in 0..mutex.len() {
+                        allocations_diff +=
+                            mutex[idx].allocations[group_idx].swap(0, Ordering::Relaxed);
+                        deallocations_diff +=
+                            mutex[idx].deallocations[group_idx].swap(0, Ordering::Relaxed);
                     }
-                });
-            }
-            thread::sleep(Duration::from_millis(5000));
+                    if allocations_diff == 0 && deallocations_diff == 0 {
+                        continue;
+                    }
+                    let mem_used_diff = allocations_diff as i64 - deallocations_diff as i64;
+                    let group_info = group.lock().unwrap();
+                    if allocations_diff > 0 {
+                        counter!(
+                            "component_allocated_bytes_total",
+                            allocations_diff,
+                            "component_kind" => group_info.component_kind.clone(),
+                            "component_type" => group_info.component_type.clone(),
+                            "component_id" => group_info.component_id.clone());
+                    }
+                    if deallocations_diff > 0 {
+                        counter!(
+                            "component_deallocated_bytes_total",
+                            deallocations_diff,
+                            "component_kind" => group_info.component_kind.clone(),
+                            "component_type" => group_info.component_type.clone(),
+                            "component_id" => group_info.component_id.clone());
+                    }
+                    if mem_used_diff > 0 {
+                        increment_gauge!(
+                            "component_allocated_bytes",
+                            mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
+                            "component_kind" => group_info.component_kind.clone(),
+                            "component_type" => group_info.component_type.clone(),
+                            "component_id" => group_info.component_id.clone());
+                    }
+                    if mem_used_diff < 0 {
+                        decrement_gauge!(
+                            "component_allocated_bytes",
+                            -mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
+                            "component_kind" => group_info.component_kind.clone(),
+                            "component_type" => group_info.component_type.clone(),
+                            "component_id" => group_info.component_id.clone());
+                    }
+                }
+                thread::sleep(Duration::from_millis(
+                    REPORTING_INTERVAL_MS.load(Ordering::Relaxed),
+                ));
+            })
         })
         .unwrap();
 }

@@ -1,21 +1,30 @@
 #[cfg(test)]
 use std::borrow::Borrow;
 use std::collections::{hash_map::DefaultHasher, BTreeMap};
+use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::{cmp::Ordering, mem};
 
 use indexmap::IndexSet;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::{configurable_component, Configurable};
+use vrl_lib::prelude::fmt::Formatter;
 
 /// A single tag value, either a bare tag or a value.
 #[derive(Clone, Configurable, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(untagged)]
 pub enum TagValue {
     /// Bare tag value.
     Bare,
     /// Tag value containing a string.
     Value(#[configurable(transparent)] String),
+}
+
+impl From<String> for TagValue {
+    fn from(value: String) -> Self {
+        Self::Value(value)
+    }
 }
 
 impl From<Option<String>> for TagValue {
@@ -90,10 +99,26 @@ impl Default for TagValueSet {
     }
 }
 
+impl Display for TagValueSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> vrl_lib::prelude::fmt::Result {
+        for (i, value) in self.iter().enumerate() {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            if let Some(value) = value {
+                write!(f, "\"{}\"", value)?;
+            } else {
+                write!(f, "null")?;
+            }
+        }
+        Ok(())
+    }
+}
+
 impl TagValueSet {
     /// Convert this set into a single value, mimicking the behavior of this set being just a plain
     /// single string while still storing all of the values.
-    pub(crate) fn into_single(self) -> Option<String> {
+    pub fn into_single(self) -> Option<String> {
         match self {
             Self::Empty => None,
             Self::Single(tag) => tag.into_option(),
@@ -106,7 +131,7 @@ impl TagValueSet {
 
     /// Get the "single" value of this set, mimicking the behavior of this set being just a plain
     /// single string while still storing all of the values.
-    pub(crate) fn as_single(&self) -> Option<&str> {
+    pub fn as_single(&self) -> Option<&str> {
         match self {
             Self::Empty => None,
             Self::Single(tag) => tag.as_option(),
@@ -117,15 +142,14 @@ impl TagValueSet {
         }
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         match self {
             Self::Empty => true,
             Self::Single(_) | Self::Set(_) => false, // the `Set` variant will never be empty
         }
     }
 
-    #[cfg(test)]
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         match self {
             Self::Empty => 0,
             Self::Single(_) => 1,
@@ -143,25 +167,6 @@ impl TagValueSet {
             Self::Empty => false,
             Self::Single(tag) => value == tag,
             Self::Set(set) => set.contains(value),
-        }
-    }
-
-    fn retain(&mut self, mut f: impl FnMut(TagValueRef<'_>) -> bool) {
-        match self {
-            Self::Empty => (),
-            Self::Single(tag) => {
-                if !f(tag.as_option()) {
-                    *self = Self::Empty;
-                }
-            }
-            Self::Set(set) => {
-                set.retain(|value| f(value.as_option()));
-                match set.len() {
-                    0 => *self = Self::Empty,
-                    1 => *self = Self::Single(set.pop().unwrap()),
-                    _ => {}
-                }
-            }
         }
     }
 
@@ -377,18 +382,38 @@ impl ByteSizeOf for TagValueSet {
 
 impl<'de> Deserialize<'de> for TagValueSet {
     fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
-        // Deserialize from a single string only
-        let s = String::deserialize(de)?;
-        Ok(Self::from([s]))
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Variants {
+            // Backwards compatibility for existing data
+            String(String),
+            // This is the new form of tag values
+            Array(Vec<TagValue>),
+        }
+
+        Variants::deserialize(de).map(|v| match v {
+            Variants::String(s) => Self::from([s]),
+            Variants::Array(a) => Self::from(a),
+        })
     }
 }
 
 impl Serialize for TagValueSet {
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-        // Always serialize the tags as a single value
-        match self.as_single() {
-            Some(s) => ser.serialize_str(s),
-            None => ser.serialize_none(),
+        match self.len() {
+            // Serialize a single tag as before.
+            1 => match self.as_single() {
+                Some(s) => ser.serialize_str(s),
+                None => ser.serialize_none(),
+            },
+            // Serialize all other sizes (including empty tag sets) as arrays.
+            len => {
+                let mut ser = ser.serialize_seq(Some(len))?;
+                for value in self {
+                    ser.serialize_element(&value)?;
+                }
+                ser.end()
+            }
         }
     }
 }
@@ -407,6 +432,11 @@ impl MetricTags {
 
     pub fn as_option(self) -> Option<Self> {
         (!self.is_empty()).then_some(self)
+    }
+
+    /// Iterates over all the tag value sets
+    pub fn iter_sets(&self) -> impl Iterator<Item = (&str, &TagValueSet)> {
+        self.0.iter().map(|(key, value)| (key.as_str(), value))
     }
 
     /// Iterate over references to all values of each tag.
@@ -445,10 +475,22 @@ impl MetricTags {
         self.0.get(name).and_then(TagValueSet::as_single)
     }
 
-    pub fn insert(&mut self, name: String, value: String) -> Option<String> {
+    /// Add a value to a tag. This does not replace any existing tags unless the value is a
+    /// duplicate.
+    pub fn insert(&mut self, name: String, value: impl Into<TagValue>) {
+        self.0.entry(name).or_default().insert(value.into());
+    }
+
+    /// Replace all the values of a tag with a single value.
+    pub fn replace(&mut self, name: String, value: impl Into<TagValue>) -> Option<String> {
         self.0
-            .insert(name, TagValueSet::from([value]))
+            .insert(name, TagValueSet::from([value.into()]))
             .and_then(TagValueSet::into_single)
+    }
+
+    pub fn set_multi_value(&mut self, name: String, values: impl IntoIterator<Item = TagValue>) {
+        let x = TagValueSet::from_iter(values);
+        self.0.insert(name, x);
     }
 
     pub fn remove(&mut self, name: &str) -> Option<String> {
@@ -468,11 +510,8 @@ impl MetricTags {
         }
     }
 
-    pub fn retain(&mut self, mut f: impl FnMut(&str, &str) -> bool) {
-        self.0.retain(|key, tags| {
-            tags.retain(|tag| tag.map_or(false, |tag| f(key, tag)));
-            !tags.is_empty()
-        });
+    pub fn retain(&mut self, mut f: impl FnMut(&str, &mut TagValueSet) -> bool) {
+        self.0.retain(|key, tags| f(key.as_str(), tags));
     }
 }
 

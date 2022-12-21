@@ -139,7 +139,10 @@ impl HttpSource for RemoteWriteSource {
 #[cfg(test)]
 mod test {
     use chrono::{SubsecRound as _, Utc};
-    use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
+    use vector_core::{
+        event::{EventStatus, Metric, MetricKind, MetricValue},
+        metric_tags,
+    };
 
     use super::*;
     use crate::{
@@ -260,6 +263,77 @@ mod test {
             .with_timestamp(Some(timestamp()))
             .into(),
         ]
+    }
+
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we accept the metric, but take the last label in the list.
+    #[tokio::test]
+    async fn receives_metrics_duplicate_labels() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let address = test_util::next_addr();
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+            let source = PrometheusRemoteWriteConfig {
+                address,
+                auth: None,
+                tls: None,
+                acknowledgements: SourceAcknowledgementsConfig::default(),
+            };
+            let source = source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(source);
+            wait_for_tcp(address).await;
+
+            let sink = RemoteWriteConfig {
+                endpoint: format!("http://localhost:{}/", address.port()),
+                ..Default::default()
+            };
+            let (sink, _) = sink
+                .build(SinkContext::new_test())
+                .await
+                .expect("Error building config.");
+
+            let timestamp = Utc::now().trunc_subsecs(3);
+
+            let events = vec![Metric::new(
+                "gauge_2",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 41.0 },
+            )
+            .with_timestamp(Some(timestamp))
+            .with_tags(Some(metric_tags! {
+                "code" => "200".to_string(),
+                "code" => "success".to_string(),
+            }))
+            .into()];
+
+            let expected = vec![Metric::new(
+                "gauge_2",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 41.0 },
+            )
+            .with_timestamp(Some(timestamp))
+            .with_tags(Some(metric_tags! {
+                "code" => "success".to_string(),
+            }))
+            .into()];
+
+            let output = test_util::spawn_collect_ready(
+                async move {
+                    sink.run_events(events).await.unwrap();
+                },
+                rx,
+                1,
+            )
+            .await;
+
+            vector_common::assert_event_data_eq!(expected, output);
+        })
+        .await;
     }
 }
 

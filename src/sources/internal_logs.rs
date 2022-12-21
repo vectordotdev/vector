@@ -8,12 +8,11 @@ use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
-    ByteSizeOf,
 };
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
-    event::Event,
+    event::{EstimatedJsonEncodedSizeOf, Event},
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace::TraceSubscription,
@@ -27,7 +26,6 @@ use crate::{
 pub struct InternalLogsConfig {
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///
-    /// The value will be the current hostname for wherever Vector is running.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
@@ -37,7 +35,6 @@ pub struct InternalLogsConfig {
 
     /// Overrides the name of the log field used to add the current process ID to each event.
     ///
-    /// The value will be the current process ID for Vector itself.
     ///
     /// By default, `"pid"` is used.
     #[serde(default)]
@@ -150,7 +147,7 @@ async fn run(
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
-        let byte_size = log.size_of();
+        let byte_size = log.estimated_json_encoded_size_of();
         // This event doesn't emit any log
         emit!(InternalLogsBytesReceived { byte_size });
         emit!(InternalLogsEventsReceived {
@@ -224,14 +221,15 @@ mod tests {
     // `start_source` helper) panics when called more than once.
     #[tokio::test]
     async fn receives_logs() {
+        trace::init(false, false, "debug", 10);
+        trace::reset_early_buffer();
+
         assert_source_compliance(&SOURCE_TAGS, run_test()).await;
     }
 
     async fn run_test() {
         let test_id: u8 = rand::random();
         let start = chrono::Utc::now();
-        trace::init(false, false, "debug", 10);
-        trace::reset_early_buffer();
 
         error!(message = "Before source started without span.", %test_id);
 

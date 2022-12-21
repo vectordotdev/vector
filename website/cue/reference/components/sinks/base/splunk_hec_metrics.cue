@@ -78,27 +78,27 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		}
 	}
 	compression: {
-		description: "Compression configuration."
-		required:    false
-		type: {
-			object: options: {
-				algorithm: {
-					required: false
-					type: string: {
-						const:   "zlib"
-						default: "none"
-					}
-				}
-				level: {
-					description: "Compression level."
-					required:    false
-					type: {
-						string: enum: ["none", "fast", "best", "default"]
-						uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-					}
-				}
+		description: """
+			Compression configuration.
+
+			All compression algorithms use the default compression level unless otherwise specified.
+			"""
+		required: false
+		type: string: {
+			default: "none"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib]][zlib] compression.
+
+					[zlib]: https://zlib.net/
+					"""
 			}
-			string: enum: ["none", "gzip", "zlib"]
 		}
 	}
 	default_namespace: {
@@ -109,7 +109,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	default_token: {
 		description: """
@@ -118,12 +118,12 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			If an event has a token set in its metadata, it will prevail over the one set here.
 			"""
 		required: true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	endpoint: {
 		description: "The base URL of the Splunk instance."
 		required:    true
-		type: string: syntax: "literal"
+		type: string: {}
 	}
 	host_key: {
 		description: """
@@ -134,10 +134,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {
-			default: "host"
-			syntax:  "literal"
-		}
+		type: string: default: "host"
 	}
 	index: {
 		description: """
@@ -164,15 +161,9 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					unstable performance and sink behavior. Proceed with caution.
 					"""
 				required: false
-				type: object: {
-					default: {
-						decrease_ratio:      0.9
-						ewma_alpha:          0.4
-						rtt_deviation_scale: 2.5
-					}
-					options: {
-						decrease_ratio: {
-							description: """
+				type: object: options: {
+					decrease_ratio: {
+						description: """
 																The fraction of the current value to set the new concurrency limit when decreasing the limit.
 
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -180,11 +171,11 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 
 																Note that the new limit is rounded down after applying this ratio.
 																"""
-							required: false
-							type: float: default: 0.9
-						}
-						ewma_alpha: {
-							description: """
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
 																The weighting of new measurements compared to older measurements.
 
 																Valid values are greater than `0` and less than `1`.
@@ -193,11 +184,11 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
 																unusually high response variability.
 																"""
-							required: false
-							type: float: default: 0.4
-						}
-						rtt_deviation_scale: {
-							description: """
+						required: false
+						type: float: default: 0.4
+					}
+					rtt_deviation_scale: {
+						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
 																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
@@ -207,9 +198,8 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
-							required: false
-							type: float: default: 2.5
-						}
+						required: false
+						type: float: default: 2.5
 					}
 				}
 			}
@@ -217,11 +207,22 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: "Configuration for outbound request concurrency."
 				required:    false
 				type: {
-					number: {}
 					string: {
-						const:   "adaptive"
 						default: "none"
+						enum: {
+							adaptive: """
+															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+
+															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															"""
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
+						}
 					}
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -290,7 +291,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		type: string: syntax: "template"
 	}
 	tls: {
-		description: "Standard TLS options."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
@@ -301,16 +302,16 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: syntax: "literal"
+				type: array: items: type: string: {}
 			}
 			ca_file: {
 				description: """
 					Absolute path to an additional CA certificate file.
 
-					The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			crt_file: {
 				description: """
@@ -322,7 +323,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_file: {
 				description: """
@@ -331,7 +332,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			key_pass: {
 				description: """
@@ -340,7 +341,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: syntax: "literal"
+				type: string: {}
 			}
 			verify_certificate: {
 				description: """

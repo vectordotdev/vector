@@ -140,10 +140,7 @@ impl Configurable for Concurrency {
         let mut none_schema = generate_const_string_schema("none".to_string());
         let mut none_metadata = Metadata::<()>::with_title("A fixed concurrency of 1.");
         none_metadata.set_description("Only one request can be outstanding at any given time.");
-        none_metadata.add_custom_attribute(CustomAttribute::KeyValue {
-            key: "logical_name".to_string(),
-            value: "None".to_string(),
-        });
+        none_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "None"));
         apply_metadata(&mut none_schema, none_metadata);
 
         let mut adaptive_schema = generate_const_string_schema("adaptive".to_string());
@@ -152,20 +149,15 @@ impl Configurable for Concurrency {
         );
         adaptive_metadata
             .set_description("[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/");
-        adaptive_metadata.add_custom_attribute(CustomAttribute::KeyValue {
-            key: "logical_name".to_string(),
-            value: "Adaptive".to_string(),
-        });
+        adaptive_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Adaptive"));
         apply_metadata(&mut adaptive_schema, adaptive_metadata);
 
         let mut fixed_schema = generate_number_schema::<usize>();
         let mut fixed_metadata =
             Metadata::<()>::with_description("A fixed amount of concurrency will be allowed.");
         fixed_metadata.set_transparent();
-        fixed_metadata.add_custom_attribute(CustomAttribute::KeyValue {
-            key: "logical_name".to_string(),
-            value: "Fixed".to_string(),
-        });
+        fixed_metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", "uint"));
+        fixed_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Fixed"));
         apply_metadata(&mut fixed_schema, fixed_metadata);
 
         Ok(generate_one_of_schema(&[

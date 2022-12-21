@@ -46,9 +46,28 @@ base: components: transforms: remap: configuration: {
 			[vrl]: https://vector.dev/docs/reference/vrl
 			"""
 		required: false
+		type: string: examples: ["./my/program.vrl"]
+	}
+	metric_tag_values: {
+		description: """
+			When set to `single`, metric tag values will be exposed as single strings, the
+			same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+			will be ignored.
+
+			When set to `full`, all metric tags will be exposed as arrays of either string or null
+			values.
+			"""
+		required: false
 		type: string: {
-			examples: ["./my/program.vrl"]
-			syntax: "literal"
+			default: "single"
+			enum: {
+				full: "All tags will be exposed as arrays of either string or null values."
+				single: """
+					Tag values will be exposed as single strings, the
+					same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+					will be ignored.
+					"""
+			}
 		}
 	}
 	reroute_dropped: {

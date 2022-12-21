@@ -68,7 +68,7 @@ fn reserialize_pre_v24_native_proto_fixtures() {
     );
 }
 
-/// The event proto file was changed in v26 to include support for enhanced metric tags. This test
+/// The event proto format was changed in v26 to include support for enhanced metric tags. This test
 /// ensures we can still load the old version binary and that when serialized and deserialized in
 /// the new format we still get the same event.
 #[test]
@@ -90,6 +90,19 @@ fn current_native_decoding_matches() {
 #[test]
 fn pre_v24_native_decoding_matches() {
     decoding_matches("pre-v24");
+}
+
+/// This "test" can be used to build new protobuf fixture files when the protocol changes. Remove
+/// the `#[ignore]` only when this is needed for such changes. You will need to manually create a
+/// `tests/data/native_encoding/json/rebuilt` subdirectory for the files to be written to.
+#[test]
+#[ignore]
+fn rebuild_json_fixtures() {
+    rebuild_fixtures(
+        "json",
+        &NativeJsonDeserializerConfig.build(),
+        &mut NativeJsonSerializerConfig.build(),
+    );
 }
 
 /// This "test" can be used to build new protobuf fixture files when the protocol changes. Remove

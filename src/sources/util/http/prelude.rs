@@ -7,7 +7,7 @@ use tracing::Span;
 use vector_core::{
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
     filters::{
@@ -124,7 +124,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .map(|events| {
                                 emit!(HttpEventsReceived {
                                     count: events.len(),
-                                    byte_size: events.size_of(),
+                                    byte_size: events.estimated_json_encoded_size_of(),
                                     http_path,
                                     protocol,
                                 });
@@ -152,13 +152,20 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
             info!(message = "Building HTTP server.", address = %address);
 
-            let listener = tls.bind(&address).await.unwrap();
-            warp::serve(routes)
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    cx.shutdown.map(|_| ()),
-                )
-                .await;
+            match tls.bind(&address).await {
+                Ok(listener) => {
+                    warp::serve(routes)
+                        .serve_incoming_with_graceful_shutdown(
+                            listener.accept_stream(),
+                            cx.shutdown.map(|_| ()),
+                        )
+                        .await;
+                }
+                Err(error) => {
+                    error!("An error occurred: {:?}.", error);
+                    return Err(());
+                }
+            }
             Ok(())
         }))
     }
