@@ -7,7 +7,7 @@ use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
 use lookup::{lookup_v2::parse_value_path, owned_value_path};
 use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
@@ -230,23 +230,20 @@ impl SourceConfig for SocketConfig {
 
         let schema_definition = match &self.mode {
             Mode::Tcp(config) => {
-                let host_key_path = config
+                let legacy_host_key = config
                     .host_key()
                     .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
                     .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                        || parse_value_path(log_schema().host_key()).ok(),
+                        |k| k.path.clone(),
+                    )
+                    .map(LegacyKey::InsertIfEmpty);
 
-                let port_key_path = config
+                let legacy_port_key = config
                     .port_key()
                     .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("port")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                    .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone())
+                    .map(LegacyKey::InsertIfEmpty);
 
                 let tls_client_metadata_path = config
                     .tls()
@@ -258,14 +255,14 @@ impl SourceConfig for SocketConfig {
                 schema_definition
                     .with_source_metadata(
                         Self::NAME,
-                        Some(host_key_path),
+                        legacy_host_key,
                         &owned_value_path!("host"),
                         Kind::bytes(),
                         None,
                     )
                     .with_source_metadata(
                         Self::NAME,
-                        Some(port_key_path),
+                        legacy_port_key,
                         &owned_value_path!("port"),
                         Kind::bytes(),
                         None,
