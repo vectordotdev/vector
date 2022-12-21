@@ -417,9 +417,9 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		description: """
 			The [stream name][stream_name] of the target CloudWatch Logs stream.
 
-			Note that there can only be one writer to a log stream at a time. If you have multiple
-			instances of Vector writing to the same log group, you must include an identifier in the
-			stream name that is guaranteed to be unique per Vector instance.
+			There can only be one writer to a log stream at a time. If you have multiple
+			instances writing to the same log group, you must include an identifier in the
+			stream name that is guaranteed to be unique per instance.
 
 			For example, you might choose `host`.
 

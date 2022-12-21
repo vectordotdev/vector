@@ -65,7 +65,7 @@ fn default_loki_path() -> String {
 pub struct LokiConfig {
     /// The base URL of the Loki instance.
     ///
-    /// Vector will append the value of `path` to this.
+    /// The `path` value is appended to this.
     #[configurable(metadata(docs::examples = "http://localhost:3100"))]
     pub endpoint: UriSerde,
 

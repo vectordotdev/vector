@@ -101,8 +101,8 @@ pub struct PrometheusExporterConfig {
 
     /// Whether or not to render [distributions][dist_metric_docs] as an [aggregated histogram][prom_agg_hist_docs] or  [aggregated summary][prom_agg_summ_docs].
     ///
-    /// While Vector supports distributions as a lossless way to represent a set of samples for a
-    /// metric, Prometheus clients (the application being scraped, which is this sink) must
+    /// While distributions as a lossless way to represent a set of samples for a
+    /// metric is supported, Prometheus clients (the application being scraped, which is this sink) must
     /// aggregate locally into either an aggregated histogram or aggregated summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution

@@ -74,7 +74,7 @@ base: components: sinks: azure_blob: configuration: {
 
 			Prefixes are useful for partitioning objects, such as by creating an blob key that
 			stores blobs under a particular "directory". If using a prefix for this purpose, it must end
-			in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
+			in `/` to act as a directory path. A trailing `/` is **not** automatically added.
 			"""
 		required: false
 		type: string: {}
