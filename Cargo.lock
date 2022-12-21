@@ -3347,6 +3347,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33ff8ae62cd3a9102e5637afc8452c55acf3844001bd5374e0b0bd7b6616c038"
+dependencies = [
+ "ahash 0.8.0",
+]
+
+[[package]]
 name = "hdrhistogram"
 version = "7.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8841,7 +8850,7 @@ dependencies = [
  "grok",
  "h2",
  "hash_hasher",
- "hashbrown 0.12.3",
+ "hashbrown 0.13.1",
  "headers",
  "heim",
  "hex",
