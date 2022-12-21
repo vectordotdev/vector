@@ -135,8 +135,10 @@ fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
     Ok(input[1..]
         .split(',')
         .map(|chunk| {
-            // note: the behavior of statsd if more than one colon is found (which would presumably
+            // note: the behavior of StatsD if more than one colon is found (which would presumably
             // be part of the tag value), is to remove any additional colons from the tag value.
+            // Thus Vector expects only one colon character to be present per chunk, so the find()
+            // operation locating the first position is sufficient.
             match chunk.find(':') {
                 // the notation `tag:` is valid for statsd, the effect is an empty string value.
                 Some(colon) => (

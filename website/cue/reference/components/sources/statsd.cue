@@ -127,12 +127,9 @@ components: sources: statsd: {
 		tags: {
 			title: "Tags"
 			body: """
-				The StatsD protocol removes any colon character found after the tag key:value
-				separator. For instance, the tagset "tagA:val::ue", is parsed by StatsD as
-				"tagA=value".
-				Additionally, a trailing colon on the last tag in a tagset will be parsed as
-				having a value of an empty string. For instance, the tagset "tagA:value,tagB:",
-				is parsed by StatsD as "tagA=value,tagB=".
+				A trailing colon on the last tag in a tagset will be parsed as having a value of
+				an empty string. For instance, the (valid) tagset "tagA:value,tagB:", is parsed by StatsD
+				the StatsD aggregator as "tagA=value,tagB=".
 				"""
 		}
 	}
