@@ -13,6 +13,7 @@ use lookup::{
     owned_value_path, path, OwnedValuePath,
 };
 use regex::bytes::Regex;
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
@@ -68,11 +69,13 @@ enum BuildError {
 }
 
 /// Configuration for the `file` source.
+#[serde_as]
 #[configurable_component(source("file"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct FileConfig {
     /// Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
+    #[configurable(metadata(docs::examples = "/var/log/**/*.log"))]
     pub include: Vec<PathBuf>,
 
     /// Array of file patterns to exclude. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
@@ -81,6 +84,7 @@ pub struct FileConfig {
     /// in `include`. This means that all files are first matched by `include` and then filtered by the `exclude`
     /// patterns. This can be impactful if `include` contains directories with contents that are not accessible.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "/var/log/binary-file.log"))]
     pub exclude: Vec<PathBuf>,
 
     /// Overrides the name of the log field used to add the file path to each event.
@@ -89,6 +93,7 @@ pub struct FileConfig {
     ///
     /// By default, `file` is used.
     #[serde(default = "default_file_key")]
+    #[configurable(metadata(docs::examples = "path"))]
     pub file_key: Option<OptionalValuePath>,
 
     /// Whether or not to start reading from the beginning of a new file.
@@ -110,12 +115,15 @@ pub struct FileConfig {
 
     /// Ignore files with a data modification date older than the specified number of seconds.
     #[serde(alias = "ignore_older", default)]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = "600"))]
     pub ignore_older_secs: Option<u64>,
 
     /// The maximum number of bytes a line can contain before being discarded.
     ///
     /// This protects against malformed lines or tailing incorrect files.
     #[serde(default = "default_max_line_bytes")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_line_bytes: usize,
 
     /// Overrides the name of the log field used to add the current hostname to each event.
@@ -126,6 +134,7 @@ pub struct FileConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "hostname"))]
     pub host_key: Option<OptionalValuePath>,
 
     /// The directory used to persist file checkpoint positions.
@@ -140,6 +149,7 @@ pub struct FileConfig {
     ///
     /// Off by default, the offset is only added to the event if this is set.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "offset"))]
     pub offset_key: Option<OptionalValuePath>,
 
     /// Delay between file discovery calls, in milliseconds.
@@ -149,6 +159,7 @@ pub struct FileConfig {
         alias = "glob_minimum_cooldown",
         default = "default_glob_minimum_cooldown_ms"
     )]
+    #[configurable(metadata(docs::type_unit = "milliseconds"))]
     pub glob_minimum_cooldown_ms: u64,
 
     #[configurable(derived)]
@@ -183,6 +194,7 @@ pub struct FileConfig {
 
     /// An approximate limit on the amount of data read from a single file at a given time.
     #[serde(default = "default_max_read_bytes")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_read_bytes: usize,
 
     /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
@@ -193,10 +205,15 @@ pub struct FileConfig {
     ///
     /// If not specified, files will not be removed.
     #[serde(alias = "remove_after", default)]
-    pub remove_after_secs: Option<u64>,
+    #[serde_as(as = "Option<serde_with::DurationSeconds<u64>>")]
+    #[configurable(metadata(docs::examples = "0"))]
+    #[configurable(metadata(docs::examples = "5"))]
+    #[configurable(metadata(docs::examples = "60"))]
+    pub remove_after_secs: Option<Duration>,
 
     /// String sequence used to separate one file line from another.
     #[serde(default = "default_line_delimiter")]
+    #[configurable(metadata(docs::examples = "\r\n"))]
     pub line_delimiter: String,
 
     #[configurable(derived)]
@@ -248,14 +265,17 @@ pub enum FingerprintConfig {
     Checksum {
         /// Maximum number of bytes to use, from the lines that are read, for generating the checksum.
         ///
-        /// TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
-        /// bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
+        // TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
+        // bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
         #[serde(alias = "fingerprint_bytes")]
+        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::type_unit = "bytes"))]
         bytes: Option<usize>,
 
         /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
         ///
         /// This can be helpful if all files share a common header that should be skipped.
+        #[configurable(metadata(docs::type_unit = "bytes"))]
         ignored_header_bytes: usize,
 
         /// The number of lines to read for generating the checksum.
@@ -264,6 +284,7 @@ pub enum FingerprintConfig {
         ///
         /// If the file has less than this amount of lines, it won’t be read at all.
         #[serde(default = "default_lines")]
+        #[configurable(metadata(docs::type_unit = "lines"))]
         lines: usize,
     },
 
@@ -524,7 +545,7 @@ pub fn file_source(
             ignore_not_found: config.ignore_not_found,
         },
         oldest_first: config.oldest_first,
-        remove_after: config.remove_after_secs.map(Duration::from_secs),
+        remove_after: config.remove_after_secs,
         emitter: FileSourceInternalEventsEmitter,
         handle: tokio::runtime::Handle::current(),
     };

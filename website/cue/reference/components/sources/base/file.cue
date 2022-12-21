@@ -60,7 +60,7 @@ base: components: sources: file: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["/var/log/binary-file.log"]
 		}
 	}
 	file_key: {
@@ -72,7 +72,12 @@ base: components: sources: file: configuration: {
 			By default, `file` is used.
 			"""
 		required: false
-		type: string: default: "file"
+		type: string: {
+			default: "file"
+			examples: [
+				"path",
+			]
+		}
 	}
 	fingerprint: {
 		description: """
@@ -82,17 +87,6 @@ base: components: sources: file: configuration: {
 			"""
 		required: false
 		type: object: options: {
-			bytes: {
-				description: """
-					Maximum number of bytes to use, from the lines that are read, for generating the checksum.
-
-					TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
-					bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
-					"""
-				relevant_when: "strategy = \"checksum\""
-				required:      false
-				type: uint: {}
-			}
 			ignored_header_bytes: {
 				description: """
 					The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
@@ -101,7 +95,10 @@ base: components: sources: file: configuration: {
 					"""
 				relevant_when: "strategy = \"checksum\""
 				required:      false
-				type: uint: default: 0
+				type: uint: {
+					default: 0
+					unit:    "bytes"
+				}
 			}
 			lines: {
 				description: """
@@ -113,7 +110,10 @@ base: components: sources: file: configuration: {
 					"""
 				relevant_when: "strategy = \"checksum\""
 				required:      false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "lines"
+				}
 			}
 			strategy: {
 				required: false
@@ -134,7 +134,10 @@ base: components: sources: file: configuration: {
 			This controls the interval at which files are searched. A higher value results in greater chances of some short-lived files being missed between searches, but a lower value increases the performance impact of file discovery.
 			"""
 		required: false
-		type: uint: default: 1000
+		type: uint: {
+			default: 1000
+			unit:    "milliseconds"
+		}
 	}
 	host_key: {
 		description: """
@@ -147,7 +150,7 @@ base: components: sources: file: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["hostname"]
 	}
 	ignore_checkpoints: {
 		description: """
@@ -170,17 +173,24 @@ base: components: sources: file: configuration: {
 	ignore_older_secs: {
 		description: "Ignore files with a data modification date older than the specified number of seconds."
 		required:    false
-		type: uint: {}
+		type: number: examples: [
+			"600",
+		]
 	}
 	include: {
 		description: "Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported."
 		required:    true
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["/var/log/**/*.log"]
 	}
 	line_delimiter: {
 		description: "String sequence used to separate one file line from another."
 		required:    false
-		type: string: default: "\n"
+		type: string: {
+			default: "\n"
+			examples: [
+				"\r\n",
+			]
+		}
 	}
 	max_line_bytes: {
 		description: """
@@ -189,12 +199,18 @@ base: components: sources: file: configuration: {
 			This protects against malformed lines or tailing incorrect files.
 			"""
 		required: false
-		type: uint: default: 102400
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
 	}
 	max_read_bytes: {
 		description: "An approximate limit on the amount of data read from a single file at a given time."
 		required:    false
-		type: uint: default: 2048
+		type: uint: {
+			default: 2048
+			unit:    "bytes"
+		}
 	}
 	message_start_indicator: {
 		description: """
@@ -290,7 +306,9 @@ base: components: sources: file: configuration: {
 			Off by default, the offset is only added to the event if this is set.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: [
+			"offset",
+		]
 	}
 	oldest_first: {
 		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
@@ -312,7 +330,7 @@ base: components: sources: file: configuration: {
 			If not specified, files will not be removed.
 			"""
 		required: false
-		type: uint: {}
+		type: number: examples: ["0", "5", "60"]
 	}
 	start_at_beginning: {
 		description: """
