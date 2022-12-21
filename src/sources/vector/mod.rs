@@ -120,9 +120,10 @@ pub struct VectorConfig {
     /// Version of the configuration.
     version: Option<VectorConfigVersion>,
 
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
     pub address: SocketAddr,
 
     #[configurable(derived)]

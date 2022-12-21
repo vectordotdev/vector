@@ -21,12 +21,12 @@ base: components: sources: vector: configuration: {
 	}
 	address: {
 		description: """
-			The address to listen for connections on.
+			The socket address to listen for connections on.
 
 			It _must_ include a port.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["0.0.0.0:9000"]
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
