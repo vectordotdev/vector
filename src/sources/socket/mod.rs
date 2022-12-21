@@ -141,7 +141,8 @@ impl SourceConfig for SocketConfig {
                 let tls_client_metadata_key = config
                     .tls()
                     .as_ref()
-                    .and_then(|tls| tls.client_metadata_key.clone());
+                    .and_then(|tls| tls.client_metadata_key.clone())
+                    .and_then(|k| k.path);
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 tcp.run(
                     config.address(),
@@ -251,7 +252,7 @@ impl SourceConfig for SocketConfig {
                     .tls()
                     .as_ref()
                     .and_then(|tls| tls.client_metadata_key.as_ref())
-                    .and_then(|x| parse_value_path(x).ok())
+                    .and_then(|k| k.path.clone())
                     .map(LegacyKey::Overwrite);
 
                 schema_definition
@@ -390,7 +391,7 @@ mod test {
     #[cfg(unix)]
     use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
     use futures::{stream, StreamExt};
-    use lookup::path;
+    use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
@@ -611,7 +612,7 @@ mod test {
                         ..Default::default()
                     },
                 },
-                client_metadata_key: Some("tls_peer".into()),
+                client_metadata_key: Some(OptionalValuePath::from(owned_value_path!("tls_peer"))),
             }));
 
             let server = SocketConfig::from(config)
