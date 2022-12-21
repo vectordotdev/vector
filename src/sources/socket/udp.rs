@@ -243,7 +243,7 @@ pub(super) fn udp(
                                         let legacy_port_key = config
                                             .port_key
                                             .as_ref()
-                                            .map_or_else(|| parse_value_path("path").ok(), |k| k.path.clone());
+                                            .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone());
 
                                         log_namespace.insert_source_metadata(
                                             SocketConfig::NAME,

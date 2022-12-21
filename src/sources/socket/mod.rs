@@ -291,7 +291,7 @@ impl SourceConfig for SocketConfig {
                 let legacy_port_key = config
                     .port_key()
                     .as_ref()
-                    .map_or_else(|| parse_value_path("path").ok(), |k| k.path.clone())
+                    .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone())
                     .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
