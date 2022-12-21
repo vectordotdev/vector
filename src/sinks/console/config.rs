@@ -60,7 +60,8 @@ impl GenerateConfig for ConsoleSinkConfig {
 
 #[async_trait::async_trait]
 impl SinkConfig for ConsoleSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, ctx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sources_details = ctx.sources_details.clone();
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -70,11 +71,13 @@ impl SinkConfig for ConsoleSinkConfig {
                 output: io::stdout(),
                 transformer,
                 encoder,
+                sources_details,
             }),
             Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
                 output: io::stderr(),
                 transformer,
                 encoder,
+                sources_details,
             }),
         };
 
