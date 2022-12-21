@@ -5,6 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
     pkcs12::{ParsedPkcs12, Pkcs12},
     pkey::{PKey, Private},
@@ -71,7 +72,7 @@ impl TlsEnableableConfig {
 #[derive(Clone, Debug, Default)]
 pub struct TlsSourceConfig {
     /// Event field for client certificate metadata.
-    pub client_metadata_key: Option<String>,
+    pub client_metadata_key: Option<OptionalValuePath>,
 
     #[serde(flatten)]
     pub tls_config: TlsEnableableConfig,

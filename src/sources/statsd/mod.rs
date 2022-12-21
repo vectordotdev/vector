@@ -145,7 +145,8 @@ impl SourceConfig for StatsdConfig {
                 let tls_client_metadata_key = config
                     .tls
                     .as_ref()
-                    .and_then(|tls| tls.client_metadata_key.clone());
+                    .and_then(|tls| tls.client_metadata_key.clone())
+                    .and_then(|k| k.path);
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 StatsdTcpSource.run(
                     config.address,
