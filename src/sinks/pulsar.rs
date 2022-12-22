@@ -15,6 +15,7 @@ use bytes::BytesMut;
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
+use pulsar::compression;
 use pulsar::error::AuthenticationError;
 use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
@@ -56,6 +57,10 @@ pub struct PulsarSinkConfig {
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    compression: PulsarCompression,
 
     #[configurable(derived)]
     auth: Option<AuthConfig>,
@@ -111,6 +116,29 @@ pub struct OAuth2Config {
     scope: Option<String>,
 }
 
+/// Supported compression types for Pulsar.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PulsarCompression {
+    /// No compression.
+    #[derivative(Default)]
+    None,
+
+    /// LZ4.
+    Lz4,
+
+    /// Zlib.
+    Zlib,
+
+    /// Zstandard.
+    Zstd,
+
+    /// Snappy.
+    Snappy,
+}
+
 type PulsarProducer = Producer<TokioExecutor>;
 type BoxedPulsarProducer = Box<PulsarProducer>;
 
@@ -156,6 +184,7 @@ impl GenerateConfig for PulsarSinkConfig {
             topic: "topic-1234".to_string(),
             partition_key_field: Some("message".to_string()),
             encoding: TextSerializerConfig::new().into(),
+            compression: Default::default(),
             auth: None,
             acknowledgements: Default::default(),
             producer_name: None,
@@ -246,18 +275,34 @@ impl PulsarSinkConfig {
             });
         }
 
+        let mut producer_options = pulsar::ProducerOptions {
+            compression: Some(match self.compression {
+                PulsarCompression::None => compression::Compression::None,
+                PulsarCompression::Lz4 => {
+                    compression::Compression::Lz4(compression::CompressionLz4::default())
+                }
+                PulsarCompression::Zlib => {
+                    compression::Compression::Zlib(compression::CompressionZlib::default())
+                }
+                PulsarCompression::Zstd => {
+                    compression::Compression::Zstd(compression::CompressionZstd::default())
+                }
+                PulsarCompression::Snappy => {
+                    compression::Compression::Snappy(compression::CompressionSnappy::default())
+                }
+            }),
+            ..Default::default()
+        };
+
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
-            pulsar_builder = pulsar_builder.with_options(pulsar::producer::ProducerOptions {
-                schema: Some(proto::Schema {
-                    schema_data: avro.schema.as_bytes().into(),
-                    r#type: proto::schema::Type::Avro as i32,
-                    ..Default::default()
-                }),
+            producer_options.schema = Some(proto::Schema {
+                schema_data: avro.schema.as_bytes().into(),
+                r#type: proto::schema::Type::Avro as i32,
                 ..Default::default()
             });
         }
 
-        pulsar_builder.build().await
+        pulsar_builder.with_options(producer_options).build().await
     }
 }
 
@@ -451,6 +496,7 @@ mod integration_tests {
             topic: topic.clone(),
             producer_name: None,
             encoding: TextSerializerConfig::new().into(),
+            compression: PulsarCompression::None,
             auth: None,
             acknowledgements: Default::default(),
             partition_key_field: Some("message".to_string()),

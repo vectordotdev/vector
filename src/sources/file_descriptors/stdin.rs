@@ -25,7 +25,6 @@ pub struct StdinConfig {
 
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///
-    /// The value will be the current hostname for wherever Vector is running.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///

@@ -42,9 +42,9 @@ macro_rules! metric_tags {
     ($($key:expr => $value:expr,)+) => { $crate::metric_tags!($($key => $value),+) };
 
     ($($key:expr => $value:expr),*) => {
-        $crate::event::MetricTags::from([
-            $( ($key.into(), $value.into()), )*
-        ])
+        [
+            $( ($key.into(), $crate::event::metric::TagValue::from($value)), )*
+        ].into_iter().collect::<$crate::event::MetricTags>()
     };
 }
 

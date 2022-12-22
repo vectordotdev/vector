@@ -82,13 +82,13 @@ const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
-    /// Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in `vector.dev/exclude` filter.
+    /// Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in `exclude` filter.
     extra_label_selector: String,
 
-    /// Specifies the label selector to filter `Namespace`s with, to be used in  addition to the built-in `vector.dev/exclude` filter.
+    /// Specifies the label selector to filter `Namespace`s with, to be used in addition to the built-in `exclude` filter.
     extra_namespace_label_selector: String,
 
-    /// The `name` of the Kubernetes `Node` that Vector runs at.
+    /// The `name` of the Kubernetes `Node` that is running.
     ///
     /// Configured to use an environment var by default, to be evaluated to a value provided by Kubernetes at `Pod` deploy time.
     self_node_name: String,
@@ -101,7 +101,7 @@ pub struct Config {
 
     /// The directory used to persist file checkpoint positions.
     ///
-    /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
+    /// By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
     data_dir: Option<PathBuf>,
 
     #[configurable(derived)]
@@ -138,17 +138,22 @@ pub struct Config {
     /// a significant overhead.
     glob_minimum_cooldown_ms: usize,
 
-    /// A field to use to set the timestamp when Vector ingested the event.
+    /// Overrides the name of the log field used to add the ingestion timestamp to each event.
+    ///
     /// This is useful to compute the latency between important event processing
-    /// stages, i.e. the time delta between log line was written and when it was
+    /// stages. For example, the time delta between when a log line was written and when it was
     /// processed by the `kubernetes_logs` source.
+    ///
+    /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+    ///
+    /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     ingestion_timestamp_field: Option<String>,
 
     /// The default time zone for timestamps without an explicit zone.
     timezone: Option<TimeZone>,
 
-    /// Optional path to a kubeconfig file readable by Vector. If not set,
-    /// Vector will try to connect to Kubernetes using in-cluster configuration.
+    /// Optional path to a readable kubeconfig file. If not set,
+    /// a connection to Kubernetes is made using the in-cluster configuration.
     kube_config_file: Option<PathBuf>,
 
     /// How long to delay removing entries from our map when we receive a deletion

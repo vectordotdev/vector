@@ -295,9 +295,21 @@ pub struct AdvancedSinkConfig {
     partition_key: String,
 
     /// The tags to apply to each event.
-    ///
-    /// Both the keys and values are templateable.
-    tags: HashMap<Template, Template>,
+    tags: HashMap<String, TagConfig>,
+}
+
+/// Specification of the value of a created tag.
+///
+/// This may be a single value, a `null` for a bare tag, or an array of either.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(untagged)]
+pub enum TagConfig {
+    /// A single tag value.
+    Plain(#[configurable(transparent)] Option<Template>),
+
+    /// An array of values to give to the same tag name.
+    Multi(#[configurable(transparent)] Vec<Option<Template>>),
 }
 
 impl GenerateConfig for AdvancedSinkConfig {

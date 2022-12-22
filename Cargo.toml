@@ -205,7 +205,7 @@ rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.11.3", default-features = false, features = ["std"] }
+prost = { version = "0.11.5", default-features = false, features = ["std"] }
 prost-types = { version = "0.11.2", default-features = false, optional = true }
 
 # GCP
@@ -216,8 +216,8 @@ smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 lapin = { version = "2.1.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "4.0.16", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "4.0.16", default-features = false, optional = true }
+async-graphql = { version = "5.0.4", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "5.0.4", default-features = false, optional = true }
 itertools = { version = "0.10.5", default-features = false, optional = true }
 
 # API client
@@ -239,16 +239,16 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 # External libs
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.15", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
-avro-rs = { version = "0.13.0", default-features = false, optional = true }
+apache-avro = { version = "0.14.0", default-features = false, optional = true }
 axum = { version = "0.6.1", default-features = false }
-base64 = { version = "0.13.1", default-features = false, optional = true }
+base64 = { version = "0.20.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.13.0", default-features = false, features = ["ssl", "chrono"] }
 bytes = { version = "1.3.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.9", default-features = false }
-clap = { version = "4.0.29", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.0.30", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -264,7 +264,7 @@ governor = { version = "0.5.1", default-features = false, features = ["dashmap",
 grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.3.13", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
-hashbrown = { version = "0.12.3", default-features = false, optional = true }
+hashbrown = { version = "0.13.1", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.8", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.8", default-features = false }
@@ -291,13 +291,12 @@ notify = { version = "5.0.0", default-features = false, features = ["macos_fseve
 once_cell = { version = "1.16", default-features = false }
 openssl = { version = "0.10.44", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
-openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.4.0", default-features = false }
 paste = "1.0.9"
 percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "5.0.0", default-features = false, features = ["tokio-runtime", "auth-oauth2"], optional = true }
+pulsar = { version = "5.0.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.29.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
@@ -307,7 +306,7 @@ roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.14", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
-snafu = { version = "0.7.3", default-features = false, features = ["futures"] }
+snafu = { version = "0.7.4", default-features = false, features = ["futures"] }
 snap = { version = "1.1.0", default-features = false, optional = true }
 socket2 = { version = "0.4.7", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
@@ -342,6 +341,7 @@ nix = { version = "0.26.1", default-features = false, features = ["socket", "sig
 [build-dependencies]
 prost-build = { version = "0.11.4", default-features = false, optional = true }
 tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
+openssl-src = { version = "111", default-features = false, features = ["force-engine"] }
 
 [dev-dependencies]
 approx = "0.5.1"
@@ -350,7 +350,7 @@ azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b
 azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
-base64 = "0.13.1"
+base64 = "0.20.0"
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.10.5", default-features = false }
 libc = "0.2.138"
@@ -365,7 +365,7 @@ tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.15"
-zstd = { version = "0.11.2", default-features = false }
+zstd = { version = "0.12.1", default-features = false }
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
@@ -375,10 +375,6 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
 # Adds `Status::is_reset` test, remove after the next version is released.
 h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
-# Enables OpenSSL ENGINE support during cross compilation to musl
-# TODO remove this branch and instead use the openssl-src feature flag once it is available
-#    (see https://github.com/vectordotdev/vector/issues/13695)
-openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", branch  = "enable_engine" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
 
@@ -510,7 +506,7 @@ sources-metrics = [
 
 sources-amqp = ["lapin"]
 sources-apache_metrics = []
-sources-aws_ecs_metrics = []
+sources-aws_ecs_metrics = ["dep:serde_with"]
 sources-aws_kinesis_firehose = ["dep:base64", "dep:infer"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
@@ -693,7 +689,7 @@ sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["aws-core", "dep:base64", "dep:prometheus-parser", "dep:snap", "dep:serde_with"]
-sinks-pulsar = ["dep:avro-rs", "dep:pulsar"]
+sinks-pulsar = ["dep:apache-avro", "dep:pulsar"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]

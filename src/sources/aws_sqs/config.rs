@@ -42,21 +42,21 @@ pub struct AwsSqsConfig {
     #[derivative(Default(value = "default_poll_secs()"))]
     pub poll_secs: u32,
 
-    /// The visibility timeout to use for messages, in secords.
+    /// The visibility timeout to use for messages, in seconds.
     ///
-    /// This controls how long a message is left unavailable after Vector receives it. If Vector receives a message, and
-    /// takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it will be made reavailable for another consumer.
+    /// This controls how long a message is left unavailable after it is received. If a message is received, and
+    /// takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it is made available again for another consumer.
     ///
-    /// This can happen if, for example, if Vector crashes between consuming a message and deleting it.
+    /// This can happen if there is an issue between consuming a message and deleting it.
     // NOTE: We restrict this to u32 for safe conversion to i64 later.
     // restricted to u32 for safe conversion to i64 later
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     pub(super) visibility_timeout_secs: u32,
 
-    /// Whether to delete the message once Vector processes it.
+    /// Whether to delete the message once it is processed.
     ///
-    /// It can be useful to set this to `false` to debug or during initial Vector setup.
+    /// It can be useful to set this to `false` for debugging or during the initial setup.
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
@@ -67,7 +67,7 @@ pub struct AwsSqsConfig {
     ///
     /// Should not typically need to be changed, but it can sometimes be beneficial to raise this value when there is a
     /// high rate of messages being pushed into the queue and the messages being fetched are small. In these cases,
-    /// Vector may not fully utilize system resources without fetching more messages per second, as it spends more time
+    /// System resources may not be fully utilized without fetching more messages per second, as it spends more time
     /// fetching the messages than processing them.
     pub client_concurrency: Option<NonZeroUsize>,
 

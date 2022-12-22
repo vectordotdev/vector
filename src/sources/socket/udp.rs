@@ -6,7 +6,10 @@ use codecs::{
 };
 use futures::StreamExt;
 use listenfd::ListenFd;
-use lookup::{lookup_v2::BorrowedSegment, path};
+use lookup::{
+    lookup_v2::{parse_value_path, OptionalValuePath},
+    owned_value_path, path,
+};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::{configurable_component, NamedComponent};
@@ -53,14 +56,14 @@ pub struct UdpConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    host_key: Option<String>,
+    host_key: Option<OptionalValuePath>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
     ///
     /// The value will be the peer host's port i.e. `9000`.
     ///
     /// By default, `"port"` is used.
-    port_key: Option<String>,
+    port_key: Option<OptionalValuePath>,
 
     /// The size, in bytes, of the receive buffer used for the listening socket.
     ///
@@ -81,11 +84,11 @@ pub struct UdpConfig {
 }
 
 impl UdpConfig {
-    pub(super) const fn host_key(&self) -> &Option<String> {
+    pub(super) const fn host_key(&self) -> &Option<OptionalValuePath> {
         &self.host_key
     }
 
-    pub const fn port_key(&self) -> &Option<String> {
+    pub const fn port_key(&self) -> &Option<OptionalValuePath> {
         &self.port_key
     }
 
@@ -106,7 +109,7 @@ impl UdpConfig {
             address,
             max_length: crate::serde::default_max_length(),
             host_key: None,
-            port_key: Some(String::from("port")),
+            port_key: Some(OptionalValuePath::from(owned_value_path!("port"))),
             receive_buffer_bytes: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -224,28 +227,28 @@ pub(super) fn udp(
                                             now,
                                         );
 
-                                        let host_key_path = config.host_key.as_ref().map_or_else(
-                                            || [BorrowedSegment::from(log_schema().host_key())],
-                                            |key| [BorrowedSegment::from(key)],
+                                        let legacy_host_key = config.host_key.as_ref().map_or_else(
+                                            || parse_value_path(log_schema().host_key()).ok(),
+                                            |k| k.path.clone(),
                                         );
 
                                         log_namespace.insert_source_metadata(
                                             SocketConfig::NAME,
                                             log,
-                                            Some(LegacyKey::InsertIfEmpty(&host_key_path)),
+                                            legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
                                             path!("host"),
                                             address.ip().to_string()
                                         );
 
-                                        let port_key_path = config.port_key.as_ref().map_or_else(
-                                            || [BorrowedSegment::from("port")],
-                                            |key| [BorrowedSegment::from(key)],
-                                        );
+                                        let legacy_port_key = config
+                                            .port_key
+                                            .as_ref()
+                                            .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone());
 
                                         log_namespace.insert_source_metadata(
                                             SocketConfig::NAME,
                                             log,
-                                            Some(LegacyKey::InsertIfEmpty(&port_key_path)),
+                                            legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
                                             path!("port"),
                                             address.port()
                                         );

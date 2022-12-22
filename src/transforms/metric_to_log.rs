@@ -10,14 +10,13 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vrl::prelude::BTreeMap;
 
-use crate::schema::Definition;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
-    schema,
+    schema::Definition,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
 };
@@ -50,6 +49,14 @@ pub struct MetricToLogConfig {
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
+
+    /// Controls if this transform should encode tags using the enhanced encoding of [the
+    /// `native_json` codec][vector_native_json]?
+    ///
+    /// If set to `false`, tags will always be encoded as single string values using the last value
+    /// assigned to the tag.
+    #[serde(default = "crate::serde::default_false")]
+    pub enhanced_tags: bool,
 }
 
 impl GenerateConfig for MetricToLogConfig {
@@ -58,6 +65,7 @@ impl GenerateConfig for MetricToLogConfig {
             host_tag: Some("host-tag".to_string()),
             timezone: None,
             log_namespace: None,
+            enhanced_tags: false,
         })
         .unwrap()
     }
@@ -66,11 +74,11 @@ impl GenerateConfig for MetricToLogConfig {
 #[async_trait::async_trait]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        let log_namespace = context.log_namespace(self.log_namespace);
         Ok(Transform::function(MetricToLog::new(
-            self.host_tag.clone(),
+            self.host_tag.as_deref(),
             self.timezone.unwrap_or_else(|| context.globals.timezone()),
-            log_namespace,
+            context.log_namespace(self.log_namespace),
+            self.enhanced_tags,
         )))
     }
 
@@ -78,7 +86,7 @@ impl TransformConfig for MetricToLogConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, _: &Definition, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition =
             Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
@@ -224,21 +232,39 @@ pub struct MetricToLog {
     host_tag: String,
     timezone: TimeZone,
     log_namespace: LogNamespace,
+    enhanced_tags: bool,
 }
 
 impl MetricToLog {
-    pub fn new(host_tag: Option<String>, timezone: TimeZone, log_namespace: LogNamespace) -> Self {
+    pub fn new(
+        host_tag: Option<&str>,
+        timezone: TimeZone,
+        log_namespace: LogNamespace,
+        enhanced_tags: bool,
+    ) -> Self {
         Self {
             host_tag: format!(
                 "tags.{}",
-                host_tag.unwrap_or_else(|| log_schema().host_key().to_string())
+                host_tag.unwrap_or_else(|| log_schema().host_key())
             ),
             timezone,
             log_namespace,
+            enhanced_tags,
         }
     }
 
-    pub fn transform_one(&self, metric: Metric) -> Option<LogEvent> {
+    pub fn transform_one(&self, mut metric: Metric) -> Option<LogEvent> {
+        if !self.enhanced_tags {
+            if let Some(tags) = metric.tags_mut() {
+                tags.retain(|_, values| match std::mem::take(values).into_single() {
+                    Some(tag) => {
+                        *values = [tag].into();
+                        true
+                    }
+                    None => false,
+                });
+            }
+        }
         serde_json::to_value(&metric)
             .map_err(|error| emit!(MetricToLogSerializeError { error }))
             .ok()
@@ -296,6 +322,8 @@ impl FunctionTransform for MetricToLog {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, DateTime, Utc};
+    use futures::executor::block_on;
+    use proptest::prelude::*;
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
@@ -303,10 +331,10 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        metric::{MetricKind, MetricTags, MetricValue, StatisticKind},
+        metric::{MetricKind, MetricTags, MetricValue, StatisticKind, TagValue, TagValueSet},
         Metric, Value,
     };
-    use crate::test_util::components::assert_transform_compliance;
+    use crate::test_util::{components::assert_transform_compliance, random_string};
     use crate::transforms::test::create_topology;
 
     #[test]
@@ -320,6 +348,7 @@ mod tests {
                 host_tag: Some("host".into()),
                 timezone: None,
                 log_namespace: Some(false),
+                ..Default::default()
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -567,5 +596,71 @@ mod tests {
             ]
         );
         assert_eq!(log.metadata(), &metadata);
+    }
+
+    // Test the encoding of tag values with the `enhanced_tags` flag.
+    proptest! {
+        #[test]
+        fn transform_tag_single_encoding(values: TagValueSet) {
+            let name = random_string(16);
+            let tags = block_on(transform_tags(
+                false,
+                values.iter()
+                    .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
+                    .collect(),
+            ));
+            // The resulting tag must be either a single string value or not present.
+            let value = values.into_single().map(|value| Value::Bytes(value.into()));
+            assert_eq!(tags.get(&*name), value.as_ref());
+        }
+
+        #[test]
+        fn transform_tag_full_encoding(values: TagValueSet) {
+            let name = random_string(16);
+            let tags = block_on(transform_tags(
+                true,
+                values.iter()
+                    .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
+                    .collect(),
+            ));
+            let tag = tags.get(&*name);
+            match values.len() {
+                // Empty tag set => missing tag
+                0 => assert_eq!(tag, None),
+                // Single value tag => scalar value
+                1 => assert_eq!(tag, Some(&tag_to_value(values.into_iter().next().unwrap()))),
+                // Multi-valued tag => array value
+                _ => assert_eq!(tag, Some(&Value::Array(values.into_iter().map(tag_to_value).collect()))),
+            }
+        }
+    }
+
+    fn tag_to_value(tag: TagValue) -> Value {
+        tag.into_option().into()
+    }
+
+    async fn transform_tags(enhanced_tags: bool, tags: MetricTags) -> Value {
+        let counter = Metric::new(
+            "counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags))
+        .with_timestamp(Some(ts()));
+
+        let mut output = OutputBuffer::with_capacity(1);
+
+        MetricToLogConfig {
+            enhanced_tags,
+            ..Default::default()
+        }
+        .build(&TransformContext::default())
+        .await
+        .unwrap()
+        .into_function()
+        .transform(&mut output, counter.into());
+
+        assert_eq!(output.len(), 1);
+        output.into_events().next().unwrap().into_log()["tags"].clone()
     }
 }

@@ -8,6 +8,7 @@ use vector_config::configurable_component;
 /// Encoding configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[configurable(description = "Configures how events are encoded into raw bytes.")]
 pub struct EncodingConfig {
     #[serde(flatten)]
     encoding: SerializerConfig,
