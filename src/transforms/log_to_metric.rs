@@ -3,13 +3,14 @@ use std::num::ParseFloatError;
 use chrono::Utc;
 use indexmap::IndexMap;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
     },
     event::{
-        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
         Event, Value,
     },
     internal_events::{
@@ -43,6 +44,11 @@ pub struct CounterConfig {
 }
 
 /// Specification of a metric derived from a log event.
+// TODO: While we're resolving the schema for this enum somewhat reasonably (in
+// `generate-components-docs.rb`), we have a problem where an overlapping field (overlap between two
+// or more of the subschemas) takes the details of the last subschema to be iterated over that
+// contains that field, such that, for example, the `Summary` variant below is overriding the
+// description for almost all of the fields because they're shared across all of the variants.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct MetricConfig {
@@ -58,11 +64,24 @@ pub struct MetricConfig {
     pub namespace: Option<Template>,
 
     /// Tags to apply to the metric.
-    pub tags: Option<IndexMap<String, Template>>,
+    pub tags: Option<IndexMap<String, TagConfig>>,
 
     #[configurable(derived)]
     #[serde(flatten)]
     pub metric: MetricTypeConfig,
+}
+
+/// Specification of the value of a created tag.
+///
+/// This may be a single value, a `null` for a bare tag, or an array of either.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(untagged)]
+pub enum TagConfig {
+    /// A single tag value.
+    Plain(#[configurable(transparent)] Option<Template>),
+    /// An array of values to give to the same tag name.
+    Multi(#[configurable(transparent)] Vec<Option<Template>>),
 }
 
 /// Specification of the type of an individual metric, and any associated data.
@@ -133,7 +152,7 @@ impl TransformConfig for LogToMetricConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 
@@ -169,31 +188,53 @@ fn render_template(template: &Template, event: &Event) -> Result<String, Transfo
 }
 
 fn render_tags(
-    tags: &Option<IndexMap<String, Template>>,
+    tags: &Option<IndexMap<String, TagConfig>>,
     event: &Event,
 ) -> Result<Option<MetricTags>, TransformError> {
     Ok(match tags {
         None => None,
         Some(tags) => {
-            let mut map = MetricTags::default();
-            for (name, template) in tags {
-                match render_template(template, event) {
-                    Ok(tag) => {
-                        map.insert(name.to_string(), tag);
+            let mut result = MetricTags::default();
+            for (name, config) in tags {
+                match config {
+                    TagConfig::Plain(template) => {
+                        render_tag_into(event, name, template, &mut result)?
                     }
-                    Err(TransformError::TemplateRenderingError(error)) => {
-                        emit!(crate::internal_events::TemplateRenderingError {
-                            error,
-                            drop_event: false,
-                            field: Some(name.as_str()),
-                        });
+                    TagConfig::Multi(vec) => {
+                        for template in vec {
+                            render_tag_into(event, name, template, &mut result)?;
+                        }
                     }
-                    Err(other) => return Err(other),
                 }
             }
-            map.as_option()
+            result.as_option()
         }
     })
+}
+
+fn render_tag_into(
+    event: &Event,
+    name: &str,
+    template: &Option<Template>,
+    result: &mut MetricTags,
+) -> Result<(), TransformError> {
+    let value = match template {
+        None => TagValue::Bare,
+        Some(template) => match render_template(template, event) {
+            Ok(result) => TagValue::Value(result),
+            Err(TransformError::TemplateRenderingError(error)) => {
+                emit!(crate::internal_events::TemplateRenderingError {
+                    error,
+                    drop_event: false,
+                    field: Some(name),
+                });
+                return Ok(());
+            }
+            Err(other) => return Err(other),
+        },
+    };
+    result.insert(name.to_string(), value);
+    Ok(())
 }
 
 fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
@@ -355,6 +396,7 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::test_util::components::assert_transform_compliance;
@@ -374,6 +416,10 @@ mod tests {
 
     fn parse_config(s: &str) -> LogToMetricConfig {
         toml::from_str(s).unwrap()
+    }
+
+    fn parse_yaml_config(s: &str) -> LogToMetricConfig {
+        serde_yaml::from_str(s).unwrap()
     }
 
     fn ts() -> DateTime<Utc> {
@@ -486,17 +532,67 @@ mod tests {
                 metadata,
             )
             .with_namespace(Some("app"))
-            .with_tags(Some(
-                vec![
-                    ("method".to_owned(), "post".to_owned()),
-                    ("code".to_owned(), "200".to_owned()),
-                    ("host".to_owned(), "localhost".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "method" => "post",
+                "code" => "200",
+                "host" => "localhost",
+            )))
             .with_timestamp(Some(ts()))
         );
+    }
+
+    #[tokio::test]
+    async fn multi_value_tags_yaml() {
+        // Have to use YAML to represent bare tags
+        let config = parse_yaml_config(
+            r#"
+            metrics:
+            - field: "message"
+              type: "counter"
+              tags:
+                tag:
+                - "one"
+                - null
+                - "two"
+            "#,
+        );
+
+        let event = create_event("message", "I am log");
+        let metric = do_transform(config, event).await.unwrap().into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(tags.iter_single().collect::<Vec<_>>(), vec![("tag", "two")]);
+
+        assert_eq!(tags.iter_all().count(), 3);
+        for (name, value) in tags.iter_all() {
+            assert_eq!(name, "tag");
+            assert!(value == None || value == Some("one") || value == Some("two"));
+        }
+    }
+
+    #[tokio::test]
+    async fn multi_value_tags_toml() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            field = "message"
+            type = "counter"
+            [metrics.tags]
+            tag = ["one", "two"]
+            "#,
+        );
+
+        let event = create_event("message", "I am log");
+        let metric = do_transform(config, event).await.unwrap().into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(tags.iter_single().collect::<Vec<_>>(), vec![("tag", "two")]);
+
+        assert_eq!(tags.iter_all().count(), 2);
+        for (name, value) in tags.iter_all() {
+            assert_eq!(name, "tag");
+            assert!(value == Some("one") || value == Some("two"));
+        }
     }
 
     #[tokio::test]

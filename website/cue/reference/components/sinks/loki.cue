@@ -13,6 +13,7 @@ components: sinks: loki: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -68,100 +69,7 @@ components: sinks: loki: {
 		notices: []
 	}
 
-	configuration: {
-		endpoint: {
-			description: "The base URL of the Loki instance. Vector will append `/loki/api/v1/push` to this."
-			required:    true
-			type: string: {
-				examples: ["http://localhost:3100"]
-			}
-		}
-		auth: configuration._http_auth & {_args: {
-			password_example: "${LOKI_PASSWORD}"
-			username_example: "${LOKI_USERNAME}"
-		}}
-		labels: {
-			description: """
-				A set of labels that are attached to each batch of events. Both keys and values are templatable, which
-				enables you to attach dynamic labels to events. Labels can be suffixed with a "*" to allow the expansion
-				of objects into multiple labels, see "How it works" for more information.
-
-				Note: If the set of labels has high cardinality, this can cause drastic performance issues with Loki.
-				To prevent this from happening, reduce the number of unique label keys and values.
-				"""
-			required: true
-			type: object: {
-				examples: [
-					{
-						"forwarder":             "vector"
-						"event":                 "{{ event_field }}"
-						"key":                   "value"
-						"\"{{ event_field }}\"": "{{ another_event_field }}"
-						"pod_labels_*":          "{{ kubernetes.pod_labels }}"
-					},
-				]
-				options: {
-					"*": {
-						common:      false
-						description: "Any Loki label, templatable"
-						required:    false
-						type: string: {
-							default: null
-							examples: ["vector", "{{ event_field }}", "{{ kubernetes.pod_labels }}"]
-							syntax: "template"
-						}
-					}
-				}
-			}
-		}
-		out_of_order_action: {
-			common: false
-			description: """
-				Some sources may generate events with timestamps that aren't in strictly chronological order. The Loki
-				service can't accept a stream of such events prior version 2.4.0. Vector sorts events before sending
-				them to Loki, however some late events might arrive after a batch has been sent. This option specifies
-				what Vector should do with those events. If you are using Loki 2.4.0 and newer, you should set this
-				option to "accept"
-				"""
-			required: false
-			type: string: {
-				default: "drop"
-				enum: {
-					"drop":              "Drop the event."
-					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
-					"accept":            "Don't do anything, send events into Loki normally (needs Loki 2.4.0 and newer)"
-				}
-			}
-		}
-		remove_label_fields: {
-			common:      false
-			description: "If this is set to `true` then when labels are collected from events those fields will also get removed from the event."
-			required:    false
-			type: bool: default: false
-		}
-
-		remove_timestamp: {
-			common:      false
-			description: "If this is set to `true` then the timestamp will be removed from the event payload. Note the event timestamp will still be sent as metadata to Loki for indexing."
-			required:    false
-			type: bool: default: true
-		}
-		tenant_id: {
-			common:      false
-			description: """
-				The tenant id that's sent with every request, by default this is not required since a proxy should set
-				this header. When running Loki locally a tenant id is not required either.
-
-				You can read more about tenant id's [here](\(urls.loki_multi_tenancy)).
-				"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["some_tenant_id", "{{ event_field }}"]
-				syntax: "template"
-			}
-		}
-	}
+	configuration: base.components.sinks.loki.configuration
 
 	input: {
 		logs:    true

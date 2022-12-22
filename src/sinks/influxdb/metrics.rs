@@ -269,7 +269,7 @@ fn encode_events(
     quantiles: &[f64],
 ) -> BytesMut {
     let mut output = BytesMut::new();
-    let count = events.len() as u64;
+    let count = events.len();
 
     for event in events.into_iter() {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
@@ -278,7 +278,7 @@ fn encode_events(
         let (metric_type, fields) = get_type_and_fields(event.value(), quantiles);
 
         let mut unwrapped_tags = tags.unwrap_or_default();
-        unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
+        unwrapped_tags.replace("metric_type".to_owned(), metric_type.to_owned());
 
         if let Err(error_message) = influx_line_protocol(
             protocol_version,
@@ -433,7 +433,7 @@ fn to_fields(value: f64) -> HashMap<String, Field> {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
 
     use super::*;
     use crate::{
@@ -938,7 +938,8 @@ mod tests {
 mod integration_tests {
     use chrono::{SecondsFormat, Utc};
     use futures::stream;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
+    use vector_core::metric_tags;
 
     use crate::{
         config::{SinkConfig, SinkContext},
@@ -1104,14 +1105,10 @@ mod integration_tests {
                     MetricValue::Counter { value: i as f64 },
                 )
                 .with_namespace(Some("ns"))
-                .with_tags(Some(
-                    vec![
-                        ("region".to_owned(), "us-west-1".to_owned()),
-                        ("production".to_owned(), "true".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                )),
+                .with_tags(Some(metric_tags!(
+                    "region" => "us-west-1",
+                    "production" => "true",
+                ))),
             );
             events.push(event);
         }
@@ -1189,14 +1186,10 @@ mod integration_tests {
                 MetricValue::Counter { value: i as f64 },
             )
             .with_namespace(Some("ns"))
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west-1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west-1",
+                "production" => "true",
+            )))
             .with_timestamp(Some(Utc::now())),
         )
     }

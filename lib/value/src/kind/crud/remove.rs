@@ -161,7 +161,6 @@ impl Kind {
                         CompactOptions::Never
                     }
                 }
-                OwnedSegment::Invalid => CompactOptions::Never,
             }
         } else {
             CompactOptions::new(self.contains_any_defined(), self.contains_undefined())
@@ -831,7 +830,7 @@ mod test {
                         "a".into(),
                         Kind::integer(),
                     )]))),
-                    path: parse_value_path("(a|b)"),
+                    path: parse_value_path("(a|b)").unwrap(),
                     compact: false,
                     want: Kind::object(Collection::empty()),
                     return_value: Kind::integer(),
@@ -844,7 +843,7 @@ mod test {
                         "b".into(),
                         Kind::integer(),
                     )]))),
-                    path: parse_value_path("(a|b)"),
+                    path: parse_value_path("(a|b)").unwrap(),
                     compact: false,
                     want: Kind::object(Collection::empty()),
                     return_value: Kind::integer(),
@@ -857,7 +856,7 @@ mod test {
                         ("a".into(), Kind::integer().or_undefined()),
                         ("b".into(), Kind::float()),
                     ]))),
-                    path: parse_value_path("(a|b)"),
+                    path: parse_value_path("(a|b)").unwrap(),
                     compact: false,
                     want: Kind::object(Collection::from(BTreeMap::from([
                         ("a".into(), Kind::integer().or_undefined()),
@@ -873,7 +872,7 @@ mod test {
                         ("a".into(), Kind::integer().or_undefined()),
                         ("b".into(), Kind::float().or_undefined()),
                     ]))),
-                    path: parse_value_path("(a|b)"),
+                    path: parse_value_path("(a|b)").unwrap(),
                     compact: false,
                     want: Kind::object(Collection::from(BTreeMap::from([
                         ("a".into(), Kind::integer().or_undefined()),
@@ -892,7 +891,7 @@ mod test {
                             Kind::integer(),
                         )]))),
                     )]))),
-                    path: parse_value_path("(a|a2).b"),
+                    path: parse_value_path("(a|a2).b").unwrap(),
                     compact: false,
                     want: Kind::object(Collection::from(BTreeMap::from([(
                         "a".into(),

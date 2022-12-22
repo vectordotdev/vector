@@ -19,7 +19,7 @@ use bytes::Buf;
 use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use flate2::read::MultiGzDecoder;
 use futures::{stream, Stream};
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 use tokio_stream::StreamExt;
 use vector_core::{
     config::proxy::ProxyConfig,

@@ -65,10 +65,10 @@ pub struct PrometheusScrapeConfig {
     /// By default, `"endpoint"` is used.
     endpoint_tag: Option<String>,
 
-    /// Controls how tag conflicts are handled if the scraped source has tags that Vector would add.
+    /// Controls how tag conflicts are handled if the scraped source has tags to be added.
     ///
-    /// If `true`, Vector will not add the new tag if the scraped metric has the tag already. If `false`, Vector will
-    /// rename the conflicting tag by prepending `exported_` to the name.
+    /// If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
+    /// is renamed by prepending `exported_` to the original name.
     ///
     /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
@@ -229,12 +229,12 @@ impl HttpClientContext for PrometheusScrapeContext {
                     {
                         match (honor_label, metric.tag_value(tag)) {
                             (false, Some(old_instance)) => {
-                                metric.insert_tag(format!("exported_{}", tag), old_instance);
-                                metric.insert_tag(tag.clone(), instance.clone());
+                                metric.replace_tag(format!("exported_{}", tag), old_instance);
+                                metric.replace_tag(tag.clone(), instance.clone());
                             }
                             (true, Some(_)) => {}
                             (_, None) => {
-                                metric.insert_tag(tag.clone(), instance.clone());
+                                metric.replace_tag(tag.clone(), instance.clone());
                             }
                         }
                     }
@@ -246,12 +246,12 @@ impl HttpClientContext for PrometheusScrapeContext {
                     {
                         match (honor_label, metric.tag_value(tag)) {
                             (false, Some(old_endpoint)) => {
-                                metric.insert_tag(format!("exported_{}", tag), old_endpoint);
-                                metric.insert_tag(tag.clone(), endpoint.clone());
+                                metric.replace_tag(format!("exported_{}", tag), old_endpoint);
+                                metric.replace_tag(tag.clone(), endpoint.clone());
                             }
                             (true, Some(_)) => {}
                             (_, None) => {
-                                metric.insert_tag(tag.clone(), endpoint.clone());
+                                metric.replace_tag(tag.clone(), endpoint.clone());
                             }
                         }
                     }
@@ -293,7 +293,7 @@ mod test {
         service::{make_service_fn, service_fn},
         Body, Client, Response, Server,
     };
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
     use warp::Filter;
 
@@ -458,6 +458,62 @@ mod test {
         }
     }
 
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we accept the metric, but take the last label in the list.
+    #[tokio::test]
+    async fn test_prometheus_duplicate_tags() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics").map(|| {
+            r#"
+                    metric_label{code="200",code="success"} 100 1612411516789
+            "#
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            scrape_interval_secs: 1,
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: true,
+            query: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(3),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+
+        let metrics: Vec<vector_core::event::Metric> = events
+            .into_iter()
+            .map(|event| event.into_metric())
+            .collect();
+        let metric = &metrics[0];
+
+        assert_eq!(metric.name(), "metric_label");
+
+        let code_tag = metric
+            .tags()
+            .unwrap()
+            .iter_all()
+            .filter(|(name, _value)| *name == "code")
+            .map(|(_name, value)| value)
+            .collect::<Vec<_>>();
+
+        assert_eq!(1, code_tag.len());
+        assert_eq!("success", code_tag[0].unwrap());
+    }
+
     #[tokio::test]
     async fn test_prometheus_request_query() {
         let in_addr = next_addr();
@@ -611,7 +667,7 @@ mod test {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
         sleep(Duration::from_secs(1)).await;
 
         let response = Client::new()

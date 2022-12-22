@@ -9,6 +9,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
+use lookup::owned_value_path;
 use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
@@ -18,16 +19,17 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
+use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
+    config::{DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     internal_events::{
@@ -170,6 +172,11 @@ pub struct PubsubConfig {
     #[serde(default = "default_keepalive")]
     pub keepalive_secs: f64,
 
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
+
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
@@ -182,7 +189,7 @@ pub struct PubsubConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    pub acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
 const fn default_ack_deadline() -> i32 {
@@ -212,6 +219,7 @@ const fn default_poll_time() -> f64 {
 #[async_trait::async_trait]
 impl SourceConfig for PubsubConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let ack_deadline_secs = match (self.ack_deadline_secs, self.ack_deadline_seconds) {
             (Some(ads), None) => ads,
             (None, Some(ads)) => {
@@ -262,9 +270,13 @@ impl SourceConfig for PubsubConfig {
 
         let token_generator = auth.spawn_regenerate_token();
 
+        let protocol = uri
+            .scheme()
+            .map(|scheme| Protocol(scheme.to_string().into()))
+            .unwrap_or(Protocol::HTTP);
+
         let source = PubsubSource {
             endpoint,
-            uri,
             auth,
             token_generator,
             subscription: format!(
@@ -274,10 +286,10 @@ impl SourceConfig for PubsubConfig {
             decoder: DecodingConfig::new(
                 self.framing.clone(),
                 self.decoding.clone(),
-                LogNamespace::Legacy,
+                log_namespace,
             )
             .build(),
-            acknowledgements: cx.do_acknowledgements(&self.acknowledgements),
+            acknowledgements: cx.do_acknowledgements(self.acknowledgements),
             shutdown: cx.shutdown,
             out: cx.out,
             ack_deadline_secs,
@@ -285,6 +297,9 @@ impl SourceConfig for PubsubConfig {
             keepalive: Duration::from_secs_f64(self.keepalive_secs),
             concurrency: Default::default(),
             full_response_size: self.full_response_size,
+            log_namespace,
+            bytes_received: register!(BytesReceived::from(protocol)),
+            events_received: register!(EventsReceived),
         }
         .run_all(
             self.max_concurrency,
@@ -294,8 +309,35 @@ impl SourceConfig for PubsubConfig {
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                PubsubConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp().or_undefined(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                PubsubConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("attributes"))),
+                &owned_value_path!("attributes"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                None,
+            )
+            .with_source_metadata(
+                PubsubConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("message_id"))),
+                &owned_value_path!("message_id"),
+                Kind::bytes(),
+                None,
+            );
+
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -308,7 +350,6 @@ impl_generate_config_from_default!(PubsubConfig);
 #[derive(Clone)]
 struct PubsubSource {
     endpoint: Endpoint,
-    uri: Uri,
     auth: GcpAuthenticator,
     token_generator: watch::Receiver<()>,
     subscription: String,
@@ -324,6 +365,9 @@ struct PubsubSource {
     // would result in repeatedly re-opening the stream on idle.
     concurrency: Arc<AtomicUsize>,
     full_response_size: usize,
+    log_namespace: LogNamespace,
+    bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
 }
 
 enum State {
@@ -443,13 +487,6 @@ impl PubsubSource {
             Finalizer::maybe_new(self.acknowledgements, self.shutdown.clone());
         let mut pending_acks = 0;
 
-        let protocol = self
-            .uri
-            .scheme()
-            .map(|scheme| Protocol(scheme.to_string().into()))
-            .unwrap_or(Protocol::HTTP);
-        let bytes_received = register!(BytesReceived::from(protocol));
-
         loop {
             tokio::select! {
                 biased;
@@ -470,7 +507,6 @@ impl PubsubSource {
                             &ack_ids_sender,
                             &mut pending_acks,
                             busy_flag,
-                            &bytes_received,
                         ).await;
                     }
                     Some(Err(error)) => break translate_error(error),
@@ -548,12 +584,11 @@ impl PubsubSource {
         ack_ids: &mpsc::Sender<Vec<String>>,
         pending_acks: &mut usize,
         busy_flag: &Arc<AtomicBool>,
-        bytes_received: &Registered<BytesReceived>,
     ) {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
-        bytes_received.emit(ByteSize(response.size_of()));
+        self.bytes_received.emit(ByteSize(response.size_of()));
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let (events, ids) = self.parse_messages(response.received_messages, batch).await;
@@ -597,7 +632,7 @@ impl PubsubSource {
     }
 
     fn parse_message<'a>(
-        &self,
+        &'a self,
         message: proto::PubsubMessage,
         batch: &'a Option<BatchNotifier>,
     ) -> impl Iterator<Item = Event> + 'a {
@@ -608,6 +643,7 @@ impl PubsubSource {
                 .map(|(key, value)| (key, Value::Bytes(value.into())))
                 .collect(),
         );
+        let log_namespace = self.log_namespace;
         util::decode_message(
             self.decoder.clone(),
             "gcp_pubsub",
@@ -619,11 +655,25 @@ impl PubsubSource {
                 )
             }),
             batch,
+            log_namespace,
+            &self.events_received,
         )
         .map(move |mut event| {
             if let Some(log) = event.maybe_as_log_mut() {
-                log.insert("message_id", message.message_id.clone());
-                log.insert("attributes", attributes.clone());
+                log_namespace.insert_source_metadata(
+                    PubsubConfig::NAME,
+                    log,
+                    Some(LegacyKey::Overwrite("message_id")),
+                    "message_id",
+                    message.message_id.clone(),
+                );
+                log_namespace.insert_source_metadata(
+                    PubsubConfig::NAME,
+                    log,
+                    Some(LegacyKey::Overwrite("attributes")),
+                    "attributes",
+                    attributes.clone(),
+                )
             }
             event
         })
@@ -671,11 +721,84 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
+    use lookup::LookupBuf;
+    use vector_core::schema::Definition;
+
     use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PubsubConfig>();
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = PubsubConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config.outputs(LogNamespace::Vector)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(LookupBuf::root(), "message")
+                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("gcp_pubsub", "timestamp"),
+                    Kind::timestamp().or_undefined(),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("gcp_pubsub", "attributes"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("gcp_pubsub", "message_id"),
+                    Kind::bytes(),
+                );
+
+        assert_eq!(definition, expected_definition);
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = PubsubConfig::default();
+
+        let definition = config.outputs(LogNamespace::Legacy)[0]
+            .clone()
+            .log_schema_definition
+            .unwrap();
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(
+            &owned_value_path!("timestamp"),
+            Kind::timestamp().or_undefined(),
+            Some("timestamp"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("attributes"),
+            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+            None,
+        )
+        .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None);
+
+        assert_eq!(definition, expected_definition);
     }
 }
 

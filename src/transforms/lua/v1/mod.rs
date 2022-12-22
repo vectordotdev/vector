@@ -5,6 +5,7 @@ use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 
+use crate::schema::Definition;
 use crate::{
     config::{DataType, Input, Output},
     event::{Event, Value},
@@ -29,7 +30,7 @@ pub struct LuaConfig {
 
     /// A list of directories to search when loading a Lua file via the `require` function.
     ///
-    /// If not specified, the modules are looked up in the directories of Vector’s configs.
+    /// If not specified, the modules are looked up in the configuration directories.
     #[serde(default)]
     search_dirs: Vec<String>,
 }
@@ -46,8 +47,11 @@ impl LuaConfig {
         Input::log()
     }
 
-    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        // Lua causes the type definition to be reset
+        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
+
+        vec![Output::default(DataType::Log).with_schema_definition(definition)]
     }
 }
 

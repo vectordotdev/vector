@@ -8,6 +8,7 @@ use vector_config::configurable_component;
 /// Encoding configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[configurable(description = "Configures how events are encoded into raw bytes.")]
 pub struct EncodingConfig {
     #[serde(flatten)]
     encoding: SerializerConfig,
@@ -168,7 +169,7 @@ mod test {
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]")])
+            &Some(vec![parse_value_path("a.b[0]").unwrap()])
         );
         assert_eq!(
             transformer.except_fields(),
@@ -203,7 +204,7 @@ mod test {
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]")])
+            &Some(vec![parse_value_path("a.b[0]").unwrap()])
         );
         assert_eq!(
             transformer.except_fields(),
@@ -235,7 +236,7 @@ mod test {
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]")])
+            &Some(vec![parse_value_path("a.b[0]").unwrap()])
         );
         assert_eq!(
             transformer.except_fields(),

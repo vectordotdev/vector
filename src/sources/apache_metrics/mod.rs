@@ -10,7 +10,7 @@ use hyper::{Body, Request};
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::{metric_tags, ByteSizeOf};
+use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
@@ -221,7 +221,7 @@ fn apache_metrics(
                                     .collect::<Vec<_>>();
 
                                 emit!(ApacheMetricsEventsReceived {
-                                    byte_size: metrics.size_of(),
+                                    byte_size: metrics.estimated_json_encoded_size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
                                 });
@@ -282,7 +282,7 @@ mod test {
         service::{make_service_fn, service_fn},
         Body, Response, Server,
     };
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
 
     use super::*;

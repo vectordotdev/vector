@@ -1,5 +1,6 @@
 use vector_common::internal_event::{Count, InternalEventHandle as _, Registered};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -16,6 +17,9 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
     #[configurable(derived)]
+    /// The condition that every input event is matched against.
+    ///
+    /// If an event is matched by the condition, it is forwarded. Otherwise, the event is dropped.
     condition: AnyCondition,
 }
 
@@ -43,8 +47,8 @@ impl TransformConfig for FilterConfig {
         Input::all()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::all()).with_schema_definition(merged_definition.clone())]
     }
 
     fn enable_concurrency(&self) -> bool {

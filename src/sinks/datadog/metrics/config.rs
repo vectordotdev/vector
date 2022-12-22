@@ -241,9 +241,19 @@ impl DatadogMetricsConfig {
             self.default_namespace.clone(),
         )?;
 
-        let sink = DatadogMetricsSink::new(service, request_builder, batcher_settings);
+        let protocol = self.get_protocol();
+        let sink = DatadogMetricsSink::new(service, request_builder, batcher_settings, protocol);
 
         Ok(VectorSink::from_event_streamsink(sink))
+    }
+
+    fn get_protocol(&self) -> String {
+        self.get_base_agent_endpoint()
+            .parse::<Uri>()
+            .unwrap()
+            .scheme_str()
+            .unwrap_or("http")
+            .to_string()
     }
 }
 

@@ -169,6 +169,7 @@ dyn_clone::clone_trait_object!(ConditionalConfig);
 /// ```
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[configurable(metadata(docs::type_override = "condition"))]
 #[serde(untagged)]
 pub enum AnyCondition {
     /// A [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).

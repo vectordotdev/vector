@@ -25,20 +25,22 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
+use lookup::owned_value_path;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
+use vector_common::internal_event::{EventsReceived, Registered};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
         SourceConfig, SourceContext,
     },
     event::Event,
@@ -87,8 +89,9 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
-    /// The namespace to use for logs. This overrides the global settings
+    /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
 
     #[configurable(derived)]
@@ -104,7 +107,7 @@ pub struct DatadogAgentConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -115,7 +118,7 @@ impl GenerateConfig for DatadogAgentConfig {
             store_api_key: true,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
@@ -158,7 +161,7 @@ impl SourceConfig for DatadogAgentConfig {
             log_namespace,
         );
         let listener = tls.bind(&self.address).await?;
-        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
         let shutdown = cx.shutdown;
 
@@ -194,51 +197,44 @@ impl SourceConfig for DatadogAgentConfig {
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
-                self.get_component_name(),
-                Some("message"),
-                "message",
-                Kind::bytes(),
-                Some("message"),
-            )
-            .with_source_metadata(
-                self.get_component_name(),
-                Some("status"),
-                "status",
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("status"))),
+                &owned_value_path!("status"),
                 Kind::bytes(),
                 Some("severity"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("timestamp"),
-                "timestamp",
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
+                &owned_value_path!("timestamp"),
                 Kind::timestamp(),
                 Some("timestamp"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("hostname"),
-                "hostname",
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
+                &owned_value_path!("hostname"),
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("service"),
-                "service",
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
+                &owned_value_path!("service"),
                 Kind::bytes(),
                 Some("service"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("ddsource"),
-                "ddsource",
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddsource"))),
+                &owned_value_path!("ddsource"),
                 Kind::bytes(),
                 Some("source"),
             )
             .with_source_metadata(
-                self.get_component_name(),
-                Some("ddtags"),
-                "ddtags",
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
+                &owned_value_path!("ddtags"),
                 Kind::bytes(),
                 Some("tags"),
             )
@@ -285,13 +281,13 @@ pub struct ApiKeyQueryParams {
 pub(crate) struct DatadogAgentSource {
     pub(crate) api_key_extractor: ApiKeyExtractor,
     pub(crate) log_schema_host_key: &'static str,
-    pub(crate) log_schema_timestamp_key: &'static str,
     pub(crate) log_schema_source_type_key: &'static str,
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
     metrics_schema_definition: Arc<schema::Definition>,
+    events_received: Registered<EventsReceived>,
 }
 
 #[derive(Clone)]
@@ -338,12 +334,12 @@ impl DatadogAgentSource {
             },
             log_schema_host_key: log_schema().host_key(),
             log_schema_source_type_key: log_schema().source_type_key(),
-            log_schema_timestamp_key: log_schema().timestamp_key(),
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
             metrics_schema_definition: Arc::new(metrics_schema_definition),
             log_namespace,
+            events_received: register!(EventsReceived),
         }
     }
 

@@ -143,7 +143,7 @@ impl DelFn {
         Self {
             query: expression::Query::new(
                 expression::Target::External(PathPrefix::Event),
-                parse_value_path(path),
+                parse_value_path(path).unwrap(),
             ),
             compact: None,
         }

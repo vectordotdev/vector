@@ -8,7 +8,7 @@ use futures::{
 };
 use hyper::StatusCode;
 use indoc::indoc;
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 use vector_core::event::{BatchNotifier, BatchStatus};
 
 use super::*;

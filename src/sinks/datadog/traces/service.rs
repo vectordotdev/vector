@@ -9,6 +9,7 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -55,12 +56,12 @@ impl RetryLogic for TraceApiRetry {
 
 #[derive(Debug, Clone)]
 pub struct TraceApiRequest {
-    pub batch_size: usize,
     pub body: Bytes,
     pub headers: BTreeMap<String, String>,
     pub finalizers: EventFinalizers,
     pub uri: Uri,
     pub uncompressed_size: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl TraceApiRequest {
@@ -79,6 +80,12 @@ impl Finalizable for TraceApiRequest {
     }
 }
 
+impl MetaDescriptive for TraceApiRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
+    }
+}
+
 #[derive(Debug)]
 pub struct TraceApiResponse {
     status_code: StatusCode,
@@ -86,7 +93,6 @@ pub struct TraceApiResponse {
     batch_size: usize,
     byte_size: usize,
     uncompressed_size: usize,
-    protocol: String,
 }
 
 impl DriverResponse for TraceApiResponse {
@@ -104,8 +110,8 @@ impl DriverResponse for TraceApiResponse {
         CountByteSize(self.batch_size, self.byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.uncompressed_size, &self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.uncompressed_size)
     }
 }
 
@@ -138,11 +144,10 @@ impl Service<TraceApiRequest> for TraceApiService {
     // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, request: TraceApiRequest) -> Self::Future {
         let client = self.client.clone();
-        let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
 
         Box::pin(async move {
-            let byte_size = request.body.len();
-            let batch_size = request.batch_size;
+            let byte_size = request.get_metadata().events_byte_size();
+            let batch_size = request.get_metadata().event_count();
             let uncompressed_size = request.uncompressed_size;
             let http_request = request.into_http_request().context(BuildRequestSnafu)?;
 
@@ -158,7 +163,6 @@ impl Service<TraceApiRequest> for TraceApiService {
                 body,
                 batch_size,
                 byte_size,
-                protocol,
                 uncompressed_size,
             })
         })

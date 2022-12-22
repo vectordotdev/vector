@@ -5,6 +5,7 @@ use futures_util::{
     stream::{self, BoxStream},
     StreamExt,
 };
+use tokio::sync::oneshot::{channel, Sender};
 use tower::Service;
 use vector_core::{
     config::log_schema,
@@ -71,6 +72,8 @@ pub struct TracesSink<S> {
     service: S,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
+    shutdown: Sender<Sender<()>>,
+    protocol: String,
 }
 
 impl<S> TracesSink<S>
@@ -84,16 +87,20 @@ where
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
+        shutdown: Sender<Sender<()>>,
+        protocol: String,
     ) -> Self {
         TracesSink {
             service,
             request_builder,
             batch_settings,
+            shutdown,
+            protocol,
         }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let sink = input
+        input
             .batched_partitioned(EventPartitioner, self.batch_settings)
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)
@@ -104,16 +111,30 @@ where
                         emit!(DatadogTracesEncodingError {
                             error_message,
                             error_reason,
-                            dropped_events,
+                            dropped_events: dropped_events as usize,
                         });
                         None
                     }
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await?;
 
-        sink.run().await
+        // Create a channel for the stats flushing thread to communicate back that it has flushed
+        // remaining stats. This is necessary so that we do not terminate the process while the
+        // stats flushing thread is trying to complete the HTTP request.
+        let (sender, receiver) = channel();
+
+        // Signal the stats thread task to flush remaining payloads and shutdown.
+        let _ = self.shutdown.send(sender);
+
+        // The stats flushing thread has until the component shutdown grace period to end
+        // gracefully. Otherwise the sink + stats flushing thread will be killed and an error
+        // reported upstream.
+        receiver.await.map_err(|_| ())
     }
 }
 

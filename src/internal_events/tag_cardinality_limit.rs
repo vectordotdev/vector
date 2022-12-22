@@ -1,7 +1,6 @@
 use crate::emit;
-use crate::internal_events::{ComponentEventsDropped, INTENTIONAL};
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
 
 pub struct TagCardinalityLimitRejectingEvent<'a> {
     pub tag_key: &'a str,

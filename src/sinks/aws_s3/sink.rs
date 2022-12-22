@@ -4,7 +4,8 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::encoding::Framer;
 use uuid::Uuid;
-use vector_core::{event::Finalizable, EstimatedJsonEncodedSizeOf};
+use vector_common::request_metadata::RequestMetadata;
+use vector_core::event::Finalizable;
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -15,7 +16,10 @@ use crate::{
             partitioner::S3PartitionKey,
             service::{S3Metadata, S3Request},
         },
-        util::{request_builder::EncodeResult, Compression, RequestBuilder},
+        util::{
+            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+            RequestBuilder,
+        },
     },
 };
 
@@ -46,25 +50,29 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         &self.encoder
     }
 
-    fn split_input(&self, input: (S3PartitionKey, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: (S3PartitionKey, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
+        let builder = RequestMetadataBuilder::from_events(&events);
+
         let finalizers = events.take_finalizers();
         let s3_key_prefix = partition_key.key_prefix.clone();
 
         let metadata = S3Metadata {
             partition_key,
             s3_key: s3_key_prefix,
-            count: events.len(),
-            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
 
-        (metadata, events)
+        (metadata, builder, events)
     }
 
     fn build_request(
         &self,
-        mut metadata: Self::Metadata,
+        mut s3metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let filename = {
@@ -75,7 +83,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
                 .unwrap_or_else(|| formatted_ts.to_string())
         };
 
-        let ssekms_key_id = metadata.partition_key.ssekms_key_id.clone();
+        let ssekms_key_id = s3metadata.partition_key.ssekms_key_id.clone();
         let mut s3_options = self.api_options.clone();
         s3_options.ssekms_key_id = ssekms_key_id;
 
@@ -85,12 +93,13 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
             .cloned()
             .unwrap_or_else(|| self.compression.extension().into());
 
-        metadata.s3_key = format!("{}{}.{}", metadata.s3_key, filename, extension);
+        s3metadata.s3_key = format!("{}{}.{}", s3metadata.s3_key, filename, extension);
 
         S3Request {
             body: payload.into_payload(),
             bucket: self.bucket.clone(),
-            metadata,
+            metadata: s3metadata,
+            request_metadata,
             content_encoding: self.compression.content_encoding(),
             options: s3_options,
         }

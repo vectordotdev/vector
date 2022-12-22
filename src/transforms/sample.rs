@@ -1,4 +1,5 @@
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -26,6 +27,7 @@ pub struct SampleConfig {
     /// Consistently samples the same events. Actual rate of sampling may differ from the configured
     /// one if values in the field are not uniformly distributed. If left unspecified, or if the
     /// event doesn’t have `key_field`, events will be count rated.
+    #[configurable(metadata(docs::examples = "message",))]
     pub key_field: Option<String>,
 
     /// A logical condition used to exclude events from sampling.
@@ -60,8 +62,9 @@ impl TransformConfig for SampleConfig {
         Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log | DataType::Trace)]
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+        vec![Output::default(DataType::Log | DataType::Trace)
+            .with_schema_definition(merged_definition.clone())]
     }
 }
 

@@ -10,7 +10,7 @@ use chrono::Duration;
 use codecs::TextSerializerConfig;
 use futures::{stream, StreamExt};
 use http::Uri;
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 
 use super::*;
 use crate::aws::create_client;

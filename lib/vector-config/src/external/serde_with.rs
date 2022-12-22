@@ -61,6 +61,7 @@ impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Stri
             "docs::numeric_type",
             NumberClass::Unsigned,
         ));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::type_unit", "seconds"));
         metadata
     }
 
@@ -86,6 +87,7 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
             "docs::numeric_type",
             NumberClass::FloatingPoint,
         ));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::type_unit", "seconds"));
         metadata
     }
 
@@ -93,5 +95,30 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
         Ok(generate_number_schema::<f64>())
+    }
+}
+
+impl Configurable for serde_with::DurationMilliSeconds<u64, serde_with::formats::Strict> {
+    fn referenceable_name() -> Option<&'static str> {
+        // We're masking the type parameters here because we only deal with whole milliseconds via this
+        // version.
+        Some("serde_with::DurationMilliSeconds")
+    }
+
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description("A span of time, in whole milliseconds.");
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            "docs::numeric_type",
+            NumberClass::Unsigned,
+        ));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::type_unit", "milliseconds"));
+        metadata
+    }
+
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        // This boils down to a number schema, but we just need to shuttle around the metadata so
+        // that we can call the relevant schema generation function.
+        Ok(generate_number_schema::<u64>())
     }
 }

@@ -67,24 +67,32 @@ impl StreamDecodingError for Error {
     }
 }
 
-/// Configuration for building a `Framer`.
+/// Framing configuration.
+///
+/// Framing deals with how events are separated when encoded in a raw byte form, where each event is
+/// a "frame" that must be prefixed, or delimited, in a way that marks where an event begins and
+/// ends within the byte stream.
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "method", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The framing method."))]
 pub enum FramingConfig {
-    /// Configures the `BytesDecoder`.
+    /// Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments).
     Bytes,
-    /// Configures the `CharacterDelimitedDecoder`.
+
+    /// Byte frames which are delimited by a chosen character.
     CharacterDelimited {
         /// Options for the character delimited decoder.
         character_delimited: CharacterDelimitedDecoderOptions,
     },
-    /// Configures the `LengthDelimitedDecoder`.
+
+    /// Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length.
     LengthDelimited,
-    /// Configures the `NewlineDelimitedDecoder`.
+
+    /// Byte frames which are delimited by a newline character.
     NewlineDelimited {
         #[serde(
             default,
@@ -93,7 +101,10 @@ pub enum FramingConfig {
         /// Options for the newline delimited decoder.
         newline_delimited: NewlineDelimitedDecoderOptions,
     },
-    /// Configures the `OctetCountingDecoder`.
+
+    /// Byte frames according to the [octet counting][octet_counting] format.
+    ///
+    /// [octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
     OctetCounting {
         #[serde(
             default,
@@ -216,26 +227,53 @@ impl tokio_util::codec::Decoder for Framer {
     }
 }
 
-/// Configuration for building a `Deserializer`.
+/// Deserializer configuration.
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
+#[configurable(description = "Configures how events are decoded from raw bytes.")]
+#[configurable(metadata(docs::enum_tag_description = "The codec to use for decoding events."))]
 pub enum DeserializerConfig {
-    /// Configures the `BytesDeserializer`.
+    /// Uses the raw bytes as-is.
     Bytes,
-    /// Configures the `JsonDeserializer`.
+
+    /// Decodes the raw bytes as [JSON][json].
+    ///
+    /// [json]: https://www.json.org/
     Json,
+
     #[cfg(feature = "syslog")]
-    /// Configures the `SyslogDeserializer`.
+    /// Decodes the raw bytes as a Syslog message.
+    ///
+    /// Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
+    /// [RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+    ///
+    /// [rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+    /// [rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
     Syslog,
-    /// Configures the `NativeDeserializer`.
+
+    /// Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+    ///
+    /// This codec is **[experimental][experimental]**.
+    ///
+    /// [vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+    /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
-    /// Configures the `NativeJsonDeserializer`.
+
+    /// Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+    ///
+    /// This codec is **[experimental][experimental]**.
+    ///
+    /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+    /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     NativeJson,
-    /// Configures the `GelfDeserializer`.
+
+    /// Decodes the raw bytes as a [GELF][gelf] message.
+    ///
+    /// [gelf]: https://docs.graylog.org/docs/gelf
     Gelf,
 }
 
@@ -271,7 +309,9 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => Deserializer::Bytes(BytesDeserializerConfig.build()),
             DeserializerConfig::Json => Deserializer::Json(JsonDeserializerConfig.build()),
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => Deserializer::Syslog(SyslogDeserializerConfig.build()),
+            DeserializerConfig::Syslog => {
+                Deserializer::Syslog(SyslogDeserializerConfig::default().build())
+            }
             DeserializerConfig::Native => Deserializer::Native(NativeDeserializerConfig.build()),
             DeserializerConfig::NativeJson => {
                 Deserializer::NativeJson(NativeJsonDeserializerConfig.build())
@@ -303,7 +343,7 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json => JsonDeserializerConfig.output_type(),
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => SyslogDeserializerConfig.output_type(),
+            DeserializerConfig::Syslog => SyslogDeserializerConfig::default().output_type(),
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
             DeserializerConfig::NativeJson => NativeJsonDeserializerConfig.output_type(),
             DeserializerConfig::Gelf => GelfDeserializerConfig.output_type(),
@@ -316,7 +356,9 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json => JsonDeserializerConfig.schema_definition(log_namespace),
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => SyslogDeserializerConfig.schema_definition(log_namespace),
+            DeserializerConfig::Syslog => {
+                SyslogDeserializerConfig::default().schema_definition(log_namespace)
+            }
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::NativeJson => {
                 NativeJsonDeserializerConfig.schema_definition(log_namespace)
@@ -359,7 +401,7 @@ impl DeserializerConfig {
 }
 
 /// Parse structured events from bytes.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Deserializer {
     /// Uses a `BytesDeserializer` for deserialization.
     Bytes(BytesDeserializer),
