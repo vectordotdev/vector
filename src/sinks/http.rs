@@ -69,6 +69,14 @@ pub struct HttpSinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
+    /// A string to prefix to the payload
+    #[serde(default)]
+    pub payload_prefix: String,
+
+    /// A string to suffix to the payload
+    #[serde(default)]
+    pub payload_suffix: String,
+
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
@@ -148,6 +156,8 @@ struct HttpSink {
     pub uri: UriSerde,
     pub method: Option<HttpMethod>,
     pub auth: Option<Auth>,
+    pub payload_prefix: String,
+    pub payload_suffix: String,
     pub compression: Compression,
     pub transformer: Transformer,
     pub encoder: Encoder<Framer>,
@@ -167,6 +177,8 @@ fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
         compression: Default::default(),
         transformer: Default::default(),
         encoder,
+        payload_prefix: Default::default(),
+        payload_suffix: Default::default(),
         batch: Default::default(),
         request: Default::default(),
     }
@@ -203,6 +215,8 @@ impl SinkConfig for HttpSinkConfig {
             encoder,
             batch: self.batch,
             request,
+            payload_prefix: self.payload_prefix.to_owned(),
+            payload_suffix: self.payload_suffix.to_owned(),
         };
 
         let request = sink
@@ -294,6 +308,7 @@ impl util::http::HttpSink for HttpSink {
                     // Prepend before building a request body to eliminate the
                     // additional copy here.
                     let message = body.split();
+                    body.put(self.payload_prefix.as_bytes());
                     body.put_u8(b'[');
                     if !message.is_empty() {
                         body.unsplit(message);
@@ -301,7 +316,7 @@ impl util::http::HttpSink for HttpSink {
                         body.truncate(body.len() - 1);
                     }
                     body.put_u8(b']');
-
+                    body.put(self.payload_suffix.as_bytes());
                     Some("application/json")
                 }
                 _ => None,
@@ -733,9 +748,71 @@ mod tests {
                         Some(Authorization::basic("waldo", "hunter2")),
                         parts.headers.typed_get()
                     );
-
                     let lines: Vec<serde_json::Value> =
                         serde_json::from_reader(MultiGzDecoder::new(body.reader())).unwrap();
+                    stream::iter(lines)
+                })
+                .map(|line| line.get("message").unwrap().as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+                .await;
+
+            assert_eq!(num_lines, output_lines.len());
+            assert_eq!(input_lines, output_lines);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn json_compression_with_payload_wrapper() {
+        components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
+            let num_lines = 1000;
+
+            let in_addr = next_addr();
+
+            let config = r#"
+        uri = "http://$IN_ADDR/frames"
+        compression = "gzip"
+        encoding.codec = "json"
+        payload_prefix = '{"data":'
+        payload_suffix = "}"
+
+        [auth]
+        strategy = "basic"
+        user = "waldo"
+        password = "hunter2"
+    "#
+            .replace("$IN_ADDR", &in_addr.to_string());
+            let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+            let cx = SinkContext::new_test();
+
+            let (sink, _) = config.build(cx).await.unwrap();
+            let (rx, trigger, server) = build_test_server(in_addr);
+
+            let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+            let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
+            let pump = sink.run(events);
+
+            tokio::spawn(server);
+
+            pump.await.unwrap();
+            drop(trigger);
+
+            assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+            let output_lines = rx
+                .flat_map(|(parts, body)| {
+                    assert_eq!(Method::POST, parts.method);
+                    assert_eq!("/frames", parts.uri.path());
+                    assert_eq!(
+                        Some(Authorization::basic("waldo", "hunter2")),
+                        parts.headers.typed_get()
+                    );
+
+                    let message: serde_json::Value =
+                        serde_json::from_reader(MultiGzDecoder::new(body.reader())).unwrap();
+                    let lines: Vec<serde_json::Value> =
+                        message["data"].as_array().unwrap().to_vec();
                     stream::iter(lines)
                 })
                 .map(|line| line.get("message").unwrap().as_str().unwrap().to_owned())
