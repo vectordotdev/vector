@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use clap::Args;
 use std::process::Command;
 
-use crate::app;
+use crate::app::{self, CommandExt as _};
 use crate::platform;
 use crate::testing::{
     config::{IntegrationTestConfig, RustToolchainConfig},
@@ -57,7 +57,7 @@ impl Cli {
         }
 
         waiting!("Stopping environment {}", &self.environment);
-        app::run_command(&mut command)?;
+        command.run()?;
 
         state::remove_env(&envs_dir, &self.environment)?;
         if state::active_envs(&envs_dir)?.is_empty() {

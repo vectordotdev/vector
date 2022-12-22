@@ -1,7 +1,9 @@
+use std::process::Command;
+
 use anyhow::Result;
 use clap::Args;
 
-use crate::app;
+use crate::app::CommandExt as _;
 use crate::platform;
 
 /// Build Vector
@@ -22,7 +24,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(&self) -> Result<()> {
-        let mut command = app::construct_command("cargo");
+        let mut command = Command::with_path("cargo");
         command.args(["build", "--no-default-features"]);
 
         if self.release {
@@ -45,7 +47,7 @@ impl Cli {
         };
 
         waiting!("Building Vector");
-        app::run_command(&mut command)?;
+        command.run()?;
 
         Ok(())
     }

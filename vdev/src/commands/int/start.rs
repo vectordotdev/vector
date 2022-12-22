@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use clap::Args;
 use std::process::Command;
 
-use crate::app;
+use crate::app::{self, CommandExt as _};
 use crate::platform;
 use crate::testing::{
     config::{IntegrationTestConfig, RustToolchainConfig},
@@ -53,7 +53,7 @@ impl Cli {
         }
 
         waiting!("Starting environment {}", &self.environment);
-        app::run_command(&mut command)?;
+        command.run()?;
 
         state::save_env(&envs_dir, &self.environment, &json)?;
         Ok(())

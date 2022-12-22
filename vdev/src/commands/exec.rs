@@ -1,7 +1,9 @@
+use std::process::Command;
+
 use anyhow::Result;
 use clap::Args;
 
-use crate::app;
+use crate::app::CommandExt as _;
 
 /// Execute a command within the repository
 #[derive(Args, Debug)]
@@ -13,7 +15,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(&self) -> Result<()> {
-        let mut command = app::construct_command(&self.args[0]);
+        let mut command = Command::with_path(&self.args[0]);
         if self.args.len() > 1 {
             command.args(&self.args[1..]);
         }

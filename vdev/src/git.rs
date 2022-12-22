@@ -1,7 +1,8 @@
-use anyhow::Result;
-use std::collections::HashSet;
+use std::{collections::HashSet, process::Command};
 
-use crate::app;
+use anyhow::Result;
+
+use crate::app::CommandExt as _;
 
 pub fn current_branch() -> Result<String> {
     let output = capture_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;
@@ -44,10 +45,10 @@ pub fn changed_files() -> Result<Vec<String>> {
 }
 
 fn capture_output(args: &[&str]) -> Result<String> {
-    let mut command = app::construct_command("git");
+    let mut command = Command::with_path("git");
     command.args(args);
 
-    app::capture_output(&mut command)
+    command.capture_output()
 }
 
 fn is_warning_line(line: &str) -> bool {

@@ -1,10 +1,11 @@
-use anyhow::Result;
-use atty::Stream;
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 use std::process::Command;
 
-use crate::app;
+use anyhow::Result;
+use atty::Stream;
+
+use crate::app::{self, CommandExt as _};
 
 pub const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const MOUNT_PATH: &str = "/home/vector";
@@ -56,10 +57,7 @@ pub trait ContainerTestRunnerBase: TestRunner {
         let mut command = Command::new("docker");
         command.args(["stop", "--time", "0", &self.container_name()]);
 
-        app::wait_for_command(
-            &mut command,
-            format!("Stopping container {}", self.container_name()),
-        )
+        command.wait(format!("Stopping container {}", self.container_name()))
     }
 }
 
@@ -70,7 +68,7 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
         let mut command = Command::new("docker");
         command.args(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
 
-        for line in app::capture_output(&mut command)?.lines() {
+        for line in command.capture_output()?.lines() {
             if let Some((name, state)) = line.split_once(' ') {
                 if name != self.container_name() {
                     continue;
@@ -124,7 +122,7 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
         volumes.insert(VOLUME_TARGET);
         volumes.insert(VOLUME_CARGO_GIT);
         volumes.insert(VOLUME_CARGO_REGISTRY);
-        for volume in app::capture_output(&mut command)?.lines() {
+        for volume in command.capture_output()?.lines() {
             volumes.take(volume);
         }
 
@@ -132,7 +130,7 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
             let mut command = Command::new("docker");
             command.args(["volume", "create", volume]);
 
-            app::wait_for_command(&mut command, format!("Creating volume {volume}"))?;
+            command.wait(format!("Creating volume {volume}"))?;
         }
 
         Ok(())
@@ -160,37 +158,28 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
         ]);
 
         waiting!("Building image {}", self.image_name());
-        app::run_command(&mut command)
+        command.run()
     }
 
     fn start(&self) -> Result<()> {
         let mut command = Command::new("docker");
         command.args(["start", &self.container_name()]);
 
-        app::wait_for_command(
-            &mut command,
-            format!("Starting container {}", self.container_name()),
-        )
+        command.wait(format!("Starting container {}", self.container_name()))
     }
 
     fn remove(&self) -> Result<()> {
         let mut command = Command::new("docker");
         command.args(["rm", &self.container_name()]);
 
-        app::wait_for_command(
-            &mut command,
-            format!("Removing container {}", self.container_name()),
-        )
+        command.wait(format!("Removing container {}", self.container_name()))
     }
 
     fn unpause(&self) -> Result<()> {
         let mut command = Command::new("docker");
         command.args(["unpause", &self.container_name()]);
 
-        app::wait_for_command(
-            &mut command,
-            format!("Unpausing container {}", self.container_name()),
-        )
+        command.wait(format!("Unpausing container {}", self.container_name()))
     }
 
     fn create(&self) -> Result<()> {
@@ -216,10 +205,7 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
             "infinity",
         ]);
 
-        app::wait_for_command(
-            &mut command,
-            format!("Creating container {}", self.container_name()),
-        )
+        command.wait(format!("Creating container {}", self.container_name()))
     }
 }
 
@@ -240,7 +226,8 @@ impl IntegrationTestRunner {
         let mut command = Command::new("docker");
         command.args(["network", "ls", "--format", "{{.Name}}"]);
 
-        if app::capture_output(&mut command)?
+        if command
+            .capture_output()?
             .lines()
             .any(|network| network == self.network_name())
         {
@@ -250,7 +237,7 @@ impl IntegrationTestRunner {
         let mut command = Command::new("docker");
         command.args(["network", "create", &self.network_name()]);
 
-        app::wait_for_command(&mut command, "Creating network")
+        command.wait("Creating network")
     }
 }
 
@@ -274,7 +261,7 @@ impl TestRunner for IntegrationTestRunner {
         command.args(TEST_COMMAND);
         command.args(args);
 
-        app::run_command(&mut command)
+        command.run()
     }
 }
 
@@ -331,7 +318,7 @@ impl TestRunner for DockerTestRunner {
         command.args(TEST_COMMAND);
         command.args(args);
 
-        app::run_command(&mut command)
+        command.run()
     }
 }
 
@@ -362,7 +349,7 @@ impl LocalTestRunner {
 
 impl TestRunner for LocalTestRunner {
     fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
-        let mut command = app::construct_command(TEST_COMMAND[0]);
+        let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);
         command.args(args);
 
@@ -370,6 +357,6 @@ impl TestRunner for LocalTestRunner {
             command.env(key, value);
         }
 
-        app::run_command(&mut command)
+        command.run()
     }
 }

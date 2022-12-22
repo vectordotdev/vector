@@ -3,7 +3,7 @@ use clap::Args;
 use std::collections::BTreeMap;
 use std::process::Command;
 
-use crate::app;
+use crate::app::{self, CommandExt as _};
 use crate::platform;
 use crate::testing::{
     config::{IntegrationTestConfig, RustToolchainConfig},
@@ -75,7 +75,7 @@ impl Cli {
                 }
 
                 waiting!("Starting environment {}", env_name);
-                app::run_command(&mut command)?;
+                command.run()?;
 
                 state::save_env(&envs_dir, env_name, &json)?;
             }
@@ -99,7 +99,7 @@ impl Cli {
                 }
 
                 waiting!("Stopping environment {}", env_name);
-                app::run_command(&mut command)?;
+                command.run()?;
 
                 state::remove_env(&envs_dir, env_name)?;
             }
