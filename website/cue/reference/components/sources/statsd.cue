@@ -124,14 +124,6 @@ components: sources: statsd: {
 				[metric data model](\(urls.vector_metric)) page for more info.
 				"""
 		}
-		tags: {
-			title: "Tags"
-			body: """
-				A trailing colon on the last tag in a tagset will be parsed as having a value of
-				an empty string. For instance, the (valid) tagset "tagA:value,tagB:", is parsed by StatsD
-				the StatsD aggregator as "tagA=value,tagB=".
-				"""
-		}
 	}
 
 	telemetry: metrics: {
