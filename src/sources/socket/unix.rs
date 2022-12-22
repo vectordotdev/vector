@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::{lookup_v2::BorrowedSegment, path};
+use lookup::{
+    lookup_v2::{parse_value_path, OptionalValuePath},
+    path,
+};
 use vector_common::shutdown::ShutdownSignal;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
@@ -50,7 +53,7 @@ pub struct UnixConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    pub host_key: Option<String>,
+    pub host_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -82,7 +85,7 @@ impl UnixConfig {
         &self.decoding
     }
 
-    pub const fn host_key(&self) -> &Option<String> {
+    pub const fn host_key(&self) -> &Option<OptionalValuePath> {
         &self.host_key
     }
 }
@@ -91,7 +94,7 @@ impl UnixConfig {
 /// Takes a single line of a received message and handles an `Event` object.
 fn handle_events(
     events: &mut [Event],
-    host_key: Option<&String>,
+    host_key: Option<&OptionalValuePath>,
     received_from: Option<Bytes>,
     log_namespace: LogNamespace,
 ) {
@@ -103,15 +106,15 @@ fn handle_events(
         log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME, now);
 
         if let Some(ref host) = received_from {
-            let host_key_path = host_key.map_or_else(
-                || [BorrowedSegment::from(log_schema().host_key())],
-                |key| [BorrowedSegment::from(key)],
+            let legacy_host_key = host_key.map_or_else(
+                || parse_value_path(log_schema().host_key()).ok(),
+                |k| k.path.clone(),
             );
 
             log_namespace.insert_source_metadata(
                 SocketConfig::NAME,
                 log,
-                Some(LegacyKey::InsertIfEmpty(&host_key_path)),
+                legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
                 path!("host"),
                 host.clone(),
             );

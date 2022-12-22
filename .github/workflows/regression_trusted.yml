@@ -453,7 +453,7 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='failure' \
             -f description='Analyze experimental results from Regression Detector cancelled.' \
-            -f context='Regression Detector / analyze-experiment' \
+            -f context='Regression Detector / detect-regression' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, success
@@ -466,7 +466,7 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='success' \
             -f description='Analyze experimental results from Regression Detector succeeded.' \
-            -f context='Regression Detector / analyze-experiment' \
+            -f context='Regression Detector / detect-regression' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, failure
@@ -480,10 +480,10 @@ jobs:
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.head-sha }} \
             -f state='success' \
             -f description='Analyze experimental results from Regression Detector failed.' \
-            -f context='Regression Detector / analyze-experiment' \
+            -f context='Regression Detector / detect-regression' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-  download-analysis:
+  analyze-experiment:
     name: Download regression analysis & upload report
     runs-on: ubuntu-22.04
     needs:

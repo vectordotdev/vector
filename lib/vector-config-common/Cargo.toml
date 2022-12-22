@@ -2,6 +2,7 @@
 name = "vector-config-common"
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2.0"
 
 [dependencies]
 darling = { version = "0.13", default-features = false, features = ["suggestions"] }
