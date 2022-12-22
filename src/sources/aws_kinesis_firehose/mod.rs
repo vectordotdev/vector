@@ -48,7 +48,8 @@ pub struct AwsKinesisFirehoseConfig {
     ///
     /// Note that this is different from [Content encoding option](\(urls.aws_kinesis_firehose_http_protocol)) of the
     /// Firehose HTTP endpoint destination. That option controls the content encoding of the entire HTTP request.
-    record_compression: Option<Compression>,
+    #[serde(default)]
+    record_compression: Compression,
 
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
@@ -114,7 +115,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
         let svc = filters::firehose(
             self.access_key.as_ref().map(|k| k.inner().to_owned()),
-            self.record_compression.unwrap_or_default(),
+            self.record_compression,
             decoder,
             acknowledgements,
             cx.out,
@@ -175,7 +176,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             address: "0.0.0.0:443".parse().unwrap(),
             access_key: None,
             tls: None,
-            record_compression: None,
+            record_compression: Default::default(),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: Default::default(),
@@ -247,7 +248,7 @@ mod tests {
 
     async fn source(
         access_key: Option<SensitiveString>,
-        record_compression: Option<Compression>,
+        record_compression: Compression,
         delivered: bool,
         log_namespace: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
@@ -425,7 +426,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, Some(source_record_compression), true, false).await;
+            let (rx, addr) = source(None, source_record_compression, true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -525,7 +526,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, Some(source_record_compression), true, true).await;
+            let (rx, addr) = source(None, source_record_compression, true, true).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -596,7 +597,7 @@ mod tests {
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr) = source(None, None, true, false).await;
+            let (rx, addr) = source(None, Default::default(), true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -633,7 +634,13 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
-        let (_rx, addr) = source(Some("an access key".to_string().into()), None, true, false).await;
+        let (_rx, addr) = source(
+            Some("an access key".to_string().into()),
+            Default::default(),
+            true,
+            false,
+        )
+        .await;
 
         let res = send(
             addr,
@@ -655,7 +662,7 @@ mod tests {
     async fn handles_acknowledgement_failure() {
         let expected = RECORD.as_bytes().to_owned();
 
-        let (rx, addr) = source(None, Some(Compression::None), false, false).await;
+        let (rx, addr) = source(None, Compression::None, false, false).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 
