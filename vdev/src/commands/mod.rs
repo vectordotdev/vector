@@ -3,7 +3,7 @@ pub mod cli;
 pub mod complete;
 pub mod config;
 pub mod exec;
-pub mod int;
+pub mod integrations;
 pub mod meta;
 pub mod status;
 pub mod test;
