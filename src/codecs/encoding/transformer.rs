@@ -13,7 +13,7 @@ use value::Value;
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, Metric};
 
-use crate::{event::Event, serde::skip_serializing_if_default, transforms::MetricTagsValues};
+use crate::{event::Event, serde::skip_serializing_if_default, transforms::MetricTagValues};
 
 /// Transformations to prepare an event for serialization.
 #[configurable_component(no_deser)]
@@ -38,7 +38,7 @@ pub struct Transformer {
     /// to `full`, all metric tag values will be exposed as either null or a string value, or an
     /// array of null or string values.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    metric_tag_values: MetricTagsValues,
+    metric_tag_values: MetricTagValues,
 }
 
 impl<'de> Deserialize<'de> for Transformer {
@@ -56,7 +56,7 @@ impl<'de> Deserialize<'de> for Transformer {
             #[serde(default)]
             timestamp_format: Option<TimestampFormat>,
             #[serde(default)]
-            metric_tag_values: MetricTagsValues,
+            metric_tag_values: MetricTagValues,
         }
 
         let inner: TransformerInner = Deserialize::deserialize(deserializer)?;
@@ -79,7 +79,7 @@ impl Transformer {
         only_fields: Option<Vec<OwnedValuePath>>,
         except_fields: Option<Vec<String>>,
         timestamp_format: Option<TimestampFormat>,
-        metric_tag_values: MetricTagsValues,
+        metric_tag_values: MetricTagValues,
     ) -> Result<Self, crate::Error> {
         Self::validate_fields(only_fields.as_ref(), except_fields.as_ref())?;
 
@@ -207,7 +207,7 @@ impl Transformer {
     }
 
     fn reduce_tag_values(&self, metric: &mut Metric) {
-        if self.metric_tag_values == MetricTagsValues::Single {
+        if self.metric_tag_values == MetricTagValues::Single {
             metric.reduce_tags_to_single();
         }
     }

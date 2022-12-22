@@ -13,7 +13,7 @@ use crate::{
         metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression, ElementCount,
         RequestBuilder,
     },
-    transforms::MetricTagsValues,
+    transforms::MetricTagValues,
 };
 
 #[derive(Clone)]
@@ -137,7 +137,7 @@ fn encoder() -> (Transformer, Encoder<()>) {
     let timestamp_format = Some(TimestampFormat::Unix);
 
     (
-        Transformer::new(only_fields, None, timestamp_format, MetricTagsValues::Full)
+        Transformer::new(only_fields, None, timestamp_format, MetricTagValues::Full)
             .expect("transformer configuration must be valid"),
         Encoder::<()>::new(JsonSerializer::new().into()),
     )

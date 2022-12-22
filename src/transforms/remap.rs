@@ -24,7 +24,7 @@ use vrl::{
     CompileConfig, Program, Runtime, Terminate, VrlRuntime,
 };
 
-use crate::transforms::MetricTagsValues;
+use crate::transforms::MetricTagValues;
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
@@ -71,7 +71,7 @@ pub struct RemapConfig {
     /// multiple values will show the last assigned value, and null values will be ignored. When set
     /// to `full`, all metric tag values will be exposed as arrays of either string or null values.
     #[serde(default)]
-    pub metric_tag_values: MetricTagsValues,
+    pub metric_tag_values: MetricTagValues,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
     /// time zone.
@@ -325,7 +325,7 @@ where
     default_schema_definition: Arc<schema::Definition>,
     dropped_schema_definition: Arc<schema::Definition>,
     runner: Runner,
-    metric_tag_values: MetricTagsValues,
+    metric_tag_values: MetricTagValues,
 }
 
 pub trait VrlRunner {
@@ -514,8 +514,8 @@ where
             event,
             self.program.info(),
             match self.metric_tag_values {
-                MetricTagsValues::Single => false,
-                MetricTagsValues::Full => true,
+                MetricTagValues::Single => false,
+                MetricTagValues::Full => true,
             },
         );
         let result = self.run_vrl(&mut target);

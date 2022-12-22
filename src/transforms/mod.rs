@@ -55,7 +55,7 @@ enum BuildError {
 #[configurable_component]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum MetricTagsValues {
+pub enum MetricTagValues {
     /// Tag values will be exposed as single strings.  Tags with multiple values will show the last
     /// assigned value, and null values will be ignored.
     #[default]
