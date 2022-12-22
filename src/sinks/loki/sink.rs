@@ -233,7 +233,7 @@ impl EventEncoder {
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
-        let partition = PartitionKey::new(tenant_id, &mut labels);
+        let partition = PartitionKey { tenant_id };
 
         Some(LokiRecord {
             labels,

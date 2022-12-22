@@ -83,10 +83,26 @@ impl From<Vec<LokiRecord>> for LokiBatch {
             .fold(Self::default(), |mut res, mut item| {
                 res.finalizers.merge(item.take_finalizers());
                 item.labels.sort();
+                // Convert a HashMap of keys and values into a string in the
+                // format "k1,v1,k2,v2,". If any of the keys or values contain
+                // a comma, it escapes the comma by adding a backslash before
+                // it (e.g. "val,ue" becomes "val\,ue").
                 let labels: String = item
                     .labels
                     .iter()
-                    .flat_map(|(a, b)| [a, "→", b, "∇"])
+                    .flat_map(|(a, b)| [a, b])
+                    .map(|s| {
+                        let mut escaped: String = s
+                            .chars()
+                            .map(|c| match c {
+                                '\\' => "\\\\".to_string(),
+                                ',' => "\\,".to_string(),
+                                c => c.to_string(),
+                            })
+                            .collect();
+                        escaped.push(',');
+                        escaped
+                    })
                     .collect();
                 if !res.stream_by_labels.contains_key(&labels) {
                     res.stream_by_labels.insert(
@@ -97,7 +113,10 @@ impl From<Vec<LokiRecord>> for LokiBatch {
                         },
                     );
                 }
-                let stream = res.stream_by_labels.get_mut(&labels).unwrap();
+                let stream = res
+                    .stream_by_labels
+                    .get_mut(&labels)
+                    .expect("stream must exist");
                 stream.values.push(item.event);
                 res
             });
@@ -188,7 +207,6 @@ impl Finalizable for LokiRecord {
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     pub tenant_id: Option<String>,
-    labels: String,
 }
 
 impl ByteSizeOf for PartitionKey {
@@ -197,15 +215,5 @@ impl ByteSizeOf for PartitionKey {
             .as_ref()
             .map(|value| value.allocated_bytes())
             .unwrap_or(0)
-            + self.labels.allocated_bytes()
-    }
-}
-
-impl PartitionKey {
-    pub fn new(tenant_id: Option<String>, _labels: &mut Labels) -> Self {
-        PartitionKey {
-            tenant_id,
-            labels: "".to_string(),
-        }
     }
 }

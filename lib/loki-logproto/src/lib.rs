@@ -32,7 +32,6 @@ pub mod util {
 
     // (<Labels>, <Lines>)
     pub struct Stream(pub HashMap<String, String>, pub Vec<Entry>);
-    pub struct Batch(pub Vec<Stream>);
 
     impl From<Stream> for logproto::StreamAdapter {
         fn from(batch: Stream) -> Self {
@@ -47,6 +46,8 @@ pub mod util {
             }
         }
     }
+
+    pub struct Batch(pub Vec<Stream>);
 
     impl Batch {
         pub fn encode(self) -> Vec<u8> {
