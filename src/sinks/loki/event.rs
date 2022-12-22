@@ -36,10 +36,9 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
                 serde_json::to_vec(&body)?
             }
             LokiBatchEncoding::Protobuf => {
-                let streams: Vec<LokiStream> = batch.stream_by_labels.into_values().collect();
+                let streams = batch.stream_by_labels.into_values();
                 let batch = loki_logproto::util::Batch(
                     streams
-                        .into_iter()
                         .map(|stream| {
                             let labels = stream.stream;
                             let entries = stream
