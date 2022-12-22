@@ -651,9 +651,9 @@ components: {
 					}
 					if Args.can_add_client_metadata {
 						client_metadata_key: {
-							common: false
+							common:      false
 							description: "Event field for client certificate metadata."
-							required: false
+							required:    false
 							type: string: {
 								default: null
 								examples: ["client_cert"]
@@ -734,9 +734,9 @@ components: {
 				}
 				let Args = _args
 
-				common: false
+				common:      false
 				description: "Configures the TLS options for incoming/outgoing connections."
-				required: false
+				required:    false
 				type: object: options: {
 					if !Args.enabled_by_scheme {
 						enabled: {
