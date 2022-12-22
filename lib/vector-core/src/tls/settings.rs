@@ -109,12 +109,14 @@ pub struct TlsConfig {
     ///
     /// Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
     /// they are defined.
+    #[configurable(metadata(docs::examples = "h2"))]
     pub alpn_protocols: Option<Vec<String>>,
 
     /// Absolute path to an additional CA certificate file.
     ///
     /// The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
     #[serde(alias = "ca_path")]
+    #[configurable(metadata(docs::examples = "/path/to/certificate_authority.crt"))]
     pub ca_file: Option<PathBuf>,
 
     /// Absolute path to a certificate file used to identify this server.
@@ -124,17 +126,21 @@ pub struct TlsConfig {
     ///
     /// If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
     #[serde(alias = "crt_path")]
+    #[configurable(metadata(docs::examples = "/path/to/host_certificate.crt"))]
     pub crt_file: Option<PathBuf>,
 
     /// Absolute path to a private key file used to identify this server.
     ///
     /// The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
     #[serde(alias = "key_path")]
+    #[configurable(metadata(docs::examples = "/path/to/host_certificate.key"))]
     pub key_file: Option<PathBuf>,
 
     /// Passphrase used to unlock the encrypted key file.
     ///
     /// This has no effect unless `key_file` is set.
+    #[configurable(metadata(docs::examples = "${KEY_PASS_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "PassWord1"))]
     pub key_pass: Option<String>,
 }
 

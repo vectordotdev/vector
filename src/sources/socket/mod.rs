@@ -310,18 +310,18 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
-                let host_key_path = config
+                let legacy_host_key = config
                     .host_key()
                     .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
                     .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                        || parse_value_path(log_schema().host_key()).ok(),
+                        |k| k.path.clone(),
+                    )
+                    .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
-                    Some(host_key_path),
+                    legacy_host_key,
                     &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
@@ -329,18 +329,18 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let host_key_path = config
+                let legacy_host_key = config
                     .host_key()
                     .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
                     .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                        || parse_value_path(log_schema().host_key()).ok(),
+                        |k| k.path.clone(),
+                    )
+                    .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
-                    Some(host_key_path),
+                    legacy_host_key,
                     &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
