@@ -35,12 +35,12 @@ base: components: sources: prometheus_remote_write: configuration: {
 			password: {
 				description: "The password for basic authentication."
 				required:    true
-				type: string: {}
+				type: string: examples: ["hunter2", "${PASSWORD}"]
 			}
 			username: {
 				description: "The username for basic authentication."
 				required:    true
-				type: string: {}
+				type: string: examples: ["AzureDiamond", "admin"]
 			}
 		}
 	}

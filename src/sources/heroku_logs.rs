@@ -43,7 +43,7 @@ use crate::{
 #[configurable_component(source("heroku_logs"))]
 #[derive(Clone, Debug)]
 pub struct LogplexConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
     #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
