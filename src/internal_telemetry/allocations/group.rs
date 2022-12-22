@@ -10,8 +10,8 @@ use std::{
 
 use tracing::Span;
 
-use super::tracing::WithAllocationGroup;
 use super::{accumulator::Accumulator, stack::GroupStack};
+use super::{sharded::ShardedAtomicU64, tracing::WithAllocationGroup};
 
 thread_local! {
     /// A stack representing the currently active allocation groups.
@@ -39,7 +39,7 @@ pub struct AllocationGroup {
     pub component_kind: Cow<'static, str>,
     pub component_type: Cow<'static, str>,
     allocated_bytes: AtomicU64,
-    deallocated_bytes: AtomicU64,
+    deallocated_bytes: ShardedAtomicU64,
 }
 
 impl AllocationGroup {
@@ -53,7 +53,7 @@ impl AllocationGroup {
             component_kind,
             component_type,
             allocated_bytes: AtomicU64::new(0),
-            deallocated_bytes: AtomicU64::new(0),
+            deallocated_bytes: ShardedAtomicU64::new(),
         }
     }
 

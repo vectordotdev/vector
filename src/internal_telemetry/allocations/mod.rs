@@ -7,6 +7,7 @@ use std::{
 mod accumulator;
 mod allocator;
 mod group;
+mod sharded;
 pub(self) mod stack;
 mod tracing;
 
