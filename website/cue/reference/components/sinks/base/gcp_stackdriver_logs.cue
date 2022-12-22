@@ -343,7 +343,7 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: examples: ["[\"h2\"]"]
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """

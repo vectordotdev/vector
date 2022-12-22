@@ -225,7 +225,7 @@ base: components: sources: http_client: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: examples: ["[\"h2\"]"]
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """

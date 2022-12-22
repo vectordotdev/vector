@@ -109,7 +109,7 @@ pub struct TlsConfig {
     ///
     /// Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
     /// they are defined.
-    #[configurable(metadata(docs::examples = "[\"h2\"]"))]
+    #[configurable(metadata(docs::examples = "h2"))]
     pub alpn_protocols: Option<Vec<String>>,
 
     /// Absolute path to an additional CA certificate file.
