@@ -182,17 +182,17 @@ base: components: sinks: pulsar: configuration: {
 
 					When set to `single`, metric tag values will be exposed as single strings. Tags with
 					multiple values will show the last assigned value, and null values will be ignored. When set
-					to `full`, all metric tag values will be exposed.
+					to `full`, all metric tag values will be exposed as either null or a string value, or an
+					array of null or string values.
 					"""
 				required: false
 				type: string: {
 					default: "single"
 					enum: {
-						full: "All tags will be exposed as arrays of either string or null values."
+						full: "The full set of values of all tags will be exposed."
 						single: """
-															Tag values will be exposed as single strings, the
-															same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
-															will be ignored.
+															Tag values will be exposed as single strings.  Tags with multiple values will show the last
+															assigned value, and null values will be ignored.
 															"""
 					}
 				}

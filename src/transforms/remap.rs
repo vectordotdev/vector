@@ -65,12 +65,11 @@ pub struct RemapConfig {
     #[configurable(metadata(docs::examples = "./my/program.vrl",))]
     pub file: Option<PathBuf>,
 
-    /// When set to `single`, metric tag values will be exposed as single strings, the
-    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
-    /// will be ignored.
+    /// Controls how metric tag values are encoded.
     ///
-    /// When set to `full`, all metric tags will be exposed as arrays of either string or null
-    /// values.
+    /// When set to `single`, metric tag values will be exposed as single strings. Tags with
+    /// multiple values will show the last assigned value, and null values will be ignored. When set
+    /// to `full`, all metric tag values will be exposed as arrays of either string or null values.
     #[serde(default)]
     pub metric_tag_values: MetricTagsValues,
 

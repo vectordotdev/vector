@@ -35,7 +35,8 @@ pub struct Transformer {
     ///
     /// When set to `single`, metric tag values will be exposed as single strings. Tags with
     /// multiple values will show the last assigned value, and null values will be ignored. When set
-    /// to `full`, all metric tag values will be exposed.
+    /// to `full`, all metric tag values will be exposed as either null or a string value, or an
+    /// array of null or string values.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     metric_tag_values: MetricTagsValues,
 }
