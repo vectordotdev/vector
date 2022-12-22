@@ -20,7 +20,7 @@ regex = { version = "1.7.0", default-features = false, features = ["std", "perf"
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union"] }
-snafu = { version = "0.7.3", default-features = false, features = ["futures"] }
+snafu = { version = "0.7.4", default-features = false, features = ["futures"] }
 syslog_loose = { version = "0.18", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tracing = { version = "0.1", default-features = false }
