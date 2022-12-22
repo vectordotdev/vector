@@ -1709,9 +1709,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.29"
+version = "4.0.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d63b9e9c07271b9957ad22c173bae2a4d9a81127680962039296abcd2f8251d"
+checksum = "656ad1e55e23d287773f7d8192c300dc715c3eeded93b3da651d11c42cfd74d2"
 dependencies = [
  "bitflags",
  "clap_derive",
@@ -3352,7 +3352,7 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33ff8ae62cd3a9102e5637afc8452c55acf3844001bd5374e0b0bd7b6616c038"
 dependencies = [
- "ahash 0.8.0",
+ "ahash 0.8.2",
 ]
 
 [[package]]
@@ -8823,7 +8823,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 4.0.29",
+ "clap 4.0.30",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8984,7 +8984,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "clap 4.0.29",
+ "clap 4.0.30",
  "futures 0.3.25",
  "graphql_client",
  "indoc",
@@ -9007,7 +9007,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.3.0",
- "clap 4.0.29",
+ "clap 4.0.30",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9252,7 +9252,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.29",
+ "clap 4.0.30",
  "exitcode",
  "indoc",
  "lookup",
@@ -9395,7 +9395,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 4.0.29",
+ "clap 4.0.30",
  "enrichment",
  "glob",
  "lookup",
