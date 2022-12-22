@@ -331,7 +331,10 @@ mod test {
         net::UdpSocket,
         time::{sleep, Duration, Instant},
     };
-    use vector_core::{config::ComponentKey, event::EventContainer};
+    use vector_core::{
+        config::ComponentKey,
+        event::{metric::TagValue, EventContainer},
+    };
 
     use super::*;
     use crate::test_util::{
@@ -488,8 +491,26 @@ mod test {
             .collect::<AbsoluteMetricState>();
         let metrics = state.finish();
 
-        assert_counter(&metrics, series!("foo", "a" => "true", "b" => "b"), 100.0);
-        assert_counter(&metrics, series!("foo", "a" => "true", "b" => "c"), 100.0);
+        assert_counter(
+            &metrics,
+            series!(
+                "foo",
+                "a" => TagValue::Bare,
+                "b" => "b"
+            ),
+            100.0,
+        );
+
+        assert_counter(
+            &metrics,
+            series!(
+                "foo",
+                "a" => TagValue::Bare,
+                "b" => "c"
+            ),
+            100.0,
+        );
+
         assert_gauge(&metrics, series!("bar"), 42.0);
         assert_distribution(
             &metrics,
