@@ -139,12 +139,9 @@ fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
             // be part of the tag value), is to remove any additional colons from the tag value.
             // Thus Vector expects only one colon character to be present per chunk, so the find()
             // operation locating the first position is sufficient.
-            match chunk.find(':') {
+            match chunk.split_once(':') {
                 // the notation `tag:` is valid for statsd, the effect is an empty string value.
-                Some(colon) => (
-                    chunk[..colon].to_string(),
-                    TagValue::Value(chunk[colon + 1..].to_string()),
-                ),
+                Some((prefix, suffix)) => (prefix.to_string(), TagValue::Value(suffix.to_string())),
                 None => (chunk.to_string(), TagValue::Bare),
             }
         })
