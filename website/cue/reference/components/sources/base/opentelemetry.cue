@@ -30,7 +30,7 @@ base: components: sources: opentelemetry: configuration: {
 					It _must_ include a port.
 					"""
 				required: true
-				type: string: {}
+				type: string: examples: ["0.0.0.0:4317", "localhost:4317"]
 			}
 			tls: {
 				description: "Configures the TLS options for incoming/outgoing connections."
@@ -140,7 +140,7 @@ base: components: sources: opentelemetry: configuration: {
 					It _must_ include a port.
 					"""
 				required: true
-				type: string: {}
+				type: string: examples: ["0.0.0.0:4318", "localhost:4318"]
 			}
 			tls: {
 				description: "Configures the TLS options for incoming/outgoing connections."

@@ -72,6 +72,8 @@ struct GrpcConfig {
     /// The address to listen for connections on.
     ///
     /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:4317"))]
+    #[configurable(metadata(docs::examples = "localhost:4317"))]
     address: SocketAddr,
 
     #[configurable(derived)]
@@ -87,6 +89,8 @@ struct HttpConfig {
     /// The address to listen for connections on.
     ///
     /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:4318"))]
+    #[configurable(metadata(docs::examples = "localhost:4318"))]
     address: SocketAddr,
 
     #[configurable(derived)]
