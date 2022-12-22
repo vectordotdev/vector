@@ -42,12 +42,15 @@ pub struct AwsKinesisFirehoseConfig {
 
     /// The compression scheme to use for decompressing records within the Firehose message.
     ///
-    /// Some services, like AWS CloudWatch Logs, will [compress the events with
-    /// gzip](\(urls.aws_cloudwatch_logs_firehose)), before sending them AWS Kinesis Firehose. This option can be used
-    /// to automatically decompress them before forwarding them to the next component.
+    /// Some services, like AWS CloudWatch Logs, will [compress the events with gzip][events_with_gzip],
+    /// before sending them AWS Kinesis Firehose. This option can be used to automatically decompress
+    /// them before forwarding them to the next component.
     ///
-    /// Note that this is different from [Content encoding option](\(urls.aws_kinesis_firehose_http_protocol)) of the
+    /// Note that this is different from [Content encoding option][encoding_option] of the
     /// Firehose HTTP endpoint destination. That option controls the content encoding of the entire HTTP request.
+    ///
+    /// [events_with_gzip]: https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-logs.html
+    /// [encoding_option]: https://docs.aws.amazon.com/firehose/latest/dev/create-destination.html#create-destination-http
     #[serde(default)]
     record_compression: Compression,
 
@@ -81,11 +84,13 @@ pub enum Compression {
     /// Automatically attempt to determine the compression scheme.
     ///
     /// The compression scheme of the object is determined by looking at its file signature, also known
-    /// as [magic bytes](\(urls.magic_bytes)).
+    /// as [magic bytes][magic_bytes].
     ///
     /// If the record fails to decompress with the discovered format, the record is forwarded as is.
     /// Thus, if you know the records are always gzip encoded (for example, if they are coming from AWS CloudWatch Logs),
     /// set `gzip` in this field so that any records that are not-gzipped are rejected.
+    ///
+    /// [magic_bytes]: https://en.wikipedia.org/wiki/List_of_file_signatures
     #[derivative(Default)]
     Auto,
     /// Uncompressed.
