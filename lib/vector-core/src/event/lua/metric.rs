@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use mlua::prelude::*;
 
@@ -101,7 +101,7 @@ impl<'a> FromLua<'a> for TagValueSet {
 
 impl<'a> FromLua<'a> for MetricTags {
     fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
-        Ok(Self(BTreeMap::from_lua(value, lua)?))
+        Ok(Self(Arc::new(BTreeMap::from_lua(value, lua)?)))
     }
 }
 
@@ -109,7 +109,7 @@ impl<'a> ToLua<'a> for LuaMetricTags {
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         if self.multi_value_tags {
             Ok(LuaValue::Table(lua.create_table_from(
-                self.tags.0.into_iter().map(|(key, value)| {
+                self.tags.into_inner().into_iter().map(|(key, value)| {
                     let value: Vec<_> = value
                         .into_iter()
                         .filter_map(|tag_value| tag_value.into_option().to_lua(lua).ok())
@@ -434,13 +434,13 @@ mod test {
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         )
-        .with_tags(Some(MetricTags(BTreeMap::from([(
+        .with_tags(Some(MetricTags(Arc::new(BTreeMap::from([(
             "example tag".to_string(),
             TagValueSet::from(vec![
                 TagValue::from("a".to_string()),
                 TagValue::from("b".to_string()),
             ]),
-        )]))));
+        )])))));
 
         assert_metric(
             metric,
@@ -674,13 +674,13 @@ mod test {
             MetricValue::Counter { value: 1.0 },
         )
         .with_namespace(Some("example_namespace"))
-        .with_tags(Some(MetricTags(BTreeMap::from([(
+        .with_tags(Some(MetricTags(Arc::new(BTreeMap::from([(
             "example tag".to_string(),
             TagValueSet::from(vec![
                 TagValue::from("a".to_string()),
                 TagValue::from("b".to_string()),
             ]),
-        )]))))
+        )])))))
         .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }

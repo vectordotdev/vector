@@ -1,10 +1,10 @@
 #[cfg(test)]
 use std::borrow::Borrow;
-
 use std::borrow::Cow;
 use std::collections::{hash_map::DefaultHasher, BTreeMap};
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 use std::{cmp::Ordering, mem};
 
 use indexmap::IndexSet;
@@ -436,7 +436,7 @@ impl Serialize for TagValueSet {
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MetricTags(
-    #[configurable(transparent)] pub(in crate::event) BTreeMap<String, TagValueSet>,
+    #[configurable(transparent)] pub(in crate::event) Arc<BTreeMap<String, TagValueSet>>,
 );
 
 impl MetricTags {
@@ -469,16 +469,29 @@ impl MetricTags {
 
     /// Iterate over all values of each tag.
     pub fn into_iter_all(self) -> impl Iterator<Item = (String, TagValue)> {
-        self.0
+        self.into_inner()
             .into_iter()
             .flat_map(|(name, tags)| tags.into_iter().map(move |tag| (name.clone(), tag)))
     }
 
     /// Iterate over a single value of each tag.
     pub fn into_iter_single(self) -> impl Iterator<Item = (String, String)> {
-        self.0
+        self.into_inner()
             .into_iter()
             .filter_map(|(name, tags)| tags.into_single().map(|tag| (name, tag)))
+    }
+
+    /// Extract an owned copy of the tag value map out of the Arc.
+    pub(in crate::event) fn into_inner(self) -> BTreeMap<String, TagValueSet> {
+        // First, try to unwrap the inner value, assuming the reference count is likely to be 1.
+        Arc::try_unwrap(self.0)
+            // If the reference count is greater than one, make a mutable copy and take ownership
+            // out of that.
+            .unwrap_or_else(|mut arc| std::mem::take(Arc::make_mut(&mut arc)))
+    }
+
+    fn inner_mut(&mut self) -> &mut BTreeMap<String, TagValueSet> {
+        Arc::make_mut(&mut self.0)
     }
 
     pub fn contains_key(&self, name: &str) -> bool {
@@ -492,23 +505,28 @@ impl MetricTags {
     /// Add a value to a tag. This does not replace any existing tags unless the value is a
     /// duplicate.
     pub fn insert(&mut self, name: String, value: impl Into<TagValue>) {
-        self.0.entry(name).or_default().insert(value.into());
+        self.inner_mut()
+            .entry(name)
+            .or_default()
+            .insert(value.into());
     }
 
     /// Replace all the values of a tag with a single value.
     pub fn replace(&mut self, name: String, value: impl Into<TagValue>) -> Option<String> {
-        self.0
+        self.inner_mut()
             .insert(name, TagValueSet::from([value.into()]))
             .and_then(TagValueSet::into_single)
     }
 
     pub fn set_multi_value(&mut self, name: String, values: impl IntoIterator<Item = TagValue>) {
         let x = TagValueSet::from_iter(values);
-        self.0.insert(name, x);
+        self.inner_mut().insert(name, x);
     }
 
     pub fn remove(&mut self, name: &str) -> Option<String> {
-        self.0.remove(name).and_then(TagValueSet::into_single)
+        self.inner_mut()
+            .remove(name)
+            .and_then(TagValueSet::into_single)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &str> {
@@ -516,16 +534,14 @@ impl MetricTags {
     }
 
     pub fn extend(&mut self, tags: impl IntoIterator<Item = (String, String)>) {
+        let this = self.inner_mut();
         for (key, value) in tags {
-            self.0
-                .entry(key)
-                .or_default()
-                .insert(TagValue::Value(value));
+            this.entry(key).or_default().insert(TagValue::Value(value));
         }
     }
 
     pub fn retain(&mut self, mut f: impl FnMut(&str, &mut TagValueSet) -> bool) {
-        self.0.retain(|key, tags| f(key.as_str(), tags));
+        self.inner_mut().retain(|key, tags| f(key.as_str(), tags));
     }
 }
 
@@ -549,25 +565,24 @@ impl<const N: usize> From<[(String, String); N]> for MetricTags {
 
 impl FromIterator<(String, String)> for MetricTags {
     fn from_iter<T: IntoIterator<Item = (String, String)>>(tags: T) -> Self {
-        let mut result = Self::default();
+        let mut result = BTreeMap::<String, TagValueSet>::default();
         for (key, value) in tags {
             result
-                .0
                 .entry(key)
                 .or_default()
                 .insert(TagValue::Value(value));
         }
-        result
+        Self(Arc::new(result))
     }
 }
 
 impl FromIterator<(String, TagValue)> for MetricTags {
     fn from_iter<T: IntoIterator<Item = (String, TagValue)>>(tags: T) -> Self {
-        let mut result = Self::default();
+        let mut result = BTreeMap::<String, TagValueSet>::default();
         for (key, value) in tags {
-            result.0.entry(key).or_default().insert(value);
+            result.entry(key).or_default().insert(value);
         }
-        result
+        Self(Arc::new(result))
     }
 }
 
@@ -599,7 +614,7 @@ mod test_support {
 
     impl Arbitrary for MetricTags {
         fn arbitrary(g: &mut Gen) -> Self {
-            Self(BTreeMap::arbitrary(g))
+            Self(Arc::new(BTreeMap::arbitrary(g)))
         }
 
         fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
