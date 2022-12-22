@@ -294,7 +294,6 @@ notify = { version = "5.0.0", default-features = false, features = ["macos_fseve
 once_cell = { version = "1.16", default-features = false }
 openssl = { version = "0.10.44", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
-openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.4.0", default-features = false }
 paste = "1.0.9"
 percent-encoding = { version = "2.2.0", default-features = false }
@@ -345,6 +344,7 @@ nix = { version = "0.26.1", default-features = false, features = ["socket", "sig
 [build-dependencies]
 prost-build = { version = "0.11.4", default-features = false, optional = true }
 tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
+openssl-src = { version = "111", default-features = false, features = ["force-engine"] }
 
 [dev-dependencies]
 approx = "0.5.1"
@@ -378,10 +378,6 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
 # Adds `Status::is_reset` test, remove after the next version is released.
 h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
-# Enables OpenSSL ENGINE support during cross compilation to musl
-# TODO remove this branch and instead use the openssl-src feature flag once it is available
-#    (see https://github.com/vectordotdev/vector/issues/13695)
-openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", branch  = "enable_engine" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
 
