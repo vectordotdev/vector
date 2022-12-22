@@ -60,7 +60,7 @@ impl Cli {
                 continue;
             }
 
-            let env_active = state::env_exists(&envs_dir, &env_name);
+            let env_active = state::env_exists(&envs_dir, env_name);
             if !env_active {
                 let mut command = Command::new("cargo");
                 command.current_dir(&test_dir);

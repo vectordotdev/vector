@@ -23,10 +23,9 @@ impl Cli {
                 .read_dir()
                 .with_context(|| format!("failed to read directory {}", root_dir.display()))?
             {
-                if let Ok(entry) = entry {
-                    if entry.path().is_dir() {
-                        entries.push(entry.file_name().into_string().unwrap());
-                    }
+                let entry = entry?;
+                if entry.path().is_dir() {
+                    entries.push(entry.file_name().into_string().unwrap());
                 }
             }
             entries.sort();
@@ -39,9 +38,9 @@ impl Cli {
         }
 
         let test_dir =
-            IntegrationTestConfig::locate_source(app::path(), &self.integration.as_ref().unwrap())?;
+            IntegrationTestConfig::locate_source(app::path(), self.integration.as_ref().unwrap())?;
         let config = IntegrationTestConfig::from_source(&test_dir)?;
-        let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration.as_ref().unwrap());
+        let envs_dir = state::envs_dir(&platform::data_dir(), self.integration.as_ref().unwrap());
         let active_envs = state::active_envs(&envs_dir)?;
 
         display!("Test args: {}", config.args.join(" "));

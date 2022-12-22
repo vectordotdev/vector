@@ -1,22 +1,26 @@
 use anyhow::{Context, Result};
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const CONFIG_FILE: &str = "config.json";
 
-pub fn envs_dir(data_dir: &PathBuf, integration: &str) -> PathBuf {
-    let mut envs_dir = data_dir.clone();
-    envs_dir.extend(["integration", "envs", integration].iter());
-
-    envs_dir
+pub fn envs_dir(data_dir: &Path, integration: &str) -> PathBuf {
+    [
+        data_dir,
+        Path::new("integration/envs"),
+        Path::new(integration),
+    ]
+    .iter()
+    .collect()
 }
 
-pub fn env_exists(envs_dir: &PathBuf, environment: &str) -> bool {
-    envs_dir.join(environment).is_dir()
+pub fn env_exists(envs_dir: &Path, environment: &str) -> bool {
+    let dir: PathBuf = [envs_dir, Path::new(environment)].iter().collect();
+    dir.is_dir()
 }
 
-pub fn active_envs(envs_dir: &PathBuf) -> Result<HashSet<String>> {
+pub fn active_envs(envs_dir: &Path) -> Result<HashSet<String>> {
     let mut environments = HashSet::new();
     if !envs_dir.is_dir() {
         return Ok(environments);
@@ -26,17 +30,17 @@ pub fn active_envs(envs_dir: &PathBuf) -> Result<HashSet<String>> {
         .read_dir()
         .with_context(|| format!("failed to read directory {}", envs_dir.display()))?
     {
-        if let Ok(entry) = entry {
-            if entry.path().is_dir() {
-                environments.insert(entry.file_name().into_string().unwrap());
-            }
+        let entry = entry
+            .with_context(|| format!("failed to read directory entry {}", envs_dir.display()))?;
+        if entry.path().is_dir() {
+            environments.insert(entry.file_name().into_string().unwrap());
         }
     }
 
     Ok(environments)
 }
 
-pub fn save_env(envs_dir: &PathBuf, environment: &str, config: &String) -> Result<()> {
+pub fn save_env(envs_dir: &Path, environment: &str, config: &str) -> Result<()> {
     let mut path = envs_dir.join(environment);
     if !path.is_dir() {
         fs::create_dir_all(&path)
@@ -49,15 +53,15 @@ pub fn save_env(envs_dir: &PathBuf, environment: &str, config: &String) -> Resul
     Ok(())
 }
 
-pub fn read_env_config(envs_dir: &PathBuf, environment: &str) -> Result<String> {
+pub fn read_env_config(envs_dir: &Path, environment: &str) -> Result<String> {
     let mut config_file = envs_dir.join(environment);
     config_file.push(CONFIG_FILE);
 
-    Ok(fs::read_to_string(&config_file)
-        .with_context(|| format!("failed to write file {}", config_file.display()))?)
+    fs::read_to_string(&config_file)
+        .with_context(|| format!("failed to write file {}", config_file.display()))
 }
 
-pub fn remove_env(envs_dir: &PathBuf, environment: &str) -> Result<()> {
+pub fn remove_env(envs_dir: &Path, environment: &str) -> Result<()> {
     let env_dir = envs_dir.join(environment);
     if env_dir.is_dir() {
         fs::remove_dir_all(&env_dir)

@@ -40,7 +40,7 @@ pub fn get_agent_test_runner(container: bool, rust_version: String) -> Box<dyn T
 }
 
 pub trait TestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &Vec<String>) -> Result<()>;
+    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()>;
 }
 
 pub trait ContainerTestRunnerBase: TestRunner {
@@ -64,14 +64,14 @@ pub trait ContainerTestRunnerBase: TestRunner {
 }
 
 trait ContainerTestRunner: ContainerTestRunnerBase {
-    fn get_rust_version(&self) -> &String;
+    fn get_rust_version(&self) -> &str;
 
     fn state(&self) -> Result<RunnerState> {
         let mut command = Command::new("docker");
         command.args(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
 
         for line in app::capture_output(&mut command)?.lines() {
-            if let Some((name, state)) = line.split_once(" ") {
+            if let Some((name, state)) = line.split_once(' ') {
                 if name != self.container_name() {
                     continue;
                 } else if state == "created" {
@@ -242,7 +242,7 @@ impl IntegrationTestRunner {
 
         if app::capture_output(&mut command)?
             .lines()
-            .any(|network| network == &self.network_name())
+            .any(|network| network == self.network_name())
         {
             return Ok(());
         }
@@ -255,7 +255,7 @@ impl IntegrationTestRunner {
 }
 
 impl TestRunner for IntegrationTestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &Vec<String>) -> Result<()> {
+    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
         self.verify_state()?;
 
         let mut command = Command::new("docker");
@@ -267,7 +267,7 @@ impl TestRunner for IntegrationTestRunner {
         command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
         for (key, value) in env_vars {
             command.env(key, value);
-            command.args(["--env", &key]);
+            command.args(["--env", key]);
         }
 
         command.arg(&self.container_name());
@@ -296,7 +296,7 @@ impl ContainerTestRunnerBase for IntegrationTestRunner {
 }
 
 impl ContainerTestRunner for IntegrationTestRunner {
-    fn get_rust_version(&self) -> &String {
+    fn get_rust_version(&self) -> &str {
         &self.rust_version
     }
 }
@@ -312,7 +312,7 @@ impl DockerTestRunner {
 }
 
 impl TestRunner for DockerTestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &Vec<String>) -> Result<()> {
+    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
         self.verify_state()?;
 
         let mut command = Command::new("docker");
@@ -324,7 +324,7 @@ impl TestRunner for DockerTestRunner {
         command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
         for (key, value) in env_vars {
             command.env(key, value);
-            command.args(["--env", &key]);
+            command.args(["--env", key]);
         }
 
         command.arg(&self.container_name());
@@ -347,7 +347,7 @@ impl ContainerTestRunnerBase for DockerTestRunner {
 }
 
 impl ContainerTestRunner for DockerTestRunner {
-    fn get_rust_version(&self) -> &String {
+    fn get_rust_version(&self) -> &str {
         &self.rust_version
     }
 }
@@ -361,7 +361,7 @@ impl LocalTestRunner {
 }
 
 impl TestRunner for LocalTestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &Vec<String>) -> Result<()> {
+    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
         let mut command = app::construct_command(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);
         command.args(args);

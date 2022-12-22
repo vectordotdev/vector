@@ -17,7 +17,7 @@ pub fn changed_files() -> Result<Vec<String>> {
     let output = capture_output(&["diff", "--name-status", "origin/master..."])?;
     for line in output.lines() {
         if !is_warning_line(line) {
-            if let Some((_, path)) = line.split_once("\t") {
+            if let Some((_, path)) = line.split_once('\t') {
                 files.insert(path.to_string());
             }
         }

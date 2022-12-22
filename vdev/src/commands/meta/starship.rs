@@ -22,14 +22,13 @@ impl Cli {
             let reader = BufReader::new(file);
 
             for line in reader.lines() {
-                if let Ok(line) = line {
-                    if line.starts_with(VERSION_START) {
-                        contexts.push(format!(
-                            "version: {}",
-                            &line[VERSION_START.len() + 1..line.len() - 1]
-                        ));
-                        break;
-                    }
+                let line = line?;
+                if line.starts_with(VERSION_START) {
+                    contexts.push(format!(
+                        "version: {}",
+                        &line[VERSION_START.len() + 1..line.len() - 1]
+                    ));
+                    break;
                 }
             }
         };

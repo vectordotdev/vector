@@ -30,7 +30,7 @@ impl Cli {
         let mut env_vars = BTreeMap::new();
         if let Some(extra_env_vars) = &self.env {
             for entry in extra_env_vars {
-                if let Some((key, value)) = entry.split_once("=") {
+                if let Some((key, value)) = entry.split_once('=') {
                     env_vars.insert(key.to_string(), value.to_string());
                 } else {
                     env_vars.insert(entry.to_string(), "".to_string());
@@ -46,7 +46,7 @@ impl Cli {
                 if platform::windows() {
                     args.extend(["--features".to_string(), "default-msvc".to_string()]);
                 } else {
-                    args.extend(["--features".to_string(), "default-msvc".to_string()]);
+                    args.extend(["--features".to_string(), "default".to_string()]);
                 }
             }
         }

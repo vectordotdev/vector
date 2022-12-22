@@ -6,7 +6,7 @@ use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;
 use std::iter;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const FILE_NAME: &str = "test.yaml";
 
@@ -21,7 +21,7 @@ pub struct RustToolchainConfig {
 }
 
 impl RustToolchainConfig {
-    pub fn parse(repo_path: &String) -> Result<Self> {
+    pub fn parse(repo_path: &str) -> Result<Self> {
         let config_file: PathBuf = [repo_path, "rust-toolchain.toml"].iter().collect();
         let contents = fs::read_to_string(&config_file)
             .with_context(|| format!("failed to read {}", config_file.display()))?;
@@ -40,7 +40,7 @@ pub struct IntegrationTestConfig {
 }
 
 impl IntegrationTestConfig {
-    fn parse_file(config_file: &PathBuf) -> Result<Self> {
+    fn parse_file(config_file: &Path) -> Result<Self> {
         let contents = fs::read_to_string(config_file)
             .with_context(|| format!("failed to read {}", config_file.display()))?;
         let config: IntegrationTestConfig = serde_yaml::from_str(&contents).with_context(|| {
@@ -70,8 +70,8 @@ impl IntegrationTestConfig {
         environments
     }
 
-    pub fn locate_source(root: &String, integration: &str) -> Result<PathBuf> {
-        let test_dir: PathBuf = [&root, "scripts", "integration", integration]
+    pub fn locate_source(root: &str, integration: &str) -> Result<PathBuf> {
+        let test_dir: PathBuf = [root, "scripts", "integration", integration]
             .iter()
             .collect();
         if !test_dir.is_dir() {
@@ -81,26 +81,23 @@ impl IntegrationTestConfig {
         Ok(test_dir)
     }
 
-    pub fn from_source(test_dir: &PathBuf) -> Result<Self> {
+    pub fn from_source(test_dir: &Path) -> Result<Self> {
         parse_integration_test_config_file(test_dir.join(FILE_NAME))
     }
 
     #[allow(dead_code)]
-    pub fn collect_all(root: &String) -> Result<BTreeMap<String, Self>> {
+    pub fn collect_all(root: &str) -> Result<BTreeMap<String, Self>> {
         let mut configs = BTreeMap::new();
-        let tests_dir: PathBuf = [&root, "scripts", "integration"].iter().collect();
+        let tests_dir: PathBuf = [root, "scripts", "integration"].iter().collect();
         for entry in tests_dir.read_dir()? {
-            if let Ok(entry) = entry {
-                if !entry.path().is_dir() {
-                    continue;
-                }
-
-                let config_file: PathBuf = [&entry.path().to_str().unwrap(), FILE_NAME]
-                    .iter()
-                    .collect();
-                let config = parse_integration_test_config_file(config_file)?;
-                configs.insert(entry.file_name().into_string().unwrap(), config);
+            let entry = entry?;
+            if !entry.path().is_dir() {
+                continue;
             }
+
+            let config_file: PathBuf = [entry.path().to_str().unwrap(), FILE_NAME].iter().collect();
+            let config = parse_integration_test_config_file(config_file)?;
+            configs.insert(entry.file_name().into_string().unwrap(), config);
         }
 
         Ok(configs)

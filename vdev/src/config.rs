@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use confy;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -33,7 +32,7 @@ impl Default for Config {
         Self {
             repo: "".to_string(),
             org: default_org,
-            orgs: orgs,
+            orgs,
         }
     }
 }
