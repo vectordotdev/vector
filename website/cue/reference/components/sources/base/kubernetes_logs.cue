@@ -2,66 +2,113 @@ package metadata
 
 base: components: sources: kubernetes_logs: configuration: {
 	auto_partial_merge: {
-		description: "Whether or not to automatically merge partial events."
-		required:    false
+		description: """
+			Whether or not to automatically merge partial events.
+
+			Partial here is in respect to messages that were split by the Kubernetes Container Runtime
+			log driver.
+			"""
+		required: false
 		type: bool: default: true
 	}
 	data_dir: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
+			By default, the global `data_dir` option is used. Make sure the running user has write
+			permissions to this directory.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["/var/local/lib/vector/"]
 	}
 	delay_deletion_ms: {
 		description: """
-			How long to delay removing entries from our map when we receive a deletion
+			How long to delay removing metadata entries from our map when we receive a deletion
 			event from the watched stream.
+
+			A longer delay will allow for continued enrichment of logs after the originating Pod is
+			removed. If relevant metadata has been removed, the log will be forwarded un-enriched and a
+			warning will be emitted.
 			"""
 		required: false
-		type: uint: default: 60000
+		type: uint: {
+			default: 60000
+			unit:    "milliseconds"
+		}
 	}
 	exclude_paths_glob_patterns: {
 		description: "A list of glob patterns to exclude from reading the files."
 		required:    false
 		type: array: {
 			default: ["**/*.gz", "**/*.tmp"]
-			items: type: string: {}
+			items: type: string: examples: ["**/exclude/**"]
 		}
 	}
 	extra_field_selector: {
-		description: "Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in `Node` filter."
-		required:    false
-		type: string: default: ""
+		description: """
+			Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in
+			`Node` filter.
+			"""
+		required: false
+		type: string: {
+			default: ""
+			examples: ["metadata.name!=pod-name-to-exclude", "metadata.name!=pod-name-to-exclude,metadata.name=mypod"]
+		}
 	}
 	extra_label_selector: {
-		description: "Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in `exclude` filter."
-		required:    false
-		type: string: default: ""
+		description: """
+			Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in
+			`exclude` filter.
+			"""
+		required: false
+		type: string: {
+			default: ""
+			examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
+		}
 	}
 	extra_namespace_label_selector: {
-		description: "Specifies the label selector to filter `Namespace`s with, to be used in addition to the built-in `exclude` filter."
-		required:    false
-		type: string: default: ""
+		description: """
+			Specifies the label selector to filter `Namespace`s with, to be used in addition to the
+			built-in `exclude` filter.
+			"""
+		required: false
+		type: string: {
+			default: ""
+			examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
+		}
 	}
 	fingerprint_lines: {
-		description: "How many first lines in a file are used for fingerprinting."
-		required:    false
-		type: uint: default: 1
+		description: """
+			The number of lines to read when generating a unique fingerprint of a log file.
+
+			This is helpful when some containers share common first log lines.
+
+			**WARNING**: If the file has less than this amount of lines then it won't be read at all.
+			This is important since container logs are broken up into several files, so the greater
+			`lines` value is, the greater the chance of it not reading the last file/logs of
+			the container.
+			"""
+		required: false
+		type: uint: {
+			default: 1
+			unit:    "lines"
+		}
 	}
 	glob_minimum_cooldown_ms: {
 		description: """
 			This value specifies not exactly the globbing, but interval
 			between the polling the files to watch from the `paths_provider`.
+
 			This is quite efficient, yet might still create some load of the
-			file system; in addition, it is currently coupled with chechsum dumping
+			file system; in addition, it is currently coupled with checksum dumping
 			in the underlying file server, so setting it too low may introduce
 			a significant overhead.
 			"""
 		required: false
-		type: uint: default: 60000
+		type: uint: {
+			default: 60000
+			unit:    "milliseconds"
+		}
 	}
 	ingestion_timestamp_field: {
 		description: """
@@ -70,129 +117,177 @@ base: components: sources: kubernetes_logs: configuration: {
 			This is useful to compute the latency between important event processing
 			stages. For example, the time delta between when a log line was written and when it was
 			processed by the `kubernetes_logs` source.
-
-			By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
-
-			[global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["ingest_timestamp"]
 	}
 	kube_config_file: {
 		description: """
-			Optional path to a readable kubeconfig file. If not set,
-			a connection to Kubernetes is made using the in-cluster configuration.
+			Optional path to a readable kubeconfig file.
+
+			If not set, a connection to Kubernetes is made using the in-cluster configuration.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["/path/to/.kube/config"]
 	}
 	max_line_bytes: {
 		description: """
-			The maximum number of bytes a line can contain before being discarded. This protects
-			against malformed lines or tailing incorrect files.
+			The maximum number of bytes a line can contain before being discarded.
+
+			This protects against malformed lines or tailing incorrect files.
 			"""
 		required: false
-		type: uint: default: 32768
+		type: uint: {
+			default: 32768
+			unit:    "bytes"
+		}
 	}
 	max_read_bytes: {
 		description: """
 			Max amount of bytes to read from a single file before switching over
 			to the next file.
+
 			This allows distributing the reads more or less evenly across
 			the files.
 			"""
 		required: false
-		type: uint: default: 2048
+		type: uint: {
+			default: 2048
+			unit:    "bytes"
+		}
 	}
 	namespace_annotation_fields: {
-		description: "Configuration for how the events are annotated with Namespace metadata."
+		description: "Configuration for how the events are enriched with `Namespace` metadata."
 		required:    false
 		type: object: options: namespace_labels: {
-			description: "Event field for Namespace labels."
+			description: "Event field for the `Namespace`'s labels."
 			required:    false
-			type: string: default: ".kubernetes.namespace_labels"
+			type: string: {
+				default: ".kubernetes.namespace_labels"
+				examples: [".k8s.ns_labels", ""]
+			}
 		}
 	}
 	node_annotation_fields: {
-		description: "Configuration for how the events are annotated with Node metadata."
+		description: "Configuration for how the events are enriched with `Node` metadata."
 		required:    false
 		type: object: options: node_labels: {
-			description: "Event field for Node labels."
+			description: "Event field for the `Node`'s labels."
 			required:    false
-			type: string: default: ".kubernetes.node_labels"
+			type: string: {
+				default: ".kubernetes.node_labels"
+				examples: [".k8s.node_labels", ""]
+			}
 		}
 	}
 	pod_annotation_fields: {
-		description: "Configuration for how the events are annotated with `Pod` metadata."
+		description: "Configuration for how the events are enriched with `Pod` metadata."
 		required:    false
 		type: object: options: {
 			container_id: {
-				description: "Event field for container ID."
+				description: "Event field for the `Container`'s ID."
 				required:    false
-				type: string: default: ".kubernetes.container_id"
+				type: string: {
+					default: ".kubernetes.container_id"
+					examples: [".k8s.container_id", ""]
+				}
 			}
 			container_image: {
-				description: "Event field for container image."
+				description: "Event field for the `Container`'s image."
 				required:    false
-				type: string: default: ".kubernetes.container_image"
+				type: string: {
+					default: ".kubernetes.container_image"
+					examples: [".k8s.container_image", ""]
+				}
 			}
 			container_name: {
-				description: "Event field for container name."
+				description: "Event field for the `Container`'s name."
 				required:    false
-				type: string: default: ".kubernetes.container_name"
+				type: string: {
+					default: ".kubernetes.container_name"
+					examples: [".k8s.container_name", ""]
+				}
 			}
 			pod_annotations: {
-				description: "Event field for Pod annotations."
+				description: "Event field for the `Pod`'s annotations."
 				required:    false
-				type: string: default: ".kubernetes.pod_annotations"
+				type: string: {
+					default: ".kubernetes.pod_annotations"
+					examples: [".k8s.pod_annotations", ""]
+				}
 			}
 			pod_ip: {
-				description: "Event field for Pod IPv4 address."
+				description: "Event field for the `Pod`'s IPv4 address."
 				required:    false
-				type: string: default: ".kubernetes.pod_ip"
+				type: string: {
+					default: ".kubernetes.pod_ip"
+					examples: [".k8s.pod_ip", ""]
+				}
 			}
 			pod_ips: {
-				description: "Event field for Pod IPv4 and IPv6 addresses."
+				description: "Event field for the `Pod`'s IPv4 and IPv6 addresses."
 				required:    false
-				type: string: default: ".kubernetes.pod_ips"
+				type: string: {
+					default: ".kubernetes.pod_ips"
+					examples: [".k8s.pod_ips", ""]
+				}
 			}
 			pod_labels: {
-				description: "Event field for Pod labels."
+				description: "Event field for the `Pod`'s labels."
 				required:    false
-				type: string: default: ".kubernetes.pod_labels"
+				type: string: {
+					default: ".kubernetes.pod_labels"
+					examples: [".k8s.pod_labels", ""]
+				}
 			}
 			pod_name: {
-				description: "Event field for Pod name."
+				description: "Event field for the `Pod`'s name."
 				required:    false
-				type: string: default: ".kubernetes.pod_name"
+				type: string: {
+					default: ".kubernetes.pod_name"
+					examples: [".k8s.pod_name", ""]
+				}
 			}
 			pod_namespace: {
-				description: "Event field for Pod namespace."
+				description: "Event field for the `Pod`'s namespace."
 				required:    false
-				type: string: default: ".kubernetes.pod_namespace"
+				type: string: {
+					default: ".kubernetes.pod_namespace"
+					examples: [".k8s.pod_ns", ""]
+				}
 			}
 			pod_node_name: {
-				description: "Event field for Pod node_name."
+				description: "Event field for the `Pod`'s node_name."
 				required:    false
-				type: string: default: ".kubernetes.pod_node_name"
+				type: string: {
+					default: ".kubernetes.pod_node_name"
+					examples: [".k8s.pod_host", ""]
+				}
 			}
 			pod_owner: {
-				description: "Event field for Pod owner reference."
+				description: "Event field for the `Pod`'s owner reference."
 				required:    false
-				type: string: default: ".kubernetes.pod_owner"
+				type: string: {
+					default: ".kubernetes.pod_owner"
+					examples: [".k8s.pod_owner", ""]
+				}
 			}
 			pod_uid: {
-				description: "Event field for Pod uid."
+				description: "Event field for the `Pod`'s uid."
 				required:    false
-				type: string: default: ".kubernetes.pod_uid"
+				type: string: {
+					default: ".kubernetes.pod_uid"
+					examples: [".k8s.pod_uid", ""]
+				}
 			}
 		}
 	}
 	self_node_name: {
 		description: """
-			The `name` of the Kubernetes `Node` that is running.
+			The name of the Kubernetes `Node` that is running.
 
-			Configured to use an environment var by default, to be evaluated to a value provided by Kubernetes at `Pod` deploy time.
+			Configured to use an environment variable by default, to be evaluated to a value provided by
+			Kubernetes at `Pod` deploy time.
 			"""
 		required: false
 		type: string: default: "${VECTOR_SELF_NODE_NAME}"
