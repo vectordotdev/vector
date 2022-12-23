@@ -17,7 +17,10 @@ pub struct TextSerializerConfig {
     ///
     /// When set to `single`, only the last non-bare value of tags will be displayed with the
     /// metric.  When set to `full`, all metric tags will be exposed as separate assignments.
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
     pub metric_tag_values: MetricTagValues,
 }
 
