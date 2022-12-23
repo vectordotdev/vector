@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 use async_trait::async_trait;
 use bytes::BytesMut;
@@ -6,8 +6,11 @@ use codecs::JsonSerializerConfig;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
+use vector_common::{
+    config::ComponentKey,
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Protocol, Registered,
+    },
 };
 use vector_config::configurable_component;
 
@@ -119,7 +122,7 @@ impl SinkConfig for NatsSinkConfig {
         &self,
         _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = NatsSink::new(self.clone()).await?;
+        let sink = NatsSink::new(self.clone(), vec![]).await?;
         let healthcheck = healthcheck(self.clone()).boxed();
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -158,10 +161,14 @@ pub struct NatsSink {
     encoder: Encoder<()>,
     connection: nats::asynk::Connection,
     subject: Template,
+    source_keys: Vec<ComponentKey>,
 }
 
 impl NatsSink {
-    async fn new(config: NatsSinkConfig) -> Result<Self, BuildError> {
+    async fn new(
+        config: NatsSinkConfig,
+        source_keys: Vec<ComponentKey>,
+    ) -> Result<Self, BuildError> {
         let connection = config.connect().await?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build().context(EncodingSnafu)?;
@@ -172,6 +179,7 @@ impl NatsSink {
             transformer,
             encoder,
             subject: Template::try_from(config.subject).context(SubjectTemplateSnafu)?,
+            source_keys,
         })
     }
 }
@@ -180,7 +188,7 @@ impl NatsSink {
 impl StreamSink<Event> for NatsSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let bytes_sent = register!(BytesSent::from(Protocol::TCP));
-        let events_sent = register!(EventsSent::from(Output(None)));
+        let events_sent = EventsSent::sources_matrix(self.source_keys, None);
 
         while let Some(mut event) = input.next().await {
             let finalizers = event.take_finalizers();
@@ -201,6 +209,7 @@ impl StreamSink<Event> for NatsSink {
             self.transformer.transform(&mut event);
 
             let event_byte_size = event.estimated_json_encoded_size_of();
+            let event_source_id = event.metadata().source_id();
 
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {
@@ -218,7 +227,10 @@ impl StreamSink<Event> for NatsSink {
                 Ok(_) => {
                     finalizers.update_status(EventStatus::Delivered);
 
-                    events_sent.emit(CountByteSize(1, event_byte_size));
+                    if let Some(handle) = events_sent.get(&event_source_id) {
+                        handle.emit(CountByteSize(1, event_byte_size));
+                    }
+
                     bytes_sent.emit(ByteSize(bytes.len()));
                 }
             }
@@ -260,7 +272,7 @@ mod integration_tests {
         // successfully published.
 
         // Create Sink
-        let sink = NatsSink::new(conf.clone()).await?;
+        let sink = NatsSink::new(conf.clone(), vec![]).await?;
         let sink = VectorSink::from_event_streamsink(sink);
 
         // Establish the consumer subscription.
