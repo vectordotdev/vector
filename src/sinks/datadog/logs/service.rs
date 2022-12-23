@@ -90,16 +90,11 @@ impl DriverResponse for LogApiResponse {
 pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
-    enterprise: bool,
 }
 
 impl LogApiService {
-    pub const fn new(client: HttpClient, uri: Uri, enterprise: bool) -> Self {
-        Self {
-            client,
-            uri,
-            enterprise,
-        }
+    pub const fn new(client: HttpClient, uri: Uri) -> Self {
+        Self { client, uri }
     }
 }
 
@@ -118,14 +113,7 @@ impl Service<LogApiRequest> for LogApiService {
         let mut client = self.client.clone();
         let http_request = Request::post(&self.uri)
             .header(CONTENT_TYPE, "application/json")
-            .header(
-                "DD-EVP-ORIGIN",
-                if self.enterprise {
-                    "vector-enterprise"
-                } else {
-                    "vector"
-                },
-            )
+            .header("DD-EVP-ORIGIN", "vector")
             .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
             .header("DD-API-KEY", request.api_key.to_string());
 

@@ -482,7 +482,6 @@ fn setup_logs_reporting(
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
-        enterprise: true,
         ..Default::default()
     };
 
