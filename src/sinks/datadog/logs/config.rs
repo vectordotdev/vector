@@ -18,7 +18,7 @@ use crate::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
             service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
-            TowerRequestConfig,
+            http::RequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -94,7 +94,7 @@ pub struct DatadogLogsConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RequestConfig,
 
     #[configurable(derived)]
     #[serde(
@@ -144,7 +144,7 @@ impl DatadogLogsConfig {
 
     pub fn build_processor(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.inner());
-        let request_limits = self.request.unwrap_with(&Default::default());
+        let request_limits = self.request.tower.unwrap_with(&Default::default());
 
         // We forcefully cap the provided batch configuration to the size/log line limits imposed by
         // the Datadog Logs API, but we still allow them to be lowered if need be.
