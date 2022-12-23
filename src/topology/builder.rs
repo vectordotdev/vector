@@ -410,7 +410,7 @@ pub async fn build_pieces(
 
         let (transform_task, transform_outputs) = {
             let _span = span.enter();
-            build_transform(transform, node, input_rx)
+            build_transform(transform, node, input_rx, source_keys.clone())
         };
 
         outputs.extend(transform_outputs);
@@ -648,17 +648,19 @@ fn build_transform(
     transform: Transform,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
+    source_keys: Vec<ComponentKey>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     match transform {
         // TODO: avoid the double boxing for function transforms here
-        Transform::Function(t) => build_sync_transform(Box::new(t), node, input_rx),
-        Transform::Synchronous(t) => build_sync_transform(t, node, input_rx),
+        Transform::Function(t) => build_sync_transform(Box::new(t), node, input_rx, source_keys),
+        Transform::Synchronous(t) => build_sync_transform(t, node, input_rx, source_keys),
         Transform::Task(t) => build_task_transform(
             t,
             input_rx,
             node.input_details.data_type(),
             node.typetag,
             &node.key,
+            source_keys,
         ),
     }
 }
@@ -667,8 +669,9 @@ fn build_sync_transform(
     t: Box<dyn SyncTransform>,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
+    source_keys: Vec<ComponentKey>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (outputs, controls) = TransformOutputs::new(node.outputs);
+    let (outputs, controls) = TransformOutputs::new(node.outputs, source_keys);
 
     let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
@@ -850,6 +853,7 @@ fn build_task_transform(
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
+    source_keys: Vec<ComponentKey>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 
@@ -864,14 +868,33 @@ fn build_task_transform(
                 events.estimated_json_encoded_size_of(),
             ))
         });
-    let events_sent = register!(EventsSent::from(internal_event::Output(None)));
+
+    let mut events_sent = HashMap::from([(
+        None,
+        register!(EventsSent::from((
+            internal_event::Output(None),
+            internal_event::Source(None),
+        ))),
+    )]);
+
+    events_sent.extend(source_keys.into_iter().enumerate().map(|(id, key)| {
+        (
+            Some(id),
+            register!(EventsSent::from((
+                internal_event::Output(None),
+                internal_event::Source(Some(key.into_id().into())),
+            ))),
+        )
+    }));
+
     let stream = t
         .transform(Box::pin(filtered))
         .inspect(move |events: &EventArray| {
-            events_sent.emit(CountByteSize(
-                events.len(),
-                events.estimated_json_encoded_size_of(),
-            ));
+            for event in events.iter_events() {
+                if let Some(handle) = events_sent.get(&event.metadata().source_id()) {
+                    handle.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
+                }
+            }
         });
     let transform = async move {
         debug!("Task transform starting.");

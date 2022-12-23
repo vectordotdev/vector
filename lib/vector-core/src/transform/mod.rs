@@ -1,6 +1,7 @@
 use std::{collections::HashMap, error, pin::Pin};
 
 use futures::{Stream, StreamExt};
+use vector_common::config::ComponentKey;
 use vector_common::internal_event::{
     self, register, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
 };
@@ -218,7 +219,7 @@ impl SyncTransform for Box<dyn FunctionTransform> {
 
 struct TransformOutput {
     fanout: Fanout,
-    events_sent: Registered<EventsSent>,
+    events_sent: HashMap<Option<usize>, Registered<EventsSent>>,
 }
 
 pub struct TransformOutputs {
@@ -230,32 +231,66 @@ pub struct TransformOutputs {
 impl TransformOutputs {
     pub fn new(
         outputs_in: Vec<config::Output>,
+        source_keys: Vec<ComponentKey>,
     ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
         let mut primary_output = None;
         let mut named_outputs = HashMap::new();
         let mut controls = HashMap::new();
 
+        let mut events_sent = HashMap::from([(None, None)]);
+
+        events_sent.extend(
+            source_keys
+                .into_iter()
+                .enumerate()
+                .map(|(id, key)| (Some(id), Some(key))),
+        );
+
         for output in outputs_in {
             let (fanout, control) = Fanout::new();
             match output.port {
                 None => {
+                    let events_sent = events_sent
+                        .clone()
+                        .into_iter()
+                        .map(|(id, key)| {
+                            (
+                                id,
+                                register(EventsSent::from((
+                                    internal_event::Output(Some(DEFAULT_OUTPUT.into())),
+                                    internal_event::Source(key.map(|k| k.into_id().into())),
+                                ))),
+                            )
+                        })
+                        .collect();
+
                     primary_output = Some(TransformOutput {
                         fanout,
-                        events_sent: register(EventsSent::from(internal_event::Output(Some(
-                            DEFAULT_OUTPUT.into(),
-                        )))),
+                        events_sent,
                     });
                     controls.insert(None, control);
                 }
                 Some(name) => {
+                    let events_sent = events_sent
+                        .clone()
+                        .into_iter()
+                        .map(|(id, key)| {
+                            (
+                                id,
+                                register(EventsSent::from((
+                                    internal_event::Output(Some(name.clone().into())),
+                                    internal_event::Source(key.map(|k| k.into_id().into())),
+                                ))),
+                            )
+                        })
+                        .collect();
+
                     named_outputs.insert(
                         name.clone(),
                         TransformOutput {
                             fanout,
-                            events_sent: register(EventsSent::from(internal_event::Output(Some(
-                                name.clone().into(),
-                            )))),
+                            events_sent,
                         },
                     );
                     controls.insert(Some(name.clone()), control);
@@ -287,25 +322,47 @@ impl TransformOutputs {
         buf: &mut TransformOutputsBuf,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         if let Some(primary) = self.primary_output.as_mut() {
-            let count = buf.primary_buffer.as_ref().map_or(0, OutputBuffer::len);
-            let byte_size = buf.primary_buffer.as_ref().map_or(
-                0,
-                EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of,
-            );
-            buf.primary_buffer
-                .as_mut()
-                .expect("mismatched outputs")
-                .send(&mut primary.fanout)
-                .await?;
-            primary.events_sent.emit(CountByteSize(count, byte_size));
+            let primary_buffer = buf.primary_buffer.as_mut().expect("mismatched outputs");
+
+            let metrics: Vec<_> = primary_buffer
+                .iter_events()
+                .map(|event| {
+                    (
+                        event.metadata().source_id(),
+                        CountByteSize(1, event.estimated_json_encoded_size_of()),
+                    )
+                })
+                .collect();
+
+            primary_buffer.send(&mut primary.fanout).await?;
+
+            for (id, count) in metrics.into_iter() {
+                if let Some(handle) = primary.events_sent.get(&id) {
+                    handle.emit(count)
+                };
+            }
         }
 
         for (key, buf) in &mut buf.named_buffers {
-            let count = buf.len();
-            let byte_size = buf.estimated_json_encoded_size_of();
             let output = self.named_outputs.get_mut(key).expect("unknown output");
+
+            let metrics: Vec<_> = buf
+                .iter_events()
+                .map(|event| {
+                    (
+                        event.metadata().source_id(),
+                        CountByteSize(1, event.estimated_json_encoded_size_of()),
+                    )
+                })
+                .collect();
+
             buf.send(&mut output.fanout).await?;
-            output.events_sent.emit(CountByteSize(count, byte_size));
+
+            for (id, count) in metrics.into_iter() {
+                if let Some(handle) = output.events_sent.get(&id) {
+                    handle.emit(count)
+                };
+            }
         }
 
         Ok(())
