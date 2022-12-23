@@ -27,7 +27,7 @@ The scripting components of `lua` and `remap` have been extended with a configur
 `metric_tag_values`. This controls how these tag values are exposed to scripts. In the default
 setting of `single`, tag values will be exposed as the single value described above. This behavior
 matches the existing behavior of scripts so that no script changes will be needed. When set to
-`full`, however, all tag values are exposed as an array at each element. In either case, scripts may
+`full`, however, all tag values are exposed as an array for each element. In either case, scripts may
 assign either a single value or an array of values to a tag.
 
 For example:
@@ -38,9 +38,9 @@ For example:
 .tags.complex = ["remotehost", null, "otherhost"] # Creates three tag values
 ```
 
-This setting also shows up in the `codec` configuration of sinks and controls how metric tags are
-exposed in codecs that can encode metrics. As above, when set to `full`, these codecs will expose
-all values of tags either as arrays (for the `json` codec) or as repeated instances of each tag (for
-the `text` codec). This setting does not apply to the `native` and `native_json` codecs which
-_always_ expose all tag values in order to seamlessly transport the values to other Vector
-instances.
+This `metric_tag_values` setting also shows up in the `codec` configuration of sinks and controls
+how metric tags are exposed in codecs that can encode metrics. As above, when set to `full`, these
+codecs will expose all values of tags either as arrays (for the `json` codec) or as repeated
+instances of each tag (for the `text` codec). This setting does not apply to the `native` and
+`native_json` codecs which _always_ expose all tag values in order to seamlessly transport the
+values to other Vector instances.
