@@ -1,6 +1,9 @@
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::{lookup_v2::BorrowedSegment, path};
+use lookup::{
+    lookup_v2::{parse_value_path, OptionalValuePath},
+    owned_value_path, path,
+};
 use smallvec::SmallVec;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
@@ -43,14 +46,14 @@ pub struct TcpConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    host_key: Option<String>,
+    host_key: Option<OptionalValuePath>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
     ///
     /// The value will be the peer host's port i.e. `9000`.
     ///
     /// By default, `"port"` is used.
-    port_key: Option<String>,
+    port_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
@@ -87,7 +90,7 @@ impl TcpConfig {
             max_length: Some(crate::serde::default_max_length()),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: None,
-            port_key: Some(String::from("port")),
+            port_key: Some(OptionalValuePath::from(owned_value_path!("port"))),
             tls: None,
             receive_buffer_bytes: None,
             framing: None,
@@ -97,11 +100,11 @@ impl TcpConfig {
         }
     }
 
-    pub const fn host_key(&self) -> &Option<String> {
+    pub const fn host_key(&self) -> &Option<OptionalValuePath> {
         &self.host_key
     }
 
-    pub const fn port_key(&self) -> &Option<String> {
+    pub const fn port_key(&self) -> &Option<OptionalValuePath> {
         &self.port_key
     }
 
@@ -168,7 +171,7 @@ impl TcpConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RawTcpSource {
     config: TcpConfig,
     decoder: Decoder,
@@ -206,28 +209,29 @@ impl TcpSource for RawTcpSource {
                     now,
                 );
 
-                let host_key_path = self.config.host_key.as_ref().map_or_else(
-                    || [BorrowedSegment::from(log_schema().host_key())],
-                    |key| [BorrowedSegment::from(key)],
+                let legacy_host_key = self.config.host_key.as_ref().map_or_else(
+                    || parse_value_path(log_schema().host_key()).ok(),
+                    |k| k.path.clone(),
                 );
 
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,
                     log,
-                    Some(LegacyKey::InsertIfEmpty(&host_key_path)),
+                    legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
                     path!("host"),
                     host.ip().to_string(),
                 );
 
-                let port_key_path = self.config.port_key.as_ref().map_or_else(
-                    || [BorrowedSegment::from("port")],
-                    |key| [BorrowedSegment::from(key)],
-                );
+                let legacy_port_key = self
+                    .config
+                    .port_key
+                    .as_ref()
+                    .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone());
 
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,
                     log,
-                    Some(LegacyKey::InsertIfEmpty(&port_key_path)),
+                    legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
                     path!("port"),
                     host.port(),
                 );

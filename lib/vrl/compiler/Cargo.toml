@@ -48,7 +48,7 @@ paste = { version = "1", default-features = false }
 regex = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive"] }
 thiserror ={ version =  "1", default-features = false }
-anymap = { version = "0.12.1", default-features = false }
+anymap = { version = "1.0.0-beta.2" }
 
 [dev-dependencies]
 criterion = "0.4"

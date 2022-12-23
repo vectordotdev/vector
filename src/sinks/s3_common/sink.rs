@@ -59,7 +59,7 @@ where
         let builder_limit = NonZeroUsize::new(64);
         let request_builder = self.request_builder;
 
-        let sink = input
+        input
             .batched_partitioned(partitioner, settings)
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(builder_limit, request_builder)
@@ -72,9 +72,9 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .run()
+            .await
     }
 }
 

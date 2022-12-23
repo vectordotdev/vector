@@ -28,7 +28,7 @@ use crate::sinks::{
 use crate::{
     codecs::{Encoder, Transformer},
     config::log_schema,
-    http::HttpClient,
+    http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
         SinkRequestBuildError, TemplateRenderingError,
@@ -326,6 +326,7 @@ pub struct LokiSink {
     batch_settings: BatcherSettings,
     out_of_order_action: OutOfOrderAction,
     service: Svc<LokiService, LokiRetryLogic>,
+    protocol: &'static str,
 }
 
 impl LokiSink {
@@ -350,6 +351,7 @@ impl LokiSink {
             }
         };
 
+        let protocol = get_http_scheme_from_uri(&config.endpoint.uri);
         let service = tower::ServiceBuilder::new()
             .settings(request_limits, LokiRetryLogic)
             .service(LokiService::new(
@@ -385,6 +387,7 @@ impl LokiSink {
             batch_settings: config.batch.into_batcher_settings()?,
             out_of_order_action: config.out_of_order_action,
             service,
+            protocol,
         })
     }
 
@@ -401,7 +404,7 @@ impl LokiSink {
             }
         };
 
-        let sink = input
+        input
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
@@ -438,9 +441,10 @@ impl LokiSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await
     }
 }
 
