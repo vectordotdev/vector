@@ -4,6 +4,7 @@ use codecs::encoding::Framer;
 use futures::{stream::BoxStream, StreamExt};
 use tokio::{io, io::AsyncWriteExt};
 use tokio_util::codec::Encoder as _;
+use vector_common::config::ComponentKey;
 use vector_core::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
@@ -21,6 +22,7 @@ pub struct WriterSink<T> {
     pub output: T,
     pub transformer: Transformer,
     pub encoder: Encoder<Framer>,
+    pub source_keys: Vec<ComponentKey>,
 }
 
 #[async_trait]
@@ -30,9 +32,12 @@ where
 {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
-        let events_sent = register!(EventsSent::from(Output(None)));
+        let events_sent = EventsSent::sources_matrix(self.source_keys, None);
+
         while let Some(mut event) = input.next().await {
             let event_byte_size = event.estimated_json_encoded_size_of();
+            let event_source_id = event.metadata().source_id();
+
             self.transformer.transform(&mut event);
 
             let finalizers = event.take_finalizers();
@@ -53,7 +58,10 @@ where
                 Ok(()) => {
                     finalizers.update_status(EventStatus::Delivered);
 
-                    events_sent.emit(CountByteSize(1, event_byte_size));
+                    if let Some(handle) = events_sent.get(&event_source_id) {
+                        handle.emit(CountByteSize(1, event_byte_size));
+                    }
+
                     bytes_sent.emit(ByteSize(bytes.len()));
                 }
             }
