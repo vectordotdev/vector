@@ -5,9 +5,10 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
+use headers::HeaderName;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-    Request, Uri,
+    HeaderValue, Request, Uri,
 };
 use hyper::Body;
 use indexmap::IndexMap;
@@ -95,8 +96,35 @@ pub struct LogApiService {
 }
 
 impl LogApiService {
-    pub const fn new(client: HttpClient, uri: Uri, headers: IndexMap<String, String>) -> Self {
-        Self { client, uri, user_provided_headers: headers }
+    pub fn new(
+        client: HttpClient,
+        uri: Uri,
+        headers: IndexMap<String, String>,
+    ) -> crate::Result<Self> {
+        Self::validate_headers(&headers)?;
+
+        Ok(Self {
+            client,
+            uri,
+            user_provided_headers: headers,
+        })
+    }
+
+    fn validate_headers(headers: &IndexMap<String, String>) -> crate::Result<()> {
+        for (name, value) in headers {
+            let name = HeaderName::from_bytes(name.as_bytes())?;
+
+            if name == CONTENT_TYPE
+                || name == CONTENT_LENGTH
+                || name == HeaderName::from_static("DD-API-KEY")
+            {
+                return Err(format!("{} header can not be customized", name).into());
+            }
+
+            HeaderValue::from_bytes(value.as_bytes())?;
+        }
+
+        Ok(())
     }
 }
 
