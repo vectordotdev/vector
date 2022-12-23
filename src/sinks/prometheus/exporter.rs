@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     convert::Infallible,
     hash::Hash,
     mem::{discriminant, Discriminant},
@@ -20,10 +21,11 @@ use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
+use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
 use vector_core::{
     internal_event::{
-        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Protocol,
         Registered,
     },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -189,7 +191,7 @@ impl GenerateConfig for PrometheusExporterConfig {
 
 #[async_trait::async_trait]
 impl SinkConfig for PrometheusExporterConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, ctx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
                 min: MIN_FLUSH_PERIOD_SECS,
@@ -198,7 +200,7 @@ impl SinkConfig for PrometheusExporterConfig {
 
         validate_quantiles(&self.quantiles)?;
 
-        let sink = PrometheusExporter::new(self.clone());
+        let sink = PrometheusExporter::new(self.clone(), ctx.source_keys);
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -221,6 +223,7 @@ struct PrometheusExporter {
     server_shutdown_trigger: Option<Trigger>,
     config: PrometheusExporterConfig,
     metrics: Arc<RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>>,
+    source_keys: Vec<ComponentKey>,
 }
 
 /// Expiration metadata for a metric.
@@ -386,7 +389,7 @@ struct Handler {
     buckets: Box<[f64]>,
     quantiles: Box<[f64]>,
     bytes_sent: Registered<BytesSent>,
-    events_sent: Registered<EventsSent>,
+    events_sent: HashMap<Option<usize>, Registered<EventsSent>>,
 }
 
 impl Handler {
@@ -408,16 +411,20 @@ impl Handler {
 
             (true, &Method::GET, "/metrics") => {
                 let metrics = metrics.read().expect(LOCK_FAILED);
-
-                let count = metrics.len();
-                let byte_size = metrics
-                    .iter()
-                    .map(|(_, (metric, _))| metric.estimated_json_encoded_size_of())
-                    .sum();
-
                 let mut collector = StringCollector::new();
+                let mut sources: HashMap<Option<usize>, (usize, usize)> = HashMap::new();
 
                 for (_, (metric, _)) in metrics.iter() {
+                    let size = metric.estimated_json_encoded_size_of();
+
+                    sources
+                        .entry(metric.metadata().source_id())
+                        .and_modify(|(count, byte_size)| {
+                            *count += 1;
+                            *byte_size += size;
+                        })
+                        .or_insert((1, size));
+
                     collector.encode_metric(
                         self.default_namespace.as_deref(),
                         &self.buckets,
@@ -438,7 +445,12 @@ impl Handler {
                     HeaderValue::from_static("text/plain; version=0.0.4"),
                 );
 
-                self.events_sent.emit(CountByteSize(count, byte_size));
+                for (source_id, (count, byte_size)) in sources {
+                    if let Some(handler) = self.events_sent.get(&source_id) {
+                        handler.emit(CountByteSize(count, byte_size));
+                    }
+                }
+
                 self.bytes_sent.emit(ByteSize(body_size));
             }
 
@@ -452,11 +464,12 @@ impl Handler {
 }
 
 impl PrometheusExporter {
-    fn new(config: PrometheusExporterConfig) -> Self {
+    fn new(config: PrometheusExporterConfig, source_keys: Vec<ComponentKey>) -> Self {
         Self {
             server_shutdown_trigger: None,
             config,
             metrics: Arc::new(RwLock::new(IndexMap::new())),
+            source_keys,
         }
     }
 
@@ -467,7 +480,7 @@ impl PrometheusExporter {
 
         let handler = Handler {
             bytes_sent: register!(BytesSent::from(Protocol::HTTP)),
-            events_sent: register!(EventsSent::from(Output(None))),
+            events_sent: EventsSent::sources_matrix(self.source_keys.clone(), None),
             default_namespace: self.config.default_namespace.clone(),
             buckets: self.config.buckets.clone().into(),
             quantiles: self.config.quantiles.clone().into(),
@@ -1062,7 +1075,7 @@ mod tests {
             ..Default::default()
         };
 
-        let sink = PrometheusExporter::new(config);
+        let sink = PrometheusExporter::new(config, vec![]);
 
         let m1 = Metric::new(
             "absolute",
@@ -1116,7 +1129,7 @@ mod tests {
         };
         let buckets = config.buckets.clone();
 
-        let sink = PrometheusExporter::new(config);
+        let sink = PrometheusExporter::new(config, vec![]);
 
         // Define a series of incremental distribution updates.
         let base_summary_metric = Metric::new(
@@ -1235,7 +1248,7 @@ mod tests {
             ..Default::default()
         };
 
-        let sink = PrometheusExporter::new(config);
+        let sink = PrometheusExporter::new(config, vec![]);
 
         // Define a series of incremental distribution updates.
         let base_summary_metric = Metric::new(
