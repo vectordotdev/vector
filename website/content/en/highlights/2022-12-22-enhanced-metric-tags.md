@@ -20,8 +20,8 @@ value). This new tag set only stores unique values, as duplicated tags are not u
 component, and so each tag name/value pair will appear only once across all tags.
 
 For compatibility with previous releases, this value set also tracks the last seen or assigned value
-for each tag. Since most components can only make use of a single value for each tag, this last
-value is used by those components.
+for each tag. Since most components, in particular sinks, can only make use of a single value for
+each tag, this last value is used by those components.
 
 The scripting components of `lua` and `remap` have been extended with a configuration option of
 `metric_tag_values`. This controls how these tag values are exposed to scripts. In the default
