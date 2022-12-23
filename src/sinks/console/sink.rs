@@ -7,7 +7,7 @@ use tokio_util::codec::Encoder as _;
 use vector_common::config::ComponentKey;
 use vector_core::{
     internal_event::{
-        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Protocol,
     },
     EstimatedJsonEncodedSizeOf,
 };
