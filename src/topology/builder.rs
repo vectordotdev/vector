@@ -196,7 +196,7 @@ pub async fn build_pieces(
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
         for output in source_outputs {
-            let mut rx = builder.add_output(output.clone());
+            let mut rx = builder.add_output(output.clone(), key.clone());
 
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
