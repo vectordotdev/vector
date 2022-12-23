@@ -869,23 +869,7 @@ fn build_task_transform(
             ))
         });
 
-    let mut events_sent = HashMap::from([(
-        None,
-        register!(EventsSent::from((
-            internal_event::Output(None),
-            internal_event::Source(None),
-        ))),
-    )]);
-
-    events_sent.extend(source_keys.into_iter().enumerate().map(|(id, key)| {
-        (
-            Some(id),
-            register!(EventsSent::from((
-                internal_event::Output(None),
-                internal_event::Source(Some(key.into_id().into())),
-            ))),
-        )
-    }));
+    let events_sent = EventsSent::sources_matrix(source_keys, None);
 
     let stream = t
         .transform(Box::pin(filtered))

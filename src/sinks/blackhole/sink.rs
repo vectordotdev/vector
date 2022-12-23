@@ -33,17 +33,17 @@ pub struct BlackholeSink {
     total_raw_bytes: Arc<AtomicUsize>,
     config: BlackholeConfig,
     last: Option<Instant>,
-    sources_details: Vec<ComponentKey>,
+    source_keys: Vec<ComponentKey>,
 }
 
 impl BlackholeSink {
-    pub fn new(config: BlackholeConfig, sources_details: Vec<ComponentKey>) -> Self {
+    pub fn new(config: BlackholeConfig, source_keys: Vec<ComponentKey>) -> Self {
         BlackholeSink {
             config,
             total_events: Arc::new(AtomicUsize::new(0)),
             total_raw_bytes: Arc::new(AtomicUsize::new(0)),
             last: None,
-            sources_details,
+            source_keys,
         }
     }
 }
@@ -58,25 +58,7 @@ impl StreamSink<EventArray> for BlackholeSink {
         let total_raw_bytes = Arc::clone(&self.total_raw_bytes);
         let (shutdown, mut tripwire) = watch::channel(());
 
-        let mut events_sent: HashMap<_, _> = self
-            .sources_details
-            .into_iter()
-            .enumerate()
-            .map(|(id, key)| {
-                let handle = register!(EventsSent::from((
-                    Output(None),
-                    Source(Some(key.into_id().into()))
-                )));
-
-                (Some(id), handle)
-            })
-            .collect();
-
-        events_sent.insert(
-            None,
-            register!(EventsSent::from((Output(None), Source(None)))),
-        );
-
+        let events_sent = EventsSent::sources_matrix(self.source_keys, None);
         let bytes_sent = register!(BytesSent::from(Protocol("blackhole".into())));
 
         if self.config.print_interval_secs.as_secs() > 0 {

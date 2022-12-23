@@ -1,7 +1,11 @@
+use std::collections::HashMap;
+
 use metrics::{register_counter, Counter};
 use tracing::trace;
 
-use super::{CountByteSize, Output, SharedString, Source};
+use crate::config::ComponentKey;
+
+use super::{register, CountByteSize, Output, SharedString, Source};
 
 pub const DEFAULT_OUTPUT: &str = "_default";
 
@@ -51,6 +55,30 @@ crate::registered_event!(
         self.event_bytes.increment(byte_size as u64);
     }
 );
+
+impl EventsSent {
+    pub fn sources_matrix(
+        sources: Vec<ComponentKey>,
+        output: Option<SharedString>,
+    ) -> HashMap<Option<usize>, EventsSentHandle> {
+        sources
+            .into_iter()
+            .enumerate()
+            .map(|(id, key)| {
+                let handle = register(Self::from((
+                    Output(output.clone()),
+                    Source(Some(key.into_id().into())),
+                )));
+
+                (Some(id), handle)
+            })
+            .chain(std::iter::once((
+                None,
+                register(Self::from((Output(None), Source(output.clone())))),
+            )))
+            .collect()
+    }
+}
 
 impl From<Output> for EventsSent {
     fn from(output: Output) -> Self {

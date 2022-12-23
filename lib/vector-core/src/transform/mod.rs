@@ -3,7 +3,7 @@ use std::{collections::HashMap, error, pin::Pin};
 use futures::{Stream, StreamExt};
 use vector_common::config::ComponentKey;
 use vector_common::internal_event::{
-    self, register, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
+    CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
 };
 use vector_common::EventDataEq;
 
@@ -238,59 +238,28 @@ impl TransformOutputs {
         let mut named_outputs = HashMap::new();
         let mut controls = HashMap::new();
 
-        let mut events_sent = HashMap::from([(None, None)]);
-
-        events_sent.extend(
-            source_keys
-                .into_iter()
-                .enumerate()
-                .map(|(id, key)| (Some(id), Some(key))),
-        );
-
         for output in outputs_in {
             let (fanout, control) = Fanout::new();
             match output.port {
                 None => {
-                    let events_sent = events_sent
-                        .clone()
-                        .into_iter()
-                        .map(|(id, key)| {
-                            (
-                                id,
-                                register(EventsSent::from((
-                                    internal_event::Output(Some(DEFAULT_OUTPUT.into())),
-                                    internal_event::Source(key.map(|k| k.into_id().into())),
-                                ))),
-                            )
-                        })
-                        .collect();
-
                     primary_output = Some(TransformOutput {
                         fanout,
-                        events_sent,
+                        events_sent: EventsSent::sources_matrix(
+                            source_keys.clone(),
+                            Some(DEFAULT_OUTPUT.into()),
+                        ),
                     });
                     controls.insert(None, control);
                 }
                 Some(name) => {
-                    let events_sent = events_sent
-                        .clone()
-                        .into_iter()
-                        .map(|(id, key)| {
-                            (
-                                id,
-                                register(EventsSent::from((
-                                    internal_event::Output(Some(name.clone().into())),
-                                    internal_event::Source(key.map(|k| k.into_id().into())),
-                                ))),
-                            )
-                        })
-                        .collect();
-
                     named_outputs.insert(
                         name.clone(),
                         TransformOutput {
                             fanout,
-                            events_sent,
+                            events_sent: EventsSent::sources_matrix(
+                                source_keys.clone(),
+                                Some(name.clone().into()),
+                            ),
                         },
                     );
                     controls.insert(Some(name.clone()), control);
