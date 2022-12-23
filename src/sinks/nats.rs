@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::TryFrom};
+use std::convert::TryFrom;
 
 use async_trait::async_trait;
 use bytes::BytesMut;
@@ -9,7 +9,7 @@ use tokio_util::codec::Encoder as _;
 use vector_common::{
     config::ComponentKey,
     internal_event::{
-        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Protocol, Registered,
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Protocol,
     },
 };
 use vector_config::configurable_component;
