@@ -17,7 +17,7 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_common::internal_event::{
-    self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
+    CountByteSize, EventsSent, InternalEventHandle as _, Registered,
 };
 use vector_config::NamedComponent;
 use vector_core::config::LogNamespace;

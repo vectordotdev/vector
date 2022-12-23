@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -17,8 +16,7 @@ use tokio::{
 use vector_common::{
     config::ComponentKey,
     internal_event::{
-        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
-        Source,
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Protocol
     },
 };
 use vector_core::EstimatedJsonEncodedSizeOf;
