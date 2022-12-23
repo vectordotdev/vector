@@ -324,6 +324,7 @@ impl TransformOutputs {
         if let Some(primary) = self.primary_output.as_mut() {
             let primary_buffer = buf.primary_buffer.as_mut().expect("mismatched outputs");
 
+            #[allow(clippy::needless_collect /* false-positive: `primary_buffer.send` drains the buffer */)]
             let metrics: Vec<_> = primary_buffer
                 .iter_events()
                 .map(|event| {
@@ -336,9 +337,9 @@ impl TransformOutputs {
 
             primary_buffer.send(&mut primary.fanout).await?;
 
-            for (id, count) in metrics.into_iter() {
+            for (id, count) in metrics {
                 if let Some(handle) = primary.events_sent.get(&id) {
-                    handle.emit(count)
+                    handle.emit(count);
                 };
             }
         }
@@ -346,6 +347,7 @@ impl TransformOutputs {
         for (key, buf) in &mut buf.named_buffers {
             let output = self.named_outputs.get_mut(key).expect("unknown output");
 
+            #[allow(clippy::needless_collect /* false-positive: `buf.send` drains the buffer */)]
             let metrics: Vec<_> = buf
                 .iter_events()
                 .map(|event| {
@@ -360,7 +362,7 @@ impl TransformOutputs {
 
             for (id, count) in metrics.into_iter() {
                 if let Some(handle) = output.events_sent.get(&id) {
-                    handle.emit(count)
+                    handle.emit(count);
                 };
             }
         }
