@@ -7,7 +7,7 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-serde = { version = "1.0.150", default-features = false, features = ["derive", "alloc"] }
+serde = { version = "1.0.151", default-features = false, features = ["derive", "alloc"] }
 snafu = { version = "0.7", default-features = false }
 regex = { version = "1.7.0", default-features = false, features = ["std", "perf"] }
 inherent = "1.0"
