@@ -1,5 +1,7 @@
-use std::convert::TryFrom;
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
@@ -19,9 +21,10 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
+use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
 use vector_core::{
-    internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
+    internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     EstimatedJsonEncodedSizeOf,
 };
 
@@ -177,9 +180,9 @@ impl OutFile {
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,
-        _cx: SinkContext,
+        ctx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self)?;
+        let sink = FileSink::new(self, ctx.source_keys)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -202,14 +205,15 @@ pub struct FileSink {
     idle_timeout: Duration,
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
-    events_sent: Registered<EventsSent>,
+    events_sent: HashMap<Option<usize>, Registered<EventsSent>>,
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig) -> crate::Result<Self> {
+    pub fn new(config: &FileSinkConfig, source_keys: Vec<ComponentKey>) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
+        let events_sent = EventsSent::sources_matrix(source_keys, None);
 
         Ok(Self {
             path: config.path.clone(),
@@ -218,7 +222,7 @@ impl FileSink {
             idle_timeout: config.idle_timeout,
             files: ExpiringHashMap::default(),
             compression: config.compression,
-            events_sent: register!(EventsSent::from(Output(None))),
+            events_sent,
         })
     }
 
@@ -361,10 +365,15 @@ impl FileSink {
         trace!(message = "Writing an event to file.", path = ?path);
         let event_size = event.estimated_json_encoded_size_of();
         let finalizers = event.take_finalizers();
+        let source_id = event.metadata().source_id();
         match write_event_to_file(file, event, &self.transformer, &mut self.encoder).await {
             Ok(byte_size) => {
                 finalizers.update_status(EventStatus::Delivered);
-                self.events_sent.emit(CountByteSize(1, event_size));
+
+                if let Some(handle) = self.events_sent.get(&source_id) {
+                    handle.emit(CountByteSize(1, event_size));
+                }
+
                 emit!(FileBytesSent {
                     byte_size,
                     file: String::from_utf8_lossy(&path),
