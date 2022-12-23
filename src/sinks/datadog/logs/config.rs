@@ -154,7 +154,7 @@ impl DatadogLogsConfig {
 
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
-            .service(LogApiService::new(client, self.get_uri()));
+            .service(LogApiService::new(client, self.get_uri(), self.request.headers.clone()));
 
         let encoding = self.encoding.clone();
         let protocol = self.get_protocol();

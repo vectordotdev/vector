@@ -10,6 +10,7 @@ use http::{
     Request, Uri,
 };
 use hyper::Body;
+use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
@@ -90,11 +91,12 @@ impl DriverResponse for LogApiResponse {
 pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
+    user_provided_headers: IndexMap<String, String>,
 }
 
 impl LogApiService {
-    pub const fn new(client: HttpClient, uri: Uri) -> Self {
-        Self { client, uri }
+    pub const fn new(client: HttpClient, uri: Uri, headers: IndexMap<String, String>) -> Self {
+        Self { client, uri, user_provided_headers: headers }
     }
 }
 
@@ -111,11 +113,12 @@ impl Service<LogApiRequest> for LogApiService {
     // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, request: LogApiRequest) -> Self::Future {
         let mut client = self.client.clone();
-        let http_request = Request::post(&self.uri)
-            .header(CONTENT_TYPE, "application/json")
+        let mut http_request = Request::post(&self.uri)
             .header("DD-EVP-ORIGIN", "vector")
-            .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
-            .header("DD-API-KEY", request.api_key.to_string());
+            .header("DD-EVP-ORIGIN-VERSION", crate::get_version());
+        for (name, value) in &self.user_provided_headers {
+            http_request = http_request.header(name, value);
+        }
 
         let http_request = if let Some(ce) = request.compression.content_encoding() {
             http_request.header(CONTENT_ENCODING, ce)
@@ -128,7 +131,9 @@ impl Service<LogApiRequest> for LogApiService {
         let raw_byte_size = request.uncompressed_size;
 
         let http_request = http_request
+            .header(CONTENT_TYPE, "application/json")
             .header(CONTENT_LENGTH, request.body.len())
+            .header("DD-API-KEY", request.api_key.to_string())
             .body(Body::from(request.body))
             .expect("building HTTP request failed unexpectedly");
 
