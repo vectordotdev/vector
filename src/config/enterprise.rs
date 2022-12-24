@@ -26,7 +26,7 @@ use crate::{
     http::{HttpClient, HttpError},
     sinks::{
         datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
-        util::retries::ExponentialBackoff,
+        util::{retries::ExponentialBackoff, http::RequestConfig},
     },
     sources::{
         host_metrics::{Collector, HostMetricsConfig},
@@ -482,6 +482,10 @@ fn setup_logs_reporting(
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
+        request: RequestConfig {
+            headers: IndexMap::from([("DD-EVP-ORIGIN".to_string(), "vector-enterprise".to_string())]),
+            ..Default::default()
+        },
         ..Default::default()
     };
 
