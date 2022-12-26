@@ -318,7 +318,7 @@ syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["connect"], optional = true}
-toml = { version = "0.5.9", default-features = false }
+toml = { version = "0.5.10", default-features = false }
 tonic = { version = "0.8", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.4", default-features = false }
