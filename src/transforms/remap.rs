@@ -83,7 +83,7 @@ pub struct RemapConfig {
     /// [global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
-    pub timezone: TimeZone,
+    pub timezone: Option<TimeZone>,
 
     /// Drops any event that encounters an error during processing.
     ///
@@ -407,7 +407,9 @@ where
         Ok(Remap {
             component_key: context.key.clone(),
             program,
-            timezone: config.timezone,
+            timezone: config
+                .timezone
+                .unwrap_or_else(|| context.globals.timezone()),
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
@@ -608,7 +610,7 @@ mod tests {
 
     use indoc::{formatdoc, indoc};
     use vector_common::btreemap;
-    use vector_core::{event::EventMetadata, metric_tags};
+    use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
 
     use super::*;
     use crate::{
@@ -624,6 +626,7 @@ mod tests {
         transforms::test::create_topology,
         transforms::OutputBuffer,
     };
+    use chrono::DateTime;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
 
@@ -702,7 +705,6 @@ mod tests {
         let conf = RemapConfig {
             source: Some(".foo = .sentinel".to_string()),
             file: None,
-            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
             ..Default::default()
@@ -755,7 +757,6 @@ mod tests {
                 .to_string(),
             ),
             file: None,
-            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
             ..Default::default()
@@ -793,7 +794,6 @@ mod tests {
                 .to_owned(),
             ),
             file: None,
-            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
             ..Default::default()
@@ -834,7 +834,6 @@ mod tests {
                 .baz = 12
             "#}),
             file: None,
-            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
             ..Default::default()
@@ -863,7 +862,6 @@ mod tests {
                 .baz = 12
             "#}),
             file: None,
-            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
             ..Default::default()
@@ -887,7 +885,6 @@ mod tests {
                 .baz = 12
             "#}),
             file: None,
-            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
             ..Default::default()
@@ -916,7 +913,6 @@ mod tests {
                 .baz = 12
             "#}),
             file: None,
-            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
             ..Default::default()
@@ -945,7 +941,6 @@ mod tests {
                 .baz = 12
             "#}),
             file: None,
-            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: true,
             ..Default::default()
@@ -973,7 +968,6 @@ mod tests {
                     .to_string(),
             ),
             file: None,
-            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
             ..Default::default()
@@ -995,6 +989,75 @@ mod tests {
                     "host" => "zoobub",
                 }))
             )
+        );
+    }
+
+    #[test]
+    fn remap_timezone_fallback() {
+        let error =
+            Event::try_from(serde_json::json!({"timestamp": "2022-12-27 00:00:00"})).unwrap();
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                .timestamp = parse_timestamp!(.timestamp, format: "%Y-%m-%d %H:%M:%S")
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            globals: GlobalOptions {
+                timezone: Some(TimeZone::parse("America/Los_Angeles").unwrap()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
+
+        let output = transform_one_fallible(&mut tform, error).unwrap();
+        let log = output.as_log();
+        assert_eq!(
+            log["timestamp"],
+            DateTime::<chrono::Utc>::from(
+                DateTime::parse_from_rfc3339("2022-12-27T00:00:00-08:00").unwrap()
+            )
+            .into()
+        );
+    }
+
+    #[test]
+    fn remap_timezone_override() {
+        let error =
+            Event::try_from(serde_json::json!({"timestamp": "2022-12-27 00:00:00"})).unwrap();
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                .timestamp = parse_timestamp!(.timestamp, format: "%Y-%m-%d %H:%M:%S")
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            timezone: Some(TimeZone::parse("America/Los_Angeles").unwrap()),
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            globals: GlobalOptions {
+                timezone: Some(TimeZone::parse("Etc/UTC").unwrap()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
+
+        let output = transform_one_fallible(&mut tform, error).unwrap();
+        let log = output.as_log();
+        assert_eq!(
+            log["timestamp"],
+            DateTime::<chrono::Utc>::from(
+                DateTime::parse_from_rfc3339("2022-12-27T00:00:00-08:00").unwrap()
+            )
+            .into()
         );
     }
 
