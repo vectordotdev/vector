@@ -112,16 +112,18 @@ impl LogApiService {
 
     fn validate_headers(headers: &IndexMap<String, String>) -> crate::Result<()> {
         for (name, value) in headers {
-            let name = HeaderName::from_bytes(name.as_bytes())?;
+            let name = HeaderName::from_bytes(name.as_bytes())
+                .map_err(|error| format!("{}: {}", error, name))?;
 
             if name == CONTENT_TYPE
                 || name == CONTENT_LENGTH
                 || name == HeaderName::from_static("DD-API-KEY")
             {
-                return Err(format!("{} header can not be customized", name).into());
+                return Err(format!("{} header can not be configured", name).into());
             }
 
-            HeaderValue::from_bytes(value.as_bytes())?;
+            HeaderValue::from_bytes(value.as_bytes())
+                .map_err(|error| format!("{}: {}", error, value))?;
         }
 
         Ok(())
