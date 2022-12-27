@@ -128,12 +128,8 @@ base: components: sinks: datadog_logs: configuration: {
 		}
 	}
 	request: {
-		description: """
-			Middleware settings for outbound requests.
-
-			Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
-			"""
-		required: false
+		description: "Outbound HTTP request settings."
+		required:    false
 		type: object: options: {
 			adaptive_concurrency: {
 				description: """
@@ -205,6 +201,14 @@ base: components: sinks: datadog_logs: configuration: {
 						}
 					}
 					uint: {}
+				}
+			}
+			headers: {
+				description: "Additional HTTP headers to add to every HTTP request."
+				required:    false
+				type: object: options: "*": {
+					required: true
+					type: string: {}
 				}
 			}
 			rate_limit_duration_secs: {
