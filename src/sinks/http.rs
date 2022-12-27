@@ -5,12 +5,11 @@ use codecs::encoding::{CharacterDelimitedEncoder, Framer, Serializer};
 use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
-    header::{self, HeaderName, HeaderValue},
+    header::{HeaderName, HeaderValue, AUTHORIZATION},
     Method, Request, StatusCode, Uri,
 };
 use hyper::Body;
 use indexmap::IndexMap;
-use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_config::configurable_component;
 
@@ -27,20 +26,6 @@ use crate::{
     },
     tls::{TlsConfig, TlsSettings},
 };
-
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("{}: {}", source, name))]
-    InvalidHeaderName {
-        name: String,
-        source: header::InvalidHeaderName,
-    },
-    #[snafu(display("{}: {}", source, value))]
-    InvalidHeaderValue {
-        value: String,
-        source: header::InvalidHeaderValue,
-    },
-}
 
 /// Configuration for the `http` sink.
 #[configurable_component(sink("http"))]
@@ -189,7 +174,7 @@ impl SinkConfig for HttpSinkConfig {
 
         let mut request = self.request.clone();
         request.add_old_option(self.headers.clone());
-        validate_headers(&request.headers, &self.auth)?;
+        validate_headers(&request.headers, self.auth.is_some())?;
 
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -369,16 +354,16 @@ async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> c
     }
 }
 
-fn validate_headers(map: &IndexMap<String, String>, auth: &Option<Auth>) -> crate::Result<()> {
-    for (name, value) in map {
-        if auth.is_some() && name.eq_ignore_ascii_case("Authorization") {
+fn validate_headers(
+    headers: &IndexMap<String, String>,
+    configures_auth: bool,
+) -> crate::Result<()> {
+    let headers = util::http::validate_headers(headers)?;
+
+    for name in headers.keys() {
+        if configures_auth && name == AUTHORIZATION {
             return Err("Authorization header can not be used with defined auth options".into());
         }
-
-        HeaderName::from_bytes(name.as_bytes())
-            .with_context(|_| InvalidHeaderNameSnafu { name })?;
-        HeaderValue::from_bytes(value.as_bytes())
-            .with_context(|_| InvalidHeaderValueSnafu { value })?;
     }
 
     Ok(())

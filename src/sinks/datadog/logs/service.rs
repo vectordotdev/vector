@@ -23,8 +23,8 @@ use vector_core::{
 
 use crate::{
     http::HttpClient,
-    sinks::datadog::DatadogApiError,
     sinks::util::{retries::RetryLogic, Compression},
+    sinks::{datadog::DatadogApiError, util::http::validate_headers},
 };
 
 #[derive(Debug, Default, Clone)]
@@ -101,29 +101,13 @@ impl LogApiService {
         uri: Uri,
         headers: IndexMap<String, String>,
     ) -> crate::Result<Self> {
-        let headers = Self::validate_headers(&headers)?;
+        let headers = validate_headers(&headers)?;
 
         Ok(Self {
             client,
             uri,
             user_provided_headers: headers,
         })
-    }
-
-    fn validate_headers(
-        headers: &IndexMap<String, String>,
-    ) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
-        let mut parsed_headers = IndexMap::new();
-        for (name, value) in headers {
-            let name = HeaderName::from_bytes(name.as_bytes())
-                .map_err(|error| format!("{}: {}", error, name))?;
-            let value = HeaderValue::from_bytes(value.as_bytes())
-                .map_err(|error| format!("{}: {}", error, value))?;
-
-            parsed_headers.insert(name, value);
-        }
-
-        Ok(parsed_headers)
     }
 }
 
