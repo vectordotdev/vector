@@ -37,7 +37,7 @@ pub fn default_target() -> String {
 }
 
 pub const fn windows() -> bool {
-    cfg!(target_os = "windows")
+    cfg!(windows)
 }
 
 #[allow(dead_code)]
@@ -47,17 +47,7 @@ pub const fn macos() -> bool {
 
 #[allow(dead_code)]
 pub const fn unix() -> bool {
-    cfg!(not(any(target_os = "windows", target_os = "macos")))
-}
-
-#[allow(dead_code)]
-pub fn os_type() -> os_info::Type {
-    _os_info().os_type()
-}
-
-#[once]
-fn _os_info() -> os_info::Info {
-    os_info::get()
+    cfg!(not(any(windows, target_os = "macos")))
 }
 
 #[once]

@@ -46,7 +46,7 @@ impl Cli {
                 if platform::windows() {
                     args.extend(["--features".to_string(), "default-msvc".to_string()]);
                 } else {
-                    args.extend(["--features".to_string(), "default-msvc".to_string()]);
+                    args.extend(["--features".to_string(), "default".to_string()]);
                 }
             }
         }

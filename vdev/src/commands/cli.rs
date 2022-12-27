@@ -4,7 +4,7 @@ use clap_verbosity_flag::{InfoLevel, Verbosity};
 
 /// Vector's unified dev tool
 #[derive(Parser, Debug)]
-#[command(version, bin_name = "vdev", disable_help_subcommand = true)]
+#[command(version, bin_name = "vdev", infer_subcommands = true, disable_help_subcommand = true)]
 pub struct Cli {
     #[clap(flatten)]
     pub verbose: Verbosity<InfoLevel>,
@@ -19,7 +19,7 @@ enum Commands {
     Complete(super::complete::Cli),
     Config(super::config::cli::Cli),
     Exec(super::exec::Cli),
-    Int(super::int::cli::Cli),
+    Integration(super::integration::cli::Cli),
     Meta(super::meta::cli::Cli),
     Status(super::status::Cli),
     Test(super::test::Cli),
@@ -32,7 +32,7 @@ impl Cli {
             Commands::Complete(cli) => cli.exec(),
             Commands::Config(cli) => cli.exec(),
             Commands::Exec(cli) => cli.exec(),
-            Commands::Int(cli) => cli.exec(),
+            Commands::Integration(cli) => cli.exec(),
             Commands::Meta(cli) => cli.exec(),
             Commands::Status(cli) => cli.exec(),
             Commands::Test(cli) => cli.exec(),
