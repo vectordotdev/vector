@@ -550,7 +550,7 @@ impl RequestConfig {
 }
 
 #[derive(Debug, Snafu)]
-enum HeaderValidationError {
+pub enum HeaderValidationError {
     #[snafu(display("{}: {}", source, name))]
     InvalidHeaderName {
         name: String,

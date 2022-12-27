@@ -394,7 +394,7 @@ mod tests {
         assert_downcast_matches,
         config::SinkContext,
         sinks::util::{
-            http::HttpSink,
+            http::{HeaderValidationError, HttpSink},
             test::{build_test_server, build_test_server_generic, build_test_server_status},
         },
         test_util::{
@@ -458,7 +458,7 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
-        assert!(super::validate_headers(&config.request.headers, &None).is_ok());
+        assert!(super::validate_headers(&config.request.headers, false).is_ok());
     }
 
     #[test]
@@ -472,9 +472,9 @@ mod tests {
         let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
         assert_downcast_matches!(
-            super::validate_headers(&config.request.headers, &None).unwrap_err(),
-            BuildError,
-            BuildError::InvalidHeaderName { .. }
+            super::validate_headers(&config.request.headers, false).unwrap_err(),
+            HeaderValidationError,
+            HeaderValidationError::InvalidHeaderName { .. }
         );
     }
 
