@@ -92,7 +92,7 @@ impl DriverResponse for LogApiResponse {
 pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
-    user_provided_headers: IndexMap<String, String>,
+    user_provided_headers: IndexMap<HeaderName, HeaderValue>,
 }
 
 impl LogApiService {
@@ -101,7 +101,7 @@ impl LogApiService {
         uri: Uri,
         headers: IndexMap<String, String>,
     ) -> crate::Result<Self> {
-        Self::validate_headers(&headers)?;
+        let headers = Self::validate_headers(&headers)?;
 
         Ok(Self {
             client,
@@ -110,23 +110,28 @@ impl LogApiService {
         })
     }
 
-    fn validate_headers(headers: &IndexMap<String, String>) -> crate::Result<()> {
+    fn validate_headers(
+        headers: &IndexMap<String, String>,
+    ) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
+        let mut parsed_headers = IndexMap::new();
         for (name, value) in headers {
             let name = HeaderName::from_bytes(name.as_bytes())
                 .map_err(|error| format!("{}: {}", error, name))?;
 
             if name == CONTENT_TYPE
                 || name == CONTENT_LENGTH
-                || name == HeaderName::from_static("DD-API-KEY")
+                || name == HeaderName::from_lowercase(b"dd-api-key").unwrap()
             {
                 return Err(format!("{} header can not be configured", name).into());
             }
 
-            HeaderValue::from_bytes(value.as_bytes())
+            let value = HeaderValue::from_bytes(value.as_bytes())
                 .map_err(|error| format!("{}: {}", error, value))?;
+
+            parsed_headers.insert(name, value);
         }
 
-        Ok(())
+        Ok(parsed_headers)
     }
 }
 
@@ -146,8 +151,11 @@ impl Service<LogApiRequest> for LogApiService {
         let mut http_request = Request::post(&self.uri)
             .header("DD-EVP-ORIGIN", "vector")
             .header("DD-EVP-ORIGIN-VERSION", crate::get_version());
-        for (name, value) in &self.user_provided_headers {
-            http_request = http_request.header(name, value);
+        if let Some(headers) = http_request.headers_mut() {
+            for (name, value) in &self.user_provided_headers {
+                // Replace rather than append to any existing header values
+                headers.insert(name, value.clone());
+            }
         }
 
         let http_request = if let Some(ce) = request.compression.content_encoding() {
