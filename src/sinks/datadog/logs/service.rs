@@ -117,14 +117,6 @@ impl LogApiService {
         for (name, value) in headers {
             let name = HeaderName::from_bytes(name.as_bytes())
                 .map_err(|error| format!("{}: {}", error, name))?;
-
-            if name == CONTENT_TYPE
-                || name == CONTENT_LENGTH
-                || name == HeaderName::from_lowercase(b"dd-api-key").unwrap()
-            {
-                return Err(format!("{} header can not be configured", name).into());
-            }
-
             let value = HeaderValue::from_bytes(value.as_bytes())
                 .map_err(|error| format!("{}: {}", error, value))?;
 
@@ -148,15 +140,11 @@ impl Service<LogApiRequest> for LogApiService {
     // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, request: LogApiRequest) -> Self::Future {
         let mut client = self.client.clone();
-        let mut http_request = Request::post(&self.uri)
+        let http_request = Request::post(&self.uri)
+            .header(CONTENT_TYPE, "application/json")
             .header("DD-EVP-ORIGIN", "vector")
-            .header("DD-EVP-ORIGIN-VERSION", crate::get_version());
-        if let Some(headers) = http_request.headers_mut() {
-            for (name, value) in &self.user_provided_headers {
-                // Replace rather than append to any existing header values
-                headers.insert(name, value.clone());
-            }
-        }
+            .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
+            .header("DD-API-KEY", request.api_key.to_string());
 
         let http_request = if let Some(ce) = request.compression.content_encoding() {
             http_request.header(CONTENT_ENCODING, ce)
@@ -168,10 +156,16 @@ impl Service<LogApiRequest> for LogApiService {
         let events_byte_size = request.get_metadata().events_byte_size();
         let raw_byte_size = request.uncompressed_size;
 
+        let mut http_request = http_request.header(CONTENT_LENGTH, request.body.len());
+
+        if let Some(headers) = http_request.headers_mut() {
+            for (name, value) in &self.user_provided_headers {
+                // Replace rather than append to any existing header values
+                headers.insert(name, value.clone());
+            }
+        }
+
         let http_request = http_request
-            .header(CONTENT_TYPE, "application/json")
-            .header(CONTENT_LENGTH, request.body.len())
-            .header("DD-API-KEY", request.api_key.to_string())
             .body(Body::from(request.body))
             .expect("building HTTP request failed unexpectedly");
 

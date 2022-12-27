@@ -498,17 +498,3 @@ async fn error_is_retriable() {
     //       but are not straightforward to instantiate due to the design of
     //       the crates they originate from.
 }
-
-#[tokio::test]
-async fn cannot_configure_restricted_headers() {
-    let (config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
-            default_api_key = "atoken"
-            compression = "none"
-
-            [request]
-            headers.DD-API-KEY = "key"
-        "#})
-    .unwrap();
-
-    assert!(config.build(cx).await.is_err());
-}
