@@ -5912,12 +5912,12 @@ dependencies = [
 
 [[package]]
 name = "prettytable-rs"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f375cb74c23b51d23937ffdeb48b1fbf5b6409d4b9979c1418c1de58bc8f801"
+checksum = "eea25e07510aa6ab6547308ebe3c036016d162b8da920dbb079e3ba8acf3d95a"
 dependencies = [
- "atty",
  "encode_unicode 1.0.0",
+ "is-terminal",
  "lazy_static",
  "term 0.7.0",
  "unicode-width",
@@ -9333,7 +9333,7 @@ dependencies = [
  "indoc",
  "lookup",
  "once_cell",
- "prettytable-rs 0.9.0",
+ "prettytable-rs 0.10.0",
  "regex",
  "rustyline",
  "serde_json",
