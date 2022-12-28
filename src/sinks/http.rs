@@ -137,7 +137,8 @@ struct HttpSink {
     pub transformer: Transformer,
     pub encoder: Encoder<Framer>,
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
-    pub request: RequestConfig,
+    pub tower: TowerRequestConfig,
+    pub headers: IndexMap<HeaderName, HeaderValue>,
 }
 
 #[cfg(test)]
@@ -153,7 +154,8 @@ fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
         transformer: Default::default(),
         encoder,
         batch: Default::default(),
-        request: Default::default(),
+        tower: Default::default(),
+        headers: Default::default(),
     }
 }
 
@@ -174,7 +176,7 @@ impl SinkConfig for HttpSinkConfig {
 
         let mut request = self.request.clone();
         request.add_old_option(self.headers.clone());
-        validate_headers(&request.headers, self.auth.is_some())?;
+        let headers = validate_headers(&request.headers, self.auth.is_some())?;
 
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -187,13 +189,11 @@ impl SinkConfig for HttpSinkConfig {
             transformer: self.encoding.transformer(),
             encoder,
             batch: self.batch,
-            request,
+            tower: request.tower,
+            headers,
         };
 
-        let request = sink
-            .request
-            .tower
-            .unwrap_with(&TowerRequestConfig::default());
+        let request = sink.tower.unwrap_with(&TowerRequestConfig::default());
 
         let batch = sink.batch.into_batch_settings()?;
         let sink = BatchedHttpSink::new(
@@ -319,12 +319,12 @@ impl util::http::HttpSink for HttpSink {
             Compression::None => {}
         }
 
-        for (header, value) in self.request.headers.iter() {
-            builder
-                .headers_mut()
-                // The request builder should not have errors at this point, and if it did it would fail in the call to `body()` also.
-                .expect("Failed to access headers in http::Request builder- builder has errors.")
-                .insert(HeaderName::try_from(header)?, HeaderValue::try_from(value)?);
+        let headers = builder
+            .headers_mut()
+            // The request builder should not have errors at this point, and if it did it would fail in the call to `body()` also.
+            .expect("Failed to access headers in http::Request builder- builder has errors.");
+        for (header, value) in self.headers.iter() {
+            headers.insert(header, value.clone());
         }
 
         let mut request = builder.body(body.freeze()).unwrap();
@@ -357,7 +357,7 @@ async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> c
 fn validate_headers(
     headers: &IndexMap<String, String>,
     configures_auth: bool,
-) -> crate::Result<()> {
+) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
     let headers = util::http::validate_headers(headers)?;
 
     for name in headers.keys() {
@@ -366,7 +366,7 @@ fn validate_headers(
         }
     }
 
-    Ok(())
+    Ok(headers)
 }
 
 #[cfg(test)]
