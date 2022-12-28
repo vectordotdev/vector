@@ -610,6 +610,7 @@ sinks-logs = [
   "sinks-chronicle",
   "sinks-clickhouse",
   "sinks-console",
+  "sinks-databend",
   "sinks-datadog_archives",
   "sinks-datadog_events",
   "sinks-datadog_logs",
@@ -666,6 +667,7 @@ sinks-blackhole = []
 sinks-chronicle = []
 sinks-clickhouse = []
 sinks-console = []
+sinks-databend = []
 sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
