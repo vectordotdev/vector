@@ -5,7 +5,7 @@ base: components: sinks: datadog_logs: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""

@@ -39,9 +39,9 @@ base: components: sources: gcp_pubsub: configuration: {
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
-			If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-			filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-			running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
 			"""
 		required: false
@@ -53,9 +53,9 @@ base: components: sources: gcp_pubsub: configuration: {
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
-			If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-			filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-			running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
 			"""
 		required: false

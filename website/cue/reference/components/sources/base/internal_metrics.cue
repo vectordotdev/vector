@@ -5,7 +5,7 @@ base: components: sources: internal_metrics: configuration: {
 		description: """
 			Overrides the default namespace for the metrics emitted by the source.
 
-			By default, `vector` is used.
+			Overrides the default namespace.
 			"""
 		required: false
 		type: string: {}
