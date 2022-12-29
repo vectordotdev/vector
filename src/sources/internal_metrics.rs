@@ -29,7 +29,7 @@ pub struct InternalMetricsConfig {
 
     /// Overrides the default namespace for the metrics emitted by the source.
     ///
-    /// By default, `vector` is used.
+    /// Overrides the default namespace.
     pub namespace: Option<String>,
 }
 
