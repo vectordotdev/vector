@@ -137,6 +137,7 @@ default = [
     "keys",
     "length",
     "log",
+    "map_key_values",
     "map_keys",
     "map_values",
     "match",
@@ -283,6 +284,7 @@ join = []
 keys = []
 length = []
 log = ["dep:tracing", "value/json"]
+map_key_values = []
 map_keys = []
 map_values = []
 match = ["dep:regex"]
