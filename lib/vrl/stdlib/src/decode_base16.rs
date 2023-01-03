@@ -66,3 +66,18 @@ impl FunctionExpression for DecodeBase16Fn {
         TypeDef::bytes().fallible()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    test_function![
+        decode_base16 => DecodeBase16;
+
+        standard {
+            args: func_args![value: value!("736F6D652B3D737472696E672F76616C7565")],
+            want: Ok(value!("some+=string/value")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+    ];
+}
