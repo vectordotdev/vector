@@ -5,7 +5,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -33,9 +33,9 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
-			If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-			filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-			running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
 			"""
 		required: false
@@ -73,9 +73,9 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
-			If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-			filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-			running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
 			"""
 		required: false
@@ -263,7 +263,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: {}
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -272,7 +272,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -284,7 +284,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			key_file: {
 				description: """
@@ -293,7 +293,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -302,7 +302,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

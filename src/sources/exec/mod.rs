@@ -38,7 +38,7 @@ use crate::{
     SourceSender,
 };
 use lookup::{owned_value_path, path};
-use vector_core::config::LogNamespace;
+use vector_core::config::{log_schema, LogNamespace};
 
 pub mod sized_bytes_codec;
 
@@ -274,7 +274,9 @@ impl SourceConfig for ExecConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("host"))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
+                    log_schema().host_key()
+                ))),
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
@@ -659,7 +661,7 @@ fn handle_event(
             log_namespace.insert_source_metadata(
                 ExecConfig::NAME,
                 log,
-                Some(LegacyKey::InsertIfEmpty(path!("host"))),
+                Some(LegacyKey::InsertIfEmpty(path!(log_schema().host_key()))),
                 path!("host"),
                 hostname.clone(),
             );

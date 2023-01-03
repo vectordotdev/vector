@@ -1,7 +1,7 @@
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, stream, Stream, StreamExt};
-use lookup::owned_value_path;
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use value::Kind;
@@ -81,7 +81,11 @@ pub struct NatsSourceConfig {
 
     /// The `NATS` subject key.
     #[serde(default = "default_subject_key_field")]
-    subject_key_field: String,
+    subject_key_field: OptionalValuePath,
+}
+
+fn default_subject_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("subject"))
 }
 
 impl GenerateConfig for NatsSourceConfig {
@@ -117,15 +121,18 @@ impl SourceConfig for NatsSourceConfig {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let legacy_subject_key_field = self
+            .subject_key_field
+            .clone()
+            .path
+            .map(LegacyKey::InsertIfEmpty);
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 NatsSourceConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(
-                    &self.subject_key_field
-                ))),
+                legacy_subject_key_field,
                 &owned_value_path!("subject"),
                 Kind::bytes(),
                 None,
@@ -146,7 +153,7 @@ impl NatsSourceConfig {
     }
 }
 
-impl std::convert::TryFrom<&NatsSourceConfig> for nats::asynk::Options {
+impl TryFrom<&NatsSourceConfig> for nats::asynk::Options {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
@@ -196,10 +203,15 @@ async fn nats_source(
                                 now,
                             );
 
+                            let legacy_subject_key_field = config
+                                .subject_key_field
+                                .path
+                                .as_ref()
+                                .map(LegacyKey::InsertIfEmpty);
                             log_namespace.insert_source_metadata(
                                 NatsSourceConfig::NAME,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(config.subject_key_field.as_str())),
+                                legacy_subject_key_field,
                                 "subject",
                                 msg.subject.as_str(),
                             )
@@ -258,7 +270,7 @@ mod tests {
     fn output_schema_definition_vector_namespace() {
         let config = NatsSourceConfig {
             log_namespace: Some(true),
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
             ..Default::default()
         };
 
@@ -283,7 +295,7 @@ mod tests {
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = NatsSourceConfig {
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
             ..Default::default()
         };
         let definition = config.outputs(LogNamespace::Legacy)[0]
@@ -374,7 +386,7 @@ mod integration_tests {
             tls: None,
             auth: None,
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -406,7 +418,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -438,7 +450,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -469,7 +481,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -500,7 +512,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -532,7 +544,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -564,7 +576,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -597,7 +609,7 @@ mod integration_tests {
             }),
             auth: None,
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -624,7 +636,7 @@ mod integration_tests {
             tls: None,
             auth: None,
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -659,7 +671,7 @@ mod integration_tests {
             }),
             auth: None,
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -692,7 +704,7 @@ mod integration_tests {
             }),
             auth: None,
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -729,7 +741,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -766,7 +778,7 @@ mod integration_tests {
                 },
             }),
             log_namespace: None,
-            subject_key_field: "subject".to_string(),
+            subject_key_field: default_subject_key_field(),
         };
 
         let r = publish_and_check(conf).await;
@@ -776,8 +788,4 @@ mod integration_tests {
             r
         );
     }
-}
-
-fn default_subject_key_field() -> String {
-    "subject".into()
 }

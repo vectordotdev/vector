@@ -29,23 +29,30 @@ mod models;
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
     /// The address to listen for connections on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:443"))]
+    #[configurable(metadata(docs::examples = "localhost:443"))]
     address: SocketAddr,
 
     /// An optional access key to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+    #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
     ///
-    /// Some services, like AWS CloudWatch Logs, will [compress the events with
-    /// gzip](\(urls.aws_cloudwatch_logs_firehose)), before sending them AWS Kinesis Firehose. This option can be used
-    /// to automatically decompress them before forwarding them to the next component.
+    /// Some services, like AWS CloudWatch Logs, will [compress the events with gzip][events_with_gzip],
+    /// before sending them AWS Kinesis Firehose. This option can be used to automatically decompress
+    /// them before forwarding them to the next component.
     ///
-    /// Note that this is different from [Content encoding option](\(urls.aws_kinesis_firehose_http_protocol)) of the
+    /// Note that this is different from [Content encoding option][encoding_option] of the
     /// Firehose HTTP endpoint destination. That option controls the content encoding of the entire HTTP request.
-    record_compression: Option<Compression>,
+    ///
+    /// [events_with_gzip]: https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-logs.html
+    /// [encoding_option]: https://docs.aws.amazon.com/firehose/latest/dev/create-destination.html#create-destination-http
+    #[serde(default)]
+    record_compression: Compression,
 
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
@@ -77,11 +84,13 @@ pub enum Compression {
     /// Automatically attempt to determine the compression scheme.
     ///
     /// The compression scheme of the object is determined by looking at its file signature, also known
-    /// as [magic bytes](\(urls.magic_bytes)).
+    /// as [magic bytes][magic_bytes].
     ///
     /// If the record fails to decompress with the discovered format, the record is forwarded as is.
     /// Thus, if you know the records are always gzip encoded (for example, if they are coming from AWS CloudWatch Logs),
     /// set `gzip` in this field so that any records that are not-gzipped are rejected.
+    ///
+    /// [magic_bytes]: https://en.wikipedia.org/wiki/List_of_file_signatures
     #[derivative(Default)]
     Auto,
     /// Uncompressed.
@@ -111,7 +120,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
         let svc = filters::firehose(
             self.access_key.as_ref().map(|k| k.inner().to_owned()),
-            self.record_compression.unwrap_or_default(),
+            self.record_compression,
             decoder,
             acknowledgements,
             cx.out,
@@ -172,7 +181,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             address: "0.0.0.0:443".parse().unwrap(),
             access_key: None,
             tls: None,
-            record_compression: None,
+            record_compression: Default::default(),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: Default::default(),
@@ -244,7 +253,7 @@ mod tests {
 
     async fn source(
         access_key: Option<SensitiveString>,
-        record_compression: Option<Compression>,
+        record_compression: Compression,
         delivered: bool,
         log_namespace: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
@@ -422,7 +431,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, Some(source_record_compression), true, false).await;
+            let (rx, addr) = source(None, source_record_compression, true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -522,7 +531,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, Some(source_record_compression), true, true).await;
+            let (rx, addr) = source(None, source_record_compression, true, true).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -593,7 +602,7 @@ mod tests {
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr) = source(None, None, true, false).await;
+            let (rx, addr) = source(None, Default::default(), true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -630,7 +639,13 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
-        let (_rx, addr) = source(Some("an access key".to_string().into()), None, true, false).await;
+        let (_rx, addr) = source(
+            Some("an access key".to_string().into()),
+            Default::default(),
+            true,
+            false,
+        )
+        .await;
 
         let res = send(
             addr,
@@ -652,7 +667,7 @@ mod tests {
     async fn handles_acknowledgement_failure() {
         let expected = RECORD.as_bytes().to_owned();
 
-        let (rx, addr) = source(None, Some(Compression::None), false, false).await;
+        let (rx, addr) = source(None, Compression::None, false, false).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 
