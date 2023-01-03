@@ -12,12 +12,13 @@ badges:
 
 The existing set of tags that have been available on metrics was a simple mapping of string values
 to single string keys. Some sources, however, may produce metrics that contain tags that don't fit
-into this model.
+into this model, such as tags that are bare strings (rather than a key/value pair) or have multiple
+values for a given key.
 
-With this release, tag values may now contain a set of values, each of which may be a string value
-or `null`, which represents a "bare" tag (ie a tag with no value, as distinct from an empty string
-value). This new tag set only stores unique values, as duplicated tags are not useful for any
-component, and so each tag name/value pair will appear only once across all tags.
+With this release, tag values for a given key may now contain a set of values, each of which may be
+a string value or `null`, which represents a "bare" tag (i.e. a tag with no value, as distinct from
+an empty string value). This new tag set only stores unique values, as duplicated tags are not
+useful for any component, and so each tag name/value pair will appear only once across all tags.
 
 For compatibility with previous releases, this value set also tracks the last seen or assigned value
 for each tag. Since most components, in particular sinks, can only make use of a single value for
