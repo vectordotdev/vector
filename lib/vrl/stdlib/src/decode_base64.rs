@@ -13,13 +13,17 @@ fn decode_base64(charset: Option<Value>, value: Value) -> Resolved {
         .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
         .transpose()?
         .unwrap_or_default();
-    let config = match charset {
-        Base64Charset::Standard => base64::STANDARD,
-        Base64Charset::UrlSafe => base64::URL_SAFE,
+    let alphabet = match charset {
+        Base64Charset::Standard => base64::alphabet::STANDARD,
+        Base64Charset::UrlSafe => base64::alphabet::URL_SAFE,
     };
     let value = value.try_bytes()?;
+    let engine = base64::engine::fast_portable::FastPortable::from(
+        &alphabet,
+        base64::engine::fast_portable::FastPortableConfig::default(),
+    );
 
-    match base64::decode_config(value, config) {
+    match base64::decode_engine(value, &engine) {
         Ok(s) => Ok(Value::from(Bytes::from(s))),
         Err(_) => Err("unable to decode value to base64".into()),
     }

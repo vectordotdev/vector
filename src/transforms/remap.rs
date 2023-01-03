@@ -6,6 +6,7 @@ use std::{
     path::PathBuf,
 };
 
+use codecs::MetricTagValues;
 use lookup::lookup_v2::{parse_value_path, ValuePath};
 use lookup::{metadata_path, owned_value_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
@@ -15,7 +16,6 @@ use vector_config::configurable_component;
 use vector_core::compile_vrl;
 use vector_core::config::LogNamespace;
 use vector_core::schema::Definition;
-
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::prelude::state::TypeState;
 use vrl::{
@@ -24,7 +24,6 @@ use vrl::{
     CompileConfig, Program, Runtime, Terminate, VrlRuntime,
 };
 
-use crate::transforms::MetricTagsValues;
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
@@ -72,7 +71,7 @@ pub struct RemapConfig {
     /// When set to `full`, all metric tags will be exposed as arrays of either string or null
     /// values.
     #[serde(default)]
-    pub metric_tag_values: MetricTagsValues,
+    pub metric_tag_values: MetricTagValues,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
     /// time zone.
@@ -326,7 +325,7 @@ where
     default_schema_definition: Arc<schema::Definition>,
     dropped_schema_definition: Arc<schema::Definition>,
     runner: Runner,
-    metric_tag_values: MetricTagsValues,
+    metric_tag_values: MetricTagValues,
 }
 
 pub trait VrlRunner {
@@ -515,8 +514,8 @@ where
             event,
             self.program.info(),
             match self.metric_tag_values {
-                MetricTagsValues::Single => false,
-                MetricTagsValues::Full => true,
+                MetricTagValues::Single => false,
+                MetricTagValues::Full => true,
             },
         );
         let result = self.run_vrl(&mut target);

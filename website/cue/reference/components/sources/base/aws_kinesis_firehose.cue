@@ -9,7 +9,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 			configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
 	}
 	acknowledgements: {
 		description: """
@@ -32,7 +32,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 	address: {
 		description: "The address to listen for connections on."
 		required:    true
-		type: string: {}
+		type: string: examples: ["0.0.0.0:443", "localhost:443"]
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
@@ -162,27 +162,35 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 		description: """
 			The compression scheme to use for decompressing records within the Firehose message.
 
-			Some services, like AWS CloudWatch Logs, will [compress the events with
-			gzip](\\(urls.aws_cloudwatch_logs_firehose)), before sending them AWS Kinesis Firehose. This option can be used
-			to automatically decompress them before forwarding them to the next component.
+			Some services, like AWS CloudWatch Logs, will [compress the events with gzip][events_with_gzip],
+			before sending them AWS Kinesis Firehose. This option can be used to automatically decompress
+			them before forwarding them to the next component.
 
-			Note that this is different from [Content encoding option](\\(urls.aws_kinesis_firehose_http_protocol)) of the
+			Note that this is different from [Content encoding option][encoding_option] of the
 			Firehose HTTP endpoint destination. That option controls the content encoding of the entire HTTP request.
+
+			[events_with_gzip]: https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-logs.html
+			[encoding_option]: https://docs.aws.amazon.com/firehose/latest/dev/create-destination.html#create-destination-http
 			"""
 		required: false
-		type: string: enum: {
-			auto: """
-				Automatically attempt to determine the compression scheme.
+		type: string: {
+			default: "auto"
+			enum: {
+				auto: """
+					Automatically attempt to determine the compression scheme.
 
-				The compression scheme of the object is determined by looking at its file signature, also known
-				as [magic bytes](\\(urls.magic_bytes)).
+					The compression scheme of the object is determined by looking at its file signature, also known
+					as [magic bytes][magic_bytes].
 
-				If the record fails to decompress with the discovered format, the record is forwarded as is.
-				Thus, if you know the records are always gzip encoded (for example, if they are coming from AWS CloudWatch Logs),
-				set `gzip` in this field so that any records that are not-gzipped are rejected.
-				"""
-			gzip: "GZIP."
-			none: "Uncompressed."
+					If the record fails to decompress with the discovered format, the record is forwarded as is.
+					Thus, if you know the records are always gzip encoded (for example, if they are coming from AWS CloudWatch Logs),
+					set `gzip` in this field so that any records that are not-gzipped are rejected.
+
+					[magic_bytes]: https://en.wikipedia.org/wiki/List_of_file_signatures
+					"""
+				gzip: "GZIP."
+				none: "Uncompressed."
+			}
 		}
 	}
 	tls: {
@@ -197,7 +205,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: {}
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -206,7 +214,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -218,7 +226,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			enabled: {
 				description: """
@@ -237,7 +245,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -246,7 +254,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

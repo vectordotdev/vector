@@ -1,4 +1,5 @@
 use chrono::Utc;
+use codecs::MetricTagValues;
 use lookup::lookup_v2::parse_value_path;
 use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
@@ -50,13 +51,13 @@ pub struct MetricToLogConfig {
     #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
 
-    /// Controls if this transform should encode tags using the enhanced encoding of [the
-    /// `native_json` codec][vector_native_json]?
+    /// Controls how metric tag values are encoded.
     ///
-    /// If set to `false`, tags will always be encoded as single string values using the last value
-    /// assigned to the tag.
-    #[serde(default = "crate::serde::default_false")]
-    pub enhanced_tags: bool,
+    /// When set to `single`, only the last non-bare value of tags will be displayed with the
+    /// metric.  When set to `full`, all metric tags will be exposed as separate assignments as
+    /// described by [the `native_json` codec][vector_native_json].
+    #[serde(default)]
+    pub metric_tag_values: MetricTagValues,
 }
 
 impl GenerateConfig for MetricToLogConfig {
@@ -65,7 +66,7 @@ impl GenerateConfig for MetricToLogConfig {
             host_tag: Some("host-tag".to_string()),
             timezone: None,
             log_namespace: None,
-            enhanced_tags: false,
+            metric_tag_values: MetricTagValues::Single,
         })
         .unwrap()
     }
@@ -78,7 +79,7 @@ impl TransformConfig for MetricToLogConfig {
             self.host_tag.as_deref(),
             self.timezone.unwrap_or_else(|| context.globals.timezone()),
             context.log_namespace(self.log_namespace),
-            self.enhanced_tags,
+            self.metric_tag_values,
         )))
     }
 
@@ -232,7 +233,7 @@ pub struct MetricToLog {
     host_tag: String,
     timezone: TimeZone,
     log_namespace: LogNamespace,
-    enhanced_tags: bool,
+    tag_values: MetricTagValues,
 }
 
 impl MetricToLog {
@@ -240,7 +241,7 @@ impl MetricToLog {
         host_tag: Option<&str>,
         timezone: TimeZone,
         log_namespace: LogNamespace,
-        enhanced_tags: bool,
+        tag_values: MetricTagValues,
     ) -> Self {
         Self {
             host_tag: format!(
@@ -249,12 +250,12 @@ impl MetricToLog {
             ),
             timezone,
             log_namespace,
-            enhanced_tags,
+            tag_values,
         }
     }
 
     pub fn transform_one(&self, mut metric: Metric) -> Option<LogEvent> {
-        if !self.enhanced_tags {
+        if self.tag_values == MetricTagValues::Single {
             if let Some(tags) = metric.tags_mut() {
                 tags.retain(|_, values| match std::mem::take(values).into_single() {
                     Some(tag) => {
@@ -598,13 +599,13 @@ mod tests {
         assert_eq!(log.metadata(), &metadata);
     }
 
-    // Test the encoding of tag values with the `enhanced_tags` flag.
+    // Test the encoding of tag values with the `metric_tag_values` flag.
     proptest! {
         #[test]
         fn transform_tag_single_encoding(values: TagValueSet) {
             let name = random_string(16);
             let tags = block_on(transform_tags(
-                false,
+                MetricTagValues::Single,
                 values.iter()
                     .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
                     .collect(),
@@ -618,7 +619,7 @@ mod tests {
         fn transform_tag_full_encoding(values: TagValueSet) {
             let name = random_string(16);
             let tags = block_on(transform_tags(
-                true,
+                MetricTagValues::Full,
                 values.iter()
                     .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
                     .collect(),
@@ -639,7 +640,7 @@ mod tests {
         tag.into_option().into()
     }
 
-    async fn transform_tags(enhanced_tags: bool, tags: MetricTags) -> Value {
+    async fn transform_tags(metric_tag_values: MetricTagValues, tags: MetricTags) -> Value {
         let counter = Metric::new(
             "counter",
             MetricKind::Absolute,
@@ -651,7 +652,7 @@ mod tests {
         let mut output = OutputBuffer::with_capacity(1);
 
         MetricToLogConfig {
-            enhanced_tags,
+            metric_tag_values,
             ..Default::default()
         }
         .build(&TransformContext::default())

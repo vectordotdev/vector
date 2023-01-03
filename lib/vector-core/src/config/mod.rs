@@ -205,7 +205,7 @@ impl From<SourceAcknowledgementsConfig> for AcknowledgementsConfig {
 #[configurable_component]
 #[configurable(title = "Controls how acknowledgements are handled for this sink.")]
 #[configurable(
-    description = "See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+    description = "See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 [e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/"
 )]
