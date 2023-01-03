@@ -14,7 +14,7 @@ use tokio::{
     time::{interval, sleep_until},
 };
 use vector_common::internal_event::{
-    BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output,
+    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
 };
 use vector_core::EstimatedJsonEncodedSizeOf;
 
@@ -51,6 +51,7 @@ impl StreamSink<EventArray> for BlackholeSink {
         let total_raw_bytes = Arc::clone(&self.total_raw_bytes);
         let (shutdown, mut tripwire) = watch::channel(());
         let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register!(BytesSent::from(Protocol("blackhole".into())));
 
         if self.config.print_interval_secs > 0 {
             let interval_dur = Duration::from_secs(self.config.print_interval_secs);
@@ -94,10 +95,7 @@ impl StreamSink<EventArray> for BlackholeSink {
                 .fetch_add(message_len, Ordering::AcqRel);
 
             events_sent.emit(CountByteSize(events.len(), message_len));
-            emit!(BytesSent {
-                byte_size: message_len,
-                protocol: "blackhole".to_string().into(),
-            });
+            bytes_sent.emit(ByteSize(message_len));
         }
 
         // Notify the reporting task to shutdown.

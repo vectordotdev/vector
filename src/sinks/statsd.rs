@@ -166,17 +166,18 @@ impl SinkConfig for StatsdSinkConfig {
     }
 }
 
+// Note that if multi-valued tags are present, this encoding may change the order from the input
+// event, since the tags with multiple values may not have been grouped together.
+// This is not an issue, but noting as it may be an observed behavior.
 fn encode_tags(tags: &MetricTags) -> String {
     let parts: Vec<_> = tags
-        .iter_single()
-        .map(|(name, value)| {
-            if value == "true" {
-                name.to_string()
-            } else {
-                format!("{}:{}", name, value)
-            }
+        .iter_all()
+        .map(|(name, tag_value)| match tag_value {
+            Some(value) => format!("{}:{}", name, value),
+            None => name.to_owned(),
         })
         .collect();
+
     // `parts` is already sorted by key because of BTreeMap
     parts.join(",")
 }
@@ -301,7 +302,7 @@ mod test {
     use futures::{channel::mpsc, StreamExt, TryStreamExt};
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-    use vector_core::metric_tags;
+    use vector_core::{event::metric::TagValue, metric_tags};
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
@@ -322,17 +323,26 @@ mod test {
     fn tags() -> MetricTags {
         metric_tags!(
             "normal_tag" => "value",
-            "true_tag" => "true",
-            "empty_tag" => "",
+            "multi_value" => "true",
+            "multi_value" => "false",
+            "multi_value" => TagValue::Bare,
+            "bare_tag" => TagValue::Bare,
         )
     }
 
     #[test]
     fn test_encode_tags() {
-        assert_eq!(
-            &encode_tags(&tags()),
-            "empty_tag:,normal_tag:value,true_tag"
-        );
+        let actual = encode_tags(&tags());
+        let mut actual = actual.split(',').collect::<Vec<_>>();
+        actual.sort();
+
+        let mut expected =
+            "bare_tag,normal_tag:value,multi_value:true,multi_value:false,multi_value"
+                .split(',')
+                .collect::<Vec<_>>();
+        expected.sort();
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -549,7 +559,7 @@ mod test {
         let messages = collect_n(rx, 1).await;
         assert_eq!(
             messages[0],
-            Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01\n"),
+            Bytes::from("vector.counter:1.5|c|#bare_tag,multi_value:true,multi_value:false,multi_value,normal_tag:value\nvector.histogram:2|h|@0.01\n"),
         );
     }
 }

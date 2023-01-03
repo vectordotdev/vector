@@ -196,9 +196,9 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
 }
 
 fn tags_to_dimensions(tags: &MetricTags) -> Vec<Dimension> {
-    // according to the API, up to 10 dimensions per metric can be provided
+    // according to the API, up to 30 dimensions per metric can be provided
     tags.iter_single()
-        .take(10)
+        .take(30)
         .map(|(k, v)| Dimension::builder().name(k).value(v).build())
         .collect()
 }

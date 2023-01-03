@@ -232,7 +232,7 @@ impl ChronicleUnstructuredConfig {
 
         let request_settings = RequestSettings::new(self)?;
 
-        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings);
+        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, "http");
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -470,7 +470,6 @@ impl Service<ChronicleRequest> for ChronicleService {
                     if status.is_success() {
                         Ok(GcsResponse {
                             inner: response,
-                            protocol: "http",
                             metadata,
                         })
                     } else {

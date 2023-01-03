@@ -156,7 +156,7 @@ impl Output {
     description = "This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. \
 Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
-See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 [e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/"
@@ -205,7 +205,7 @@ impl From<SourceAcknowledgementsConfig> for AcknowledgementsConfig {
 #[configurable_component]
 #[configurable(title = "Controls how acknowledgements are handled for this sink.")]
 #[configurable(
-    description = "See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+    description = "See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 [e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/"
 )]

@@ -106,6 +106,7 @@ pub struct ByteSize(pub usize);
 #[derive(Clone, Copy)]
 pub struct Count(pub usize);
 
+/// Holds the tuple `(count_of_events, size_of_events_in_bytes)`.
 #[derive(Clone, Copy)]
 pub struct CountByteSize(pub usize, pub usize);
 
