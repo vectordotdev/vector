@@ -12,7 +12,7 @@ use vector_core::{config::DataType, event::Event};
 use crate::codecs::{DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
 pub use self::event::TestEvent;
-pub use self::http::HttpConfig;
+pub use self::http::HttpResourceConfig;
 
 use super::sync::{Configuring, TaskCoordinator};
 
@@ -201,11 +201,11 @@ pub enum ResourceDirection {
 /// validation runner to create an instance of them, such as spawning an HTTP server if a source has
 /// specified an HTTP resource in the "pull" direction.
 pub enum ResourceDefinition {
-    Http(HttpConfig),
+    Http(HttpResourceConfig),
 }
 
-impl From<HttpConfig> for ResourceDefinition {
-    fn from(config: HttpConfig) -> Self {
+impl From<HttpResourceConfig> for ResourceDefinition {
+    fn from(config: HttpResourceConfig) -> Self {
         Self::Http(config)
     }
 }
