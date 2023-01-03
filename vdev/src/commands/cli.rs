@@ -7,8 +7,8 @@ use clap_verbosity_flag::{InfoLevel, Verbosity};
 #[command(
     version,
     bin_name = "vdev",
-    disable_help_subcommand = true,
-    infer_subcommands = true
+    infer_subcommands = true,
+    disable_help_subcommand = true
 )]
 pub struct Cli {
     #[clap(flatten)]
@@ -24,7 +24,7 @@ enum Commands {
     Complete(super::complete::Cli),
     Config(super::config::cli::Cli),
     Exec(super::exec::Cli),
-    Integrations(super::integrations::cli::Cli),
+    Integration(super::integration::cli::Cli),
     Meta(super::meta::cli::Cli),
     Status(super::status::Cli),
     Test(super::test::Cli),
@@ -37,7 +37,7 @@ impl Cli {
             Commands::Complete(cli) => cli.exec(),
             Commands::Config(cli) => cli.exec(),
             Commands::Exec(cli) => cli.exec(),
-            Commands::Integrations(cli) => cli.exec(),
+            Commands::Integration(cli) => cli.exec(),
             Commands::Meta(cli) => cli.exec(),
             Commands::Status(cli) => cli.exec(),
             Commands::Test(cli) => cli.exec(),
