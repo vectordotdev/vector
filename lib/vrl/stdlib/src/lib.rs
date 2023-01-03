@@ -162,6 +162,8 @@ mod log;
     feature = "parse_nginx_log"
 ))]
 mod log_util;
+#[cfg(feature = "map_key_values")]
+mod map_key_values;
 #[cfg(feature = "map_keys")]
 mod map_keys;
 #[cfg(feature = "map_values")]
@@ -449,6 +451,8 @@ pub use keys::Keys;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
+#[cfg(feature = "map_key_values")]
+pub use map_key_values::MapKeyValues;
 #[cfg(feature = "map_keys")]
 pub use map_keys::MapKeys;
 #[cfg(feature = "map_values")]
@@ -742,6 +746,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Length),
         #[cfg(feature = "log")]
         Box::new(Log),
+        #[cfg(feature = "map_key_values")]
+        Box::new(MapKeyValues),
         #[cfg(feature = "map_keys")]
         Box::new(MapKeys),
         #[cfg(feature = "map_values")]
