@@ -49,11 +49,11 @@ pub const LOGS: &str = "logs";
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
     #[configurable(derived)]
-    #[serde(default = "default_grpc_config")]
+    #[serde(default)]
     grpc: GrpcConfig,
 
     #[configurable(derived)]
-    #[serde(default = "default_http_config")]
+    #[serde(default)]
     http: HttpConfig,
 
     #[configurable(derived)]
@@ -82,6 +82,15 @@ struct GrpcConfig {
     tls: Option<TlsEnableableConfig>,
 }
 
+impl Default for GrpcConfig {
+    fn default() -> Self {
+        Self {
+            address: "0.0.0.0:4317".parse().unwrap(),
+            tls: None,
+        }
+    }
+}
+
 /// Configuration for the `opentelemetry` HTTP server.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -98,25 +107,20 @@ struct HttpConfig {
     tls: Option<TlsEnableableConfig>,
 }
 
-fn default_grpc_config() -> GrpcConfig {
-    GrpcConfig {
-        address: "0.0.0.0:4317".parse().unwrap(),
-        tls: None,
-    }
-}
-
-fn default_http_config() -> HttpConfig {
-    HttpConfig {
-        address: "0.0.0.0:4318".parse().unwrap(),
-        tls: None,
+impl Default for HttpConfig {
+    fn default() -> Self {
+        Self {
+            address: "0.0.0.0:4318".parse().unwrap(),
+            tls: None,
+        }
     }
 }
 
 impl GenerateConfig for OpentelemetryConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            grpc: default_grpc_config(),
-            http: default_http_config(),
+            grpc: GrpcConfig::default(),
+            http: HttpConfig::default(),
             acknowledgements: Default::default(),
             log_namespace: None,
         })
