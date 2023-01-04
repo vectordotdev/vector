@@ -96,7 +96,7 @@ async fn azure_blob_insert_json_into_blob() {
         blob_prefix: Some(blob_prefix.clone()),
         encoding: (
             Some(NewlineDelimitedEncoderConfig::new()),
-            JsonSerializerConfig::new(),
+            JsonSerializerConfig::default(),
         )
             .into(),
         ..config
@@ -154,7 +154,7 @@ async fn azure_blob_insert_json_into_blob_gzip() {
         blob_prefix: Some(blob_prefix.clone()),
         encoding: (
             Some(NewlineDelimitedEncoderConfig::new()),
-            JsonSerializerConfig::new(),
+            JsonSerializerConfig::default(),
         )
             .into(),
         compression: Compression::gzip_default(),
@@ -223,7 +223,7 @@ impl AzureBlobSinkConfig {
                 blob_prefix: None,
                 blob_time_format: None,
                 blob_append_uuid: None,
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
                 compression: Compression::None,
                 batch: Default::default(),
                 request: TowerRequestConfig::default(),

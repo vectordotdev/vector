@@ -133,7 +133,7 @@ impl SinkConfig for HumioMetricsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),
             source: self.source.clone(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             event_type: self.event_type.clone(),
             host_key: self.host_key.clone(),
             indexed_fields: self.indexed_fields.clone(),

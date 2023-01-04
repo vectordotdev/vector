@@ -46,7 +46,7 @@ impl Default for AmqpSinkConfig {
         Self {
             exchange: Template::try_from("vector").unwrap(),
             routing_key: None,
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection: AmqpConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
         }

@@ -278,7 +278,7 @@ mod integration_tests {
             },
             batch: Default::default(),
             request: Default::default(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             tls: Default::default(),
             acknowledgements: Default::default(),
         }
