@@ -299,6 +299,7 @@ mod tests {
         let (mut config, cx) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
+            metric_tag_values = "full"
         "#})
         .unwrap();
 
