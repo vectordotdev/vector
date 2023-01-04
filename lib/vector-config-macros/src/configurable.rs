@@ -519,7 +519,7 @@ fn generate_variant_metadata(
     //
     // You can think of this as an enum-specific additional title.
     let logical_name_attrs = vec![LazyCustomAttribute::kv(
-        "logical_name".to_string(),
+        "logical_name",
         variant.ident().to_string(),
     )];
     let variant_logical_name =
