@@ -26,6 +26,8 @@ fn main() {
             Ordering::Relaxed,
         );
         drop(opts);
+        // At this point, we make the following assumption:
+        // The heap does not contain any allocations that have a shorter lifetime than the program.
         if allocation_tracing {
             // Start tracking allocations
             TRACK_ALLOCATIONS.store(true, Ordering::Relaxed);

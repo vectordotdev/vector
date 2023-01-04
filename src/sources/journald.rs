@@ -98,7 +98,7 @@ type Matches = HashMap<String, HashSet<String>>;
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
-    /// Only include entries that appended to the journal after Vector starts reading it.
+    /// Only include entries that appended to the journal after the entries have been read.
     pub since_now: Option<bool>,
 
     /// Only include entries that occurred after the current boot of the system.
@@ -133,7 +133,7 @@ pub struct JournaldConfig {
 
     /// The directory used to persist file checkpoint positions.
     ///
-    /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
+    /// By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
     pub data_dir: Option<PathBuf>,
 
     /// The `systemd` journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.
@@ -141,7 +141,7 @@ pub struct JournaldConfig {
 
     /// The full path of the `journalctl` executable.
     ///
-    /// If not set, Vector will search the path for `journalctl`.
+    /// If not set, a search is done for the journalctl` path.
     pub journalctl_path: Option<PathBuf>,
 
     /// The full path of the journal directory.

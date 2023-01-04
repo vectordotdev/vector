@@ -1,5 +1,7 @@
 #[cfg(test)]
 use std::borrow::Borrow;
+
+use std::borrow::Cow;
 use std::collections::{hash_map::DefaultHasher, BTreeMap};
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
@@ -33,6 +35,18 @@ impl From<Option<String>> for TagValue {
             None => Self::Bare,
             Some(value) => Self::Value(value),
         }
+    }
+}
+
+impl From<&str> for TagValue {
+    fn from(value: &str) -> Self {
+        Self::Value(value.to_string())
+    }
+}
+
+impl From<Cow<'_, str>> for TagValue {
+    fn from(value: Cow<'_, str>) -> Self {
+        Self::Value(value.to_string())
     }
 }
 
@@ -118,7 +132,7 @@ impl Display for TagValueSet {
 impl TagValueSet {
     /// Convert this set into a single value, mimicking the behavior of this set being just a plain
     /// single string while still storing all of the values.
-    pub(crate) fn into_single(self) -> Option<String> {
+    pub fn into_single(self) -> Option<String> {
         match self {
             Self::Empty => None,
             Self::Single(tag) => tag.into_option(),
@@ -131,7 +145,7 @@ impl TagValueSet {
 
     /// Get the "single" value of this set, mimicking the behavior of this set being just a plain
     /// single string while still storing all of the values.
-    pub(crate) fn as_single(&self) -> Option<&str> {
+    pub fn as_single(&self) -> Option<&str> {
         match self {
             Self::Empty => None,
             Self::Single(tag) => tag.as_option(),
@@ -149,7 +163,7 @@ impl TagValueSet {
         }
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         match self {
             Self::Empty => 0,
             Self::Single(_) => 1,
@@ -510,7 +524,7 @@ impl MetricTags {
         }
     }
 
-    pub fn retain(&mut self, mut f: impl FnMut(&str, &TagValueSet) -> bool) {
+    pub fn retain(&mut self, mut f: impl FnMut(&str, &mut TagValueSet) -> bool) {
         self.0.retain(|key, tags| f(key.as_str(), tags));
     }
 }

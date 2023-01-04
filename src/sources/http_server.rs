@@ -211,7 +211,11 @@ impl SimpleHttpConfig {
             (framing, decoding)
         };
 
-        Ok(DecodingConfig::new(framing, decoding, LogNamespace::Legacy))
+        Ok(DecodingConfig::new(
+            framing,
+            decoding,
+            self.log_namespace.unwrap_or(false).into(),
+        ))
     }
 }
 

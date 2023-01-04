@@ -4,7 +4,7 @@ base: components: sources: configuration: proxy: {
 	description: """
 		Proxy configuration.
 
-		Vector can be configured to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
+		Configure to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
 		proxy configuration convention, users can set different proxies to use based on the type of traffic being proxied,
 		as well as set specific hosts that should not be proxied.
 		"""
@@ -22,10 +22,7 @@ base: components: sources: configuration: proxy: {
 				Must be a valid URI string.
 				"""
 			required: false
-			type: string: {
-				examples: ["http://foo.bar:3128"]
-				syntax: "literal"
-			}
+			type: string: examples: ["http://foo.bar:3128"]
 		}
 		https: {
 			description: """
@@ -34,10 +31,7 @@ base: components: sources: configuration: proxy: {
 				Must be a valid URI string.
 				"""
 			required: false
-			type: string: {
-				examples: ["http://foo.bar:3128"]
-				syntax: "literal"
-			}
+			type: string: examples: ["http://foo.bar:3128"]
 		}
 		no_proxy: {
 			description: """
@@ -58,7 +52,7 @@ base: components: sources: configuration: proxy: {
 			required: false
 			type: array: {
 				default: []
-				items: type: string: syntax: "literal"
+				items: type: string: {}
 			}
 		}
 	}
