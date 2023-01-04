@@ -329,7 +329,9 @@ impl Application {
                 topology,
                 config_paths,
                 require_healthy: opts.require_healthy,
+                #[cfg(feature = "enterprise")]
                 enterprise_reporter,
+                #[cfg(feature = "api")]
                 api_server,
             };
 
@@ -399,6 +401,7 @@ struct TopologyController {
     require_healthy: Option<bool>,
     #[cfg(feature = "enterprise")]
     enterprise_reporter: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
+    #[cfg(feature = "api")]
     api_server: Option<api::Server>,
 }
 
