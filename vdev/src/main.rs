@@ -11,7 +11,7 @@ use anyhow::Result;
 use clap::Parser;
 use std::env;
 
-use crate::commands::cli::Cli;
+use commands::Cli;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();

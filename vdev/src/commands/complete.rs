@@ -3,7 +3,7 @@ use clap::{Args, CommandFactory};
 use clap_complete::{generate, Shell};
 use std::io;
 
-use crate::commands::cli::Cli as RootCli;
+use super::Cli as RootCli;
 
 /// Display the completion file for a given shell
 #[derive(Args, Debug)]
