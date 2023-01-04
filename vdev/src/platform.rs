@@ -27,27 +27,13 @@ pub fn data_dir() -> PathBuf {
 }
 
 pub fn default_target() -> String {
-    if windows() {
+    if cfg!(windows) {
         format!("{}-pc-windows-msvc", ARCH)
-    } else if macos() {
+    } else if cfg!(macos) {
         format!("{}-apple-darwin", ARCH)
     } else {
         format!("{}-unknown-linux-gnu", ARCH)
     }
-}
-
-pub const fn windows() -> bool {
-    cfg!(windows)
-}
-
-#[allow(dead_code)]
-pub const fn macos() -> bool {
-    cfg!(target_os = "macos")
-}
-
-#[allow(dead_code)]
-pub const fn unix() -> bool {
-    cfg!(not(any(windows, target_os = "macos")))
 }
 
 #[once]

@@ -34,7 +34,7 @@ impl Cli {
         command.arg("--features");
         if !self.feature.is_empty() {
             command.args([self.feature.join(",")]);
-        } else if platform::windows() {
+        } else if cfg!(windows) {
             command.arg("default-msvc");
         } else {
             command.arg("default");

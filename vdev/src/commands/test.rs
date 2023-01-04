@@ -3,7 +3,6 @@ use clap::Args;
 use std::collections::BTreeMap;
 
 use crate::app;
-use crate::platform;
 use crate::testing::{config::RustToolchainConfig, runner::*};
 
 /// Execute tests
@@ -43,7 +42,7 @@ impl Cli {
             args.extend(extra_args.to_owned());
 
             if !(self.container || extra_args.contains(&"--features".to_string())) {
-                if platform::windows() {
+                if cfg!(windows) {
                     args.extend(["--features".to_string(), "default-msvc".to_string()]);
                 } else {
                     args.extend(["--features".to_string(), "default".to_string()]);
