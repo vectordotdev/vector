@@ -367,7 +367,7 @@ tokio = { version = "1.23.0", features = ["test-util"] }
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
-wiremock = "0.5.15"
+wiremock = "0.5.16"
 zstd = { version = "0.12.1", default-features = false }
 
 [patch.crates-io]
