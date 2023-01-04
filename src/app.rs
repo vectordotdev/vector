@@ -274,9 +274,9 @@ impl Application {
         let rt = self.runtime;
 
         let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash_receiver);
-        let mut topology = self.config.topology;
+        let topology = self.config.topology;
 
-        let mut config_paths = self.config.config_paths;
+        let config_paths = self.config.config_paths;
 
         let opts = self.opts;
 
@@ -284,7 +284,7 @@ impl Application {
         let api_config = self.config.api;
 
         #[cfg(feature = "enterprise")]
-        let mut enterprise_reporter = self.config.enterprise;
+        let enterprise_reporter = self.config.enterprise;
 
         let mut signal_handler = self.config.signal_handler;
         let mut signal_rx = self.config.signal_rx;
@@ -325,7 +325,7 @@ impl Application {
                 None
             };
 
-            let topology_controller = TopologyController {
+            let mut topology_controller = TopologyController {
                 topology,
                 config_paths,
                 require_healthy: opts.require_healthy,
@@ -345,10 +345,12 @@ impl Application {
                             }
                             Ok(SignalTo::ReloadFromDisk) => {
                                 // Reload paths
-                                config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
+                                if let Some(paths) = config::process_paths(&opts.config_paths_with_formats()) {
+                                    topology_controller.config_paths = paths;
+                                }
 
                                 // Reload config
-                                let new_config = config::load_from_paths_with_provider_and_secrets(&config_paths, &mut signal_handler)
+                                let new_config = config::load_from_paths_with_provider_and_secrets(&topology_controller.config_paths, &mut signal_handler)
                                     .await
                                     .map_err(handle_config_errors).ok();
 
@@ -372,7 +374,7 @@ impl Application {
                 SignalTo::Shutdown => {
                     emit!(VectorStopped);
                     tokio::select! {
-                        _ = topology.stop() => (), // Graceful shutdown finished
+                        _ = topology_controller.stop() => (), // Graceful shutdown finished
                         _ = signal_rx.recv() => {
                             // It is highly unlikely that this event will exit from topology.
                             emit!(VectorQuit);
@@ -383,7 +385,7 @@ impl Application {
                 SignalTo::Quit => {
                     // It is highly unlikely that this event will exit from topology.
                     emit!(VectorQuit);
-                    drop(topology);
+                    drop(topology_controller);
                 }
                 _ => unreachable!(),
             }
@@ -458,5 +460,9 @@ impl TopologyController {
 
     fn sources_finished(&self) -> BoxFuture<'static, ()> {
         self.topology.sources_finished()
+    }
+
+    async fn stop(self) {
+        self.topology.stop().await;
     }
 }
