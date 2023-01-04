@@ -129,9 +129,6 @@ base: components: transforms: remap: configuration: {
 			[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 			"""
 		required: false
-		type: string: {
-			default: "local"
-			examples: ["local", "America/New_York", "EST5EDT"]
-		}
+		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 }
