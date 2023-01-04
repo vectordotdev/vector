@@ -8954,7 +8954,6 @@ dependencies = [
  "tracing-tower",
  "trust-dns-proto 0.22.0",
  "tui",
- "typetag",
  "url",
  "uuid 1.2.2",
  "value",
