@@ -8,5 +8,7 @@ license = "MPL-2.0"
 darling = { version = "0.13", default-features = false, features = ["suggestions"] }
 proc-macro2 = { version = "1.0", default-features = false }
 schemars = { version = "0.8.11", default-features = false }
+serde = { version = "1.0", default-features = false }
+serde_json = { version = "1.0", default-features = false }
 syn = { version = "1.0", features = ["full", "extra-traits", "visit-mut", "visit"] }
 quote = { version = "1.0", default-features = false }

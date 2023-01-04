@@ -118,12 +118,25 @@ pub enum Encoding {
 /// Enableable TLS configuration.
 #[derive(Clone)]
 #[configurable_component]
+#[configurable(metadata(docs::examples = "Self::default()"))]
 pub struct TlsEnablableConfig {
     /// Whether or not TLS is enabled.
     pub enabled: bool,
 
     #[serde(flatten)]
     pub options: TlsConfig,
+}
+
+impl Default for TlsEnablableConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            options: TlsConfig {
+                crt_file: None,
+                key_file: None,
+            },
+        }
+    }
 }
 
 /// TLS configuration.
