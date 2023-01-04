@@ -182,6 +182,8 @@ urls: {
 	encoding_standard:                          "https://encoding.spec.whatwg.org/"
 	endler_dev:                                 "https://endler.dev/"
 	enrichment_tables_concept:                  "/docs/reference/glossary/#enrichment-tables"
+	envoy:                                      "https://www.envoyproxy.io/docs/envoy/v1.24.1/"
+	envoy_als:                                  "https://www.envoyproxy.io/docs/envoy/v1.24.1/api-v3/service/accesslog/v3/als.proto"
 	eof:                                        "\(wikipedia)/wiki/End-of-file#EOF_character"
 	etsy:                                       "https://www.etsy.com"
 	event_proto:                                "\(vector_repo)/blob/master/lib/vector-core/proto/event.proto"

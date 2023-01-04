@@ -21,6 +21,8 @@ pub mod demo_logs;
 pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;
+#[cfg(feature = "sources-envoy_als")]
+pub mod envoy_als;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
@@ -145,6 +147,10 @@ pub enum Sources {
     /// Docker Logs.
     #[cfg(feature = "sources-docker_logs")]
     DockerLogs(#[configurable(derived)] docker_logs::DockerLogsConfig),
+
+    /// Envoy ALS.
+    #[cfg(feature = "sources-envoy_als")]
+    EnvoyAls(#[configurable(derived)] envoy_als::EnvoyAlsConfig),
 
     /// EventStoreDB Metrics.
     #[cfg(feature = "sources-eventstoredb_metrics")]
@@ -327,6 +333,8 @@ impl NamedComponent for Sources {
             Self::Dnstap(config) => config.get_component_name(),
             #[cfg(feature = "sources-docker_logs")]
             Self::DockerLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sources-envoy_als")]
+            Self::EnvoyAls(config) => config.get_component_name(),
             #[cfg(feature = "sources-eventstoredb_metrics")]
             Self::EventstoredbMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sources-exec")]

@@ -69,6 +69,7 @@ jobs:
           - test: 'dnstap'
           - test: 'docker-logs'
           - test: 'elasticsearch'
+          - test: 'envoy-als'
           - test: 'eventstoredb'
           - test: 'fluent'
           - test: 'gcp'
