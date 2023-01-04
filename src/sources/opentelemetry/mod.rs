@@ -49,6 +49,7 @@ pub const LOGS: &str = "logs";
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
     #[configurable(derived)]
+    #[serde(default = "default_grpc_config")]
     grpc: GrpcConfig,
 
     #[configurable(derived)]
@@ -68,7 +69,6 @@ pub struct OpentelemetryConfig {
 /// Configuration for the `opentelemetry` gRPC server.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(default = "default_grpc_config")]
 #[serde(deny_unknown_fields)]
 struct GrpcConfig {
     /// The address to listen for connections on.
@@ -85,7 +85,6 @@ struct GrpcConfig {
 /// Configuration for the `opentelemetry` HTTP server.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(default = "default_http_config")]
 #[serde(deny_unknown_fields)]
 struct HttpConfig {
     /// The address to listen for connections on.
