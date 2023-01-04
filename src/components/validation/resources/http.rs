@@ -1,19 +1,22 @@
 use std::{
     collections::VecDeque,
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    net::{IpAddr, SocketAddr},
     str::FromStr,
     sync::Arc,
 };
 
+use axum::{
+    response::IntoResponse,
+    routing::{MethodFilter, MethodRouter},
+    Router,
+};
 use bytes::BytesMut;
 use codecs::{
     encoding, JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, NewlineDelimitedEncoder,
 };
-use http::{uri::PathAndQuery, Method, Request, Response, Uri};
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Body, Client, Error, Server,
-};
+use http::{Method, Request, StatusCode, Uri};
+use hyper::{Body, Client, Server};
+use std::future::Future;
 use tokio::{
     select,
     sync::{mpsc, oneshot, Mutex, Notify},
@@ -70,7 +73,7 @@ impl HttpResourceConfig {
             ResourceDirection::Pull => {
                 spawn_output_http_client(self, codec, output_tx, task_coordinator)
             }
-            // The sink will push data data to us.
+            // The sink will push data to us.
             ResourceDirection::Push => {
                 spawn_output_http_server(self, codec, output_tx, task_coordinator)
             }
@@ -78,6 +81,7 @@ impl HttpResourceConfig {
     }
 }
 
+/// Spawns an HTTP server that a source will make requests to in order to get events.
 #[allow(clippy::missing_const_for_fn)]
 fn spawn_input_http_server(
     config: HttpResourceConfig,
@@ -85,116 +89,40 @@ fn spawn_input_http_server(
     mut input_rx: mpsc::Receiver<TestEvent>,
     task_coordinator: &TaskCoordinator<Configuring>,
 ) {
-    // Spin up an HTTP server that responds with all of the input data it has received since the
-    // last request was responded to. Essentially, a client calling the server will never see data
-    // more than once.
-    let resource_started = task_coordinator.track_started();
-    let http_server_started = task_coordinator.track_started();
-    let resource_completed = task_coordinator.track_completed();
-    let http_server_completed = task_coordinator.track_completed();
+    // This HTTP server will poll the input receiver for input events and buffer them. When a
+    // request comes in on the right path/method, one buffered input event will be sent back. If no
+    // buffered events are available when the request arrives, an empty response (204 No Content) is
+    // returned to the caller.
+    let outstanding_events = Arc::new(Mutex::new(VecDeque::new()));
+
+    // First, we'll build and spawn our HTTP server.
     let encoder = codec.into_encoder();
+    let sendable_events = Arc::clone(&outstanding_events);
 
-    tokio::spawn(async move {
-        let uri_port = config.uri.port_u16().unwrap_or(80);
-        let uri_host = config
-            .uri
-            .host()
-            .ok_or_else(|| "host must be present in URI".to_string())
-            .and_then(|host| {
-                Ipv4Addr::from_str(host)
-                    .map_err(|_| "URI host must be valid IPv4 address".to_string())
-            })
-            .expect("HTTP URI not valid");
-
-        let listen_addr = SocketAddr::from(SocketAddrV4::new(uri_host, uri_port));
-        let server_builder = Server::try_bind(&listen_addr)
-            .expect("failed to bind HTTP server external input listen address");
-
-        let request_path = config
-            .uri
-            .path_and_query()
-            .cloned()
-            .or_else(|| Some(PathAndQuery::from_static("/")));
-        let request_method = config.method.unwrap_or(Method::POST);
-
-        let outstanding_events = Arc::new(Mutex::new(VecDeque::new()));
-        let server_notifier = Arc::new(Notify::new());
-
-        let sendable_events = Arc::clone(&outstanding_events);
-        let resource_notifier = Arc::clone(&server_notifier);
-
-        let make_svc = make_service_fn(move |_| {
-            let path = request_path.clone();
-            let method = request_method.clone();
+    let (resource_notifier, http_server_shutdown_tx) =
+        spawn_http_server(task_coordinator, &config, move |_| {
             let sendable_events = Arc::clone(&sendable_events);
-            let resource_notifier = Arc::clone(&resource_notifier);
-            let encoder = encoder.clone();
+            let mut encoder = encoder.clone();
 
             async move {
-                Ok::<_, Error>(service_fn(move |req| {
-                    let path = path.clone();
-                    let method = method.clone();
-                    let sendable_events = Arc::clone(&sendable_events);
-                    let resource_notifier = Arc::clone(&resource_notifier);
-                    let mut encoder = encoder.clone();
+                let mut sendable_events = sendable_events.lock().await;
+                if let Some(event) = sendable_events.pop_front() {
+                    let mut buffer = BytesMut::new();
+                    encode_test_event(&mut encoder, &mut buffer, event);
 
-                    async move {
-                        let actual_path = req.uri().path_and_query();
-                        let actual_method = req.method();
-
-                        if actual_method == method && actual_path == path.as_ref() {
-                            let mut sendable_events = sendable_events.lock().await;
-                            if let Some(event) = sendable_events.pop_front() {
-                                let mut buffer = BytesMut::new();
-                                encode_test_event(&mut encoder, &mut buffer, event);
-
-                                // Gotta notify the resource before we technically send back the response.
-                                resource_notifier.notify_one();
-
-                                Ok(Response::new(Body::from(buffer.freeze())))
-                            } else {
-                                // No outstanding events to send, so just provide an empty response.
-                                Ok(Response::new(Body::empty()))
-                            }
-                        } else {
-                            // TODO: We probably need/want to capture a metric for these errors.
-
-                            error!(
-                                expected_path = ?path, actual_path = ?actual_path,
-                                expected_method = ?method, actual_method = ?actual_method,
-                                "Component sent request to a different path/method than expected."
-                            );
-
-                            Response::builder().status(400).body(Body::empty())
-                        }
-                    }
-                }))
+                    buffer.into_response()
+                } else {
+                    // No outstanding events to send, so just provide an empty response.
+                    StatusCode::NO_CONTENT.into_response()
+                }
             }
         });
 
-        // Spawn the HTTP server and start our resource loop.
-        let (http_server_shutdown_tx, http_server_shutdown_rx) = oneshot::channel();
-        tokio::spawn(async move {
-            http_server_started.mark_as_done();
-
-            let server = server_builder
-                .serve(make_svc)
-                .with_graceful_shutdown(async {
-                    http_server_shutdown_rx.await.ok();
-                });
-
-            if let Err(e) = server.await {
-                error!(error = ?e, "HTTP server encountered an error.");
-            }
-
-            http_server_completed.mark_as_done();
-        });
-
-        // Now that we've spawned the HTTP server task, we can mark ourselves as started. The HTTP
-        // server task will also mark itself as started/completed as well.
-        //
-        // We could be more precise and use a barrier to only need a single start/complete token
-        // pair, but this is slightly cleaner.
+    // Now we'll create and spawn the resource's core logic loop which drives the buffering of input
+    // events and working with the HTTP server as they're consumed.
+    let resource_started = task_coordinator.track_started();
+    let resource_completed = task_coordinator.track_completed();
+    tokio::spawn(async move {
         resource_started.mark_as_done();
         debug!("HTTP server external input resource started.");
 
@@ -215,7 +143,7 @@ fn spawn_input_http_server(
                     None => input_finished = true,
                 },
 
-                _ = server_notifier.notified() => {
+                _ = resource_notifier.notified() => {
                     // The HTTP server notified us that it made progress with a send, which is
                     // specifically that it serviced a request which returned a non-zero number of
                     // events.
@@ -241,6 +169,7 @@ fn spawn_input_http_server(
     });
 }
 
+/// Spawns an HTTP client that pushes events to an HTTP server driven by a source.
 fn spawn_input_http_client(
     config: HttpResourceConfig,
     codec: ResourceCodec,
@@ -294,6 +223,7 @@ fn spawn_input_http_client(
     });
 }
 
+/// Spawns an HTTP server that a sink will make requests to in order to send events.
 #[allow(clippy::missing_const_for_fn)]
 fn spawn_output_http_server(
     _config: HttpResourceConfig,
@@ -303,6 +233,7 @@ fn spawn_output_http_server(
 ) {
 }
 
+/// Spawns an HTTP client that pulls events by making requests to an HTTP server driven by a sink.
 #[allow(clippy::missing_const_for_fn)]
 fn spawn_output_http_client(
     _config: HttpResourceConfig,
@@ -310,6 +241,108 @@ fn spawn_output_http_client(
     _output_tx: mpsc::Sender<Event>,
     _task_coordinator: &TaskCoordinator<Configuring>,
 ) {
+}
+
+fn spawn_http_server<H, F, R>(
+    task_coordinator: &TaskCoordinator<Configuring>,
+    config: &HttpResourceConfig,
+    handler: H,
+) -> (Arc<Notify>, oneshot::Sender<()>)
+where
+    H: Fn(Request<Body>) -> F + Clone + Send + 'static,
+    F: Future<Output = R> + Send,
+    R: IntoResponse,
+{
+    let http_server_started = task_coordinator.track_started();
+    let http_server_completed = task_coordinator.track_completed();
+
+    let listen_addr = socketaddr_from_uri(&config.uri);
+    let request_path = config
+        .uri
+        .path_and_query()
+        .map(|pq| pq.as_str().to_string())
+        .unwrap_or_else(|| "/".to_string());
+    let request_method = config.method.clone().unwrap_or(Method::POST);
+
+    // Create our synchronization primitives that are shared between the HTTP server and the
+    // resource's core logic loop.
+    //
+    // This will let the resource be able to trigger the HTTP server to gracefully shutdown, as well
+    // as be notified when the HTTP server has served a request, so that it can check if all input
+    // events have been sent yet.
+    let (http_server_shutdown_tx, http_server_shutdown_rx) = oneshot::channel();
+    let resource_notifier = Arc::new(Notify::new());
+    let server_notifier = Arc::clone(&resource_notifier);
+
+    tokio::spawn(async move {
+        // Create our HTTP server by binding as early as possible to return an error if we can't
+        // actually bind.
+        let server_builder = Server::try_bind(&listen_addr)
+            .expect("failed to bind HTTP server external input listen address");
+
+        // Create our router, which is a bit boilerplate-y because we take the HTTP method
+        // parametrically. We generate a handler that calls the given `handler` and then triggers
+        // the notifier shared by the HTTP server and the resource's core logic loop.
+        //
+        // Every time a request is processed, we notify the core logic loop so it can continue
+        // checking to see if it's time to fully close once all input events have been consumed and
+        // the input receiver is closed.
+        let method_filter = MethodFilter::try_from(request_method)
+            .expect("should not fail to convert method to method filter");
+        let method_router = MethodRouter::new()
+            .fallback(|req: Request<Body>| async move {
+                error!(
+                    path = req.uri().path(),
+                    method = req.method().as_str(),
+                    "Component sent request to a different path/method than expected."
+                );
+
+                StatusCode::METHOD_NOT_ALLOWED
+            })
+            .on(method_filter, move |request: Request<Body>| {
+                let request_handler = handler(request);
+                let notifier = Arc::clone(&server_notifier);
+
+                async move {
+                    let response = request_handler.await;
+                    notifier.notify_one();
+                    response
+                }
+            });
+
+        let router = Router::new().route(&request_path, method_router);
+
+        // Now actually run/drive the HTTP server and process requests until we're told to shutdown.
+        http_server_started.mark_as_done();
+
+        let server = server_builder
+            .serve(router.into_make_service())
+            .with_graceful_shutdown(async {
+                http_server_shutdown_rx.await.ok();
+            });
+
+        if let Err(e) = server.await {
+            error!(error = ?e, "HTTP server encountered an error.");
+        }
+
+        http_server_completed.mark_as_done();
+    });
+
+    (resource_notifier, http_server_shutdown_tx)
+}
+
+fn socketaddr_from_uri(uri: &Uri) -> SocketAddr {
+    let uri_port = uri.port_u16().unwrap_or(80);
+    let uri_host = uri
+        .host()
+        .ok_or_else(|| "host must be present in URI".to_string())
+        .and_then(|host| {
+            IpAddr::from_str(host)
+                .map_err(|_| "URI host must be valid IPv4/IPv6 address".to_string())
+        })
+        .expect("HTTP URI not valid");
+
+    SocketAddr::from((uri_host, uri_port))
 }
 
 fn encode_test_event(
