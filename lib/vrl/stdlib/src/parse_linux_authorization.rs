@@ -28,7 +28,7 @@ impl Function for ParseLinuxAuthorization {
                 "hostname": "localhost",
                 "message": "Accepted publickey for eng from 10.1.1.1 port 8888 ssh2: RSA SHA256:foobar",
                 "procid": 1111,
-                "timestamp": "2022-03-23T01:49:58Z"
+                "timestamp": "2023-03-23T01:49:58Z"
             }"#}),
         }]
     }
