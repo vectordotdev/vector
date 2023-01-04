@@ -5,7 +5,7 @@ base: components: sinks: aws_s3: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -346,9 +346,9 @@ base: components: sinks: aws_s3: configuration: {
 					enum: {
 						full: "All tags will be exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the
-															same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
-															will be ignored.
+															Tag values will be exposed as single strings, the same as they were before this config
+															option. Tags with multiple values will show the last assigned value, and null values will be
+															ignored.
 															"""
 					}
 				}

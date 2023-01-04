@@ -5,7 +5,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -88,9 +88,9 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
-			If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-			filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-			running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
 			"""
 		required: false
@@ -157,9 +157,9 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 
 			Either an API key, or a path to a service account credentials JSON file can be specified.
 
-			If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-			filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-			running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
 			"""
 		required: false
@@ -259,9 +259,9 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					enum: {
 						full: "All tags will be exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the
-															same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
-															will be ignored.
+															Tag values will be exposed as single strings, the same as they were before this config
+															option. Tags with multiple values will show the last assigned value, and null values will be
+															ignored.
 															"""
 					}
 				}
