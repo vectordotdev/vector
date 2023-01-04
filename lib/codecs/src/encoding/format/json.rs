@@ -46,7 +46,6 @@ impl JsonSerializerConfig {
 /// Serializer that converts an `Event` to bytes using the JSON format.
 #[derive(Debug, Clone)]
 pub struct JsonSerializer {
-    #[allow(dead_code)]
     metric_tag_values: MetricTagValues,
 }
 
