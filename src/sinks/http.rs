@@ -5,12 +5,11 @@ use codecs::encoding::{CharacterDelimitedEncoder, Framer, Serializer};
 use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
-    header::{self, HeaderName, HeaderValue},
+    header::{HeaderName, HeaderValue, AUTHORIZATION},
     Method, Request, StatusCode, Uri,
 };
 use hyper::Body;
 use indexmap::IndexMap;
-use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_config::configurable_component;
 
@@ -27,20 +26,6 @@ use crate::{
     },
     tls::{TlsConfig, TlsSettings},
 };
-
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("{}: {}", source, name))]
-    InvalidHeaderName {
-        name: String,
-        source: header::InvalidHeaderName,
-    },
-    #[snafu(display("{}: {}", source, value))]
-    InvalidHeaderValue {
-        value: String,
-        source: header::InvalidHeaderValue,
-    },
-}
 
 /// Configuration for the `http` sink.
 #[configurable_component(sink("http"))]
@@ -152,7 +137,8 @@ struct HttpSink {
     pub transformer: Transformer,
     pub encoder: Encoder<Framer>,
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
-    pub request: RequestConfig,
+    pub tower: TowerRequestConfig,
+    pub headers: IndexMap<HeaderName, HeaderValue>,
 }
 
 #[cfg(test)]
@@ -168,7 +154,8 @@ fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
         transformer: Default::default(),
         encoder,
         batch: Default::default(),
-        request: Default::default(),
+        tower: Default::default(),
+        headers: Default::default(),
     }
 }
 
@@ -189,7 +176,7 @@ impl SinkConfig for HttpSinkConfig {
 
         let mut request = self.request.clone();
         request.add_old_option(self.headers.clone());
-        validate_headers(&request.headers, &self.auth)?;
+        let headers = validate_headers(&request.headers, self.auth.is_some())?;
 
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -202,13 +189,11 @@ impl SinkConfig for HttpSinkConfig {
             transformer: self.encoding.transformer(),
             encoder,
             batch: self.batch,
-            request,
+            tower: request.tower,
+            headers,
         };
 
-        let request = sink
-            .request
-            .tower
-            .unwrap_with(&TowerRequestConfig::default());
+        let request = sink.tower.unwrap_with(&TowerRequestConfig::default());
 
         let batch = sink.batch.into_batch_settings()?;
         let sink = BatchedHttpSink::new(
@@ -334,12 +319,12 @@ impl util::http::HttpSink for HttpSink {
             Compression::None => {}
         }
 
-        for (header, value) in self.request.headers.iter() {
-            builder
-                .headers_mut()
-                // The request builder should not have errors at this point, and if it did it would fail in the call to `body()` also.
-                .expect("Failed to access headers in http::Request builder- builder has errors.")
-                .insert(HeaderName::try_from(header)?, HeaderValue::try_from(value)?);
+        let headers = builder
+            .headers_mut()
+            // The request builder should not have errors at this point, and if it did it would fail in the call to `body()` also.
+            .expect("Failed to access headers in http::Request builder- builder has errors.");
+        for (header, value) in self.headers.iter() {
+            headers.insert(header, value.clone());
         }
 
         let mut request = builder.body(body.freeze()).unwrap();
@@ -369,19 +354,19 @@ async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> c
     }
 }
 
-fn validate_headers(map: &IndexMap<String, String>, auth: &Option<Auth>) -> crate::Result<()> {
-    for (name, value) in map {
-        if auth.is_some() && name.eq_ignore_ascii_case("Authorization") {
+fn validate_headers(
+    headers: &IndexMap<String, String>,
+    configures_auth: bool,
+) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
+    let headers = util::http::validate_headers(headers)?;
+
+    for name in headers.keys() {
+        if configures_auth && name == AUTHORIZATION {
             return Err("Authorization header can not be used with defined auth options".into());
         }
-
-        HeaderName::from_bytes(name.as_bytes())
-            .with_context(|_| InvalidHeaderNameSnafu { name })?;
-        HeaderValue::from_bytes(value.as_bytes())
-            .with_context(|_| InvalidHeaderValueSnafu { value })?;
     }
 
-    Ok(())
+    Ok(headers)
 }
 
 #[cfg(test)]
@@ -409,7 +394,7 @@ mod tests {
         assert_downcast_matches,
         config::SinkContext,
         sinks::util::{
-            http::HttpSink,
+            http::{HeaderValidationError, HttpSink},
             test::{build_test_server, build_test_server_generic, build_test_server_status},
         },
         test_util::{
@@ -473,7 +458,7 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
-        assert!(super::validate_headers(&config.request.headers, &None).is_ok());
+        assert!(super::validate_headers(&config.request.headers, false).is_ok());
     }
 
     #[test]
@@ -487,9 +472,9 @@ mod tests {
         let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
         assert_downcast_matches!(
-            super::validate_headers(&config.request.headers, &None).unwrap_err(),
-            BuildError,
-            BuildError::InvalidHeaderName { .. }
+            super::validate_headers(&config.request.headers, false).unwrap_err(),
+            HeaderValidationError,
+            HeaderValidationError::InvalidHeaderName { .. }
         );
     }
 

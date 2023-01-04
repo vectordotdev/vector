@@ -570,28 +570,6 @@ components: sinks: [Name=string]: {
 
 		if features.send != _|_ {
 			if features.send.request.enabled {
-				partitioning: _ | *{
-					title: "Partitioning"
-					body: """
-						Vector supports dynamic configuration values through a simple
-						template syntax. If an option supports templating, it will be
-						noted with a badge and you can use event fields to create dynamic
-						values. For example:
-
-						```toml title="vector.toml"
-						[sinks.my-sink]
-						dynamic_option = "application={{ application_id }}"
-						```
-
-						In the above example, the `application_id` for each event will be
-						used to partition outgoing data.
-						"""
-				}
-			}
-		}
-
-		if features.send != _|_ {
-			if features.send.request.enabled {
 				rate_limits: {
 					title: "Rate limits & adaptive concurrency"
 					body:  null
