@@ -1,7 +1,7 @@
 # RFC 14742 - Support for Duplicate and Bare Tags on Metrics
 
 Vector's current metric model supports only a single value for each tag. Several sources, however,
-however, may send metrics that contain multiple values for a given tag name, or bare tags with no
+may send metrics that contain multiple values for a given tag name, or bare tags with no
 value. Vector's tag support should be enhanced to handle this data.
 
 ## Context

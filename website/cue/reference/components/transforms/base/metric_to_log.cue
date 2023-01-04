@@ -1,17 +1,6 @@
 package metadata
 
 base: components: transforms: metric_to_log: configuration: {
-	enhanced_tags: {
-		description: """
-			Controls if this transform should encode tags using the enhanced encoding of [the
-			`native_json` codec][vector_native_json]?
-
-			If set to `false`, tags will always be encoded as single string values using the last value
-			assigned to the tag.
-			"""
-		required: false
-		type: bool: default: false
-	}
 	host_tag: {
 		description: """
 			Name of the tag in the metric to use for the source host.
@@ -23,6 +12,27 @@ base: components: transforms: metric_to_log: configuration: {
 			"""
 		required: false
 		type: string: examples: ["host", "hostname"]
+	}
+	metric_tag_values: {
+		description: """
+			Controls how metric tag values are encoded.
+
+			When set to `single`, only the last non-bare value of tags will be displayed with the
+			metric.  When set to `full`, all metric tags will be exposed as separate assignments as
+			described by [the `native_json` codec][vector_native_json].
+			"""
+		required: false
+		type: string: {
+			default: "single"
+			enum: {
+				full: "All tags will be exposed as arrays of either string or null values."
+				single: """
+					Tag values will be exposed as single strings, the
+					same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
+					will be ignored.
+					"""
+			}
+		}
 	}
 	timezone: {
 		description: """
