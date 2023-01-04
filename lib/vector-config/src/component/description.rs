@@ -24,8 +24,7 @@ pub struct ComponentDescription<T: ComponentMarker + Sized> {
 impl<T> ComponentDescription<T>
 where
     T: ComponentMarker + Sized + 'static,
-    inventory::iter<ComponentDescription<T>>:
-        std::iter::IntoIterator<Item = &'static ComponentDescription<T>>,
+    ComponentDescription<T>: super::Inventoried,
 {
     /// Creates a new `ComponentDescription`.
     ///
@@ -49,7 +48,7 @@ where
     /// If no component, identified by `T` and the given name, is registered, or if there is an
     /// error generating the example configuration, an error variant will be returned.
     pub fn example(component_name: &str) -> Result<Value, ExampleError> {
-        inventory::iter::<ComponentDescription<T>>
+        <Self as super::Inventoried>::iter()
             .into_iter()
             .find(|t| t.component_name == component_name)
             .ok_or_else(|| ExampleError::DoesNotExist {
@@ -61,7 +60,7 @@ where
     /// Gets a sorted list of all registered components of the given component type.
     pub fn types() -> Vec<&'static str> {
         let mut types = Vec::new();
-        for definition in inventory::iter::<ComponentDescription<T>> {
+        for definition in <Self as super::Inventoried>::iter() {
             types.push(definition.component_name);
         }
         types.sort_unstable();

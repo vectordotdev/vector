@@ -4358,6 +4358,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "linkme"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22bcb06ef182e7557cf18d85bd151319d657bd8f699d381435781871f3027af8"
+dependencies = [
+ "linkme-impl",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83f2011c1121c45eb4d9639cf5dcbae9622d2978fc5e922a346bfdc6c46700b5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.0.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8842,12 +8862,12 @@ dependencies = [
  "indexmap",
  "indoc",
  "infer 0.11.0",
- "inventory",
  "itertools",
  "k8s-openapi",
  "kube",
  "lapin",
  "libc",
+ "linkme",
  "listenfd",
  "logfmt",
  "loki-logproto",
@@ -9064,7 +9084,7 @@ dependencies = [
  "chrono-tz",
  "encoding_rs",
  "indexmap",
- "inventory",
+ "linkme",
  "no-proxy",
  "num-traits",
  "schemars",

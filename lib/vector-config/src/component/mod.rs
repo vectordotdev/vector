@@ -1,3 +1,5 @@
+use linkme::distributed_slice;
+
 mod description;
 mod generate;
 mod marker;
@@ -18,9 +20,60 @@ pub type SinkDescription = ComponentDescription<SinkComponent>;
 pub type EnrichmentTableDescription = ComponentDescription<EnrichmentTableComponent>;
 pub type ProviderDescription = ComponentDescription<ProviderComponent>;
 
-inventory::collect!(SourceDescription);
-inventory::collect!(TransformDescription);
-inventory::collect!(SecretsDescription);
-inventory::collect!(SinkDescription);
-inventory::collect!(EnrichmentTableDescription);
-inventory::collect!(ProviderDescription);
+pub trait Inventoried: Sized {
+    fn iter() -> &'static [Self];
+}
+
+#[distributed_slice]
+pub static SOURCES: [SourceDescription] = [..];
+
+impl Inventoried for SourceDescription {
+    fn iter() -> &'static [Self] {
+        &SOURCES
+    }
+}
+
+#[distributed_slice]
+pub static TRANSFORMS: [TransformDescription] = [..];
+
+impl Inventoried for TransformDescription {
+    fn iter() -> &'static [Self] {
+        &TRANSFORMS
+    }
+}
+
+#[distributed_slice]
+pub static SECRETS: [SecretsDescription] = [..];
+
+impl Inventoried for SecretsDescription {
+    fn iter() -> &'static [Self] {
+        &SECRETS
+    }
+}
+
+#[distributed_slice]
+pub static SINKS: [SinkDescription] = [..];
+
+impl Inventoried for SinkDescription {
+    fn iter() -> &'static [Self] {
+        &SINKS
+    }
+}
+
+#[distributed_slice]
+pub static ENRICHMENT_TABLES: [EnrichmentTableDescription] = [..];
+
+impl Inventoried for EnrichmentTableDescription {
+    fn iter() -> &'static [Self] {
+        &ENRICHMENT_TABLES
+    }
+}
+
+#[distributed_slice]
+pub static PROVIDERS: [ProviderDescription] = [..];
+
+impl Inventoried for ProviderDescription {
+    fn iter() -> &'static [Self] {
+        &PROVIDERS
+    }
+}

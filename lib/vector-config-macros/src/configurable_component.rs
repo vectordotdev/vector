@@ -3,8 +3,8 @@ use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned};
 use syn::{
-    parse_macro_input, parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned,
-    token::Comma, AttributeArgs, DeriveInput, Lit, LitStr, Meta, MetaList, NestedMeta, Path,
+    parse_macro_input, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, token::Comma,
+    AttributeArgs, DeriveInput, Lit, LitStr, Meta, MetaList, NestedMeta, Path,
 };
 
 use crate::attrs;
@@ -140,28 +140,44 @@ impl TypedComponent {
     ) -> Option<proc_macro2::TokenStream> {
         self.component_name.as_ref().map(|component_name| {
             let config_ty = &input.ident;
-            let desc_ty: syn::Type = match self.component_type {
+            let name = format!("{config_ty}_desc").to_uppercase();
+            let id = Ident::new(&name, Span::call_site());
+            match self.component_type {
                 ComponentType::EnrichmentTable => {
-                    parse_quote! { ::vector_config::component::EnrichmentTableDescription }
+                    quote! {
+                        #[linkme::distributed_slice(vector_config::component::ENRICHMENT_TABLES)]
+                        static #id: ::vector_config::component::EnrichmentTableDescription = ::vector_config::component::EnrichmentTableDescription::new::<#config_ty>(#component_name);
+                    }
                 }
                 ComponentType::Provider => {
-                    parse_quote! { ::vector_config::component::ProviderDescription }
+                    quote! {
+                        #[linkme::distributed_slice(vector_config::component::PROVIDERS)]
+                        static #id: ::vector_config::component::ProviderDescription = ::vector_config::component::ProviderDescription::new::<#config_ty>(#component_name);
+                    }
                 }
                 ComponentType::Secrets => {
-                    parse_quote! { ::vector_config::component::SecretsDescription }
+                    quote! {
+                        #[linkme::distributed_slice(vector_config::component::SECRETS)]
+                        static #id: ::vector_config::component::SecretsDescription = ::vector_config::component::SecretsDescription::new::<#config_ty>(#component_name);
+                    }
                 }
-                ComponentType::Sink => parse_quote! { ::vector_config::component::SinkDescription },
+                ComponentType::Sink => {
+                    quote! {
+                        #[linkme::distributed_slice(vector_config::component::SINKS)]
+                        static #id: ::vector_config::component::SinkDescription = ::vector_config::component::SinkDescription::new::<#config_ty>(#component_name);
+                    }
+                }
                 ComponentType::Source => {
-                    parse_quote! { ::vector_config::component::SourceDescription }
+                    quote! {
+                        #[linkme::distributed_slice(vector_config::component::SOURCES)]
+                        static #id: ::vector_config::component::SourceDescription = ::vector_config::component::SourceDescription::new::<#config_ty>(#component_name);
+                    }
                 }
                 ComponentType::Transform => {
-                    parse_quote! { ::vector_config::component::TransformDescription }
-                }
-            };
-
-            quote! {
-                ::inventory::submit! {
-                    #desc_ty::new::<#config_ty>(#component_name)
+                    quote! {
+                        #[linkme::distributed_slice(vector_config::component::TRANSFORMS)]
+                        static #id: ::vector_config::component::TransformDescription = ::vector_config::component::TransformDescription::new::<#config_ty>(#component_name);
+                    }
                 }
             }
         })
