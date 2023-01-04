@@ -151,5 +151,5 @@ components: sinks: splunk_hec_metrics: {
 				If Splunk recieves a tag with multiple values it will only take the last value specified,
 				so Vector only sends this last value.
 				"""
-		}	}
+		}}
 }
