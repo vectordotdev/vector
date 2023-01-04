@@ -397,6 +397,7 @@ struct TopologyController {
     topology: RunningTopology,
     config_paths: Vec<config::ConfigPath>,
     require_healthy: Option<bool>,
+    #[cfg(feature = "enterprise")]
     enterprise_reporter: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
     api_server: Option<api::Server>,
 }
@@ -458,8 +459,8 @@ impl TopologyController {
         None
     }
 
-    fn sources_finished(&self) -> BoxFuture<'static, ()> {
-        self.topology.sources_finished()
+    async fn sources_finished(&self) {
+        self.topology.sources_finished().await;
     }
 
     async fn stop(self) {
