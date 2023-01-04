@@ -21,7 +21,7 @@ base: components: sources: opentelemetry: configuration: {
 	}
 	grpc: {
 		description: "Configuration for the `opentelemetry` gRPC server."
-		required:    true
+		required:    false
 		type: object: options: {
 			address: {
 				description: """
@@ -29,8 +29,11 @@ base: components: sources: opentelemetry: configuration: {
 
 					It _must_ include a port.
 					"""
-				required: true
-				type: string: examples: ["0.0.0.0:4317", "localhost:4317"]
+				required: false
+				type: string: {
+					default: "0.0.0.0:4317"
+					examples: ["localhost:4317"]
+				}
 			}
 			tls: {
 				description: "Configures the TLS options for incoming/outgoing connections."
@@ -131,7 +134,7 @@ base: components: sources: opentelemetry: configuration: {
 	}
 	http: {
 		description: "Configuration for the `opentelemetry` HTTP server."
-		required:    true
+		required:    false
 		type: object: options: {
 			address: {
 				description: """
@@ -139,8 +142,11 @@ base: components: sources: opentelemetry: configuration: {
 
 					It _must_ include a port.
 					"""
-				required: true
-				type: string: examples: ["0.0.0.0:4318", "localhost:4318"]
+				required: false
+				type: string: {
+					default: "0.0.0.0:4318"
+					examples: ["localhost:4318"]
+				}
 			}
 			tls: {
 				description: "Configures the TLS options for incoming/outgoing connections."

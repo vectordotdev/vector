@@ -52,6 +52,7 @@ pub struct OpentelemetryConfig {
     grpc: GrpcConfig,
 
     #[configurable(derived)]
+    #[serde(default = "default_http_config")]
     http: HttpConfig,
 
     #[configurable(derived)]
@@ -67,12 +68,12 @@ pub struct OpentelemetryConfig {
 /// Configuration for the `opentelemetry` gRPC server.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(default = "default_grpc_config")]
 #[serde(deny_unknown_fields)]
 struct GrpcConfig {
     /// The address to listen for connections on.
     ///
     /// It _must_ include a port.
-    #[configurable(metadata(docs::examples = "0.0.0.0:4317"))]
     #[configurable(metadata(docs::examples = "localhost:4317"))]
     address: SocketAddr,
 
@@ -84,12 +85,12 @@ struct GrpcConfig {
 /// Configuration for the `opentelemetry` HTTP server.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(default = "default_http_config")]
 #[serde(deny_unknown_fields)]
 struct HttpConfig {
     /// The address to listen for connections on.
     ///
     /// It _must_ include a port.
-    #[configurable(metadata(docs::examples = "0.0.0.0:4318"))]
     #[configurable(metadata(docs::examples = "localhost:4318"))]
     address: SocketAddr,
 
@@ -98,17 +99,25 @@ struct HttpConfig {
     tls: Option<TlsEnableableConfig>,
 }
 
+fn default_grpc_config() -> GrpcConfig {
+    GrpcConfig {
+        address: "0.0.0.0:4317".parse().unwrap(),
+        tls: None,
+    }
+}
+
+fn default_http_config() -> HttpConfig {
+    HttpConfig {
+        address: "0.0.0.0:4318".parse().unwrap(),
+        tls: None,
+    }
+}
+
 impl GenerateConfig for OpentelemetryConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            grpc: GrpcConfig {
-                address: "0.0.0.0:4317".parse().unwrap(),
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: "0.0.0.0:4318".parse().unwrap(),
-                tls: Default::default(),
-            },
+            grpc: default_grpc_config(),
+            http: default_http_config(),
             acknowledgements: Default::default(),
             log_namespace: None,
         })
