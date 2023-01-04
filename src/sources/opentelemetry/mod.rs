@@ -49,11 +49,9 @@ pub const LOGS: &str = "logs";
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
     #[configurable(derived)]
-    #[serde(default)]
     grpc: GrpcConfig,
 
     #[configurable(derived)]
-    #[serde(default)]
     http: HttpConfig,
 
     #[configurable(derived)]
@@ -68,12 +66,14 @@ pub struct OpentelemetryConfig {
 
 /// Configuration for the `opentelemetry` gRPC server.
 #[configurable_component]
+#[configurable(metadata(docs::examples = "Self::default()"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct GrpcConfig {
     /// The address to listen for connections on.
     ///
     /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:4317"))]
     #[configurable(metadata(docs::examples = "localhost:4317"))]
     address: SocketAddr,
 
@@ -93,12 +93,14 @@ impl Default for GrpcConfig {
 
 /// Configuration for the `opentelemetry` HTTP server.
 #[configurable_component]
+#[configurable(metadata(docs::examples = "Self::default()"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct HttpConfig {
     /// The address to listen for connections on.
     ///
     /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:4318"))]
     #[configurable(metadata(docs::examples = "localhost:4318"))]
     address: SocketAddr,
 
