@@ -34,9 +34,11 @@ use vector_core::config::LogNamespace;
 #[derive(Clone, Debug)]
 pub struct ApacheMetricsConfig {
     /// The list of `mod_status` endpoints to scrape metrics from.
+    #[configurable(metadata(docs::examples = "http://localhost:8080/server-status/?auto"))]
     endpoints: Vec<String>,
 
     /// The interval between scrapes, in seconds.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 
