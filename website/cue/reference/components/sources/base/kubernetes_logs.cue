@@ -119,7 +119,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			processed by the `kubernetes_logs` source.
 			"""
 		required: false
-		type: string: examples: ["ingest_timestamp"]
+		type: string: examples: [".ingest_timestamp"]
 	}
 	kube_config_file: {
 		description: """

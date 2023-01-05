@@ -28,8 +28,7 @@ use kube::{
     Client, Config as ClientConfig,
 };
 use lifecycle::Lifecycle;
-use lookup::lookup_v2::OptionalValuePath;
-use lookup::{owned_value_path, path, OwnedValuePath};
+use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use serde_with::serde_as;
 use value::{kind::Collection, Kind};
 use vector_common::{
@@ -185,9 +184,8 @@ pub struct Config {
     /// This is useful to compute the latency between important event processing
     /// stages. For example, the time delta between when a log line was written and when it was
     /// processed by the `kubernetes_logs` source.
-    // TODO: Update to Option<OptionalValuePath>
     #[configurable(metadata(docs::examples = ".ingest_timestamp"))]
-    ingestion_timestamp_field: Option<OptionalValuePath>,
+    ingestion_timestamp_field: Option<OptionalTargetPath>,
 
     /// The default time zone for timestamps without an explicit zone.
     timezone: Option<TimeZone>,
@@ -488,7 +486,7 @@ struct Source {
     max_line_bytes: usize,
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
-    ingestion_timestamp_field: Option<OwnedValuePath>,
+    ingestion_timestamp_field: Option<OwnedTargetPath>,
     delay_deletion: Duration,
 }
 
@@ -838,7 +836,7 @@ impl Source {
 fn create_event(
     line: Bytes,
     file: &str,
-    ingestion_timestamp_field: Option<&OwnedValuePath>,
+    ingestion_timestamp_field: Option<&OwnedTargetPath>,
     log_namespace: LogNamespace,
 ) -> Event {
     let deserializer = BytesDeserializer::new();
