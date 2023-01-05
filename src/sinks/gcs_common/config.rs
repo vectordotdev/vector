@@ -124,7 +124,6 @@ pub fn build_healthcheck(
     Ok(healthcheck.boxed())
 }
 
-// Use this to map a healthcheck response, as it handles setting up the renewal task.
 pub fn healthcheck_response(
     response: http::Response<hyper::Body>,
     not_found_error: crate::Error,
