@@ -37,6 +37,11 @@ pub struct DemoLogsConfig {
     /// `interval` to `0.0`.
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
+    #[configurable(metadata(
+        docs::examples = "1.0",
+        docs::examples = "0.1",
+        docs::examples = "0.01",
+    ))]
     pub interval: f64,
 
     /// The total number of lines to output.
@@ -88,6 +93,7 @@ pub enum OutputFormat {
         #[serde(default)]
         sequence: bool,
         /// The list of lines to output.
+        #[configurable(metadata(docs::examples = r#"["line1", "line2"]"#))]
         lines: Vec<String>,
     },
 
