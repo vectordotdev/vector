@@ -36,12 +36,12 @@ impl Cli {
 
         let mut env_vars = BTreeMap::new();
         if let Some(configured_env_vars) = &config.env {
-            env_vars.extend(configured_env_vars.to_owned());
+            env_vars.extend(configured_env_vars.clone());
         }
 
-        let mut args = Vec::from_iter(config.args.to_owned());
+        let mut args = Vec::from_iter(config.args.clone());
         if let Some(configured_args) = &self.args {
-            args.extend(configured_args.to_owned());
+            args.extend(configured_args.clone());
         }
 
         if let Some(environment) = &self.environment {

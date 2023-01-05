@@ -30,7 +30,7 @@ impl Cli {
             }
             entries.sort();
 
-            for integration in entries.iter() {
+            for integration in &entries {
                 display!("{integration}");
             }
 

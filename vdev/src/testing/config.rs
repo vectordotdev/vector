@@ -5,7 +5,6 @@ use itertools::{self, Itertools};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;
-use std::iter;
 use std::path::{Path, PathBuf};
 
 const FILE_NAME: &str = "test.yaml";
@@ -56,11 +55,11 @@ impl IntegrationTestConfig {
     pub fn environments(&self) -> LinkedHashMap<String, LinkedHashMap<String, String>> {
         let mut environments = LinkedHashMap::new();
 
-        for matrix in self.matrix.iter() {
+        for matrix in &self.matrix {
             for product in matrix.values().multi_cartesian_product() {
                 let mut config = LinkedHashMap::new();
-                for (variable, value) in iter::zip(matrix.keys(), product.iter()) {
-                    config.insert(variable.to_string(), value.to_string());
+                for (variable, &value) in matrix.keys().zip(product.iter()) {
+                    config.insert(variable.clone(), value.clone());
                 }
 
                 environments.insert(product.iter().join("-"), config);

@@ -3,7 +3,7 @@ use clap::Args;
 use std::collections::BTreeMap;
 
 use crate::app;
-use crate::testing::{config::RustToolchainConfig, runner::*};
+use crate::testing::{config::RustToolchainConfig, runner::get_agent_test_runner};
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -39,7 +39,7 @@ impl Cli {
 
         let mut args = vec!["--workspace".to_string()];
         if let Some(extra_args) = &self.args {
-            args.extend(extra_args.to_owned());
+            args.extend(extra_args.clone());
 
             if !(self.container || extra_args.contains(&"--features".to_string())) {
                 if cfg!(windows) {

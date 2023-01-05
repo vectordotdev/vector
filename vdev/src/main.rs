@@ -1,3 +1,11 @@
+#![deny(clippy::pedantic)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::unused_self,
+    clippy::wildcard_imports,
+    clippy::unnecessary_wraps
+)]
+
 #[macro_use]
 mod macros;
 mod app;
@@ -19,13 +27,13 @@ fn main() -> Result<()> {
     app::set_global_verbosity(cli.verbose.log_level_filter());
     app::set_global_config(config::load()?);
 
-    let path = if !app::config().repo.is_empty() {
-        app::config().repo.to_string()
-    } else {
+    let path = if app::config().repo.is_empty() {
         match env::current_dir() {
             Ok(p) => p.display().to_string(),
             Err(_) => ".".to_string(),
         }
+    } else {
+        app::config().repo.to_string()
     };
     app::set_global_path(path);
 

@@ -62,10 +62,10 @@ pub fn read_env_config(envs_dir: &Path, environment: &str) -> Result<String> {
 }
 
 pub fn remove_env(envs_dir: &Path, environment: &str) -> Result<()> {
-    let env_dir = envs_dir.join(environment);
-    if env_dir.is_dir() {
-        fs::remove_dir_all(&env_dir)
-            .with_context(|| format!("failed to remove directory {}", env_dir.display()))?;
+    let env_path = envs_dir.join(environment);
+    if env_path.is_dir() {
+        fs::remove_dir_all(&env_path)
+            .with_context(|| format!("failed to remove directory {env_path:?}"))?;
     }
 
     Ok(())

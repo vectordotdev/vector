@@ -49,8 +49,11 @@ impl CommandExt for Command {
         } else {
             bail!(
                 "command: {} {}\nfailed with exit code: {}",
-                self.get_program().to_str().unwrap(),
-                Vec::from_iter(self.get_args().map(|arg| arg.to_str().unwrap())).join(" "),
+                self.get_program().to_str().expect("Invalid program name"),
+                self.get_args()
+                    .map(|arg| arg.to_str().expect("Invalid command argument"))
+                    .collect::<Vec<_>>()
+                    .join(" "),
                 status.code().unwrap()
             )
         }
@@ -92,13 +95,13 @@ fn get_progress_bar() -> Result<ProgressBar> {
 }
 
 pub fn set_global_verbosity(verbosity: LevelFilter) {
-    VERBOSITY.set(verbosity).expect("could not set verbosity")
+    VERBOSITY.set(verbosity).expect("could not set verbosity");
 }
 
 pub fn set_global_config(config: Config) {
-    CONFIG.set(config).expect("could not set config")
+    CONFIG.set(config).expect("could not set config");
 }
 
 pub fn set_global_path(path: String) {
-    PATH.set(path).expect("could not set path")
+    PATH.set(path).expect("could not set path");
 }

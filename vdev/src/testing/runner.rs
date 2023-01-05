@@ -70,22 +70,16 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
 
         for line in command.capture_output()?.lines() {
             if let Some((name, state)) = line.split_once(' ') {
-                if name != self.container_name() {
-                    continue;
-                } else if state == "created" {
-                    return Ok(RunnerState::Created);
-                } else if state == "dead" {
-                    return Ok(RunnerState::Dead);
-                } else if state == "exited" {
-                    return Ok(RunnerState::Exited);
-                } else if state == "paused" {
-                    return Ok(RunnerState::Paused);
-                } else if state == "restarting" {
-                    return Ok(RunnerState::Restarting);
-                } else if state == "running" {
-                    return Ok(RunnerState::Running);
-                } else {
-                    return Ok(RunnerState::Unknown);
+                if name == self.container_name() {
+                    return Ok(match state {
+                        "created" => RunnerState::Created,
+                        "dead" => RunnerState::Dead,
+                        "exited" => RunnerState::Exited,
+                        "paused" => RunnerState::Paused,
+                        "restarting" => RunnerState::Restarting,
+                        "running" => RunnerState::Running,
+                        _ => RunnerState::Unknown,
+                    });
                 }
             }
         }
