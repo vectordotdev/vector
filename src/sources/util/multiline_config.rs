@@ -27,6 +27,7 @@ pub struct MultilineConfig {
     /// The maximum amount of time to wait for the next additional line, in milliseconds.
     ///
     /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
+    // TODO: Duration?
     pub timeout_ms: u64,
 }
 

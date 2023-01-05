@@ -75,10 +75,13 @@ pub enum AwsAuthentication {
 
     /// Assume the given role ARN.
     Role {
-        /// The ARN of the role to assume.
+        /// The ARN of an [IAM role][iam_role] to assume.
+        ///
+        /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
         assume_role: String,
 
         /// Timeout for assuming the role, in seconds.
+        // TODO: Duration?
         load_timeout_secs: Option<u64>,
 
         /// Configuration for authenticating with AWS through IMDS.
@@ -96,6 +99,7 @@ pub enum AwsAuthentication {
     #[derivative(Default)]
     Default {
         /// Timeout for successfully loading any credentials, in seconds.
+        // TODO: Duration?
         load_timeout_secs: Option<u64>,
 
         /// Configuration for authenticating with AWS through IMDS.

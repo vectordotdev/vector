@@ -62,6 +62,7 @@ pub(super) struct Config {
     /// Generally should not be changed unless instructed to do so, as if messages are available, they will always be
     /// consumed, regardless of the value of `poll_secs`.
     // NOTE: We restrict this to u32 for safe conversion to i64 later.
+    // TODO: Duration?
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
     pub(super) poll_secs: u32,
@@ -73,6 +74,7 @@ pub(super) struct Config {
     ///
     /// This can happen if there is an issue between consuming a message and deleting it.
     // NOTE: We restrict this to u32 for safe conversion to i64 later.
+    // TODO: Duration?
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     pub(super) visibility_timeout_secs: u32,

@@ -38,7 +38,11 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				type: string: {}
 			}
 			assume_role: {
-				description:   "The ARN of the role to assume."
+				description: """
+					The ARN of an [IAM role][iam_role] to assume.
+
+					[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+					"""
 				relevant_when: "strategy = \"aws\""
 				required:      true
 				type: string: {}
