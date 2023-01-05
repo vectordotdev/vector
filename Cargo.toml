@@ -10,7 +10,7 @@ readme = "README.md"
 publish = false
 default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
-rust-version = "1.64.0"
+rust-version = "1.66.0"
 
 [[bin]]
 name = "vector"
@@ -33,9 +33,6 @@ name = "secret-backend-example"
 path = "src/config/loading/secret_backend_example.rs"
 test = false
 bench = false
-
-[profile.dev]
-split-debuginfo = "unpacked" # Faster debug builds on macOS
 
 # CI-based builds use full release optimization.  See scripts/environment/release-flags.sh.
 # This results in roughly a 5% reduction in performance when compiling locally vs when

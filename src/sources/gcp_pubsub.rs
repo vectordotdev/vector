@@ -1041,7 +1041,7 @@ mod integration_tests {
             let lines: Vec<_> = test_util::random_lines(44).take(count).collect();
             let messages: Vec<_> = lines
                 .iter()
-                .map(|message| base64::encode(&message))
+                .map(base64::encode)
                 .map(|data| json!({ "data": data, "attributes": attributes.clone() }))
                 .collect();
             let body = json!({ "messages": messages });

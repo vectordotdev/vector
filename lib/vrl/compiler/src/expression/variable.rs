@@ -135,7 +135,7 @@ impl DiagnosticMessage for Error {
                     {
                         let guessed = &idents[idx];
                         vec.push(Label::context(
-                            format!(r#"did you mean "{}"?"#, guessed),
+                            format!(r#"did you mean "{guessed}"?"#),
                             self.span,
                         ));
                     }

@@ -82,12 +82,12 @@ fn insert_unknown(
     insert_kind(&mut unknown_tree, &unknown, unknown_exact);
     if unknown.is_exact() {
         tree.insert(
-            format!("{}_unknown_exact", prefix),
+            format!("{prefix}_unknown_exact"),
             Value::Object(unknown_tree),
         );
     } else {
         tree.insert(
-            format!("{}_unknown_infinite", prefix),
+            format!("{prefix}_unknown_infinite"),
             Value::Object(unknown_tree),
         );
     }
