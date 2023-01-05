@@ -22,8 +22,7 @@ use value::{kind::Collection, Kind};
 use vector_common::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::LogNamespace,
-    config::{log_schema, LegacyKey},
+    config::{log_schema, LegacyKey, LogNamespace},
     schema::Definition,
 };
 
