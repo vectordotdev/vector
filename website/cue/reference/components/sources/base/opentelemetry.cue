@@ -25,7 +25,6 @@ base: components: sources: opentelemetry: configuration: {
 		type: object: {
 			examples: [{
 				address: "0.0.0.0:4317"
-				tls:     null
 			}]
 			options: {
 				address: {
@@ -141,7 +140,6 @@ base: components: sources: opentelemetry: configuration: {
 		type: object: {
 			examples: [{
 				address: "0.0.0.0:4318"
-				tls:     null
 			}]
 			options: {
 				address: {
