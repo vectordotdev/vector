@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::Args;
 use std::collections::BTreeMap;
 
-use crate::app;
 use crate::testing::{config::RustToolchainConfig, runner::get_agent_test_runner};
 
 /// Execute tests
@@ -23,7 +22,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let toolchain_config = RustToolchainConfig::parse(app::path())?;
+        let toolchain_config = RustToolchainConfig::parse()?;
         let runner = get_agent_test_runner(self.container, toolchain_config.channel);
 
         let mut env_vars = BTreeMap::new();

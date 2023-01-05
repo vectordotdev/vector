@@ -17,6 +17,7 @@ pub fn data_dir() -> PathBuf {
     _project_dirs().data_local_dir().to_path_buf()
 }
 
+#[once]
 pub fn default_target() -> String {
     if cfg!(windows) {
         format!("{}-pc-windows-msvc", ARCH)

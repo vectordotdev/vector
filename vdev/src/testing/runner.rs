@@ -5,6 +5,7 @@ use std::process::Command;
 use anyhow::Result;
 use atty::Stream;
 
+use super::config::RustToolchainConfig;
 use crate::app::{self, CommandExt as _};
 
 pub const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
@@ -209,11 +210,12 @@ pub struct IntegrationTestRunner {
 }
 
 impl IntegrationTestRunner {
-    pub fn new(integration: String, rust_version: String) -> Self {
-        Self {
+    pub fn new(integration: String) -> Result<Self> {
+        let rust_version = RustToolchainConfig::parse()?.channel;
+        Ok(Self {
             integration,
             rust_version,
-        }
+        })
     }
 
     pub fn ensure_network(&self) -> Result<()> {

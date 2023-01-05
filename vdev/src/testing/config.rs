@@ -1,11 +1,13 @@
 use anyhow::{bail, Context, Result};
-use cached::proc_macro::cached;
 use hashlink::LinkedHashMap;
 use itertools::{self, Itertools};
 use serde::Deserialize;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use crate::app;
 
 const FILE_NAME: &str = "test.yaml";
 
@@ -20,7 +22,8 @@ pub struct RustToolchainConfig {
 }
 
 impl RustToolchainConfig {
-    pub fn parse(repo_path: &str) -> Result<Self> {
+    pub fn parse() -> Result<Self> {
+        let repo_path = app::path();
         let config_file: PathBuf = [repo_path, "rust-toolchain.toml"].iter().collect();
         let contents = fs::read_to_string(&config_file)
             .with_context(|| format!("failed to read {}", config_file.display()))?;
@@ -69,19 +72,16 @@ impl IntegrationTestConfig {
         environments
     }
 
-    pub fn locate_source(root: &str, integration: &str) -> Result<PathBuf> {
-        let test_dir: PathBuf = [root, "scripts", "integration", integration]
+    pub fn load(integration: &str) -> Result<(PathBuf, Self)> {
+        let test_dir: PathBuf = [app::path(), "scripts", "integration", integration]
             .iter()
             .collect();
         if !test_dir.is_dir() {
             bail!("unknown integration: {}", integration);
         }
 
-        Ok(test_dir)
-    }
-
-    pub fn from_source(test_dir: &Path) -> Result<Self> {
-        parse_integration_test_config_file(test_dir.join(FILE_NAME))
+        let config = Self::parse_file(&test_dir.join(FILE_NAME))?;
+        Ok((test_dir, config))
     }
 
     #[allow(dead_code)]
@@ -95,15 +95,10 @@ impl IntegrationTestConfig {
             }
 
             let config_file: PathBuf = [entry.path().to_str().unwrap(), FILE_NAME].iter().collect();
-            let config = parse_integration_test_config_file(config_file)?;
+            let config = Self::parse_file(&config_file)?;
             configs.insert(entry.file_name().into_string().unwrap(), config);
         }
 
         Ok(configs)
     }
-}
-
-#[cached(result = true)]
-fn parse_integration_test_config_file(config_file: PathBuf) -> Result<IntegrationTestConfig> {
-    IntegrationTestConfig::parse_file(&config_file)
 }

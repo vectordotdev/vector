@@ -1,14 +1,10 @@
-use anyhow::{bail, Result};
-use clap::Args;
 use std::process::Command;
 
-use crate::app::{self, CommandExt as _};
-use crate::platform;
-use crate::testing::{
-    config::{IntegrationTestConfig, RustToolchainConfig},
-    runner::*,
-    state,
-};
+use anyhow::{bail, Result};
+use clap::Args;
+
+use crate::app::CommandExt as _;
+use crate::testing::{config::IntegrationTestConfig, runner::*, state};
 
 /// Start an environment
 #[derive(Args, Debug)]
@@ -23,13 +19,10 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let test_dir = IntegrationTestConfig::locate_source(app::path(), &self.integration)?;
+        let (test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
 
-        let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration);
-        let config = IntegrationTestConfig::from_source(&test_dir)?;
-        let toolchain_config = RustToolchainConfig::parse(app::path())?;
-        let runner =
-            IntegrationTestRunner::new(self.integration.to_string(), toolchain_config.channel);
+        let envs_dir = state::envs_dir(&self.integration);
+        let runner = IntegrationTestRunner::new(self.integration)?;
         runner.ensure_network()?;
 
         let mut command = Command::new("cargo");

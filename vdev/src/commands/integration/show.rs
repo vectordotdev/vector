@@ -3,7 +3,6 @@ use clap::Args;
 use std::path::PathBuf;
 
 use crate::app;
-use crate::platform;
 use crate::testing::{config::IntegrationTestConfig, state};
 
 /// Show information about integrations
@@ -36,9 +35,8 @@ impl Cli {
                 }
             }
             Some(integration) => {
-                let test_dir = IntegrationTestConfig::locate_source(app::path(), &integration)?;
-                let config = IntegrationTestConfig::from_source(&test_dir)?;
-                let envs_dir = state::envs_dir(&platform::data_dir(), &integration);
+                let (_test_dir, config) = IntegrationTestConfig::load(&integration)?;
+                let envs_dir = state::envs_dir(&integration);
                 let active_envs = state::active_envs(&envs_dir)?;
 
                 display!("Test args: {}", config.args.join(" "));

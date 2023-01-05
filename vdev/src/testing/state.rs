@@ -1,13 +1,16 @@
-use anyhow::{Context, Result};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use anyhow::{Context, Result};
+
+use crate::platform;
+
 const CONFIG_FILE: &str = "config.json";
 
-pub fn envs_dir(data_dir: &Path, integration: &str) -> PathBuf {
+pub fn envs_dir(integration: &str) -> PathBuf {
     [
-        data_dir,
+        &platform::data_dir(),
         Path::new("integration/envs"),
         Path::new(integration),
     ]
