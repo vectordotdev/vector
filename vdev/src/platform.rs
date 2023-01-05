@@ -1,29 +1,20 @@
 use cached::proc_macro::once;
 use directories::ProjectDirs;
+
 use std::env::consts::ARCH;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-pub fn canonicalize_path(path: &str) -> String {
-    match dunce::canonicalize(path) {
-        Ok(p) => p.display().to_string(),
-        Err(_) => path.to_string(),
-    }
+pub fn canonicalize_path(path: impl AsRef<Path>) -> String {
+    let path = path.as_ref();
+    dunce::canonicalize(path)
+        .unwrap_or_else(|err| panic!("Could not canonicalize path {path:?}: {err}"))
+        .display()
+        .to_string()
 }
 
-pub fn home() -> PathBuf {
-    match home::home_dir() {
-        Some(path) => path,
-        None => ["~"].iter().collect(),
-    }
-}
-
+#[once]
 pub fn data_dir() -> PathBuf {
-    match _project_dirs() {
-        Some(path) => path.data_local_dir().to_path_buf(),
-        None => [home().to_str().unwrap(), ".local", "vector", "vdev"]
-            .iter()
-            .collect(),
-    }
+    _project_dirs().data_local_dir().to_path_buf()
 }
 
 pub fn default_target() -> String {
@@ -37,6 +28,6 @@ pub fn default_target() -> String {
 }
 
 #[once]
-fn _project_dirs() -> Option<ProjectDirs> {
-    ProjectDirs::from("", "vector", "vdev")
+fn _project_dirs() -> ProjectDirs {
+    ProjectDirs::from("", "vector", "vdev").expect("Could not determine the project directory")
 }

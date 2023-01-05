@@ -28,12 +28,12 @@ fn main() -> Result<()> {
     app::set_global_config(config::load()?);
 
     let path = if app::config().repo.is_empty() {
-        match env::current_dir() {
-            Ok(p) => p.display().to_string(),
-            Err(_) => ".".to_string(),
-        }
+        env::current_dir()
+            .expect("Could not determine current directory")
+            .display()
+            .to_string()
     } else {
-        app::config().repo.to_string()
+        app::config().repo.clone()
     };
     app::set_global_path(path);
 
