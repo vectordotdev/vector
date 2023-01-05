@@ -9061,6 +9061,8 @@ dependencies = [
  "proc-macro2",
  "quote",
  "schemars",
+ "serde",
+ "serde_json",
  "syn",
 ]
 
