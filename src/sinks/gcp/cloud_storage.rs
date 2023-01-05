@@ -231,8 +231,8 @@ impl GcsSinkConfig {
 
         let request_settings = RequestSettings::new(self)?;
 
-        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, protocol);
-
+        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings);
+        
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
