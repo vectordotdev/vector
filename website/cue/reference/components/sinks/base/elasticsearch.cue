@@ -5,7 +5,7 @@ base: components: sinks: elasticsearch: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -363,17 +363,6 @@ base: components: sinks: elasticsearch: configuration: {
 		description: "Configuration for the `metric_to_log` transform."
 		required:    false
 		type: object: options: {
-			enhanced_tags: {
-				description: """
-					Controls if this transform should encode tags using the enhanced encoding of [the
-					`native_json` codec][vector_native_json]?
-
-					If set to `false`, tags will always be encoded as single string values using the last value
-					assigned to the tag.
-					"""
-				required: false
-				type: bool: default: false
-			}
 			host_tag: {
 				description: """
 					Name of the tag in the metric to use for the source host.
@@ -385,6 +374,27 @@ base: components: sinks: elasticsearch: configuration: {
 					"""
 				required: false
 				type: string: examples: ["host", "hostname"]
+			}
+			metric_tag_values: {
+				description: """
+					Controls how metric tag values are encoded.
+
+					When set to `single`, only the last non-bare value of tags will be displayed with the
+					metric.  When set to `full`, all metric tags will be exposed as separate assignments as
+					described by [the `native_json` codec][vector_native_json].
+					"""
+				required: false
+				type: string: {
+					default: "single"
+					enum: {
+						full: "All tags will be exposed as arrays of either string or null values."
+						single: """
+															Tag values will be exposed as single strings, the same as they were before this config
+															option. Tags with multiple values will show the last assigned value, and null values will be
+															ignored.
+															"""
+					}
+				}
 			}
 			timezone: {
 				description: """
@@ -593,7 +603,7 @@ base: components: sinks: elasticsearch: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: {}
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -602,7 +612,7 @@ base: components: sinks: elasticsearch: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -614,7 +624,7 @@ base: components: sinks: elasticsearch: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			key_file: {
 				description: """
@@ -623,7 +633,7 @@ base: components: sinks: elasticsearch: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -632,7 +642,7 @@ base: components: sinks: elasticsearch: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

@@ -52,7 +52,7 @@ async fn sqs_send_message_batch() {
     let config = SqsSinkConfig {
         queue_url: queue_url.clone(),
         region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         message_group_id: None,
         message_deduplication_id: None,
         request: Default::default(),

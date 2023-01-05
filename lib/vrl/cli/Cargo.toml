@@ -11,11 +11,11 @@ name = "vrl"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.0.29", features = ["derive"] }
+clap = { version = "4.0.32", features = ["derive"] }
 exitcode = "1"
-indoc = "1.0.7"
-once_cell = { version = "1.16", optional = true }
-prettytable-rs = { version = "0.9", default-features = false, optional = true }
+indoc = "1.0.8"
+once_cell = { version = "1.17", optional = true }
+prettytable-rs = { version = "0.10", default-features = false, optional = true }
 regex = { version = "1", default-features = false, optional = true, features = ["perf"] }
 rustyline = { version = "10", default-features = false, optional = true }
 serde_json = "1"

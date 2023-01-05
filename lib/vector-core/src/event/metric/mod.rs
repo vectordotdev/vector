@@ -42,9 +42,9 @@ macro_rules! metric_tags {
     ($($key:expr => $value:expr,)+) => { $crate::metric_tags!($($key => $value),+) };
 
     ($($key:expr => $value:expr),*) => {
-        $crate::event::MetricTags::from([
-            $( ($key.into(), $value.into()), )*
-        ])
+        [
+            $( ($key.into(), $crate::event::metric::TagValue::from($value)), )*
+        ].into_iter().collect::<$crate::event::MetricTags>()
     };
 }
 
@@ -382,6 +382,17 @@ impl Metric {
     #[must_use]
     pub fn subtract(&mut self, other: impl AsRef<MetricData>) -> bool {
         self.data.subtract(other.as_ref())
+    }
+
+    /// Reduces all the tag values to their single value, discarding any for which that value would
+    /// be null. If the result is empty, the tag set is dropped.
+    pub fn reduce_tags_to_single(&mut self) {
+        if let Some(tags) = &mut self.series.tags {
+            tags.reduce_to_single();
+            if tags.is_empty() {
+                self.series.tags = None;
+            }
+        }
     }
 }
 

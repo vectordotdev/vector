@@ -41,6 +41,8 @@
           {{ with $v.syntax }}
           {{ if eq . "remap_program" }}
           {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+          {{ else if eq . "template" }}
+          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/configuration/template-syntax/") }}
           {{ else }}
           {{ partial "badge.html" (dict "word" . "color" "gray") }}
           {{ end }}
@@ -1961,6 +1963,8 @@
         {{ with $v.syntax }}
         {{ if eq . "remap_program" }}
         {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+        {{ else if eq . "template" }}
+        {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/configuration/template-syntax/") }}
         {{ else }}
         {{ partial "badge.html" (dict "word" . "color" "gray") }}
         {{ end }}
@@ -1976,6 +1980,14 @@
     <div class="mt-4 prose dark:prose-dark max-w-none leading-snug">
       {{ $v.description | markdownify }}
     </div>
+
+    {{ if eq $v.type.string.syntax "template" }}
+    <div class="mt-4 text-sm">
+      <strong>Note</strong>: This parameter supports Vector's
+      <a href="/docs/reference/configuration/template-syntax">template syntax</a>, which enables you to use
+      dynamic per-event values.
+    </div>
+    {{ end }}
 
     {{ with $v.relevant_when }}
     <div class="mt-2">

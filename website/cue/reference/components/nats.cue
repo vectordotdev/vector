@@ -48,23 +48,6 @@ components: _nats: {
 				examples: ["nats://demo.nats.io", "nats://127.0.0.1:4222"]
 			}
 		}
-		subject: {
-			description: "The NATS subject to publish messages to."
-			required:    true
-			type: string: {
-				examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
-				syntax: "template"
-			}
-		}
-		connection_name: {
-			common:      false
-			description: "A name assigned to the NATS connection."
-			required:    false
-			type: string: {
-				default: "vector"
-				examples: ["foo", "API Name Option Example"]
-			}
-		}
 		auth: {
 			common:      false
 			description: "Configuration for how Vector should authenticate to NATS."

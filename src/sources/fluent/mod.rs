@@ -89,7 +89,8 @@ impl SourceConfig for FluentConfig {
         let tls_client_metadata_key = self
             .tls
             .as_ref()
-            .and_then(|tls| tls.client_metadata_key.clone());
+            .and_then(|tls| tls.client_metadata_key.clone())
+            .and_then(|k| k.path);
         let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
@@ -136,7 +137,7 @@ impl FluentConfig {
             .tls
             .as_ref()
             .and_then(|tls| tls.client_metadata_key.as_ref())
-            .and_then(|x| parse_value_path(x).ok())
+            .and_then(|k| k.path.clone())
             .map(LegacyKey::Overwrite);
 
         // There is a global and per-source `log_namespace` config.
