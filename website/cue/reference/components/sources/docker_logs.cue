@@ -72,14 +72,6 @@ components: sources: docker_logs: {
 		requirements: []
 		warnings: [
 			"""
-			Collecting logs directly from the Docker Engine is known to have
-			performance problems for very large setups. If you have a large
-			setup, please consider alternative collection methods, such as the
-			Docker [`syslog`](\(urls.docker_logging_driver_syslog)) or
-			[Docker `journald` driver](\(urls.docker_logging_driver_journald))
-			drivers.
-			""",
-			"""
 				To avoid collecting logs from itself when deployed as a container,
 				the Docker source uses current hostname to find out which container
 				it is inside. If a container's ID matches the hostname, that container

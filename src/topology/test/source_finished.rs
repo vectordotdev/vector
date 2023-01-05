@@ -20,7 +20,7 @@ async fn sources_finished() {
         &["in"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             acknowledgements: Default::default(),
         },
     );

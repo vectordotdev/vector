@@ -16,6 +16,7 @@
   - [Unit tests](#unit-tests)
   - [Integration tests](#integration-tests)
   - [Blackbox tests](#blackbox-tests)
+  - [Property tests](#property-tests)
   - [Tips and tricks](#tips-and-tricks)
     - [Faster builds With `sccache`](#faster-builds-with-sccache)
     - [Testing specific components](#testing-specific-components)
@@ -347,6 +348,10 @@ environments. It is typically used for benchmarking, but also correctness
 testing.
 
 You can run these tests within a PR as described in the [CI section](CONTRIBUTING.md).
+
+### Property tests
+
+Vector prefers the use of [Proptest](https://github.com/proptest-rs/proptest) for any property tests.
 
 ### Tips and tricks
 

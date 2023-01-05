@@ -46,7 +46,7 @@ async fn firehose_put_records() {
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
         region: region.clone(),
-        encoding: JsonSerializerConfig::new().into(), // required for ES destination w/ localstack
+        encoding: JsonSerializerConfig::default().into(), // required for ES destination w/ localstack
         compression: Compression::None,
         request: TowerRequestConfig {
             timeout_secs: Some(10),

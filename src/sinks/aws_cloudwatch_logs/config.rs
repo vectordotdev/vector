@@ -201,7 +201,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(default_config(JsonSerializerConfig::new().into())).unwrap()
+        toml::Value::try_from(default_config(JsonSerializerConfig::default().into())).unwrap()
     }
 }
 

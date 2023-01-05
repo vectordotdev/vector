@@ -53,7 +53,7 @@ pub fn build_unix_stream_source(
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
         change_socket_permissions(&listen_path, socket_file_mode)
-            .expect("Failed to set socket permssions");
+            .expect("Failed to set socket permissions");
 
         let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
 

@@ -53,7 +53,7 @@ impl GenerateConfig for WebSocketSinkConfig {
         toml::Value::try_from(Self {
             uri: "ws://127.0.0.1:9000/endpoint".into(),
             tls: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),

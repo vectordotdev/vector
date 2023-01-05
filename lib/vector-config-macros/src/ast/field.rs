@@ -1,14 +1,14 @@
 use darling::{util::Flag, FromAttributes};
 use serde_derive_internals::ast as serde_ast;
 use syn::{parse_quote, spanned::Spanned, ExprPath, Ident};
-use vector_config_common::{attributes::CustomAttribute, validation::Validation};
+use vector_config_common::validation::Validation;
 
 use super::{
     util::{
         err_field_missing_description, find_delegated_serde_deser_ty, get_serde_default_value,
         try_extract_doc_title_description,
     },
-    Metadata,
+    LazyCustomAttribute, Metadata,
 };
 
 /// A field of a container.
@@ -207,7 +207,7 @@ impl<'a> Field<'a> {
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
     /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
     /// metadata to be attached directly to fields.
-    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+    pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
         self.attrs
             .metadata
             .clone()
