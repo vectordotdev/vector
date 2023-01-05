@@ -39,19 +39,33 @@ components: sources: nats: {
 	}
 
 	configuration: components._nats.configuration & {
+		connection_name: {
+			description: "A name assigned to the NATS connection."
+			required:    true
+			type: string: {
+				examples: ["foo", "API Name Option Example"]
+			}
+		}
 		queue: {
 			common:      false
-			description: "NATS Queue Group to join"
+			description: "NATS Queue Group to join."
 			required:    false
 			type: string: {
 				default: "vector"
 				examples: ["foo", "API Name Option Example"]
 			}
 		}
+		subject: {
+			description: "The NATS subject to pull messages from."
+			required:    true
+			type: string: {
+				examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
+			}
+		}
 	}
 
 	output: logs: record: {
-		description: "An individual NATS record"
+		description: "An individual NATS record."
 		fields: {
 			message: {
 				description: "The raw line from the NATS message."

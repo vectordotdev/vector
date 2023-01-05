@@ -74,7 +74,7 @@ impl GenerateConfig for FileSinkConfig {
         toml::Value::try_from(Self {
             path: Template::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout_secs: None,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Default::default(),
             acknowledgements: Default::default(),
         })
@@ -432,7 +432,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
@@ -454,7 +454,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
         };
@@ -476,7 +476,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Zstd,
             acknowledgements: Default::default(),
         };
@@ -503,7 +503,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
@@ -580,7 +580,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: Some(1),
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };

@@ -51,8 +51,7 @@ pub struct NatsSourceConfig {
     #[serde(alias = "name")]
     connection_name: String,
 
-    /// The NATS subject to publish messages to.
-    #[configurable(metadata(docs::templateable))]
+    /// The NATS subject to pull messages from.
     subject: String,
 
     /// NATS Queue Group to join.

@@ -225,9 +225,9 @@ base: components: sources: nats: configuration: {
 		type: string: {}
 	}
 	subject: {
-		description: "The NATS subject to publish messages to."
+		description: "The NATS subject to pull messages from."
 		required:    true
-		type: string: syntax: "template"
+		type: string: {}
 	}
 	subject_key_field: {
 		description: "The `NATS` subject key."

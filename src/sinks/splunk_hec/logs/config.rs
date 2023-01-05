@@ -135,7 +135,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),

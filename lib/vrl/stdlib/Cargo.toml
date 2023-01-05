@@ -31,7 +31,7 @@ indexmap = { version = "~1.9.2", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.2", optional = true }
-once_cell = { version = "1.16", optional = true }
+once_cell = { version = "1.17", optional = true }
 quoted_printable = {version = "0.4.6", optional = true }
 rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }

@@ -193,7 +193,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializer};
+    use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializerConfig};
     use tokio::net::UnixListener;
 
     use super::*;
@@ -216,7 +216,7 @@ mod tests {
         assert!(UnixSinkConfig::new(good_path)
             .build(
                 Default::default(),
-                Encoder::<()>::new(TextSerializer::new().into())
+                Encoder::<()>::new(TextSerializerConfig::default().build().into())
             )
             .unwrap()
             .1
@@ -227,7 +227,7 @@ mod tests {
         assert!(UnixSinkConfig::new(bad_path)
             .build(
                 Default::default(),
-                Encoder::<()>::new(TextSerializer::new().into())
+                Encoder::<()>::new(TextSerializerConfig::default().build().into())
             )
             .unwrap()
             .1
@@ -250,7 +250,7 @@ mod tests {
                 Default::default(),
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::new().into(),
-                    TextSerializer::new().into(),
+                    TextSerializerConfig::default().build().into(),
                 ),
             )
             .unwrap();
