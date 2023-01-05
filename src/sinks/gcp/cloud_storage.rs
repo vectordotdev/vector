@@ -230,7 +230,7 @@ impl GcsSinkConfig {
             .service(GcsService::new(client, base_url, auth));
 
         let request_settings = RequestSettings::new(self)?;
-        
+
         let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, protocol);
 
         Ok(VectorSink::from_event_streamsink(sink))
