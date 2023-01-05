@@ -70,10 +70,12 @@ pub use self::message_decoding::decode_message;
 /// Thus Vector expects only one colon character to be present per chunk, so the find()
 /// operation locating the first position is sufficient.
 #[cfg(any(feature = "sources-statsd", feature = "sources-datadog_agent"))]
-pub fn extract_tag_key_and_value(
-    tag_chunk: &str,
+pub fn extract_tag_key_and_value<S: AsRef<str>>(
+    tag_chunk: S,
 ) -> (String, vector_core::event::metric::TagValue) {
     use vector_core::event::metric::TagValue;
+
+    let tag_chunk = tag_chunk.as_ref();
 
     // tag_chunk is expected to be formatted as "tag_name:tag_value"
     // If no colon is found, then it is classified as a Bare tag.

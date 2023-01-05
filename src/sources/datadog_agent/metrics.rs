@@ -377,9 +377,7 @@ fn decode_datadog_series_v1(
 }
 
 fn into_metric_tags(tags: Vec<String>) -> MetricTags {
-    tags.iter()
-        .map(|tag_chunk| extract_tag_key_and_value(tag_chunk))
-        .collect()
+    tags.iter().map(extract_tag_key_and_value).collect()
 }
 
 fn into_vector_metric(

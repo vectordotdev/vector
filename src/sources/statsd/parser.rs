@@ -136,7 +136,7 @@ fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
 
     Ok(input[1..]
         .split(',')
-        .map(|tag_chunk| extract_tag_key_and_value(tag_chunk))
+        .map(extract_tag_key_and_value)
         .collect())
 }
 
