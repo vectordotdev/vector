@@ -37,11 +37,7 @@ pub struct DemoLogsConfig {
     /// `interval` to `0.0`.
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
-    #[configurable(metadata(
-        docs::examples = "1.0",
-        docs::examples = "0.1",
-        docs::examples = "0.01",
-    ))]
+    #[configurable(metadata(docs::examples = 1.0, docs::examples = 0.1, docs::examples = 0.01,))]
     pub interval: f64,
 
     /// The total number of lines to output.
@@ -93,7 +89,7 @@ pub enum OutputFormat {
         #[serde(default)]
         sequence: bool,
         /// The list of lines to output.
-        #[configurable(metadata(docs::examples = r#"["line1", "line2"]"#))]
+        #[configurable(metadata(docs::examples = "lines_example()"))]
         lines: Vec<String>,
     },
 
@@ -114,6 +110,10 @@ pub enum OutputFormat {
     /// Randomly generated HTTP server logs in [JSON](\(urls.json)) format.
     #[derivative(Default)]
     Json,
+}
+
+const fn lines_example() -> [&'static str; 2] {
+    ["line1", "line2"]
 }
 
 impl OutputFormat {

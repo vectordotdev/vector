@@ -158,14 +158,14 @@ base: components: sources: demo_logs: configuration: {
 		required: false
 		type: float: {
 			default: 1.0
-			examples: ["1.0", "0.1", "0.01"]
+			examples: [1.0, 0.1, 0.01]
 		}
 	}
 	lines: {
 		description:   "The list of lines to output."
 		relevant_when: "format = \"shuffle\""
 		required:      true
-		type: array: items: type: string: examples: ["[\"line1\", \"line2\"]"]
+		type: array: items: type: string: examples: ["line1", "line2"]
 	}
 	sequence: {
 		description:   "If `true`, each output line starts with an increasing sequence number, beginning with 0."
