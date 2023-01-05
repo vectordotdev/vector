@@ -27,6 +27,7 @@ impl AccessLogService for Service {
     ) -> Result<Response<StreamAccessLogsResponse>, Status> {
         let mut in_stream = request.into_inner();
         let mut shutdown = self.shutdown.clone();
+        let mut stream_identifier = None;
 
         loop {
             tokio::select! {
@@ -46,7 +47,10 @@ impl AccessLogService for Service {
                                                     evt.insert("http_log", Value::from(l));
 
                                                     if let Some(identifier) = msg.identifier.clone() {
-                                                        evt.insert("identifier", Value::from(identifier));
+                                                        stream_identifier = Some(identifier);
+                                                    }
+                                                    if let Some(stream_id) = stream_identifier.clone() {
+                                                        evt.insert("identifier", Value::from(stream_id));
                                                     }
 
                                                     events.push(evt);

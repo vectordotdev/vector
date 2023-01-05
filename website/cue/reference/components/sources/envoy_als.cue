@@ -101,7 +101,7 @@ components: sources: envoy_als: {
 			description: "An individual log event from a batch of events received an Envoy ALS stream"
 			fields: {
 				identifier: {
-					description: "Only sent on the first message on a log stream. See https://www.envoyproxy.io/docs/envoy/v1.24.1/api-v3/service/accesslog/v3/als.proto#envoy-v3-api-msg-service-accesslog-v3-streamaccesslogsmessage-identifier for more details."
+					description: "Added to each log event on the stream. See https://www.envoyproxy.io/docs/envoy/v1.24.1/api-v3/service/accesslog/v3/als.proto#envoy-v3-api-msg-service-accesslog-v3-streamaccesslogsmessage-identifier for more details."
 					required:    false
 					common:      true
 					type: object: {
@@ -116,7 +116,6 @@ components: sources: envoy_als: {
 									"locality": {...}
 									"user_agent_name": "envoy"
 									"user_agent_version_type": {...}
-									"extensions": []
 									"client_features": []
 								}
 							},

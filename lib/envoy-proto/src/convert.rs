@@ -2,8 +2,7 @@ use super::{
     envoy::config::core::v3::{
         address, envoy_internal_address::AddressNameSpecifier, node::UserAgentVersionType,
         socket_address::PortSpecifier, socket_address::Protocol, Address, BuildVersion,
-        EnvoyInternalAddress, Extension, Locality, Metadata, Node, Pipe, RequestMethod,
-        SocketAddress,
+        EnvoyInternalAddress, Locality, Metadata, Node, Pipe, RequestMethod, SocketAddress,
     },
     envoy::data::accesslog::v3::{
         http_access_log_entry::HttpVersion, response_flags, response_flags::unauthorized,
@@ -28,14 +27,12 @@ const ADDRESS_KEY: &str = "address";
 const ADDRESS_NAME_SPECIFIER_KEY: &str = "address_name_specifier";
 const AUTHORITY_KEY: &str = "authority";
 const BUILD_VERSION_KEY: &str = "version";
-const CATEGORY_KEY: &str = "category";
 const CLIENT_FEATURES_KEY: &str = "client_features";
 const CLUSTER_KEY: &str = "cluster";
 const COMMON_PROPERTIES_KEY: &str = "common_properties";
 const CONNECTION_TERMINATION_DETAILS_KEY: &str = "connection_termination_details";
 const CUSTOM_TAGS_KEY: &str = "custom_tags";
 const DELAY_INJECTED_KEY: &str = "delay_injected";
-const DISABLED_KEY: &str = "disabled";
 const DNS_KEY: &str = "dns";
 const DNS_RESOLUTION_FAILURE_KEY: &str = "dns_resolution_failure";
 const DOWNSTREAM_CONNECTION_TERMINATION_KEY: &str = "downstream_connection_termination";
@@ -48,7 +45,6 @@ const DURATION_TIMEOUT_KEY: &str = "duration_timeout";
 const DYNAMIC_PARAMETERS_KEY: &str = "dynamic_parameters";
 const ENDPOINT_ID_KEY: &str = "endpoint_id";
 const ENVOY_INTERNAL_ADDRESS_KEY: &str = "envoy_internal_address";
-const EXTENSIONS_KEY: &str = "extensions";
 const FAILED_LOCAL_HEALTHCHECK_KEY: &str = "failed_local_healthcheck";
 const FAULT_INJECTED_KEY: &str = "fault_injected";
 const FILTER_METADATA_KEY: &str = "filter_metadata";
@@ -67,7 +63,6 @@ const METADATA_KEY: &str = "metadata";
 const MINOR_NUM_KEY: &str = "minor_number";
 const MODE_KEY: &str = "mode";
 const NAMED_PORT_KEY: &str = "named_port";
-const NAME_KEY: &str = "name";
 const NODE_KEY: &str = "node";
 const NO_CLUSTER_FOUND_KEY: &str = "no_cluster_found";
 const NO_FILTER_CONFIG_FOUND_KEY: &str = "no_filter_config_found";
@@ -130,7 +125,6 @@ const TLS_SESSION_ID_KEY: &str = "tls_session_id";
 const TLS_SNI_HOSTNAME_KEY: &str = "tls_sni_hostname";
 const TLS_VERSION_KEY: &str = "tls_version";
 const TYPED_FILTER_METADATA_KEY: &str = "typed_filter_metadata";
-const TYPE_URLS_KEY: &str = "type_urls";
 const TYPE_URL_KEY: &str = "type_url";
 const UNAUTHORIZED_DETAILS_KEY: &str = "unauthorized_details";
 const UPSTREAM_CLUSTER_KEY: &str = "upstream_cluster";
@@ -190,15 +184,6 @@ impl From<Node> for Value {
         node_map.insert(
             String::from(USER_AGENT_NAME_KEY),
             Value::Bytes(node.user_agent_name.into()),
-        );
-        node_map.insert(
-            String::from(EXTENSIONS_KEY),
-            Value::Array(
-                node.extensions
-                    .iter()
-                    .map(|ext| Value::from(ext.clone()))
-                    .collect(),
-            ),
         );
         node_map.insert(
             String::from(CLIENT_FEATURES_KEY),
@@ -277,31 +262,6 @@ impl From<Locality> for Value {
             Value::Bytes(locality.sub_zone.into()),
         );
         Value::Object(locality_map)
-    }
-}
-
-impl From<Extension> for Value {
-    fn from(ext: Extension) -> Self {
-        let mut ext_map = BTreeMap::new();
-        ext_map.insert(String::from(NAME_KEY), Value::Bytes(ext.name.into()));
-        ext_map.insert(
-            String::from(CATEGORY_KEY),
-            Value::Bytes(ext.category.into()),
-        );
-        if let Some(v) = ext.version {
-            ext_map.insert(String::from(BUILD_VERSION_KEY), Value::from(v));
-        }
-        ext_map.insert(String::from(DISABLED_KEY), Value::Boolean(ext.disabled));
-        ext_map.insert(
-            String::from(TYPE_URLS_KEY),
-            Value::Array(
-                ext.type_urls
-                    .iter()
-                    .map(|val| Value::Bytes(val.clone().into()))
-                    .collect(),
-            ),
-        );
-        Value::Object(ext_map)
     }
 }
 
