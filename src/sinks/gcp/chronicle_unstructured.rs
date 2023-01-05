@@ -192,7 +192,7 @@ impl SinkConfig for ChronicleUnstructuredConfig {
 
         // For the healthcheck we see if we can fetch the list of available log types.
         let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
- 
+
         let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
         creds.spawn_regenerate_token();
         let sink = self.build_sink(client, endpoint, creds)?;
