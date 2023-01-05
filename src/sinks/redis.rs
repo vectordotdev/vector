@@ -396,7 +396,7 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
 mod tests {
     use std::{collections::HashMap, convert::TryFrom};
 
-    use codecs::{JsonSerializer, TextSerializer};
+    use codecs::{JsonSerializerConfig, TextSerializerConfig};
     use vector_core::event::LogEvent;
 
     use super::*;
@@ -416,7 +416,7 @@ mod tests {
             evt.into(),
             &Template::try_from("key").unwrap(),
             &Default::default(),
-            &mut Encoder::<()>::new(JsonSerializer::new().into()),
+            &mut Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         )
         .unwrap()
         .item
@@ -433,7 +433,7 @@ mod tests {
             evt.into(),
             &Template::try_from("key").unwrap(),
             &Default::default(),
-            &mut Encoder::<()>::new(TextSerializer::new().into()),
+            &mut Encoder::<()>::new(TextSerializerConfig::default().build().into()),
         )
         .unwrap()
         .item
@@ -451,7 +451,7 @@ mod tests {
             evt.into(),
             &Template::try_from("key").unwrap(),
             &Transformer::new(None, Some(vec!["key".into()]), None).unwrap(),
-            &mut Encoder::<()>::new(JsonSerializer::new().into()),
+            &mut Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         )
         .unwrap()
         .item
@@ -495,7 +495,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
                 method: Method::LPush,
@@ -558,7 +558,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
                 method: Method::RPush,
@@ -637,7 +637,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             data_type: DataTypeConfig::Channel,
             list_option: None,
             batch: BatchConfig::default(),

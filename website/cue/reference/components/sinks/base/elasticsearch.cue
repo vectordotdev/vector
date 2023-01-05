@@ -389,9 +389,9 @@ base: components: sinks: elasticsearch: configuration: {
 					enum: {
 						full: "All tags will be exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the
-															same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
-															will be ignored.
+															Tag values will be exposed as single strings, the same as they were before this config
+															option. Tags with multiple values will show the last assigned value, and null values will be
+															ignored.
 															"""
 					}
 				}
