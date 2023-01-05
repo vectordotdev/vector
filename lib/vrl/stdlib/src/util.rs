@@ -8,7 +8,7 @@ where
     F: Fn(f64) -> f64,
 {
     let multiplier = 10_f64.powf(precision as f64);
-    fun(num * multiplier as f64) / multiplier
+    fun(num * multiplier) / multiplier
 }
 
 /// Takes a set of captures that have resulted from matching a regular expression

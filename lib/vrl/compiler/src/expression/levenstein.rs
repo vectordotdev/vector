@@ -29,11 +29,7 @@ pub(crate) fn distance(word1: &[char], word2: &[char]) -> usize {
 
     for row in 1..n {
         for col in 1..m {
-            let cost = if word1[col - 1] == word2[row - 1] {
-                0
-            } else {
-                1
-            };
+            let cost = usize::from(word1[col - 1] != word2[row - 1]);
 
             matrix[pos(col, row)] = min3(
                 matrix[pos(col - 1, row)] + 1,

@@ -82,7 +82,7 @@ impl fmt::Display for Array {
             .collect::<Vec<_>>()
             .join(", ");
 
-        write!(f, "[{}]", exprs)
+        write!(f, "[{exprs}]")
     }
 }
 

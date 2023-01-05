@@ -358,7 +358,7 @@ impl<'a> DnstapParser<'a> {
             );
         }
 
-        if message != None {
+        if message.is_none() {
             self.parent_key_path.push_field(message_key);
 
             let time_key_name = if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
@@ -556,35 +556,17 @@ impl<'a> DnstapParser<'a> {
 
         self.insert(self.event_schema.dns_query_header_schema().qr(), header.qr);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().aa(),
-            header.aa as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().aa(), header.aa);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().tc(),
-            header.tc as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().tc(), header.tc);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().rd(),
-            header.rd as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().rd(), header.rd);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().ra(),
-            header.ra as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().ra(), header.ra);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().ad(),
-            header.ad as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().ad(), header.ad);
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().cd(),
-            header.cd as bool,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().cd(), header.cd);
 
         self.insert(
             self.event_schema.dns_query_header_schema().question_count(),
@@ -803,7 +785,7 @@ impl<'a> DnstapParser<'a> {
                 self.event_schema
                     .dns_message_opt_pseudo_section_schema()
                     .do_flag(),
-                edns.dnssec_ok as bool,
+                edns.dnssec_ok,
             );
             self.insert(
                 self.event_schema

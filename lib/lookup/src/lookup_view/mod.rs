@@ -280,7 +280,7 @@ impl<'a> Serialize for Lookup<'a> {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&*self.to_string())
+        serializer.serialize_str(&self.to_string())
     }
 }
 

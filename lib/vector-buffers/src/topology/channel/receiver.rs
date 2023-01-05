@@ -69,7 +69,7 @@ where
                             emit(re);
                             continue;
                         }
-                        None => panic!("Reader encountered unrecoverable error: {:?}", e),
+                        None => panic!("Reader encountered unrecoverable error: {e:?}"),
                     },
                 }
             },

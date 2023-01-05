@@ -2,7 +2,7 @@ use std::{fmt::Debug, io, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializer};
+use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
 use futures::{stream::BoxStream, StreamExt};
 use lookup::event_path;
 use snafu::Snafu;
@@ -123,7 +123,7 @@ impl JsonEncoding {
                 transformer,
                 Encoder::<Framer>::new(
                     CharacterDelimitedEncoder::new(b',').into(),
-                    JsonSerializer::new().into(),
+                    JsonSerializerConfig::default().build().into(),
                 ),
             ),
         }

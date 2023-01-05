@@ -566,7 +566,7 @@ mod tests {
         assert_eq!(tags.iter_all().count(), 3);
         for (name, value) in tags.iter_all() {
             assert_eq!(name, "tag");
-            assert!(value == None || value == Some("one") || value == Some("two"));
+            assert!(value.is_none() || value == Some("one") || value == Some("two"));
         }
     }
 

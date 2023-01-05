@@ -67,7 +67,7 @@ fn parse_xml(value: Value, options: ParseOptions) -> Resolved {
     };
     // Trim whitespace around XML elements, if applicable.
     let parse = if trim { trim_xml(&string) } else { string };
-    let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {}", e))?;
+    let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {e}"))?;
     let value = process_node(doc.root(), &config);
     Ok(value)
 }

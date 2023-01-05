@@ -6,11 +6,11 @@ fn ip_cidr_contains(value: Value, cidr: Value) -> Resolved {
     let value = value
         .try_bytes_utf8_lossy()?
         .parse()
-        .map_err(|err| format!("unable to parse IP address: {}", err))?;
+        .map_err(|err| format!("unable to parse IP address: {err}"))?;
     let cidr = {
         let cidr = cidr.try_bytes_utf8_lossy()?;
 
-        IpCidr::from_str(cidr).map_err(|err| format!("unable to parse CIDR: {}", err))?
+        IpCidr::from_str(cidr).map_err(|err| format!("unable to parse CIDR: {err}"))?
     };
     Ok(cidr.contains(value).into())
 }
