@@ -33,7 +33,6 @@ impl Cli {
             }
         };
 
-        contexts.push(format!("org: {}", app::config().org));
         display!("vector{{ {} }}", contexts.join(", "));
 
         Ok(())
