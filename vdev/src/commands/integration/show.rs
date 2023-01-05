@@ -16,44 +16,43 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        if self.integration.is_none() {
-            let mut entries = vec![];
-            let root_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
-            for entry in root_dir
-                .read_dir()
-                .with_context(|| format!("failed to read directory {}", root_dir.display()))?
-            {
-                let entry = entry?;
-                if entry.path().is_dir() {
-                    entries.push(entry.file_name().into_string().unwrap());
+        match self.integration {
+            None => {
+                let mut entries = vec![];
+                let root_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
+                for entry in root_dir
+                    .read_dir()
+                    .with_context(|| format!("failed to read directory {}", root_dir.display()))?
+                {
+                    let entry = entry?;
+                    if entry.path().is_dir() {
+                        entries.push(entry.file_name().into_string().unwrap());
+                    }
+                }
+                entries.sort();
+
+                for integration in &entries {
+                    display!("{integration}");
                 }
             }
-            entries.sort();
+            Some(integration) => {
+                let test_dir = IntegrationTestConfig::locate_source(app::path(), &integration)?;
+                let config = IntegrationTestConfig::from_source(&test_dir)?;
+                let envs_dir = state::envs_dir(&platform::data_dir(), &integration);
+                let active_envs = state::active_envs(&envs_dir)?;
 
-            for integration in &entries {
-                display!("{integration}");
-            }
+                display!("Test args: {}", config.args.join(" "));
 
-            return Ok(());
-        }
-
-        let test_dir =
-            IntegrationTestConfig::locate_source(app::path(), self.integration.as_ref().unwrap())?;
-        let config = IntegrationTestConfig::from_source(&test_dir)?;
-        let envs_dir = state::envs_dir(&platform::data_dir(), self.integration.as_ref().unwrap());
-        let active_envs = state::active_envs(&envs_dir)?;
-
-        display!("Test args: {}", config.args.join(" "));
-
-        display!("Environments:");
-        for environment in config.environments().keys() {
-            if active_envs.contains(environment) {
-                display!("  {} (active)", environment);
-            } else {
-                display!("  {}", environment);
+                display!("Environments:");
+                for environment in config.environments().keys() {
+                    if active_envs.contains(environment) {
+                        display!("  {} (active)", environment);
+                    } else {
+                        display!("  {}", environment);
+                    }
+                }
             }
         }
-
         Ok(())
     }
 }
