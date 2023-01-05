@@ -295,7 +295,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn duplicate_metrics() {
+    async fn multi_value_tags() {
         let (mut config, cx) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
