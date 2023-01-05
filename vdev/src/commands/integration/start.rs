@@ -22,7 +22,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
+    pub fn exec(self) -> Result<()> {
         let test_dir = IntegrationTestConfig::locate_source(app::path(), &self.integration)?;
 
         let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration);

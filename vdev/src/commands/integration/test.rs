@@ -26,22 +26,23 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
+    pub fn exec(self) -> Result<()> {
         let test_dir = IntegrationTestConfig::locate_source(app::path(), &self.integration)?;
         let toolchain_config = RustToolchainConfig::parse(app::path())?;
         let runner =
             IntegrationTestRunner::new(self.integration.to_string(), toolchain_config.channel);
         let envs_dir = state::envs_dir(&platform::data_dir(), &self.integration);
         let config = IntegrationTestConfig::from_source(&test_dir)?;
+        let envs = config.environments();
 
-        let mut env_vars = BTreeMap::new();
-        if let Some(configured_env_vars) = &config.env {
-            env_vars.extend(configured_env_vars.clone());
-        }
+        let env_vars: BTreeMap<_, _> = config
+            .env
+            .clone()
+            .map_or(BTreeMap::default(), |map| map.into_iter().collect());
 
-        let mut args = Vec::from_iter(config.args.clone());
-        if let Some(configured_args) = &self.args {
-            args.extend(configured_args.clone());
+        let mut args: Vec<_> = config.args.into_iter().collect();
+        if let Some(configured_args) = self.args {
+            args.extend(configured_args);
         }
 
         if let Some(environment) = &self.environment {
@@ -55,19 +56,19 @@ impl Cli {
         runner.ensure_network()?;
 
         let active_envs = state::active_envs(&envs_dir)?;
-        for (env_name, env_config) in config.environments().iter() {
-            if !(active_envs.is_empty() || active_envs.contains(env_name)) {
+        for (env_name, env_config) in envs {
+            if !(active_envs.is_empty() || active_envs.contains(&env_name)) {
                 continue;
             }
 
-            let env_active = state::env_exists(&envs_dir, env_name);
+            let env_active = state::env_exists(&envs_dir, &env_name);
             if !env_active {
                 let mut command = Command::new("cargo");
                 command.current_dir(&test_dir);
                 command.env(NETWORK_ENV_VAR, runner.network_name());
                 command.args(["run", "--quiet", "--", "start"]);
 
-                let json = serde_json::to_string(env_config)?;
+                let json = serde_json::to_string(&env_config)?;
                 command.arg(&json);
 
                 if let Some(env_vars) = &config.env {
@@ -77,7 +78,7 @@ impl Cli {
                 waiting!("Starting environment {}", env_name);
                 command.run()?;
 
-                state::save_env(&envs_dir, env_name, &json)?;
+                state::save_env(&envs_dir, &env_name, &json)?;
             }
 
             runner.test(&env_vars, &args)?;
@@ -91,7 +92,7 @@ impl Cli {
                     "--quiet",
                     "--",
                     "stop",
-                    &state::read_env_config(&envs_dir, env_name)?,
+                    &state::read_env_config(&envs_dir, &env_name)?,
                 ]);
 
                 if let Some(env_vars) = &config.env {
@@ -101,7 +102,7 @@ impl Cli {
                 waiting!("Stopping environment {}", env_name);
                 command.run()?;
 
-                state::remove_env(&envs_dir, env_name)?;
+                state::remove_env(&envs_dir, &env_name)?;
             }
         }
 

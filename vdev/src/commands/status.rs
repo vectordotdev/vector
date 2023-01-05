@@ -9,7 +9,7 @@ use crate::git;
 pub struct Cli {}
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
+    pub fn exec(self) -> Result<()> {
         display!("Branch: {}", git::current_branch()?);
         display!("Changed files: {}", git::changed_files()?.len());
 

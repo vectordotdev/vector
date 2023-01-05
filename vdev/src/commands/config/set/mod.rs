@@ -17,8 +17,8 @@ enum Commands {
 }
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
-        match &self.command {
+    pub fn exec(self) -> Result<()> {
+        match self.command {
             Commands::Repo(cli) => cli.exec(),
         }
     }

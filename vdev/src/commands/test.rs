@@ -22,7 +22,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
+    pub fn exec(self) -> Result<()> {
         let toolchain_config = RustToolchainConfig::parse(app::path())?;
         let runner = get_agent_test_runner(self.container, toolchain_config.channel);
 

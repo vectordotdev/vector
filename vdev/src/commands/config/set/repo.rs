@@ -11,7 +11,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
+    pub fn exec(self) -> Result<()> {
         let path = platform::canonicalize_path(&self.path);
 
         let mut config = app::config().clone();

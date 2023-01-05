@@ -9,7 +9,7 @@ use crate::config;
 pub struct Cli {}
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
+    pub fn exec(self) -> Result<()> {
         display!("{}", config::path()?.display());
 
         Ok(())

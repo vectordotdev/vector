@@ -15,7 +15,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
+    pub fn exec(self) -> Result<()> {
         if self.integration.is_none() {
             let mut entries = vec![];
             let root_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();

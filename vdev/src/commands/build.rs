@@ -23,7 +23,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
+    pub fn exec(self) -> Result<()> {
         let mut command = Command::with_path("cargo");
         command.args(["build", "--no-default-features"]);
 

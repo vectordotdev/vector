@@ -14,7 +14,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
+    pub fn exec(self) -> Result<()> {
         let mut command = Command::with_path(&self.args[0]);
         if self.args.len() > 1 {
             command.args(&self.args[1..]);

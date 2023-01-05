@@ -11,7 +11,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(&self) -> Result<()> {
+    pub fn exec(self) -> Result<()> {
         let mut config = app::config().clone();
         config.org = self.name.to_string();
         config::save(config)?;
