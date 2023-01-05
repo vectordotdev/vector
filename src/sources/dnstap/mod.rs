@@ -29,8 +29,9 @@ use vector_core::config::{LegacyKey, LogNamespace};
 #[configurable_component(source("dnstap"))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
-    /// Maximum length, in bytes, that a frame can be.
+    /// Max dnstap frame length that the dnstap source can handle.    
     #[serde(default = "default_max_frame_length")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_frame_length: usize,
 
     /// Overrides the name of the log field used to add the source path to each event.
