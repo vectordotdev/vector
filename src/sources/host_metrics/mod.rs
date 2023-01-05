@@ -23,7 +23,6 @@ use crate::{
     SourceSender,
 };
 
-#[cfg(target_os = "linux")]
 mod cgroups;
 mod cpu;
 mod disk;
@@ -37,7 +36,6 @@ mod network;
 #[serde(rename_all = "lowercase")]
 pub enum Collector {
     /// CGroups.
-    #[cfg(target_os = "linux")]
     CGroups,
 
     /// CPU.
@@ -95,10 +93,9 @@ pub struct HostMetricsConfig {
     #[serde(default = "default_namespace")]
     pub namespace: Option<String>,
 
-    #[cfg(target_os = "linux")]
     #[configurable(derived)]
     #[serde(default)]
-    pub(crate) cgroups: cgroups::CGroupsConfig,
+    pub(crate) cgroups: Option<cgroups::CGroupsConfig>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -211,7 +208,6 @@ impl HostMetrics {
     async fn capture_metrics(&self) -> Vec<Metric> {
         let mut buffer = self.buffer();
 
-        #[cfg(target_os = "linux")]
         if self.config.has_collector(Collector::CGroups) {
             self.cgroups_metrics(&mut buffer).await;
         }
