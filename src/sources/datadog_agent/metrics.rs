@@ -23,7 +23,7 @@ use crate::{
             ddmetric_proto::{metric_payload, MetricPayload, SketchPayload},
             handle_request, ApiKeyQueryParams, DatadogAgentSource,
         },
-        util::ErrorMessage,
+        util::{extract_tag_key_and_value, ErrorMessage},
     },
     SourceSender,
 };
@@ -377,12 +377,7 @@ fn decode_datadog_series_v1(
 }
 
 fn into_metric_tags(tags: Vec<String>) -> MetricTags {
-    tags.iter()
-        .map(|tag| {
-            let kv = tag.split_once(':').unwrap_or((tag, ""));
-            (kv.0.trim().to_string(), kv.1.trim().to_string())
-        })
-        .collect()
+    tags.iter().map(extract_tag_key_and_value).collect()
 }
 
 fn into_vector_metric(

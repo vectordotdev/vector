@@ -616,9 +616,7 @@ pub fn file_source(
         // Once file server ends this will run until it has finished processing remaining
         // logs in the queue.
         let span = Span::current();
-        let span2 = span.clone();
         let mut messages = messages.map(move |line| {
-            let _enter = span2.enter();
             let mut event = create_event(
                 line.text,
                 line.start_offset,

@@ -35,7 +35,7 @@ async fn kinesis_put_records() {
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
         region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
         tls: Default::default(),

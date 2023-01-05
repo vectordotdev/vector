@@ -6,14 +6,13 @@ use syn::{
     DeriveInput, ExprPath, GenericArgument, Generics, Ident, PathArguments, PathSegment, Type,
     TypeParam,
 };
-use vector_config_common::attributes::CustomAttribute;
 
 use super::{
     util::{
         err_serde_failed, get_serde_default_value, try_extract_doc_title_description,
         DarlingResultIterator,
     },
-    Data, Field, Metadata, Style, Tagging, Variant,
+    Data, Field, LazyCustomAttribute, Metadata, Style, Tagging, Variant,
 };
 
 const ERR_NO_ENUM_TUPLES: &str = "enum variants cannot be tuples (multiple unnamed fields)";
@@ -369,7 +368,7 @@ impl<'a> Container<'a> {
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
     /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
     /// metadata to be attached directly to containers.
-    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+    pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
         self.attrs
             .metadata
             .clone()

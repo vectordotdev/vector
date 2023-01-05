@@ -20,9 +20,9 @@ base: components: sources: heroku_logs: configuration: {
 		}
 	}
 	address: {
-		description: "The address to listen for connections on."
+		description: "The socket address to listen for connections on."
 		required:    true
-		type: string: {}
+		type: string: examples: ["0.0.0.0:80", "localhost:80"]
 	}
 	auth: {
 		description: "HTTP Basic authentication configuration."
@@ -31,12 +31,12 @@ base: components: sources: heroku_logs: configuration: {
 			password: {
 				description: "The password for basic authentication."
 				required:    true
-				type: string: {}
+				type: string: examples: ["hunter2", "${PASSWORD}"]
 			}
 			username: {
 				description: "The username for basic authentication."
 				required:    true
-				type: string: {}
+				type: string: examples: ["AzureDiamond", "admin"]
 			}
 		}
 	}
@@ -173,7 +173,7 @@ base: components: sources: heroku_logs: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["application", "source"]
 		}
 	}
 	tls: {

@@ -3,7 +3,9 @@ mod http;
 
 use codecs::{
     decoding::{self, DeserializerConfig},
-    encoding::{self, Framer, FramingConfig, SerializerConfig},
+    encoding::{
+        self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig, TextSerializerConfig,
+    },
     BytesEncoder,
 };
 use tokio::sync::mpsc;
@@ -128,8 +130,8 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         // TODO: This isn't necessarily a one-to-one conversion, at least not in the future when
         // "bytes" can be a top-level field and we aren't implicitly decoding everything into the
         // `message` field... but it's close enough for now.
-        DeserializerConfig::Bytes => SerializerConfig::Text,
-        DeserializerConfig::Json => SerializerConfig::Json,
+        DeserializerConfig::Bytes => SerializerConfig::Text(TextSerializerConfig::default()),
+        DeserializerConfig::Json => SerializerConfig::Json(JsonSerializerConfig::default()),
         // TODO: We need to create an Avro serializer because, certainly, for any source decoding
         // the data as Avro, we can't possibly send anything else without the source just
         // immediately barfing.

@@ -122,7 +122,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
-            encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::new()).into(),
+            encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::default()).into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),

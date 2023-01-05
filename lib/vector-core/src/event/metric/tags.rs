@@ -156,6 +156,26 @@ impl TagValueSet {
         }
     }
 
+    /// Reduce this tag set to either a simple single tag or an empty set.
+    fn reduce_to_simple(&mut self) {
+        match self {
+            Self::Empty => (),
+            Self::Single(tag) => {
+                if tag == &TagValue::Bare {
+                    *self = Self::Empty;
+                }
+            }
+            Self::Set(set) => {
+                // Extract the last element of the set that has a value and convert it back into
+                // self as a single value.
+                *self = std::mem::take(set)
+                    .into_iter()
+                    .rfind(TagValue::is_value)
+                    .map_or(Self::Empty, Self::Single);
+            }
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         match self {
             Self::Empty => true,
@@ -527,6 +547,15 @@ impl MetricTags {
     pub fn retain(&mut self, mut f: impl FnMut(&str, &mut TagValueSet) -> bool) {
         self.0.retain(|key, tags| f(key.as_str(), tags));
     }
+
+    /// Reduces all the tag values to their single value, discarding any for which that value would
+    /// be null.
+    pub(super) fn reduce_to_single(&mut self) {
+        self.0
+            .iter_mut()
+            .for_each(|(_, values)| values.reduce_to_simple());
+        self.retain(|_, values| !values.is_empty());
+    }
 }
 
 impl From<BTreeMap<String, String>> for MetricTags {
@@ -615,6 +644,20 @@ mod tests {
     use super::*;
 
     proptest! {
+        #[test]
+        fn reduces_set_to_simple(mut values: TagValueSet) {
+            values.reduce_to_simple();
+            assert!(values.is_empty() || (values.len() == 1 && values.as_single().is_some()));
+        }
+
+        #[test]
+        fn reduces_tags_to_single(mut tags: MetricTags) {
+            tags.reduce_to_single();
+            for (_, values) in tags.iter_sets() {
+                assert!(values.is_empty() || (values.len() == 1 && values.as_single().is_some()));
+            }
+        }
+
         #[test]
         fn eq_implies_hash_matches_proptest(values1: TagValueSet, values2: TagValueSet) {
             fn hash<T: Hash>(values: &T) -> u64 {

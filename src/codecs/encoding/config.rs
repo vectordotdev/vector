@@ -163,7 +163,7 @@ mod test {
         let encoding = serde_json::from_str::<EncodingConfig>(string).unwrap();
         let serializer = encoding.config();
 
-        assert!(matches!(serializer, SerializerConfig::Json));
+        assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();
 
@@ -198,7 +198,7 @@ mod test {
         let (framing, serializer) = encoding.config();
 
         assert!(matches!(framing, Some(FramingConfig::NewlineDelimited)));
-        assert!(matches!(serializer, SerializerConfig::Json));
+        assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();
 
@@ -230,7 +230,7 @@ mod test {
         let (framing, serializer) = encoding.config();
 
         assert!(matches!(framing, None));
-        assert!(matches!(serializer, SerializerConfig::Json));
+        assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();
 
