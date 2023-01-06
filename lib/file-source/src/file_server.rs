@@ -441,6 +441,10 @@ async fn checkpoint_writer(
     checkpointer
 }
 
+pub fn calculate_ignore_before(ignore_older_secs: Option<u64>) -> Option<DateTime<Utc>> {
+    ignore_older_secs.map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64))
+}
+
 /// A sentinel type to signal that file server was gracefully shut down.
 ///
 /// The purpose of this type is to clarify the semantics of the result values

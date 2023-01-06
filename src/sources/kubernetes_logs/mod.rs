@@ -10,8 +10,8 @@ use std::{convert::TryInto, path::PathBuf, time::Duration};
 use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
-    Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
-    ReadFrom,
+    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
+    Fingerprinter, Line, ReadFrom, ReadFromConfig,
 };
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
@@ -172,27 +172,6 @@ pub struct Config {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
-}
-
-/// File position to use when reading a new file.
-#[configurable_component]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ReadFromConfig {
-    /// Read from the beginning of the file.
-    Beginning,
-
-    /// Start reading from the current end of the file.
-    End,
-}
-
-impl From<ReadFromConfig> for ReadFrom {
-    fn from(rfc: ReadFromConfig) -> Self {
-        match rfc {
-            ReadFromConfig::Beginning => ReadFrom::Beginning,
-            ReadFromConfig::End => ReadFrom::End,
-        }
-    }
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -663,8 +642,7 @@ impl Source {
             NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec, log_namespace);
         let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec, log_namespace);
 
-        let ignore_before =
-            ignore_older_secs.map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
+        let ignore_before = calculate_ignore_before(ignore_older_secs);
 
         // TODO: maybe more of the parameters have to be configurable.
 
