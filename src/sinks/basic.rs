@@ -40,6 +40,13 @@ pub struct BasicConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    /// The endpoint to send HTTP traffic to.
+    #[configurable(metadata(
+        docs::examples = "http://localhost:3000/",
+        docs::examples = "http://example.com/endpoint/",
+    ))]
+    pub endpoint: String,
 }
 
 impl GenerateConfig for BasicConfig {
@@ -132,10 +139,10 @@ struct BasicSink {
 }
 
 impl BasicSink {
-    pub fn new(_config: &BasicConfig) -> Self {
+    pub fn new(config: &BasicConfig) -> Self {
         let tls = TlsSettings::from_options(&None).unwrap();
         let client = HttpClient::new(tls, &Default::default()).unwrap();
-        let endpoint = "http://localhost:5678".to_string();
+        let endpoint = config.endpoint.clone();
 
         Self { client, endpoint }
     }
