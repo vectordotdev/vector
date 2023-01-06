@@ -22,13 +22,13 @@ impl Cli {
         let (test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
 
         let envs_dir = state::envs_dir(&self.integration);
-        let runner = IntegrationTestRunner::new(self.integration)?;
+        let runner = IntegrationTestRunner::new(self.integration.clone())?;
         runner.ensure_network()?;
 
         let mut command = Command::new("cargo");
         command.current_dir(&test_dir);
         command.env(NETWORK_ENV_VAR, runner.network_name());
-        command.args(["run", "--quiet", "--bin", &self.integration, "--", "start"]);
+        command.args(["run", "--quiet", "--", "start", &self.integration]);
 
         let environments = config.environments();
         let json = match environments.get(&self.environment) {

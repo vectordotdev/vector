@@ -29,7 +29,7 @@ impl Cli {
         let mut command = Command::new("cargo");
         command.current_dir(&test_dir);
         command.env(NETWORK_ENV_VAR, runner.network_name());
-        command.args(["run", "--quiet", "--bin", &self.integration, "--", "stop"]);
+        command.args(["run", "--quiet", "--", "stop", &self.integration]);
 
         if state::env_exists(&envs_dir, &self.environment) {
             command.arg(state::read_env_config(&envs_dir, &self.environment)?);
