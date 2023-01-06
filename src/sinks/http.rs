@@ -195,8 +195,16 @@ impl SinkConfig for HttpSinkConfig {
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let (payload_prefix, payload_suffix) =
-            validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix)?;
+        let (payload_prefix, payload_suffix) = match (encoder.serializer(), encoder.framer()) {
+            (
+                Serializer::Json(_),
+                Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
+            ) => validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix)?,
+            _ => (
+                self.payload_prefix.to_owned(),
+                self.payload_suffix.to_owned(),
+            ),
+        };
 
         let sink = HttpSink {
             uri: self.uri.with_default_parts(),
