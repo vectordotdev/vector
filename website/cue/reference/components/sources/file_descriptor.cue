@@ -73,7 +73,7 @@ components: sources: file_descriptor: {
 			title: "Line Delimiters"
 			body: """
 				Each line is read until a new line delimiter, the `0xA` byte, is found.
-p				"""
+				"""
 		}
 	}
 
