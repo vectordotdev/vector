@@ -113,7 +113,8 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				type: string: {}
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					aws:   "Amazon Prometheus Service-specific authentication."
 					basic: "HTTP Basic Authentication."

@@ -243,13 +243,15 @@ fn default_line_delimiter() -> String {
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The strategy used to uniquely identify files.\n\nThis is important for checkpointing when file rotation is used."
+))]
 pub enum FingerprintConfig {
     /// Read lines from the beginning of the file and compute a checksum over them.
     Checksum {
         /// Maximum number of bytes to use, from the lines that are read, for generating the checksum.
-        ///
-        /// TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
-        /// bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
+        // TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
+        // bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
         #[serde(alias = "fingerprint_bytes")]
         bytes: Option<usize>,
 
@@ -267,7 +269,9 @@ pub enum FingerprintConfig {
         lines: usize,
     },
 
-    /// Use the [device and inode](https://en.wikipedia.org/wiki/Inode) as the identifier.
+    /// Use the [device and inode][inode] as the identifier.
+    ///
+    /// [inode]: https://en.wikipedia.org/wiki/Inode
     #[serde(rename = "device_and_inode")]
     DevInode,
 }

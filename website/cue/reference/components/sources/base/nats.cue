@@ -41,24 +41,21 @@ base: components: sources: nats: configuration: {
 				}
 			}
 			strategy: {
+				description: """
+					The strategy used to authenticate with the NATS server.
+
+					More information on NATS authentication, and the various authentication strategies, can be found in the
+					NATS [documentation][nats_auth_docs]. For TLS client certificate authentication specifically, see the
+					`tls` settings.
+
+					[nats_auth_docs]: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro
+					"""
 				required: true
 				type: string: enum: {
-					credentials_file: """
-						Credentials file authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt))
-						"""
-					nkey: """
-						NKey authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth))
-						"""
-					token: """
-						Token authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens))
-						"""
-					user_password: """
-						Username and password authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password))
-						"""
+					credentials_file: "Credentials file authentication. (JWT-based)"
+					nkey:             "NKey authentication."
+					token:            "Token authentication."
+					user_password:    "Username/password authentication."
 				}
 			}
 			token: {

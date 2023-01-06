@@ -65,7 +65,8 @@ base: components: transforms: log_to_metric: configuration: metrics: {
 			}
 		}
 		type: {
-			required: true
+			description: "The type of metric to create."
+			required:    true
 			type: string: enum: {
 				counter:   "A counter."
 				gauge:     "A gauge."

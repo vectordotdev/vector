@@ -88,6 +88,7 @@ pub enum TagConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of metric to create."))]
 pub enum MetricTypeConfig {
     /// A counter.
     Counter(#[configurable(derived)] CounterConfig),
