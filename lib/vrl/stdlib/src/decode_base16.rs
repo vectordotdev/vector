@@ -62,7 +62,7 @@ impl FunctionExpression for DecodeBase16Fn {
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        // Always fallible due to the possibility of decoding errors that VRL can't detect in
+        // Always fallible due to the possibility of decoding errors that VRL can't detect in `base16`
         TypeDef::bytes().fallible()
     }
 }
