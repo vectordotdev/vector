@@ -29,7 +29,6 @@ use crate::{
 #[configurable_component(source("demo_logs"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(default)]
 pub struct DemoLogsConfig {
     /// The amount of time, in seconds, to pause between each batch of output lines.
     ///
