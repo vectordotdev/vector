@@ -137,7 +137,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             .chain(self.access_key.iter());
 
         let svc = filters::firehose(
-            access_keys.collect(),
+            access_keys.map(|key| format!("{}", key.inner())).collect(),
             self.record_compression,
             decoder,
             acknowledgements,
