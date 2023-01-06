@@ -55,10 +55,12 @@ pub struct HttpSinkConfig {
     pub encoding: EncodingConfigWithFraming,
 
     /// A string to prefix to the payload
+    /// This option is ignored if the encoding is not character delimited JSON.
     #[serde(default)]
     pub payload_prefix: String,
 
     /// A string to suffix to the payload
+    /// This option is ignored if the encoding is not character delimited JSON.
     #[serde(default)]
     pub payload_suffix: String,
 
@@ -193,6 +195,9 @@ impl SinkConfig for HttpSinkConfig {
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
+        let (payload_prefix, payload_suffix) =
+            validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix)?;
+
         let sink = HttpSink {
             uri: self.uri.with_default_parts(),
             method: self.method,
@@ -203,8 +208,8 @@ impl SinkConfig for HttpSinkConfig {
             batch: self.batch,
             tower: request.tower,
             headers,
-            payload_prefix: self.payload_prefix.to_owned(),
-            payload_suffix: self.payload_suffix.to_owned(),
+            payload_prefix,
+            payload_suffix,
         };
 
         let request = sink.tower.unwrap_with(&TowerRequestConfig::default());
@@ -384,6 +389,19 @@ fn validate_headers(
     Ok(headers)
 }
 
+fn validate_payload_wrapper(
+    payload_prefix: &str,
+    payload_suffix: &str,
+) -> crate::Result<(String, String)> {
+    let payload = [&payload_prefix, "{}", &payload_suffix].join("");
+    match serde_json::from_str::<serde_json::Value>(&payload) {
+        Ok(_) => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
+        Err(_) => Err(
+            "Payload prefix and suffix wrapped around payload have to produce a valid json".into(),
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -490,6 +508,37 @@ mod tests {
             super::validate_headers(&config.request.headers, false).unwrap_err(),
             HeaderValidationError,
             HeaderValidationError::InvalidHeaderName { .. }
+        );
+    }
+
+    #[test]
+    fn http_validates_payload_prefix_and_suffix() {
+        let config = r#"
+        uri = "http://$IN_ADDR/"
+        encoding.codec = "json"
+        payload_prefix = '{"data":'
+        payload_suffix = "}"
+        "#;
+        let config: HttpSinkConfig = toml::from_str(config).unwrap();
+
+        assert!(
+            super::validate_payload_wrapper(&config.payload_prefix, &config.payload_suffix).is_ok()
+        );
+    }
+
+    #[test]
+    fn http_validates_payload_prefix_and_suffix_failes_on_invalid_json() {
+        let config = r#"
+        uri = "http://$IN_ADDR/"
+        encoding.codec = "json"
+        payload_prefix = '{"data":'
+        payload_suffix = ""
+        "#;
+        let config: HttpSinkConfig = toml::from_str(config).unwrap();
+
+        assert!(
+            super::validate_payload_wrapper(&config.payload_prefix, &config.payload_suffix)
+                .is_err()
         );
     }
 
