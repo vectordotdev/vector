@@ -60,7 +60,8 @@ base: components: sources: demo_logs: configuration: {
 		}
 	}
 	format: {
-		required: true
+		description: "The format of the randomly generated output."
+		required:    true
 		type: string: enum: {
 			apache_common: "Randomly generated logs in [Apache common](\\(urls.apache_common)) format."
 			apache_error:  "Randomly generated logs in [Apache error](\\(urls.apache_error)) format."

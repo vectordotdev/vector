@@ -48,6 +48,9 @@ pub struct DemoLogsConfig {
     pub count: usize,
 
     #[serde(flatten)]
+    #[configurable(metadata(
+        docs::enum_tag_description = "The format of the randomly generated output."
+    ))]
     pub format: OutputFormat,
 
     #[configurable(derived)]
