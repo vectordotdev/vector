@@ -687,17 +687,89 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key_from_list() {
-        todo!()
+        let (_rx, addr) = source(
+            None,
+            Some(vec!["an access key in list".to_string().into()]),
+            Default::default(),
+            true,
+            false,
+        )
+            .await;
+
+        let res = send(
+            addr,
+            Utc::now(),
+            vec![],
+            Some("bad access key"),
+            false,
+            Compression::None,
+        )
+            .await
+            .unwrap();
+        assert_eq!(401, res.status().as_u16());
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, REQUEST_ID);
     }
 
     #[tokio::test]
     async fn aws_kinesis_firehose_accepts_merged_access_keys() {
-        todo!()
+        let valid_access_key = SensitiveString::from(String::from("an access key in list"));
+
+        let (_rx, addr) = source(
+            Some(valid_access_key.clone()),
+            Some(vec!["valid access key 2".to_string().into()]),
+            Default::default(),
+            true,
+            false,
+        )
+            .await;
+
+        let res = send(
+            addr,
+            Utc::now(),
+            vec![],
+            Some(valid_access_key.clone().inner()),
+            false,
+            Compression::None,
+        )
+            .await
+            .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, REQUEST_ID);
     }
 
     #[tokio::test]
     async fn aws_kinesis_firehose_accepts_access_keys_from_list() {
-        todo!()
+        let valid_access_key = "an access key in list".to_string();
+
+        let (_rx, addr) = source(
+            None,
+            Some(vec![valid_access_key.clone().into(), "valid access key 2".to_string().into()]),
+            Default::default(),
+            true,
+            false,
+        )
+            .await;
+
+        let res = send(
+            addr,
+            Utc::now(),
+            vec![],
+            Some(&valid_access_key),
+            false,
+            Compression::None,
+        )
+            .await
+            .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, REQUEST_ID);
     }
 
     #[tokio::test]
