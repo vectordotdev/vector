@@ -1,7 +1,6 @@
-use std::process::Command;
-
 use anyhow::{bail, Result};
 use clap::Args;
+use serde_json::Value;
 
 use crate::app::CommandExt as _;
 use crate::testing::{config::IntegrationTestConfig, runner::*, state};
@@ -25,17 +24,15 @@ impl Cli {
         let runner = IntegrationTestRunner::new(self.integration.clone())?;
         runner.ensure_network()?;
 
-        let mut command = Command::new("cargo");
-        command.current_dir(&test_dir);
+        let mut command = super::compose_command(&test_dir, ["up", "--detach"])?;
         command.env(NETWORK_ENV_VAR, runner.network_name());
-        command.args(["run", "--quiet", "--", "start", &self.integration]);
 
         let environments = config.environments();
         let json = match environments.get(&self.environment) {
             Some(config) => serde_json::to_string(config)?,
             None => bail!("unknown environment: {}", self.environment),
         };
-        command.arg(&json);
+        let cmd_config: Value = serde_json::from_str(&json)?;
 
         if state::env_exists(&envs_dir, &self.environment) {
             bail!("environment is already up");
@@ -44,6 +41,8 @@ impl Cli {
         if let Some(env_vars) = config.env {
             command.envs(env_vars);
         }
+
+        super::apply_env_vars(&mut command, &cmd_config, &self.integration);
 
         waiting!("Starting environment {}", &self.environment);
         command.run()?;
