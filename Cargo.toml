@@ -505,7 +505,7 @@ sources-metrics = [
 ]
 
 sources-amqp = ["lapin"]
-sources-apache_metrics = []
+sources-apache_metrics = ["dep:serde_with"]
 sources-aws_ecs_metrics = ["dep:serde_with"]
 sources-aws_kinesis_firehose = ["dep:base64", "dep:infer"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
