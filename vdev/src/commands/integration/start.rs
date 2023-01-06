@@ -28,7 +28,7 @@ impl Cli {
         let mut command = Command::new("cargo");
         command.current_dir(&test_dir);
         command.env(NETWORK_ENV_VAR, runner.network_name());
-        command.args(["run", "--quiet", "--", "start"]);
+        command.args(["run", "--quiet", "--bin", &self.integration, "--", "start"]);
 
         let environments = config.environments();
         let json = match environments.get(&self.environment) {

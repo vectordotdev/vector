@@ -1,5 +1,5 @@
 [package]
-name = "vector-aws-env-manager"
+name = "vector-integration-managers"
 version = "0.1.0"
 edition = "2021"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
