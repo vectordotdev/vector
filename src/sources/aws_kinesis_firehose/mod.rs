@@ -125,6 +125,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
+        if self.access_key.is_some() {
+            warn!("DEPRECATION `access_key`, use `access_keys` instead")
+        }
+
         // Merge with legacy `access_key`
         let access_keys = self
             .access_keys
