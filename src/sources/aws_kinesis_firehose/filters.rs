@@ -4,10 +4,12 @@ use bytes::{Buf, Bytes};
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
 use snafu::ResultExt;
-use vector_common::internal_event::{BytesReceived, Protocol};
+use vector_common::{
+    internal_event::{BytesReceived, Protocol},
+    sensitive_string::SensitiveString,
+};
 use vector_core::config::LogNamespace;
 use warp::{http::StatusCode, Filter};
-use vector_common::sensitive_string::SensitiveString;
 
 use super::{
     errors::{ParseSnafu, RequestError},

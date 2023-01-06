@@ -40,6 +40,11 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
+    /// An optional access key to authenticate requests against.
+    ///
+    /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
+    /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+    #[configurable(metadata(docs::examples = "[A94A8FE5CCB19BA61C4C08, A99A8FE5CCB19BA61C4C08]"))]
     access_keys: Option<Vec<SensitiveString>>,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
