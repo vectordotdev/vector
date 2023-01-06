@@ -1,6 +1,6 @@
+use ::value::Value;
 use std::str;
 use nom::AsBytes;
-use ::value::Value;
 use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
@@ -20,13 +20,11 @@ impl Function for DecodeBase16 {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                kind: kind::BYTES,
-                required: true,
-            },
-        ]
+        &[Parameter {
+            keyword: "value",
+            kind: kind::BYTES,
+            required: true,
+        }]
     }
 
     fn compile(

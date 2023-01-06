@@ -16,13 +16,11 @@ impl Function for EncodeBase16 {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                kind: kind::BYTES,
-                required: true,
-            }
-        ]
+        &[Parameter {
+            keyword: "value",
+            kind: kind::BYTES,
+            required: true,
+        }]
     }
 
     fn compile(
@@ -33,10 +31,7 @@ impl Function for EncodeBase16 {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(EncodeBase16Fn {
-            value
-        }
-        .as_expr())
+        Ok(EncodeBase16Fn { value }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -50,7 +45,7 @@ impl Function for EncodeBase16 {
 
 #[derive(Clone, Debug)]
 struct EncodeBase16Fn {
-    value: Box<dyn Expression>
+    value: Box<dyn Expression>,
 }
 
 impl FunctionExpression for EncodeBase16Fn {
