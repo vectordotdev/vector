@@ -6,7 +6,6 @@ use flate2::read::MultiGzDecoder;
 use snafu::ResultExt;
 use vector_common::{
     internal_event::{BytesReceived, Protocol},
-    sensitive_string::SensitiveString,
 };
 use vector_core::config::LogNamespace;
 use warp::{http::StatusCode, Filter};
