@@ -91,6 +91,7 @@ default = [
     "decrypt",
     "del",
     "downcase",
+    "encode_base16",
     "encode_base64",
     "encode_json",
     "encode_key_value",
@@ -237,6 +238,7 @@ decode_mime_q = ["dep:data-encoding","dep:charset","dep:quoted_printable"]
 decrypt = ["cryptography", "random_bytes", "encrypt"]
 del = []
 downcase = []
+encode_base16 = ["dep:base16"]
 encode_base64 = ["dep:base64"]
 encode_json = ["dep:serde_json", "value/json", "dep:chrono", "dep:regex"]
 encode_key_value = ["vector-common/encoding", "value/json"]

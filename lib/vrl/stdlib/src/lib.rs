@@ -62,6 +62,8 @@ mod decrypt;
 mod del;
 #[cfg(feature = "downcase")]
 mod downcase;
+#[cfg(feature = "encode_base16")]
+mod encode_base16;
 #[cfg(feature = "encode_base64")]
 mod encode_base64;
 #[cfg(feature = "encode_json")]
@@ -357,6 +359,8 @@ pub use decrypt::Decrypt;
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::Downcase;
+#[cfg(feature = "encode_base16")]
+pub use encode_base16::EncodeBase16;
 #[cfg(feature = "encode_base64")]
 pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
@@ -652,6 +656,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Del),
         #[cfg(feature = "downcase")]
         Box::new(Downcase),
+        #[cfg(feature = "encode_base16")]
+        Box::new(EncodeBase16),
         #[cfg(feature = "encode_base64")]
         Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
