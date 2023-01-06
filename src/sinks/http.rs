@@ -56,11 +56,13 @@ pub struct HttpSinkConfig {
 
     /// A string to prefix to the payload
     /// This option is ignored if the encoding is not character delimited JSON.
+    /// Will be validate to produce a valid json in combination with payload_suffix.
     #[serde(default)]
     pub payload_prefix: String,
 
     /// A string to suffix to the payload
     /// This option is ignored if the encoding is not character delimited JSON.
+    /// Will be validate to produce a valid json in combination with payload_prefix.
     #[serde(default)]
     pub payload_suffix: String,
 
