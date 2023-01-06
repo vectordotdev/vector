@@ -20,6 +20,7 @@ pub struct FileDescriptorSourceConfig {
     ///
     /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_length: usize,
 
     /// Overrides the name of the log field used to add the current hostname to each event.
@@ -29,13 +30,16 @@ pub struct FileDescriptorSourceConfig {
     pub host_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::hidden))]
     pub framing: Option<FramingConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
     /// The file descriptor number to read from.
+    #[configurable(metadata(docs::examples = 10))]
     pub fd: u32,
 
     /// The namespace to use for logs. This overrides the global setting.

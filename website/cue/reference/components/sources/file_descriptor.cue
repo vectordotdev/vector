@@ -39,37 +39,7 @@ components: sources: file_descriptor: {
 		platform_name: null
 	}
 
-	configuration: {
-		fd: {
-			description: "The file descriptor to read events from."
-			required:    true
-			type: uint: {
-				examples: [10]
-				unit: null
-			}
-		}
-		host_key: {
-			category:    "Context"
-			common:      false
-			description: """
-				The key name added to each event representing the current hostname. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-				"""
-			required:    false
-			type: string: {
-				default: "host"
-			}
-		}
-		max_length: {
-			common:      false
-			description: "The maximum bytes size of a message before rest of it will be discarded."
-			required:    false
-			type: uint: {
-				default: 102400
-				unit:    "bytes"
-			}
-		}
-	}
+	configuration: base.components.sources.file_descriptor.configuration
 
 	output: logs: line: {
 		description: "An individual event from the file descriptor."
@@ -103,7 +73,7 @@ components: sources: file_descriptor: {
 			title: "Line Delimiters"
 			body: """
 				Each line is read until a new line delimiter, the `0xA` byte, is found.
-				"""
+p				"""
 		}
 	}
 
