@@ -5,9 +5,9 @@ use syn::{
     parse_macro_input, parse_quote, spanned::Spanned, token::Colon2, DeriveInput, ExprPath, Ident,
     PathArguments, Type,
 };
-use vector_config_common::{attributes::CustomAttribute, validation::Validation};
+use vector_config_common::validation::Validation;
 
-use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
+use crate::ast::{Container, Data, Field, LazyCustomAttribute, Style, Tagging, Variant};
 
 pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
     // Parse our input token stream as a derive input, and process the container, and the
@@ -518,7 +518,10 @@ fn generate_variant_metadata(
     // information.
     //
     // You can think of this as an enum-specific additional title.
-    let logical_name_attrs = vec![CustomAttribute::kv("logical_name", variant.ident())];
+    let logical_name_attrs = vec![LazyCustomAttribute::kv(
+        "logical_name",
+        variant.ident().to_string(),
+    )];
     let variant_logical_name =
         get_metadata_custom_attributes(meta_ident, logical_name_attrs.into_iter());
 
@@ -641,18 +644,17 @@ fn get_metadata_validation(
 
 fn get_metadata_custom_attributes(
     meta_ident: &Ident,
-    custom_attributes: impl Iterator<Item = CustomAttribute>,
+    custom_attributes: impl Iterator<Item = LazyCustomAttribute>,
 ) -> proc_macro2::TokenStream {
     let mapped_custom_attributes = custom_attributes
         .map(|attr| match attr {
-            CustomAttribute::Flag(key) => quote! {
-                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::Flag(#key.to_string()));
+            LazyCustomAttribute::Flag(key) => quote! {
+                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::flag(#key));
             },
-            CustomAttribute::KeyValue { key, value } => quote! {
-                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::KeyValue {
-                    key: #key.to_string(),
-                    value: #value.to_string(),
-                });
+            LazyCustomAttribute::KeyValue { key, value } => quote! {
+                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::kv(
+                    #key, #value
+                ));
             },
         });
 

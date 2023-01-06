@@ -469,7 +469,7 @@ mod tests {
         convert::TryFrom,
     };
 
-    use codecs::JsonSerializer;
+    use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
     use vector_core::event::{Event, LogEvent, Value};
 
@@ -484,7 +484,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: false,
@@ -523,7 +523,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             remove_label_fields: false,
             remove_timestamp: false,
@@ -555,7 +555,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: true,
@@ -583,7 +583,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             remove_label_fields: true,
             remove_timestamp: false,
@@ -602,7 +602,7 @@ mod tests {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             remove_label_fields: false,
             remove_timestamp: false,

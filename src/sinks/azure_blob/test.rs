@@ -2,7 +2,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
     encoding::{Framer, FramingConfig},
-    NewlineDelimitedEncoder, TextSerializer, TextSerializerConfig,
+    NewlineDelimitedEncoder, TextSerializerConfig,
 };
 use vector_core::partition::Partitioner;
 
@@ -42,7 +42,7 @@ fn azure_blob_build_request_without_compression() {
     let sink_config = AzureBlobSinkConfig {
         blob_prefix: Some("blob".into()),
         container_name: container_name.clone(),
-        ..default_config((None::<FramingConfig>, TextSerializerConfig::new()).into())
+        ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
     let blob_time_format = String::from("");
     let blob_append_uuid = false;
@@ -61,7 +61,7 @@ fn azure_blob_build_request_without_compression() {
             Default::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                TextSerializer::new().into(),
+                TextSerializerConfig::default().build().into(),
             ),
         ),
         compression,
@@ -87,7 +87,7 @@ fn azure_blob_build_request_with_compression() {
     let sink_config = AzureBlobSinkConfig {
         blob_prefix: Some("blob".into()),
         container_name: container_name.clone(),
-        ..default_config((None::<FramingConfig>, TextSerializerConfig::new()).into())
+        ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
     let blob_time_format = String::from("");
     let blob_append_uuid = false;
@@ -106,7 +106,7 @@ fn azure_blob_build_request_with_compression() {
             Default::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                TextSerializer::new().into(),
+                TextSerializerConfig::default().build().into(),
             ),
         ),
         compression,
@@ -131,7 +131,7 @@ fn azure_blob_build_request_with_time_format() {
     let sink_config = AzureBlobSinkConfig {
         blob_prefix: Some("blob".into()),
         container_name: container_name.clone(),
-        ..default_config((None::<FramingConfig>, TextSerializerConfig::new()).into())
+        ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
     let blob_time_format = String::from("%F");
     let blob_append_uuid = false;
@@ -150,7 +150,7 @@ fn azure_blob_build_request_with_time_format() {
             Default::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                TextSerializer::new().into(),
+                TextSerializerConfig::default().build().into(),
             ),
         ),
         compression,
@@ -179,7 +179,7 @@ fn azure_blob_build_request_with_uuid() {
     let sink_config = AzureBlobSinkConfig {
         blob_prefix: Some("blob".into()),
         container_name: container_name.clone(),
-        ..default_config((None::<FramingConfig>, TextSerializerConfig::new()).into())
+        ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
     let blob_time_format = String::from("");
     let blob_append_uuid = true;
@@ -198,7 +198,7 @@ fn azure_blob_build_request_with_uuid() {
             Default::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                TextSerializer::new().into(),
+                TextSerializerConfig::default().build().into(),
             ),
         ),
         compression,

@@ -13,8 +13,8 @@ pub enum StringSegment {
 impl fmt::Display for StringSegment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StringSegment::Literal(s, _) => write!(f, "{}", s),
-            StringSegment::Template(s, _) => write!(f, "{{{{ {} }}}}", s),
+            StringSegment::Literal(s, _) => write!(f, "{s}"),
+            StringSegment::Template(s, _) => write!(f, "{{{{ {s} }}}}"),
         }
     }
 }
@@ -55,7 +55,7 @@ impl TemplateString {
                 || {
                     Expr::Literal(Node::new(
                         diagnostic::Span::default(),
-                        RawString("".to_string()),
+                        RawString(String::new()),
                     ))
                 },
                 |(_span, expr)| expr,

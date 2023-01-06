@@ -319,8 +319,8 @@ pub fn update_config(config: &Config) {
     // Get the component_ids of existing components
     let existing_component_keys = state::get_component_keys();
     let new_component_keys = new_components
-        .iter()
-        .map(|(component_key, _)| component_key.clone())
+        .keys()
+        .cloned()
         .collect::<HashSet<ComponentKey>>();
 
     // Publish all components that have been removed

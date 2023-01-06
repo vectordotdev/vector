@@ -16,9 +16,13 @@ use super::error::ErrorMessage;
 #[derive(Clone, Debug)]
 pub struct HttpSourceAuthConfig {
     /// The username for basic authentication.
+    #[configurable(metadata(docs::examples = "AzureDiamond"))]
+    #[configurable(metadata(docs::examples = "admin"))]
     pub username: String,
 
     /// The password for basic authentication.
+    #[configurable(metadata(docs::examples = "hunter2"))]
+    #[configurable(metadata(docs::examples = "${PASSWORD}"))]
     pub password: SensitiveString,
 }
 

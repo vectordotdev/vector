@@ -11,10 +11,12 @@ use std::{
 
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, Sink};
-use http::StatusCode;
+use headers::HeaderName;
+use http::{header, HeaderValue, StatusCode};
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
+use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_config::configurable_component;
@@ -545,6 +547,36 @@ impl RequestConfig {
             self.headers.extend(headers);
         }
     }
+}
+
+#[derive(Debug, Snafu)]
+pub enum HeaderValidationError {
+    #[snafu(display("{}: {}", source, name))]
+    InvalidHeaderName {
+        name: String,
+        source: header::InvalidHeaderName,
+    },
+    #[snafu(display("{}: {}", source, value))]
+    InvalidHeaderValue {
+        value: String,
+        source: header::InvalidHeaderValue,
+    },
+}
+
+pub fn validate_headers(
+    headers: &IndexMap<String, String>,
+) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
+    let mut validated_headers = IndexMap::new();
+    for (name, value) in headers {
+        let name = HeaderName::from_bytes(name.as_bytes())
+            .with_context(|_| InvalidHeaderNameSnafu { name })?;
+        let value = HeaderValue::from_bytes(value.as_bytes())
+            .with_context(|_| InvalidHeaderValueSnafu { value })?;
+
+        validated_headers.insert(name, value);
+    }
+
+    Ok(validated_headers)
 }
 
 #[cfg(test)]

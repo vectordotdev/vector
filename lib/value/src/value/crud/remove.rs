@@ -109,8 +109,8 @@ mod test {
         ];
 
         for (query, expected_first, expected_second) in &queries {
-            assert_eq!(value.remove(*query, false), *expected_first, "{}", query);
-            assert_eq!(value.remove(*query, false), *expected_second, "{}", query);
+            assert_eq!(value.remove(*query, false), *expected_first, "{query}");
+            assert_eq!(value.remove(*query, false), *expected_second, "{query}");
         }
 
         assert_eq!(

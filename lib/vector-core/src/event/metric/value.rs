@@ -423,7 +423,7 @@ impl fmt::Display for MetricValue {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
             MetricValue::Counter { value } | MetricValue::Gauge { value } => {
-                write!(fmt, "{}", value)
+                write!(fmt, "{value}")
             }
             MetricValue::Set { values } => {
                 write_list(fmt, " ", values.iter(), |fmt, value| write_word(fmt, value))
@@ -446,7 +446,7 @@ impl fmt::Display for MetricValue {
                 count,
                 sum,
             } => {
-                write!(fmt, "count={} sum={} ", count, sum)?;
+                write!(fmt, "count={count} sum={sum} ")?;
                 write_list(fmt, " ", buckets, |fmt, bucket| {
                     write!(fmt, "{}@{}", bucket.count, bucket.upper_limit)
                 })
@@ -456,7 +456,7 @@ impl fmt::Display for MetricValue {
                 count,
                 sum,
             } => {
-                write!(fmt, "count={} sum={} ", count, sum)?;
+                write!(fmt, "count={count} sum={sum} ")?;
                 write_list(fmt, " ", quantiles, |fmt, quantile| {
                     write!(fmt, "{}@{}", quantile.quantile, quantile.value)
                 })

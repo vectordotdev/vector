@@ -25,7 +25,7 @@ pub enum Error {
 ///
 /// Only relevant when connecting to Docker via an HTTPS URL.
 ///
-/// If not configured, Vector will try to use environment variable `DOCKER_CERT_PATH` and then` DOCKER_CONFIG`. If both environment variables are absent, Vector will try to read certificates in `~/.docker/`.
+/// If not configured, the environment variable `DOCKER_CERT_PATH` is used. If `DOCKER_CERT_PATH` is absent, then` DOCKER_CONFIG` is used. If both environment variables are absent, the certificates in `~/.docker/` are read.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]

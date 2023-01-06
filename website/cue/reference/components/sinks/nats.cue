@@ -52,7 +52,25 @@ components: sinks: nats: {
 		notices: []
 	}
 
-	configuration: components._nats.configuration & {}
+	configuration: components._nats.configuration & {
+		connection_name: {
+			common:      false
+			description: "A name assigned to the NATS connection."
+			required:    false
+			type: string: {
+				default: "vector"
+				examples: ["foo", "API Name Option Example"]
+			}
+		}
+		subject: {
+			description: "The NATS subject to publish messages to."
+			required:    true
+			type: string: {
+				examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
+				syntax: "template"
+			}
+		}
+	}
 
 	input: {
 		logs:    true
