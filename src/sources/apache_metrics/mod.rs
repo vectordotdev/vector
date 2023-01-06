@@ -40,7 +40,6 @@ pub struct ApacheMetricsConfig {
     endpoints: Vec<String>,
 
     /// The interval between scrapes.
-    #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     scrape_interval_secs: Duration,
