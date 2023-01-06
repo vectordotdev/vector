@@ -12,7 +12,8 @@ use crate::{
 use chrono::{DateTime, NaiveDateTime, Utc};
 use envoy_proto::{
     envoy::config::core::v3::{
-        address, socket_address::PortSpecifier, Address, Metadata, SocketAddress,
+        address, node, socket_address::PortSpecifier, Address, Locality, Metadata, Node,
+        SocketAddress,
     },
     envoy::data::accesslog::v3::{
         tls_properties, tls_properties::certificate_properties,
@@ -24,6 +25,7 @@ use envoy_proto::{
         access_log_service_client::AccessLogServiceClient, stream_access_logs_message,
         StreamAccessLogsMessage,
     },
+    xds::core::v3::ContextParams,
 };
 use futures_util::stream;
 use std::collections::{BTreeMap, HashMap};
@@ -36,6 +38,39 @@ fn generate_config() {
 
 #[tokio::test]
 async fn translate_http_log() {
+    let identifier = stream_access_logs_message::Identifier {
+        log_name: String::from("my-log-name"),
+        node: Some(Node {
+            id: String::from("my-id"),
+            cluster: String::from("my-cluster"),
+            metadata: Some(prost_types::Struct {
+                fields: BTreeMap::from([(
+                    String::from("active"),
+                    prost_types::Value {
+                        kind: Some(prost_types::value::Kind::BoolValue(true)),
+                    },
+                )]),
+            }),
+            dynamic_parameters: HashMap::from([(
+                String::from("key"),
+                ContextParams {
+                    params: HashMap::from([(String::from("shard"), String::from("1"))]),
+                },
+            )]),
+            locality: Some(Locality {
+                region: String::from("nyc"),
+                zone: String::from("1"),
+                sub_zone: String::from("a"),
+            }),
+            user_agent_name: String::from("envoy"),
+            extensions: vec![],
+            client_features: vec![String::from("my-feature")],
+            user_agent_version_type: Some(node::UserAgentVersionType::UserAgentVersion(
+                String::from("my-envoy-build"),
+            )),
+            ..Default::default()
+        }),
+    };
     let entry = HttpAccessLogEntry{
     common_properties: Some(AccessLogCommon{
       sample_rate: 1.0,
@@ -190,7 +225,7 @@ async fn translate_http_log() {
     test_util::wait_for_tcp(grpc_addr).await;
 
     let logs = vec![StreamAccessLogsMessage{
-      identifier: None,
+      identifier: Some(identifier),
       log_entries: Some(stream_access_logs_message::LogEntries::HttpLogs(stream_access_logs_message::HttpAccessLogEntries{log_entry: vec![entry]})),
     }];
     let req = Request::new(stream::iter(logs));
@@ -206,6 +241,39 @@ async fn translate_http_log() {
     let actual_event = output.pop().unwrap();
     let expect_map =  BTreeMap::from(
       [
+        (String::from("identifier"),Value::Object(
+          BTreeMap::from(
+            [
+              (String::from("log_name"), Value::Bytes("my-log-name".into())),
+              (String::from("node"), Value::Object(
+                BTreeMap::from([
+                  (String::from("id"), Value::Bytes("my-id".into())),
+                  (String::from("cluster"), Value::Bytes("my-cluster".into())),
+                  (String::from("metadata"), Value::Object(BTreeMap::from([
+                      (String::from("active"), Value::Boolean(true)),
+                  ]))),
+                  (String::from("dynamic_parameters"), Value::Object(BTreeMap::from([
+                    (String::from("key"), Value::Object(BTreeMap::from([
+                      (String::from("params"), Value::Object(BTreeMap::from([
+                        (String::from("shard"), Value::Bytes("1".into())),
+                      ]))),
+                    ]))),
+                  ]))),
+                  (String::from("locality"), Value::Object(BTreeMap::from([
+                    (String::from("region"), Value::Bytes("nyc".into())),
+                    (String::from("zone"), Value::Bytes("1".into())),
+                    (String::from("sub_zone"), Value::Bytes("a".into())),
+                  ]))),
+                  (String::from("user_agent_name"), Value::Bytes("envoy".into())),
+                  (String::from("client_features"), Value::Array(vec![Value::Bytes("my-feature".into())])),
+                  (String::from("user_agent_version_type"), Value::Object(BTreeMap::from([
+                    (String::from("user_agent_version"), Value::Bytes("my-envoy-build".into())),
+                  ]))),
+                ]),
+              )),
+            ]
+          )
+        )),
         (String::from("http_log"),Value::Object(
           BTreeMap::from(
             [
