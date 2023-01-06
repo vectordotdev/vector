@@ -10,4 +10,4 @@ env:
   KAFKA_HOST: kafka
 
 matrix:
-- version: latest
+- version: [latest]
