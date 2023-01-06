@@ -35,6 +35,7 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
 pub enum ElasticsearchAuth {
     /// HTTP Basic Authentication.
     Basic {

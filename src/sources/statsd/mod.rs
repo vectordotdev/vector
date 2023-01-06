@@ -42,6 +42,7 @@ use vector_core::config::LogNamespace;
 #[configurable_component(source("statsd"))]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum StatsdConfig {
     /// Listen on TCP.
     Tcp(#[configurable(derived)] TcpConfig),
