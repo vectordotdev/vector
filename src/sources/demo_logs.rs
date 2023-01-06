@@ -6,6 +6,7 @@ use codecs::{
 use fakedata::logs::*;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
+use serde_with::serde_as;
 use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{self, Duration};
@@ -26,6 +27,7 @@ use crate::{
 };
 
 /// Configuration for the `demo_logs` source.
+#[serde_as]
 #[configurable_component(source("demo_logs"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -38,7 +40,8 @@ pub struct DemoLogsConfig {
     #[derivative(Default(value = "default_interval()"))]
     #[serde(default = "default_interval")]
     #[configurable(metadata(docs::examples = 1.0, docs::examples = 0.1, docs::examples = 0.01,))]
-    pub interval: f64,
+    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    pub interval: Duration,
 
     /// The total number of lines to output.
     ///
@@ -69,8 +72,8 @@ pub struct DemoLogsConfig {
     pub log_namespace: Option<bool>,
 }
 
-const fn default_interval() -> f64 {
-    1.0
+const fn default_interval() -> Duration {
+    Duration::from_secs(1)
 }
 
 const fn default_count() -> usize {
@@ -170,7 +173,7 @@ impl DemoLogsConfig {
     pub fn repeat(
         lines: Vec<String>,
         count: usize,
-        interval: f64,
+        interval: Duration,
         log_namespace: Option<bool>,
     ) -> Self {
         Self {
@@ -188,7 +191,7 @@ impl DemoLogsConfig {
 }
 
 async fn demo_logs_source(
-    interval: f64,
+    interval: Duration,
     count: usize,
     format: OutputFormat,
     decoder: Decoder,
@@ -196,9 +199,8 @@ async fn demo_logs_source(
     mut out: SourceSender,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = (interval != 0.0).then_some(interval);
-
-    let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
+    let interval: Option<Duration> = (interval != Duration::ZERO).then_some(interval);
+    let mut interval = interval.map(time::interval);
 
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
     let events_received = register!(EventsReceived);

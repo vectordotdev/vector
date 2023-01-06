@@ -157,6 +157,7 @@ base: components: sources: demo_logs: configuration: {
 		type: float: {
 			default: 1.0
 			examples: [1.0, 0.1, 0.01]
+			unit: "seconds"
 		}
 	}
 	lines: {
