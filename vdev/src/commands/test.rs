@@ -31,7 +31,7 @@ impl Cli {
                 if let Some((key, value)) = entry.split_once('=') {
                     env_vars.insert(key.to_string(), value.to_string());
                 } else {
-                    env_vars.insert(entry.to_string(), "".to_string());
+                    env_vars.insert(entry.to_string(), String::new());
                 }
             }
         }

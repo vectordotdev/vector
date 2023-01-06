@@ -188,7 +188,7 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
             "--workdir",
             MOUNT_PATH,
             "--volume",
-            &format!("{}:{}", app::path(), MOUNT_PATH),
+            &format!("{}:{MOUNT_PATH}", app::path()),
             "--volume",
             &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
             "--volume",

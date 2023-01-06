@@ -20,11 +20,11 @@ pub fn data_dir() -> PathBuf {
 #[once]
 pub fn default_target() -> String {
     if cfg!(windows) {
-        format!("{}-pc-windows-msvc", ARCH)
+        format!("{ARCH}-pc-windows-msvc")
     } else if cfg!(macos) {
-        format!("{}-apple-darwin", ARCH)
+        format!("{ARCH}-apple-darwin")
     } else {
-        format!("{}-unknown-linux-gnu", ARCH)
+        format!("{ARCH}-unknown-linux-gnu")
     }
 }
 
