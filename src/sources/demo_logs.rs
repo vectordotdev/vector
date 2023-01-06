@@ -36,6 +36,7 @@ pub struct DemoLogsConfig {
     /// `interval` to `0.0`.
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
+    #[serde(default = "default_interval")]
     #[configurable(metadata(docs::examples = 1.0, docs::examples = 0.1, docs::examples = 0.01,))]
     pub interval: f64,
 
@@ -43,6 +44,7 @@ pub struct DemoLogsConfig {
     ///
     /// By default, the source continuously prints logs (infinitely).
     #[derivative(Default(value = "default_count()"))]
+    #[serde(default = "default_count")]
     pub count: usize,
 
     #[serde(flatten)]
@@ -50,10 +52,12 @@ pub struct DemoLogsConfig {
 
     #[configurable(derived)]
     #[derivative(Default(value = "default_framing_message_based()"))]
+    #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 
     #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
+    #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
