@@ -1,9 +1,8 @@
-use std::path::PathBuf;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use serde_json::Value;
 
@@ -30,7 +29,7 @@ fn main() -> Result<()> {
 }
 
 fn start(name: &str, config: Value) -> Result<()> {
-    let mut command = compose_command();
+    let mut command = compose_command()?;
     command.args(["up", "-d"]);
 
     apply_env_vars(&mut command, &config, name);
@@ -45,7 +44,7 @@ fn start(name: &str, config: Value) -> Result<()> {
 }
 
 fn stop(name: &str, config: Value) -> Result<()> {
-    let mut command = compose_command();
+    let mut command = compose_command()?;
     command.args(["down", "-t", "0"]);
 
     apply_env_vars(&mut command, &config, name);
@@ -58,16 +57,16 @@ fn stop(name: &str, config: Value) -> Result<()> {
     }
 }
 
-fn compose_command() -> Command {
-    let path = PathBuf::from_iter(["data", "docker-compose.yml"].iter());
-    let compose_file = match dunce::canonicalize(&path) {
-        Ok(p) => p.display().to_string(),
-        Err(_) => path.display().to_string(),
-    };
+fn compose_command() -> Result<Command> {
+    const PATH: &str = "docker-compose.yml";
+    let compose_file = dunce::canonicalize(PATH)
+        .context("Could not canonicalize docker compose path")?
+        .display()
+        .to_string();
 
     let mut command = Command::new("docker");
     command.args(["compose", "-f", &compose_file]);
-    command
+    Ok(command)
 }
 
 fn apply_env_vars(command: &mut Command, config: &Value, integration: &str) {
