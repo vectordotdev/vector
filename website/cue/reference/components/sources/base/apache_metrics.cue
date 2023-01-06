@@ -16,7 +16,7 @@ base: components: sources: apache_metrics: configuration: {
 		type: string: default: "apache"
 	}
 	scrape_interval_secs: {
-		description: "The interval between scrapes, in seconds."
+		description: "The interval between scrapes."
 		required:    false
 		type: uint: {
 			default: 15

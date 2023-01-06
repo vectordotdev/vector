@@ -7,6 +7,7 @@ use chrono::Utc;
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::uri::Scheme;
 use hyper::{Body, Request};
+use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
@@ -30,6 +31,7 @@ pub use parser::ParseError;
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `apache_metrics` source.
+#[serde_as]
 #[configurable_component(source("apache_metrics"))]
 #[derive(Clone, Debug)]
 pub struct ApacheMetricsConfig {
@@ -37,10 +39,11 @@ pub struct ApacheMetricsConfig {
     #[configurable(metadata(docs::examples = "http://localhost:8080/server-status/?auto"))]
     endpoints: Vec<String>,
 
-    /// The interval between scrapes, in seconds.
+    /// The interval between scrapes.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    scrape_interval_secs: Duration,
 
     /// The namespace of the metric.
     ///
@@ -49,8 +52,8 @@ pub struct ApacheMetricsConfig {
     namespace: String,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
-    15
+pub const fn default_scrape_interval_secs() -> Duration {
+    Duration::from_secs(15)
 }
 
 pub fn default_namespace() -> String {
@@ -143,14 +146,14 @@ impl UriExt for http::Uri {
 
 fn apache_metrics(
     urls: Vec<http::Uri>,
-    interval: u64,
+    interval: Duration,
     namespace: Option<String>,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
     proxy: ProxyConfig,
 ) -> super::Source {
     Box::pin(async move {
-        let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
+        let mut stream = IntervalStream::new(tokio::time::interval(interval))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
