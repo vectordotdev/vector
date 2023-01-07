@@ -43,6 +43,7 @@ pub mod cli;
 #[allow(unreachable_pub)]
 pub mod components;
 pub mod conditions;
+pub mod control_server;
 pub mod dns;
 #[cfg(feature = "docker")]
 pub mod docker;
