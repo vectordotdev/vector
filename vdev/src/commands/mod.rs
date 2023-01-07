@@ -6,6 +6,7 @@ mod build;
 mod complete;
 mod config;
 mod exec;
+mod features;
 mod integration;
 mod meta;
 mod status;
@@ -33,6 +34,7 @@ enum Commands {
     Complete(complete::Cli),
     Config(config::Cli),
     Exec(exec::Cli),
+    Features(features::Cli),
     Integration(integration::Cli),
     Meta(meta::Cli),
     Status(status::Cli),
@@ -46,6 +48,7 @@ impl Cli {
             Commands::Complete(cli) => cli.exec(),
             Commands::Config(cli) => cli.exec(),
             Commands::Exec(cli) => cli.exec(),
+            Commands::Features(cli) => cli.exec(),
             Commands::Integration(cli) => cli.exec(),
             Commands::Meta(cli) => cli.exec(),
             Commands::Status(cli) => cli.exec(),

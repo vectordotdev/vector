@@ -17,7 +17,6 @@ fi
 config="$1"
 shift
 
-scripts="$(dirname $0)"
-features=$( "$scripts"/features "$config" )
+features=$( cargo run --package vdev -- features "$config" )
 
 exec cargo run "${options[@]}" --no-default-features --features "$features" -- --config "$config" "$@"
