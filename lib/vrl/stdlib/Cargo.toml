@@ -103,6 +103,7 @@ default = [
     "float",
     "floor",
     "for_each",
+    "for_keys",
     "format_int",
     "format_number",
     "format_timestamp",
@@ -137,7 +138,6 @@ default = [
     "keys",
     "length",
     "log",
-    "map_key_values",
     "map_keys",
     "map_values",
     "match",
@@ -250,6 +250,7 @@ flatten = []
 float = []
 floor = []
 for_each = []
+for_keys = []
 format_int = []
 format_number = ["dep:rust_decimal"]
 format_timestamp = ["dep:chrono"]
@@ -284,7 +285,6 @@ join = []
 keys = []
 length = []
 log = ["dep:tracing", "value/json"]
-map_key_values = []
 map_keys = []
 map_values = []
 match = ["dep:regex"]

@@ -88,6 +88,8 @@ mod float;
 mod floor;
 #[cfg(feature = "for_each")]
 mod for_each;
+#[cfg(feature = "for_keys")]
+mod for_keys;
 #[cfg(feature = "format_int")]
 mod format_int;
 #[cfg(feature = "format_number")]
@@ -162,8 +164,6 @@ mod log;
     feature = "parse_nginx_log"
 ))]
 mod log_util;
-#[cfg(feature = "map_key_values")]
-mod map_key_values;
 #[cfg(feature = "map_keys")]
 mod map_keys;
 #[cfg(feature = "map_values")]
@@ -383,6 +383,8 @@ pub use float::Float;
 pub use floor::Floor;
 #[cfg(feature = "for_each")]
 pub use for_each::ForEach;
+#[cfg(feature = "for_keys")]
+pub use for_keys::ForKeys;
 #[cfg(feature = "format_int")]
 pub use format_int::FormatInt;
 #[cfg(feature = "format_number")]
@@ -451,8 +453,6 @@ pub use keys::Keys;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
-#[cfg(feature = "map_key_values")]
-pub use map_key_values::MapKeyValues;
 #[cfg(feature = "map_keys")]
 pub use map_keys::MapKeys;
 #[cfg(feature = "map_values")]
@@ -678,6 +678,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Floor),
         #[cfg(feature = "for_each")]
         Box::new(ForEach),
+        #[cfg(feature = "for_keys")]
+        Box::new(ForKeys),
         #[cfg(feature = "format_int")]
         Box::new(FormatInt),
         #[cfg(feature = "format_number")]
@@ -746,8 +748,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Length),
         #[cfg(feature = "log")]
         Box::new(Log),
-        #[cfg(feature = "map_key_values")]
-        Box::new(MapKeyValues),
         #[cfg(feature = "map_keys")]
         Box::new(MapKeys),
         #[cfg(feature = "map_values")]

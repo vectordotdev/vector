@@ -1,19 +1,19 @@
-
-use std::collections::btree_map;
 use ::value::Value;
+use std::collections::btree_map;
 use vrl::prelude::*;
 
-fn map_key_values<T>(value: Value, ctx: &mut Context, runner: closure::Runner<T>) -> Resolved where T: Fn(&mut Context) -> Resolved,
-{    
+fn for_keys<T>(value: Value, ctx: &mut Context, runner: closure::Runner<T>) -> Resolved
+where
+    T: Fn(&mut Context) -> Resolved,
+{
     match value {
         Value::Object(map) => {
             let map_parent = MapParent::new(map.iter());
-            for (keys, val) in map_parent
-            {
+            for (keys, val) in map_parent {
                 runner.run_keys_value(ctx, keys, val)?;
             }
             Ok(().into())
-        },
+        }
         value => Err(value::Error::Expected {
             got: value.kind(),
             expected: Kind::object(Collection::any()),
@@ -38,10 +38,7 @@ impl<'a> MapParent<'a> {
         }
     }
 
-    fn new_from_parent(
-        parent: Vec<String>,
-        values: btree_map::Iter<'a, String, Value>,
-    ) -> Self {
+    fn new_from_parent(parent: Vec<String>, values: btree_map::Iter<'a, String, Value>) -> Self {
         Self {
             values,
             inner: None,
@@ -50,14 +47,13 @@ impl<'a> MapParent<'a> {
     }
 
     fn new_key(&self, key: &str) -> Vec<String> {
-
         match &self.parent {
             None => vec![key.to_string()],
             Some(parent) => {
                 let mut copy = parent.to_vec();
                 copy.push(key.to_string());
                 copy
-            },
+            }
         }
     }
 }
@@ -83,7 +79,6 @@ impl<'a> std::iter::Iterator for MapParent<'a> {
                 )));
                 self.next()
             }
-            // If its just a key, value. Creating the new key.
             Some((key, value)) => Some((self.new_key(key), value)),
             None => None,
         }
@@ -91,11 +86,11 @@ impl<'a> std::iter::Iterator for MapParent<'a> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct MapKeyValues;
+pub struct ForKeys;
 
-impl Function for MapKeyValues {
+impl Function for ForKeys {
     fn identifier(&self) -> &'static str {
-        "map_key_values"
+        "for_keys"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -107,13 +102,11 @@ impl Function for MapKeyValues {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[
-            Example {
-                title: "iterate object key values",
-                source: r#"map_key_values({ "a": 1, "b": 2 }) -> |keys, value| { if is_integer(value) { int!(value) + 1 } else { value } }"#,
-                result: Ok(r#"{ "a": 2, "b": 3 }"#),
-            },
-        ]
+        &[Example {
+            title: "iterate object key values",
+            source: r#"for_keys({ "a": 1, "b": 2 }) -> |keys, value| { if is_integer(value) { int!(value) + 1 } else { value } }"#,
+            result: Ok(r#"{ "a": 2, "b": 3 }"#),
+        }]
     }
 
     fn compile(
@@ -125,7 +118,7 @@ impl Function for MapKeyValues {
         let value = arguments.required("value");
         let closure = arguments.required_closure()?;
 
-        Ok(MapKeyValuesFn { value, closure }.as_expr())
+        Ok(ForKeysFn { value, closure }.as_expr())
     }
 
     fn closure(&self) -> Option<closure::Definition> {
@@ -145,8 +138,8 @@ impl Function for MapKeyValues {
                 ],
                 output: Output::Kind(Kind::any()),
                 example: Example {
-                    title: "map object values",
-                    source: r#"map_key_values({ "one" : "one", "two": "two" }) -> |keys, value| { upcase(value) }"#,
+                    title: "iterate object keys/values",
+                    source: r#"for_keys({ "one" : "one", "two": "two" }) -> |keys, value| { upcase(value) }"#,
                     result: Ok(r#"{ "one": "ONE", "two": "TWO" }"#),
                 },
             }],
@@ -156,12 +149,12 @@ impl Function for MapKeyValues {
 }
 
 #[derive(Debug, Clone)]
-struct MapKeyValuesFn {
+struct ForKeysFn {
     value: Box<dyn Expression>,
     closure: FunctionClosure,
 }
 
-impl FunctionExpression for MapKeyValuesFn {
+impl FunctionExpression for ForKeysFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let FunctionClosure {
@@ -171,7 +164,7 @@ impl FunctionExpression for MapKeyValuesFn {
         } = &self.closure;
         let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
 
-        map_key_values(value, ctx, runner)
+        for_keys(value, ctx, runner)
     }
 
     fn type_def(&self, ctx: &state::TypeState) -> TypeDef {
