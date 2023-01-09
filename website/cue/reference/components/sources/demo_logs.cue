@@ -19,7 +19,7 @@ components: sources: demo_logs: {
 	}
 
 	features: {
-		auto_generated:  true
+		auto_generated:   true
 		acknowledgements: false
 		multiline: enabled: false
 		codecs: {
