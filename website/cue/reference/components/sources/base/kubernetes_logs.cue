@@ -196,9 +196,12 @@ base: components: sources: kubernetes_logs: configuration: {
 	read_from: {
 		description: "File position to use when reading a new file."
 		required:    false
-		type: string: enum: {
-			beginning: "Read from the beginning of the file."
-			end:       "Start reading from the current end of the file."
+		type: string: {
+			default: "beginning"
+			enum: {
+				beginning: "Read from the beginning of the file."
+				end:       "Start reading from the current end of the file."
+			}
 		}
 	}
 	self_node_name: {
