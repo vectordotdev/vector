@@ -1,6 +1,6 @@
 use ::value::Value;
-use std::str;
 use nom::AsBytes;
+use std::str;
 use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
