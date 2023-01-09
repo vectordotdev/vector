@@ -106,6 +106,7 @@ struct PostgresqlMetricsTlsConfig {
     /// Absolute path to an additional CA certificate file.
     ///
     /// The certificate must be in the DER or PEM (X.509) format.
+    #[configurable(metadata(docs::examples = "certs/ca.pem"))]
     ca_file: PathBuf,
 }
 
@@ -113,7 +114,7 @@ struct PostgresqlMetricsTlsConfig {
 #[serde_as]
 #[configurable_component(source("postgresql_metrics"))]
 #[derive(Clone, Debug)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct PostgresqlMetricsConfig {
     /// A list of PostgreSQL instances to scrape.
     ///
@@ -149,14 +150,13 @@ pub struct PostgresqlMetricsConfig {
     #[configurable(metadata(docs::examples = "^postgres$", docs::examples = "^template.*",))]
     exclude_databases: Option<Vec<String>>,
 
-    /// The interval between scrapes, in seconds.
+    /// The interval between scrapes.
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
-    ///
-    /// By default, `postgresql` is used.
+    #[serde(default = "default_namespace")]
     namespace: String,
 
     #[configurable(derived)]
@@ -180,6 +180,10 @@ impl_generate_config_from_default!(PostgresqlMetricsConfig);
 
 pub const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
+}
+
+pub fn default_namespace() -> String {
+    "postgresql".to_owned()
 }
 
 #[async_trait::async_trait]
