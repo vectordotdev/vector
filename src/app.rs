@@ -16,6 +16,8 @@ use crate::config::enterprise::{
     attach_enterprise_components, report_configuration, EnterpriseError, EnterpriseMetadata,
     EnterpriseReporter,
 };
+#[cfg(not(windows))]
+use crate::control_server::ControlServer;
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
 #[cfg(windows)]
@@ -24,14 +26,11 @@ use crate::service;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config,
-    generate, generate_schema, graph, heartbeat, list,
+    config, generate, generate_schema, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology, TopologyController},
     trace, unit_test, validate,
 };
-#[cfg(not(windows))]
-use crate::control_server::ControlServer;
 #[cfg(feature = "api-client")]
 use crate::{tap, top};
 
