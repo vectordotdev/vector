@@ -103,6 +103,7 @@ default = [
     "float",
     "floor",
     "for_each",
+    "for_keys",
     "format_int",
     "format_number",
     "format_timestamp",
@@ -249,6 +250,7 @@ flatten = []
 float = []
 floor = []
 for_each = []
+for_keys = []
 format_int = []
 format_number = ["dep:rust_decimal"]
 format_timestamp = ["dep:chrono"]
