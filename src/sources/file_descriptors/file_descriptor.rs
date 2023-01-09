@@ -30,11 +30,9 @@ pub struct FileDescriptorSourceConfig {
     pub host_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::hidden))]
     pub framing: Option<FramingConfig>,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::hidden))]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 

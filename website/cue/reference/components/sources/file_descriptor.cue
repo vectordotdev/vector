@@ -13,6 +13,7 @@ components: sources: file_descriptor: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		multiline: enabled: false
 		codecs: {
