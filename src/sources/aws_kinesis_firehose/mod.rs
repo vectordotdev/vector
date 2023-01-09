@@ -694,7 +694,7 @@ mod tests {
             true,
             false,
         )
-            .await;
+        .await;
 
         let res = send(
             addr,
@@ -704,8 +704,8 @@ mod tests {
             false,
             Compression::None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
         assert_eq!(401, res.status().as_u16());
 
         let response: models::FirehoseResponse = res.json().await.unwrap();
@@ -723,7 +723,7 @@ mod tests {
             true,
             false,
         )
-            .await;
+        .await;
 
         let res = send(
             addr,
@@ -733,8 +733,8 @@ mod tests {
             false,
             Compression::None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         assert_eq!(200, res.status().as_u16());
 
@@ -748,12 +748,15 @@ mod tests {
 
         let (_rx, addr) = source(
             None,
-            Some(vec![valid_access_key.clone().into(), "valid access key 2".to_string().into()]),
+            Some(vec![
+                valid_access_key.clone().into(),
+                "valid access key 2".to_string().into(),
+            ]),
             Default::default(),
             true,
             false,
         )
-            .await;
+        .await;
 
         let res = send(
             addr,
@@ -763,8 +766,8 @@ mod tests {
             false,
             Compression::None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         assert_eq!(200, res.status().as_u16());
 
