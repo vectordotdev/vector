@@ -37,7 +37,7 @@ remap: functions: for_keys: {
 		{
 			title: "Validate log fields"
 			input: log: {
-				event: { category: "authentication", example: "remove me" }
+			    event: { category: "authentication", example: "remove me" }
 			}
 			source: #"""
 
@@ -49,7 +49,7 @@ remap: functions: for_keys: {
                         # Remove key if doesnt match
                         . = remove!(., keys)
                     }				
-				}
+			    }
 				
 				"""#
 			return: { event: { category: "authentication" }}
