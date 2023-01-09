@@ -53,7 +53,9 @@ base: components: sources: file_descriptor: configuration: {
 	fd: {
 		description: "The file descriptor number to read from."
 		required:    true
-		type: uint: {}
+		type: uint: examples: [
+			10,
+		]
 	}
 	framing: {
 		description: """
@@ -143,6 +145,9 @@ base: components: sources: file_descriptor: configuration: {
 			Messages larger than this are truncated.
 			"""
 		required: false
-		type: uint: default: 102400
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
 	}
 }

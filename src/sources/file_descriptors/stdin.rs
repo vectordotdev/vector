@@ -20,6 +20,7 @@ pub struct StdinConfig {
     /// The maximum buffer size, in bytes, of incoming messages.
     ///
     /// Messages larger than this are truncated.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
 
