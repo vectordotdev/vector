@@ -147,7 +147,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.3", default-features = false }
-async-trait = { version = "0.1.60", default-features = false }
+async-trait = { version = "0.1.61", default-features = false }
 futures = { version = "0.3.25", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.24.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
@@ -259,7 +259,7 @@ enum_dispatch = { version = "0.3.9", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.25", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.25", default-features = false }
-glob = { version = "0.3.0", default-features = false }
+glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.5.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.3.13", default-features = false, optional = true }
@@ -300,7 +300,7 @@ pulsar = { version = "5.0.0", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.29.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.22.1", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.22.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.7.0", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }

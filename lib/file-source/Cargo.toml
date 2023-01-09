@@ -12,7 +12,7 @@ winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
 crc = "3.0.0"
-glob = "0.3.0"
+glob = "0.3.1"
 scan_fmt = "0.2.6"
 
 [dependencies.bstr]
