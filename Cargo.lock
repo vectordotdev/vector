@@ -2881,6 +2881,9 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing 0.1.37",
+ "vector-config",
+ "vector-config-common",
+ "vector-config-macros",
  "winapi",
 ]
 
