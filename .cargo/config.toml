@@ -1,3 +1,6 @@
+[alias]
+vdev = "run --package vdev --"
+
 [target.'cfg(all())']
 rustflags = [
   "-Dclippy::print_stdout",
