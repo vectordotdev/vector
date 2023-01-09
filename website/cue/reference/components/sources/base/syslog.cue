@@ -50,7 +50,8 @@ base: components: sources: syslog: configuration: {
 		type: uint: default: 102400
 	}
 	mode: {
-		required: true
+		description: "The type of socket to use."
+		required:    true
 		type: string: enum: {
 			tcp:  "Listen on TCP."
 			udp:  "Listen on UDP."

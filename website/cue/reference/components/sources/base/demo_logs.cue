@@ -60,7 +60,8 @@ base: components: sources: demo_logs: configuration: {
 		}
 	}
 	format: {
-		required: false
+		description: "The format of the randomly generated output."
+		required:    false
 		type: string: {
 			default: "json"
 			enum: {
