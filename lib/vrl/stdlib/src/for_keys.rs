@@ -104,8 +104,8 @@ impl Function for ForKeys {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "iterate object key values",
-            source: r#"for_keys({ "a": 1, "b": 2 }) -> |keys, value| { if is_integer(value) { int!(value) + 1 } else { value } }"#,
-            result: Ok(r#"{ "a": 2, "b": 3 }"#),
+            source: r#".example = {}; .example.child = "123"; for_keys(.) -> |keys, value| { if join!(keys, ".") == "example.child" { . = remove!(., keys) }}"#,
+            result: Ok(r#"{"example":{}}"#),
         }]
     }
 
@@ -130,7 +130,7 @@ impl Function for ForKeys {
                 kind: Kind::object(Collection::any()).or_array(Collection::any()),
                 variables: vec![
                     Variable {
-                        kind: VariableKind::TargetInnerValue,
+                        kind: VariableKind::Exact(Kind::array(Collection::any())),
                     },
                     Variable {
                         kind: VariableKind::TargetInnerValue,
@@ -139,8 +139,8 @@ impl Function for ForKeys {
                 output: Output::Kind(Kind::any()),
                 example: Example {
                     title: "iterate object keys/values",
-                    source: r#"for_keys({ "one" : "one", "two": "two" }) -> |keys, value| { upcase(value) }"#,
-                    result: Ok(r#"{ "one": "ONE", "two": "TWO" }"#),
+                    source: r#".example = {}; .example.child = "123"; for_keys(.) -> |keys, value| { if join!(keys, ".") == "example.child" { . = remove!(., keys) }}"#,
+                    result: Ok(r#"{"example":{}}"#),
                 },
             }],
             is_iterator: true,
