@@ -49,6 +49,7 @@ static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
 //
 // TODO: It seems awfully likely that we could re-use the existing configuration type for the `aws_sqs` source in some
 // way, given the near 100% overlap in configurable values.
+#[serde_with]
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]

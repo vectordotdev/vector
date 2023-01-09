@@ -81,7 +81,6 @@ pub enum AwsAuthentication {
         assume_role: String,
 
         /// Timeout for assuming the role, in seconds.
-        // TODO: Duration?
         load_timeout_secs: Option<u64>,
 
         /// Configuration for authenticating with AWS through IMDS.
@@ -99,7 +98,6 @@ pub enum AwsAuthentication {
     #[derivative(Default)]
     Default {
         /// Timeout for successfully loading any credentials, in seconds.
-        // TODO: Duration?
         load_timeout_secs: Option<u64>,
 
         /// Configuration for authenticating with AWS through IMDS.

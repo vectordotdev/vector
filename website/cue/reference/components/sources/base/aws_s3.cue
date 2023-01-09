@@ -19,15 +19,6 @@ base: components: sources: aws_s3: configuration: {
 			type: bool: {}
 		}
 	}
-	assume_role: {
-		description: """
-			The ARN of an [IAM role][iam_role] to assume at startup.
-
-			[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
-			"""
-		required: false
-		type: string: {}
-	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
 		required:    false
