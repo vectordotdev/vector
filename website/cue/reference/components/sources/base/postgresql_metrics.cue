@@ -11,7 +11,7 @@ base: components: sources: postgresql_metrics: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["postgresql://postgres:vector@localhost:5432/postgres"]
 		}
 	}
 	exclude_databases: {
@@ -25,7 +25,7 @@ base: components: sources: postgresql_metrics: configuration: {
 			This can be used in conjunction with `include_databases`.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["^postgres$", "^template.*"]
 	}
 	include_databases: {
 		description: """
@@ -39,7 +39,7 @@ base: components: sources: postgresql_metrics: configuration: {
 			This can be used in conjunction with `exclude_databases`.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["^postgres$", "^vector$", "^foo"]
 	}
 	namespace: {
 		description: """
@@ -53,7 +53,10 @@ base: components: sources: postgresql_metrics: configuration: {
 	scrape_interval_secs: {
 		description: "The interval between scrapes, in seconds."
 		required:    false
-		type: uint: default: 15
+		type: uint: {
+			default: 15
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description: "Configuration of TLS when connecting to PostgreSQL."
