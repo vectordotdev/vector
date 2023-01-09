@@ -34,10 +34,10 @@ jobs:
 
     - if: runner.os != 'Windows'
       name: Strip binary
-      run: strip vdev/target/release/vdev
+      run: strip target/release/vdev
 
     - uses: actions/upload-artifact@v3
       with:
         name: vdev-${{ runner.os }}
-        path: vdev/target/release/${{ runner.os == 'Windows' && 'vdev.exe' || 'vdev' }}
+        path: target/release/${{ runner.os == 'Windows' && 'vdev.exe' || 'vdev' }}
         if-no-files-found: error
