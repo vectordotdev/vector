@@ -11,6 +11,7 @@ mod macros;
 mod app;
 mod commands;
 mod config;
+mod features;
 mod git;
 mod platform;
 mod testing;

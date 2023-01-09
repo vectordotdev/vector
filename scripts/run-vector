@@ -1,22 +1,2 @@
-#!/bin/bash
-set -o errexit
-
-options=()
-while [[ "$1" = -* ]]
-do
-  options+=( "$1" )
-  shift
-done
-
-if [ $# -lt 1 ]
-then
-  echo "usage: $0 [--debug] [--release] CONFIG.toml [VECTOR-OPTIONS]"
-  exit 1
-fi
-
-config="$1"
-shift
-
-features=$( cargo run --package vdev -- features "$config" )
-
-exec cargo run "${options[@]}" --no-default-features --features "$features" -- --config "$config" "$@"
+#!/bin/sh
+exec cargo vdev run "$@"
