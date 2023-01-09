@@ -63,7 +63,7 @@ impl ControlServer {
         let server = server::Builder::new(accept, Http::new()).serve(app.into_make_service());
         let graceful = server.with_graceful_shutdown(self.shutdown_signal.map(|_| ()));
 
-        info!(message = "Starting Vector control server", socket_path = ?self.socket_path);
+        info!(message = "Starting Vector control server.", socket_path = ?self.socket_path);
 
         graceful.await?;
 

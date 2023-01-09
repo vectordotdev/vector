@@ -25,12 +25,13 @@ use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config,
-    control_server::ControlServer,
     generate, generate_schema, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology, TopologyController},
     trace, unit_test, validate,
 };
+#[cfg(not(windows))]
+use crate::control_server::ControlServer;
 #[cfg(feature = "api-client")]
 use crate::{tap, top};
 
@@ -324,6 +325,7 @@ impl Application {
             let topology_controller = Arc::new(Mutex::new(topology_controller));
 
             // If the relevant ENV var is set, start up the control server
+            #[cfg(not(windows))]
             let control_server_pieces = if let Ok(path) = std::env::var("VECTOR_CONTROL_SOCKET_PATH") {
                 let (shutdown_trigger, tripwire) = stream_cancel::Tripwire::new();
                 match ControlServer::bind(path, Arc::clone(&topology_controller), tripwire) {
@@ -332,7 +334,7 @@ impl Application {
                         Some((shutdown_trigger, server_handle))
                     }
                     Err(error) => {
-                        error!(message = "Error binding control server", %error);
+                        error!(message = "Error binding control server.", %error);
                         // TODO: We should exit non-zero here, but `Application::run` isn't set up
                         // that way, and we'd need to push everything up to the API server start
                         // into `Application::prepare`.
@@ -387,6 +389,7 @@ impl Application {
             };
 
             // Shut down the control server, if running
+            #[cfg(not(windows))]
             if let Some((shutdown_trigger, server_handle)) = control_server_pieces {
                 drop(shutdown_trigger);
                 server_handle.await.expect("control server task panicked").expect("control server error");
