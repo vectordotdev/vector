@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashSet};
+use std::env;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -8,6 +9,7 @@ use atty::Stream;
 use super::config::RustToolchainConfig;
 use crate::app::{self, CommandExt as _};
 
+const DEFAULT_CONTAINER_TOOL: &str = "docker";
 pub const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
@@ -21,6 +23,13 @@ const TEST_COMMAND: &[&str] = &[
     "--no-fail-fast",
     "--no-default-features",
 ];
+
+fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
+    let command = env::var_os("CONTAINER_TOOL").unwrap_or_else(|| DEFAULT_CONTAINER_TOOL.into());
+    let mut command = Command::new(command);
+    command.args(args);
+    command
+}
 
 enum RunnerState {
     Running,
@@ -43,12 +52,6 @@ pub fn get_agent_test_runner(container: bool, rust_version: String) -> Box<dyn T
 
 pub trait TestRunner {
     fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()>;
-}
-
-fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
-    let mut command = Command::new("docker");
-    command.args(args);
-    command
 }
 
 pub trait ContainerTestRunnerBase: TestRunner {
