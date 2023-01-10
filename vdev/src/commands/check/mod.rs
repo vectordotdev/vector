@@ -2,7 +2,7 @@ crate::cli_subcommands! {
     "Check parts of the Vector code base"
     component_docs,
     component_features,
-    deny,
+    mod deny,
     docs,
     events,
     examples,
@@ -23,11 +23,6 @@ crate::script_wrapper! {
 crate::script_wrapper! {
     component_features = "scripts/check-component-features"
         "Check that all component features are set up properly"
-}
-
-crate::script_wrapper! {
-    deny = "scripts/check-deny.sh"
-        "Check advisories, licenses, and sources for crate dependencies "
 }
 
 crate::script_wrapper! {
