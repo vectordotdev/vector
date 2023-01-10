@@ -37,16 +37,20 @@ macro_rules! mapping {
     };
 }
 
-pub fn load_and_extract(filename: impl AsRef<Path>) -> Result<String> {
-    let filename = filename.as_ref();
+pub fn load_and_extract(filename: &Path) -> Result<String> {
     let config =
         fs::read_to_string(filename).with_context(|| format!("failed to read {filename:?}"))?;
 
-    let config: VectorConfig = match filename.extension().and_then(OsStr::to_str) {
+    let config: VectorConfig = match filename
+        .extension()
+        .and_then(OsStr::to_str)
+        .map(str::to_lowercase)
+        .as_deref()
+    {
         None => bail!("Invalid filename {filename:?}, no extension"),
         Some("json") => serde_json::from_str(&config)?,
         Some("toml") => toml::from_str(&config)?,
-        Some("yaml") => serde_yaml::from_str(&config)?,
+        Some("yaml" | "yml") => serde_yaml::from_str(&config)?,
         Some(_) => bail!("Invalid filename {filename:?}, unknown extension"),
     };
 

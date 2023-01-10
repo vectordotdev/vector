@@ -15,7 +15,7 @@ pub struct Cli {
 impl Cli {
     #[allow(clippy::print_stdout)]
     pub fn exec(self) -> Result<()> {
-        let features = features::load_and_extract(self.config)?;
+        let features = features::load_and_extract(&self.config)?;
         println!("{features}");
         Ok(())
     }
