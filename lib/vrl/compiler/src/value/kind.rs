@@ -170,7 +170,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(Kind::from(value), want, "{}", title);
+            assert_eq!(Kind::from(value), want, "{title}");
         }
     }
 }

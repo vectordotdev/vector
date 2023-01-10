@@ -27,7 +27,7 @@ pub fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option
     Some(iter.fold(
         m.clone(),
         |mut m1, m2| {
-            if m1.update(&m2) {
+            if m1.update(m2) {
                 m1
             } else {
                 m2.clone()

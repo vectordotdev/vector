@@ -167,7 +167,7 @@ pub fn init_test() {
 fn has_tags(metric: &Metric, names: &[&str]) -> bool {
     metric
         .tags()
-        .map(|tags| names.iter().all(|name| tags.contains_key(*name)))
+        .map(|tags| names.iter().all(|name| tags.contains_key(name)))
         .unwrap_or_else(|| names.is_empty())
 }
 

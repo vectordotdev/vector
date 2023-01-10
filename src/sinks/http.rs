@@ -457,7 +457,7 @@ mod tests {
     fn http_encode_event_text() {
         let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink((None::<FramingConfig>, TextSerializerConfig::new()).into());
+        let sink = default_sink((None::<FramingConfig>, TextSerializerConfig::default()).into());
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 
@@ -471,7 +471,7 @@ mod tests {
         let sink = default_sink(
             (
                 Some(NewlineDelimitedEncoderConfig::new()),
-                JsonSerializerConfig::new(),
+                JsonSerializerConfig::default(),
             )
                 .into(),
         );

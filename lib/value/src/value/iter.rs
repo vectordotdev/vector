@@ -378,7 +378,7 @@ mod tests {
                 })
                 .collect();
 
-            assert_eq!(got, items, "{}", title);
+            assert_eq!(got, items, "{title}");
         }
     }
 

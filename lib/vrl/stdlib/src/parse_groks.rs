@@ -32,7 +32,7 @@ impl DiagnosticMessage for Error {
         match self {
             Error::InvalidGrokPattern(err) => {
                 vec![Label::primary(
-                    format!("grok pattern error: {}", err),
+                    format!("grok pattern error: {err}"),
                     Span::default(),
                 )]
             }
@@ -161,7 +161,7 @@ impl FunctionExpression for ParseGroksFn {
         let bytes = value.try_bytes_utf8_lossy()?;
 
         let v = parse_grok::parse_grok(bytes.as_ref(), &self.grok_rules)
-            .map_err(|err| format!("unable to parse grok: {}", err))?;
+            .map_err(|err| format!("unable to parse grok: {err}"))?;
 
         Ok(v)
     }

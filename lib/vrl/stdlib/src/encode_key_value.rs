@@ -138,7 +138,7 @@ fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
         .map(|(idx, v)| {
             v.try_bytes_utf8_lossy()
                 .map(|v| v.to_string())
-                .map_err(|e| format!("invalid field value type at index {}: {}", idx, e).into())
+                .map_err(|e| format!("invalid field value type at index {idx}: {e}").into())
         })
         .collect()
 }

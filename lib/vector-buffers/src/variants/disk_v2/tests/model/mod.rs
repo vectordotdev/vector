@@ -932,7 +932,7 @@ proptest! {
                                                 Ok(written) => prop_assert_eq!(model_result, Progress::RecordWritten(written), "expected completed write"),
                                                 Err(e) => prop_assert_eq!(model_result, Progress::WriteError(e), "expected write error"),
                                             },
-                                            WriteActionResult::Flush(r) => panic!("got unexpected flush action result for pending write: {:?}", r),
+                                            WriteActionResult::Flush(r) => panic!("got unexpected flush action result for pending write: {r:?}"),
                                         }
                                     },
                                 }
@@ -948,11 +948,11 @@ proptest! {
                                     Poll::Pending => panic!("flush should never be blocked"),
                                     Poll::Ready(sut_result) => match sut_result {
                                         WriteActionResult::Flush(result) => prop_assert!(result.is_ok()),
-                                        WriteActionResult::Write(r) => panic!("got unexpected write action result for pending flush: {:?}", r),
+                                        WriteActionResult::Write(r) => panic!("got unexpected write action result for pending flush: {r:?}"),
                                     },
                                 }
                             },
-                            a => panic!("invalid action for pending write: {:?}", a),
+                            a => panic!("invalid action for pending write: {a:?}"),
                         }
                     }
 
@@ -975,7 +975,7 @@ proptest! {
                                     },
                                 }
                             },
-                            a => panic!("invalid action for pending read: {:?}", a),
+                            a => panic!("invalid action for pending read: {a:?}"),
                         }
                     }
 

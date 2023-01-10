@@ -81,6 +81,9 @@ pub enum DemoLogsConfigError {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(tag = "format", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The format of the randomly generated output."
+))]
 pub enum OutputFormat {
     /// Lines are chosen at random from the list specified using `lines`.
     Shuffle {

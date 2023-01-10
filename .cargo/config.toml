@@ -1,3 +1,6 @@
+[alias]
+vdev = "run --package vdev --"
+
 [target.'cfg(all())']
 rustflags = [
   "-Dclippy::print_stdout",
@@ -24,3 +27,7 @@ rustflags = ["-C", "link-args=-rdynamic"]
 
 [target.aarch64-unknown-linux-gnu]
 rustflags = ["-C", "link-args=-rdynamic"]
+
+[target.x86_64-pc-windows-msvc]
+# https://github.com/dtolnay/inventory/issues/58
+rustflags = ["-C", "codegen-units=1"]

@@ -28,7 +28,7 @@ fn parse_int(value: Value, base: Option<Value>) -> Resolved {
         },
     };
     let converted = i64::from_str_radix(&string[index..], base)
-        .map_err(|err| format!("could not parse integer: {}", err))?;
+        .map_err(|err| format!("could not parse integer: {err}"))?;
 
     Ok(converted.into())
 }

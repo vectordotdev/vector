@@ -1,26 +1,27 @@
-use std::{
-    fmt,
-    num::{
-        NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64,
-        NonZeroU8, NonZeroUsize,
-    },
+use std::num::{
+    NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8,
+    NonZeroUsize,
 };
 
 use num_traits::{Bounded, One, ToPrimitive, Zero};
 use schemars::schema::InstanceType;
+use serde::Serialize;
 use serde_json::Number;
 use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
 
 /// The class of a numeric type.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub enum NumberClass {
     /// A signed integer.
+    #[serde(rename = "int")]
     Signed,
 
     /// An unsigned integer.
+    #[serde(rename = "uint")]
     Unsigned,
 
     /// A floating-point number.
+    #[serde(rename = "float")]
     FloatingPoint,
 }
 
@@ -33,16 +34,6 @@ impl NumberClass {
         match self {
             Self::Signed | Self::Unsigned => InstanceType::Integer,
             Self::FloatingPoint => InstanceType::Number,
-        }
-    }
-}
-
-impl fmt::Display for NumberClass {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Signed => f.write_str("int"),
-            Self::Unsigned => f.write_str("uint"),
-            Self::FloatingPoint => f.write_str("float"),
         }
     }
 }

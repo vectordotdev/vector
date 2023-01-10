@@ -164,7 +164,7 @@ impl Template {
                             EventRef::Metric(metric) => {
                                 render_metric_field(key, metric).map(Cow::Borrowed)
                             }
-                            EventRef::Trace(trace) => trace.get(&key).map(Value::to_string_lossy),
+                            EventRef::Trace(trace) => trace.get(key).map(Value::to_string_lossy),
                         }
                         .unwrap_or_else(|| {
                             missing_keys.push(key.to_owned());

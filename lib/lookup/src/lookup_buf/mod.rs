@@ -314,7 +314,7 @@ impl Serialize for LookupBuf {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&*ToString::to_string(self))
+        serializer.serialize_str(&ToString::to_string(self))
     }
 }
 

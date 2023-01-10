@@ -187,7 +187,7 @@ where
     fn from(e: CompositeSerializerError<StdInfallible, AllocScratchError, StdInfallible>) -> Self {
         match e {
             CompositeSerializerError::ScratchSpaceError(sse) => WriterError::FailedToSerialize {
-                reason: format!("insufficient space to serialize encoded record: {}", sse),
+                reason: format!("insufficient space to serialize encoded record: {sse}"),
             },
             // Only our scratch space strategy is fallible, so we should never get here.
             _ => unreachable!(),

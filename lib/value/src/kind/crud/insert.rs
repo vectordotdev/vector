@@ -751,7 +751,7 @@ mod tests {
             ),
         ] {
             this.insert(&path, kind);
-            assert_eq!(this, expected, "{}", title);
+            assert_eq!(this, expected, "{title}");
         }
     }
 }

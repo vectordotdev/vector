@@ -306,7 +306,7 @@ mod tests {
         };
 
         let mut builder = reqwest::Client::new()
-            .post(&format!("http://{}", address))
+            .post(format!("http://{}", address))
             .header("host", address.to_string())
             .header(
                 "x-amzn-trace-id",
@@ -368,7 +368,7 @@ mod tests {
             Compression::None => record.to_vec(),
         };
 
-        Ok(base64::encode(&compressed))
+        Ok(base64::encode(compressed))
     }
 
     #[tokio::test]

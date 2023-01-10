@@ -99,7 +99,7 @@ impl Event {
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a log event"),
         }
     }
 
@@ -111,7 +111,7 @@ impl Event {
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a log event"),
         }
     }
 
@@ -123,7 +123,7 @@ impl Event {
     pub fn into_log(self) -> LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a log event"),
         }
     }
 
@@ -155,7 +155,7 @@ impl Event {
     pub fn as_metric(&self) -> &Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
+            _ => panic!("Failed type coercion, {self:?} is not a metric"),
         }
     }
 
@@ -167,7 +167,7 @@ impl Event {
     pub fn as_mut_metric(&mut self) -> &mut Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
+            _ => panic!("Failed type coercion, {self:?} is not a metric"),
         }
     }
 
@@ -179,7 +179,7 @@ impl Event {
     pub fn into_metric(self) -> Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
+            _ => panic!("Failed type coercion, {self:?} is not a metric"),
         }
     }
 
@@ -201,7 +201,7 @@ impl Event {
     pub fn as_trace(&self) -> &TraceEvent {
         match self {
             Event::Trace(trace) => trace,
-            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a trace event"),
         }
     }
 
@@ -213,7 +213,7 @@ impl Event {
     pub fn as_mut_trace(&mut self) -> &mut TraceEvent {
         match self {
             Event::Trace(trace) => trace,
-            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a trace event"),
         }
     }
 
@@ -225,7 +225,7 @@ impl Event {
     pub fn into_trace(self) -> TraceEvent {
         match self {
             Event::Trace(trace) => trace,
-            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+            _ => panic!("Failed type coercion, {self:?} is not a trace event"),
         }
     }
 

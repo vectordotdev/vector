@@ -16,7 +16,7 @@ use std::{
 use azure_storage_blobs::prelude::ContainerClient;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
-use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
+use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoder};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
 use http::Uri;
@@ -310,6 +310,7 @@ impl DatadogArchivesSinkConfig {
                     Some(azure_config.connection_string.clone()),
                     None,
                     self.bucket.clone(),
+                    None,
                 )?;
                 let svc = self
                     .build_azure_sink(Arc::<ContainerClient>::clone(&client))
@@ -525,7 +526,7 @@ impl DatadogArchivesEncoding {
                 transformer,
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new().into(),
+                    JsonSerializerConfig::default().build().into(),
                 ),
             ),
             reserved_attributes: RESERVED_ATTRIBUTES.iter().copied().collect(),

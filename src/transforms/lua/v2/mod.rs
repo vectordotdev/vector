@@ -1,5 +1,6 @@
 use std::{path::PathBuf, time::Duration};
 
+use codecs::MetricTagValues;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
@@ -8,7 +9,6 @@ use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 use crate::event::lua::event::LuaEvent;
 use crate::schema::Definition;
-use crate::transforms::MetricTagsValues;
 use crate::{
     config::{self, DataType, Input, Output, CONFIG_PATHS},
     event::Event,
@@ -83,7 +83,7 @@ pub struct LuaConfig {
     /// When set to `full`, all metric tags will be exposed as arrays of either string or null
     /// values.
     #[serde(default)]
-    metric_tag_values: MetricTagsValues,
+    metric_tag_values: MetricTagValues,
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
@@ -269,7 +269,7 @@ impl Lua {
             timers.push((timer, handler_key));
         }
 
-        let multi_value_tags = config.metric_tag_values == MetricTagsValues::Full;
+        let multi_value_tags = config.metric_tag_values == MetricTagValues::Full;
 
         Ok(Self {
             lua,
