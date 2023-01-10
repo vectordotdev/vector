@@ -67,10 +67,11 @@ pub struct Cli {
 
 cli_commands! {
     mod build,
+    mod check,
     mod complete,
-    mod component_docs,
     mod config,
     mod exec,
+    mod generate,
     mod integration,
     mod meta,
     mod status,

@@ -13,5 +13,5 @@ set -eu
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
-scripts/generate-manifests.sh
-scripts/generate-release-cue.rb
+cargo vdev generate manifests
+cargo vdev generate release-cue

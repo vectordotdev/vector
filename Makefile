@@ -451,7 +451,7 @@ check-all: check-scripts check-deny check-component-docs
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check component-features
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
@@ -459,43 +459,43 @@ check-clippy: ## Check code with Clippy
 
 .PHONY: check-docs
 check-docs: ## Check that all /docs file are valid
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-docs.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check docs
 
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-fmt.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check fmt
 
 .PHONY: check-style
 check-style: ## Check that all files are styled properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check style
 
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-markdown.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check markdown
 
 .PHONY: check-version
 check-version: ## Check that Vector's version is correct accounting for recent changes
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-version.rb
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check version
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-examples.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check examples
 
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check scripts
 
 .PHONY: check-deny
 check-deny: ## Check advisories licenses and sources for crate dependencies
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-deny.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check deny
 
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check events
 
 .PHONY: check-component-docs
 check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev component-docs check
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check component-docs
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -657,17 +657,17 @@ clean: environment-clean ## Clean everything
 .PHONY: fmt
 fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check style --fix
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
-	scripts/generate-manifests.sh
+	cargo vdev generate manifests
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
 	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev component-docs generate /tmp/vector-config-schema.json \
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev generate component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: signoff
