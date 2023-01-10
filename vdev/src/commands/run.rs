@@ -1,10 +1,9 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{bail, Result};
 use clap::Args;
-use exec::Command;
 
-use crate::features;
+use crate::{app, features};
 
 /// Run `vector` with the minimum set of features required by the config file
 #[derive(Args, Debug)]
@@ -34,19 +33,19 @@ impl Cli {
 
         let features = features::load_and_extract(&self.config)?;
 
-        // exec cargo run "${options[@]}" --no-default-features --features "$features" -- --config "$config" "$@"
-        let mut command = Command::new("cargo");
-        command.args(&[
-            "--no-default-features",
-            "--features",
-            &features,
-            mode,
-            "--",
-            "--config",
-        ]);
-        command.arg(self.config);
-        command.args(&self.args);
-
-        Err(command.exec()).context("Could not execute `cargo`")
+        app::exec(
+            Path::new("cargo"),
+            [
+                "--no-default-features",
+                "--features",
+                &features,
+                mode,
+                "--",
+                "--config",
+                self.config.to_str().expect("Invalid config file name"),
+            ]
+            .into_iter()
+            .chain(self.args.iter().map(String::as_str)),
+        )
     }
 }
