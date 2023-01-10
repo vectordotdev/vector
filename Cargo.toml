@@ -242,7 +242,7 @@ arc-swap = { version = "1.6", default-features = false, optional = true }
 async-compression = { version = "0.3.15", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.14.0", default-features = false, optional = true }
 axum = { version = "0.6.2", default-features = false }
-base64 = { version = "0.20.0", default-features = false, optional = true }
+base64 = { version = "0.21.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.13.0", default-features = false, features = ["ssl", "chrono"] }
 bytes = { version = "1.3.0", default-features = false, features = ["serde"] }
@@ -351,7 +351,7 @@ azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b
 azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
-base64 = "0.20.0"
+base64 = "0.21.0"
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.10.5", default-features = false }
 libc = "0.2.139"
