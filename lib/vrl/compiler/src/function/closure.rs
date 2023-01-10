@@ -227,13 +227,12 @@ where
     ) -> Result<Value, ExpressionError> {
         // TODO: we need to allow `LocalEnv` to take a mutable reference to
         // values, instead of owning them.
-        let cloned_keys = keys.to_owned();
         let cloned_value = value.clone();
 
         let keys_ident = self.ident(0);
         let value_ident = self.ident(1);
 
-        let old_keys = insert(ctx.state_mut(), keys_ident, cloned_keys.into());
+        let old_keys = insert(ctx.state_mut(), keys_ident, keys.into());
         let old_value = insert(ctx.state_mut(), value_ident, cloned_value);
 
         let value = (self.runner)(ctx)?;
