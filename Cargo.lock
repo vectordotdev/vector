@@ -1536,16 +1536,16 @@ checksum = "c1db59621ec70f09c5e9b597b220c7a2b43611f4710dc03ceb8748637775692c"
 
 [[package]]
 name = "cached"
-version = "0.40.0"
+version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b4147cd94d5fbdc2ab71b11d50a2f45493625576b3bb70257f59eedea69f3d"
+checksum = "5e5877db5d1af7fae60d06b5db9430b68056a69b3582a0be8e3691e87654aeb6"
 dependencies = [
  "async-trait",
  "async_once",
  "cached_proc_macro",
  "cached_proc_macro_types",
  "futures 0.3.25",
- "hashbrown 0.12.3",
+ "hashbrown 0.13.1",
  "instant",
  "lazy_static",
  "once_cell",
@@ -1555,12 +1555,13 @@ dependencies = [
 
 [[package]]
 name = "cached_proc_macro"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "751f7f4e7a091545e7f6c65bacc404eaee7e87bfb1f9ece234a1caa173dc16f2"
+checksum = "e10ca87c81aaa3a949dbbe2b5e6c2c45dbc94ba4897e45ea31ff9ec5087be3dc"
 dependencies = [
  "cached_proc_macro_types",
- "darling 0.13.4",
+ "darling 0.14.2",
+ "proc-macro2",
  "quote",
  "syn",
 ]
