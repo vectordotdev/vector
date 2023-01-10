@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: for_keys: {
-	category:    "Enumerate"
+	category: "Enumerate"
 	description: """
 		Iterate recursively through an object.
 
@@ -38,7 +38,7 @@ remap: functions: for_keys: {
 		{
 			title: "Validate log fields"
 			input: log: {
-			    event: { category: "authentication", example: "remove me" }
+				event: {category: "authentication", example: "remove me"}
 			}
 			source: #"""
 
@@ -53,7 +53,7 @@ remap: functions: for_keys: {
 			    }
 
 				"""#
-			return: { event: { category: "authentication" }}
+			return: {event: {category: "authentication"}}
 		},
 	]
 }
