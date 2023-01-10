@@ -297,7 +297,7 @@ mod integration_tests {
     async fn test_nginx(endpoint: String, auth: Option<Auth>, proxy: ProxyConfig) {
         let config = NginxMetricsConfig {
             endpoints: vec![endpoint],
-            scrape_interval_secs: 15,
+            scrape_interval_secs: Duration::from_secs(1),
             namespace: "vector_nginx".to_owned(),
             tls: None,
             auth,
