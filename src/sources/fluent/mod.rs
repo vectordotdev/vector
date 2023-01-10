@@ -1,5 +1,6 @@
 use std::io::{self, Read};
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
@@ -84,7 +85,7 @@ impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let source = FluentSource::new(log_namespace);
-        let shutdown_secs = 30;
+        let shutdown_secs = Duration::from_secs(30);
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
         let tls_client_metadata_key = self
             .tls

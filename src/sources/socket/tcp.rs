@@ -1,9 +1,12 @@
+use std::time::Duration;
+
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::{
     lookup_v2::{parse_value_path, OptionalValuePath},
     owned_value_path, path,
 };
+use serde_with::serde_as;
 use smallvec::SmallVec;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LegacyKey, LogNamespace};
@@ -22,6 +25,7 @@ use super::SocketConfig;
 
 /// TCP configuration for the `socket` source.
 #[configurable_component]
+#[serde_as]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
     /// The address to listen for connections on.
@@ -37,7 +41,9 @@ pub struct TcpConfig {
 
     /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
-    shutdown_timeout_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::numeric_type))]
+    shutdown_timeout_secs: Duration,
 
     /// Overrides the name of the log field used to add the peer host to each event.
     ///
@@ -78,8 +84,8 @@ pub struct TcpConfig {
     pub log_namespace: Option<bool>,
 }
 
-const fn default_shutdown_timeout_secs() -> u64 {
-    30
+const fn default_shutdown_timeout_secs() -> Duration {
+    Duration::from_secs(30)
 }
 
 impl TcpConfig {
@@ -132,7 +138,7 @@ impl TcpConfig {
         self.max_length
     }
 
-    pub const fn shutdown_timeout_secs(&self) -> u64 {
+    pub const fn shutdown_timeout_secs(&self) -> Duration {
         self.shutdown_timeout_secs
     }
 
@@ -146,7 +152,7 @@ impl TcpConfig {
     }
 
     pub fn set_shutdown_timeout_secs(&mut self, val: u64) -> &mut Self {
-        self.shutdown_timeout_secs = val;
+        self.shutdown_timeout_secs = Duration::from_secs(val);
         self
     }
 
