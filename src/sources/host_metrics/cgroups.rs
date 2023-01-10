@@ -253,19 +253,19 @@ impl CGroupRoot {
             let hybrid_test_file = join_path(&hybrid_root, CGROUP_CONTROLLERS);
             let modern_test_file = join_path(&base_dir, CGROUP_CONTROLLERS);
             let cpu_dir = join_path(&base_dir, "cpu");
-            if is_file(&hybrid_test_file) {
+            if is_file(hybrid_test_file) {
                 debug!(
                     message = "Detected hybrid cgroup base directory.",
                     ?base_dir
                 );
                 Mode::Hybrid(base_dir, hybrid_root)
-            } else if is_file(&modern_test_file) {
+            } else if is_file(modern_test_file) {
                 debug!(
                     message = "Detected modern cgroup base directory.",
                     ?base_dir
                 );
                 Mode::Modern(base_dir)
-            } else if is_dir(&cpu_dir) {
+            } else if is_dir(cpu_dir) {
                 debug!(
                     message = "Detected legacy cgroup base directory.",
                     ?base_dir

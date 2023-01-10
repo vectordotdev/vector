@@ -458,7 +458,7 @@ mod tests {
         query: &str,
     ) -> u16 {
         let len = body.lines().count();
-        let mut req = reqwest::Client::new().post(&format!("http://{}/events?{}", address, query));
+        let mut req = reqwest::Client::new().post(format!("http://{}/events?{}", address, query));
         if let Some(auth) = auth {
             req = req.basic_auth(auth.username, Some(auth.password.inner()));
         }

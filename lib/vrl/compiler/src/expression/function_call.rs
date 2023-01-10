@@ -580,7 +580,7 @@ impl FunctionCall {
                     match params.iter().position(|param| param.keyword == keyword) {
                         None => {
                             // The parameter was not found in the list.
-                            return Err(format!("parameter {} not found.", keyword));
+                            return Err(format!("parameter {keyword} not found."));
                         }
                         Some(pos) => {
                             result[pos].1 = Some(param.clone().take().1);
@@ -931,7 +931,7 @@ impl DiagnosticMessage for Error {
                     {
                         let guessed: &str = idents[idx];
                         vec.push(Label::context(
-                            format!(r#"did you mean "{}"?"#, guessed),
+                            format!(r#"did you mean "{guessed}"?"#),
                             ident_span,
                         ));
                     }
@@ -949,7 +949,7 @@ impl DiagnosticMessage for Error {
                 vec![
                     Label::primary("too many function arguments", arguments_span),
                     Label::context(
-                        format!("this function takes a maximum of {} {}", max, arg),
+                        format!("this function takes a maximum of {max} {arg}"),
                         arguments_span,
                     ),
                 ]
@@ -966,7 +966,7 @@ impl DiagnosticMessage for Error {
                         "this function accepts the following keywords: {}",
                         keywords
                             .iter()
-                            .map(|k| format!(r#""{}""#, k))
+                            .map(|k| format!(r#""{k}""#))
                             .collect::<Vec<_>>()
                             .join(", ")
                     ),
@@ -1023,9 +1023,9 @@ impl DiagnosticMessage for Error {
                     if kind.is_any() {
                         kind.to_string()
                     } else if kind.is_exact() {
-                        format!(r#"the exact type {}"#, kind)
+                        format!(r#"the exact type {kind}"#)
                     } else {
-                        format!("one of {}", kind)
+                        format!("one of {kind}")
                     }
                 };
 
@@ -1101,33 +1101,33 @@ impl DiagnosticMessage for Error {
                 // TODO: move this into a generic helper function
                 let kind = parameter.kind();
                 let guard = if kind.is_bytes() {
-                    format!("string!({})", argument)
+                    format!("string!({argument})")
                 } else if kind.is_integer() {
-                    format!("int!({})", argument)
+                    format!("int!({argument})")
                 } else if kind.is_float() {
-                    format!("float!({})", argument)
+                    format!("float!({argument})")
                 } else if kind.is_boolean() {
-                    format!("bool!({})", argument)
+                    format!("bool!({argument})")
                 } else if kind.is_object() {
-                    format!("object!({})", argument)
+                    format!("object!({argument})")
                 } else if kind.is_array() {
-                    format!("array!({})", argument)
+                    format!("array!({argument})")
                 } else if kind.is_timestamp() {
-                    format!("timestamp!({})", argument)
+                    format!("timestamp!({argument})")
                 } else {
                     return vec![];
                 };
 
                 let coerce = if kind.is_bytes() {
-                    Some(format!(r#"to_string({}) ?? "default""#, argument))
+                    Some(format!(r#"to_string({argument}) ?? "default""#))
                 } else if kind.is_integer() {
-                    Some(format!("to_int({}) ?? 0", argument))
+                    Some(format!("to_int({argument}) ?? 0"))
                 } else if kind.is_float() {
-                    Some(format!("to_float({}) ?? 0", argument))
+                    Some(format!("to_float({argument}) ?? 0"))
                 } else if kind.is_boolean() {
-                    Some(format!("to_bool({}) ?? false", argument))
+                    Some(format!("to_bool({argument}) ?? false"))
                 } else if kind.is_timestamp() {
-                    Some(format!("to_timestamp({}) ?? now()", argument))
+                    Some(format!("to_timestamp({argument}) ?? now()"))
                 } else {
                     None
                 };
@@ -1149,17 +1149,17 @@ impl DiagnosticMessage for Error {
 
                 let mut notes = vec![];
 
-                let call = format!("{}{}({})", function_ident, abort, args);
+                let call = format!("{function_ident}{abort}({args})");
 
                 notes.append(&mut Note::solution(
                     "ensuring an appropriate type at runtime",
-                    vec![format!("{} = {}", argument, guard), call.clone()],
+                    vec![format!("{argument} = {guard}"), call.clone()],
                 ));
 
                 if let Some(coerce) = coerce {
                     notes.append(&mut Note::solution(
                         "coercing to an appropriate type and specifying a default value as a fallback in case coercion fails",
-                        vec![format!("{} = {}", argument, coerce), call],
+                        vec![format!("{argument} = {coerce}"), call],
                     ))
                 }
 

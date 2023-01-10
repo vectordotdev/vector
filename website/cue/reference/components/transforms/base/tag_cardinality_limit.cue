@@ -27,7 +27,8 @@ base: components: transforms: tag_cardinality_limit: configuration: {
 		}
 	}
 	mode: {
-		required: true
+		description: "Controls the approach taken for tracking tag cardinality."
+		required:    true
 		type: string: enum: {
 			exact: """
 				Tracks cardinality exactly.

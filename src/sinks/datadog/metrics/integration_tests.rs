@@ -74,7 +74,7 @@ async fn start_test(
     let events: Vec<_> = (0..10)
         .map(|index| {
             Event::Metric(Metric::new(
-                &format!("counter_{}", thread_rng().gen::<u32>()),
+                format!("counter_{}", thread_rng().gen::<u32>()),
                 MetricKind::Absolute,
                 MetricValue::Counter {
                     value: index as f64,

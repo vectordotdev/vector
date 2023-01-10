@@ -85,11 +85,12 @@ base: components: sinks: statsd: configuration: {
 		}
 	}
 	mode: {
-		required: true
+		description: "The type of socket to use."
+		required:    true
 		type: string: enum: {
-			tcp:  "TCP."
-			udp:  "UDP."
-			unix: "Unix Domain Socket."
+			tcp:  "Send over TCP."
+			udp:  "Send over UDP."
+			unix: "Send over a Unix domain socket (UDS)."
 		}
 	}
 	path: {

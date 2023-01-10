@@ -302,7 +302,7 @@ mod tests {
         let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::OverflowWhenLast) => {}
-            r => panic!("unexpected build result: {:?}", r),
+            r => panic!("unexpected build result: {r:?}"),
         }
     }
 
@@ -320,7 +320,7 @@ mod tests {
         let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
-            r => panic!("unexpected build result: {:?}", r),
+            r => panic!("unexpected build result: {r:?}"),
         }
     }
 
@@ -338,7 +338,7 @@ mod tests {
         let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
-            r => panic!("unexpected build result: {:?}", r),
+            r => panic!("unexpected build result: {r:?}"),
         }
     }
 

@@ -16,6 +16,7 @@ datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true 
 lookup_lib = {package = "lookup", path = "../../lookup", optional = true }
 vector-common = { path = "../../vector-common", default-features = false, optional = true }
 
+base16 = { version = "0.2", optional = true }
 base64 = { version = "0.20", optional = true }
 bytes = { version = "1.3.0", optional = true }
 charset = { version = "0.1.3", optional = true }
@@ -83,12 +84,14 @@ default = [
     "chunks",
     "compact",
     "contains",
+    "decode_base16",
     "decode_base64",
     "decode_percent",
     "decode_mime_q",
     "decrypt",
     "del",
     "downcase",
+    "encode_base16",
     "encode_base64",
     "encode_json",
     "encode_key_value",
@@ -228,12 +231,14 @@ chunks = []
 compact = []
 contains = []
 cryptography = ["dep:aes", "dep:ctr", "dep:cbc", "dep:cfb-mode", "dep:ofb"]
+decode_base16 = ["dep:base16"]
 decode_base64 = ["dep:base64"]
 decode_percent = ["dep:percent-encoding"]
 decode_mime_q = ["dep:data-encoding","dep:charset","dep:quoted_printable"]
 decrypt = ["cryptography", "random_bytes", "encrypt"]
 del = []
 downcase = []
+encode_base16 = ["dep:base16"]
 encode_base64 = ["dep:base64"]
 encode_json = ["dep:serde_json", "value/json", "dep:chrono", "dep:regex"]
 encode_key_value = ["vector-common/encoding", "value/json"]

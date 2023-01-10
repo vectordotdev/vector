@@ -76,8 +76,8 @@ impl<S: MetricSplit> MetricSplitter<S> {
     }
 }
 
-impl<S: Default> MetricSplitter<S> {
-    pub fn default() -> Self {
+impl<S: Default> Default for MetricSplitter<S> {
+    fn default() -> Self {
         Self {
             splitter: S::default(),
         }

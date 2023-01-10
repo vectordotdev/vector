@@ -142,7 +142,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(kind.to_primitives(), want, "{}", title);
+            assert_eq!(kind.to_primitives(), want, "{title}");
         }
     }
 }

@@ -1463,7 +1463,7 @@ mod tests {
 
     fn transform_one(ft: &mut dyn SyncTransform, event: Event) -> Option<Event> {
         let out = collect_outputs(ft, event);
-        assert_eq!(0, out.named.iter().map(|(_, v)| v.len()).sum::<usize>());
+        assert_eq!(0, out.named.values().map(|v| v.len()).sum::<usize>());
         assert!(out.primary.len() <= 1);
         out.primary.into_events().next()
     }

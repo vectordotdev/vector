@@ -196,7 +196,7 @@ impl fmt::Debug for Target {
         use Target::{Container, External, FunctionCall, Internal};
 
         match self {
-            Internal(v) => write!(f, "Internal({:?})", v),
+            Internal(v) => write!(f, "Internal({v:?})"),
             External(prefix) => match prefix {
                 PathPrefix::Event => f.write_str("External(Event)"),
                 PathPrefix::Metadata => f.write_str("External(Metadata)"),
