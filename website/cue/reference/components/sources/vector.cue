@@ -19,7 +19,7 @@ components: sources: vector: {
 	}
 
 	features: {
-		auto_generated: true
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
