@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ffi::OsStr, path::Path, process::Command, time::Duration};
+use std::{borrow::Cow, env, ffi::OsStr, process::Command, time::Duration};
 
 use anyhow::{anyhow, bail, Context as _, Result};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -82,7 +82,10 @@ impl CommandExt for Command {
     }
 }
 
-pub fn exec<T: AsRef<OsStr>>(command: &Path, args: impl IntoIterator<Item = T>) -> Result<()> {
+pub fn exec<T: AsRef<OsStr>>(
+    command: impl AsRef<OsStr>,
+    args: impl IntoIterator<Item = T>,
+) -> Result<()> {
     let mut command = Command::new(command);
     command.args(args);
     match command
@@ -94,6 +97,14 @@ pub fn exec<T: AsRef<OsStr>>(command: &Path, args: impl IntoIterator<Item = T>) 
         status if status.success() => Ok(()),
         status => Err(anyhow!("Command failed, exit code {status}")),
     }
+}
+
+pub fn exec_app_path<T: AsRef<OsStr>>(
+    command: impl AsRef<OsStr>,
+    args: impl IntoIterator<Item = T>,
+) -> Result<()> {
+    env::set_current_dir(path()).context("Could not change directory")?;
+    exec(command, args)
 }
 
 fn get_progress_bar() -> Result<ProgressBar> {
