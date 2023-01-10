@@ -1,6 +1,7 @@
 use std::{collections::BTreeSet, collections::HashMap, ffi::OsStr, fs, path::Path};
 
 use anyhow::{bail, Context, Result};
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -8,6 +9,37 @@ type ComponentMap = HashMap<String, Component>;
 
 // Use a BTree to keep the results in sorted order
 type FeatureSet = BTreeSet<String>;
+
+macro_rules! mapping {
+    ( $( $key:ident => $value:ident, )* ) => {
+        HashMap::from([
+            $( (stringify!($key), stringify!($value)), )*
+        ])
+    };
+}
+
+// Mapping of component names to feature name exceptions.
+
+static SOURCE_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+    mapping!(
+        prometheus_scrape => prometheus,
+        prometheus_remote_write => prometheus,
+    )
+});
+
+static TRANSFORM_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| mapping!());
+
+static SINK_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+    mapping!(
+        gcp_pubsub => gcp,
+        gcp_cloud_storage => gcp,
+        gcp_stackdriver_logs => gcp,
+        gcp_stackdriver_metrics => gcp,
+        prometheus_exporter => prometheus,
+        prometheus_remote_write => prometheus,
+        splunk_hec_logs => splunk_hec,
+    )
+});
 
 /// This is a ersatz copy of the Vector config, containing just the elements we are interested in
 /// examining. Everything else is thrown away.
@@ -27,14 +59,6 @@ pub struct VectorConfig {
 #[derive(Deserialize)]
 struct Component {
     r#type: String,
-}
-
-macro_rules! mapping {
-    ( $( $key:ident => $value:ident, )* ) => {
-        HashMap::from([
-            $( (stringify!($key), stringify!($value)), )*
-        ])
-    };
 }
 
 pub fn load_and_extract(filename: &Path) -> Result<String> {
@@ -58,22 +82,6 @@ pub fn load_and_extract(filename: &Path) -> Result<String> {
 }
 
 pub fn from_config(config: VectorConfig) -> String {
-    // Mapping of component names to feature name exceptions.
-    let source_feature_map = mapping!(
-            prometheus_scrape => prometheus,
-            prometheus_remote_write => prometheus,
-    );
-    let transform_feature_map = mapping!();
-    let sink_feature_map = mapping!(
-            gcp_pubsub => gcp,
-            gcp_cloud_storage => gcp,
-            gcp_stackdriver_logs => gcp,
-            gcp_stackdriver_metrics => gcp,
-            prometheus_exporter => prometheus,
-            prometheus_remote_write => prometheus,
-            splunk_hec_logs => splunk_hec,
-    );
-
     let mut features = FeatureSet::default();
     add_option(&mut features, "api", &config.api);
     add_option(&mut features, "enterprise", &config.enterprise);
@@ -82,15 +90,15 @@ pub fn from_config(config: VectorConfig) -> String {
         &mut features,
         "sources",
         config.sources,
-        &source_feature_map,
+        &SOURCE_FEATURE_MAP,
     );
     get_features(
         &mut features,
         "transforms",
         config.transforms,
-        &transform_feature_map,
+        &TRANSFORM_FEATURE_MAP,
     );
-    get_features(&mut features, "sinks", config.sinks, &sink_feature_map);
+    get_features(&mut features, "sinks", config.sinks, &SINK_FEATURE_MAP);
 
     // Set of always-compiled components, in terms of their computed feature flag, that should
     // not be emitted as they don't actually have a feature flag because we always compile them.
