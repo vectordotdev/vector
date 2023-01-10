@@ -41,7 +41,9 @@ pub struct EventStoreDbConfig {
     scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
-    #[serde(default = "default_namespace")]
+    ///
+    /// By default, `eventstoredb` is used.
+    #[configurable(metadata(docs::examples = "eventstoredb"))]
     default_namespace: Option<String>,
 }
 
@@ -51,10 +53,6 @@ const fn default_scrape_interval_secs() -> Duration {
 
 pub fn default_endpoint() -> String {
     "https://localhost:2113/stats".to_string()
-}
-
-pub fn default_namespace() -> Option<String> {
-    Some("eventstoredb".to_string())
 }
 
 impl_generate_config_from_default!(EventStoreDbConfig);

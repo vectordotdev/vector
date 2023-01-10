@@ -2,9 +2,13 @@ package metadata
 
 base: components: sources: eventstoredb_metrics: configuration: {
 	default_namespace: {
-		description: "Overrides the default namespace for the metrics emitted by the source."
-		required:    false
-		type: string: default: "eventstoredb"
+		description: """
+			Overrides the default namespace for the metrics emitted by the source.
+
+			By default, `eventstoredb` is used.
+			"""
+		required: false
+		type: string: examples: ["eventstoredb"]
 	}
 	endpoint: {
 		description: "Endpoints to scrape stats from."
