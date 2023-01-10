@@ -1,15 +1,45 @@
-use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 
-mod build;
-mod complete;
-mod config;
-mod exec;
-mod integration;
-mod meta;
-mod status;
-mod test;
+/// This macro simplifies the generation of CLI subcommand invocation structures by combining the
+/// creation of the command enum and implementation of the dispatch function into one simple list.
+#[macro_export]
+macro_rules! cli_commands {
+    ( $( $mod:ident ),* ) => { $crate::cli_commands! { $( $mod, )* } };
+    ( $( $mod:ident, )* ) => {
+        $( mod $mod; )*
+
+        paste::paste! {
+            #[derive(clap::Subcommand, Debug)]
+            enum Commands {
+                $( [<$mod:camel>]($mod::Cli), )*
+            }
+
+            impl Cli {
+                pub fn exec(self) -> anyhow::Result<()> {
+                    match self.command {
+                        $( Commands::[<$mod:camel>](cli) => cli.exec(), )*
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! cli_subcommands {
+    ( $doc:literal $( $mod:ident ),* ) => {
+        #[derive(clap::Args, Debug)]
+        #[doc = $doc]
+        #[command()]
+        pub(super) struct Cli {
+            #[command(subcommand)]
+            command: Commands,
+        }
+
+        $crate::cli_commands! { $( $mod, )* }
+    }
+}
 
 /// Vector's unified dev tool
 #[derive(Parser, Debug)]
@@ -27,29 +57,13 @@ pub struct Cli {
     command: Commands,
 }
 
-#[derive(Subcommand, Debug)]
-enum Commands {
-    Build(build::Cli),
-    Complete(complete::Cli),
-    Config(config::Cli),
-    Exec(exec::Cli),
-    Integration(integration::Cli),
-    Meta(meta::Cli),
-    Status(status::Cli),
-    Test(test::Cli),
-}
-
-impl Cli {
-    pub fn exec(self) -> Result<()> {
-        match self.command {
-            Commands::Build(cli) => cli.exec(),
-            Commands::Complete(cli) => cli.exec(),
-            Commands::Config(cli) => cli.exec(),
-            Commands::Exec(cli) => cli.exec(),
-            Commands::Integration(cli) => cli.exec(),
-            Commands::Meta(cli) => cli.exec(),
-            Commands::Status(cli) => cli.exec(),
-            Commands::Test(cli) => cli.exec(),
-        }
-    }
+cli_commands! {
+    build,
+    complete,
+    config,
+    exec,
+    integration,
+    meta,
+    status,
+    test,
 }
