@@ -14,6 +14,7 @@ use std::{
 };
 
 use azure_storage_blobs::prelude::ContainerClient;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoder};
@@ -515,7 +516,7 @@ impl DatadogArchivesEncoding {
         let id_seq_number = self.id_seq_number.fetch_add(1, Ordering::Relaxed);
         id.put_u32(id_seq_number);
 
-        base64::encode(id.freeze())
+        BASE64_STANDARD.encode(id.freeze())
     }
 }
 
@@ -1054,7 +1055,9 @@ mod tests {
     /// - base64-encoded,
     /// - first 6 bytes - a "now" timestamp in millis
     fn validate_event_id(id: &str) {
-        let bytes = base64::decode(id).expect("_id is not base64-encoded");
+        let bytes = BASE64_STANDARD
+            .decode(id)
+            .expect("_id is not base64-encoded");
         assert_eq!(bytes.len(), 18);
         let mut timestamp: [u8; 8] = [0; 8];
         for (i, b) in bytes[..6].iter().enumerate() {
