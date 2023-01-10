@@ -20,7 +20,7 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         let (test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
 
-        let envs_dir = state::envs_dir(&self.integration);
+        let envs_dir = state::EnvsDir::new(&self.integration);
         let runner = IntegrationTestRunner::new(self.integration.clone())?;
         runner.ensure_network()?;
 
@@ -34,7 +34,7 @@ impl Cli {
         };
         let cmd_config: Value = serde_json::from_str(&json)?;
 
-        if state::env_exists(&envs_dir, &self.environment) {
+        if envs_dir.exists(&self.environment) {
             bail!("environment is already up");
         }
 
@@ -47,7 +47,7 @@ impl Cli {
         waiting!("Starting environment {}", &self.environment);
         command.run()?;
 
-        state::save_env(&envs_dir, &self.environment, &json)?;
+        envs_dir.save(&self.environment, &json)?;
         Ok(())
     }
 }

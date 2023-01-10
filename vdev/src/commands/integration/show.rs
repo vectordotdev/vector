@@ -36,8 +36,8 @@ impl Cli {
             }
             Some(integration) => {
                 let (_test_dir, config) = IntegrationTestConfig::load(&integration)?;
-                let envs_dir = state::envs_dir(&integration);
-                let active_envs = state::active_envs(&envs_dir)?;
+                let envs_dir = state::EnvsDir::new(&integration);
+                let active_envs = envs_dir.list_active()?;
 
                 display!("Test args: {}", config.args.join(" "));
 

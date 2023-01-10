@@ -23,14 +23,14 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let (test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
-        let envs_dir = state::envs_dir(&self.integration);
+        let envs_dir = state::EnvsDir::new(&self.integration);
         let runner = IntegrationTestRunner::new(self.integration.clone())?;
 
         let mut command = super::compose_command(&test_dir, ["down", "--timeout", "0"])?;
         command.env(NETWORK_ENV_VAR, runner.network_name());
 
-        let json = if state::env_exists(&envs_dir, &self.environment) {
-            state::read_env_config(&envs_dir, &self.environment)?
+        let json = if envs_dir.exists(&self.environment) {
+            envs_dir.read_config(&self.environment)?
         } else if self.force {
             let environments = config.environments();
             if let Some(config) = environments.get(&self.environment) {
@@ -52,8 +52,8 @@ impl Cli {
         waiting!("Stopping environment {}", &self.environment);
         command.run()?;
 
-        state::remove_env(&envs_dir, &self.environment)?;
-        if state::active_envs(&envs_dir)?.is_empty() {
+        envs_dir.remove(&self.environment)?;
+        if envs_dir.list_active()?.is_empty() {
             runner.stop()?;
         }
 

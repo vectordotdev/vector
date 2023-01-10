@@ -24,7 +24,7 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         let (test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
         let runner = IntegrationTestRunner::new(self.integration.clone())?;
-        let envs_dir = state::envs_dir(&self.integration);
+        let envs_dir = state::EnvsDir::new(&self.integration);
         let envs = config.environments();
 
         let env_vars: BTreeMap<_, _> = config
@@ -38,7 +38,7 @@ impl Cli {
         }
 
         if let Some(environment) = &self.environment {
-            if !state::env_exists(&envs_dir, environment) {
+            if !envs_dir.exists(environment) {
                 bail!("environment {environment} is not up");
             }
 
@@ -47,13 +47,13 @@ impl Cli {
 
         runner.ensure_network()?;
 
-        let active_envs = state::active_envs(&envs_dir)?;
+        let active_envs = envs_dir.list_active()?;
         for (env_name, env_config) in envs {
             if !(active_envs.is_empty() || active_envs.contains(&env_name)) {
                 continue;
             }
 
-            let env_active = state::env_exists(&envs_dir, &env_name);
+            let env_active = envs_dir.exists(&env_name);
             if !env_active {
                 let mut command = Command::new("cargo");
                 command.current_dir(&test_dir);
@@ -70,7 +70,7 @@ impl Cli {
                 waiting!("Starting environment {}", env_name);
                 command.run()?;
 
-                state::save_env(&envs_dir, &env_name, &json)?;
+                envs_dir.save(&env_name, &json)?;
             }
 
             runner.test(&env_vars, &args)?;
@@ -84,7 +84,7 @@ impl Cli {
                     "--quiet",
                     "--",
                     "stop",
-                    &state::read_env_config(&envs_dir, &env_name)?,
+                    &envs_dir.read_config(&env_name)?,
                 ]);
 
                 if let Some(env_vars) = &config.env {
@@ -94,7 +94,7 @@ impl Cli {
                 waiting!("Stopping environment {}", env_name);
                 command.run()?;
 
-                state::remove_env(&envs_dir, &env_name)?;
+                envs_dir.remove(&env_name)?;
             }
         }
 
