@@ -60,15 +60,10 @@ pub fn load_and_extract(filename: &Path) -> Result<String> {
 pub fn from_config(config: VectorConfig) -> String {
     // Mapping of component names to feature name exceptions.
     let source_feature_map = mapping!(
-            generator => demo_logs,
-            logplex => heroku_logs,
             prometheus_scrape => prometheus,
             prometheus_remote_write => prometheus,
     );
-    let transform_feature_map = mapping!(
-            sampler => sample,
-            swimlanes => route,
-    );
+    let transform_feature_map = mapping!();
     let sink_feature_map = mapping!(
             gcp_pubsub => gcp,
             gcp_cloud_storage => gcp,
