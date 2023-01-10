@@ -55,14 +55,16 @@ pub struct HttpSinkConfig {
     pub encoding: EncodingConfigWithFraming,
 
     /// A string to prefix to the payload
+    ///
     /// This option is ignored if the encoding is not character delimited JSON.
-    /// Will be validate to produce a valid json in combination with payload_suffix.
+    /// If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
     #[serde(default)]
     pub payload_prefix: String,
 
     /// A string to suffix to the payload
+    ///
     /// This option is ignored if the encoding is not character delimited JSON.
-    /// Will be validate to produce a valid json in combination with payload_prefix.
+    /// If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
     #[serde(default)]
     pub payload_suffix: String,
 
@@ -540,7 +542,7 @@ mod tests {
     }
 
     #[test]
-    fn http_validates_payload_prefix_and_suffix_failes_on_invalid_json() {
+    fn http_validates_payload_prefix_and_suffix_fails_on_invalid_json() {
         let config = r#"
         uri = "http://$IN_ADDR/"
         encoding.codec = "json"
