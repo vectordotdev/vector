@@ -2759,9 +2759,9 @@ dependencies = [
 
 [[package]]
 name = "enum_dispatch"
-version = "0.3.9"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1693044dcf452888dd3a6a6a0dab67f0652094e3920dfe029a54d2f37d9b7394"
+checksum = "cb609da60cb562dcb49cd458d42d0d8501d2312aa56dd246911472f9422db017"
 dependencies = [
  "once_cell",
  "proc-macro2",
