@@ -197,16 +197,8 @@ impl SinkConfig for HttpSinkConfig {
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let (payload_prefix, payload_suffix) = match (encoder.serializer(), encoder.framer()) {
-            (
-                Serializer::Json(_),
-                Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
-            ) => validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix)?,
-            _ => (
-                self.payload_prefix.to_owned(),
-                self.payload_suffix.to_owned(),
-            ),
-        };
+        let (payload_prefix, payload_suffix) =
+            validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
 
         let sink = HttpSink {
             uri: self.uri.with_default_parts(),
@@ -402,13 +394,21 @@ fn validate_headers(
 fn validate_payload_wrapper(
     payload_prefix: &str,
     payload_suffix: &str,
+    encoder: &Encoder<Framer>,
 ) -> crate::Result<(String, String)> {
-    let payload = [&payload_prefix, "{}", &payload_suffix].join("");
-    match serde_json::from_str::<serde_json::Value>(&payload) {
-        Ok(_) => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
-        Err(_) => Err(
-            "Payload prefix and suffix wrapped around payload have to produce a valid json".into(),
-        ),
+    let payload = [payload_prefix, "{}", payload_suffix].join("");
+    match (encoder.serializer(), encoder.framer()) {
+        (
+            Serializer::Json(_),
+            Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
+        ) => match serde_json::from_str::<serde_json::Value>(&payload) {
+            Ok(_) => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
+            Err(_) => Err(
+                "Payload prefix and suffix wrapped around payload have to produce a valid json"
+                    .into(),
+            ),
+        },
+        _ => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
     }
 }
 
@@ -530,10 +530,14 @@ mod tests {
         payload_suffix = "}"
         "#;
         let config: HttpSinkConfig = toml::from_str(config).unwrap();
-
-        assert!(
-            super::validate_payload_wrapper(&config.payload_prefix, &config.payload_suffix).is_ok()
-        );
+        let (framer, serializer) = config.encoding.build(SinkType::MessageBased).unwrap();
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+        assert!(super::validate_payload_wrapper(
+            &config.payload_prefix,
+            &config.payload_suffix,
+            &encoder
+        )
+        .is_ok());
     }
 
     #[test]
@@ -545,11 +549,14 @@ mod tests {
         payload_suffix = ""
         "#;
         let config: HttpSinkConfig = toml::from_str(config).unwrap();
-
-        assert!(
-            super::validate_payload_wrapper(&config.payload_prefix, &config.payload_suffix)
-                .is_err()
-        );
+        let (framer, serializer) = config.encoding.build(SinkType::MessageBased).unwrap();
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+        assert!(super::validate_payload_wrapper(
+            &config.payload_prefix,
+            &config.payload_suffix,
+            &encoder
+        )
+        .is_err());
     }
 
     // TODO: Fix failure on GH Actions using macos-latest image.
