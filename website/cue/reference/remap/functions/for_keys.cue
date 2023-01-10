@@ -6,11 +6,12 @@ remap: functions: for_keys: {
 		Iterate recursively through an object.
 
         This function exposes the parent keys and value for
-        every key iterated through in the object.
+        every key iterated through in the object. The keys include
+		the parent keys and the current key in an array.
 
 		The function uses the "function closure syntax" to allow reading
 		the keys/value combination for each item in the
-		collection.
+		object.
 
 		The same scoping rules apply to closure blocks as they do for
 		regular blocks, meaning, any variable defined in parent scopes
