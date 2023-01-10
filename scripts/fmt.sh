@@ -10,5 +10,5 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
-scripts/check-style.sh --fix
+cargo vdev check style --fix
 cargo fmt
