@@ -495,7 +495,7 @@ check-events: ## Check that events satisfy patterns set in https://github.com/ve
 
 .PHONY: check-component-docs
 check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-docs.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev component-docs check
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -667,7 +667,7 @@ generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
 	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
-	${MAYBE_ENVIRONMENT_EXEC} scripts/generate-component-docs.rb /tmp/vector-config-schema.json \
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev component-docs generate /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: signoff

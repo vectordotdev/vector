@@ -5,10 +5,16 @@ use clap_verbosity_flag::{InfoLevel, Verbosity};
 /// creation of the command enum and implementation of the dispatch function into one simple list.
 #[macro_export]
 macro_rules! cli_commands {
-    ( $( $mod:ident ),* ) => { $crate::cli_commands! { $( $mod, )* } };
-    ( $( $mod:ident, )* ) => {
-        $( mod $mod; )*
-
+    // Peel off the list of module identifiers one-by-one
+    ( :: $( $list:ident, )* :: mod $mod:ident, $( $rest:tt )* ) => {
+        mod $mod;
+        $crate::cli_commands! { :: $( $list, )* $mod, :: $( $rest )* }
+    };
+    ( :: $( $list:ident, )* :: $mod:ident, $( $rest:tt )* ) => {
+        $crate::cli_commands! { :: $( $list, )* $mod, :: $( $rest )* }
+    };
+    // All the identifiers are parsed out, build up the enum and impl blocks
+    ( :: $( $mod:ident, )* :: ) => {
         paste::paste! {
             #[derive(clap::Subcommand, Debug)]
             enum Commands {
@@ -23,12 +29,14 @@ macro_rules! cli_commands {
                 }
             }
         }
-    }
+    };
+    // Start the above patterns
+    ( $( $rest:tt )+ ) => { $crate::cli_commands! { :: :: $( $rest )+ } };
 }
 
 #[macro_export]
 macro_rules! cli_subcommands {
-    ( $doc:literal $( $mod:ident ),* ) => {
+    ( $doc:literal $( $rest:tt )* ) => {
         #[derive(clap::Args, Debug)]
         #[doc = $doc]
         #[command()]
@@ -37,7 +45,7 @@ macro_rules! cli_subcommands {
             command: Commands,
         }
 
-        $crate::cli_commands! { $( $mod, )* }
+        $crate::cli_commands! { $( $rest )* }
     }
 }
 
@@ -58,12 +66,44 @@ pub struct Cli {
 }
 
 cli_commands! {
-    build,
-    complete,
-    config,
-    exec,
-    integration,
-    meta,
-    status,
-    test,
+    mod build,
+    mod complete,
+    mod component_docs,
+    mod config,
+    mod exec,
+    mod integration,
+    mod meta,
+    mod status,
+    mod test,
+}
+
+/// This macro creates a wrapper for an existing script
+#[macro_export]
+macro_rules! script_wrapper {
+    ( $mod:ident = $script:literal $doc:literal ) => {
+        paste::paste! {
+            mod $mod {
+                use std::path::Path;
+
+                use anyhow::{Context as _};
+
+                #[doc = $doc]
+                #[derive(clap::Args, Debug)]
+                #[command()]
+                pub(super) struct Cli {
+                    args: Vec<String>,
+                }
+
+                impl Cli {
+                    #[allow(clippy::dbg_macro)]
+                    pub(super) fn exec(self) -> anyhow::Result<()> {
+                        let script = Path::new($crate::app::path()).join($script);
+                        let mut command = exec::Command::new(script);
+                        command.args(&self.args);
+                        Err(command.exec()).with_context(|| format!("Could not execute {:?}", $script))
+                    }
+                }
+            }
+        }
+    };
 }

@@ -1,4 +1,7 @@
 crate::cli_subcommands! {
     "Manage integration test environments"
-        show, start, stop, test
+    mod show,
+    mod start,
+    mod stop,
+    mod test,
 }
