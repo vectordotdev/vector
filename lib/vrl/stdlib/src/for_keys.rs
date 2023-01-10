@@ -104,7 +104,7 @@ impl Function for ForKeys {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "iterate object key values",
-            source: r#".example = {}; .example.child = "123"; for_keys(.) -> |keys, value| { if join!(keys, ".") == "example.child" { . = remove!(., keys) }}"#,
+            source: r#".example = {}; .example.child = "123"; for_keys(.) -> |keys, value| { if join!(keys, ".") == "example.child" { . = remove!(., keys) }}; ."#,
             result: Ok(r#"{"example":{}}"#),
         }]
     }
@@ -139,7 +139,7 @@ impl Function for ForKeys {
                 output: Output::Kind(Kind::any()),
                 example: Example {
                     title: "iterate object keys/values",
-                    source: r#".example = {}; .example.child = "123"; for_keys(.) -> |keys, value| { if join!(keys, ".") == "example.child" { . = remove!(., keys) }}"#,
+                    source: r#".example = {}; .example.child = "123"; for_keys(.) -> |keys, value| { if join!(keys, ".") == "example.child" { . = remove!(., keys) }}; ."#,
                     result: Ok(r#"{"example":{}}"#),
                 },
             }],
