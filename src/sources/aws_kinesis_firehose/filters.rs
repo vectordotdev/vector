@@ -4,9 +4,7 @@ use bytes::{Buf, Bytes};
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
 use snafu::ResultExt;
-use vector_common::{
-    internal_event::{BytesReceived, Protocol},
-};
+use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_core::config::LogNamespace;
 use warp::{http::StatusCode, Filter};
 
@@ -125,7 +123,9 @@ fn authenticate(
                     // No configured access keys
                     (_, true) => Ok(()),
                     // Passed access key is present in configured access keys
-                    (Some(access_key), false) if configured_access_keys.contains(&access_key) => Ok(()),
+                    (Some(access_key), false) if configured_access_keys.contains(&access_key) => {
+                        Ok(())
+                    }
                     // No configured access keys, but passed with the request
                     (Some(_), false) => Err(warp::reject::custom(RequestError::AccessKeyInvalid {
                         request_id,
