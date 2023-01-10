@@ -1,6 +1,6 @@
-use std::path::Path;
+use std::{env, path::Path};
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 
 use crate::app;
 
@@ -11,6 +11,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        env::set_current_dir(app::path()).context("Could not change directory")?;
         app::exec(
             Path::new("cargo"),
             [
