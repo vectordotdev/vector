@@ -42,7 +42,6 @@ pub struct TcpConfig {
     /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    #[configurable(metadata(docs::numeric_type))]
     shutdown_timeout_secs: Duration,
 
     /// Overrides the name of the log field used to add the peer host to each event.
