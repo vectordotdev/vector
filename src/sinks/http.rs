@@ -403,10 +403,9 @@ fn validate_payload_wrapper(
             Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
         ) => match serde_json::from_str::<serde_json::Value>(&payload) {
             Ok(_) => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
-            Err(_) => Err(
-                "Payload prefix and suffix wrapped around payload have to produce a valid json"
-                    .into(),
-            ),
+            Err(_) => {
+                Err("Payload prefix and suffix wrapper must produce a valid JSON object.".into())
+            }
         },
         _ => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
     }

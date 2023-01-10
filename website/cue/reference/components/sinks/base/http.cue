@@ -496,4 +496,24 @@ base: components: sinks: http: configuration: {
 		required: true
 		type: string: {}
 	}
+	payload_prefix: {
+		description: """
+			A string to prefix the payload with.
+
+			This option is ignored if the encoding is not character delimited JSON.
+			If specified, the `payload_suffix`must also be specified and together they must produce a valid JSON object.
+			"""
+		required: false
+		type: string: {}
+	}
+	payload_suffix: {
+		description: """
+			A string to suffix the payload with.
+
+			This option is ignored if the encoding is not character delimited JSON.
+			If specified, the `payload_prefix`must also be specified and together they must produce a valid JSON object.
+			"""
+		required: false
+		type: string: {}
+	}
 }
