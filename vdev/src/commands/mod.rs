@@ -86,8 +86,6 @@ macro_rules! script_wrapper {
             mod $mod {
                 use std::path::Path;
 
-                use anyhow::{Context as _};
-
                 #[doc = $doc]
                 #[derive(clap::Args, Debug)]
                 #[command()]
@@ -99,9 +97,7 @@ macro_rules! script_wrapper {
                     #[allow(clippy::dbg_macro)]
                     pub(super) fn exec(self) -> anyhow::Result<()> {
                         let script = Path::new($crate::app::path()).join($script);
-                        let mut command = exec::Command::new(script);
-                        command.args(&self.args);
-                        Err(command.exec()).with_context(|| format!("Could not execute {:?}", $script))
+                        $crate::app::exec(&script, &self.args)
                     }
                 }
             }
