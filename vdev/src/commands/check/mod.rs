@@ -6,7 +6,7 @@ crate::cli_subcommands! {
     docs,
     events,
     examples,
-    fmt,
+    mod fmt,
     markdown,
     scripts,
     style,
@@ -38,11 +38,6 @@ crate::script_wrapper! {
 crate::script_wrapper! {
     examples = "scripts/check-examples.sh"
         "Check that the config/example files are valid"
-}
-
-crate::script_wrapper! {
-    fmt = "scripts/check-fmt.sh"
-        "Check that all files are formatted properly"
 }
 
 crate::script_wrapper! {
