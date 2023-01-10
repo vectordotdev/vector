@@ -54,17 +54,19 @@ pub struct HttpSinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
-    /// A string to prefix to the payload
+    /// A string to prefix the payload with.
     ///
     /// This option is ignored if the encoding is not character delimited JSON.
     /// If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
+    #[configurable(metadata(docs::examples = "{\"data\":"))]
     #[serde(default)]
     pub payload_prefix: String,
 
-    /// A string to suffix to the payload
+    /// A string to suffix the payload with.
     ///
     /// This option is ignored if the encoding is not character delimited JSON.
     /// If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
+    #[configurable(metadata(docs::examples = "}"))]
     #[serde(default)]
     pub payload_suffix: String,
 
