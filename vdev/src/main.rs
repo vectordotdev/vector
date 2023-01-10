@@ -1,9 +1,10 @@
 #![deny(clippy::pedantic)]
 #![allow(
     clippy::module_name_repetitions,
+    clippy::print_stdout,
     clippy::unused_self,
-    clippy::wildcard_imports,
-    clippy::unnecessary_wraps
+    clippy::unnecessary_wraps,
+    clippy::wildcard_imports
 )]
 
 #[macro_use]
@@ -11,6 +12,7 @@ mod macros;
 mod app;
 mod commands;
 mod config;
+mod features;
 mod git;
 mod platform;
 mod testing;
