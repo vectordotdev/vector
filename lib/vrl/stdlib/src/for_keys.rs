@@ -50,7 +50,7 @@ impl<'a> MapParent<'a> {
         match &self.parent {
             None => vec![key.to_string()],
             Some(parent) => {
-                let mut copy = parent.to_vec();
+                let mut copy = parent.clone();
                 copy.push(key.to_string());
                 copy
             }
