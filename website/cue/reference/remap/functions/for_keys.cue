@@ -3,11 +3,11 @@ package metadata
 remap: functions: for_keys: {
 	category:    "Enumerate"
 	description: """
-		Iterate recursively through an object. 
+		Iterate recursively through an object.
 
-        This function exposes the parent keys and value for 
-        every key iterated through in the object. 
-        
+        This function exposes the parent keys and value for
+        every key iterated through in the object.
+
 		The function uses the "function closure syntax" to allow reading
 		the keys/value combination for each item in the
 		collection.
@@ -48,9 +48,9 @@ remap: functions: for_keys: {
                     if join!(keys, ".") != "event.category" {
                         # Remove key if doesnt match
                         . = remove!(., keys)
-                    }				
+                    }
 			    }
-				
+
 				"""#
 			return: { event: { category: "authentication" }}
 		},
