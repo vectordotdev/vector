@@ -257,6 +257,21 @@ base: components: sinks: azure_blob: configuration: {
 			}
 		}
 	}
+	endpoint: {
+		description: """
+			The Azure Blob Storage Endpoint URL.
+
+			This is used to override the default blob storage endpoint URL in cases where you are using
+			credentials read from the environment/managed identities or access tokens without using an
+			explicit connection_string (which already explicitly supports overriding the blob endpoint
+			URL).
+
+			This may only be used with `storage_account` and will be ignored when used with
+			`connection_string`.
+			"""
+		required: false
+		type: string: {}
+	}
 	framing: {
 		description: "Framing configuration."
 		required:    false

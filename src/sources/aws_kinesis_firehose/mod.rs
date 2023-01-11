@@ -200,6 +200,7 @@ mod tests {
         net::SocketAddr,
     };
 
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
     use bytes::Bytes;
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
@@ -368,7 +369,7 @@ mod tests {
             Compression::None => record.to_vec(),
         };
 
-        Ok(base64::encode(compressed))
+        Ok(BASE64_STANDARD.encode(compressed))
     }
 
     #[tokio::test]

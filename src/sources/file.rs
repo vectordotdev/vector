@@ -4,8 +4,10 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use file_source::{
+    calculate_ignore_before,
     paths_provider::glob::{Glob, MatchOptions},
     Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
+    ReadFromConfig,
 };
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use lookup::{
@@ -289,26 +291,6 @@ impl Default for FingerprintConfig {
 const fn default_lines() -> usize {
     1
 }
-/// File position to use when reading a new file.
-#[configurable_component]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ReadFromConfig {
-    /// Read from the beginning of the file.
-    Beginning,
-
-    /// Start reading from the current end of the file.
-    End,
-}
-
-impl From<ReadFromConfig> for ReadFrom {
-    fn from(rfc: ReadFromConfig) -> Self {
-        match rfc {
-            ReadFromConfig::Beginning => ReadFrom::Beginning,
-            ReadFromConfig::End => ReadFrom::End,
-        }
-    }
-}
 
 impl From<FingerprintConfig> for FingerprintStrategy {
     fn from(config: FingerprintConfig) -> FingerprintStrategy {
@@ -484,9 +466,7 @@ pub fn file_source(
         return Box::pin(future::ready(Err(())));
     }
 
-    let ignore_before = config
-        .ignore_older_secs
-        .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
+    let ignore_before = calculate_ignore_before(config.ignore_older_secs);
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown_ms);
     let (ignore_checkpoints, read_from) = reconcile_position_options(
         config.start_at_beginning,
