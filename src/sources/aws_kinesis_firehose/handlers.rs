@@ -5,7 +5,6 @@ use chrono::Utc;
 use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
-use libc::access;
 use lookup::{metadata_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
