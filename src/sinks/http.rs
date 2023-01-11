@@ -401,12 +401,16 @@ fn validate_payload_wrapper(
     encoder: &Encoder<Framer>,
 ) -> crate::Result<(String, String)> {
     let payload = [payload_prefix, "{}", payload_suffix].join("");
-    match (encoder.serializer(), encoder.framer(), serde_json::from_str::<serde_json::Value>(&payload) ) {
+    match (
+        encoder.serializer(),
+        encoder.framer(),
+        serde_json::from_str::<serde_json::Value>(&payload),
+    ) {
         (
             Serializer::Json(_),
             Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
-            Err(_)
-         ) => Err("Payload prefix and suffix wrapper must produce a valid JSON object.".into()),
+            Err(_),
+        ) => Err("Payload prefix and suffix wrapper must produce a valid JSON object.".into()),
         _ => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
     }
 }
