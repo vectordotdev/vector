@@ -12,7 +12,8 @@ use axum::{
 };
 use bytes::BytesMut;
 use codecs::{
-    encoding, JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, NewlineDelimitedEncoder,
+    encoding, JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, MetricTagValues,
+    NewlineDelimitedEncoder,
 };
 use http::{Method, Request, StatusCode, Uri};
 use hyper::{Body, Client, Server};
@@ -21,7 +22,7 @@ use tokio::{
     select,
     sync::{mpsc, oneshot, Mutex, Notify},
 };
-use tokio_util::codec::Encoder as _;
+use tokio_util::codec::{Decoder, Encoder as _};
 use vector_core::event::Event;
 
 use crate::{
@@ -169,7 +170,7 @@ fn spawn_input_http_server(
     });
 }
 
-/// Spawns an HTTP client that pushes events to an HTTP server driven by a source.
+/// Spawns an HTTP client that pushes events to a source which is accepting events over HTTP.
 fn spawn_input_http_client(
     config: HttpResourceConfig,
     codec: ResourceCodec,
@@ -223,14 +224,64 @@ fn spawn_input_http_client(
     });
 }
 
-/// Spawns an HTTP server that a sink will make requests to in order to send events.
+/// Spawns an HTTP server that accepts events sent by a sink.
 #[allow(clippy::missing_const_for_fn)]
 fn spawn_output_http_server(
-    _config: HttpResourceConfig,
-    _codec: ResourceCodec,
-    _output_tx: mpsc::Sender<Event>,
-    _task_coordinator: &TaskCoordinator<Configuring>,
+    config: HttpResourceConfig,
+    codec: ResourceCodec,
+    output_tx: mpsc::Sender<Event>,
+    task_coordinator: &TaskCoordinator<Configuring>,
 ) {
+    // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
+    // via an output sender. We accept/collect events until we're told to shutdown.
+
+    // First, we'll build and spawn our HTTP server.
+    let decoder = codec.into_decoder();
+
+    let (_, http_server_shutdown_tx) =
+        spawn_http_server(task_coordinator, &config, move |request| {
+            let output_tx = output_tx.clone();
+            let mut decoder = decoder.clone();
+
+            async move {
+                match hyper::body::to_bytes(request.into_body()).await {
+                    Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+                    Ok(body) => {
+                        let mut body = BytesMut::from(&body[..]);
+                        loop {
+                            match decoder.decode_eof(&mut body) {
+                                Ok(Some((events, _byte_size))) => {
+                                    for event in events {
+                                        output_tx
+                                            .send(event)
+                                            .await
+                                            .expect("should not fail to send output event");
+                                    }
+                                }
+                                Ok(None) => return StatusCode::OK.into_response(),
+                                Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+    // Now we'll create and spawn the resource's core logic loop which simply waits for the runner
+    // to instruct us to shutdown, and when that happens, cascades to shutting down the HTTP server.
+    let resource_started = task_coordinator.track_started();
+    let resource_completed = task_coordinator.track_completed();
+    let mut resource_shutdown_rx = task_coordinator.register_for_shutdown();
+    tokio::spawn(async move {
+        resource_started.mark_as_done();
+        debug!("HTTP server external output resource started.");
+
+        resource_shutdown_rx.wait().await;
+        let _ = http_server_shutdown_tx.send(());
+        resource_completed.mark_as_done();
+
+        debug!("HTTP server external output resource completed.");
+    });
 }
 
 /// Spawns an HTTP client that pulls events by making requests to an HTTP server driven by a sink.
@@ -277,8 +328,12 @@ where
     tokio::spawn(async move {
         // Create our HTTP server by binding as early as possible to return an error if we can't
         // actually bind.
-        let server_builder = Server::try_bind(&listen_addr)
-            .expect("failed to bind HTTP server external input listen address");
+        let server_builder = match Server::try_bind(&listen_addr) {
+            Err(e) => {
+                error!(?listen_addr, error = ?e, "failed to bind listen address");
+                panic!("woopsie");
+            }, Ok(server_builder) => server_builder,
+        };
 
         // Create our router, which is a bit boilerplate-y because we take the HTTP method
         // parametrically. We generate a handler that calls the given `handler` and then triggers
@@ -370,7 +425,7 @@ fn encode_test_event(
             } else {
                 Encoder::<encoding::Framer>::new(
                     NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new().into(),
+                    JsonSerializer::new(MetricTagValues::default()).into(),
                 )
             };
 

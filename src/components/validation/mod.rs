@@ -112,6 +112,7 @@ mod tests {
         components::validation::{Runner, StandardValidators},
         sources::http_client::HttpClientConfig,
         sources::http_server::SimpleHttpConfig,
+        sinks::http::HttpSinkConfig,
     };
 
     use super::ValidatableComponent;
@@ -129,6 +130,7 @@ mod tests {
         vec![
             Box::leak(Box::new(SimpleHttpConfig::validation())),
             Box::leak(Box::new(HttpClientConfig::validation())),
+            Box::leak(Box::new(HttpSinkConfig::validation())),
         ]
     }
 
