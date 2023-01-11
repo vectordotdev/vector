@@ -40,6 +40,14 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
+    /// An optional access key to authenticate requests against.
+    ///
+    /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
+    /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+    /// Deprecated - use `access_keys` instead
+    #[configurable(derived)]
+    store_access_key: bool,
+
     /// The compression scheme to use for decompressing records within the Firehose message.
     ///
     /// Some services, like AWS CloudWatch Logs, will [compress the events with gzip][events_with_gzip],
@@ -120,6 +128,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
         let svc = filters::firehose(
             self.access_key.as_ref().map(|k| k.inner().to_owned()),
+            self.store_access_key,
             self.record_compression,
             decoder,
             acknowledgements,
@@ -180,6 +189,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
         toml::Value::try_from(Self {
             address: "0.0.0.0:443".parse().unwrap(),
             access_key: None,
+            store_access_key: false,
             tls: None,
             record_compression: Default::default(),
             framing: default_framing_message_based(),
@@ -199,6 +209,7 @@ mod tests {
         io::{Cursor, Read},
         net::SocketAddr,
     };
+    use std::default::Default;
 
     use bytes::Bytes;
     use chrono::{DateTime, SubsecRound, Utc};
@@ -207,7 +218,11 @@ mod tests {
     use lookup::path;
     use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
+    use codecs::JsonSerializerConfig;
     use vector_common::assert_event_data_eq;
+    use vector_core::config::log_schema;
+    use vector_core::event::LogEvent;
+    use vector_core::sink::VectorSink;
 
     use super::*;
     use crate::{
@@ -220,6 +235,14 @@ mod tests {
         },
         SourceSender,
     };
+    use crate::aws::AwsAuthentication::Default;
+    use crate::aws::RegionOrEndpoint;
+    use crate::config::{SinkConfig, SinkContext};
+    use crate::sinks::aws_kinesis::firehose::{KinesisFirehoseSinkConfig, KinesisSinkBaseConfig};
+    use crate::sinks::Healthcheck;
+    use crate::sinks::util::BatchConfig;
+    use crate::test_util::collect_n;
+    use crate::test_util::components::HTTP_PUSH_SOURCE_TAGS;
 
     const SOURCE_ARN: &str = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
     const REQUEST_ID: &str = "e17265d6-97af-4938-982e-90d5614c4242";
@@ -251,8 +274,32 @@ mod tests {
         crate::test_util::test_generate_config::<AwsKinesisFirehoseConfig>();
     }
 
+    async fn channel_n(
+        messages: Vec<impl Into<String> + Send + 'static>,
+        sink: VectorSink,
+        source: impl Stream<Item = Event> + Unpin,
+    ) -> Vec<Event> {
+        let n = messages.len();
+
+        tokio::spawn(async move {
+            sink.run_events(
+                messages
+                    .into_iter()
+                    .map(|s| Event::Log(LogEvent::from(s.into()))),
+            )
+                .await
+                .unwrap();
+        });
+
+        let events = collect_n(source, n).await;
+        assert_eq!(n, events.len());
+
+        events
+    }
+
     async fn source(
         access_key: Option<SensitiveString>,
+        store_access_key: bool,
         record_compression: Compression,
         delivered: bool,
         log_namespace: bool,
@@ -267,6 +314,7 @@ mod tests {
                 address,
                 tls: None,
                 access_key,
+                store_access_key,
                 record_compression,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
@@ -283,6 +331,32 @@ mod tests {
         (recv, address)
     }
 
+    async fn sink(
+
+    ) -> (VectorSink, Healthcheck) {
+        let mut batch = BatchConfig::<KinesisFirehoseDefaultBatchSettings>::default();
+        batch.max_events = Some(MAX_PAYLOAD_EVENTS + 1);
+
+        let base = KinesisSinkBaseConfig {
+            stream_name: String::from("test"),
+            region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
+            encoding: JsonSerializerConfig::default().into(),
+            compression: crate::sinks::util::buffer::compression::Compression::None,
+            request: Default::default(),
+            tls: None,
+            auth: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        KinesisFirehoseSinkConfig {
+            batch,
+            base,
+        }
+        .build(SinkContext::new_test())
+        .await
+        .unwrap()
+    }
+
     /// Sends the body to the address with the appropriate Firehose headers
     ///
     /// https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html
@@ -295,6 +369,7 @@ mod tests {
         record_compression: Compression,
     ) -> reqwest::Result<reqwest::Response> {
         let request = models::FirehoseRequest {
+            access_key: Some(key.to_string()),
             request_id: REQUEST_ID.to_string(),
             timestamp,
             records: records
@@ -431,7 +506,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, source_record_compression, true, false).await;
+            let (rx, addr) = source(None, false, source_record_compression, true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -531,7 +606,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, source_record_compression, true, true).await;
+            let (rx, addr) = source(None, false, source_record_compression, true, true).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -602,7 +677,7 @@ mod tests {
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr) = source(None, Default::default(), true, false).await;
+            let (rx, addr) = source(None, false, Default::default(), true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -642,6 +717,7 @@ mod tests {
         let (_rx, addr) = source(
             Some("an access key".to_string().into()),
             Default::default(),
+            Default::default(),
             true,
             false,
         )
@@ -667,7 +743,7 @@ mod tests {
     async fn handles_acknowledgement_failure() {
         let expected = RECORD.as_bytes().to_owned();
 
-        let (rx, addr) = source(None, Compression::None, false, false).await;
+        let (rx, addr) = source(None, false, Compression::None, false, false).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 
@@ -699,5 +775,51 @@ mod tests {
 
         let response: models::FirehoseResponse = res.json().await.unwrap();
         assert_eq!(response.request_id, REQUEST_ID);
+    }
+
+    #[tokio::test]
+    async fn event_service_token_passthrough_enabled() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "passthrough_token_enabled";
+            let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
+            let (sink, health) = sink(
+                address,
+                TextSerializerConfig::default().into(),
+                Compression::gzip_default(),
+            )
+                .await;
+            assert!(health.await.is_ok());
+
+            let event = channel_n(vec![message], sink, source).await.remove(0);
+
+            assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+            assert_eq!(
+                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+                TOKEN
+            );
+        })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn no_authorization_token_passthrough_enabled() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "no_authorization";
+            let token = "ASDASD";
+
+            let (source, address) = source(None, Some(vec![SensitiveString::from(token.into())]), Default::default(), true, true).await;
+            let (sink, health) = sink()
+                .await;
+            assert!(health.await.is_ok());
+
+            let event = channel_n(vec![message], sink, source).await.remove(0);
+
+            assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+            assert_eq!(
+                &event.metadata().secrets().as_ref().unwrap()[..],
+                token
+            );
+        })
+            .await;
     }
 }

@@ -5,6 +5,7 @@ use chrono::Utc;
 use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
+use libc::access;
 use lookup::{metadata_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
@@ -21,6 +22,7 @@ use vector_core::{
     EstimatedJsonEncodedSizeOf,
 };
 use warp::reject;
+use vrl::SecretTarget;
 
 use super::{
     errors::{ParseRecordsSnafu, RequestError},
@@ -41,6 +43,7 @@ use crate::{
 #[derive(Clone)]
 pub(super) struct Context {
     pub(super) compression: Compression,
+    pub(super) store_access_key: bool,
     pub(super) decoder: Decoder,
     pub(super) acknowledgements: bool,
     pub(super) bytes_received: Registered<BytesReceived>,
@@ -127,6 +130,18 @@ pub(super) async fn firehose(
                                 path!("source_arn"),
                                 source_arn.to_owned(),
                             );
+
+                            match (&request.access_key, context.store_access_key) {
+                                (Some(access_key), true) => {
+                                    log
+                                        .metadata_mut()
+                                        .secrets_mut()
+                                        .insert_secret("access_key", access_key)
+                                },
+
+                                _ => todo!(),
+                            }
+
                         }
                     }
 

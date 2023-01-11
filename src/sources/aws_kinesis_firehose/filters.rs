@@ -23,6 +23,7 @@ use crate::{
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(
     access_key: Option<String>,
+    store_access_key: bool,
     record_compression: Compression,
     decoder: codecs::Decoder,
     acknowledgements: bool,
@@ -32,6 +33,7 @@ pub fn firehose(
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     let context = handlers::Context {
         compression: record_compression,
+        store_access_key,
         decoder,
         acknowledgements,
         bytes_received,
@@ -69,9 +71,10 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
     warp::any()
         .and(warp::header::optional::<String>("Content-Encoding"))
         .and(warp::header("X-Amz-Firehose-Request-Id"))
+        .and(warp::header::optional("X-Amz-Firehose-Access-Key"))
         .and(warp::body::bytes())
         .and_then(
-            |encoding: Option<String>, request_id: String, body: Bytes| async move {
+            |encoding: Option<String>, request_id: String, access_key: Option<String>, body: Bytes| async move {
                 match encoding {
                     Some(s) if s == "gzip" => {
                         Ok(Box::new(MultiGzDecoder::new(body.reader())) as Box<dyn io::Read>)
@@ -88,6 +91,7 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
                     serde_json::from_reader(r)
                         .context(ParseSnafu {
                             request_id: request_id.clone(),
+                            access_key: access_key.clone(),
                         })
                         .map_err(warp::reject::custom)
                 })
