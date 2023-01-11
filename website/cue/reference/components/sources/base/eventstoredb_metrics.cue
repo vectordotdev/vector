@@ -11,7 +11,7 @@ base: components: sources: eventstoredb_metrics: configuration: {
 		type: string: examples: ["eventstoredb"]
 	}
 	endpoint: {
-		description: "Endpoints to scrape stats from."
+		description: "Endpoint to scrape stats from."
 		required:    false
 		type: string: {
 			default: "https://localhost:2113/stats"
