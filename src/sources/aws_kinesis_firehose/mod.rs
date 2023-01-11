@@ -39,6 +39,7 @@ pub struct AwsKinesisFirehoseConfig {
     /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
     ///
     /// This option has been deprecated, the `access_keys` option should be used instead.
+    #[configurable(deprecated)]
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
