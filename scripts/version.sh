@@ -11,7 +11,7 @@ set -euo pipefail
 #   is nightly.
 
 VERSION="${VERSION:-"$(awk -F ' = ' '$1 ~ /^version/ { gsub(/["]/, "", $2); printf("%s",$2) }' Cargo.toml)"}"
-CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
+CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
 
 if [[ $CHANNEL == "latest" ]] ; then
   TAG="$(git describe --exact-match --tags HEAD)"

@@ -76,6 +76,7 @@ cli_commands! {
     mod generate,
     mod integration,
     mod meta,
+    mod release,
     mod run,
     mod status,
     mod test,

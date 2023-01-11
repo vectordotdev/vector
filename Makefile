@@ -600,35 +600,31 @@ release: release-prepare generate release-commit ## Release a new Vector version
 
 .PHONY: release-commit
 release-commit: ## Commits release changes
-	@scripts/release-commit.rb
+	@cargo vdev release commit
 
 .PHONY: release-docker
 release-docker: ## Release to Docker Hub
-	@scripts/build-docker.sh
+	@cargo vdev release docker
 
 .PHONY: release-github
 release-github: ## Release to Github
-	@scripts/release-github.sh
+	@cargo vdev release github
 
 .PHONY: release-homebrew
 release-homebrew: ## Release to vectordotdev Homebrew tap
-	@scripts/release-homebrew.sh
+	@cargo vdev release homebrew
 
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights
-	@scripts/release-prepare.rb
+	@cargo vdev release prepare
 
 .PHONY: release-push
 release-push: ## Push new Vector version
-	@scripts/release-push.sh
-
-.PHONY: release-rollback
-release-rollback: ## Rollback pending release changes
-	@scripts/release-rollback.rb
+	@cargo vdev release push
 
 .PHONY: release-s3
 release-s3: ## Release artifacts to S3
-	@scripts/release-s3.sh
+	@cargo vdev release s3
 
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
