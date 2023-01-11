@@ -288,7 +288,7 @@ def get_docs_type_for_value(schema, value)
     numeric_type = get_schema_metadata(schema, 'docs::numeric_type')
     if numeric_type.nil?
       @logger.error "All fields with numeric types should have 'docs::numeric_type' metadata included." +
-        "e.g. #[configurable(metadata(docs::numeric_type = \"uint\""))]"
+        "e.g. #[configurable(metadata(docs::numeric_type = \"uint\"))]"
       @logger.error "Value: #{value} (type: #{value_type})"
       exit 1
     end
