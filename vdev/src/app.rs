@@ -104,7 +104,7 @@ pub fn exec_script<T: AsRef<OsStr>>(script: &str, args: impl IntoIterator<Item =
     exec(script, args)
 }
 
-pub fn exec_app_path<T: AsRef<OsStr>>(
+pub fn exec_in_app_path<T: AsRef<OsStr>>(
     command: impl AsRef<OsStr>,
     args: impl IntoIterator<Item = T>,
 ) -> Result<()> {

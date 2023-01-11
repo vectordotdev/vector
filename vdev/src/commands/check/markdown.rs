@@ -9,7 +9,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        app::exec_app_path(
+        app::exec_in_app_path(
             "markdownlint",
             [
                 "--config",
