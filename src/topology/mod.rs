@@ -24,7 +24,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub use controller::TopologyController;
+pub use controller::{ReloadOutcome, TopologyController};
 use futures::{Future, FutureExt};
 pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};

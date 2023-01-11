@@ -28,7 +28,7 @@ use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config, generate, generate_schema, graph, heartbeat, list,
     signal::{self, SignalTo},
-    topology::{self, RunningTopology, TopologyController},
+    topology::{self, RunningTopology, TopologyController, ReloadOutcome},
     trace, unit_test, validate,
 };
 #[cfg(feature = "api-client")]
@@ -351,8 +351,8 @@ impl Application {
                             Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
                                 let mut topology_controller = topology_controller.lock().await;
                                 let new_config = config_builder.build().map_err(handle_config_errors).ok();
-                                if let Some(signal) = topology_controller.reload(new_config).await {
-                                    break signal;
+                                if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
+                                    break SignalTo::Shutdown;
                                 }
                             }
                             Ok(SignalTo::ReloadFromDisk) => {
@@ -368,8 +368,8 @@ impl Application {
                                     .await
                                     .map_err(handle_config_errors).ok();
 
-                                if let Some(signal) = topology_controller.reload(new_config).await {
-                                    break signal;
+                                if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
+                                    break SignalTo::Shutdown;
                                 }
                             },
                             Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),

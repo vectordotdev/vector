@@ -10,7 +10,7 @@ use crate::config::enterprise::{
 use crate::internal_events::{
     VectorConfigLoadError, VectorRecoveryError, VectorReloadError, VectorReloaded,
 };
-use crate::{config, signal::SignalTo, topology::RunningTopology};
+use crate::{config, topology::RunningTopology};
 
 pub struct TopologyController {
     pub topology: RunningTopology,
@@ -31,11 +31,21 @@ impl std::fmt::Debug for TopologyController {
     }
 }
 
+pub enum ReloadOutcome {
+    NoConfig,
+    MissingApiKey,
+    Success,
+    RolledBack,
+    FatalError,
+}
+
 impl TopologyController {
-    pub async fn reload(&mut self, new_config: Option<config::Config>) -> Option<SignalTo> {
+    pub async fn reload(&mut self, new_config: Option<config::Config>) -> ReloadOutcome {
+        use ReloadOutcome::*;
+
         if new_config.is_none() {
             emit!(VectorConfigLoadError);
-            return None;
+            return NoConfig;
         }
         let mut new_config = new_config.unwrap();
 
@@ -59,7 +69,7 @@ impl TopologyController {
             Err(err) => {
                 if let EnterpriseError::MissingApiKey = err {
                     emit!(VectorReloadError);
-                    return None;
+                    return MissingApiKey;
                 }
             }
         }
@@ -74,18 +84,20 @@ impl TopologyController {
 
                 emit!(VectorReloaded {
                     config_paths: &self.config_paths
-                })
+                });
+                Success
             }
-            Ok(false) => emit!(VectorReloadError),
+            Ok(false) => {
+                emit!(VectorReloadError);
+                RolledBack
+            }
             // Trigger graceful shutdown for what remains of the topology
             Err(()) => {
                 emit!(VectorReloadError);
                 emit!(VectorRecoveryError);
-                return Some(SignalTo::Shutdown);
+                FatalError
             }
         }
-
-        None
     }
 
     pub async fn stop(self) {
