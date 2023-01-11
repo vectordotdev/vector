@@ -5,6 +5,7 @@ use lookup::lookup_v2::OptionalValuePath;
 use lookup::{owned_value_path, path, OwnedValuePath};
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
+use vector_core::config::log_schema;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
@@ -47,7 +48,7 @@ pub struct InternalLogsConfig {
 }
 
 fn host_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("host"))
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
 }
 
 fn pid_key() -> OptionalValuePath {
