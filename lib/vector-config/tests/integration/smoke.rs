@@ -74,6 +74,7 @@ pub struct BatchConfig {
     max_events: Option<NonZeroU64>,
 
     /// The maximum number of bytes in a batch before it is flushed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     max_bytes: Option<NonZeroU64>,
 
     /// The maximum amount of time a batch can exist before it is flushed.
