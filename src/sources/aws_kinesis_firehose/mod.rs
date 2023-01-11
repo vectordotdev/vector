@@ -37,7 +37,8 @@ pub struct AwsKinesisFirehoseConfig {
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
-    /// Deprecated - use `access_keys` instead
+    ///
+    /// This option has been deprecated, the `access_keys` option should be used instead.
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
@@ -45,7 +46,7 @@ pub struct AwsKinesisFirehoseConfig {
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_keys` should be set to the same value. Otherwise, all requests will be allowed.
-    #[configurable(metadata(docs::examples = "[A94A8FE5CCB19BA61C4C08, A99A8FE5CCB19BA61C4C08]"))]
+    #[configurable(metadata(docs::examples = "access_keys_example()"))]
     access_keys: Option<Vec<SensitiveString>>,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
@@ -81,6 +82,10 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+}
+
+const fn access_keys_example() -> [&'static str; 2] {
+    ["A94A8FE5CCB19BA61C4C08", "B94B8FE5CCB19BA61C4C12"]
 }
 
 /// Compression scheme for records in a Firehose message.
@@ -138,7 +143,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             .chain(self.access_key.iter());
 
         let svc = filters::firehose(
-            access_keys.map(|key| format!("{}", key.inner())).collect(),
+            access_keys.map(|key| key.inner().to_string()).collect(),
             self.record_compression,
             decoder,
             acknowledgements,
