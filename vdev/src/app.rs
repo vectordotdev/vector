@@ -1,4 +1,4 @@
-use std::{borrow::Cow, env, ffi::OsStr, process::Command, time::Duration};
+use std::{borrow::Cow, env, ffi::OsStr, path::PathBuf, process::Command, time::Duration};
 
 use anyhow::{anyhow, bail, Context as _, Result};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -97,6 +97,11 @@ pub fn exec<T: AsRef<OsStr>>(
         status if status.success() => Ok(()),
         status => Err(anyhow!("Command failed, exit code {status}")),
     }
+}
+
+pub fn exec_script<T: AsRef<OsStr>>(script: &str, args: impl IntoIterator<Item = T>) -> Result<()> {
+    let script: PathBuf = [path(), "scripts", script].into_iter().collect();
+    exec(script, args)
 }
 
 pub fn exec_app_path<T: AsRef<OsStr>>(

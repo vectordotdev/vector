@@ -87,8 +87,6 @@ macro_rules! script_wrapper {
     ( $mod:ident = $script:literal $doc:literal ) => {
         paste::paste! {
             mod $mod {
-                use std::path::Path;
-
                 #[doc = $doc]
                 #[derive(clap::Args, Debug)]
                 #[command()]
@@ -99,8 +97,7 @@ macro_rules! script_wrapper {
                 impl Cli {
                     #[allow(clippy::dbg_macro)]
                     pub(super) fn exec(self) -> anyhow::Result<()> {
-                        let script = Path::new($crate::app::path()).join($script);
-                        $crate::app::exec(&script, &self.args)
+                        $crate::app::exec_script($script, &self.args)
                     }
                 }
             }

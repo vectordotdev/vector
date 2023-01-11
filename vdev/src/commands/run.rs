@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use clap::Args;
@@ -34,7 +34,7 @@ impl Cli {
         let features = features::load_and_extract(&self.config)?;
 
         app::exec(
-            Path::new("cargo"),
+            "cargo",
             [
                 "--no-default-features",
                 "--features",
