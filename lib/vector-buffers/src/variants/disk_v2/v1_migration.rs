@@ -63,7 +63,7 @@ where
     let (mut dst_writer, _) =
         build_disk_v2_buffer(usage_handle, base_data_dir, id, buffer_max_size)
             .await
-            .map_err(|e| format!("Failed to build `disk_v2` buffer: {}", e))?;
+            .map_err(|e| format!("Failed to build `disk_v2` buffer: {e}"))?;
 
     // Now that we've got our source and destination buffers configured, read each record from the
     // source and write it to the destination. If the write succeeds, we acknowledge it in the

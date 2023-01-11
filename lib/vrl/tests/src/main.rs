@@ -431,7 +431,7 @@ fn compare_partial_diagnostic(got: &str, want: &str) -> bool {
 }
 
 fn print_result(failed_count: usize) {
-    let code = if failed_count > 0 { 1 } else { 0 };
+    let code = i32::from(failed_count > 0);
 
     println!("\n");
 

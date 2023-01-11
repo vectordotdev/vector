@@ -1,4 +1,10 @@
-use std::{collections::HashSet, fmt::Write as _, iter, path::PathBuf, time::Instant};
+use std::{
+    collections::HashSet,
+    fmt::Write as _,
+    iter,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use chrono::{DateTime, Utc};
 use futures::{
@@ -10,6 +16,7 @@ use openssl::{
     ssl::{SslConnector, SslMethod},
 };
 use postgres_openssl::MakeTlsConnector;
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_postgres::{
@@ -99,18 +106,23 @@ struct PostgresqlMetricsTlsConfig {
     /// Absolute path to an additional CA certificate file.
     ///
     /// The certificate must be in the DER or PEM (X.509) format.
+    #[configurable(metadata(docs::examples = "certs/ca.pem"))]
     ca_file: PathBuf,
 }
 
 /// Configuration for the `postgresql_metrics` source.
+#[serde_as]
 #[configurable_component(source("postgresql_metrics"))]
 #[derive(Clone, Debug)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct PostgresqlMetricsConfig {
     /// A list of PostgreSQL instances to scrape.
     ///
     /// Each endpoint must be in the [Connection URI
     /// format](https://www.postgresql.org/docs/current/libpq-connect.html#id-1.7.3.8.3.6).
+    #[configurable(metadata(
+        docs::examples = "postgresql://postgres:vector@localhost:5432/postgres"
+    ))]
     endpoints: Vec<String>,
 
     /// A list of databases to match (by using [POSIX Regular
@@ -121,6 +133,11 @@ pub struct PostgresqlMetricsConfig {
     /// `NULL`.
     ///
     /// This can be used in conjunction with `exclude_databases`.
+    #[configurable(metadata(
+        docs::examples = "^postgres$",
+        docs::examples = "^vector$",
+        docs::examples = "^foo",
+    ))]
     include_databases: Option<Vec<String>>,
 
     /// A list of databases to match (by using [POSIX Regular
@@ -130,14 +147,16 @@ pub struct PostgresqlMetricsConfig {
     /// Specifying `""` will include metrics where `datname` is `NULL`.
     ///
     /// This can be used in conjunction with `include_databases`.
+    #[configurable(metadata(docs::examples = "^postgres$", docs::examples = "^template.*",))]
     exclude_databases: Option<Vec<String>>,
 
-    /// The interval between scrapes, in seconds.
-    scrape_interval_secs: u64,
+    /// The interval between scrapes.
+    #[serde(default = "default_scrape_interval_secs")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
-    ///
-    /// By default, `postgresql` is used.
+    #[serde(default = "default_namespace")]
     namespace: String,
 
     #[configurable(derived)]
@@ -150,7 +169,7 @@ impl Default for PostgresqlMetricsConfig {
             endpoints: vec![],
             include_databases: None,
             exclude_databases: None,
-            scrape_interval_secs: 15,
+            scrape_interval_secs: Duration::from_secs(15),
             namespace: "postgresql".to_owned(),
             tls: None,
         }
@@ -158,6 +177,14 @@ impl Default for PostgresqlMetricsConfig {
 }
 
 impl_generate_config_from_default!(PostgresqlMetricsConfig);
+
+pub const fn default_scrape_interval_secs() -> Duration {
+    Duration::from_secs(15)
+}
+
+pub fn default_namespace() -> String {
+    "postgresql".to_owned()
+}
 
 #[async_trait::async_trait]
 impl SourceConfig for PostgresqlMetricsConfig {
@@ -178,7 +205,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
         }))
         .await?;
 
-        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);

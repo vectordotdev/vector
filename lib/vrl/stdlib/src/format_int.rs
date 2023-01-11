@@ -20,7 +20,7 @@ fn format_int(value: Value, base: Option<Value>) -> Resolved {
         }
         None => 10u32,
     };
-    let converted = format_radix(value, base as u32);
+    let converted = format_radix(value, base);
     Ok(converted.into())
 }
 

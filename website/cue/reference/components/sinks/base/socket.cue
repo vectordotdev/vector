@@ -169,7 +169,8 @@ base: components: sinks: socket: configuration: {
 				}
 			}
 			method: {
-				required: true
+				description: "The framing method."
+				required:    true
 				type: string: enum: {
 					bytes:               "Event data is not delimited at all."
 					character_delimited: "Event data is delimited by a single ASCII (7-bit) character."
@@ -194,11 +195,12 @@ base: components: sinks: socket: configuration: {
 		}
 	}
 	mode: {
-		required: true
+		description: "The type of socket to use."
+		required:    true
 		type: string: enum: {
-			tcp:  "TCP."
-			udp:  "UDP."
-			unix: "Unix Domain Socket."
+			tcp:  "Send over TCP."
+			udp:  "Send over UDP."
+			unix: "Send over a Unix domain socket (UDS)."
 		}
 	}
 	path: {

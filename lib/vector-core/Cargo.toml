@@ -38,15 +38,15 @@ proptest = { version = "1.0", optional = true }
 prost-types = { version = "0.11.5", default-features = false }
 prost = { version = "0.11.5", default-features = false, features = ["std"] }
 quanta = { version = "0.10.1", default-features = false }
-regex = { version = "1.7.0", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.7.1", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
 serde = { version = "1.0.152", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.91", default-features = false }
-serde_with = { version = "2.1.0", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "2.2.0", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.4", default-features = false }
 socket2 = { version = "0.4.7", default-features = false }
-tokio = { version = "1.23.1", default-features = false, features = ["net"] }
+tokio = { version = "1.24.1", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
@@ -74,13 +74,13 @@ vrl-lib = { package = "vrl", path = "../vrl/vrl" }
 security-framework = "2.7.0"
 
 [target.'cfg(windows)'.dependencies]
-schannel = "0.1.20"
+schannel = "0.1.21"
 
 [build-dependencies]
 prost-build = "0.11.5"
 
 [dev-dependencies]
-base64 = "0.20.0"
+base64 = "0.21.0"
 chrono-tz = { version = "0.8.1", default-features = false }
 criterion = { version = "0.4.0", features = ["html_reports"] }
 env-test-util = "1.0.1"

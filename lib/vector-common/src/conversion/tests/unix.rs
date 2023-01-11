@@ -62,7 +62,7 @@ where
 {
     std::env::set_var("TZ", TIMEZONE_NAME);
     Conversion::parse(fmt, TimeZone::Local)
-        .unwrap_or_else(|_| panic!("Invalid conversion {:?}", fmt))
+        .unwrap_or_else(|_| panic!("Invalid conversion {fmt:?}"))
         .convert(value.into())
 }
 

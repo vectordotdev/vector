@@ -354,7 +354,7 @@ mod tests {
             .expect("Test metric is not present");
         match metric.value() {
             MetricValue::Counter { value } => assert_eq!(*value, 2.0),
-            value => panic!("Invalid metric value {:?}", value),
+            value => panic!("Invalid metric value {value:?}"),
         }
     }
 }

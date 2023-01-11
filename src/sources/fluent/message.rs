@@ -272,7 +272,7 @@ mod test {
           if input.is_nan() {
               assert_eq!(val, Value::Null);
           } else {
-              assert_relative_eq!(input as f64, val.as_float().unwrap().into_inner());
+              assert_relative_eq!(input, val.as_float().unwrap().into_inner());
           }
         }
     }

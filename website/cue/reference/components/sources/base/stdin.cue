@@ -140,6 +140,9 @@ base: components: sources: stdin: configuration: {
 			Messages larger than this are truncated.
 			"""
 		required: false
-		type: uint: default: 102400
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
 	}
 }
