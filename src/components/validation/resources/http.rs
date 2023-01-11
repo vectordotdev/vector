@@ -332,13 +332,8 @@ where
     tokio::spawn(async move {
         // Create our HTTP server by binding as early as possible to return an error if we can't
         // actually bind.
-        let server_builder = match Server::try_bind(&listen_addr) {
-            Err(e) => {
-                error!(?listen_addr, error = ?e, "failed to bind listen address");
-                panic!("woopsie");
-            }
-            Ok(server_builder) => server_builder,
-        };
+        let server_builder =
+            Server::try_bind(&listen_addr).expect("Failed to bind to listen address.");
 
         // Create our router, which is a bit boilerplate-y because we take the HTTP method
         // parametrically. We generate a handler that calls the given `handler` and then triggers

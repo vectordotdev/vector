@@ -276,10 +276,7 @@ impl ValidatableComponent for HttpSinkConfig {
     fn external_resource(&self) -> Option<ExternalResource> {
         Some(ExternalResource::new(
             ResourceDirection::Push,
-            HttpResourceConfig::from_parts(
-                self.uri.uri.clone(),
-                self.method.clone().map(Into::into),
-            ),
+            HttpResourceConfig::from_parts(self.uri.uri.clone(), self.method.map(Into::into)),
             self.encoding.clone(),
         ))
     }
