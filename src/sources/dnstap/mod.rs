@@ -45,8 +45,8 @@ pub struct DnstapConfig {
 
     /// Absolute path to the socket file to read DNSTAP data from.
     ///
-    /// The DNS server must be configured to send its DNSTAP data to this socket file. The socket file will be created,
-    /// if it doesn't already exist, when the source first starts.
+    /// The DNS server must be configured to receive its DNSTAP data from this socket file. The socket file will be created
+    /// if it doesn't already exist when the source first starts.
     pub socket_path: PathBuf,
 
     /// Whether or not to skip parsing/decoding of DNSTAP frames.
@@ -65,19 +65,37 @@ pub struct DnstapConfig {
     ///
     /// Note that the file mode value can be specified in any numeric format supported by your configuration
     /// language, but it is most intuitive to use an octal number.
+    #[configurable(metadata(
+        docs::examples = "0o777",
+        docs::examples = "0o754",
+        docs::examples = "0o777",
+    ))]
     pub socket_file_mode: Option<u32>,
 
     /// The size, in bytes, of the receive buffer used for the socket.
     ///
     /// This should not typically needed to be changed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(
+        docs::warnings = "System-wide setting of max socket send buffer size
+					(i.e. value of '/proc/sys/net/core/wmem_max' on Linux)
+					may need adjustment accordingly."
+    ))]
     pub socket_receive_buffer_size: Option<usize>,
 
     /// The size, in bytes, of the send buffer used for the socket.
     ///
     /// This should not typically needed to be changed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(
+        docs::warnings = "System-wide setting of max socket send buffer size
+					(i.e. value of '/proc/sys/net/core/wmem_max' on Linux)
+					may need adjustment accordingly."
+    ))]
     pub socket_send_buffer_size: Option<usize>,
 
     /// The namespace to use for logs. This overrides the global settings.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
 }
