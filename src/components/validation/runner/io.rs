@@ -103,8 +103,8 @@ impl InputEdge {
                     events: vec![test_event.into_event().into()],
                 };
                 match client.push_events(request).await {
-                    Ok(_response) => {},
-                    Err(_e) => {},
+                    Ok(_response) => {}
+                    Err(_e) => {}
                 }
             }
 

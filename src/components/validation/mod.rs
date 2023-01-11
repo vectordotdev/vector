@@ -110,9 +110,9 @@ where
 mod tests {
     use crate::{
         components::validation::{Runner, StandardValidators},
+        sinks::http::HttpSinkConfig,
         sources::http_client::HttpClientConfig,
         sources::http_server::SimpleHttpConfig,
-        sinks::http::HttpSinkConfig,
     };
 
     use super::ValidatableComponent;

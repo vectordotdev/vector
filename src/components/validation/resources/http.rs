@@ -292,6 +292,10 @@ fn spawn_output_http_client(
     _output_tx: mpsc::Sender<Event>,
     _task_coordinator: &TaskCoordinator<Configuring>,
 ) {
+    // The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
+    // scraped... but since we need special logic to aggregate/deduplicate scraped metrics, we can't
+    // use this generically for that purpose.
+    todo!()
 }
 
 fn spawn_http_server<H, F, R>(
@@ -332,7 +336,8 @@ where
             Err(e) => {
                 error!(?listen_addr, error = ?e, "failed to bind listen address");
                 panic!("woopsie");
-            }, Ok(server_builder) => server_builder,
+            }
+            Ok(server_builder) => server_builder,
         };
 
         // Create our router, which is a bit boilerplate-y because we take the HTTP method
