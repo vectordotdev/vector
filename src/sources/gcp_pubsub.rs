@@ -129,7 +129,9 @@ pub struct PubsubConfig {
     pub subscription: String,
 
     /// The endpoint from which to pull data.
-    pub endpoint: Option<String>,
+    #[configurable(metadata(docs::examples = "https://us-central1-pubsub.googleapis.com"))]
+    #[serde(default = "default_endpoint")]
+    pub endpoint: String,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
@@ -144,6 +146,9 @@ pub struct PubsubConfig {
     /// The number of messages in a response to mark a stream as
     /// "busy". This is used to determine if more streams should be
     /// started.
+    ///
+    /// The GCP Pub/Sub servers send responses with 100 or more messages when
+    /// the subscription is busy.
     #[serde(default = "default_full_response")]
     pub full_response_size: usize,
 
@@ -155,15 +160,19 @@ pub struct PubsubConfig {
     /// The acknowledgement deadline, in seconds, to use for this stream.
     ///
     /// Messages that are not acknowledged when this deadline expires may be retransmitted.
-    pub ack_deadline_secs: Option<i32>,
+    #[serde(default = "default_ack_deadline")]
+    pub ack_deadline_secs: i32,
 
     /// Deprecated, old name of `ack_deadline_secs`.
+    #[configurable(deprecated)]
     pub ack_deadline_seconds: Option<i32>,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
-    pub retry_delay_secs: Option<f64>,
+    #[serde(default = "default_retry_delay")]
+    pub retry_delay_secs: f64,
 
     /// Deprecated, old name of `retry_delay_secs`.
+    #[configurable(deprecated)]
     pub retry_delay_seconds: Option<f64>,
 
     /// The amount of time, in seconds, with no received activity
@@ -190,6 +199,10 @@ pub struct PubsubConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
+}
+
+fn default_endpoint() -> String {
+    PUBSUB_URL.to_string()
 }
 
 const fn default_ack_deadline() -> i32 {
@@ -220,37 +233,28 @@ const fn default_poll_time() -> f64 {
 impl SourceConfig for PubsubConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let ack_deadline_secs = match (self.ack_deadline_secs, self.ack_deadline_seconds) {
-            (Some(ads), None) => ads,
-            (None, Some(ads)) => {
+        let ack_deadline_secs = match self.ack_deadline_seconds {
+            None => self.ack_deadline_secs,
+            Some(ads) => {
                 warn!("The `ack_deadline_seconds` setting is deprecated, use `ack_deadline_secs` instead.");
                 ads
             }
-            (Some(_), Some(_)) => return Err(PubsubError::BothAckDeadlineSecsAndSeconds.into()),
-            (None, None) => default_ack_deadline(),
         };
         if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs) {
             return Err(PubsubError::InvalidAckDeadline.into());
         }
 
-        let retry_delay_secs = match (self.retry_delay_secs, self.retry_delay_seconds) {
-            (Some(rds), None) => rds,
-            (None, Some(rds)) => {
+        let retry_delay_secs = match self.retry_delay_seconds {
+            None => self.retry_delay_secs,
+            Some(rds) => {
                 warn!("The `retry_delay_seconds` setting is deprecated, use `retry_delay_secs` instead.");
                 rds
             }
-            (Some(_), Some(_)) => return Err(PubsubError::BothRetryDelaySecsAndSeconds.into()),
-            (None, None) => default_retry_delay(),
         };
 
         let auth = self.auth.build(Scope::PubSub).await?;
 
-        let mut uri: Uri = self
-            .endpoint
-            .as_deref()
-            .unwrap_or(PUBSUB_URL)
-            .parse()
-            .context(UriSnafu)?;
+        let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
         auth.apply_uri(&mut uri);
 
         let tls = TlsSettings::from_options(&self.tls)?;
@@ -1017,12 +1021,12 @@ mod integration_tests {
             let config = PubsubConfig {
                 project: PROJECT.into(),
                 subscription: self.subscription.clone(),
-                endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
+                endpoint: gcp::PUBSUB_ADDRESS.clone(),
                 auth: GcpAuthConfig {
                     skip_authentication: true,
                     ..Default::default()
                 },
-                ack_deadline_secs: Some(ACK_DEADLINE as i32),
+                ack_deadline_secs: ACK_DEADLINE as i32,
                 ..Default::default()
             };
             let (mut ctx, shutdown) = SourceContext::new_shutdown(&self.component, tx);
@@ -1074,6 +1078,9 @@ mod integration_tests {
             let path = base
                 .replace("{topic}", &self.topic)
                 .replace("{sub}", &self.subscription);
+            ///
+            /// The GCP Pub/Sub servers send responses with 100 or more messages when
+            /// the subscription is busy.
             let uri = [PROJECT_URI.as_str(), &path].join("/");
             let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
             let request = Request::builder()

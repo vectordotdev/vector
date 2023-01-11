@@ -13,7 +13,7 @@ base: components: sources: gcp_pubsub: configuration: {
 			Messages that are not acknowledged when this deadline expires may be retransmitted.
 			"""
 		required: false
-		type: int: {}
+		type: int: default: 600
 	}
 	acknowledgements: {
 		description: """
@@ -113,7 +113,10 @@ base: components: sources: gcp_pubsub: configuration: {
 	endpoint: {
 		description: "The endpoint from which to pull data."
 		required:    false
-		type: string: {}
+		type: string: {
+			default: "https://pubsub.googleapis.com"
+			examples: ["https://us-central1-pubsub.googleapis.com"]
+		}
 	}
 	framing: {
 		description: """
@@ -195,6 +198,9 @@ base: components: sources: gcp_pubsub: configuration: {
 			The number of messages in a response to mark a stream as
 			"busy". This is used to determine if more streams should be
 			started.
+
+			The GCP Pub/Sub servers send responses with 100 or more messages when
+			the subscription is busy.
 			"""
 		required: false
 		type: uint: default: 100
@@ -234,7 +240,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	retry_delay_secs: {
 		description: "The amount of time, in seconds, to wait between retry attempts after an error."
 		required:    false
-		type: float: {}
+		type: float: default: 1.0
 	}
 	skip_authentication: {
 		description: "Skip all authentication handling. For use with integration tests only."
