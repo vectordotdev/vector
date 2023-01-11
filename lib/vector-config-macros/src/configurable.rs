@@ -167,14 +167,13 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
 
     let spanned_generate_schema = quote_spanned! {field.span()=>
-        ::vector_config::schema::get_or_generate_schema(schema_gen, #field_metadata_ref.as_subschema())?
+        ::vector_config::schema::get_or_generate_schema(schema_gen, #field_metadata_ref)?
     };
 
     quote! {
         #field_metadata
 
         let mut subschema = #spanned_generate_schema;
-        ::vector_config::schema::apply_metadata(&mut subschema, #field_metadata_ref);
     }
 }
 
