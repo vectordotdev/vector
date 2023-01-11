@@ -10,8 +10,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        // Dummy arguments to satisfy `impl` trait bound
-        app::exec_in_app_path("scripts/generate-manifests.sh", [""])?;
-        app::exec_in_app_path("scripts/generate-release-cue.rb", [""])
+        app::exec_in_app_path::<&str>("scripts/generate-manifests.sh", [])?;
+        app::exec_in_app_path::<&str>("scripts/generate-release-cue.rb", [])
     }
 }
