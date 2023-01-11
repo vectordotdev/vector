@@ -72,6 +72,7 @@ cli_commands! {
     mod config,
     mod exec,
     mod features,
+    mod fmt,
     mod generate,
     mod integration,
     mod meta,
