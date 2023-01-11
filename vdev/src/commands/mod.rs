@@ -80,6 +80,7 @@ cli_commands! {
     mod run,
     mod status,
     mod test,
+    mod version,
 }
 
 /// This macro creates a wrapper for an existing script

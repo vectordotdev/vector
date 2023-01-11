@@ -16,6 +16,7 @@ mod features;
 mod git;
 mod platform;
 mod testing;
+mod util;
 
 use anyhow::Result;
 use clap::Parser;

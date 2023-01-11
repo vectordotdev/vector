@@ -54,7 +54,7 @@ export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
 # Set version
-export VERSION ?= $(shell scripts/version.sh)
+export VERSION ?= $(shell cargo vdev version)
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
@@ -685,7 +685,7 @@ endif
 
 .PHONY: version
 version: ## Get the current Vector version
-	@scripts/version.sh
+	@cargo vdev version
 
 .PHONY: git-hooks
 git-hooks: ## Add Vector-local git hooks for commit sign-off

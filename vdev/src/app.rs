@@ -23,6 +23,10 @@ pub fn path() -> &'static String {
     PATH.get().expect("path is not initialized")
 }
 
+pub fn set_base_dir() -> Result<()> {
+    env::set_current_dir(path()).context("Could not change directory")
+}
+
 /// Overlay some extra helper functions onto `std::process::Command`
 pub trait CommandExt {
     fn with_path(program: &str) -> Self;
@@ -108,7 +112,7 @@ pub fn exec_in_app_path<T: AsRef<OsStr>>(
     command: impl AsRef<OsStr>,
     args: impl IntoIterator<Item = T>,
 ) -> Result<()> {
-    env::set_current_dir(path()).context("Could not change directory")?;
+    set_base_dir()?;
     exec(command, args)
 }
 
