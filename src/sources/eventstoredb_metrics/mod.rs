@@ -30,7 +30,7 @@ pub mod types;
 #[configurable_component(source("eventstoredb_metrics"))]
 #[derive(Clone, Debug, Default)]
 pub struct EventStoreDbConfig {
-    /// Endpoints to scrape stats from.
+    /// Endpoint to scrape stats from.
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(docs::examples = "https://localhost:2113/stats"))]
     endpoint: String,
