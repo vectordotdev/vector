@@ -71,9 +71,11 @@ cli_commands! {
     mod complete,
     mod config,
     mod exec,
+    mod features,
     mod generate,
     mod integration,
     mod meta,
+    mod run,
     mod status,
     mod test,
 }

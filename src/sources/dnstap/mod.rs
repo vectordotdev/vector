@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use lookup::{owned_value_path, path, OwnedValuePath};
 use value::{kind::Collection, Kind};
@@ -289,7 +290,7 @@ impl FrameHandler for DnstapFrameHandler {
         if self.raw_data_only {
             log_event.insert(
                 self.schema.dnstap_root_data_schema().raw_data(),
-                base64::encode(&frame),
+                BASE64_STANDARD.encode(&frame),
             );
             let event = Event::from(log_event);
             Some(event)

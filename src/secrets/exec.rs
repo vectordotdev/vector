@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bytes::BytesMut;
 use futures::executor;
@@ -41,10 +41,10 @@ const fn default_timeout_secs() -> u64 {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct ExecQuery {
     version: String,
-    secrets: Vec<String>,
+    secrets: HashSet<String>,
 }
 
-fn new_query(secrets: Vec<String>) -> ExecQuery {
+fn new_query(secrets: HashSet<String>) -> ExecQuery {
     ExecQuery {
         version: "1.0".to_string(),
         secrets,
@@ -60,7 +60,7 @@ struct ExecResponse {
 impl SecretBackend for ExecBackend {
     fn retrieve(
         &mut self,
-        secret_keys: Vec<String>,
+        secret_keys: HashSet<String>,
         signal_rx: &mut signal::SignalRx,
     ) -> crate::Result<HashMap<String, String>> {
         let mut output = executor::block_on(async {
@@ -82,7 +82,7 @@ impl SecretBackend for ExecBackend {
                     if v.is_empty() {
                         return Err(format!("secret for key '{}' was empty", k).into());
                     }
-                    secrets.insert(k, v);
+                    secrets.insert(k.to_string(), v);
                 } else {
                     return Err(format!("secret for key '{}' was empty", k).into());
                 }

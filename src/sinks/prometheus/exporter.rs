@@ -8,6 +8,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
     header::HeaderValue,
@@ -349,7 +350,7 @@ fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
                 Auth::Basic { user, password } => HeaderValue::from_str(
                     format!(
                         "Basic {}",
-                        base64::encode(format!("{}:{}", user, password.inner()))
+                        BASE64_STANDARD.encode(format!("{}:{}", user, password.inner()))
                     )
                     .as_str(),
                 ),
