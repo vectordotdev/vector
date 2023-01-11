@@ -132,22 +132,6 @@ impl tower::Service<BasicRequest> for BasicService {
     }
 }
 
-#[derive(Debug, Clone)]
-struct BasicSink {
-    endpoint: String,
-    client: HttpClient,
-}
-
-impl BasicSink {
-    pub fn new(config: &BasicConfig) -> Self {
-        let tls = TlsSettings::from_options(&None).unwrap();
-        let client = HttpClient::new(tls, &Default::default()).unwrap();
-        let endpoint = config.endpoint.clone();
-
-        Self { client, endpoint }
-    }
-}
-
 #[derive(Clone)]
 struct BasicEncoder;
 
@@ -167,19 +151,19 @@ struct BasicRequestBuilder {
     encoder: BasicEncoder,
 }
 
-#[derive(Debug, Snafu)]
-pub enum RequestBuildError {
-    #[snafu(display("An error occurred."))]
-    PayloadTooBig,
-    #[snafu(display("Failed to build payload with error: {}", error))]
-    Io { error: std::io::Error },
-}
+// #[derive(Debug, Snafu)]
+// pub enum RequestBuildError {
+//     #[snafu(display("An error occurred."))]
+//     PayloadTooBig,
+//     #[snafu(display("Failed to build payload with error: {}", error))]
+//     Io { error: std::io::Error },
+// }
 
-impl From<std::io::Error> for RequestBuildError {
-    fn from(error: std::io::Error) -> RequestBuildError {
-        RequestBuildError::Io { error }
-    }
-}
+// impl From<std::io::Error> for RequestBuildError {
+//     fn from(error: std::io::Error) -> RequestBuildError {
+//         RequestBuildError::Io { error }
+//     }
+// }
 
 #[derive(Clone)]
 struct BasicRequest {
@@ -206,7 +190,7 @@ impl RequestBuilder<Event> for BasicRequestBuilder {
     type Encoder = BasicEncoder;
     type Payload = Bytes;
     type Request = BasicRequest;
-    type Error = RequestBuildError;
+    type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
         Compression::None
@@ -253,6 +237,22 @@ impl StreamSink<Event> for BasicSink {
         input: futures_util::stream::BoxStream<'_, Event>,
     ) -> Result<(), ()> {
         self.run_inner(input).await
+    }
+}
+
+#[derive(Debug, Clone)]
+struct BasicSink {
+    endpoint: String,
+    client: HttpClient,
+}
+
+impl BasicSink {
+    pub fn new(config: &BasicConfig) -> Self {
+        let tls = TlsSettings::from_options(&None).unwrap();
+        let client = HttpClient::new(tls, &Default::default()).unwrap();
+        let endpoint = config.endpoint.clone();
+
+        Self { client, endpoint }
     }
 }
 
