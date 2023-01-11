@@ -1,3 +1,10 @@
+//! This mod implements the `envoy_als` source.
+//! The Envoy Access Log Service is a gRPC API that Envoy (An L7 load balancer) can
+//! be configured to stream logs to. Thus the `envoy_als` source's scope is to accept
+//! log streams from Envoy instances, and generate log events for each log.
+//! For more information on the details of the ALS service, see
+//! https://www.envoyproxy.io/docs/envoy/v1.24.1/api-v3/service/accesslog/v3/als.proto
+
 mod grpc;
 #[cfg(all(test, feature = "envoy-als-integration-tests"))]
 mod integration_tests;
@@ -13,7 +20,7 @@ use crate::{
 use envoy_proto::envoy::service::accesslog::v3::access_log_service_server::AccessLogServiceServer;
 use futures::{FutureExt, TryFutureExt};
 use std::net::SocketAddr;
-use vector_common::internal_event::EventsReceived;
+use vector_common::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
@@ -31,7 +38,7 @@ pub struct EnvoyAlsConfig {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct GrpcConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
     address: SocketAddr,
@@ -57,11 +64,13 @@ impl GenerateConfig for EnvoyAlsConfig {
 impl SourceConfig for EnvoyAlsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let events_received = register!(EventsReceived);
+        let bytes_received = register!(BytesReceived::from(Protocol::from("protobuf")));
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(&self.grpc.tls, true)?;
         let grpc_service = AccessLogServiceServer::new(Service {
-            events_received: events_received.clone(),
-            pipeline: cx.out.clone(),
+            events_received,
+            bytes_received,
+            pipeline: cx.out,
             shutdown: cx.shutdown.clone(),
         })
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
@@ -69,7 +78,7 @@ impl SourceConfig for EnvoyAlsConfig {
             self.grpc.address,
             grpc_tls_settings,
             grpc_service,
-            cx.shutdown.clone(),
+            cx.shutdown,
         )
         .map_err(|error| {
             error!(message = "Source future failed.", %error);

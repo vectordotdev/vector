@@ -39,7 +39,8 @@ components: sources: envoy_als: {
 		requirements: []
 		warnings: [
 			"""
-				The `envoy_als` source only supports http log events at this time.
+				The `envoy_als` source only supports HTTP log events at this time. TCP logs will not be ingested
+				and will generate a warning in Vector logs if sent.
 				""",
 		]
 		notices: [
@@ -98,7 +99,7 @@ components: sources: envoy_als: {
 
 	output: {
 		logs: event: {
-			description: "An individual log event from a batch of events received an Envoy ALS stream"
+			description: "An individual log event from a batch of events received by an Envoy ALS stream"
 			fields: {
 				identifier: {
 					description: "Added to each log event on the stream. See https://www.envoyproxy.io/docs/envoy/v1.24.1/api-v3/service/accesslog/v3/als.proto#envoy-v3-api-msg-service-accesslog-v3-streamaccesslogsmessage-identifier for more details."
