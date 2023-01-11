@@ -1,6 +1,6 @@
-use std::{borrow::Cow, process::Command, time::Duration};
+use std::{borrow::Cow, ffi::OsStr, path::Path, process::Command, time::Duration};
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Context as _, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 use once_cell::sync::OnceCell;
@@ -79,6 +79,20 @@ impl CommandExt for Command {
                 output.status.code().unwrap()
             )
         }
+    }
+}
+
+pub fn exec<T: AsRef<OsStr>>(command: &Path, args: impl IntoIterator<Item = T>) -> Result<()> {
+    let mut command = Command::new(command);
+    command.args(args);
+    match command
+        .spawn()
+        .with_context(|| format!("Could not spawn {command:?}"))?
+        .wait()
+        .context("Could not wait for program exit")?
+    {
+        status if status.success() => Ok(()),
+        status => Err(anyhow!("Command failed, exit code {status}")),
     }
 }
 
