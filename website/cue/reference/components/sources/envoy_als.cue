@@ -40,7 +40,8 @@ components: sources: envoy_als: {
 		warnings: [
 			"""
 				The `envoy_als` source only supports HTTP log events at this time. TCP logs will not be ingested
-				and will generate a warning in Vector logs if sent.
+				and will generate a warning in Vector logs if sent. Please make sure you are using HTTP access logs in
+				you Envoy configuration.
 				""",
 		]
 		notices: [

@@ -43,7 +43,6 @@ impl AccessLogService for Service {
                             match err {
                                 StreamError::StreamClosed => break,
                                 StreamError::Grpc(status) => {
-                                    // TODO emit error?
                                     return Err(status);
                                 }
                             }
