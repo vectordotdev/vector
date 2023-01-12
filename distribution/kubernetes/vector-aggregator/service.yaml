@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Aggregator
     app.kubernetes.io/version: "0.26.0-distroless-libc"
-  annotations: {}
+  annotations:
 spec:
   ports:
     - name: datadog-agent
