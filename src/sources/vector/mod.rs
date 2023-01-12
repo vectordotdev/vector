@@ -120,7 +120,7 @@ pub struct VectorConfig {
     /// Version of the configuration.
     version: Option<VectorConfigVersion>,
 
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
     pub address: SocketAddr,

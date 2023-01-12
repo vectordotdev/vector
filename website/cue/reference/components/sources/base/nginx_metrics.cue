@@ -56,7 +56,7 @@ base: components: sources: nginx_metrics: configuration: {
 			`ngx_http_stub_status_module` module enabled.
 			"""
 		required: true
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["http://localhost:8000/basic_status"]
 	}
 	namespace: {
 		description: """
@@ -70,9 +70,12 @@ base: components: sources: nginx_metrics: configuration: {
 		type: string: default: "nginx"
 	}
 	scrape_interval_secs: {
-		description: "The interval between scrapes, in seconds."
+		description: "The interval between scrapes."
 		required:    false
-		type: uint: default: 15
+		type: uint: {
+			default: 15
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description: "TLS configuration."

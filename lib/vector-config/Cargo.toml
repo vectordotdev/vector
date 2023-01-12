@@ -21,7 +21,7 @@ num-traits = { version = "0.2.15", default-features = false }
 schemars = { version = "0.8.11", default-features = true, features = ["preserve_order"] }
 serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0", default-features = false }
-serde_with = { version = "2.1.0", default-features = false, features = ["std"] }
+serde_with = { version = "2.2.0", default-features = false, features = ["std"] }
 snafu = { version = "0.7.4", default-features = false }
 toml = { version = "0.5.10", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
@@ -29,4 +29,4 @@ vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
-serde_with = { version = "2.1.0", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "2.2.0", default-features = false, features = ["std", "macros"] }
