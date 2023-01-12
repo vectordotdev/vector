@@ -6,7 +6,7 @@ begin
   require 'tempfile'
 rescue LoadError => e
   puts "Load error: #{e.message}"
-  exit
+  exit 1
 end
 
 DEBUG_LEVEL = 1
@@ -277,7 +277,7 @@ def get_docs_type_for_value(schema, value)
     @logger.error "Schema instance type and value type are a mismatch, which should not happen."
     @logger.error "Schema instance type: #{schema_instance_type}"
     @logger.error "Value: #{value} (type: #{value_type})"
-    exit
+    exit 1
   end
 
   # For any numeric type, extract the value of `docs::numeric_type`, which must always be present in
@@ -288,7 +288,7 @@ def get_docs_type_for_value(schema, value)
     numeric_type = get_schema_metadata(schema, 'docs::numeric_type')
     if numeric_type.nil?
       @logger.error "All fields with numeric types should have 'docs::numeric_type' metadata included."
-      exit
+      exit 1
     end
 
     return numeric_type
@@ -461,7 +461,7 @@ def get_schema_by_name(root_schema, schema_name)
   schema_def = root_schema.dig('definitions', schema_name)
   if schema_def.nil?
     @logger.error "Could not find schema definition '#{schema_name}' in given schema."
-    exit
+    exit 1
   end
 
   schema_def
@@ -713,7 +713,7 @@ def resolve_schema_by_name(root_schema, schema_name)
     cycles with `#[configurable(metadata(docs::cycle_entrypoint))]`. As such a field will have no type \
     information rendered, it is advised to supply a sufficiently detailed field description that \
     describes the allowable values, etc."
-    exit
+    exit 1
   end
 
   # It wasn't already cached, so we actually have to resolve it.
@@ -949,7 +949,7 @@ def resolve_bare_schema(root_schema, schema)
       grouped
     else
       @logger.error "Failed to resolve the schema. Schema: #{schema}"
-      exit
+      exit 1
     end
 
   { 'type' => resolved }
@@ -985,7 +985,7 @@ def resolve_enum_schema(root_schema, schema)
     @logger.error 'Enum schemas should never be missing the metadata for the enum tagging mode.'
     @logger.error "Schema: #{JSON.pretty_generate(schema)}"
     @logger.error "Filter subschemas: #{JSON.pretty_generate(subschemas)}"
-    exit
+    exit 1
   end
 
   enum_tag_field = get_schema_metadata(schema, 'docs::enum_tag_field')
@@ -1098,12 +1098,12 @@ def resolve_enum_schema(root_schema, schema)
         if tag_value.nil?
           @logger.error 'All enum subschemas representing an internally-tagged enum must have the tag field use a const value.'
           @logger.error "Tag subschema: #{tag_subschema}"
-          exit
+          exit 1
         end
 
         if unique_tag_values.key?(tag_value)
           @logger.error "Found duplicate tag value '#{tag_value}' when resolving enum subschemas."
-          exit
+          exit 1
         end
 
         unique_tag_values[tag_value] = tag_subschema
@@ -1122,7 +1122,7 @@ def resolve_enum_schema(root_schema, schema)
               @logger.error "Had overlapping property '#{property_name}' from resolved enum subschema, but schemas differed:"
               @logger.error "Existing property schema (reduced): #{to_pretty_json(reduced_existing_property)}"
               @logger.error "New property schema (reduced): #{to_pretty_json(reduced_new_property)}"
-              exit
+              exit 1
             end
 
             @logger.debug "Adding relevant tag to existing resolved property schema for '#{property_name}'."
@@ -1185,8 +1185,14 @@ def resolve_enum_schema(root_schema, schema)
           }
         }
       }
+
       tag_description = get_schema_metadata(schema, 'docs::enum_tag_description')
-      resolved_tag_property['description'] = tag_description unless tag_description.nil?
+      if tag_description.nil?
+        @logger.error "A unique tag description must be specified for enums which are internally tagged (i.e. `#[serde(tag = \"...\")/`). This can be specified via `#[configurable(metadata(docs::enum_tag_description = \"...\"))]`."
+        @logger.error "Schema being generated: #{JSON.pretty_generate(schema)}"
+        exit 1
+      end
+      resolved_tag_property['description'] = tag_description
       unique_resolved_properties[enum_tag_field] = resolved_tag_property
 
       @logger.debug "Resolved as 'internally-tagged with named fields' enum schema."
@@ -1366,7 +1372,7 @@ def apply_schema_default_value!(source_schema, resolved_schema)
       Source schema: #{to_pretty_json(source_schema)} \
       Default value: #{to_pretty_json(default_value)} (type: #{default_value_type}) \
       Resolved schema: #{to_pretty_json(resolved_schema)}"
-      exit
+      exit 1
     end
 
     case default_value_type
@@ -1487,7 +1493,7 @@ def apply_schema_metadata!(source_schema, resolved_schema)
   if !syntax_override.nil?
     if resolved_schema_type?(resolved_schema) != "string"
       @logger.error "Non-string schemas should not use the `syntax_override` metadata attribute."
-      exit
+      exit 1
     end
 
     resolved_schema['type']['string']['syntax'] = syntax_override.to_s
@@ -1656,7 +1662,7 @@ def render_and_import_schema(root_schema, schema_name, friendly_name, config_map
   unwrapped_resolved_schema = resolved_schema.dig('type', 'object', 'options')
   if unwrapped_resolved_schema.nil?
     @logger.error 'Configuration types must always resolve to an object schema.'
-    exit
+    exit 1
   end
 
   unwrapped_resolved_schema = sort_hash_nested(unwrapped_resolved_schema)
@@ -1689,7 +1695,7 @@ def render_and_import_schema(root_schema, schema_name, friendly_name, config_map
   cue_output_file = "website/cue/reference/components/#{cue_relative_path}"
   unless system(@cue_binary_path, 'import', '-f', '-o', cue_output_file, '-p', 'metadata', json_output_file)
     @logger.error "[!]   Failed to import #{friendly_name} schema as valid Cue."
-    exit
+    exit 1
   end
   @logger.info "[✓]   Imported #{friendly_name} schema to '#{cue_output_file}'."
 end
@@ -1716,13 +1722,13 @@ end
 
 if ARGV.empty?
   puts 'usage: extract-component-schema.rb <configuration schema path>'
-  exit
+  exit 1
 end
 
 # Ensure that Cue is present since we need it to import our intermediate JSON representation.
 if @cue_binary_path.nil?
   puts 'Failed to find \'cue\' binary on the current path. Install \'cue\' (or make it available on the current path) and try again.'
-  exit
+  exit 1
 end
 
 schema_path = ARGV[0]

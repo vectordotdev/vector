@@ -30,6 +30,7 @@ pub struct SocketConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 #[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum Mode {
     /// Listen on TCP.
@@ -38,11 +39,11 @@ pub enum Mode {
     /// Listen on UDP.
     Udp(#[configurable(derived)] udp::UdpConfig),
 
-    /// Listen on UDS, in datagram mode. (Unix domain socket)
+    /// Listen on a Unix domain socket (UDS), in datagram mode.
     #[cfg(unix)]
     UnixDatagram(#[configurable(derived)] unix::UnixConfig),
 
-    /// Listen on UDS, in stream mode. (Unix domain socket)
+    /// Listen on a Unix domain socket (UDS), in stream mode.
     #[cfg(unix)]
     #[serde(alias = "unix")]
     UnixStream(#[configurable(derived)] unix::UnixConfig),

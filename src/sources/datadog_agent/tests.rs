@@ -21,7 +21,11 @@ use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
 use value::Kind;
-use vector_core::config::LogNamespace;
+use vector_core::{
+    config::LogNamespace,
+    event::{metric::TagValue, MetricTags},
+    metric_tags,
+};
 use vrl::prelude::Collection;
 
 use crate::schema::Definition;
@@ -749,8 +753,13 @@ async fn decode_series_endpoint_v1() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
-            assert_tag(metric, "host", "random_host");
-            assert_tag(metric, "foo", "bar");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "random_host",
+                    "foo" => "bar",
+                ),
+            );
 
             assert_eq!(
                 &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -766,8 +775,13 @@ async fn decode_series_endpoint_v1() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
-            assert_tag(metric, "host", "random_host");
-            assert_tag(metric, "foo", "bar");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "random_host",
+                    "foo" => "bar",
+                ),
+            );
 
             assert_eq!(
                 &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -788,8 +802,13 @@ async fn decode_series_endpoint_v1() {
                     value: 3.14 * (10_f64)
                 }
             );
-            assert_tag(metric, "host", "another_random_host");
-            assert_tag(metric, "foo", "bar:baz");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "another_random_host",
+                    "foo" => "bar:baz",
+                ),
+            );
 
             assert_eq!(
                 &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -809,8 +828,13 @@ async fn decode_series_endpoint_v1() {
                     value: 16777216_f64
                 }
             );
-            assert_tag(metric, "host", "a_host");
-            assert_tag(metric, "foobar", "");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "a_host",
+                    "foobar" => TagValue::Bare,
+                ),
+            );
 
             metric = events[4].as_metric();
             assert_eq!(metric.name(), "disk.free");
@@ -850,7 +874,11 @@ async fn decode_sketches() {
         let mut buf = Vec::new();
         let sketch = ddmetric_proto::sketch_payload::Sketch {
             metric: "dd_sketch".to_string(),
-            tags: vec!["foo:bar".to_string(), "foobar".to_string()],
+            tags: vec![
+                "foo:bar".to_string(),
+                "foo:baz".to_string(),
+                "foobar".to_string(),
+            ],
             host: "a_host".to_string(),
             distributions: Vec::new(),
             dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
@@ -898,10 +926,15 @@ async fn decode_sketches() {
                 Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
-            assert_tag(metric, "host", "a_host");
-            assert_tag(metric, "foo", "bar");
-            assert_tag(metric, "foobar", "");
-
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "a_host",
+                    "foo" => "bar",
+                    "foo" => "baz",
+                    "foobar" => TagValue::Bare,
+                ),
+            );
             let s = metric.value();
             assert!(matches!(s, MetricValue::Sketch { .. }));
             if let MetricValue::Sketch {
@@ -1263,8 +1296,13 @@ async fn split_outputs() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
-            assert_tag(metric, "host", "random_host");
-            assert_tag(metric, "foo", "bar");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "random_host",
+                    "foo" => "bar",
+                ),
+            );
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "abcdefgh12345678abcdefgh12345678"
@@ -1771,7 +1809,7 @@ async fn decode_series_endpoint_v2() {
                     name: "another_random_host".to_string(),
                 }],
                 metric: "another_namespace.dd_rate".to_string(),
-                tags: vec!["foo:bar:baz".to_string()],
+                tags: vec!["foo:bar:baz".to_string(), "foo:bizbaz".to_string()],
                 points: vec![ddmetric_proto::metric_payload::MetricPoint {
                     value: 3.14,
                     timestamp: 1542182950,
@@ -1831,9 +1869,14 @@ async fn decode_series_endpoint_v2() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
-            assert_tag(metric, "host", "random_host");
-            assert_tag(metric, "foo", "bar");
-            assert_tag(metric, "source_type_name", "a_random_source_type_name");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "random_host",
+                    "foo" => "bar",
+                    "source_type_name" => "a_random_source_type_name",
+                ),
+            );
             assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
@@ -1849,9 +1892,14 @@ async fn decode_series_endpoint_v2() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
-            assert_tag(metric, "host", "random_host");
-            assert_tag(metric, "foo", "bar");
-            assert_tag(metric, "source_type_name", "a_random_source_type_name");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "random_host",
+                    "foo" => "bar",
+                    "source_type_name" => "a_random_source_type_name",
+                ),
+            );
             assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
@@ -1872,12 +1920,14 @@ async fn decode_series_endpoint_v2() {
                     value: 3.14 * (10_f64)
                 }
             );
-            assert_tag(metric, "host", "another_random_host");
-            assert_tag(metric, "foo", "bar:baz");
-            assert_tag(
+            assert_tags(
                 metric,
-                "source_type_name",
-                "another_random_source_type_name",
+                metric_tags!(
+                    "host" => "another_random_host",
+                    "foo" => "bar:baz",
+                    "foo" => "bizbaz",
+                    "source_type_name" => "another_random_source_type_name",
+                ),
             );
             assert_eq!(metric.namespace(), Some("another_namespace"));
 
@@ -1899,9 +1949,14 @@ async fn decode_series_endpoint_v2() {
                     value: 16777216_f64
                 }
             );
-            assert_tag(metric, "host", "a_host");
-            assert_tag(metric, "foobar", "");
-            assert_tag(metric, "source_type_name", "a_very_random_source_type_name");
+            assert_tags(
+                metric,
+                metric_tags!(
+                    "host" => "a_host",
+                    "foobar" => TagValue::Bare,
+                    "source_type_name" => "a_very_random_source_type_name",
+                ),
+            );
             assert_eq!(metric.namespace(), None);
 
             assert_eq!(
@@ -2081,13 +2136,6 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
     )
 }
 
-fn assert_tag(metric: &Metric, tag: &str, value: &str) {
-    assert_eq!(
-        metric
-            .tags()
-            .expect("Missing tags")
-            .get(tag)
-            .map(AsRef::as_ref),
-        Some(value)
-    );
+fn assert_tags(metric: &Metric, tags: MetricTags) {
+    assert_eq!(metric.tags().expect("Missing tags"), &tags);
 }

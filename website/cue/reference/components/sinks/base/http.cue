@@ -255,7 +255,8 @@ base: components: sinks: http: configuration: {
 				}
 			}
 			method: {
-				required: true
+				description: "The framing method."
+				required:    true
 				type: string: enum: {
 					bytes:               "Event data is not delimited at all."
 					character_delimited: "Event data is delimited by a single ASCII (7-bit) character."
@@ -293,6 +294,34 @@ base: components: sinks: http: configuration: {
 			post:    "POST."
 			put:     "PUT."
 			trace:   "TRACE."
+		}
+	}
+	payload_prefix: {
+		description: """
+			A string to prefix the payload with.
+
+			This option is ignored if the encoding is not character delimited JSON.
+			If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
+			"""
+		required: false
+		type: string: {
+			default: ""
+			examples: ["{\"data\":"]
+		}
+	}
+	payload_suffix: {
+		description: """
+			A string to suffix the payload with.
+
+			This option is ignored if the encoding is not character delimited JSON.
+			If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
+			"""
+		required: false
+		type: string: {
+			default: ""
+			examples: [
+				"}",
+			]
 		}
 	}
 	request: {

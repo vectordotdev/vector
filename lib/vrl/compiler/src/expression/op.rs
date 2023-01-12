@@ -402,12 +402,12 @@ mod tests {
 
         let lhs = match lhs.clone().try_into() {
             Ok(v) => v,
-            Err(_) => panic!("not a valid lhs expression: {:?}", lhs),
+            Err(_) => panic!("not a valid lhs expression: {lhs:?}"),
         };
 
         let rhs = match rhs.clone().try_into() {
             Ok(v) => v,
-            Err(_) => panic!("not a valid rhs expression: {:?}", rhs),
+            Err(_) => panic!("not a valid rhs expression: {rhs:?}"),
         };
 
         Op {

@@ -299,7 +299,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.is_superset(&other), want, "{}", title);
+            assert_eq!(this.is_superset(&other), want, "{title}");
         }
     }
 }

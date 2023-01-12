@@ -15,14 +15,14 @@ fn to_timestamp(value: Value, unit: Unit) -> Resolved {
                 let t = Utc.timestamp_opt(v, 0).single();
                 match t {
                     Some(time) => time.into(),
-                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                    None => return Err(format!("unable to coerce {v} into timestamp").into()),
                 }
             }
             Unit::Milliseconds => {
                 let t = Utc.timestamp_millis_opt(v).single();
                 match t {
                     Some(time) => time.into(),
-                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                    None => return Err(format!("unable to coerce {v} into timestamp").into()),
                 }
             }
             Unit::Nanoseconds => Utc.timestamp_nanos(v).into(),
@@ -37,7 +37,7 @@ fn to_timestamp(value: Value, unit: Unit) -> Resolved {
                     .single();
                 match t {
                     Some(time) => time.into(),
-                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                    None => return Err(format!("unable to coerce {v} into timestamp").into()),
                 }
             }
             Unit::Milliseconds => {
@@ -49,7 +49,7 @@ fn to_timestamp(value: Value, unit: Unit) -> Resolved {
                     .single();
                 match t {
                     Some(time) => time.into(),
-                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                    None => return Err(format!("unable to coerce {v} into timestamp").into()),
                 }
             }
             Unit::Nanoseconds => {
@@ -61,7 +61,7 @@ fn to_timestamp(value: Value, unit: Unit) -> Resolved {
                     .single();
                 match t {
                     Some(time) => time.into(),
-                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                    None => return Err(format!("unable to coerce {v} into timestamp").into()),
                 }
             }
         },

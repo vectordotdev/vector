@@ -211,6 +211,28 @@ components: sources: kubernetes_logs: {
 			required:    false
 			type: string: default: null
 		}
+		ignore_older_secs: {
+			common:      true
+			description: "Ignore files with a data modification date older than the specified number of seconds."
+			required:    false
+			type: uint: {
+				default: null
+				examples: [60 * 10]
+				unit: "seconds"
+			}
+		}
+		read_from: {
+			common:      true
+			description: "In the absence of a checkpoint, this setting tells Vector where to start reading files that are present at startup."
+			required:    false
+			type: string: {
+				default: "beginning"
+				enum: {
+					"beginning": "Read from the beginning of the file."
+					"end":       "Start reading from the current end of the file."
+				}
+			}
+		}
 		self_node_name: {
 			common:      false
 			description: "The name of the Kubernetes `Node` this Vector instance runs at. Configured to use an env var by default, to be evaluated to a value provided by Kubernetes at Pod deploy time."
