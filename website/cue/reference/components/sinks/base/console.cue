@@ -158,7 +158,8 @@ base: components: sinks: console: configuration: {
 				}
 			}
 			method: {
-				required: true
+				description: "The framing method."
+				required:    true
 				type: string: enum: {
 					bytes:               "Event data is not delimited at all."
 					character_delimited: "Event data is delimited by a single ASCII (7-bit) character."

@@ -13,7 +13,7 @@ fn to_syslog_severity(level: Value) -> Resolved {
         "notice" => 5,
         "info" => 6,
         "debug" => 7,
-        _ => return Err(format!("syslog level {} not valid", level).into()),
+        _ => return Err(format!("syslog level {level} not valid").into()),
     };
     Ok(severity.into())
 }

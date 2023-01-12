@@ -24,7 +24,7 @@ base: components: sinks: configuration: {
 
 					Must be at least ~256 megabytes (268435488 bytes).
 					"""
-				relevant_when: "type = \"disk_v1\" or type = \"disk\""
+				relevant_when: "type = \"disk\""
 				required:      true
 				type: uint: {}
 			}
@@ -41,12 +41,6 @@ base: components: sinks: configuration: {
 														be lost if Vector is restarted forcefully or crashes.
 
 														Data is synchronized to disk every 500ms.
-														"""
-						disk_v1: """
-														Events are buffered on disk. (version 1)
-
-														This is less performant, but more durable. Data that has been synchronized to disk will not
-														be lost if Vector is restarted forcefully or crashes.
 														"""
 						memory: """
 														Events are buffered in memory.

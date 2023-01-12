@@ -29,7 +29,7 @@ jobs:
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@57396166ad8aefe6098280995947635806a0e6ea
+        uses: docker/metadata-action@05d22bf31770de02e20c67c70365453e00227f61
         with:
           images: timberio/vector-dev
           flavor: |

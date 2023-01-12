@@ -610,7 +610,7 @@ impl Decoder for LogstashDecoder {
                     let payload_size = rest.get_u32() as usize;
 
                     if rest.remaining() < payload_size {
-                        src.reserve(payload_size as usize);
+                        src.reserve(payload_size);
                         return Ok(None);
                     }
 

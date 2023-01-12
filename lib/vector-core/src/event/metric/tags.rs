@@ -120,7 +120,7 @@ impl Display for TagValueSet {
                 write!(f, ", ")?;
             }
             if let Some(value) = value {
-                write!(f, "\"{}\"", value)?;
+                write!(f, "\"{value}\"")?;
             } else {
                 write!(f, "null")?;
             }
@@ -716,7 +716,7 @@ mod tests {
             assert!(set.contains(&addition));
 
             // If the addition wasn't in the start set, it will increase the length.
-            assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
+            assert_eq!(set.len(), start_len + usize::from(new_addition));
             // The "single" value will match the addition.
             assert_eq!(set.as_single(), addition.as_option());
         }
@@ -773,7 +773,7 @@ mod tests {
             assert!(set.contains(&addition));
 
             // If the addition wasn't in the start set, it will increase the length.
-            assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
+            assert_eq!(set.len(), start_len + usize::from(new_addition));
             // The "single" value will match the addition.
             if addition.is_value() {
                 assert_eq!(set.as_single(), addition.as_option());

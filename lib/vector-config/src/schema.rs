@@ -75,23 +75,22 @@ where
             CustomAttribute::KeyValue { key, value } => {
                 custom_map.entry(key.to_string())
                     .and_modify(|existing_value| match existing_value {
-                        // When we have an existing KV pair, convert it to a multi-value KV pair.
-                        Value::String(_) => {
-                            let existing_str = std::mem::replace(existing_value, Value::Null);
-                            *existing_value = Value::Array(vec![existing_str, Value::String(value.to_string())]);
-                        },
-                        // This is already a multi-value KV pair, so just append the value.
-                        Value::Array(items) => {
-                            items.push(Value::String(value.to_string()));
-                        },
-                        // We have an unexpected value for this existing key, which is unallowed.
+                        // We already have a flag entry for this key, which we cannot turn into an
+                        // array, so we panic in this particular case to signify the weirdness.
                         Value::Bool(_) => {
-                            panic!("Tried to set metadata key/value pair '{}' but already existed in schema metadata for `{}` as a flag.", key, std::any::type_name::<T>());
+                            panic!("Tried to overwrite metadata flag '{}' but already existed in schema metadata for `{}` as a flag.", key, std::any::type_name::<T>());
                         },
-                        // The existing value had an entirely unexpected value type... uh oh!
-                        _ => panic!("Tried to set metadata key/value pair '{}' but already existed in schema metadata for `{}` as unexpected value type.", key, std::any::type_name::<T>()),
+                        // The entry is already a multi-value KV pair, so just append the value.
+                        Value::Array(items) => {
+                            items.push(value.clone());
+                        },
+                        // The entry is not already a multi-value KV pair, so turn it into one.
+                        _ => {
+                            let taken_existing_value = std::mem::replace(existing_value, Value::Null);
+                            *existing_value = Value::Array(vec![taken_existing_value, value.clone()]);
+                        },
                     })
-                    .or_insert(Value::String(value.to_string()));
+                    .or_insert(value.clone());
             }
         }
     }

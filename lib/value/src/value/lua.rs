@@ -164,7 +164,7 @@ mod test {
         let lua = Lua::new();
         for (expression, expected) in pairs {
             let value: Value = lua.load(expression).eval().unwrap();
-            assert_eq!(value, expected, "expression: {:?}", expression);
+            assert_eq!(value, expected, "expression: {expression:?}");
         }
     }
 
@@ -260,7 +260,7 @@ mod test {
             let test_fn: LuaFunction<'_> = lua
                 .load(test_src)
                 .eval()
-                .unwrap_or_else(|_| panic!("Failed to load {} for value {:?}", test_src, value));
+                .unwrap_or_else(|_| panic!("Failed to load {test_src} for value {value:?}"));
             assert!(
                 test_fn
                     .call::<_, bool>(value.clone())

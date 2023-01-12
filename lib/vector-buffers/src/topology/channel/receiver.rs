@@ -13,10 +13,7 @@ use vector_common::internal_event::emit;
 use super::limited_queue::LimitedReceiver;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    variants::{
-        disk_v1,
-        disk_v2::{self, ProductionFilesystem},
-    },
+    variants::disk_v2::{self, ProductionFilesystem},
     Bufferable,
 };
 
@@ -26,9 +23,6 @@ pub enum ReceiverAdapter<T: Bufferable> {
     /// The in-memory channel buffer.
     InMemory(LimitedReceiver<T>),
 
-    /// The disk v1 buffer.
-    DiskV1(disk_v1::Reader<T>),
-
     /// The disk v2 buffer.
     DiskV2(disk_v2::Reader<T, ProductionFilesystem>),
 }
@@ -36,12 +30,6 @@ pub enum ReceiverAdapter<T: Bufferable> {
 impl<T: Bufferable> From<LimitedReceiver<T>> for ReceiverAdapter<T> {
     fn from(v: LimitedReceiver<T>) -> Self {
         Self::InMemory(v)
-    }
-}
-
-impl<T: Bufferable> From<disk_v1::Reader<T>> for ReceiverAdapter<T> {
-    fn from(v: disk_v1::Reader<T>) -> Self {
-        Self::DiskV1(v)
     }
 }
 
@@ -58,7 +46,6 @@ where
     pub(crate) async fn next(&mut self) -> Option<T> {
         match self {
             ReceiverAdapter::InMemory(rx) => rx.next().await,
-            ReceiverAdapter::DiskV1(reader) => reader.next().await,
             ReceiverAdapter::DiskV2(reader) => loop {
                 match reader.next().await {
                     Ok(result) => break result,
@@ -69,7 +56,7 @@ where
                             emit(re);
                             continue;
                         }
-                        None => panic!("Reader encountered unrecoverable error: {:?}", e),
+                        None => panic!("Reader encountered unrecoverable error: {e:?}"),
                     },
                 }
             },

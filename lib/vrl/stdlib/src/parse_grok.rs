@@ -47,7 +47,7 @@ impl DiagnosticMessage for Error {
         match self {
             Error::InvalidGrokPattern(err) => {
                 vec![Label::primary(
-                    format!("grok pattern error: {}", err),
+                    format!("grok pattern error: {err}"),
                     Span::default(),
                 )]
             }

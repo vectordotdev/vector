@@ -391,7 +391,7 @@ async fn writer_detects_when_last_record_has_scrambled_archive_data() {
                 .expect("metadata should not fail");
             assert_eq!(expected_data_file_len, metadata.len());
 
-            let target_pos = expected_data_file_len as u64 - 8;
+            let target_pos = expected_data_file_len - 8;
             let pos = data_file
                 .seek(SeekFrom::Start(target_pos))
                 .await

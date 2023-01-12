@@ -2,11 +2,10 @@ use darling::{error::Accumulator, util::Flag, FromAttributes};
 use proc_macro2::Ident;
 use serde_derive_internals::ast as serde_ast;
 use syn::spanned::Spanned;
-use vector_config_common::attributes::CustomAttribute;
 
 use super::{
     util::{try_extract_doc_title_description, DarlingResultIterator},
-    Field, Metadata, Style, Tagging,
+    Field, LazyCustomAttribute, Metadata, Style, Tagging,
 };
 
 /// A variant in an enum.
@@ -157,7 +156,7 @@ impl<'a> Variant<'a> {
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
     /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
     /// metadata to be attached directly to variants.
-    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+    pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
         self.attrs
             .metadata
             .clone()

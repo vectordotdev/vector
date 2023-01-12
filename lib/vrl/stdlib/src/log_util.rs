@@ -185,12 +185,12 @@ fn capture_value(
         "status" | "size" | "pid" | "tid" | "cid" | "port" => Value::Integer(
             value
                 .parse()
-                .map_err(|_| format!("failed parsing {}", name))?,
+                .map_err(|_| format!("failed parsing {name}"))?,
         ),
         "excess" => Value::Float(
             value
                 .parse()
-                .map_err(|_| format!("failed parsing {}", name))?,
+                .map_err(|_| format!("failed parsing {name}"))?,
         ),
         _ => Value::Bytes(value.to_owned().into()),
     })
@@ -232,5 +232,5 @@ pub(crate) fn parse_message(
             return log_fields(regex, &captures, timestamp_format, timezone);
         }
     }
-    Err(format!("failed parsing {} log line", log_type))
+    Err(format!("failed parsing {log_type} log line"))
 }

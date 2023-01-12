@@ -226,6 +226,7 @@ mod tests {
         net::SocketAddr,
     };
 
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
     use bytes::Bytes;
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
@@ -334,7 +335,7 @@ mod tests {
         };
 
         let mut builder = reqwest::Client::new()
-            .post(&format!("http://{}", address))
+            .post(format!("http://{}", address))
             .header("host", address.to_string())
             .header(
                 "x-amzn-trace-id",
@@ -396,7 +397,7 @@ mod tests {
             Compression::None => record.to_vec(),
         };
 
-        Ok(base64::encode(&compressed))
+        Ok(BASE64_STANDARD.encode(compressed))
     }
 
     #[tokio::test]

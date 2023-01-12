@@ -249,10 +249,10 @@ mod test {
         let full_line_path = target_dir.path().join("full_line.log");
         let duplicate_path = target_dir.path().join("duplicate.log");
         let not_full_line_path = target_dir.path().join("not_full_line.log");
-        fs::write(&empty_path, &[]).unwrap();
+        fs::write(&empty_path, []).unwrap();
         fs::write(&full_line_path, &full_line_data).unwrap();
         fs::write(&duplicate_path, &full_line_data).unwrap();
-        fs::write(&not_full_line_path, &not_full_line_data).unwrap();
+        fs::write(&not_full_line_path, not_full_line_data).unwrap();
 
         let mut buf = Vec::new();
         assert!(fingerprinter
@@ -417,8 +417,8 @@ mod test {
         let small_path = target_dir.path().join("small.log");
         let medium_path = target_dir.path().join("medium.log");
         let duplicate_path = target_dir.path().join("duplicate.log");
-        fs::write(&empty_path, &[]).unwrap();
-        fs::write(&small_path, &small_data).unwrap();
+        fs::write(&empty_path, []).unwrap();
+        fs::write(&small_path, small_data).unwrap();
         fs::write(&medium_path, &medium_data).unwrap();
         fs::write(&duplicate_path, &medium_data).unwrap();
 

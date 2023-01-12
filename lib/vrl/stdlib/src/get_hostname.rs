@@ -2,7 +2,7 @@ use vrl::prelude::*;
 
 fn get_hostname() -> Resolved {
     Ok(hostname::get()
-        .map_err(|error| format!("failed to get hostname: {}", error))?
+        .map_err(|error| format!("failed to get hostname: {error}"))?
         .to_string_lossy()
         .into())
 }

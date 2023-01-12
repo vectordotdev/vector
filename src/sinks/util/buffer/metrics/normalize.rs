@@ -61,8 +61,8 @@ impl<N: MetricNormalize> MetricNormalizer<N> {
     }
 }
 
-impl<N: Default> MetricNormalizer<N> {
-    pub fn default() -> Self {
+impl<N: Default> Default for MetricNormalizer<N> {
+    fn default() -> Self {
         Self {
             state: MetricSet::default(),
             normalizer: N::default(),

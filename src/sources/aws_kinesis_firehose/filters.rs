@@ -28,7 +28,7 @@ pub fn firehose(
     acknowledgements: bool,
     out: SourceSender,
     log_namespace: LogNamespace,
-) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = Infallible> + Clone {
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     let context = handlers::Context {
         compression: record_compression,
