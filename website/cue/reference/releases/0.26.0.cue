@@ -6,7 +6,12 @@ releases: "0.26.0": {
 
 	whats_next: []
 
-	known_issues: []
+	known_issues: [
+		"""
+			Annotating namespace labels in the `kubernetes_logs` source cannot be disabled by
+			setting `namespace_labels` to `""`. Fixed in v0.27.0.
+			""",
+	]
 
 	description: """
 		The Vector team is pleased to announce version 0.26.0!
