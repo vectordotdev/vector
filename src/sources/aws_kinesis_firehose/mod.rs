@@ -468,8 +468,15 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) =
-                source(None, None, false, source_record_compression, true, false).await;
+            let (rx, addr) = source(
+                None,
+                None,
+                false,
+                source_record_compression,
+                true,
+                false,
+            )
+            .await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
