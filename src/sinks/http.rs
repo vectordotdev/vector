@@ -177,6 +177,8 @@ impl HttpSinkConfig {
             request: RequestConfig::default(),
             tls: None,
             acknowledgements: AcknowledgementsConfig::default(),
+            payload_prefix: String::new(),
+            payload_suffix: String::new(),
         }
     }
 
