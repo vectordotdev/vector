@@ -870,8 +870,8 @@ mod tests {
         .await;
 
         let events = collect_ready(rx).await;
-        let a = events[0].metadata().secrets().get("access_key").unwrap();
-        assert_eq!(a.to_string(), "an access key".to_string());
+        let access_key = events[0].metadata().secrets().get("access_key").unwrap();
+        assert_eq!(access_key.to_string(), "an access key".to_string());
     }
 
     #[tokio::test]

@@ -131,13 +131,13 @@ pub(super) async fn firehose(
                                 source_arn.to_owned(),
                             );
 
-                            match (&request.access_key, context.store_access_key) {
-                                (Some(access_key), true) => log
-                                    .metadata_mut()
-                                    .secrets_mut()
-                                    .insert_secret("access_key", access_key),
-
-                                _ => {}
+                            if context.store_access_key {
+                                if let Some(access_key) = &request.access_key {
+                                    log
+                                        .metadata_mut()
+                                        .secrets_mut()
+                                        .insert_secret("access_key", access_key);
+                                }
                             }
                         }
                     }
