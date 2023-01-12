@@ -687,7 +687,8 @@ base: components: sinks: aws_s3: configuration: {
 		description: "The tag-set for the object."
 		required:    false
 		type: object: options: "*": {
-			required: true
+			description: "A single tag."
+			required:    true
 			type: string: {}
 		}
 	}

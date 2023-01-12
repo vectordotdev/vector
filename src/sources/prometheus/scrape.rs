@@ -80,6 +80,7 @@ pub struct PrometheusScrapeConfig {
     /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
     /// scraping the `/federate` endpoint.
     #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     query: HashMap<String, Vec<String>>,
 
     #[configurable(derived)]

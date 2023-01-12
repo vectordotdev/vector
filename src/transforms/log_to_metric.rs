@@ -64,6 +64,7 @@ pub struct MetricConfig {
     pub namespace: Option<Template>,
 
     /// Tags to apply to the metric.
+    #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
     pub tags: Option<IndexMap<String, TagConfig>>,
 
     #[configurable(derived)]
