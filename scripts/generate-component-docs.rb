@@ -1460,8 +1460,15 @@ def apply_schema_metadata!(source_schema, resolved_schema)
   # also work totally fine as-is!
   examples = get_schema_metadata(source_schema, 'docs::examples')
   if !examples.nil?
-    count = [examples].flatten.length
-    @logger.debug "Schema has #{count} example(s)."
+    flattened_examples = [examples].flatten.map { |example|
+      if example.is_a?(Hash)
+        sort_hash_nested(example)
+      else
+        example
+      end
+    }
+
+    @logger.debug "Schema has #{flattened_examples.length} example(s)."
     resolved_schema['type'].each { |type_name, type_def|
       # We need to recurse one more level if we're dealing with an array type definition, as we need
       # to stick the examples on the type definition for the array's `items`. There might also be
@@ -1470,11 +1477,11 @@ def apply_schema_metadata!(source_schema, resolved_schema)
       when 'array'
         type_def['items']['type'].each { |subtype_name, subtype_def|
           if subtype_name != 'array'
-            subtype_def['examples'] = [examples].flatten
+            subtype_def['examples'] = flattened_examples
           end
         }
       else
-        type_def['examples'] = [examples].flatten
+        type_def['examples'] = flattened_examples
       end
     }
   end
