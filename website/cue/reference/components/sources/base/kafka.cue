@@ -230,14 +230,17 @@ base: components: sources: kafka: configuration: {
 			See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "The librdkafka configuration property name."
-			required:    true
-			type: string: examples: [{
+		type: object: {
+			examples: [{
+				"client.id":                "${ENV_VAR}"
 				"fetch.error.backoff.ms":   "1000"
 				"socket.send.buffer.bytes": "100"
-				"client.id":                "${ENV_VAR}"
 			}]
+			options: "*": {
+				description: "A librdkafka configuration option."
+				required:    true
+				type: string: {}
+			}
 		}
 	}
 	offset_key: {
@@ -307,7 +310,7 @@ base: components: sources: kafka: configuration: {
 		}
 	}
 	session_timeout_ms: {
-		description: "The Kafka session timeout, in milliseconds."
+		description: "The Kafka session timeout."
 		required:    false
 		type: uint: {
 			default: 10000
@@ -316,7 +319,7 @@ base: components: sources: kafka: configuration: {
 		}
 	}
 	socket_timeout_ms: {
-		description: "Timeout for network requests, in milliseconds."
+		description: "Timeout for network requests."
 		required:    false
 		type: uint: {
 			default: 60000
