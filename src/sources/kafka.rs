@@ -99,30 +99,30 @@ pub struct KafkaSourceConfig {
 
     /// The Kafka session timeout, in milliseconds.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    #[configurable(metadata(docs::examples = "5000"))]
-    #[configurable(metadata(docs::examples = "10000"))]
+    #[configurable(metadata(docs::examples = 5000))]
+    #[configurable(metadata(docs::examples = 10000))]
     #[serde(default = "default_session_timeout_ms")]
     session_timeout_ms: Duration,
 
     /// Timeout for network requests, in milliseconds.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    #[configurable(metadata(docs::examples = "30000"))]
-    #[configurable(metadata(docs::examples = "60000"))]
+    #[configurable(metadata(docs::examples = 30000))]
+    #[configurable(metadata(docs::examples = 60000))]
     #[serde(default = "default_socket_timeout_ms")]
     socket_timeout_ms: Duration,
 
     /// Maximum time the broker may wait to fill the response.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    #[configurable(metadata(docs::examples = "50"))]
-    #[configurable(metadata(docs::examples = "100"))]
+    #[configurable(metadata(docs::examples = 50))]
+    #[configurable(metadata(docs::examples = 100))]
     #[serde(default = "default_fetch_wait_max_ms")]
     fetch_wait_max_ms: Duration,
 
     /// The frequency that the consumer offsets are committed (written) to offset storage.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[serde(default = "default_commit_interval_ms")]
-    #[configurable(metadata(docs::examples = "5000"))]
-    #[configurable(metadata(docs::examples = "10000"))]
+    #[configurable(metadata(docs::examples = 5000))]
+    #[configurable(metadata(docs::examples = 10000))]
     commit_interval_ms: Duration,
 
     /// Overrides the name of the log field used to add the message key to each event.
@@ -173,9 +173,7 @@ pub struct KafkaSourceConfig {
     /// Advanced options set directly on the underlying `librdkafka` client.
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
-    #[configurable(metadata(
-        docs::examples = r#"{ "client.id": "${ENV_VAR}", "fetch.error.backoff.ms": "1000", "socket.send.buffer.bytes": "100" }"#
-    ))]
+    #[configurable(metadata(docs::examples = "example_librdkafka_options()"))]
     librdkafka_options: Option<HashMap<String, String>>,
 
     #[serde(flatten)]
@@ -245,6 +243,17 @@ fn default_offset_key() -> OptionalValuePath {
 
 fn default_headers_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("headers"))
+}
+
+fn example_librdkafka_options() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("client.id".to_string(), "${ENV_VAR}".to_string()),
+            ("fetch.error.backoff.ms".to_string(), "1000".to_string()),
+            ("socket.send.buffer.bytes".to_string(), "100".to_string()),
+        ]
+        .into_iter(),
+    )
 }
 
 impl_generate_config_from_default!(KafkaSourceConfig);

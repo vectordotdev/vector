@@ -48,7 +48,7 @@ base: components: sources: kafka: configuration: {
 		required:    false
 		type: uint: {
 			default: 5000
-			examples: ["5000", "10000"]
+			examples: [5000, 10000]
 			unit: "milliseconds"
 		}
 	}
@@ -106,7 +106,7 @@ base: components: sources: kafka: configuration: {
 		required:    false
 		type: uint: {
 			default: 100
-			examples: ["50", "100"]
+			examples: [50, 100]
 			unit: "milliseconds"
 		}
 	}
@@ -227,7 +227,11 @@ base: components: sources: kafka: configuration: {
 		required: false
 		type: object: options: "*": {
 			required: true
-			type: string: examples: ["{ \"client.id\": \"${ENV_VAR}\", \"fetch.error.backoff.ms\": \"1000\", \"socket.send.buffer.bytes\": \"100\" }"]
+			type: string: examples: [{
+				"socket.send.buffer.bytes": "100"
+				"client.id":                "${ENV_VAR}"
+				"fetch.error.backoff.ms":   "1000"
+			}]
 		}
 	}
 	offset_key: {
@@ -282,17 +286,17 @@ base: components: sources: kafka: configuration: {
 			mechanism: {
 				description: "The SASL mechanism to use."
 				required:    false
-				type: string: {}
+				type: string: examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
 			}
 			password: {
 				description: "The SASL password."
 				required:    false
-				type: string: {}
+				type: string: examples: ["password"]
 			}
 			username: {
 				description: "The SASL username."
 				required:    false
-				type: string: {}
+				type: string: examples: ["username"]
 			}
 		}
 	}
@@ -301,7 +305,7 @@ base: components: sources: kafka: configuration: {
 		required:    false
 		type: uint: {
 			default: 10000
-			examples: ["5000", "10000"]
+			examples: [5000, 10000]
 			unit: "milliseconds"
 		}
 	}
@@ -310,7 +314,7 @@ base: components: sources: kafka: configuration: {
 		required:    false
 		type: uint: {
 			default: 60000
-			examples: ["30000", "60000"]
+			examples: [30000, 60000]
 			unit: "milliseconds"
 		}
 	}
