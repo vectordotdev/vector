@@ -4,7 +4,7 @@ components: sources: gcp_pubsub: {
 	title: "GCP Pub/Sub"
 
 	features: {
-		auto_generated: true
+		auto_generated:   true
 		acknowledgements: true
 		collect: {
 			tls: {
@@ -58,8 +58,8 @@ components: sources: gcp_pubsub: {
 		platform_name: null
 	}
 
-	configuration:  base.components.sources.gcp_pubsub.configuration
-		
+	configuration: base.components.sources.gcp_pubsub.configuration
+
 	output: logs: record: {
 		description: "An individual Pub/Sub record"
 		fields: {
