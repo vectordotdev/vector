@@ -19,7 +19,7 @@ pub enum RequestError {
     #[snafu(display("Could not parse incoming request {}: {}", request_id, source))]
     Parse {
         source: serde_json::error::Error,
-        access_key: String,
+        access_key: Option<String>,
         request_id: String,
     },
     #[snafu(display(

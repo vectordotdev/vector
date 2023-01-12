@@ -20,8 +20,8 @@ use vector_core::{
     event::BatchNotifier,
     EstimatedJsonEncodedSizeOf,
 };
-use warp::reject;
 use vrl::SecretTarget;
+use warp::reject;
 
 use super::{
     errors::{ParseRecordsSnafu, RequestError},
@@ -131,16 +131,13 @@ pub(super) async fn firehose(
                             );
 
                             match (&request.access_key, context.store_access_key) {
-                                (Some(access_key), true) => {
-                                    log
-                                        .metadata_mut()
-                                        .secrets_mut()
-                                        .insert_secret("access_key", access_key)
-                                },
+                                (Some(access_key), true) => log
+                                    .metadata_mut()
+                                    .secrets_mut()
+                                    .insert_secret("access_key", access_key),
 
-                                _ => todo!(),
+                                _ => {}
                             }
-
                         }
                     }
 

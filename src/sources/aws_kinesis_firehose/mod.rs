@@ -205,11 +205,11 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
+    use std::default::Default;
     use std::{
         io::{Cursor, Read},
         net::SocketAddr,
     };
-    use std::default::Default;
 
     use bytes::Bytes;
     use chrono::{DateTime, SubsecRound, Utc};
@@ -218,11 +218,7 @@ mod tests {
     use lookup::path;
     use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
-    use codecs::JsonSerializerConfig;
     use vector_common::assert_event_data_eq;
-    use vector_core::config::log_schema;
-    use vector_core::event::LogEvent;
-    use vector_core::sink::VectorSink;
 
     use super::*;
     use crate::{
@@ -235,14 +231,6 @@ mod tests {
         },
         SourceSender,
     };
-    use crate::aws::AwsAuthentication::Default;
-    use crate::aws::RegionOrEndpoint;
-    use crate::config::{SinkConfig, SinkContext};
-    use crate::sinks::aws_kinesis::firehose::{KinesisFirehoseSinkConfig, KinesisSinkBaseConfig};
-    use crate::sinks::Healthcheck;
-    use crate::sinks::util::BatchConfig;
-    use crate::test_util::collect_n;
-    use crate::test_util::components::HTTP_PUSH_SOURCE_TAGS;
 
     const SOURCE_ARN: &str = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
     const REQUEST_ID: &str = "e17265d6-97af-4938-982e-90d5614c4242";
@@ -272,29 +260,6 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<AwsKinesisFirehoseConfig>();
-    }
-
-    async fn channel_n(
-        messages: Vec<impl Into<String> + Send + 'static>,
-        sink: VectorSink,
-        source: impl Stream<Item = Event> + Unpin,
-    ) -> Vec<Event> {
-        let n = messages.len();
-
-        tokio::spawn(async move {
-            sink.run_events(
-                messages
-                    .into_iter()
-                    .map(|s| Event::Log(LogEvent::from(s.into()))),
-            )
-                .await
-                .unwrap();
-        });
-
-        let events = collect_n(source, n).await;
-        assert_eq!(n, events.len());
-
-        events
     }
 
     async fn source(
@@ -331,32 +296,6 @@ mod tests {
         (recv, address)
     }
 
-    async fn sink(
-
-    ) -> (VectorSink, Healthcheck) {
-        let mut batch = BatchConfig::<KinesisFirehoseDefaultBatchSettings>::default();
-        batch.max_events = Some(MAX_PAYLOAD_EVENTS + 1);
-
-        let base = KinesisSinkBaseConfig {
-            stream_name: String::from("test"),
-            region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
-            encoding: JsonSerializerConfig::default().into(),
-            compression: crate::sinks::util::buffer::compression::Compression::None,
-            request: Default::default(),
-            tls: None,
-            auth: Default::default(),
-            acknowledgements: Default::default(),
-        };
-
-        KinesisFirehoseSinkConfig {
-            batch,
-            base,
-        }
-        .build(SinkContext::new_test())
-        .await
-        .unwrap()
-    }
-
     /// Sends the body to the address with the appropriate Firehose headers
     ///
     /// https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html
@@ -369,7 +308,7 @@ mod tests {
         record_compression: Compression,
     ) -> reqwest::Result<reqwest::Response> {
         let request = models::FirehoseRequest {
-            access_key: Some(key.to_string()),
+            access_key: key.map(|s| s.to_string()),
             request_id: REQUEST_ID.to_string(),
             timestamp,
             records: records
@@ -779,47 +718,50 @@ mod tests {
 
     #[tokio::test]
     async fn event_service_token_passthrough_enabled() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-            let message = "passthrough_token_enabled";
-            let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
-            let (sink, health) = sink(
-                address,
-                TextSerializerConfig::default().into(),
-                Compression::gzip_default(),
-            )
-                .await;
-            assert!(health.await.is_ok());
+        let (rx, address) = source(
+            Some("an access key".to_string().into()),
+            true,
+            Default::default(),
+            true,
+            true,
+        )
+        .await;
 
-            let event = channel_n(vec![message], sink, source).await.remove(0);
+        let timestamp: DateTime<Utc> = Utc::now();
 
-            assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-            assert_eq!(
-                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
-                TOKEN
-            );
-        })
-            .await;
+        spawn_send(
+            address,
+            timestamp,
+            vec![RECORD.as_bytes()],
+            Some("an access key"),
+            false,
+            Compression::None,
+        )
+        .await;
+
+        let events = collect_ready(rx).await;
+        let a = events[0].metadata().secrets().get("access_key").unwrap();
+        assert_eq!(a.to_string(), "an access key".to_string());
     }
 
     #[tokio::test]
     async fn no_authorization_token_passthrough_enabled() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-            let message = "no_authorization";
-            let token = "ASDASD";
+        let (rx, address) = source(None, true, Default::default(), true, true).await;
 
-            let (source, address) = source(None, Some(vec![SensitiveString::from(token.into())]), Default::default(), true, true).await;
-            let (sink, health) = sink()
-                .await;
-            assert!(health.await.is_ok());
+        let timestamp: DateTime<Utc> = Utc::now();
 
-            let event = channel_n(vec![message], sink, source).await.remove(0);
+        spawn_send(
+            address,
+            timestamp,
+            vec![RECORD.as_bytes()],
+            None,
+            false,
+            Compression::None,
+        )
+        .await;
 
-            assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-            assert_eq!(
-                &event.metadata().secrets().as_ref().unwrap()[..],
-                token
-            );
-        })
-            .await;
+        let events = collect_ready(rx).await;
+
+        assert!(events[0].metadata().secrets().get("access_key").is_none());
     }
 }
