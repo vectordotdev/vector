@@ -142,7 +142,7 @@ components: sources: aws_kinesis_firehose: {
 				   this source. You will likely also want to use the
 				   [`parse_aws_cloudwatch_log_subscription_message`](\(urls.vrl_functions)/#parse_aws_cloudwatch_log_subscription_message)
 				   function to extract the log events. Make sure to set
-				   the `access_key` to secure this endpoint. Your
+				   the `access_keys` to secure this endpoint. Your
 				   configuration might look something like:
 
 				   ```toml
@@ -150,7 +150,7 @@ components: sources: aws_kinesis_firehose: {
 					# General
 					type = "aws_kinesis_firehose"
 					address = "127.0.0.1:9000"
-					access_key = "secret"
+					access_keys = ["secret"]
 
 					[transforms.cloudwatch]
 					type = "remap"
@@ -178,7 +178,7 @@ components: sources: aws_kinesis_firehose: {
 				   ingest.
 				3. Set the stream to forward to your Vector instance via its
 				   HTTP Endpoint destination. Make sure to configure the
-				   same `access_key` you set earlier.
+				   same `access_keys` you set earlier.
 				4. Setup a [CloudWatch Logs
 				   subscription](\(urls.aws_cloudwatch_logs_subscriptions)) to
 				   forward the events to your delivery stream
