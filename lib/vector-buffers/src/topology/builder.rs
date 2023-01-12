@@ -14,7 +14,7 @@ use crate::{
 
 /// Value that can be used as a stage in a buffer topology.
 #[async_trait]
-pub trait IntoBuffer<T: Bufferable> {
+pub trait IntoBuffer<T: Bufferable>: Send {
     /// Gets whether or not this buffer stage provides its own instrumentation, or if it should be
     /// instrumented from the outside.
     ///
