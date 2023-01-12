@@ -13,7 +13,10 @@ base: components: sources: gcp_pubsub: configuration: {
 			Messages that are not acknowledged when this deadline expires may be retransmitted.
 			"""
 		required: false
-		type: int: default: 600
+		type: uint: {
+			default: 600
+			unit:    "seconds"
+		}
 	}
 	acknowledgements: {
 		description: """
@@ -212,7 +215,10 @@ base: components: sources: gcp_pubsub: configuration: {
 			`60`, you may see periodic errors sent from the server.
 			"""
 		required: false
-		type: float: default: 60.0
+		type: float: {
+			default: 60.0
+			unit:    "seconds"
+		}
 	}
 	max_concurrency: {
 		description: "The maximum number of concurrent stream connections to open at once."
@@ -225,7 +231,10 @@ base: components: sources: gcp_pubsub: configuration: {
 			are all busy and so open a new stream.
 			"""
 		required: false
-		type: float: default: 2.0
+		type: float: {
+			default: 2.0
+			unit:    "seconds"
+		}
 	}
 	project: {
 		description: "The project name from which to pull logs."
@@ -240,7 +249,10 @@ base: components: sources: gcp_pubsub: configuration: {
 	retry_delay_secs: {
 		description: "The amount of time, in seconds, to wait between retry attempts after an error."
 		required:    false
-		type: float: default: 1.0
+		type: float: {
+			default: 1.0
+			unit:    "seconds"
+		}
 	}
 	skip_authentication: {
 		description: "Skip all authentication handling. For use with integration tests only."

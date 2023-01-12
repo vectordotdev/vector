@@ -11,6 +11,7 @@ use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, Tr
 use http::uri::{InvalidUri, Scheme, Uri};
 use lookup::owned_value_path;
 use once_cell::sync::Lazy;
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
@@ -43,8 +44,8 @@ use crate::{
     SourceSender,
 };
 
-const MIN_ACK_DEADLINE_SECS: i32 = 10;
-const MAX_ACK_DEADLINE_SECS: i32 = 600;
+const MIN_ACK_DEADLINE_SECS: u64 = 10;
+const MAX_ACK_DEADLINE_SECS: u64 = 600;
 
 // We use a bounded channel for the acknowledgement ID communication
 // between the request stream and receiver. During benchmark runs,
@@ -117,6 +118,7 @@ pub(crate) enum PubsubError {
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 
 /// Configuration for the `gcp_pubsub` source.
+#[serde_as]
 #[configurable_component(source("gcp_pubsub"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -155,13 +157,15 @@ pub struct PubsubConfig {
     /// How often to poll the currently active streams to see if they
     /// are all busy and so open a new stream.
     #[serde(default = "default_poll_time")]
-    pub poll_time_seconds: f64,
+    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    pub poll_time_seconds: Duration,
 
     /// The acknowledgement deadline, in seconds, to use for this stream.
     ///
     /// Messages that are not acknowledged when this deadline expires may be retransmitted.
     #[serde(default = "default_ack_deadline")]
-    pub ack_deadline_secs: i32,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub ack_deadline_secs: Duration,
 
     /// Deprecated, old name of `ack_deadline_secs`.
     #[configurable(deprecated)]
@@ -169,7 +173,8 @@ pub struct PubsubConfig {
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
     #[serde(default = "default_retry_delay")]
-    pub retry_delay_secs: f64,
+    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    pub retry_delay_secs: Duration,
 
     /// Deprecated, old name of `retry_delay_secs`.
     #[configurable(deprecated)]
@@ -179,7 +184,8 @@ pub struct PubsubConfig {
     /// before sending a keepalive request. If this is set larger than
     /// `60`, you may see periodic errors sent from the server.
     #[serde(default = "default_keepalive")]
-    pub keepalive_secs: f64,
+    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    pub keepalive_secs: Duration,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -205,16 +211,16 @@ fn default_endpoint() -> String {
     PUBSUB_URL.to_string()
 }
 
-const fn default_ack_deadline() -> i32 {
-    600
+const fn default_ack_deadline() -> Duration {
+    Duration::from_secs(600)
 }
 
-const fn default_retry_delay() -> f64 {
-    1.0
+const fn default_retry_delay() -> Duration {
+    Duration::from_secs(1)
 }
 
-const fn default_keepalive() -> f64 {
-    60.0
+const fn default_keepalive() -> Duration {
+    Duration::from_secs(60)
 }
 
 const fn default_max_concurrency() -> usize {
@@ -225,8 +231,8 @@ const fn default_full_response() -> usize {
     100
 }
 
-const fn default_poll_time() -> f64 {
-    2.0
+const fn default_poll_time() -> Duration {
+    Duration::from_secs(2)
 }
 
 #[async_trait::async_trait]
@@ -237,10 +243,10 @@ impl SourceConfig for PubsubConfig {
             None => self.ack_deadline_secs,
             Some(ads) => {
                 warn!("The `ack_deadline_seconds` setting is deprecated, use `ack_deadline_secs` instead.");
-                ads
+                Duration::from_secs(ads as u64)
             }
         };
-        if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs) {
+        if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs.as_secs()) {
             return Err(PubsubError::InvalidAckDeadline.into());
         }
 
@@ -248,7 +254,7 @@ impl SourceConfig for PubsubConfig {
             None => self.retry_delay_secs,
             Some(rds) => {
                 warn!("The `retry_delay_seconds` setting is deprecated, use `retry_delay_secs` instead.");
-                rds
+                Duration::from_secs_f64(rds)
             }
         };
 
@@ -297,18 +303,15 @@ impl SourceConfig for PubsubConfig {
             shutdown: cx.shutdown,
             out: cx.out,
             ack_deadline_secs,
-            retry_delay: Duration::from_secs_f64(retry_delay_secs),
-            keepalive: Duration::from_secs_f64(self.keepalive_secs),
+            retry_delay: retry_delay_secs,
+            keepalive: self.keepalive_secs,
             concurrency: Default::default(),
             full_response_size: self.full_response_size,
             log_namespace,
             bytes_received: register!(BytesReceived::from(protocol)),
             events_received: register!(EventsReceived),
         }
-        .run_all(
-            self.max_concurrency,
-            Duration::from_secs_f64(self.poll_time_seconds),
-        )
+        .run_all(self.max_concurrency, self.poll_time_seconds)
         .map_err(|error| error!(message = "Source failed.", %error));
         Ok(Box::pin(source))
     }
@@ -359,7 +362,7 @@ struct PubsubSource {
     subscription: String,
     decoder: Decoder,
     acknowledgements: bool,
-    ack_deadline_secs: i32,
+    ack_deadline_secs: Duration,
     shutdown: ShutdownSignal,
     out: SourceSender,
     retry_delay: Duration,
@@ -555,7 +558,7 @@ impl PubsubSource {
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
-        let stream_ack_deadline_seconds = self.ack_deadline_secs;
+        let stream_ack_deadline_seconds = self.ack_deadline_secs.as_secs() as i32;
         let ack_ids = ReceiverStream::new(ack_ids).ready_chunks(ACK_QUEUE_SIZE);
 
         stream::once(async move {
