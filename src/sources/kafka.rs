@@ -101,14 +101,14 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::examples = "error"))]
     auto_offset_reset: String,
 
-    /// The Kafka session timeout, in milliseconds.
+    /// The Kafka session timeout.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 5000))]
     #[configurable(metadata(docs::examples = 10000))]
     #[serde(default = "default_session_timeout_ms")]
     session_timeout_ms: Duration,
 
-    /// Timeout for network requests, in milliseconds.
+    /// Timeout for network requests.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 30000))]
     #[configurable(metadata(docs::examples = 60000))]
