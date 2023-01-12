@@ -50,6 +50,10 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "access_keys_example()"))]
     access_keys: Option<Vec<SensitiveString>>,
 
+    /// Whether or not to forward the access key with events.
+    ///
+    /// If set to `true`, when incoming requests contains an access key, it will be kept in the
+    /// event metadata.
     #[configurable(derived)]
     store_access_key: bool,
 
