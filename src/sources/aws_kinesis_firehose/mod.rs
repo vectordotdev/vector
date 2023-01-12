@@ -468,7 +468,8 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, None, false, source_record_compression, true, false).await;
+            let (rx, addr) =
+                source(None, None, false, source_record_compression, true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -708,6 +709,7 @@ mod tests {
             None,
             Some(vec!["an access key in list".to_string().into()]),
             Default::default(),
+            Default::default(),
             true,
             false,
         )
@@ -736,6 +738,7 @@ mod tests {
         let (_rx, addr) = source(
             Some(valid_access_key.clone()),
             Some(vec!["valid access key 2".to_string().into()]),
+            Default::default(),
             Default::default(),
             true,
             false,
@@ -769,6 +772,7 @@ mod tests {
                 valid_access_key.clone().into(),
                 "valid access key 2".to_string().into(),
             ]),
+            Default::default(),
             Default::default(),
             true,
             false,
@@ -834,7 +838,7 @@ mod tests {
     async fn event_service_token_passthrough_enabled() {
         let (rx, address) = source(
             None,
-            vec!["an access key".to_string().into()],
+            Some(vec!["an access key".to_string().into()]),
             true,
             Default::default(),
             true,
