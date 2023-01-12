@@ -10,7 +10,7 @@ pub(super) struct Cli {}
 
 impl Cli {
     pub(super) fn exec(self) -> Result<()> {
-        app::set_base_dir()?;
+        app::set_repo_dir()?;
         let version = env::var("VERSION").or_else(|_| util::read_version())?;
         let channel = env::var("CHANNEL").or_else(|_| util::release_channel().map(Into::into))?;
 

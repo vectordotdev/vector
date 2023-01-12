@@ -99,7 +99,7 @@ macro_rules! script_wrapper {
 
                 impl Cli {
                     pub(super) fn exec(self) -> anyhow::Result<()> {
-                        $crate::app::set_base_dir()?;
+                        $crate::app::set_repo_dir()?;
                         $crate::app::exec_script($script, &self.args)
                     }
                 }

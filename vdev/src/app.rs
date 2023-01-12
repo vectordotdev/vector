@@ -23,7 +23,7 @@ pub fn path() -> &'static String {
     PATH.get().expect("path is not initialized")
 }
 
-pub fn set_base_dir() -> Result<()> {
+pub fn set_repo_dir() -> Result<()> {
     env::set_current_dir(path()).context("Could not change directory")
 }
 
@@ -108,11 +108,11 @@ pub fn exec_script<T: AsRef<OsStr>>(script: &str, args: impl IntoIterator<Item =
     exec(script, args)
 }
 
-pub fn exec_in_app_path<T: AsRef<OsStr>>(
+pub fn exec_in_repo<T: AsRef<OsStr>>(
     command: impl AsRef<OsStr>,
     args: impl IntoIterator<Item = T>,
 ) -> Result<()> {
-    set_base_dir()?;
+    set_repo_dir()?;
     exec(command, args)
 }
 

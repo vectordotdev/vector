@@ -10,6 +10,6 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         app::exec_script("check-style.sh", ["--fix"])?;
-        app::exec_in_app_path("cargo", ["fmt"])
+        app::exec_in_repo("cargo", ["fmt"])
     }
 }

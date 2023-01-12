@@ -9,6 +9,6 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        app::exec_in_app_path("cargo", ["fmt", "--", "--check"])
+        app::exec_in_repo("cargo", ["fmt", "--", "--check"])
     }
 }

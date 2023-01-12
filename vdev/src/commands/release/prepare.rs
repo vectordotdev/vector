@@ -10,7 +10,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        app::exec_in_app_path::<&str>("scripts/generate-manifests.sh", [])?;
-        app::exec_in_app_path::<&str>("scripts/generate-release-cue.rb", [])
+        app::exec_in_repo::<&str>("scripts/generate-manifests.sh", [])?;
+        app::exec_in_repo::<&str>("scripts/generate-release-cue.rb", [])
     }
 }
