@@ -4,6 +4,7 @@ components: sources: gcp_pubsub: {
 	title: "GCP Pub/Sub"
 
 	features: {
+		auto_generated: true
 		acknowledgements: true
 		collect: {
 			tls: {

@@ -169,7 +169,7 @@ pub struct PubsubConfig {
 
     /// Deprecated, old name of `ack_deadline_secs`.
     #[configurable(deprecated)]
-    pub ack_deadline_seconds: Option<i32>,
+    pub ack_deadline_seconds: Option<u16>,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
     #[serde(default = "default_retry_delay")]

@@ -4,7 +4,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	ack_deadline_seconds: {
 		description: "Deprecated, old name of `ack_deadline_secs`."
 		required:    false
-		type: int: {}
+		type: uint: {}
 	}
 	ack_deadline_secs: {
 		description: """
