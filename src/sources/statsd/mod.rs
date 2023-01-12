@@ -82,8 +82,8 @@ impl UdpConfig {
 }
 
 /// TCP configuration for the `statsd` source.
-#[configurable_component]
 #[serde_as]
+#[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
     /// The socket address to listen for connections on.

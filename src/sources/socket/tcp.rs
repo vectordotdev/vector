@@ -24,8 +24,8 @@ use crate::{
 use super::SocketConfig;
 
 /// TCP configuration for the `socket` source.
-#[configurable_component]
 #[serde_as]
+#[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
     /// The address to listen for connections on.

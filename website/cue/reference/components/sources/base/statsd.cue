@@ -2,7 +2,7 @@ package metadata
 
 base: components: sources: statsd: configuration: {
 	address: {
-		description:   "The address to listen for connections on."
+		description:   "The socket address to listen for connections on."
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
 		type: {
@@ -32,7 +32,7 @@ base: components: sources: statsd: configuration: {
 		type: string: enum: {
 			tcp:  "Listen on TCP."
 			udp:  "Listen on UDP."
-			unix: "Listen on UDS. (Unix domain socket)"
+			unix: "Listen on a Unix domain Socket (UDS)."
 		}
 	}
 	path: {
@@ -49,7 +49,7 @@ base: components: sources: statsd: configuration: {
 		description: """
 			The size, in bytes, of the receive buffer used for each connection.
 
-			This should not typically needed to be changed.
+			Generally this should not need to be configured.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
@@ -59,7 +59,10 @@ base: components: sources: statsd: configuration: {
 		description:   "The timeout before a connection is forcefully closed during shutdown."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: default: 30
+		type: uint: {
+			default: 30
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate"
