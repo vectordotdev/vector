@@ -142,6 +142,7 @@ impl IntoResponse for ApiError {
                     "errors": errors,
                 })),
             ),
-        }.into_response()
+        }
+        .into_response()
     }
 }
