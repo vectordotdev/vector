@@ -369,8 +369,6 @@ wiremock = "0.5.16"
 zstd = { version = "0.12.2", default-features = false }
 
 [patch.crates-io]
-# A patch for lib/vector-core/buffers, addresses Issue 7514
-leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch = "leveldb_mmap_limit" }
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }

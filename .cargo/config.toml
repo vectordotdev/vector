@@ -8,7 +8,7 @@ rustflags = [
   "-Dclippy::dbg_macro",
 ]
 
-# We need to bring in `libstdc++` for things that build against C++ (LevelDB, librdkafka, etc) which comes along in the
+# We need to bring in `libstdc++` for things that build against C++ (librdkafka, etc) which comes along in the
 # `cross` base image but _isn't_ in a path searched by the linker normally. Additionally, our custom Docker image that
 # we base on the `cross` image moves `libstdc++` into this custom-looking directory to avoid some _other_ libraries
 # included in the `cross` base image from having a higher precedence than some of the "self-contained" libraries that
