@@ -207,7 +207,7 @@ rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"],
 
 # Prost
 prost = { version = "0.11.6", default-features = false, features = ["std"] }
-prost-types = { version = "0.11.5", default-features = false, optional = true }
+prost-types = { version = "0.11.6", default-features = false, optional = true }
 
 # GCP
 goauth = { version = "0.13.1", optional = true }
@@ -265,7 +265,7 @@ governor = { version = "0.5.1", default-features = false, features = ["dashmap",
 grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.3.13", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
-hashbrown = { version = "0.13.1", default-features = false, optional = true, features = ["ahash"] }
+hashbrown = { version = "0.13.2", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.8", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.8", default-features = false }
@@ -366,7 +366,7 @@ tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.16"
-zstd = { version = "0.12.1", default-features = false }
+zstd = { version = "0.12.2", default-features = false }
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
@@ -515,7 +515,7 @@ sources-datadog_agent = ["sources-utils-http-error", "protobuf-build"]
 sources-demo_logs = ["dep:fakedata", "dep:serde_with"]
 sources-dnstap = ["dep:base64", "dep:trust-dns-proto", "dep:dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
-sources-eventstoredb_metrics = []
+sources-eventstoredb_metrics = ["dep:serde_with"]
 sources-exec = []
 sources-file = ["dep:file-source"]
 sources-file-descriptor = ["tokio-util/io"]
@@ -533,7 +533,7 @@ sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
-sources-nginx_metrics = ["dep:nom"]
+sources-nginx_metrics = ["dep:nom", "dep:serde_with"]
 sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:serde_with", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-utils-http-client"]
