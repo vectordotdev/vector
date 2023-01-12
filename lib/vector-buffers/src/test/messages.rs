@@ -277,10 +277,6 @@ impl FixedEncodable for MultiEventRecord {
 message_wrapper!(PoisonPillMultiEventRecord: u32, |m: &Self| m.0);
 
 impl PoisonPillMultiEventRecord {
-    pub fn poisoned() -> Self {
-        Self::new(42)
-    }
-
     pub fn encoded_size(&self) -> usize {
         usize::try_from(self.0).unwrap_or(usize::MAX) + std::mem::size_of::<u32>()
     }
