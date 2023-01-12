@@ -95,7 +95,7 @@ impl<'a> FieldsIter<'a> {
                     }
                 }
                 Some(PathComponent::Index(index)) => {
-                    write!(res, "[{}]", index).expect("write to String never fails");
+                    write!(res, "[{index}]").expect("write to String never fails");
                 }
             }
             if let Some(PathComponent::Key(_)) = path_iter.peek() {

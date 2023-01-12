@@ -43,7 +43,7 @@ pub enum StandardValidators {
 impl From<StandardValidators> for Box<dyn Validator> {
     fn from(sv: StandardValidators) -> Self {
         match sv {
-            StandardValidators::ComponentSpec => Box::new(ComponentSpecValidator::default()),
+            StandardValidators::ComponentSpec => Box::<ComponentSpecValidator>::default(),
         }
     }
 }

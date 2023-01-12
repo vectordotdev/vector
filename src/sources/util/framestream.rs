@@ -326,10 +326,10 @@ impl FrameStreamReader {
 
     fn make_frame(header: ControlHeader, content_type: Option<String>) -> Bytes {
         let mut frame = BytesMut::new();
-        frame.extend(&header.to_u32().to_be_bytes());
+        frame.extend(header.to_u32().to_be_bytes());
         if let Some(s) = content_type {
-            frame.extend(&ControlField::ContentType.to_u32().to_be_bytes()); //field type: ContentType
-            frame.extend(&(s.len() as u32).to_be_bytes()); //length of type
+            frame.extend(ControlField::ContentType.to_u32().to_be_bytes()); //field type: ContentType
+            frame.extend((s.len() as u32).to_be_bytes()); //length of type
             frame.extend(s.as_bytes());
         }
         Bytes::from(frame)
@@ -782,8 +782,8 @@ mod test {
     ) -> Bytes {
         let mut frame = BytesMut::from(&header.to_u32().to_be_bytes()[..]);
         for content_type in content_types {
-            frame.extend(&ControlField::ContentType.to_u32().to_be_bytes());
-            frame.extend(&(content_type.len() as u32).to_be_bytes());
+            frame.extend(ControlField::ContentType.to_u32().to_be_bytes());
+            frame.extend((content_type.len() as u32).to_be_bytes());
             frame.extend(content_type.clone());
         }
         Bytes::from(frame)

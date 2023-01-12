@@ -38,6 +38,10 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub skip_unknown_fields: bool,
 
+    /// Sets `date_time_input_format` to `best_effort`, allowing ClickHouse to properly parse RFC3339/ISO 8601.
+    #[serde(default)]
+    pub date_time_best_effort: bool,
+
     #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,

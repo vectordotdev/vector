@@ -70,7 +70,7 @@ async fn find_entry(message: &str) -> serde_json::value::Value {
         match recent_entries(None)
             .await
             .into_iter()
-            .find(|entry| entry["_raw"].as_str().unwrap_or("").contains(&message))
+            .find(|entry| entry["_raw"].as_str().unwrap_or("").contains(message))
         {
             Some(value) => return value,
             None => std::thread::sleep(std::time::Duration::from_millis(100)),

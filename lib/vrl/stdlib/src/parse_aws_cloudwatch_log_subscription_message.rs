@@ -7,7 +7,7 @@ use vrl::prelude::*;
 fn parse_aws_cloudwatch_log_subscription_message(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
-        .map_err(|e| format!("unable to parse: {}", e))?;
+        .map_err(|e| format!("unable to parse: {e}"))?;
     let map = Value::from(BTreeMap::from([
         (String::from("owner"), Value::from(message.owner)),
         (

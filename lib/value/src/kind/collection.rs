@@ -514,7 +514,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.is_superset(&other).is_ok(), want, "{}", title);
+            assert_eq!(this.is_superset(&other).is_ok(), want, "{title}");
         }
     }
 
@@ -693,7 +693,7 @@ mod tests {
             ),
         ] {
             this.merge(other, strategy);
-            assert_eq!(this, want, "{}", title);
+            assert_eq!(this, want, "{title}");
         }
     }
 
@@ -778,7 +778,7 @@ mod tests {
         ]) {
             this.anonymize();
 
-            assert_eq!(this, want, "{}", title);
+            assert_eq!(this, want, "{title}");
         }
     }
 
@@ -837,7 +837,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.to_string(), want.to_string(), "{}", title);
+            assert_eq!(this.to_string(), want.to_string(), "{title}");
         }
     }
 
@@ -893,7 +893,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.to_string(), want.to_string(), "{}", title);
+            assert_eq!(this.to_string(), want.to_string(), "{title}");
         }
     }
 
@@ -948,7 +948,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.reduced_kind(), want, "{}", title);
+            assert_eq!(this.reduced_kind(), want, "{title}");
         }
     }
 }

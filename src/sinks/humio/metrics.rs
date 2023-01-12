@@ -293,4 +293,48 @@ mod tests {
             output[1].1
         );
     }
+
+    #[tokio::test]
+    async fn multi_value_tags() {
+        let (mut config, cx) = load_sink::<HumioMetricsConfig>(indoc! {r#"
+            token = "atoken"
+            batch.max_events = 1
+            metric_tag_values = "full"
+        "#})
+        .unwrap();
+
+        let addr = test_util::next_addr();
+        // Swap out the endpoint so we can force send it
+        // to our local server
+        let endpoint = format!("http://{}", addr);
+        config.endpoint = Some(endpoint.clone());
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let (rx, _trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
+
+        // Make our test metrics.
+        let metrics = vec![Event::from(
+            Metric::new(
+                "metric1",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 42.0 },
+            )
+            .with_tags(Some(metric_tags!(
+                "code" => "200",
+                "code" => "success"
+            )))
+            .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1))),
+        )];
+
+        let len = metrics.len();
+        run_and_assert_sink_compliance(sink, stream::iter(metrics), &HTTP_SINK_TAGS).await;
+
+        let output = rx.take(len).collect::<Vec<_>>().await;
+        assert_eq!(
+            r#"{"event":{"counter":{"value":42.0},"kind":"incremental","name":"metric1","tags":{"code":["200","success"]}},"fields":{},"time":1597784401.0}"#,
+            output[0].1
+        );
+    }
 }

@@ -114,7 +114,7 @@ where
         }
 
         existing_files.sort_by_key(|(path, _file_id)| {
-            fs::metadata(&path)
+            fs::metadata(path)
                 .and_then(|m| m.created())
                 .map(DateTime::<Utc>::from)
                 .unwrap_or_else(|_| Utc::now())
@@ -206,8 +206,8 @@ where
                                 );
                                 let (old_path, new_path) = (&watcher.path, &path);
                                 if let (Ok(old_modified_time), Ok(new_modified_time)) = (
-                                    fs::metadata(&old_path).and_then(|m| m.modified()),
-                                    fs::metadata(&new_path).and_then(|m| m.modified()),
+                                    fs::metadata(old_path).and_then(|m| m.modified()),
+                                    fs::metadata(new_path).and_then(|m| m.modified()),
                                 ) {
                                     if old_modified_time < new_modified_time {
                                         info!(
@@ -439,6 +439,10 @@ async fn checkpoint_writer(
         .ok();
     }
     checkpointer
+}
+
+pub fn calculate_ignore_before(ignore_older_secs: Option<u64>) -> Option<DateTime<Utc>> {
+    ignore_older_secs.map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64))
 }
 
 /// A sentinel type to signal that file server was gracefully shut down.

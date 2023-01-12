@@ -74,10 +74,13 @@ impl Difference {
             .filter(|&n| {
                 // This is a hack around the issue of comparing two
                 // trait objects. Json is used here over toml since
-                // toml does not support serializing `None`.
-                let old_json = serde_json::to_vec(&old[n]).unwrap();
-                let new_json = serde_json::to_vec(&new[n]).unwrap();
-                old_json != new_json
+                // toml does not support serializing `None`
+                // to_value is used specifically (instead of string)
+                // to avoid problems comparing serialized HashMaps,
+                // which can iterate in varied orders.
+                let old_value = serde_json::to_value(&old[n]).unwrap();
+                let new_value = serde_json::to_value(&new[n]).unwrap();
+                old_value != new_value
             })
             .cloned()
             .collect::<HashSet<_>>();
