@@ -205,7 +205,6 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
-    use std::default::Default;
     use std::{
         io::{Cursor, Read},
         net::SocketAddr,
