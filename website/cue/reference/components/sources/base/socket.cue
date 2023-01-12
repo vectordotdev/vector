@@ -6,8 +6,8 @@ base: components: sources: socket: configuration: {
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
 		type: {
-			number: {}
-			string: {}
+			number: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
+			string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 		}
 	}
 	connection_limit: {
@@ -145,10 +145,12 @@ base: components: sources: socket: configuration: {
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
+			Set to `""` to suppress this key.
+
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {}
+		type: string: default: "host"
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
@@ -201,16 +203,18 @@ base: components: sources: socket: configuration: {
 			The value will be the peer host's port i.e. `9000`.
 
 			By default, `"port"` is used.
+
+			Set to `""` to suppress this key.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: string: {}
+		type: string: default: "port"
 	}
 	receive_buffer_bytes: {
 		description: """
 			The size, in bytes, of the receive buffer used for each connection.
 
-			This should not typically needed to be changed.
+			Generally this should not need to be configured.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false

@@ -2,10 +2,7 @@ use std::time::Duration;
 
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::{
-    lookup_v2::{parse_value_path, OptionalValuePath},
-    owned_value_path, path,
-};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use serde_with::serde_as;
 use smallvec::SmallVec;
 use vector_config::{configurable_component, NamedComponent};
@@ -29,6 +26,9 @@ use super::SocketConfig;
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
     /// The address to listen for connections on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
+    #[configurable(metadata(docs::examples = "systemd"))]
+    #[configurable(metadata(docs::examples = "systemd#3"))]
     address: SocketListenAddr,
 
     #[configurable(derived)]
@@ -50,22 +50,28 @@ pub struct TcpConfig {
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
+    /// Set to `""` to suppress this key.
+    ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    host_key: Option<OptionalValuePath>,
+    #[serde(default = "default_host_key")]
+    host_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
     ///
     /// The value will be the peer host's port i.e. `9000`.
     ///
     /// By default, `"port"` is used.
-    port_key: Option<OptionalValuePath>,
+    ///
+    /// Set to `""` to suppress this key.
+    #[serde(default = "default_port_key")]
+    port_key: OptionalValuePath,
 
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
     /// The size, in bytes, of the receive buffer used for each connection.
     ///
-    /// This should not typically needed to be changed.
+    /// Generally this should not need to be configured.
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
@@ -87,6 +93,14 @@ const fn default_shutdown_timeout_secs() -> Duration {
     Duration::from_secs(30)
 }
 
+fn default_host_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+}
+
+fn default_port_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("port"))
+}
+
 impl TcpConfig {
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
@@ -94,8 +108,8 @@ impl TcpConfig {
             keepalive: None,
             max_length: Some(crate::serde::default_max_length()),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
-            host_key: None,
-            port_key: Some(OptionalValuePath::from(owned_value_path!("port"))),
+            host_key: default_host_key(),
+            port_key: default_port_key(),
             tls: None,
             receive_buffer_bytes: None,
             framing: None,
@@ -105,11 +119,11 @@ impl TcpConfig {
         }
     }
 
-    pub const fn host_key(&self) -> &Option<OptionalValuePath> {
+    pub const fn host_key(&self) -> &OptionalValuePath {
         &self.host_key
     }
 
-    pub const fn port_key(&self) -> &Option<OptionalValuePath> {
+    pub const fn port_key(&self) -> &OptionalValuePath {
         &self.port_key
     }
 
@@ -214,10 +228,7 @@ impl TcpSource for RawTcpSource {
                     now,
                 );
 
-                let legacy_host_key = self.config.host_key.as_ref().map_or_else(
-                    || parse_value_path(log_schema().host_key()).ok(),
-                    |k| k.path.clone(),
-                );
+                let legacy_host_key = self.config.host_key.clone().path;
 
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,
@@ -227,11 +238,7 @@ impl TcpSource for RawTcpSource {
                     host.ip().to_string(),
                 );
 
-                let legacy_port_key = self
-                    .config
-                    .port_key
-                    .as_ref()
-                    .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone());
+                let legacy_port_key = self.config.port_key.clone().path;
 
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,

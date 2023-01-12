@@ -231,20 +231,9 @@ impl SourceConfig for SocketConfig {
 
         let schema_definition = match &self.mode {
             Mode::Tcp(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
-                let legacy_port_key = config
-                    .port_key()
-                    .as_ref()
-                    .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone())
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 let tls_client_metadata_path = config
                     .tls()
@@ -259,7 +248,7 @@ impl SourceConfig for SocketConfig {
                         legacy_host_key,
                         &owned_value_path!("host"),
                         Kind::bytes(),
-                        None,
+                        Some("host"),
                     )
                     .with_source_metadata(
                         Self::NAME,
