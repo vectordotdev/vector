@@ -95,7 +95,6 @@ pub struct MongoDbMetricsConfig {
     ///
     /// If set to an empty string, no namespace is added to the metrics.
     ///
-
     /// By default, `mongodb` is used.
     #[serde(default = "default_namespace")]
     namespace: String,
