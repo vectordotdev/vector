@@ -206,7 +206,7 @@ rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.11.5", default-features = false, features = ["std"] }
+prost = { version = "0.11.6", default-features = false, features = ["std"] }
 prost-types = { version = "0.11.5", default-features = false, optional = true }
 
 # GCP
@@ -512,10 +512,10 @@ sources-aws_kinesis_firehose = ["dep:base64", "dep:infer"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-error", "protobuf-build"]
-sources-demo_logs = ["dep:fakedata"]
+sources-demo_logs = ["dep:fakedata", "dep:serde_with"]
 sources-dnstap = ["dep:base64", "dep:trust-dns-proto", "dep:dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
-sources-eventstoredb_metrics = []
+sources-eventstoredb_metrics = ["dep:serde_with"]
 sources-exec = []
 sources-file = ["dep:file-source"]
 sources-file-descriptor = ["tokio-util/io"]
@@ -533,7 +533,7 @@ sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
-sources-nginx_metrics = ["dep:nom"]
+sources-nginx_metrics = ["dep:nom", "dep:serde_with"]
 sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:serde_with", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-utils-http-client"]
