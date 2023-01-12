@@ -1,15 +1,14 @@
 use std::collections::{BTreeMap, HashSet};
-use std::env;
-use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::{env, ffi::OsString, path::PathBuf};
 
 use anyhow::Result;
 use atty::Stream;
+use once_cell::sync::Lazy;
 
 use super::config::RustToolchainConfig;
 use crate::app::{self, CommandExt as _};
 
-const DEFAULT_CONTAINER_TOOL: &str = "docker";
 pub const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
@@ -27,9 +26,28 @@ const TEST_COMMAND: &[&str] = &[
 const UPSTREAM_IMAGE: &str =
     "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a";
 
+static CONTAINER_TOOL: Lazy<OsString> =
+    Lazy::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));
+
+fn detect_container_tool() -> OsString {
+    for tool in ["docker", "podman"] {
+        if Command::new(tool)
+            .arg("version")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .and_then(|mut child| child.wait())
+            .map_or(false, |status| status.success())
+        {
+            return OsString::from(String::from(tool));
+        }
+    }
+    critical!("No container tool could be detected.");
+    std::process::exit(1);
+}
+
 fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
-    let command = env::var_os("CONTAINER_TOOL").unwrap_or_else(|| DEFAULT_CONTAINER_TOOL.into());
-    let mut command = Command::new(command);
+    let mut command = Command::new(&*CONTAINER_TOOL);
     command.args(args);
     command
 }
