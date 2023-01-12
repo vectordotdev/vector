@@ -220,10 +220,7 @@ base: components: sources: socket: configuration: {
 		description:   "The timeout, in seconds, before a connection is forcefully closed during shutdown."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: {
-			default: 30
-			unit:    "seconds"
-		}
+		type: uint: default: 30
 	}
 	socket_file_mode: {
 		description: """

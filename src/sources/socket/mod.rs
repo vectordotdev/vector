@@ -5,7 +5,6 @@ mod unix;
 
 use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
 use lookup::{lookup_v2::parse_value_path, owned_value_path};
-use serde_with::serde_as;
 use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
@@ -22,7 +21,6 @@ use crate::{
 /// Configuration for the `socket` source.
 #[configurable_component(source("socket"))]
 #[derive(Clone, Debug)]
-#[serde_as]
 pub struct SocketConfig {
     #[serde(flatten)]
     pub mode: Mode,
@@ -31,7 +29,6 @@ pub struct SocketConfig {
 /// Listening mode for the `socket` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde_as]
 #[serde(tag = "mode", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 #[allow(clippy::large_enum_variant)] // just used for configuration
