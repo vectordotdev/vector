@@ -85,6 +85,7 @@ pub struct KafkaSourceConfig {
     group_id: String,
 
     /// Override dynamic membership and broker assignment behavior with static membership, using a group instance (member) id.
+    #[configurable(metadata(docs::examples = "kafka-streams-instance-1"))]
     group_instance_id: Option<String>,
 
     /// If offsets for consumer group do not exist, set them using this strategy.

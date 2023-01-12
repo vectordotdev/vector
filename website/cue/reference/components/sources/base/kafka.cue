@@ -193,7 +193,7 @@ base: components: sources: kafka: configuration: {
 	group_instance_id: {
 		description: "Override dynamic membership and broker assignment behavior with static membership, using a group instance (member) id."
 		required:    false
-		type: string: {}
+		type: string: examples: ["kafka-streams-instance-1"]
 	}
 	headers_key: {
 		description: """
