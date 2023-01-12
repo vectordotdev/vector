@@ -4,18 +4,18 @@ crate::cli_subcommands! {
 }
 
 crate::script_wrapper! {
-    archive = "package-archive.sh"
-        "Create a .tar.gz package for the specified $TARGET"
+    archive = "Create a .tar.gz package for the specified $TARGET"
+        => "package-archive.sh"
 }
 crate::script_wrapper! {
-    deb = "package-deb.sh"
-        "Create a .deb package to be distributed in the APT package manager"
+    deb = "Create a .deb package to be distributed in the APT package manager"
+        => "package-deb.sh"
 }
 crate::script_wrapper! {
-    msi = "package-msi.sh"
-        "Create a .msi package for Windows"
+    msi = "Create a .msi package for Windows"
+        => "package-msi.sh"
 }
 crate::script_wrapper! {
-    rpm = "package-rpm.sh"
-        "Create a .rpm package to be distributed in the YUM package manager"
+    rpm = "Create a .rpm package to be distributed in the YUM package manager"
+        => "package-rpm.sh"
 }

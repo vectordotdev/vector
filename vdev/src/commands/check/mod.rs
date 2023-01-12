@@ -16,41 +16,41 @@ crate::cli_subcommands! {
 // These should eventually be migrated to Rust code
 
 crate::script_wrapper! {
-    component_docs = "check-component-docs.sh"
-        "Check component documentation is up-to-date"
+    component_docs = "Check component documentation is up-to-date"
+        => "check-component-docs.sh"
 }
 
 crate::script_wrapper! {
-    component_features = "check-component-features"
-        "Check that all component features are set up properly"
+    component_features = "Check that all component features are set up properly"
+        => "check-component-features"
 }
 
 crate::script_wrapper! {
-    docs = "check-docs.sh"
-        "Check that all /docs files are valid"
+    docs = "Check that all /docs files are valid"
+        => "check-docs.sh"
 }
 
 crate::script_wrapper! {
-    events = "check-events"
-        "Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md"
+    events = "Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md"
+        => "check-events"
 }
 
 crate::script_wrapper! {
-    examples = "check-examples.sh"
-        "Check that the config/example files are valid"
+    examples = "Check that the config/example files are valid"
+        => "check-examples.sh"
 }
 
 crate::script_wrapper! {
-    scripts = "check-scripts.sh"
-        "Check that scripts do not have common mistakes"
+    scripts = "Check that scripts do not have common mistakes"
+        => "check-scripts.sh"
 }
 
 crate::script_wrapper! {
-    style = "check-style.sh"
-        "Check that all files are styled properly"
+    style = "Check that all files are styled properly"
+        => "check-style.sh"
 }
 
 crate::script_wrapper! {
-    version = "check-version.rb"
-        "Check that Vector's version is correct, accounting for recent changes"
+    version = "Check that Vector's version is correct, accounting for recent changes"
+        => "check-version.rb"
 }

@@ -87,7 +87,7 @@ cli_commands! {
 /// This macro creates a wrapper for an existing script
 #[macro_export]
 macro_rules! script_wrapper {
-    ( $mod:ident = $script:literal $doc:literal ) => {
+    ( $mod:ident = $doc:literal => $script:literal ) => {
         paste::paste! {
             mod $mod {
                 #[doc = $doc]

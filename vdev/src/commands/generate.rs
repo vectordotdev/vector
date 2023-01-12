@@ -6,14 +6,14 @@ crate::cli_subcommands! {
 }
 
 crate::script_wrapper! {
-    component_docs = "generate-component-docs.rb"
-        "Generate component documentation"
+    component_docs = "Generate component documentation"
+        => "generate-component-docs.rb"
 }
 crate::script_wrapper! {
-    manifests = "generate-manifests.sh"
-        "Generate Kubernetes manifests from latest Helm chart"
+    manifests = "Generate Kubernetes manifests from latest Helm chart"
+        => "generate-manifests.sh"
 }
 crate::script_wrapper! {
-    release_cue = "generate-release-cue.rb"
-        "Generate the release documentation files"
+    release_cue = "Generate the release documentation files"
+        => "generate-release-cue.rb"
 }
