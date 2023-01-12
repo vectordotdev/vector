@@ -28,7 +28,7 @@ use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config, generate, generate_schema, graph, heartbeat, list,
     signal::{self, SignalTo},
-    topology::{self, RunningTopology, TopologyController, ReloadOutcome},
+    topology::{self, ReloadOutcome, RunningTopology, TopologyController},
     trace, unit_test, validate,
 };
 #[cfg(feature = "api-client")]
