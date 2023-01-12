@@ -1029,7 +1029,7 @@ mod integration_tests {
                     skip_authentication: true,
                     ..Default::default()
                 },
-                ack_deadline_secs: ACK_DEADLINE as i32,
+                ack_deadline_secs: Duration::from_secs(ACK_DEADLINE),
                 ..Default::default()
             };
             let (mut ctx, shutdown) = SourceContext::new_shutdown(&self.component, tx);
@@ -1081,9 +1081,6 @@ mod integration_tests {
             let path = base
                 .replace("{topic}", &self.topic)
                 .replace("{sub}", &self.subscription);
-            ///
-            /// The GCP Pub/Sub servers send responses with 100 or more messages when
-            /// the subscription is busy.
             let uri = [PROJECT_URI.as_str(), &path].join("/");
             let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
             let request = Request::builder()
