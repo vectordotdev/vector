@@ -2952,12 +2952,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ffi-opaque"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "534be3985e262585e2a8bb8322969e2115f0eff293b5bf522bef397fff54c9bc"
-
-[[package]]
 name = "file-source"
 version = "0.1.0"
 dependencies = [
@@ -4416,28 +4410,6 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-
-[[package]]
-name = "leveldb"
-version = "0.8.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32651baaaa5596b3a6e0bee625e73fd0334c167db0ea5ac68750ef9a629a2d6a"
-dependencies = [
- "db-key",
- "leveldb-sys",
- "libc",
-]
-
-[[package]]
-name = "leveldb-sys"
-version = "2.0.9"
-source = "git+https://github.com/vectordotdev/leveldb-sys.git?branch=leveldb_mmap_limit#deca67b91b32c77bb5bcd122e306877468520a97"
-dependencies = [
- "cmake",
- "ffi-opaque",
- "libc",
- "num_cpus",
-]
 
 [[package]]
 name = "libc"
@@ -9147,18 +9119,15 @@ dependencies = [
  "criterion",
  "crossbeam-queue",
  "crossbeam-utils",
- "db-key",
  "fslock",
  "futures 0.3.25",
  "hdrhistogram",
- "leveldb",
  "memmap2",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
  "num-traits",
  "once_cell",
- "parking_lot",
  "pin-project",
  "proptest",
  "quickcheck",
