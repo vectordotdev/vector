@@ -1460,8 +1460,15 @@ def apply_schema_metadata!(source_schema, resolved_schema)
   # also work totally fine as-is!
   examples = get_schema_metadata(source_schema, 'docs::examples')
   if !examples.nil?
-    count = [examples].flatten.length
-    @logger.debug "Schema has #{count} example(s)."
+    flattened_examples = [examples].flatten.map { |example|
+      if example.is_a?(Hash)
+        sort_hash_nested(example)
+      else
+        example
+      end
+    }
+
+    @logger.debug "Schema has #{flattened_examples.length} example(s)."
     resolved_schema['type'].each { |type_name, type_def|
       # We need to recurse one more level if we're dealing with an array type definition, as we need
       # to stick the examples on the type definition for the array's `items`. There might also be
@@ -1470,11 +1477,11 @@ def apply_schema_metadata!(source_schema, resolved_schema)
       when 'array'
         type_def['items']['type'].each { |subtype_name, subtype_def|
           if subtype_name != 'array'
-            subtype_def['examples'] = [examples].flatten
+            subtype_def['examples'] = flattened_examples
           end
         }
       else
-        type_def['examples'] = [examples].flatten
+        type_def['examples'] = flattened_examples
       end
     }
   end
@@ -1513,7 +1520,7 @@ def reconcile_resolved_schema!(resolved_schema)
   # Only works if `type` is an object, which it won't be in some cases, such as a schema that maps
   # to a cycle entrypoint, or is hidden, and so on.
   if !resolved_schema['type'].is_a?(Hash)
-    @logger.debug "Schema was not an full resolved schema; reconciliation not applicable."
+    @logger.debug "Schema was not a fully resolved schema; reconciliation not applicable."
     return
   end
 
@@ -1523,30 +1530,6 @@ def reconcile_resolved_schema!(resolved_schema)
   object_properties = resolved_schema.dig('type', 'object', 'options')
   if !object_properties.nil?
     object_properties.values.each { |resolved_property| reconcile_resolved_schema!(resolved_property) }
-
-    # Reconcile examples for wildcard object schemas.
-    #
-    # In some cases, a field may be set to an object schema with only "additional properties" set,
-    # which implies the type on the Rust side is just a map that can have any number of free-form
-    # key/value pairs.
-    #
-    # When specifying examples for that field, the examples land on the field's object type itself,
-    # when we actually need them to land on the schema for the object's wildcard property. We simply
-    # check if the object has a single property, `*`, which signals that we're dealing purely with a
-    # map field, and move any examples on the object itself down to the property's schema.
-    object_schema = resolved_schema.dig('type', 'object')
-    has_examples = object_schema.has_key?('examples')
-    is_map_field = object_properties.keys == ['*']
-
-    if has_examples && is_map_field
-      object_examples = object_schema.delete('examples')
-
-      # TODO: We blindly grab the first type field we can find, because we don't expect to handle
-      # this for map values that have multiple type representations.
-      wildcard_property_schema = object_properties['*']
-      wildcard_type_field = wildcard_property_schema['type'].values.first
-      wildcard_type_field['examples'] = object_examples
-    end
   else
     # Look for required/default value inconsistencies.
     #
