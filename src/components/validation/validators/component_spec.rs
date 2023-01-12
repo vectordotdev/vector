@@ -37,11 +37,15 @@ impl Validator for ComponentSpecValidator {
         }
 
         // Validate that the number of inputs/outputs matched the test case expectation.
+        //
+        // NOTE: This logic currently assumes that one input event leads to, at most, one output
+        // event. It also assumes that tests that are marked as expecting to be partially successful
+        // should never emit the same number of output events as there are input events.
         match expectation {
             TestCaseExpectation::Success => {
                 if inputs.len() != outputs.len() {
                     return Err(vec![format!(
-                        "sent {} inputs but only received {} outputs",
+                        "Sent {} inputs but only received {} outputs.",
                         inputs.len(),
                         outputs.len()
                     )]);
@@ -50,26 +54,15 @@ impl Validator for ComponentSpecValidator {
             TestCaseExpectation::Failure => {
                 if !outputs.is_empty() {
                     return Err(vec![format!(
-                        "received {} outputs but none were expected",
+                        "Received {} outputs but none were expected.",
                         outputs.len()
                     )]);
                 }
             }
             TestCaseExpectation::PartialSuccess => {
-                // TODO: This one is a bit loosy goosy because we should really be checking if we
-                // got an output event for every valid input event, where, ostensibly, any event
-                // that wasn't marked for modification would represent a valid input event.
-                //
-                // Thinking it through, however, it's not 100% clear at this moment whether or not
-                // we'll ever have a test case, with an expectation of partial success, that
-                // intentionally modifies one or more input events but where some of those modified
-                // events will lead to output events.
-                //
-                // I might be overthinking it, but we'll leave this as-is for now because it's
-                // certainly the simplest check that matches reality.
                 if inputs.len() == outputs.len() {
                     return Err(vec![
-                        "received an output event for every input, when only some outputs were expected".to_string()
+                        "Received an output event for every input, when only some outputs were expected.".to_string()
                     ]);
                 }
             }

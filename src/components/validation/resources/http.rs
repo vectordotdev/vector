@@ -292,7 +292,7 @@ fn spawn_output_http_client(
     _output_tx: mpsc::Sender<Event>,
     _task_coordinator: &TaskCoordinator<Configuring>,
 ) {
-    // The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
+    // TODO: The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
     // scraped... but since we need special logic to aggregate/deduplicate scraped metrics, we can't
     // use this generically for that purpose.
     todo!()

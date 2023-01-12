@@ -102,9 +102,9 @@ impl InputEdge {
                 let request = PushEventsRequest {
                     events: vec![test_event.into_event().into()],
                 };
-                match client.push_events(request).await {
-                    Ok(_response) => {}
-                    Err(_e) => {}
+
+                if let Err(e) = client.push_events(request).await {
+                    error!(error = ?e, "Failed to send input event to controlled input edge.");
                 }
             }
 
