@@ -231,11 +231,12 @@ base: components: sources: kafka: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			required: true
+			description: "The librdkafka configuration property name."
+			required:    true
 			type: string: examples: [{
+				"fetch.error.backoff.ms":   "1000"
 				"socket.send.buffer.bytes": "100"
 				"client.id":                "${ENV_VAR}"
-				"fetch.error.backoff.ms":   "1000"
 			}]
 		}
 	}

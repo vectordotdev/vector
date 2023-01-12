@@ -178,6 +178,9 @@ pub struct KafkaSourceConfig {
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
     #[configurable(metadata(docs::examples = "example_librdkafka_options()"))]
+    #[configurable(metadata(
+        docs::additional_props_description = "The librdkafka configuration property name."
+    ))]
     librdkafka_options: Option<HashMap<String, String>>,
 
     #[serde(flatten)]
