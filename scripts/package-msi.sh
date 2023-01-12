@@ -9,7 +9,6 @@ set -euo pipefail
 
 set -x
 
-PROJECT_ROOT="$(pwd)"
 ARCHIVE_VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 
 rm -rf target/msi-x64
