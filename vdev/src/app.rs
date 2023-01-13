@@ -90,8 +90,35 @@ pub fn exec<T: AsRef<OsStr>>(
     command: impl AsRef<OsStr>,
     args: impl IntoIterator<Item = T>,
 ) -> Result<()> {
+    _exec(command.as_ref(), args, None)
+}
+
+pub fn exec_script<T: AsRef<OsStr>>(script: &str, args: impl IntoIterator<Item = T>) -> Result<()> {
+    let script: PathBuf = [path(), "scripts", script].into_iter().collect();
+    _exec(script.as_ref(), args, None)
+}
+
+pub fn exec_in_repo<T: AsRef<OsStr>>(
+    command: impl AsRef<OsStr>,
+    args: impl IntoIterator<Item = T>,
+) -> Result<()> {
+    _exec(command.as_ref(), args, Some(path().as_ref()))
+}
+
+fn _exec<T: AsRef<OsStr>>(
+    command: &OsStr,
+    args: impl IntoIterator<Item = T>,
+    cwd: Option<&OsStr>,
+) -> Result<()> {
     let mut command = Command::new(command);
     command.args(args);
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
+    debug!("Executing: {command:?}");
+    if let Some(cwd) = cwd {
+        debug!("  in working directory {cwd:?}");
+    }
     match command
         .spawn()
         .with_context(|| format!("Could not spawn {command:?}"))?
@@ -101,19 +128,6 @@ pub fn exec<T: AsRef<OsStr>>(
         status if status.success() => Ok(()),
         status => Err(anyhow!("Command failed, exit code {status}")),
     }
-}
-
-pub fn exec_script<T: AsRef<OsStr>>(script: &str, args: impl IntoIterator<Item = T>) -> Result<()> {
-    let script: PathBuf = [path(), "scripts", script].into_iter().collect();
-    exec(script, args)
-}
-
-pub fn exec_in_repo<T: AsRef<OsStr>>(
-    command: impl AsRef<OsStr>,
-    args: impl IntoIterator<Item = T>,
-) -> Result<()> {
-    set_repo_dir()?;
-    exec(command, args)
 }
 
 fn get_progress_bar() -> Result<ProgressBar> {
