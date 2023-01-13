@@ -37,8 +37,18 @@ pub struct AwsKinesisFirehoseConfig {
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+    ///
+    /// This option has been deprecated, the `access_keys` option should be used instead.
+    #[configurable(deprecated)]
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
+
+    /// An optional list of access keys to authenticate requests against.
+    ///
+    /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
+    /// configured, `access_keys` should be set to the same value. Otherwise, all requests will be allowed.
+    #[configurable(metadata(docs::examples = "access_keys_example()"))]
+    access_keys: Option<Vec<SensitiveString>>,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
     ///
@@ -73,6 +83,10 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+}
+
+const fn access_keys_example() -> [&'static str; 2] {
+    ["A94A8FE5CCB19BA61C4C08", "B94B8FE5CCB19BA61C4C12"]
 }
 
 /// Compression scheme for records in a Firehose message.
@@ -118,8 +132,19 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
+        if self.access_key.is_some() {
+            warn!("DEPRECATION `access_key`, use `access_keys` instead.")
+        }
+
+        // Merge with legacy `access_key`
+        let access_keys = self
+            .access_keys
+            .iter()
+            .flatten()
+            .chain(self.access_key.iter());
+
         let svc = filters::firehose(
-            self.access_key.as_ref().map(|k| k.inner().to_owned()),
+            access_keys.map(|key| key.inner().to_string()).collect(),
             self.record_compression,
             decoder,
             acknowledgements,
@@ -180,6 +205,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
         toml::Value::try_from(Self {
             address: "0.0.0.0:443".parse().unwrap(),
             access_key: None,
+            access_keys: None,
             tls: None,
             record_compression: Default::default(),
             framing: default_framing_message_based(),
@@ -254,6 +280,7 @@ mod tests {
 
     async fn source(
         access_key: Option<SensitiveString>,
+        access_keys: Option<Vec<SensitiveString>>,
         record_compression: Compression,
         delivered: bool,
         log_namespace: bool,
@@ -268,6 +295,7 @@ mod tests {
                 address,
                 tls: None,
                 access_key,
+                access_keys,
                 record_compression,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
@@ -432,7 +460,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, source_record_compression, true, false).await;
+            let (rx, addr) = source(None, None, source_record_compression, true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -532,7 +560,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, source_record_compression, true, true).await;
+            let (rx, addr) = source(None, None, source_record_compression, true, true).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -603,7 +631,7 @@ mod tests {
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr) = source(None, Default::default(), true, false).await;
+            let (rx, addr) = source(None, None, Default::default(), true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -642,6 +670,7 @@ mod tests {
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
         let (_rx, addr) = source(
             Some("an access key".to_string().into()),
+            Some(vec!["an access key in list".to_string().into()]),
             Default::default(),
             true,
             false,
@@ -665,10 +694,100 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn aws_kinesis_firehose_rejects_bad_access_key_from_list() {
+        let (_rx, addr) = source(
+            None,
+            Some(vec!["an access key in list".to_string().into()]),
+            Default::default(),
+            true,
+            false,
+        )
+        .await;
+
+        let res = send(
+            addr,
+            Utc::now(),
+            vec![],
+            Some("bad access key"),
+            false,
+            Compression::None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(401, res.status().as_u16());
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, REQUEST_ID);
+    }
+
+    #[tokio::test]
+    async fn aws_kinesis_firehose_accepts_merged_access_keys() {
+        let valid_access_key = SensitiveString::from(String::from("an access key in list"));
+
+        let (_rx, addr) = source(
+            Some(valid_access_key.clone()),
+            Some(vec!["valid access key 2".to_string().into()]),
+            Default::default(),
+            true,
+            false,
+        )
+        .await;
+
+        let res = send(
+            addr,
+            Utc::now(),
+            vec![],
+            Some(valid_access_key.clone().inner()),
+            false,
+            Compression::None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, REQUEST_ID);
+    }
+
+    #[tokio::test]
+    async fn aws_kinesis_firehose_accepts_access_keys_from_list() {
+        let valid_access_key = "an access key in list".to_string();
+
+        let (_rx, addr) = source(
+            None,
+            Some(vec![
+                valid_access_key.clone().into(),
+                "valid access key 2".to_string().into(),
+            ]),
+            Default::default(),
+            true,
+            false,
+        )
+        .await;
+
+        let res = send(
+            addr,
+            Utc::now(),
+            vec![],
+            Some(&valid_access_key),
+            false,
+            Compression::None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, REQUEST_ID);
+    }
+
+    #[tokio::test]
     async fn handles_acknowledgement_failure() {
         let expected = RECORD.as_bytes().to_owned();
 
-        let (rx, addr) = source(None, Compression::None, false, false).await;
+        let (rx, addr) = source(None, None, Compression::None, false, false).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 

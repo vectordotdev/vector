@@ -274,7 +274,8 @@ base: components: sinks: http: configuration: {
 		description: "A list of custom headers to add to each request."
 		required:    false
 		type: object: options: "*": {
-			required: true
+			description: "An HTTP request header."
+			required:    true
 			type: string: {}
 		}
 	}
@@ -404,7 +405,8 @@ base: components: sinks: http: configuration: {
 				description: "Additional HTTP headers to add to every HTTP request."
 				required:    false
 				type: object: options: "*": {
-					required: true
+					description: "An HTTP request header."
+					required:    true
 					type: string: {}
 				}
 			}

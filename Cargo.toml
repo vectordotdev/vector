@@ -256,7 +256,7 @@ derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.10", default-features = false }
 encoding_rs = { version = "0.8.31", default-features = false, features = ["serde"] }
-enum_dispatch = { version = "0.3.10", default-features = false }
+enum_dispatch = { version = "0.3.11", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.25", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.25", default-features = false }
@@ -340,7 +340,7 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.26.1", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.11.5", default-features = false, optional = true }
+prost-build = { version = "0.11.6", default-features = false, optional = true }
 tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
 openssl-src = { version = "111", default-features = false, features = ["force-engine"] }
 
@@ -518,7 +518,7 @@ sources-exec = []
 sources-file = ["dep:file-source"]
 sources-file-descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
-sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic"]
+sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic", "dep:serde_with"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
 sources-host_metrics =  ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
 sources-http_client = ["sources-utils-http-client"]
@@ -529,7 +529,7 @@ sources-journald = []
 sources-kafka = ["dep:rdkafka", "dep:serde_with"]
 sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
-sources-mongodb_metrics = ["dep:mongodb"]
+sources-mongodb_metrics = ["dep:mongodb", "dep:serde_with"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom", "dep:serde_with"]
 sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]

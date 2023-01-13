@@ -53,6 +53,7 @@ pub struct HttpClientConfig {
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
     /// appended to any parameters manually provided in the `endpoint` option.
     #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     pub query: HashMap<String, Vec<String>>,
 
     /// Decoder to use on the HTTP responses.
@@ -66,8 +67,10 @@ pub struct HttpClientConfig {
     pub framing: FramingConfig,
 
     /// Headers to apply to the HTTP requests.
+    ///
     /// One or more values for the same header can be provided.
     #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
     pub headers: HashMap<String, Vec<String>>,
 
     /// Specifies the action of the HTTP request.

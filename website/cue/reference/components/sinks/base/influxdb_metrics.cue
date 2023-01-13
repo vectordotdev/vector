@@ -259,7 +259,8 @@ base: components: sinks: influxdb_metrics: configuration: {
 		description: "A map of additional tags, in the form of key/value pairs, to add to each measurement."
 		required:    false
 		type: object: options: "*": {
-			required: true
+			description: "A tag key/value pair."
+			required:    true
 			type: string: {}
 		}
 	}
