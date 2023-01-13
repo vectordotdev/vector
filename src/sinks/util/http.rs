@@ -537,6 +537,7 @@ pub struct RequestConfig {
 
     /// Additional HTTP headers to add to every HTTP request.
     #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
     pub headers: IndexMap<String, String>,
 }
 

@@ -120,6 +120,7 @@ pub struct ElasticsearchConfig {
     pub auth: Option<ElasticsearchAuth>,
 
     /// Custom parameters to add to the query string of each request sent to Elasticsearch.
+    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     pub query: Option<HashMap<String, String>>,
 
     #[configurable(derived)]

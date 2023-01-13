@@ -890,11 +890,18 @@ def resolve_bare_schema(root_schema, schema)
         # the wildcard property, we might want to have the description read as "A foobar label."
         # just to make the UI look nice.
         #
-        # Rather than try and derive this from the title/description on the field, we'll just allow
-        # for the possibility of specifying one for the wildcard property via the metadata attribute
-        # below. It's not technically required in the Cue schema, so it can indeed be optional.
+        # Rather than try and derive this from the title/description on the field, we'll require
+        # such a description to be provided on the Rust side via the metadata attribute shown below.
         singular_description = get_schema_metadata(schema, 'docs::additional_props_description')
-        additional_properties['description'] = singular_description unless singular_description.nil?
+        if singular_description.nil?
+          @logger.error "Missing 'docs::additional_props_description' metadata for a wildcard field.\n\n" \
+          "For map fields (`HashMap<...>`, etc), a description (in the singular form) must be provided by via `#[configurable(metadata(docs::additional_props_description = \"Description of the field.\"))]`.\n\n" \
+          "The description on the field, derived from the code comments, is shown specifically for `field`, while the description provided via `docs::additional_props_description` is shown for the special `field.*` entry that denotes that the field is actually a map."
+
+          @logger.error "Relevant schema: #{JSON.pretty_generate(schema)}"
+          exit 1
+        end
+        additional_properties['description'] = singular_description
 
         resolved_additional_properties = resolve_schema(root_schema, additional_properties)
         resolved_additional_properties['required'] = true

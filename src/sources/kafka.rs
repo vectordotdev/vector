@@ -144,6 +144,9 @@ pub struct KafkaSourceConfig {
     /// Advanced options set directly on the underlying `librdkafka` client.
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
+    #[configurable(metadata(
+        docs::additional_props_description = "A librdkafka configuration option."
+    ))]
     librdkafka_options: Option<HashMap<String, String>>,
 
     #[serde(flatten)]

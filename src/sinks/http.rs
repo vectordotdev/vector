@@ -45,6 +45,7 @@ pub struct HttpSinkConfig {
 
     /// A list of custom headers to add to each request.
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
     pub headers: Option<IndexMap<String, String>>,
 
     #[configurable(derived)]
