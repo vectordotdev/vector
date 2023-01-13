@@ -46,6 +46,17 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
     }
 }
 
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+/// AWS Cloudwatch Logs sink
+pub struct Retention {
+    #[configurable(derived)]
+    pub enabled: bool,
+
+    #[configurable(derived)]
+    pub days: i32,
+}
+
 /// Configuration for the `aws_cloudwatch_logs` sink.
 #[configurable_component(sink("aws_cloudwatch_logs"))]
 #[derive(Clone, Debug)]
@@ -85,6 +96,9 @@ pub struct CloudwatchLogsSinkConfig {
     ///
     /// [log_stream]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub create_missing_stream: Option<bool>,
+
+    #[configurable(derived)]
+    pub retention: Retention,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
@@ -213,6 +227,7 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         region: Default::default(),
         create_missing_group: Default::default(),
         create_missing_stream: Default::default(),
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
