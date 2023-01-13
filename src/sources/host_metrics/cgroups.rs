@@ -69,7 +69,7 @@ enum CGroupsError {
 
 type CGroupsResult<T> = Result<T, CGroupsError>;
 
-fn default_levels() -> usize {
+const fn default_levels() -> usize {
     100
 }
 

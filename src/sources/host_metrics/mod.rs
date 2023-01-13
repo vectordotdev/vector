@@ -128,7 +128,7 @@ fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-fn example_collectors() -> [&'static str; 8] {
+const fn example_collectors() -> [&'static str; 8] {
     [
         "cgroups",
         "cpu",
