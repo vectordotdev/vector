@@ -1,6 +1,73 @@
 package metadata
 
 base: components: sources: host_metrics: configuration: {
+	cgroups: {
+		description: """
+			Options for the “cgroups” (controller groups) metrics collector.
+
+			This collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
+			"""
+		required: false
+		type: object: options: {
+			base: {
+				description: "The base cgroup name to provide metrics for."
+				required:    false
+				type: string: examples: ["/", "system.slice/snapd.service"]
+			}
+			base_dir: {
+				description: "Base cgroup directory, for testing use only"
+				required:    false
+				type: string: {}
+			}
+			groups: {
+				description: """
+					Lists of cgroup name patterns to include or exclude in gathering
+					usage metrics.
+
+					Defaults to including all cgroups.
+					"""
+				required: false
+				type: object: {
+					examples: [{
+						excludes: ["*.service"]
+						includes: ["user.slice/*"]
+					}]
+					options: {
+						excludes: {
+							description: """
+																Any patterns which should be excluded.
+
+																The patterns are matched using globbing.
+																"""
+							required: false
+							type: array: items: type: string: {}
+						}
+						includes: {
+							description: """
+																Any patterns which should be included.
+
+																The patterns are matched using globbing.
+																"""
+							required: false
+							type: array: items: type: string: {}
+						}
+					}
+				}
+			}
+			levels: {
+				description: """
+					The number of levels of the cgroups hierarchy for which to report metrics.
+
+					A value of `1` means just the root or named cgroup.
+					"""
+				required: false
+				type: uint: {
+					default: 100
+					examples: [1, 3]
+				}
+			}
+		}
+	}
 	collectors: {
 		description: """
 			The list of host metric collector services to use.
@@ -10,6 +77,7 @@ base: components: sources: host_metrics: configuration: {
 		required: false
 		type: array: items: type: string: {
 			enum: {
+				cgroups:    "Metrics related to Linux control groups."
 				cpu:        "Metrics related to CPU utilization."
 				disk:       "Metrics related to disk I/O utilization."
 				filesystem: "Metrics related to filesystem space utilization."
