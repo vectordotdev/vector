@@ -26,7 +26,10 @@ base: components: sources: kafka: configuration: {
 			See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for the `auto.offset.reset` option for further clarification.
 			"""
 		required: false
-		type: string: default: "largest"
+		type: string: {
+			default: "largest"
+			examples: ["smallest", "earliest", "beginning", "largest", "latest", "end", "error"]
+		}
 	}
 	bootstrap_servers: {
 		description: """
@@ -38,12 +41,16 @@ base: components: sources: kafka: configuration: {
 			Must be in the form of `host:port`, and comma-separated.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["10.14.22.123:9092,10.14.23.332:9092"]
 	}
 	commit_interval_ms: {
-		description: "The frequency that the consumer offsets are committed (written) to offset storage, in milliseconds."
+		description: "The frequency that the consumer offsets are committed (written) to offset storage."
 		required:    false
-		type: uint: default: 5000
+		type: uint: {
+			default: 5000
+			examples: [5000, 10000]
+			unit: "milliseconds"
+		}
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
@@ -95,9 +102,13 @@ base: components: sources: kafka: configuration: {
 		}
 	}
 	fetch_wait_max_ms: {
-		description: "Maximum time the broker may wait to fill the response, in milliseconds."
+		description: "Maximum time the broker may wait to fill the response."
 		required:    false
-		type: uint: default: 100
+		type: uint: {
+			default: 100
+			examples: [50, 100]
+			unit: "milliseconds"
+		}
 	}
 	framing: {
 		description: """
@@ -177,12 +188,12 @@ base: components: sources: kafka: configuration: {
 	group_id: {
 		description: "The consumer group name to be used to consume events from Kafka."
 		required:    true
-		type: string: {}
+		type: string: examples: ["consumer-group-name"]
 	}
 	group_instance_id: {
 		description: "Override dynamic membership and broker assignment behavior with static membership, using a group instance (member) id."
 		required:    false
-		type: string: {}
+		type: string: examples: ["kafka-streams-instance-1"]
 	}
 	headers_key: {
 		description: """
@@ -193,7 +204,10 @@ base: components: sources: kafka: configuration: {
 			By default, `"headers"` is used.
 			"""
 		required: false
-		type: string: default: "headers"
+		type: string: {
+			default: "headers"
+			examples: ["headers"]
+		}
 	}
 	key_field: {
 		description: """
@@ -204,7 +218,10 @@ base: components: sources: kafka: configuration: {
 			By default, `"message_key"` is used.
 			"""
 		required: false
-		type: string: default: "message_key"
+		type: string: {
+			default: "message_key"
+			examples: ["message_key"]
+		}
 	}
 	librdkafka_options: {
 		description: """
@@ -213,10 +230,17 @@ base: components: sources: kafka: configuration: {
 			See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "A librdkafka configuration option."
-			required:    true
-			type: string: {}
+		type: object: {
+			examples: [{
+				"client.id":                "${ENV_VAR}"
+				"fetch.error.backoff.ms":   "1000"
+				"socket.send.buffer.bytes": "100"
+			}]
+			options: "*": {
+				description: "A librdkafka configuration option."
+				required:    true
+				type: string: {}
+			}
 		}
 	}
 	offset_key: {
@@ -228,7 +252,12 @@ base: components: sources: kafka: configuration: {
 			By default, `"offset"` is used.
 			"""
 		required: false
-		type: string: default: "offset"
+		type: string: {
+			default: "offset"
+			examples: [
+				"offset",
+			]
+		}
 	}
 	partition_key: {
 		description: """
@@ -239,7 +268,10 @@ base: components: sources: kafka: configuration: {
 			By default, `"partition"` is used.
 			"""
 		required: false
-		type: string: default: "partition"
+		type: string: {
+			default: "partition"
+			examples: ["partition"]
+		}
 	}
 	sasl: {
 		description: "Configuration for SASL authentication when interacting with Kafka."
@@ -263,29 +295,37 @@ base: components: sources: kafka: configuration: {
 			mechanism: {
 				description: "The SASL mechanism to use."
 				required:    false
-				type: string: {}
+				type: string: examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
 			}
 			password: {
 				description: "The SASL password."
 				required:    false
-				type: string: {}
+				type: string: examples: ["password"]
 			}
 			username: {
 				description: "The SASL username."
 				required:    false
-				type: string: {}
+				type: string: examples: ["username"]
 			}
 		}
 	}
 	session_timeout_ms: {
-		description: "The Kafka session timeout, in milliseconds."
+		description: "The Kafka session timeout."
 		required:    false
-		type: uint: default: 10000
+		type: uint: {
+			default: 10000
+			examples: [5000, 10000]
+			unit: "milliseconds"
+		}
 	}
 	socket_timeout_ms: {
-		description: "Timeout for network requests, in milliseconds."
+		description: "Timeout for network requests."
 		required:    false
-		type: uint: default: 60000
+		type: uint: {
+			default: 60000
+			examples: [30000, 60000]
+			unit: "milliseconds"
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -391,7 +431,12 @@ base: components: sources: kafka: configuration: {
 			By default, `"topic"` is used.
 			"""
 		required: false
-		type: string: default: "topic"
+		type: string: {
+			default: "topic"
+			examples: [
+				"topic",
+			]
+		}
 	}
 	topics: {
 		description: """
@@ -400,6 +445,6 @@ base: components: sources: kafka: configuration: {
 			Regular expression syntax is supported if the topic begins with `^`.
 			"""
 		required: true
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
 	}
 }

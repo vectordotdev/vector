@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     io::Cursor,
     sync::Arc,
+    time::Duration,
 };
 
 use async_stream::stream;
@@ -19,6 +20,7 @@ use rdkafka::{
     message::{BorrowedMessage, Headers as _, Message},
     ClientConfig, ClientContext, Statistics,
 };
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 
@@ -55,6 +57,7 @@ enum BuildError {
 }
 
 /// Configuration for the `kafka` source.
+#[serde_as]
 #[configurable_component(source("kafka"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -66,40 +69,59 @@ pub struct KafkaSourceConfig {
     /// allowing discovering all other hosts in the cluster.
     ///
     /// Must be in the form of `host:port`, and comma-separated.
+    #[configurable(metadata(docs::examples = "10.14.22.123:9092,10.14.23.332:9092"))]
     bootstrap_servers: String,
 
     /// The Kafka topics names to read events from.
     ///
     /// Regular expression syntax is supported if the topic begins with `^`.
+    #[configurable(metadata(docs::examples = "^(prefix1|prefix2)-.+"))]
+    #[configurable(metadata(docs::examples = "topic-1"))]
+    #[configurable(metadata(docs::examples = "topic-2"))]
     topics: Vec<String>,
 
     /// The consumer group name to be used to consume events from Kafka.
+    #[configurable(metadata(docs::examples = "consumer-group-name"))]
     group_id: String,
 
     /// Override dynamic membership and broker assignment behavior with static membership, using a group instance (member) id.
+    #[configurable(metadata(docs::examples = "kafka-streams-instance-1"))]
     group_instance_id: Option<String>,
 
     /// If offsets for consumer group do not exist, set them using this strategy.
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for the `auto.offset.reset` option for further clarification.
     #[serde(default = "default_auto_offset_reset")]
+    #[configurable(metadata(docs::examples = "example_auto_offset_reset_values()"))]
     auto_offset_reset: String,
 
-    /// The Kafka session timeout, in milliseconds.
+    /// The Kafka session timeout.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::examples = 5000))]
+    #[configurable(metadata(docs::examples = 10000))]
     #[serde(default = "default_session_timeout_ms")]
-    session_timeout_ms: u64,
+    session_timeout_ms: Duration,
 
-    /// Timeout for network requests, in milliseconds.
+    /// Timeout for network requests.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::examples = 30000))]
+    #[configurable(metadata(docs::examples = 60000))]
     #[serde(default = "default_socket_timeout_ms")]
-    socket_timeout_ms: u64,
+    socket_timeout_ms: Duration,
 
-    /// Maximum time the broker may wait to fill the response, in milliseconds.
+    /// Maximum time the broker may wait to fill the response.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::examples = 50))]
+    #[configurable(metadata(docs::examples = 100))]
     #[serde(default = "default_fetch_wait_max_ms")]
-    fetch_wait_max_ms: u64,
+    fetch_wait_max_ms: Duration,
 
-    /// The frequency that the consumer offsets are committed (written) to offset storage, in milliseconds.
+    /// The frequency that the consumer offsets are committed (written) to offset storage.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[serde(default = "default_commit_interval_ms")]
-    commit_interval_ms: u64,
+    #[configurable(metadata(docs::examples = 5000))]
+    #[configurable(metadata(docs::examples = 10000))]
+    commit_interval_ms: Duration,
 
     /// Overrides the name of the log field used to add the message key to each event.
     ///
@@ -107,6 +129,7 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"message_key"` is used.
     #[serde(default = "default_key_field")]
+    #[configurable(metadata(docs::examples = "message_key"))]
     key_field: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the topic to each event.
@@ -115,6 +138,7 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"topic"` is used.
     #[serde(default = "default_topic_key")]
+    #[configurable(metadata(docs::examples = "topic"))]
     topic_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the partition to each event.
@@ -123,6 +147,7 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"partition"` is used.
     #[serde(default = "default_partition_key")]
+    #[configurable(metadata(docs::examples = "partition"))]
     partition_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the offset to each event.
@@ -131,6 +156,7 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"offset"` is used.
     #[serde(default = "default_offset_key")]
+    #[configurable(metadata(docs::examples = "offset"))]
     offset_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the headers to each event.
@@ -139,11 +165,13 @@ pub struct KafkaSourceConfig {
     ///
     /// By default, `"headers"` is used.
     #[serde(default = "default_headers_key")]
+    #[configurable(metadata(docs::examples = "headers"))]
     headers_key: OptionalValuePath,
 
     /// Advanced options set directly on the underlying `librdkafka` client.
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
+    #[configurable(metadata(docs::examples = "example_librdkafka_options()"))]
     #[configurable(metadata(
         docs::additional_props_description = "A librdkafka configuration option."
     ))]
@@ -178,20 +206,20 @@ impl KafkaSourceConfig {
     }
 }
 
-const fn default_session_timeout_ms() -> u64 {
-    10000 // default in librdkafka
+const fn default_session_timeout_ms() -> Duration {
+    Duration::from_millis(10000) // default in librdkafka
 }
 
-const fn default_socket_timeout_ms() -> u64 {
-    60000 // default in librdkafka
+const fn default_socket_timeout_ms() -> Duration {
+    Duration::from_millis(60000) // default in librdkafka
 }
 
-const fn default_fetch_wait_max_ms() -> u64 {
-    100 // default in librdkafka
+const fn default_fetch_wait_max_ms() -> Duration {
+    Duration::from_millis(100) // default in librdkafka
 }
 
-const fn default_commit_interval_ms() -> u64 {
-    5000 // default in librdkafka
+const fn default_commit_interval_ms() -> Duration {
+    Duration::from_millis(5000)
 }
 
 fn default_auto_offset_reset() -> String {
@@ -216,6 +244,29 @@ fn default_offset_key() -> OptionalValuePath {
 
 fn default_headers_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("headers"))
+}
+
+const fn example_auto_offset_reset_values() -> [&'static str; 7] {
+    [
+        "smallest",
+        "earliest",
+        "beginning",
+        "largest",
+        "latest",
+        "end",
+        "error",
+    ]
+}
+
+fn example_librdkafka_options() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("client.id".to_string(), "${ENV_VAR}".to_string()),
+            ("fetch.error.backoff.ms".to_string(), "1000".to_string()),
+            ("socket.send.buffer.bytes".to_string(), "100".to_string()),
+        ]
+        .into_iter(),
+    )
 }
 
 impl_generate_config_from_default!(KafkaSourceConfig);
@@ -601,14 +652,23 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
         .set("group.id", &config.group_id)
         .set("bootstrap.servers", &config.bootstrap_servers)
         .set("auto.offset.reset", &config.auto_offset_reset)
-        .set("session.timeout.ms", &config.session_timeout_ms.to_string())
-        .set("socket.timeout.ms", &config.socket_timeout_ms.to_string())
-        .set("fetch.wait.max.ms", &config.fetch_wait_max_ms.to_string())
+        .set(
+            "session.timeout.ms",
+            &config.session_timeout_ms.as_millis().to_string(),
+        )
+        .set(
+            "socket.timeout.ms",
+            &config.socket_timeout_ms.as_millis().to_string(),
+        )
+        .set(
+            "fetch.wait.max.ms",
+            &config.fetch_wait_max_ms.as_millis().to_string(),
+        )
         .set("enable.partition.eof", "false")
         .set("enable.auto.commit", "true")
         .set(
             "auto.commit.interval.ms",
-            &config.commit_interval_ms.to_string(),
+            &config.commit_interval_ms.as_millis().to_string(),
         )
         .set("enable.auto.offset.store", "false")
         .set("statistics.interval.ms", "1000")
@@ -687,15 +747,15 @@ mod test {
             topics: vec![topic.into()],
             group_id: group.into(),
             auto_offset_reset: "beginning".into(),
-            session_timeout_ms: 6000,
-            commit_interval_ms: 1,
+            session_timeout_ms: Duration::from_millis(6000),
+            commit_interval_ms: Duration::from_millis(1),
             key_field: default_key_field(),
             topic_key: default_topic_key(),
             partition_key: default_partition_key(),
             offset_key: default_offset_key(),
             headers_key: default_headers_key(),
-            socket_timeout_ms: 60000,
-            fetch_wait_max_ms: 100,
+            socket_timeout_ms: Duration::from_millis(60000),
+            fetch_wait_max_ms: Duration::from_millis(100),
             log_namespace: Some(log_namespace == LogNamespace::Vector),
             ..Default::default()
         }
