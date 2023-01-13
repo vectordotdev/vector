@@ -10,9 +10,19 @@ use super::{filter_result, FilterList, HostMetrics};
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct DiskConfig {
-    /// Lists of device name patterns to include or exclude.
-    #[serde(default)]
+    /// Lists of device name patterns to include or exclude in gathering
+    /// I/O utilization metrics.
+    ///
+    /// Defaults to including all devices.
+    #[configurable(metadata(docs::examples = "example_devices()"))]
     devices: FilterList,
+}
+
+fn example_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["sda".to_string().try_into().unwrap()]),
+        excludes: Some(vec!["dm-*".to_string().try_into().unwrap()]),
+    }
 }
 
 impl HostMetrics {

@@ -13,17 +13,50 @@ use super::{filter_result, FilterList, HostMetrics};
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct FilesystemConfig {
-    /// Lists of device name patterns to include or exclude.
+    /// Lists of device name patterns to include or exclude in gathering
+    /// usage metrics.
+    ///
+    /// Defaults to including all devices.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "example_devices()"))]
     devices: FilterList,
 
-    /// Lists of filesystem name patterns to include or exclude.
+    /// Lists of filesystem name patterns to include or exclude in gathering
+    /// usage metrics.
+    ///
+    /// Defaults to including all filesystems.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "example_filesystems()"))]
     filesystems: FilterList,
 
-    /// Lists of mount point path patterns to include or exclude.
+    /// Lists of mount point path patterns to include or exclude in gathering
+    /// usage metrics.
+    ///
+    /// Defaults to including all mount points.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "example_mountpoints()"))]
     mountpoints: FilterList,
+}
+
+fn example_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["sda".to_string().try_into().unwrap()]),
+        excludes: Some(vec!["dm-*".to_string().try_into().unwrap()]),
+    }
+}
+
+fn example_filesystems() -> FilterList {
+    FilterList {
+        includes: Some(vec!["ntfs".to_string().try_into().unwrap()]),
+        excludes: Some(vec!["ext*".to_string().try_into().unwrap()]),
+    }
+}
+
+fn example_mountpoints() -> FilterList {
+    FilterList {
+        includes: Some(vec!["/home".to_string().try_into().unwrap()]),
+        excludes: Some(vec!["/raid*".to_string().try_into().unwrap()]),
+    }
 }
 
 impl HostMetrics {

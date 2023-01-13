@@ -15,9 +15,20 @@ use super::{filter_result, FilterList, HostMetrics};
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct NetworkConfig {
-    /// Lists of device name patterns to include or exclude.
+    /// Lists of device name patterns to include or exclude in gathering
+    /// network utilization metrics.
+    ///
+    /// Defaults to including all devices.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "example_devices()"))]
     devices: FilterList,
+}
+
+fn example_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["sda".to_string().try_into().unwrap()]),
+        excludes: Some(vec!["dm-*".to_string().try_into().unwrap()]),
+    }
 }
 
 impl HostMetrics {
