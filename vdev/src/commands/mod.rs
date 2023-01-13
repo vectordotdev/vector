@@ -22,6 +22,7 @@ mod test;
     disable_help_subcommand = true,
     after_help = r#"Environment variables:
   $CONTAINER_TOOL  Set the tool used to run containers (Defaults to autodetect)
+                   Valid values are either "docker" or "podman".
 "#
 )]
 pub struct Cli {
