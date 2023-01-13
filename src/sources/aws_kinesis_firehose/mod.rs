@@ -472,15 +472,8 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(
-                None,
-                None,
-                false,
-                source_record_compression,
-                true,
-                false,
-            )
-            .await;
+            let (rx, addr) =
+                source(None, None, false, source_record_compression, true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -870,7 +863,11 @@ mod tests {
         .await;
 
         let events = collect_ready(rx).await;
-        let access_key = events[0].metadata().secrets().get("aws_kinesis_firehose_access_key").unwrap();
+        let access_key = events[0]
+            .metadata()
+            .secrets()
+            .get("aws_kinesis_firehose_access_key")
+            .unwrap();
         assert_eq!(access_key.to_string(), "an access key".to_string());
     }
 
@@ -892,6 +889,10 @@ mod tests {
 
         let events = collect_ready(rx).await;
 
-        assert!(events[0].metadata().secrets().get("aws_kinesis_firehose_access_key").is_none());
+        assert!(events[0]
+            .metadata()
+            .secrets()
+            .get("aws_kinesis_firehose_access_key")
+            .is_none());
     }
 }
