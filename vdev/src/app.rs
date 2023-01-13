@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ffi::OsStr, path::Path, process::Command, time::Duration};
+use std::{borrow::Cow, env, ffi::OsStr, path::PathBuf, process::Command, time::Duration};
 
 use anyhow::{anyhow, bail, Context as _, Result};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -21,6 +21,10 @@ pub fn config() -> &'static Config {
 
 pub fn path() -> &'static String {
     PATH.get().expect("path is not initialized")
+}
+
+pub fn set_repo_dir() -> Result<()> {
+    env::set_current_dir(path()).context("Could not change directory")
 }
 
 /// Overlay some extra helper functions onto `std::process::Command`
@@ -82,9 +86,39 @@ impl CommandExt for Command {
     }
 }
 
-pub fn exec<T: AsRef<OsStr>>(command: &Path, args: impl IntoIterator<Item = T>) -> Result<()> {
+pub fn exec<T: AsRef<OsStr>>(
+    command: impl AsRef<OsStr>,
+    args: impl IntoIterator<Item = T>,
+) -> Result<()> {
+    _exec(command.as_ref(), args, None)
+}
+
+pub fn exec_script<T: AsRef<OsStr>>(script: &str, args: impl IntoIterator<Item = T>) -> Result<()> {
+    let script: PathBuf = [path(), "scripts", script].into_iter().collect();
+    _exec(script.as_ref(), args, None)
+}
+
+pub fn exec_in_repo<T: AsRef<OsStr>>(
+    command: impl AsRef<OsStr>,
+    args: impl IntoIterator<Item = T>,
+) -> Result<()> {
+    _exec(command.as_ref(), args, Some(path().as_ref()))
+}
+
+fn _exec<T: AsRef<OsStr>>(
+    command: &OsStr,
+    args: impl IntoIterator<Item = T>,
+    cwd: Option<&OsStr>,
+) -> Result<()> {
     let mut command = Command::new(command);
     command.args(args);
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
+    debug!("Executing: {command:?}");
+    if let Some(cwd) = cwd {
+        debug!("  in working directory {cwd:?}");
+    }
     match command
         .spawn()
         .with_context(|| format!("Could not spawn {command:?}"))?

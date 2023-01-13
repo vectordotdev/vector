@@ -8876,6 +8876,7 @@ dependencies = [
  "once_cell",
  "os_info",
  "owo-colors",
+ "paste",
  "serde",
  "serde_json",
  "serde_yaml 0.9.16",

@@ -1,17 +1,53 @@
-use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 
-mod build;
-mod complete;
-mod config;
-mod exec;
-mod features;
-mod integration;
-mod meta;
-mod run;
-mod status;
-mod test;
+/// This macro simplifies the generation of CLI subcommand invocation structures by combining the
+/// creation of the command enum and implementation of the dispatch function into one simple list.
+#[macro_export]
+macro_rules! cli_commands {
+    // Peel off the list of module identifiers one-by-one
+    ( :: $( $list:ident, )* :: mod $mod:ident, $( $rest:tt )* ) => {
+        mod $mod;
+        $crate::cli_commands! { :: $( $list, )* $mod, :: $( $rest )* }
+    };
+    ( :: $( $list:ident, )* :: $mod:ident, $( $rest:tt )* ) => {
+        $crate::cli_commands! { :: $( $list, )* $mod, :: $( $rest )* }
+    };
+    // All the identifiers are parsed out, build up the enum and impl blocks
+    ( :: $( $mod:ident, )* :: ) => {
+        paste::paste! {
+            #[derive(clap::Subcommand, Debug)]
+            enum Commands {
+                $( [<$mod:camel>]($mod::Cli), )*
+            }
+
+            impl Cli {
+                pub fn exec(self) -> anyhow::Result<()> {
+                    match self.command {
+                        $( Commands::[<$mod:camel>](cli) => cli.exec(), )*
+                    }
+                }
+            }
+        }
+    };
+    // Start the above patterns
+    ( $( $rest:tt )+ ) => { $crate::cli_commands! { :: :: $( $rest )+ } };
+}
+
+#[macro_export]
+macro_rules! cli_subcommands {
+    ( $doc:literal $( $rest:tt )* ) => {
+        #[derive(clap::Args, Debug)]
+        #[doc = $doc]
+        #[command()]
+        pub(super) struct Cli {
+            #[command(subcommand)]
+            command: Commands,
+        }
+
+        $crate::cli_commands! { $( $rest )* }
+    }
+}
 
 /// Vector's unified dev tool
 #[derive(Parser, Debug)]
@@ -33,33 +69,45 @@ pub struct Cli {
     command: Commands,
 }
 
-#[derive(Subcommand, Debug)]
-enum Commands {
-    Build(build::Cli),
-    Complete(complete::Cli),
-    Config(config::Cli),
-    Exec(exec::Cli),
-    Features(features::Cli),
-    Integration(integration::Cli),
-    Meta(meta::Cli),
-    Run(run::Cli),
-    Status(status::Cli),
-    Test(test::Cli),
+cli_commands! {
+    mod build,
+    mod check,
+    mod complete,
+    mod config,
+    mod exec,
+    mod features,
+    mod fmt,
+    mod generate,
+    mod integration,
+    mod meta,
+    mod package,
+    mod release,
+    mod run,
+    mod status,
+    mod test,
+    mod version,
 }
 
-impl Cli {
-    pub fn exec(self) -> Result<()> {
-        match self.command {
-            Commands::Build(cli) => cli.exec(),
-            Commands::Complete(cli) => cli.exec(),
-            Commands::Config(cli) => cli.exec(),
-            Commands::Exec(cli) => cli.exec(),
-            Commands::Features(cli) => cli.exec(),
-            Commands::Integration(cli) => cli.exec(),
-            Commands::Meta(cli) => cli.exec(),
-            Commands::Run(cli) => cli.exec(),
-            Commands::Status(cli) => cli.exec(),
-            Commands::Test(cli) => cli.exec(),
+/// This macro creates a wrapper for an existing script
+#[macro_export]
+macro_rules! script_wrapper {
+    ( $mod:ident = $doc:literal => $script:literal ) => {
+        paste::paste! {
+            mod $mod {
+                #[doc = $doc]
+                #[derive(clap::Args, Debug)]
+                #[command()]
+                pub(super) struct Cli {
+                    args: Vec<String>,
+                }
+
+                impl Cli {
+                    pub(super) fn exec(self) -> anyhow::Result<()> {
+                        $crate::app::set_repo_dir()?;
+                        $crate::app::exec_script($script, &self.args)
+                    }
+                }
+            }
         }
-    }
+    };
 }
