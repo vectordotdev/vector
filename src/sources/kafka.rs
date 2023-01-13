@@ -246,7 +246,7 @@ fn default_headers_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("headers"))
 }
 
-fn example_auto_offset_reset_values() -> [&'static str; 7] {
+const fn example_auto_offset_reset_values() -> [&'static str; 7] {
     [
         "smallest",
         "earliest",
