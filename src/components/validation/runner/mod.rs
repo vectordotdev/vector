@@ -312,8 +312,8 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
 
             let validator_results = self
                 .validators
-                .iter()
-                .map(|(_, validator)| {
+                .values()
+                .map(|validator| {
                     validator.check_validation(
                         component_type,
                         expectation,
@@ -365,7 +365,7 @@ fn load_component_test_cases<C: ValidatableComponent>(
         component_type, component_name
     );
 
-    std::fs::File::open(&component_test_cases_path)
+    std::fs::File::open(component_test_cases_path)
         .map_err(|e| {
             format!(
                 "I/O error during open of component validation test cases file: {}",
