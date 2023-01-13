@@ -52,7 +52,7 @@ pub struct AwsKinesisFirehoseConfig {
 
     /// Whether or not to store the AWS Firehose Access Key in event secrets.
     ///
-    /// If set to `true`, when incoming requests contains an access key, it will be kept in the
+    /// If set to `true`, when incoming requests contains an Access Key sent by AWS Firehose, it will be kept in the
     /// event secrets.
     #[configurable(derived)]
     store_access_key: bool,
