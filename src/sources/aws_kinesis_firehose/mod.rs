@@ -50,7 +50,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "access_keys_example()"))]
     access_keys: Option<Vec<SensitiveString>>,
 
-    /// Whether or not to store the AWS Access Key in event secrets.
+    /// Whether or not to store the AWS Firehose Access Key in event secrets.
     ///
     /// If set to `true`, when incoming requests contains an access key, it will be kept in the
     /// event secrets.
