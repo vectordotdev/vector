@@ -26,8 +26,8 @@ pub struct NetworkConfig {
 
 fn example_devices() -> FilterList {
     FilterList {
-        includes: Some(vec!["sda".to_string().try_into().unwrap()]),
-        excludes: Some(vec!["dm-*".to_string().try_into().unwrap()]),
+        includes: Some(vec!["sda".try_into().unwrap()]),
+        excludes: Some(vec!["dm-*".try_into().unwrap()]),
     }
 }
 

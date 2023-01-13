@@ -496,6 +496,14 @@ impl TryFrom<String> for PatternWrapper {
     }
 }
 
+impl TryFrom<&str> for PatternWrapper {
+    type Error = PatternError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        value.to_string().try_into()
+    }
+}
+
 impl From<PatternWrapper> for String {
     fn from(pattern: PatternWrapper) -> Self {
         pattern.0.to_string()

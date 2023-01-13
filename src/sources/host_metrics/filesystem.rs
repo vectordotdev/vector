@@ -40,22 +40,22 @@ pub struct FilesystemConfig {
 
 fn example_devices() -> FilterList {
     FilterList {
-        includes: Some(vec!["sda".to_string().try_into().unwrap()]),
-        excludes: Some(vec!["dm-*".to_string().try_into().unwrap()]),
+        includes: Some(vec!["sda".try_into().unwrap()]),
+        excludes: Some(vec!["dm-*".try_into().unwrap()]),
     }
 }
 
 fn example_filesystems() -> FilterList {
     FilterList {
-        includes: Some(vec!["ntfs".to_string().try_into().unwrap()]),
-        excludes: Some(vec!["ext*".to_string().try_into().unwrap()]),
+        includes: Some(vec!["ntfs".try_into().unwrap()]),
+        excludes: Some(vec!["ext*".try_into().unwrap()]),
     }
 }
 
 fn example_mountpoints() -> FilterList {
     FilterList {
-        includes: Some(vec!["/home".to_string().try_into().unwrap()]),
-        excludes: Some(vec!["/raid*".to_string().try_into().unwrap()]),
+        includes: Some(vec!["/home".try_into().unwrap()]),
+        excludes: Some(vec!["/raid*".try_into().unwrap()]),
     }
 }
 

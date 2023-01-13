@@ -75,8 +75,8 @@ fn default_levels() -> usize {
 
 fn example_cgroups() -> FilterList {
     FilterList {
-        includes: Some(vec!["user.slice/*".to_string().try_into().unwrap()]),
-        excludes: Some(vec!["*.service".to_string().try_into().unwrap()]),
+        includes: Some(vec!["user.slice/*".try_into().unwrap()]),
+        excludes: Some(vec!["*.service".try_into().unwrap()]),
     }
 }
 
