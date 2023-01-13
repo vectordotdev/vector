@@ -50,10 +50,10 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "access_keys_example()"))]
     access_keys: Option<Vec<SensitiveString>>,
 
-    /// Whether or not to forward the access key with events.
+    /// Whether or not to store the AWS Access Key in event secrets.
     ///
     /// If set to `true`, when incoming requests contains an access key, it will be kept in the
-    /// event metadata.
+    /// event secrets.
     #[configurable(derived)]
     store_access_key: bool,
 
@@ -846,7 +846,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn event_service_token_passthrough_enabled() {
+    async fn event_access_key_passthrough_enabled() {
         let (rx, address) = source(
             None,
             Some(vec!["an access key".to_string().into()]),
@@ -875,7 +875,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn no_authorization_token_passthrough_enabled() {
+    async fn no_authorization_access_key_passthrough_enabled() {
         let (rx, address) = source(None, None, true, Default::default(), true, true).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
