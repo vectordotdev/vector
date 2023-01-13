@@ -831,7 +831,7 @@ mod integration_tests {
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: Lazy<String> =
         Lazy::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
-    const ACK_DEADLINE: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
+    static ACK_DEADLINE: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
     #[tokio::test]
     async fn oneshot() {
@@ -922,7 +922,7 @@ mod integration_tests {
             assert_eq!(tester.pull_count(10).await, 0);
 
             // Wait for the acknowledgement deadline to expire
-            tokio::time::sleep(ACK_DEADLINE + Duration::from_secs(1)).await;
+            tokio::time::sleep(*ACK_DEADLINE + Duration::from_secs(1)).await;
 
             // All messages are still acknowledged
             assert_eq!(tester.pull_count(10).await, 0);
@@ -948,7 +948,7 @@ mod integration_tests {
             assert_eq!(tester.pull_count(10).await, 0);
 
             // Wait for the acknowledgement deadline to expire
-            tokio::time::sleep(ACK_DEADLINE + Duration::from_secs(1)).await;
+            tokio::time::sleep(*ACK_DEADLINE + Duration::from_secs(1)).await;
 
             // All messages are still in the queue
             assert_eq!(tester.pull_count(10).await, 1);
@@ -1006,7 +1006,7 @@ mod integration_tests {
 
             let body = json!({
                 "topic": format!("projects/{}/topics/{}", PROJECT, this.topic),
-                "ackDeadlineSeconds": ACK_DEADLINE,
+                "ackDeadlineSeconds": *ACK_DEADLINE,
             });
             this.request(Method::PUT, "subscriptions/{sub}", body).await;
 
@@ -1029,7 +1029,7 @@ mod integration_tests {
                     skip_authentication: true,
                     ..Default::default()
                 },
-                ack_deadline_secs: ACK_DEADLINE,
+                ack_deadline_secs: *ACK_DEADLINE,
                 ..Default::default()
             };
             let (mut ctx, shutdown) = SourceContext::new_shutdown(&self.component, tx);
