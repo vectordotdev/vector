@@ -5,7 +5,8 @@ use std::{
 };
 
 use aws_sdk_cloudwatchlogs::error::{
-    CreateLogGroupError, CreateLogStreamError, DescribeLogStreamsError, PutLogEventsError,
+    CreateLogGroupError, CreateLogStreamError, DeleteRetentionPolicyError, DescribeLogStreamsError,
+    PutLogEventsError, PutRetentionPolicyError,
 };
 use aws_sdk_cloudwatchlogs::model::InputLogEvent;
 use aws_sdk_cloudwatchlogs::types::SdkError;
@@ -26,6 +27,7 @@ use vector_common::request_metadata::MetaDescriptive;
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 use vrl::prelude::fmt::Debug;
 
+use crate::sinks::aws_cloudwatch_logs::config::Retention;
 use crate::{
     event::EventStatus,
     sinks::{
@@ -64,6 +66,8 @@ pub enum CloudwatchError {
     Describe(SdkError<DescribeLogStreamsError>),
     CreateStream(SdkError<CreateLogStreamError>),
     CreateGroup(SdkError<CreateLogGroupError>),
+    PutRetentionPolicy(SdkError<PutRetentionPolicyError>),
+    DeleteRetentionPolicy(SdkError<DeleteRetentionPolicyError>),
     NoStreamsFound,
 }
 
@@ -79,6 +83,12 @@ impl fmt::Display for CloudwatchError {
                 write!(f, "CloudwatchError::CreateGroup: {}", error)
             }
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
+            CloudwatchError::PutRetentionPolicy(error) => {
+                write!(f, "CloudwatchError::PutRetentionPolicy: {}", error)
+            }
+            CloudwatchError::DeleteRetentionPolicy(error) => {
+                write!(f, "CloudwatchError::DeleteRetentionPolicy: {}", error)
+            }
         }
     }
 }
@@ -223,6 +233,8 @@ impl CloudwatchLogsSvc {
         let create_missing_group = config.create_missing_group.unwrap_or(true);
         let create_missing_stream = config.create_missing_stream.unwrap_or(true);
 
+        let retention = config.retention.clone();
+
         CloudwatchLogsSvc {
             headers: config.request.headers,
             client,
@@ -231,6 +243,7 @@ impl CloudwatchLogsSvc {
             group_name,
             create_missing_group,
             create_missing_stream,
+            retention,
             token: None,
             token_rx: None,
         }
@@ -312,6 +325,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 self.group_name.clone(),
                 self.create_missing_group,
                 self.create_missing_stream,
+                self.retention.clone(),
                 event_batches,
                 self.token.take(),
                 tx,
@@ -330,6 +344,7 @@ pub struct CloudwatchLogsSvc {
     group_name: String,
     create_missing_group: bool,
     create_missing_stream: bool,
+    retention: Retention,
     token: Option<String>,
     token_rx: Option<oneshot::Receiver<Option<String>>>,
 }
