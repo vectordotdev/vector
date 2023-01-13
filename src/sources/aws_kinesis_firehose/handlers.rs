@@ -136,7 +136,7 @@ pub(super) async fn firehose(
                                     log
                                         .metadata_mut()
                                         .secrets_mut()
-                                        .insert_secret("access_key", access_key);
+                                        .insert_secret("aws_kinesis_firehose_access_key", access_key);
                                 }
                             }
                         }
