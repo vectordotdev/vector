@@ -6,10 +6,7 @@ use codecs::{
 };
 use futures::StreamExt;
 use listenfd::ListenFd;
-use lookup::{
-    lookup_v2::{parse_value_path, OptionalValuePath},
-    owned_value_path, path,
-};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::{configurable_component, NamedComponent};
@@ -41,6 +38,9 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct UdpConfig {
     /// The address to listen for messages on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
+    #[configurable(metadata(docs::examples = "systemd"))]
+    #[configurable(metadata(docs::examples = "systemd#3"))]
     address: SocketListenAddr,
 
     /// The maximum buffer size, in bytes, of incoming messages.
@@ -55,19 +55,25 @@ pub struct UdpConfig {
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
+    /// Set to `""` to suppress this key.
+    ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    host_key: Option<OptionalValuePath>,
+    #[serde(default = "default_host_key")]
+    host_key: OptionalValuePath,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
     ///
     /// The value will be the peer host's port i.e. `9000`.
     ///
     /// By default, `"port"` is used.
-    port_key: Option<OptionalValuePath>,
+    ///
+    /// Set to `""` to suppress this key.
+    #[serde(default = "default_port_key")]
+    port_key: OptionalValuePath,
 
     /// The size, in bytes, of the receive buffer used for the listening socket.
     ///
-    /// This should not typically needed to be changed.
+    /// Generally this should not need to be configured.
     receive_buffer_bytes: Option<usize>,
 
     #[configurable(derived)]
@@ -83,12 +89,20 @@ pub struct UdpConfig {
     pub log_namespace: Option<bool>,
 }
 
+fn default_host_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+}
+
+fn default_port_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("port"))
+}
+
 impl UdpConfig {
-    pub(super) const fn host_key(&self) -> &Option<OptionalValuePath> {
+    pub(super) const fn host_key(&self) -> &OptionalValuePath {
         &self.host_key
     }
 
-    pub const fn port_key(&self) -> &Option<OptionalValuePath> {
+    pub const fn port_key(&self) -> &OptionalValuePath {
         &self.port_key
     }
 
@@ -108,8 +122,8 @@ impl UdpConfig {
         Self {
             address,
             max_length: crate::serde::default_max_length(),
-            host_key: None,
-            port_key: Some(OptionalValuePath::from(owned_value_path!("port"))),
+            host_key: default_host_key(),
+            port_key: default_port_key(),
             receive_buffer_bytes: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -227,10 +241,7 @@ pub(super) fn udp(
                                             now,
                                         );
 
-                                        let legacy_host_key = config.host_key.as_ref().map_or_else(
-                                            || parse_value_path(log_schema().host_key()).ok(),
-                                            |k| k.path.clone(),
-                                        );
+                                        let legacy_host_key = config.host_key.clone().path;
 
                                         log_namespace.insert_source_metadata(
                                             SocketConfig::NAME,
@@ -240,10 +251,7 @@ pub(super) fn udp(
                                             address.ip().to_string()
                                         );
 
-                                        let legacy_port_key = config
-                                            .port_key
-                                            .as_ref()
-                                            .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone());
+                                        let legacy_port_key = config.port_key.clone().path;
 
                                         log_namespace.insert_source_metadata(
                                             SocketConfig::NAME,

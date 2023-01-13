@@ -267,20 +267,9 @@ impl SourceConfig for SocketConfig {
                     )
             }
             Mode::Udp(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
-                let legacy_port_key = config
-                    .port_key()
-                    .as_ref()
-                    .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone())
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
                     .with_source_metadata(
