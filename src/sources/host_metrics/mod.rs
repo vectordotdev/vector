@@ -796,7 +796,7 @@ pub(self) mod tests {
     #[tokio::test]
     async fn source_compliance() {
         let config = HostMetricsConfig {
-            scrape_interval_secs: Duration::from_secs(1.0),
+            scrape_interval_secs: Duration::from_secs(1),
             ..Default::default()
         };
 
