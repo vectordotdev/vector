@@ -193,7 +193,7 @@ impl ProxyConfig {
 
 #[cfg(test)]
 mod tests {
-    use base64::encode;
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
     use env_test_util::TempEnvVar;
     use http::{HeaderValue, Uri};
 
@@ -328,7 +328,7 @@ mod tests {
             .https_proxy()
             .expect("should not be an error")
             .expect("should not be None");
-        let encoded_header = format!("Basic {}", encode("user:pass"));
+        let encoded_header = format!("Basic {}", BASE64_STANDARD.encode("user:pass"));
         let expected_header_value = HeaderValue::from_str(encoded_header.as_str());
 
         assert_eq!(

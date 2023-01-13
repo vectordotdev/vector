@@ -10,8 +10,8 @@ use std::{convert::TryInto, path::PathBuf, time::Duration};
 use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
-    Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
-    ReadFrom,
+    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
+    Fingerprinter, Line, ReadFrom, ReadFromConfig,
 };
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
@@ -117,6 +117,14 @@ pub struct Config {
     /// A list of glob patterns to exclude from reading the files.
     exclude_paths_glob_patterns: Vec<PathBuf>,
 
+    #[configurable(derived)]
+    #[serde(default = "default_read_from")]
+    read_from: ReadFromConfig,
+
+    /// Ignore files with a data modification date older than the specified number of seconds.
+    #[serde(default)]
+    ignore_older_secs: Option<u64>,
+
     /// Max amount of bytes to read from a single file before switching over
     /// to the next file.
     /// This allows distributing the reads more or less evenly across
@@ -166,6 +174,10 @@ pub struct Config {
     log_namespace: Option<bool>,
 }
 
+const fn default_read_from() -> ReadFromConfig {
+    ReadFromConfig::Beginning
+}
+
 impl GenerateConfig for Config {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self {
@@ -190,6 +202,8 @@ impl Default for Config {
             namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec::default(),
             node_annotation_fields: node_metadata_annotator::FieldsSpec::default(),
             exclude_paths_glob_patterns: default_path_exclusion(),
+            read_from: default_read_from(),
+            ignore_older_secs: None,
             max_read_bytes: default_max_read_bytes(),
             max_line_bytes: default_max_line_bytes(),
             fingerprint_lines: default_fingerprint_lines(),
@@ -437,6 +451,8 @@ struct Source {
     node_selector: String,
     self_node_name: String,
     exclude_paths: Vec<glob::Pattern>,
+    read_from: ReadFrom,
+    ignore_older_secs: Option<u64>,
     max_read_bytes: usize,
     max_line_bytes: usize,
     fingerprint_lines: usize,
@@ -514,6 +530,8 @@ impl Source {
             node_selector,
             self_node_name,
             exclude_paths,
+            read_from: ReadFrom::from(config.read_from),
+            ignore_older_secs: config.ignore_older_secs,
             max_read_bytes: config.max_read_bytes,
             max_line_bytes: config.max_line_bytes,
             fingerprint_lines: config.fingerprint_lines,
@@ -542,6 +560,8 @@ impl Source {
             node_selector,
             self_node_name,
             exclude_paths,
+            read_from,
+            ignore_older_secs,
             max_read_bytes,
             max_line_bytes,
             fingerprint_lines,
@@ -622,6 +642,8 @@ impl Source {
             NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec, log_namespace);
         let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec, log_namespace);
 
+        let ignore_before = calculate_ignore_before(ignore_older_secs);
+
         // TODO: maybe more of the parameters have to be configurable.
 
         let checkpointer = Checkpointer::new(&data_dir);
@@ -633,17 +655,17 @@ impl Source {
             // This allows distributing the reads more or less evenly across
             // the files.
             max_read_bytes,
-            // We want to use checkpoining mechanism, and resume from where we
+            // We want to use checkpointing mechanism, and resume from where we
             // left off.
             ignore_checkpoints: false,
             // Match the default behavior
-            read_from: ReadFrom::Beginning,
+            read_from,
             // We're now aware of the use cases that would require specifying
             // the starting point in time since when we should collect the logs,
             // so we just disable it. If users ask, we can expose it. There may
             // be other, more sound ways for users considering the use of this
             // option to solve their use case, so take consideration.
-            ignore_before: None,
+            ignore_before,
             // The maximum number of bytes a line can contain before being discarded. This
             // protects against malformed lines or tailing incorrect files.
             max_line_bytes,

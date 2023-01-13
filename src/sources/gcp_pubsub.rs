@@ -806,6 +806,7 @@ mod tests {
 mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
 
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
     use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
@@ -1041,7 +1042,7 @@ mod integration_tests {
             let lines: Vec<_> = test_util::random_lines(44).take(count).collect();
             let messages: Vec<_> = lines
                 .iter()
-                .map(base64::encode)
+                .map(|input| BASE64_STANDARD.encode(input))
                 .map(|data| json!({ "data": data, "attributes": attributes.clone() }))
                 .collect();
             let body = json!({ "messages": messages });

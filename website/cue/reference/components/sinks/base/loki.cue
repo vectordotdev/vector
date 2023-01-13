@@ -264,12 +264,16 @@ base: components: sinks: loki: configuration: {
 			values.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "A Loki label."
-			required:    true
-			type: string: {
-				examples: ["vector", "{{ event_field }}", "{{ kubernetes.pod_labels }}"]
-				syntax: "template"
+		type: object: {
+			examples: [{
+				labels:              "{{ kubernetes.pod_labels }}"
+				source:              "vector"
+				"{{ event_field }}": "{{ some_other_event_field }}"
+			}]
+			options: "*": {
+				description: "A Loki label."
+				required:    true
+				type: string: syntax: "template"
 			}
 		}
 	}

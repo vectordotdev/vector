@@ -1,6 +1,9 @@
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
+use base64::prelude::{Engine as _, BASE64_URL_SAFE};
 pub use goauth::scopes::Scope;
 use goauth::{
     auth::{JwtClaims, Token, TokenErr},
@@ -20,12 +23,6 @@ use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
-
-const URL_SAFE_ENGINE_PAD: base64::engine::fast_portable::FastPortable =
-    base64::engine::fast_portable::FastPortable::from(
-        &base64::alphabet::URL_SAFE,
-        base64::engine::fast_portable::PAD,
-    );
 
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
@@ -139,7 +136,9 @@ impl GcpAuthenticator {
     }
 
     fn from_api_key(api_key: &str) -> crate::Result<Self> {
-        base64::decode_engine(api_key, &URL_SAFE_ENGINE_PAD).context(InvalidApiKeySnafu)?;
+        BASE64_URL_SAFE
+            .decode(api_key)
+            .context(InvalidApiKeySnafu)?;
         Ok(Self::ApiKey(api_key.into()))
     }
 

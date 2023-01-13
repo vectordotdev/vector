@@ -48,6 +48,8 @@ mod chunks;
 mod compact;
 #[cfg(feature = "contains")]
 mod contains;
+#[cfg(feature = "decode_base16")]
+mod decode_base16;
 #[cfg(feature = "decode_base64")]
 mod decode_base64;
 #[cfg(feature = "decode_mime_q")]
@@ -60,6 +62,8 @@ mod decrypt;
 mod del;
 #[cfg(feature = "downcase")]
 mod downcase;
+#[cfg(feature = "encode_base16")]
+mod encode_base16;
 #[cfg(feature = "encode_base64")]
 mod encode_base64;
 #[cfg(feature = "encode_json")]
@@ -343,6 +347,8 @@ pub use chunks::Chunks;
 pub use compact::Compact;
 #[cfg(feature = "contains")]
 pub use contains::Contains;
+#[cfg(feature = "decode_base16")]
+pub use decode_base16::DecodeBase16;
 #[cfg(feature = "decode_base64")]
 pub use decode_base64::DecodeBase64;
 #[cfg(feature = "decode_mime_q")]
@@ -355,6 +361,8 @@ pub use decrypt::Decrypt;
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::Downcase;
+#[cfg(feature = "encode_base16")]
+pub use encode_base16::EncodeBase16;
 #[cfg(feature = "encode_base64")]
 pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
@@ -638,6 +646,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Compact),
         #[cfg(feature = "contains")]
         Box::new(Contains),
+        #[cfg(feature = "decode_base16")]
+        Box::new(DecodeBase16),
         #[cfg(feature = "decode_base64")]
         Box::new(DecodeBase64),
         #[cfg(feature = "decode_percent")]
@@ -650,6 +660,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Del),
         #[cfg(feature = "downcase")]
         Box::new(Downcase),
+        #[cfg(feature = "encode_base16")]
+        Box::new(EncodeBase16),
         #[cfg(feature = "encode_base64")]
         Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]

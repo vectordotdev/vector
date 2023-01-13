@@ -57,7 +57,7 @@ where
         // Said another way, this allows callers to use `#[configurable(derived)]` on a field of `Option<T>` so long as
         // `T` has a description, and both the optional field and the schema for `T` will get the description... but the
         // description for the optional field can still be overridden independently, etc.
-        T::metadata().convert().as_subschema()
+        T::metadata().convert()
     }
 
     fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
