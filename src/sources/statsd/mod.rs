@@ -64,6 +64,9 @@ pub enum StatsdConfig {
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
     /// The socket address to listen for messages on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:8125"))]
+    #[configurable(metadata(docs::examples = "systemd"))]
+    #[configurable(metadata(docs::examples = "systemd#3"))]
     address: SocketListenAddr,
 
     /// The size, in bytes, of the receive buffer used for each connection.
@@ -86,7 +89,13 @@ impl UdpConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    /// The socket address to listen for connections on.
+    /// The address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+    /// systemd socket activation.
+    ///
+    /// If a socket address is used, it _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:8125"))]
+    #[configurable(metadata(docs::examples = "systemd"))]
+    #[configurable(metadata(docs::examples = "systemd#3"))]
     address: SocketListenAddr,
 
     #[configurable(derived)]
@@ -104,6 +113,7 @@ pub struct TcpConfig {
     /// The size, in bytes, of the receive buffer used for each connection.
     ///
     /// Generally this should not need to be configured.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.

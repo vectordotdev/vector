@@ -34,10 +34,13 @@ use crate::{
 
 /// UDP configuration for the `socket` source.
 #[configurable_component]
-#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub struct UdpConfig {
-    /// The address to listen for messages on.
+    /// The address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+    /// systemd socket activation.
+    ///
+    /// If a socket address is used, it _must_ include a port.
     #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
     #[configurable(metadata(docs::examples = "systemd"))]
     #[configurable(metadata(docs::examples = "systemd#3"))]
@@ -46,8 +49,9 @@ pub struct UdpConfig {
     /// The maximum buffer size, in bytes, of incoming messages.
     ///
     /// Messages larger than this are truncated.
-    #[serde(default = "crate::serde::default_max_length")]
-    pub(super) max_length: usize,
+    #[serde(default = "default_max_length")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub(super) max_length: Option<usize>,
 
     /// Overrides the name of the log field used to add the peer host to each event.
     ///
@@ -74,6 +78,7 @@ pub struct UdpConfig {
     /// The size, in bytes, of the receive buffer used for the listening socket.
     ///
     /// Generally this should not need to be configured.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
     #[configurable(derived)]
@@ -95,6 +100,10 @@ fn default_host_key() -> OptionalValuePath {
 
 fn default_port_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("port"))
+}
+
+fn default_max_length() -> Option<usize> {
+    Some(crate::serde::default_max_length())
 }
 
 impl UdpConfig {
@@ -121,7 +130,7 @@ impl UdpConfig {
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
-            max_length: crate::serde::default_max_length(),
+            max_length: default_max_length(),
             host_key: default_host_key(),
             port_key: default_port_key(),
             receive_buffer_bytes: None,
@@ -161,10 +170,11 @@ pub(super) fn udp(
             }
         }
 
-        let max_length = match config.receive_buffer_bytes {
-            Some(receive_buffer_bytes) => std::cmp::min(config.max_length, receive_buffer_bytes),
-            None => config.max_length,
-        };
+        let mut max_length = config.max_length.unwrap_or(default_max_length().unwrap());
+
+        if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
+            max_length = std::cmp::min(max_length, receive_buffer_bytes);
+        }
 
         let bytes_received = register!(BytesReceived::from(Protocol::UDP));
 

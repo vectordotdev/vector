@@ -10,7 +10,6 @@ use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
     codecs::Decoder,
-    config::log_schema,
     event::Event,
     serde::default_decoding,
     sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource},
@@ -18,14 +17,17 @@ use crate::{
     tls::TlsSourceConfig,
 };
 
-use super::SocketConfig;
+use super::{default_host_key, SocketConfig};
 
 /// TCP configuration for the `socket` source.
 #[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    /// The address to listen for connections on.
+    /// The address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+    /// systemd socket activation.
+    ///
+    /// If a socket address is used, it _must_ include a port.
     #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
     #[configurable(metadata(docs::examples = "systemd"))]
     #[configurable(metadata(docs::examples = "systemd#3"))]
@@ -37,6 +39,10 @@ pub struct TcpConfig {
     /// The maximum buffer size, in bytes, of incoming messages.
     ///
     /// Messages larger than this are truncated.
+    ///
+    /// This option is deprecated. Configure `max_length` on the framing config instead.
+    #[configurable(deprecated)]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     max_length: Option<usize>,
 
     /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
@@ -72,9 +78,11 @@ pub struct TcpConfig {
     /// The size, in bytes, of the receive buffer used for each connection.
     ///
     /// Generally this should not need to be configured.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
+    #[configurable(metadata(docs::type_unit = "concurrency"))]
     pub connection_limit: Option<u32>,
 
     #[configurable(derived)]
@@ -93,27 +101,24 @@ const fn default_shutdown_timeout_secs() -> Duration {
     Duration::from_secs(30)
 }
 
-fn default_host_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
-}
-
 fn default_port_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("port"))
 }
 
 impl TcpConfig {
     pub fn from_address(address: SocketListenAddr) -> Self {
+        let decoding = default_decoding();
         Self {
             address,
             keepalive: None,
-            max_length: Some(crate::serde::default_max_length()),
+            max_length: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: default_host_key(),
             port_key: default_port_key(),
             tls: None,
             receive_buffer_bytes: None,
-            framing: None,
-            decoding: default_decoding(),
+            framing: Some(decoding.default_stream_framing()),
+            decoding,
             connection_limit: None,
             log_namespace: None,
         }

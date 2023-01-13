@@ -4,7 +4,7 @@ pub mod udp;
 mod unix;
 
 use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
-use lookup::{lookup_v2::parse_value_path, owned_value_path};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
@@ -289,14 +289,7 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
@@ -308,14 +301,7 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
@@ -345,6 +331,10 @@ impl SourceConfig for SocketConfig {
     fn can_acknowledge(&self) -> bool {
         false
     }
+}
+
+pub(crate) fn default_host_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
 }
 
 #[cfg(test)]
