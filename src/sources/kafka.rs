@@ -92,13 +92,7 @@ pub struct KafkaSourceConfig {
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for the `auto.offset.reset` option for further clarification.
     #[serde(default = "default_auto_offset_reset")]
-    #[configurable(metadata(docs::examples = "smallest"))]
-    #[configurable(metadata(docs::examples = "earliest"))]
-    #[configurable(metadata(docs::examples = "beginning"))]
-    #[configurable(metadata(docs::examples = "largest"))]
-    #[configurable(metadata(docs::examples = "latest"))]
-    #[configurable(metadata(docs::examples = "end"))]
-    #[configurable(metadata(docs::examples = "error"))]
+    #[configurable(metadata(docs::examples = "example_auto_offset_reset_values()"))]
     auto_offset_reset: String,
 
     /// The Kafka session timeout.
@@ -250,6 +244,18 @@ fn default_offset_key() -> OptionalValuePath {
 
 fn default_headers_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("headers"))
+}
+
+fn example_auto_offset_reset_values() -> [&'static str; 7] {
+    [
+        "smallest",
+        "earliest",
+        "beginning",
+        "largest",
+        "latest",
+        "end",
+        "error",
+    ]
 }
 
 fn example_librdkafka_options() -> HashMap<String, String> {
