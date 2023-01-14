@@ -27,7 +27,8 @@ base: components: sources: statsd: configuration: {
 		}
 	}
 	mode: {
-		required: true
+		description: "The type of socket to use."
+		required:    true
 		type: string: enum: {
 			tcp:  "Listen on TCP."
 			udp:  "Listen on UDP."
@@ -73,7 +74,7 @@ base: components: sources: statsd: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: {}
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -82,7 +83,7 @@ base: components: sources: statsd: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			client_metadata_key: {
 				description: "Event field for client certificate metadata."
@@ -99,7 +100,7 @@ base: components: sources: statsd: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			enabled: {
 				description: """
@@ -118,7 +119,7 @@ base: components: sources: statsd: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -127,7 +128,7 @@ base: components: sources: statsd: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

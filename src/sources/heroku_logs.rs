@@ -43,13 +43,16 @@ use crate::{
 #[configurable_component(source("heroku_logs"))]
 #[derive(Clone, Debug)]
 pub struct LogplexConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
+    #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
 
     /// A list of URL query parameters to include in the log event.
     ///
     /// These will override any values included in the body with conflicting names.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "application", docs::examples = "source"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
@@ -455,7 +458,7 @@ mod tests {
         query: &str,
     ) -> u16 {
         let len = body.lines().count();
-        let mut req = reqwest::Client::new().post(&format!("http://{}/events?{}", address, query));
+        let mut req = reqwest::Client::new().post(format!("http://{}/events?{}", address, query));
         if let Some(auth) = auth {
             req = req.basic_auth(auth.username, Some(auth.password.inner()));
         }

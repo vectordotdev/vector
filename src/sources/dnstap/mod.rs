@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use lookup::{owned_value_path, path, OwnedValuePath};
 use value::{kind::Collection, Kind};
@@ -69,6 +70,7 @@ pub struct DnstapConfig {
     /// The size, in bytes, of the receive buffer used for the socket.
     ///
     /// This should not typically needed to be changed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub socket_receive_buffer_size: Option<usize>,
 
     /// The size, in bytes, of the send buffer used for the socket.
@@ -289,7 +291,7 @@ impl FrameHandler for DnstapFrameHandler {
         if self.raw_data_only {
             log_event.insert(
                 self.schema.dnstap_root_data_schema().raw_data(),
-                base64::encode(&frame),
+                BASE64_STANDARD.encode(&frame),
             );
             let event = Event::from(log_event);
             Some(event)
@@ -514,7 +516,7 @@ mod integration_tests {
         if raw_data {
             assert_eq!(events.len(), 2);
             assert!(
-                events.iter().all(|v| v.as_log().get("rawData") != None),
+                events.iter().all(|v| v.as_log().get("rawData").is_some()),
                 "No rawData field!"
             );
         } else if query_event == "query" {

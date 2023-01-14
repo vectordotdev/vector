@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use futures::{
@@ -11,6 +11,7 @@ use mongodb::{
     options::ClientOptions,
     Client,
 };
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
@@ -74,6 +75,7 @@ enum CollectError {
 }
 
 /// Configuration for the `mongodb_metrics` source.
+#[serde_as]
 #[configurable_component(source("mongodb_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -81,11 +83,13 @@ pub struct MongoDbMetricsConfig {
     /// A list of MongoDB instances to scrape.
     ///
     /// Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
+    #[configurable(metadata(docs::examples = "mongodb://localhost:27017"))]
     endpoints: Vec<String>,
 
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
     ///
@@ -104,8 +108,8 @@ struct MongoDbMetrics {
     tags: MetricTags,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
-    15
+pub const fn default_scrape_interval_secs() -> Duration {
+    Duration::from_secs(15)
 }
 
 pub fn default_namespace() -> String {
@@ -126,7 +130,7 @@ impl SourceConfig for MongoDbMetricsConfig {
         )
         .await?;
 
-        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
@@ -1118,7 +1122,7 @@ mod integration_tests {
             tokio::spawn(async move {
                 MongoDbMetricsConfig {
                     endpoints,
-                    scrape_interval_secs: 15,
+                    scrape_interval_secs: Duration::from_secs(15),
                     namespace: namespace.to_owned(),
                 }
                 .build(SourceContext::new_test(sender, None))

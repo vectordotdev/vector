@@ -1115,7 +1115,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
     } else {
         splunk_response::SUCCESS
     };
-    response_json(StatusCode::OK, &body)
+    response_json(StatusCode::OK, body)
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
@@ -1350,7 +1350,7 @@ mod tests {
         opts: &SendWithOpts<'_>,
     ) -> RequestBuilder {
         let mut b = reqwest::Client::new()
-            .post(&format!("http://{}/{}", address, api))
+            .post(format!("http://{}/{}", address, api))
             .header("Authorization", format!("Splunk {}", token));
 
         b = match opts.channel {
@@ -1394,8 +1394,12 @@ mod tests {
     #[tokio::test]
     async fn no_compression_text_event() {
         let message = "gzip_text_event";
-        let (sink, source) =
-            start(TextSerializerConfig::new().into(), Compression::None, None).await;
+        let (sink, source) = start(
+            TextSerializerConfig::default().into(),
+            Compression::None,
+            None,
+        )
+        .await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1412,7 +1416,7 @@ mod tests {
     async fn one_simple_text_event() {
         let message = "one_simple_text_event";
         let (sink, source) = start(
-            TextSerializerConfig::new().into(),
+            TextSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1432,8 +1436,12 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_text_event() {
         let n = 200;
-        let (sink, source) =
-            start(TextSerializerConfig::new().into(), Compression::None, None).await;
+        let (sink, source) = start(
+            TextSerializerConfig::default().into(),
+            Compression::None,
+            None,
+        )
+        .await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_text_event_{}", i))
@@ -1455,7 +1463,7 @@ mod tests {
     async fn one_simple_json_event() {
         let message = "one_simple_json_event";
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1476,7 +1484,7 @@ mod tests {
     async fn multiple_simple_json_event() {
         let n = 200;
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1501,7 +1509,7 @@ mod tests {
     #[tokio::test]
     async fn json_event() {
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1523,7 +1531,7 @@ mod tests {
     #[tokio::test]
     async fn line_to_message() {
         let (sink, source) = start(
-            JsonSerializerConfig::new().into(),
+            JsonSerializerConfig::default().into(),
             Compression::gzip_default(),
             None,
         )
@@ -1775,7 +1783,7 @@ mod tests {
             let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
             let (sink, health) = sink(
                 address,
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
             )
             .await;
@@ -1823,7 +1831,7 @@ mod tests {
             let (source, address) = source_with(None, None, None, false).await;
             let (sink, health) = sink(
                 address,
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
             )
             .await;
@@ -1844,7 +1852,7 @@ mod tests {
             let (source, address) = source_with(None, None, None, true).await;
             let (sink, health) = sink(
                 address,
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
             )
             .await;
@@ -1936,7 +1944,7 @@ mod tests {
         let (source, address) = source(None).await;
 
         let b = reqwest::Client::new()
-            .post(&format!(
+            .post(format!(
                 "http://{}/{}",
                 address, "services/collector/event"
             ))
@@ -2004,16 +2012,13 @@ mod tests {
             let millis = case.timestamp_millis();
             let nano = case.timestamp_nanos();
 
+            assert_eq!(parse_timestamp(sec).unwrap().timestamp(), case.timestamp());
             assert_eq!(
-                parse_timestamp(sec as i64).unwrap().timestamp(),
-                case.timestamp()
-            );
-            assert_eq!(
-                parse_timestamp(millis as i64).unwrap().timestamp_millis(),
+                parse_timestamp(millis).unwrap().timestamp_millis(),
                 case.timestamp_millis()
             );
             assert_eq!(
-                parse_timestamp(nano as i64).unwrap().timestamp_nanos(),
+                parse_timestamp(nano).unwrap().timestamp_nanos(),
                 case.timestamp_nanos()
             );
         }
@@ -2032,7 +2037,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "for the host";
             let (sink, source) = start(
-                TextSerializerConfig::new().into(),
+                TextSerializerConfig::default().into(),
                 Compression::gzip_default(),
                 None,
             )

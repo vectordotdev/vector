@@ -1,14 +1,12 @@
 mod request_limiter;
 
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
-use std::{io, mem::drop, time::Duration};
+use std::{collections::BTreeMap, io, mem::drop, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use listenfd::ListenFd;
-use lookup::metadata_path;
+use lookup::{path, OwnedValuePath};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use tokio::{
@@ -19,8 +17,10 @@ use tokio::{
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
 use vector_common::finalization::AddBatchNotifier;
-use vector_core::config::LogNamespace;
-use vector_core::{config::SourceAcknowledgementsConfig, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
@@ -110,7 +110,7 @@ where
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
-        tls_client_metadata_key: Option<String>,
+        tls_client_metadata_key: Option<OwnedValuePath>,
         receive_buffer_bytes: Option<usize>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
@@ -238,7 +238,7 @@ async fn handle_stream<T>(
     mut out: SourceSender,
     acknowledgements: bool,
     request_limiter: RequestLimiter,
-    tls_client_metadata_key: Option<String>,
+    tls_client_metadata_key: Option<OwnedValuePath>,
     source_name: &'static str,
     log_namespace: LogNamespace,
 ) where
@@ -351,16 +351,13 @@ async fn handle_stream<T>(
                             for event in &mut events {
                                 let log = event.as_mut_log();
 
-                                match log_namespace {
-                                    LogNamespace::Vector => {
-                                        log.insert(metadata_path!(source_name, "tls_client_metadata"), metadata.clone());
-                                    }
-                                    LogNamespace::Legacy => {
-                                        if let Some(tls_client_metadata_key) = &tls_client_metadata_key {
-                                            log.insert(&tls_client_metadata_key[..], metadata.clone());
-                                        }
-                                    }
-                                }
+                                log_namespace.insert_source_metadata(
+                                    source_name,
+                                    log,
+                                    tls_client_metadata_key.as_ref().map(LegacyKey::Overwrite),
+                                    path!("tls_client_metadata"),
+                                    metadata.clone()
+                                );
                             }
                         }
 

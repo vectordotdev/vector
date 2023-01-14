@@ -29,23 +29,40 @@ mod models;
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
     /// The address to listen for connections on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:443"))]
+    #[configurable(metadata(docs::examples = "localhost:443"))]
     address: SocketAddr,
 
     /// An optional access key to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+    ///
+    /// This option has been deprecated, the `access_keys` option should be used instead.
+    #[configurable(deprecated)]
+    #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
+
+    /// An optional list of access keys to authenticate requests against.
+    ///
+    /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
+    /// configured, `access_keys` should be set to the same value. Otherwise, all requests will be allowed.
+    #[configurable(metadata(docs::examples = "access_keys_example()"))]
+    access_keys: Option<Vec<SensitiveString>>,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
     ///
-    /// Some services, like AWS CloudWatch Logs, will [compress the events with
-    /// gzip](\(urls.aws_cloudwatch_logs_firehose)), before sending them AWS Kinesis Firehose. This option can be used
-    /// to automatically decompress them before forwarding them to the next component.
+    /// Some services, like AWS CloudWatch Logs, will [compress the events with gzip][events_with_gzip],
+    /// before sending them AWS Kinesis Firehose. This option can be used to automatically decompress
+    /// them before forwarding them to the next component.
     ///
-    /// Note that this is different from [Content encoding option](\(urls.aws_kinesis_firehose_http_protocol)) of the
+    /// Note that this is different from [Content encoding option][encoding_option] of the
     /// Firehose HTTP endpoint destination. That option controls the content encoding of the entire HTTP request.
-    record_compression: Option<Compression>,
+    ///
+    /// [events_with_gzip]: https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-logs.html
+    /// [encoding_option]: https://docs.aws.amazon.com/firehose/latest/dev/create-destination.html#create-destination-http
+    #[serde(default)]
+    record_compression: Compression,
 
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
@@ -68,6 +85,10 @@ pub struct AwsKinesisFirehoseConfig {
     log_namespace: Option<bool>,
 }
 
+const fn access_keys_example() -> [&'static str; 2] {
+    ["A94A8FE5CCB19BA61C4C08", "B94B8FE5CCB19BA61C4C12"]
+}
+
 /// Compression scheme for records in a Firehose message.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
@@ -77,11 +98,13 @@ pub enum Compression {
     /// Automatically attempt to determine the compression scheme.
     ///
     /// The compression scheme of the object is determined by looking at its file signature, also known
-    /// as [magic bytes](\(urls.magic_bytes)).
+    /// as [magic bytes][magic_bytes].
     ///
     /// If the record fails to decompress with the discovered format, the record is forwarded as is.
     /// Thus, if you know the records are always gzip encoded (for example, if they are coming from AWS CloudWatch Logs),
     /// set `gzip` in this field so that any records that are not-gzipped are rejected.
+    ///
+    /// [magic_bytes]: https://en.wikipedia.org/wiki/List_of_file_signatures
     #[derivative(Default)]
     Auto,
     /// Uncompressed.
@@ -109,9 +132,20 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
+        if self.access_key.is_some() {
+            warn!("DEPRECATION `access_key`, use `access_keys` instead.")
+        }
+
+        // Merge with legacy `access_key`
+        let access_keys = self
+            .access_keys
+            .iter()
+            .flatten()
+            .chain(self.access_key.iter());
+
         let svc = filters::firehose(
-            self.access_key.as_ref().map(|k| k.inner().to_owned()),
-            self.record_compression.unwrap_or_default(),
+            access_keys.map(|key| key.inner().to_string()).collect(),
+            self.record_compression,
             decoder,
             acknowledgements,
             cx.out,
@@ -171,8 +205,9 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
         toml::Value::try_from(Self {
             address: "0.0.0.0:443".parse().unwrap(),
             access_key: None,
+            access_keys: None,
             tls: None,
-            record_compression: None,
+            record_compression: Default::default(),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: Default::default(),
@@ -191,6 +226,7 @@ mod tests {
         net::SocketAddr,
     };
 
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
     use bytes::Bytes;
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
@@ -244,7 +280,8 @@ mod tests {
 
     async fn source(
         access_key: Option<SensitiveString>,
-        record_compression: Option<Compression>,
+        access_keys: Option<Vec<SensitiveString>>,
+        record_compression: Compression,
         delivered: bool,
         log_namespace: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
@@ -258,6 +295,7 @@ mod tests {
                 address,
                 tls: None,
                 access_key,
+                access_keys,
                 record_compression,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
@@ -297,7 +335,7 @@ mod tests {
         };
 
         let mut builder = reqwest::Client::new()
-            .post(&format!("http://{}", address))
+            .post(format!("http://{}", address))
             .header("host", address.to_string())
             .header(
                 "x-amzn-trace-id",
@@ -359,7 +397,7 @@ mod tests {
             Compression::None => record.to_vec(),
         };
 
-        Ok(base64::encode(&compressed))
+        Ok(BASE64_STANDARD.encode(compressed))
     }
 
     #[tokio::test]
@@ -422,7 +460,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, Some(source_record_compression), true, false).await;
+            let (rx, addr) = source(None, None, source_record_compression, true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -522,7 +560,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, Some(source_record_compression), true, true).await;
+            let (rx, addr) = source(None, None, source_record_compression, true, true).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -593,7 +631,7 @@ mod tests {
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr) = source(None, None, true, false).await;
+            let (rx, addr) = source(None, None, Default::default(), true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -630,7 +668,14 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
-        let (_rx, addr) = source(Some("an access key".to_string().into()), None, true, false).await;
+        let (_rx, addr) = source(
+            Some("an access key".to_string().into()),
+            Some(vec!["an access key in list".to_string().into()]),
+            Default::default(),
+            true,
+            false,
+        )
+        .await;
 
         let res = send(
             addr,
@@ -649,10 +694,100 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn aws_kinesis_firehose_rejects_bad_access_key_from_list() {
+        let (_rx, addr) = source(
+            None,
+            Some(vec!["an access key in list".to_string().into()]),
+            Default::default(),
+            true,
+            false,
+        )
+        .await;
+
+        let res = send(
+            addr,
+            Utc::now(),
+            vec![],
+            Some("bad access key"),
+            false,
+            Compression::None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(401, res.status().as_u16());
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, REQUEST_ID);
+    }
+
+    #[tokio::test]
+    async fn aws_kinesis_firehose_accepts_merged_access_keys() {
+        let valid_access_key = SensitiveString::from(String::from("an access key in list"));
+
+        let (_rx, addr) = source(
+            Some(valid_access_key.clone()),
+            Some(vec!["valid access key 2".to_string().into()]),
+            Default::default(),
+            true,
+            false,
+        )
+        .await;
+
+        let res = send(
+            addr,
+            Utc::now(),
+            vec![],
+            Some(valid_access_key.clone().inner()),
+            false,
+            Compression::None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, REQUEST_ID);
+    }
+
+    #[tokio::test]
+    async fn aws_kinesis_firehose_accepts_access_keys_from_list() {
+        let valid_access_key = "an access key in list".to_string();
+
+        let (_rx, addr) = source(
+            None,
+            Some(vec![
+                valid_access_key.clone().into(),
+                "valid access key 2".to_string().into(),
+            ]),
+            Default::default(),
+            true,
+            false,
+        )
+        .await;
+
+        let res = send(
+            addr,
+            Utc::now(),
+            vec![],
+            Some(&valid_access_key),
+            false,
+            Compression::None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, REQUEST_ID);
+    }
+
+    #[tokio::test]
     async fn handles_acknowledgement_failure() {
         let expected = RECORD.as_bytes().to_owned();
 
-        let (rx, addr) = source(None, Some(Compression::None), false, false).await;
+        let (rx, addr) = source(None, None, Compression::None, false, false).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 

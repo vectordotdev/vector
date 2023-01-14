@@ -8,7 +8,7 @@ use codecs::{
     NewlineDelimitedDecoderConfig,
 };
 
-use http::{Method, StatusCode, Uri};
+use http::{StatusCode, Uri};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
 use value::{kind::Collection, Kind};
@@ -21,10 +21,7 @@ use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    components::validation::{
-        self, ComponentConfiguration, ComponentType, ExternalResource, ResourceDirection,
-        ValidatableComponent,
-    },
+    components::validation::*,
     config::{
         GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
     },
@@ -138,6 +135,14 @@ pub struct SimpleHttpConfig {
 }
 
 impl SimpleHttpConfig {
+    #[cfg(test)]
+    pub fn validation() -> Self {
+        Self {
+            decoding: Some(DeserializerConfig::Json),
+            ..Default::default()
+        }
+    }
+
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         let mut schema_definition = self
@@ -268,16 +273,14 @@ impl ValidatableComponent for SimpleHttpConfig {
             .path_and_query(self.path.clone())
             .build()
             .expect("should not fail to build request URI");
-        // TODO: Why do we use our own custom method enum that isn't just a newtype wrapper of
-        // `http::Method`? :thinkies:
-        let method = Some(Method::POST);
+        let method = Some(self.method.into());
         let decoding_config = self
             .get_decoding_config()
             .expect("should not fail to get decoding config");
 
         Some(ExternalResource::new(
             ResourceDirection::Push,
-            validation::HttpConfig::from_parts(uri, method),
+            HttpResourceConfig::from_parts(uri, method),
             decoding_config,
         ))
     }

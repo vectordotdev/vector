@@ -5,7 +5,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -113,7 +113,8 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				type: string: {}
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					aws:   "Amazon Prometheus Service-specific authentication."
 					basic: "HTTP Basic Authentication."
@@ -371,7 +372,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					they are defined.
 					"""
 				required: false
-				type: array: items: type: string: {}
+				type: array: items: type: string: examples: ["h2"]
 			}
 			ca_file: {
 				description: """
@@ -380,7 +381,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/certificate_authority.crt"]
 			}
 			crt_file: {
 				description: """
@@ -392,7 +393,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/host_certificate.crt"]
 			}
 			key_file: {
 				description: """
@@ -401,7 +402,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["/path/to/host_certificate.key"]
 			}
 			key_pass: {
 				description: """
@@ -410,7 +411,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					This has no effect unless `key_file` is set.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
 			verify_certificate: {
 				description: """

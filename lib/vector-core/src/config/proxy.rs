@@ -26,7 +26,7 @@ impl NoProxyInterceptor {
                 let matches = host.map_or(false, |host| {
                     self.0.matches(host)
                         || port.map_or(false, |port| {
-                            let url = format!("{}:{}", host, port);
+                            let url = format!("{host}:{port}");
                             self.0.matches(&url)
                         })
                 });
@@ -39,7 +39,7 @@ impl NoProxyInterceptor {
 
 /// Proxy configuration.
 ///
-/// Vector can be configured to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
+/// Configure to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
 /// proxy configuration convention, users can set different proxies to use based on the type of traffic being proxied,
 /// as well as set specific hosts that should not be proxied.
 #[configurable_component]
@@ -193,7 +193,7 @@ impl ProxyConfig {
 
 #[cfg(test)]
 mod tests {
-    use base64::encode;
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
     use env_test_util::TempEnvVar;
     use http::{HeaderValue, Uri};
 
@@ -328,7 +328,7 @@ mod tests {
             .https_proxy()
             .expect("should not be an error")
             .expect("should not be None");
-        let encoded_header = format!("Basic {}", encode("user:pass"));
+        let encoded_header = format!("Basic {}", BASE64_STANDARD.encode("user:pass"));
         let expected_header_value = HeaderValue::from_str(encoded_header.as_str());
 
         assert_eq!(

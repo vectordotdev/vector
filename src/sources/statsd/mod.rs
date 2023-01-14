@@ -42,6 +42,7 @@ use vector_core::config::LogNamespace;
 #[configurable_component(source("statsd"))]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum StatsdConfig {
     /// Listen on TCP.
     Tcp(#[configurable(derived)] TcpConfig),
@@ -145,7 +146,8 @@ impl SourceConfig for StatsdConfig {
                 let tls_client_metadata_key = config
                     .tls
                     .as_ref()
-                    .and_then(|tls| tls.client_metadata_key.clone());
+                    .and_then(|tls| tls.client_metadata_key.clone())
+                    .and_then(|k| k.path);
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 StatsdTcpSource.run(
                     config.address,
@@ -330,7 +332,10 @@ mod test {
         net::UdpSocket,
         time::{sleep, Duration, Instant},
     };
-    use vector_core::{config::ComponentKey, event::EventContainer};
+    use vector_core::{
+        config::ComponentKey,
+        event::{metric::TagValue, EventContainer},
+    };
 
     use super::*;
     use crate::test_util::{
@@ -487,8 +492,26 @@ mod test {
             .collect::<AbsoluteMetricState>();
         let metrics = state.finish();
 
-        assert_counter(&metrics, series!("foo", "a" => "true", "b" => "b"), 100.0);
-        assert_counter(&metrics, series!("foo", "a" => "true", "b" => "c"), 100.0);
+        assert_counter(
+            &metrics,
+            series!(
+                "foo",
+                "a" => TagValue::Bare,
+                "b" => "b"
+            ),
+            100.0,
+        );
+
+        assert_counter(
+            &metrics,
+            series!(
+                "foo",
+                "a" => TagValue::Bare,
+                "b" => "c"
+            ),
+            100.0,
+        );
+
         assert_gauge(&metrics, series!("bar"), 42.0);
         assert_distribution(
             &metrics,

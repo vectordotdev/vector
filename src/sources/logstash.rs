@@ -77,7 +77,7 @@ impl LogstashConfig {
             .tls
             .as_ref()
             .and_then(|tls| tls.client_metadata_key.as_ref())
-            .and_then(|x| parse_value_path(x).ok())
+            .and_then(|k| k.path.clone())
             .map(LegacyKey::Overwrite);
 
         BytesDeserializerConfig
@@ -141,7 +141,8 @@ impl SourceConfig for LogstashConfig {
         let tls_client_metadata_key = self
             .tls
             .as_ref()
-            .and_then(|tls| tls.client_metadata_key.clone());
+            .and_then(|tls| tls.client_metadata_key.clone())
+            .and_then(|k| k.path);
 
         let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
@@ -609,7 +610,7 @@ impl Decoder for LogstashDecoder {
                     let payload_size = rest.get_u32() as usize;
 
                     if rest.remaining() < payload_size {
-                        src.reserve(payload_size as usize);
+                        src.reserve(payload_size);
                         return Ok(None);
                     }
 

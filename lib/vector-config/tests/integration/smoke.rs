@@ -74,6 +74,7 @@ pub struct BatchConfig {
     max_events: Option<NonZeroU64>,
 
     /// The maximum number of bytes in a batch before it is flushed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     max_bytes: Option<NonZeroU64>,
 
     /// The maximum amount of time a batch can exist before it is flushed.
@@ -118,12 +119,25 @@ pub enum Encoding {
 /// Enableable TLS configuration.
 #[derive(Clone)]
 #[configurable_component]
+#[configurable(metadata(docs::examples = "Self::default()"))]
 pub struct TlsEnablableConfig {
     /// Whether or not TLS is enabled.
     pub enabled: bool,
 
     #[serde(flatten)]
     pub options: TlsConfig,
+}
+
+impl Default for TlsEnablableConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            options: TlsConfig {
+                crt_file: None,
+                key_file: None,
+            },
+        }
+    }
 }
 
 /// TLS configuration.

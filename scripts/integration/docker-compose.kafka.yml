@@ -6,7 +6,7 @@ services:
     ports:
       - 2181:2181
   kafka:
-    image: docker.io/wurstmeister/kafka:2.13-2.6.0
+    image: docker.io/wurstmeister/kafka:2.12-2.4.1
     depends_on:
       - zookeeper
     environment:

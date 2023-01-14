@@ -38,11 +38,11 @@ base: components: sources: file: configuration: {
 				Takes one of the encoding [label strings](https://encoding.spec.whatwg.org/#concept-encoding-get) defined as
 				part of the [Encoding Standard](https://encoding.spec.whatwg.org/).
 
-				When set, the messages are transcoded from the specified encoding to UTF-8, which is the encoding that Vector
-				assumes internally for string-like data. You should enable this transcoding operation if you need your data to
-				be in UTF-8 for further processing. At the time of transcoding, any malformed sequences (that can’t be mapped to
-				UTF-8) will be replaced with the Unicode [REPLACEMENT
-				CHARACTER](https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character) and warnings will be
+				When set, the messages are transcoded from the specified encoding to UTF-8, which is the encoding that is
+				assumed internally for string-like data. Enable this transcoding operation if you need your data to
+				be in UTF-8 for further processing. At the time of transcoding, any malformed sequences (that can't be mapped to
+				UTF-8) is replaced with the Unicode [REPLACEMENT
+				CHARACTER](https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character) and warnings are
 				logged.
 				"""
 			required: true
@@ -83,12 +83,7 @@ base: components: sources: file: configuration: {
 		required: false
 		type: object: options: {
 			bytes: {
-				description: """
-					Maximum number of bytes to use, from the lines that are read, for generating the checksum.
-
-					TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
-					bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
-					"""
+				description:   "Maximum number of bytes to use, from the lines that are read, for generating the checksum."
 				relevant_when: "strategy = \"checksum\""
 				required:      false
 				type: uint: {}
@@ -116,12 +111,21 @@ base: components: sources: file: configuration: {
 				type: uint: default: 1
 			}
 			strategy: {
+				description: """
+					The strategy used to uniquely identify files.
+
+					This is important for checkpointing when file rotation is used.
+					"""
 				required: false
 				type: string: {
 					default: "checksum"
 					enum: {
-						checksum:         "Read lines from the beginning of the file and compute a checksum over them."
-						device_and_inode: "Use the [device and inode](https://en.wikipedia.org/wiki/Inode) as the identifier."
+						checksum: "Read lines from the beginning of the file and compute a checksum over them."
+						device_and_inode: """
+															Use the [device and inode][inode] as the identifier.
+
+															[inode]: https://en.wikipedia.org/wiki/Inode
+															"""
 					}
 				}
 			}

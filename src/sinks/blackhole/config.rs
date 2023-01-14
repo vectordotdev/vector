@@ -57,7 +57,7 @@ impl SinkConfig for BlackholeConfig {
 
 impl GenerateConfig for BlackholeConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
+        toml::Value::try_from(Self::default()).unwrap()
     }
 }
 

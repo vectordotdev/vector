@@ -1,3 +1,4 @@
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
@@ -185,7 +186,7 @@ impl HttpEventEncoder<Value> for PubSubSinkEventEncoder {
         self.encoder.encode(event, &mut bytes).ok()?;
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
-        Some(json!({ "data": base64::encode(&bytes) }))
+        Some(json!({ "data": BASE64_STANDARD.encode(&bytes) }))
     }
 }
 
@@ -278,7 +279,7 @@ mod integration_tests {
             },
             batch: Default::default(),
             request: Default::default(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             tls: Default::default(),
             acknowledgements: Default::default(),
         }
@@ -411,7 +412,9 @@ mod integration_tests {
 
     impl PullMessage {
         fn decode_data(&self) -> TestMessage {
-            let data = base64::decode(&self.data).expect("Invalid base64 data");
+            let data = BASE64_STANDARD
+                .decode(&self.data)
+                .expect("Invalid base64 data");
             let data = String::from_utf8_lossy(&data);
             serde_json::from_str(&data).expect("Invalid message structure")
         }

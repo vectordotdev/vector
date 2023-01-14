@@ -8,7 +8,7 @@ where
     F: Fn(f64) -> f64,
 {
     let multiplier = 10_f64.powf(precision as f64);
-    fun(num * multiplier as f64) / multiplier
+    fun(num * multiplier) / multiplier
 }
 
 /// Takes a set of captures that have resulted from matching a regular expression
@@ -97,13 +97,13 @@ impl Default for Base64Charset {
 }
 
 #[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
-impl From<Base64Charset> for base64::CharacterSet {
-    fn from(charset: Base64Charset) -> base64::CharacterSet {
+impl From<Base64Charset> for base64::alphabet::Alphabet {
+    fn from(charset: Base64Charset) -> base64::alphabet::Alphabet {
         use Base64Charset::{Standard, UrlSafe};
 
         match charset {
-            Standard => base64::CharacterSet::Standard,
-            UrlSafe => base64::CharacterSet::UrlSafe,
+            Standard => base64::alphabet::STANDARD,
+            UrlSafe => base64::alphabet::URL_SAFE,
         }
     }
 }

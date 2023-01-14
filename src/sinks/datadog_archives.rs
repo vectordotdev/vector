@@ -14,9 +14,10 @@ use std::{
 };
 
 use azure_storage_blobs::prelude::ContainerClient;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
-use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
+use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoder};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
 use http::Uri;
@@ -217,6 +218,7 @@ pub struct S3Options {
     pub storage_class: Option<S3StorageClass>,
 
     /// The tag-set for the object.
+    #[configurable(metadata(docs::additional_props_description = "A single tag."))]
     pub tags: Option<BTreeMap<String, String>>,
 }
 
@@ -247,6 +249,7 @@ pub struct GcsConfig {
     /// For more information, see [Custom metadata][custom_metadata].
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
+    #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
     metadata: Option<HashMap<String, String>>,
 
     #[serde(flatten)]
@@ -310,6 +313,7 @@ impl DatadogArchivesSinkConfig {
                     Some(azure_config.connection_string.clone()),
                     None,
                     self.bucket.clone(),
+                    None,
                 )?;
                 let svc = self
                     .build_azure_sink(Arc::<ContainerClient>::clone(&client))
@@ -514,7 +518,7 @@ impl DatadogArchivesEncoding {
         let id_seq_number = self.id_seq_number.fetch_add(1, Ordering::Relaxed);
         id.put_u32(id_seq_number);
 
-        base64::encode(id.freeze())
+        BASE64_STANDARD.encode(id.freeze())
     }
 }
 
@@ -525,7 +529,7 @@ impl DatadogArchivesEncoding {
                 transformer,
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new().into(),
+                    JsonSerializerConfig::default().build().into(),
                 ),
             ),
             reserved_attributes: RESERVED_ATTRIBUTES.iter().copied().collect(),
@@ -1053,7 +1057,9 @@ mod tests {
     /// - base64-encoded,
     /// - first 6 bytes - a "now" timestamp in millis
     fn validate_event_id(id: &str) {
-        let bytes = base64::decode(id).expect("_id is not base64-encoded");
+        let bytes = BASE64_STANDARD
+            .decode(id)
+            .expect("_id is not base64-encoded");
         assert_eq!(bytes.len(), 18);
         let mut timestamp: [u8; 8] = [0; 8];
         for (i, b) in bytes[..6].iter().enumerate() {

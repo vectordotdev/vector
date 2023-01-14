@@ -75,6 +75,7 @@ pub struct GcsSinkConfig {
     /// For more information, see [Custom metadata][custom_metadata].
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
+    #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
     metadata: Option<HashMap<String, String>>,
 
     /// A prefix to apply to all object keys.
@@ -412,7 +413,8 @@ mod tests {
         let client =
             HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
 
-        let config = default_config((None::<FramingConfig>, JsonSerializerConfig::new()).into());
+        let config =
+            default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into());
         let sink = config
             .build_sink(client, mock_endpoint.to_string(), GcpAuthenticator::None)
             .expect("failed to build sink");
@@ -431,7 +433,7 @@ mod tests {
 
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key: {{ key }}".into()),
-            ..default_config((None::<FramingConfig>, TextSerializerConfig::new()).into())
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
         let key = sink_config
             .key_partitioner()
@@ -456,7 +458,7 @@ mod tests {
             ..default_config(
                 (
                     Some(NewlineDelimitedEncoderConfig::new()),
-                    JsonSerializerConfig::new(),
+                    JsonSerializerConfig::default(),
                 )
                     .into(),
             )

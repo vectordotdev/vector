@@ -55,6 +55,7 @@ impl From<std::io::Error> for Error {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "method", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The framing method."))]
 pub enum FramingConfig {
     /// Event data is not delimited at all.
     Bytes,
@@ -204,7 +205,10 @@ pub enum SerializerConfig {
     /// Encodes an event as [JSON][json].
     ///
     /// [json]: https://www.json.org/
-    Json,
+    Json(
+        /// Encoding options specific to the text serializer.
+        JsonSerializerConfig,
+    ),
 
     /// Encodes an event as a [logfmt][logfmt] message.
     ///
@@ -236,14 +240,18 @@ pub enum SerializerConfig {
     /// could lead to the encoding emitting empty strings for the given event.
     RawMessage,
 
-    /// Plaintext encoding.
+    /// Plain text encoding.
     ///
-    /// This "encoding" simply uses the `message` field of a log event.
+    /// This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+    /// encoding that resembles the Prometheus export format.
     ///
     /// Users should take care if they're modifying their log events (such as by using a `remap`
     /// transform, etc) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
-    Text,
+    Text(
+        /// Encoding options specific to the text serializer.
+        TextSerializerConfig,
+    ),
 }
 
 impl From<AvroSerializerConfig> for SerializerConfig {
@@ -259,8 +267,8 @@ impl From<GelfSerializerConfig> for SerializerConfig {
 }
 
 impl From<JsonSerializerConfig> for SerializerConfig {
-    fn from(_: JsonSerializerConfig) -> Self {
-        Self::Json
+    fn from(config: JsonSerializerConfig) -> Self {
+        Self::Json(config)
     }
 }
 
@@ -289,8 +297,8 @@ impl From<RawMessageSerializerConfig> for SerializerConfig {
 }
 
 impl From<TextSerializerConfig> for SerializerConfig {
-    fn from(_: TextSerializerConfig) -> Self {
-        Self::Text
+    fn from(config: TextSerializerConfig) -> Self {
+        Self::Text(config)
     }
 }
 
@@ -302,7 +310,7 @@ impl SerializerConfig {
                 AvroSerializerConfig::new(avro.schema.clone()).build()?,
             )),
             SerializerConfig::Gelf => Ok(Serializer::Gelf(GelfSerializerConfig::new().build())),
-            SerializerConfig::Json => Ok(Serializer::Json(JsonSerializerConfig.build())),
+            SerializerConfig::Json(config) => Ok(Serializer::Json(config.build())),
             SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
             SerializerConfig::Native => Ok(Serializer::Native(NativeSerializerConfig.build())),
             SerializerConfig::NativeJson => {
@@ -311,7 +319,7 @@ impl SerializerConfig {
             SerializerConfig::RawMessage => {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
-            SerializerConfig::Text => Ok(Serializer::Text(TextSerializerConfig.build())),
+            SerializerConfig::Text(config) => Ok(Serializer::Text(config.build())),
         }
     }
 
@@ -333,11 +341,11 @@ impl SerializerConfig {
                 FramingConfig::LengthDelimited
             }
             SerializerConfig::Gelf
-            | SerializerConfig::Json
+            | SerializerConfig::Json(_)
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
-            | SerializerConfig::Text => FramingConfig::NewlineDelimited,
+            | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
         }
     }
 
@@ -348,12 +356,12 @@ impl SerializerConfig {
                 AvroSerializerConfig::new(avro.schema.clone()).input_type()
             }
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::input_type(),
-            SerializerConfig::Json => JsonSerializerConfig.input_type(),
+            SerializerConfig::Json(config) => config.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
-            SerializerConfig::Text => TextSerializerConfig.input_type(),
+            SerializerConfig::Text(config) => config.input_type(),
         }
     }
 
@@ -364,12 +372,12 @@ impl SerializerConfig {
                 AvroSerializerConfig::new(avro.schema.clone()).schema_requirement()
             }
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::schema_requirement(),
-            SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
+            SerializerConfig::Json(config) => config.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
-            SerializerConfig::Text => TextSerializerConfig.schema_requirement(),
+            SerializerConfig::Text(config) => config.schema_requirement(),
         }
     }
 }

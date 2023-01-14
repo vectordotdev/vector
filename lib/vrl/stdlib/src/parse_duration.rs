@@ -15,20 +15,20 @@ fn parse_duration(bytes: Value, unit: Value) -> Resolved {
 
         UNITS
             .get(string.as_ref())
-            .ok_or(format!("unknown unit format: '{}'", string))?
+            .ok_or(format!("unknown unit format: '{string}'"))?
     };
     let captures = RE
         .captures(&value)
-        .ok_or(format!("unable to parse duration: '{}'", value))?;
+        .ok_or(format!("unable to parse duration: '{value}'"))?;
     let value = Decimal::from_str(&captures["value"])
-        .map_err(|error| format!("unable to parse number: {}", error))?;
+        .map_err(|error| format!("unable to parse number: {error}"))?;
     let unit = UNITS
         .get(&captures["unit"])
         .ok_or(format!("unknown duration unit: '{}'", &captures["unit"]))?;
     let number = value * unit / conversion_factor;
     let number = number
         .to_f64()
-        .ok_or(format!("unable to format duration: '{}'", number))?;
+        .ok_or(format!("unable to format duration: '{number}'"))?;
     Ok(Value::from_f64_or_zero(number))
 }
 

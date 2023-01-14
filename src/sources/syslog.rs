@@ -67,6 +67,7 @@ pub struct SyslogConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
@@ -174,8 +175,10 @@ impl SourceConfig for SyslogConfig {
                 };
                 let shutdown_secs = 30;
                 let tls_config = tls.as_ref().map(|tls| tls.tls_config.clone());
-                let tls_client_metadata_key =
-                    tls.as_ref().and_then(|tls| tls.client_metadata_key.clone());
+                let tls_client_metadata_key = tls
+                    .as_ref()
+                    .and_then(|tls| tls.client_metadata_key.clone())
+                    .and_then(|k| k.path);
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 source.run(
                     address,

@@ -815,7 +815,7 @@ mod tests {
                                     marker_stack.push_back((id, len));
                                 }
                             },
-                            a => panic!("got unexpected action after adding pending marker: {:?}", a),
+                            a => panic!("got unexpected action after adding pending marker: {a:?}"),
                         }
                     },
                     Action::GetNextEligibleMarker => match sut.get_next_eligible_marker() {
@@ -836,7 +836,7 @@ mod tests {
                                 }
                                 (PendingMarkerLength::Unknown, _) =>
                                     panic!("SUT had eligible marker but marker stack had unknown length marker"),
-                                (a, b) => panic!("unknown SUT/model marker len combination: {:?}, {:?}", a, b),
+                                (a, b) => panic!("unknown SUT/model marker len combination: {a:?}, {b:?}"),
                             };
 
                             assert!(unclaimed_acks_to_consume <= unclaimed_acks,

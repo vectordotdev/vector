@@ -97,11 +97,7 @@ pub struct LokiConfig {
     /// Note: If the set of labels has high cardinality, this can cause drastic performance issues
     /// with Loki. To prevent this from happening, reduce the number of unique label keys and
     /// values.
-    #[configurable(metadata(
-        docs::examples = "vector",
-        docs::examples = "{{ event_field }}",
-        docs::examples = "{{ kubernetes.pod_labels }}",
-    ))]
+    #[configurable(metadata(docs::examples = "loki_labels_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "A Loki label."))]
     pub labels: HashMap<Template, Template>,
 
@@ -144,6 +140,20 @@ pub struct LokiConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn loki_labels_examples() -> HashMap<String, String> {
+    let mut examples = HashMap::new();
+    examples.insert("source".to_string(), "vector".to_string());
+    examples.insert(
+        "labels".to_string(),
+        "{{ kubernetes.pod_labels }}".to_string(),
+    );
+    examples.insert(
+        "{{ event_field }}".to_string(),
+        "{{ some_other_event_field }}".to_string(),
+    );
+    examples
 }
 
 #[derive(Clone, Copy, Debug, Default)]

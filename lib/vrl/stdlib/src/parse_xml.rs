@@ -7,6 +7,7 @@ use ::value::Value;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
+use rust_decimal::prelude::Zero;
 use vrl::prelude::*;
 
 /// Used to keep Clippy's `too_many_argument` check happy.
@@ -67,7 +68,7 @@ fn parse_xml(value: Value, options: ParseOptions) -> Resolved {
     };
     // Trim whitespace around XML elements, if applicable.
     let parse = if trim { trim_xml(&string) } else { string };
-    let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {}", e))?;
+    let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {e}"))?;
     let value = process_node(doc.root(), &config);
     Ok(value)
 }
@@ -338,7 +339,10 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
         NodeType::Root => Value::Object(recurse(node)),
 
         NodeType::Element => {
-            match (config.always_use_text_key, node.attributes().is_empty()) {
+            match (
+                config.always_use_text_key,
+                node.attributes().len().is_zero(),
+            ) {
                 // If the node has attributes, *always* recurse to expand default keys.
                 (_, false) if config.include_attr => Value::Object(recurse(node)),
                 // If a text key should be used, always recurse.

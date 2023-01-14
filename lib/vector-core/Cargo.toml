@@ -6,14 +6,14 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-graphql = { version = "4.0.16", default-features = false, optional = true }
+async-graphql = { version = "5.0.5", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 bitmask-enum = { version = "2.1.0", default-features = false }
 bytes = { version = "1.3.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 crossbeam-utils = { version = "0.8.14", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
-dyn-clone = { version = "1.0.9", default-features = false }
+dyn-clone = { version = "1.0.10", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.5", default-features = false }
 float_eq = { version = "1.0", default-features = false }
@@ -27,37 +27,37 @@ lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = "0.20.1"
 metrics-tracing-context = { version = "0.12.0", default-features = false }
 metrics-util = { version = "0.14.0", default-features = false, features = ["registry"] }
-mlua = { version = "0.8.6", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.8.7", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
-once_cell = { version = "1.16", default-features = false }
-openssl = { version = "0.10.44", default-features = false, features = ["vendored"] }
+once_cell = { version = "1.17", default-features = false }
+openssl = { version = "0.10.45", default-features = false, features = ["vendored"] }
 ordered-float = { version = "3.4.0", default-features = false }
 parking_lot = { version = "0.12.1", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 proptest = { version = "1.0", optional = true }
-prost-types = { version = "0.11.2", default-features = false }
-prost = { version = "0.11.3", default-features = false, features = ["std"] }
+prost-types = { version = "0.11.6", default-features = false }
+prost = { version = "0.11.6", default-features = false, features = ["std"] }
 quanta = { version = "0.10.1", default-features = false }
-regex = { version = "1.7.0", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.7.1", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
-serde = { version = "1.0.150", default-features = false, features = ["derive", "rc"] }
-serde_json = { version = "1.0.89", default-features = false }
-serde_with = { version = "2.1.0", default-features = false, features = ["std", "macros"] }
+serde = { version = "1.0.152", default-features = false, features = ["derive", "rc"] }
+serde_json = { version = "1.0.91", default-features = false }
+serde_with = { version = "2.2.0", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
-snafu = { version = "0.7.3", default-features = false }
+snafu = { version = "0.7.4", default-features = false }
 socket2 = { version = "0.4.7", default-features = false }
-tokio = { version = "1.23.0", default-features = false, features = ["net"] }
+tokio = { version = "1.24.1", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
-toml = { version = "0.5.9", default-features = false }
+toml = { version = "0.5.10", default-features = false }
 tonic = { version = "0.8", default-features = false, features = ["transport"] }
 tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-core = { version = "0.1.26", default-features = false }
 tracing-log = { version = "0.1.3", default-features = false }
 tracing-subscriber = { version = "0.3.16", default-features = false, features = ["std"] }
-typetag = { version = "0.2.3", default-features = false }
+typetag = { version = "0.2.4", default-features = false }
 twox-hash = { version = "1.6.3", default-features = false }
 url = { version = "2", default-features = false }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api"] }
@@ -68,19 +68,19 @@ vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 # Rename to "vrl" once we use a release with stable `-Z namespaced-features`:
 # https://doc.rust-lang.org/cargo/reference/unstable.html#namespaced-features
-vrl-lib = { package = "vrl", path = "../vrl/vrl", optional = true }
+vrl-lib = { package = "vrl", path = "../vrl/vrl" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "2.7.0"
 
 [target.'cfg(windows)'.dependencies]
-schannel = "0.1.20"
+schannel = "0.1.21"
 
 [build-dependencies]
-prost-build = "0.11.4"
+prost-build = "0.11.6"
 
 [dev-dependencies]
-base64 = "0.13.1"
+base64 = "0.21.0"
 chrono-tz = { version = "0.8.1", default-features = false }
 criterion = { version = "0.4.0", features = ["html_reports"] }
 env-test-util = "1.0.1"
@@ -97,13 +97,12 @@ rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.16", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
-vrl-lib = { package = "vrl", path = "../vrl/vrl"}
 
 [features]
 api = ["dep:async-graphql", "value/api"]
 default = []
 lua = ["dep:mlua", "dep:tokio-stream"]
-vrl = ["dep:vrl-lib", "dep:enrichment"]
+vrl = ["dep:enrichment"]
 test = ["vector-common/test", "proptest"]
 
 [[bench]]
