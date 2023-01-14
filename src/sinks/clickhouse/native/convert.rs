@@ -119,7 +119,7 @@ fn into_clickhouse_value(v: Option<&Value>, target_type: &SqlType) -> CResult {
         SqlType::Int8 => into_integer(v, |t| CHValue::Int8(t as i8)),
         SqlType::Int16 => into_integer(v, |t| CHValue::Int16(t as i16)),
         SqlType::Int32 => into_integer(v, |t| CHValue::Int32(t as i32)),
-        SqlType::Int64 => into_integer(v, |t| CHValue::Int64(t as i64)),
+        SqlType::Int64 => into_integer(v, |t| CHValue::Int64(t)),
         SqlType::String => into_string(v),
         SqlType::FixedString(len) => into_fixed_string(v, *len),
         SqlType::Float32 => into_float(v, true),
@@ -146,7 +146,7 @@ fn into_clickhouse_value(v: Option<&Value>, target_type: &SqlType) -> CResult {
                 .context(InvalidIPAddrSnafu { val: s.to_string() })?;
             Ok(CHValue::Ipv6(w.octets()))
         }),
-        SqlType::Nullable(ty) => into_nullable(v, *ty),
+        SqlType::Nullable(ty) => into_nullable(v, ty),
         SqlType::Array(ty) => into_array(v, ty),
         SqlType::Map(_, ty) => into_map(v, ty),
         _ => Err(ConvertError::UnsupportedType {

@@ -1,28 +1,11 @@
-use std::{
-    convert::Infallible,
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
-
-use futures::{
-    future::{ok, ready},
-    stream,
-};
-use http::StatusCode;
+use futures::{future::ready, stream};
 use serde::Deserialize;
 use serde_json::Value;
-use tokio::time::{timeout, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
-use warp::Filter;
 
-use super::*;
 use crate::sinks::clickhouse::ClickhouseConfig;
 use crate::{
-    codecs::{TimestampFormat, Transformer},
-    config::{log_schema, SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext},
     sinks::util::{BatchConfig, Compression, TowerRequestConfig},
     test_util::{
         components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
