@@ -1,10 +1,14 @@
 use super::convert::build_block;
-use crate::event::{EventStatus, LogEvent};
+use crate::event::EventStatus;
 use clickhouse_rs::{types::SqlType, Pool};
 use futures::future::BoxFuture;
 use std::task::{Context, Poll};
+use tower::Service;
+use vector_common::finalization::{EventFinalizers, Finalizable};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_common::{internal_event::CountByteSize, Error};
-use vector_core::{stream::DriverResponse, ByteSizeOf};
+use vector_core::event::Event;
+use vector_core::stream::DriverResponse;
 
 pub(super) struct ClickhouseResponse {
     pub(super) event_count: usize,
@@ -21,13 +25,32 @@ impl DriverResponse for ClickhouseResponse {
     }
 }
 
+#[derive(Clone, Default)]
+pub(super) struct NativeClickhouseRequest {
+    pub finalizers: EventFinalizers,
+    pub metadata: RequestMetadata,
+    pub events: Vec<Event>,
+}
+
+impl Finalizable for NativeClickhouseRequest {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for NativeClickhouseRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
+    }
+}
+
 pub(super) struct ClickhouseService {
     pool: Pool,
     schema: Vec<(String, SqlType)>,
     table: String,
 }
 
-impl tower::Service<Vec<LogEvent>> for ClickhouseService {
+impl Service<NativeClickhouseRequest> for ClickhouseService {
     type Response = ClickhouseResponse;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -41,14 +64,14 @@ impl tower::Service<Vec<LogEvent>> for ClickhouseService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, events: Vec<LogEvent>) -> Self::Future {
+    fn call(&mut self, request: NativeClickhouseRequest) -> Self::Future {
         let pool = self.pool.clone();
-        let event_count = events.len();
-        let event_byte_size = events.size_of();
+        let event_count = request.metadata.event_count();
+        let event_byte_size = request.metadata.events_byte_size();
         let schema = self.schema.clone();
         let table = self.table.clone();
         Box::pin(async move {
-            let block = build_block(schema, events)?;
+            let block = build_block(schema, request.events)?;
             let mut handle = pool.get_handle().await?;
             handle.insert(table, block).await?;
             Ok(ClickhouseResponse {

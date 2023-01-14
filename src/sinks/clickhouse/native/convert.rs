@@ -10,14 +10,15 @@ use std::{
     sync::Arc,
 };
 use value::Value;
+use vector_core::event::Event;
 
 pub(super) fn build_block(
     schema: Vec<(String, SqlType)>,
-    events: Vec<LogEvent>,
+    events: Vec<Event>,
 ) -> crate::Result<Block> {
     let mut b = Block::new();
     for ev in &events {
-        b.push(get_row_from_events(&schema, ev)?)
+        b.push(get_row_from_events(&schema, &ev.clone().into_log())?)
             .map_err(Box::new)?;
     }
     Ok(b)

@@ -86,3 +86,86 @@ async fn insert_events() {
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 }
+
+fn make_event() -> (Event, BatchStatusReceiver) {
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let mut event = LogEvent::from("raw log line").with_batch_notifier(&batch);
+    event.insert("host", "example.com");
+    (event.into(), receiver)
+}
+
+struct ClickhouseClient {
+    host: String,
+    client: reqwest::Client,
+}
+
+impl ClickhouseClient {
+    fn new(host: String) -> Self {
+        ClickhouseClient {
+            host,
+            client: reqwest::Client::new(),
+        }
+    }
+
+    async fn create_table(&self, table: &str, schema: &str) {
+        let response = self
+            .client
+            .post(&self.host)
+            //
+            .body(format!(
+                "CREATE TABLE {}
+                    ({})
+                    ENGINE = MergeTree()
+                    ORDER BY (host, timestamp);",
+                table, schema
+            ))
+            .send()
+            .await
+            .unwrap();
+
+        if !response.status().is_success() {
+            panic!("create table failed: {}", response.text().await.unwrap())
+        }
+    }
+
+    async fn select_all(&self, table: &str) -> QueryResponse {
+        let response = self
+            .client
+            .post(&self.host)
+            .body(format!("SELECT * FROM {} FORMAT JSON", table))
+            .send()
+            .await
+            .unwrap();
+
+        if !response.status().is_success() {
+            panic!("select all failed: {}", response.text().await.unwrap())
+        } else {
+            let text = response.text().await.unwrap();
+            match serde_json::from_str(&text) {
+                Ok(value) => value,
+                Err(_) => panic!("json failed: {:?}", text),
+            }
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)] // deserialize all fields
+struct QueryResponse {
+    data: Vec<Value>,
+    meta: Vec<Value>,
+    rows: usize,
+    statistics: Stats,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)] // deserialize all fields
+struct Stats {
+    bytes_read: usize,
+    elapsed: f64,
+    rows_read: usize,
+}
+
+fn gen_table() -> String {
+    format!("test_{}", random_string(10).to_lowercase())
+}
