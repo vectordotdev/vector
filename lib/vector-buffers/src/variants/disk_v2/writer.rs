@@ -1352,7 +1352,7 @@ where
 {
     /// Closes this [`Writer`], marking it as done.
     ///
-    /// Closing the writer signals to the reader that that no more records will be written until the
+    /// Closing the writer signals to the reader that no more records will be written until the
     /// buffer is reopened.  Writers and readers effectively share a "session", so until the writer
     /// and reader both close, the buffer cannot be reopened by another Vector instance.
     ///

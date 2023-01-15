@@ -40,7 +40,7 @@ impl AsMetadata for () {
 /// ## Implementation
 ///
 /// As designed, an implementor would define a primary encoding scheme, schema version, and so on,
-/// that matched how an object would be encoded.  This is acquired from `get_metadata` by code tht
+/// that matched how an object would be encoded.  This is acquired from `get_metadata` by code that
 /// depends on `Encodable` and will be stored alongside the encoded object.  When the encoded object
 /// is later read back, and the caller wants to decode it, they would also read the metadata and do
 /// two things: check that the metadata is still valid for this implementation by calling
