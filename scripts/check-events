@@ -490,7 +490,7 @@ $all_events.each do |name, event|
           error_count += 1
         end
       else
-        puts "Registered event #{event.name} references non-existent handle #{event.impl_register_event}"
+        puts "Registered event #{event.name} references nonexistent handle #{event.impl_register_event}"
         error_count += 1
         next
       end
