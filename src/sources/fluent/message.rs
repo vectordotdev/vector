@@ -96,7 +96,7 @@ impl<'de> serde::de::Deserialize<'de> for FluentEventTime {
 
                 if tag != 0 {
                     return Err(serde::de::Error::custom(format!(
-                        "expected extension type 0 for fluent timestamp, got got {}",
+                        "expected extension type 0 for fluent timestamp, got {}",
                         tag
                     )));
                 }
