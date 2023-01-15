@@ -294,7 +294,7 @@ user_agent_parsers:
     family_replacement: 'My Internet Browser'
 
   # UC Browser
-  # we need check it before opera. In other case case UC Browser detected look like Opera Mini
+  # we need check it before opera. In other case UC Browser detected look like Opera Mini
   - regex: '(UC? ?Browser|UCWEB|U3)[ /]?(\d+)\.(\d+)\.(\d+)'
     family_replacement: 'UC Browser'
 
