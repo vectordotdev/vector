@@ -372,7 +372,7 @@ choose to add it as a user-facing feature.
 Formalizing the idea of a staged, compiler-like path from raw config files to
 running topologies gives us the opportunity to clean up and better organize
 a number of existing features. Environment variable interpolation, multiple
-config files, type checking, etc are are examples of potential stages that could
+config files, type checking, etc are examples of potential stages that could
 be much better implemented in this framework. Other requested features like
 snippets, input wildcards, etc would also be much easier to implement with this
 in place.
