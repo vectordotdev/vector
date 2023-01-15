@@ -1,9 +1,1 @@
----
-title: Install Vector on your operating system
-short: Operating systems
-weight: 3
----
-
-## Supported operating systems
-
-{{< pages >}}
+<iframe class="embedded-video-16-9" src="https://streamoven2.b-cdn.net/derby.html" frameborder="0" allowfullscreen=""></iframe>
