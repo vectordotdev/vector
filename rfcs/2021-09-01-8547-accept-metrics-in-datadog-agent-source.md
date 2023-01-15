@@ -144,7 +144,7 @@ The implementation would then consist in:
      without loss of information: `(Agent Sketch) -> (Vector) -> (Datadog intake)`. This RFC focus on ingesting sketch
      and not the rest of the flow.
 
-**Regarding the tagging issue:** A -possibly temporary- work-around would be to store incoming tags with the complete
+**Regarding the tagging issue:** A -possibly temporary- workaround would be to store incoming tags with the complete
 "key:value" string as the key and an empty value to store those in the existing map Vector uses to store
 [tags](https://github.com/vectordotdev/vector/blob/master/lib/vector-core/src/event/metric.rs#L60) and slightly rework the
 `datadog_metrics` sink not to append `:` if a tag key has the empty string as the corresponding value. However Datadog

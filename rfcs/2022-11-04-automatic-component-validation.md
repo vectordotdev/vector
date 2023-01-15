@@ -560,7 +560,7 @@ somewhat fallible at the edges -- we have to actually do work to integrate this 
 etc -- it achieves uniform coverage across all components and provides the scaffolding to avoid the
 human fallibility aspect of "oops, we're not actually validating this component".
 
-It also heavily centralizes this validation logic such that any future work around updating what
+It also heavily centralizes this validation logic such that any future workaround updating what
 gets validated, or exposing more information during the validation step, and so on, can happen as a
 set of changes to a relatively small set of files, rather than, again, a change to every component
 involved, which is exactly where human fallibility has struck us in the past.
