@@ -135,7 +135,7 @@ can't predict the next instruction in the interpreter loop.
 ### In scope
 
 Introducing a new execution model to VRL that directly executes machine code
-without runtime interpretation overhead, which can be opt in by users.
+without runtime interpretation overhead, which can be opted into by users.
 
 ### Out of scope
 
