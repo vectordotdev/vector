@@ -98,7 +98,7 @@ Project like Thanos and Loki have used hashrings to enable multi-tenancy, we cou
 
 * [x] Which reverse proxy to use? HAProxy, NGINX, Envoy, Traefik, etc. It should be widely used, battle-tested, support most/all protocols Vector uses, and preferably well understood by multiple members of our team.
 * [x] Should built-in load balancing capabilities be explored (where possible)? Internal load balancing options would simplify operations for end users who are all-in on Vector. - This is probably more appropriate on a different RFC, or per component.
-* [x] Do we always need to ensure requests are made to the same downstream aggregator, or only a specific subset of requests? - Default balancing will be `roundrobin`, with with documentations around setting to `source` as an alternative
+* [x] Do we always need to ensure requests are made to the same downstream aggregator, or only a specific subset of requests? - Default balancing will be `roundrobin`, with documentations around setting to `source` as an alternative
 * [x] Each `source` needs its unique port; what defaults and/or templating do we provide to the load balancer? - Out of the box configurations for Datadog agents and Vector agents
 * [x] How will users monitor the load balancer? Logs, metrics, and health. - We will provide out of the box configurations for Datadog agents and Vector to collect and process the proxy's logs and metrics, allowing the user to route them with the rest of their data.
 
