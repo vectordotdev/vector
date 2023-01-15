@@ -111,7 +111,7 @@ pub enum Encoding {
 
     #[configurable(description = "MessagePack encoding.")]
     MessagePack(
-        /// Starting offset for fields something something this is a fake description anyways.
+        /// Starting offset for fields something this is a fake description anyways.
         u64,
     ),
 }
