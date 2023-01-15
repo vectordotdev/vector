@@ -71,7 +71,7 @@ The `wasm` transform was [deprecated in v0.16.0][deprecation] and has been remov
 In its place, we recommend using the `remap` and `lua` transforms.
 
 Note, we may revisit adding WASM support to Vector for custom plugins in the future. If you have a use-case, please add
-it to the [Github issue][9466].
+it to the [GitHub issue][9466].
 
 [deprecation]: /highlights/2021-08-23-removing-wasm
 [9466]: https://github.com/vectordotdev/vector/issues/9466

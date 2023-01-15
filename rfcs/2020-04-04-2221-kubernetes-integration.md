@@ -407,7 +407,7 @@ Everything we need to do to achieve this is outlined at the
 [The Chart Repository Guide].
 
 We can use a tool like [ChartMuseum] to manage our repo. Alternatively, we can
-use a bare HTTP server, like AWS S3 or Github Pages.
+use a bare HTTP server, like AWS S3 or GitHub Pages.
 [ChartMuseum] has the benefit of doing some things for us. It can use S3 for
 storage, and offers a convenient [helm plugin][helm_push] to release charts, so
 the release process should be very simple.
@@ -1093,7 +1093,7 @@ This is a very controversial question.
 
 Currently we have:
 
-- the Vector repo (with the Github Actions based CI flow)
+- the Vector repo (with the GitHub Actions based CI flow)
 - the test harness (also integrated with CI, but this is it's own thing)
 
 We don't necessarily have to choose one of those places: we can add a new
@@ -1578,7 +1578,7 @@ See [motivation](#motivation).
     - Ensure we are testing all supported minor versions. See
       [issue#2223].
   - Run `make test-integration-kubernetes` against AWS' EKS platform in
-    Vector's Github actions.
+    Vector's GitHub actions.
 - Finalize the `kubernetes` source.
   - Audit the code and ensure the base is high-quality and correct.
   - Merge in the `kubernetes_pod_metadata` transform.

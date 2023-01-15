@@ -11,7 +11,7 @@ GIT_SHA=$(git rev-parse --short HEAD)
 CURRENT_DATE=$(date +%Y-%m-%d)
 BUILD_DESC="${GIT_SHA} ${CURRENT_DATE}"
 
-# If we're in Github CI, set it in the special environment variables file. Otherwise,
+# If we're in GitHub CI, set it in the special environment variables file. Otherwise,
 # export the variable.  This requires sourcing the file instead of simply running it.
 if [[ -f "${GITHUB_ENV}" ]]; then
     echo VECTOR_BUILD_DESC="${BUILD_DESC}" >> "${GITHUB_ENV}"
