@@ -975,7 +975,7 @@ where
         // waiting for the reader to delete it if it already exists and hasn't been fully read yet,
         // etc.
         //
-        // Essentially, we defer tthe actual skipping to avoid deadlocking here trying to open a
+        // Essentially, we defer the actual skipping to avoid deadlocking here trying to open a
         // data file we might not be able to open yet.
         if should_skip_to_next_file {
             self.reset();

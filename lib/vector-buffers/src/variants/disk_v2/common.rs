@@ -75,7 +75,7 @@ fn get_maximum_data_file_size() -> u64 {
     (u64::MAX - ledger_len) / 2
 }
 
-/// Gets the minimum buffer size for the the given maximum data file size.
+/// Gets the minimum buffer size for the given maximum data file size.
 ///
 /// This ensures that we are allowed to store enough bytes on-disk, as the buffer design requires being able to always
 /// write to a minimum number of data files, etc. This allow ensures that we're accounting for non-data file disk usage

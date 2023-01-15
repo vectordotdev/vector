@@ -555,7 +555,7 @@ configuration: {
 				the `SECRET[<backend_name>.<secret_key>]` notation to interpolate the secret. Interpolation will happen immediately after
 				environment variables interpolation. While Vector supports multiple commands to retrieve secrets, a
 				secret backend cannot use the secret interpolation feature for its own configuration. Currently the only supported
-				kind of secret backend is the the `exec` one that runs an external command to retrieve secrets.
+				kind of secret backend is the `exec` one that runs an external command to retrieve secrets.
 
 				The following example shows a simple configuration with two backends defined:
 
