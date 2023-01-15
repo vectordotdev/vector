@@ -993,7 +993,7 @@ where
                 // reading, we might actually encounter a valid record.
                 //
                 // Theoretically, based on both the validation done by `rkyv` and the checksum, it
-                // should be incredibly incredibly unlikely to read a valid record after getting a
+                // should be incredibly unlikely to read a valid record after getting a
                 // corrupted record if there was missing data or more invalid data.  We use
                 // checksumming to assert errors within a given chunk of the payload, so one payload
                 // being corrupted doesn't always, in fact, mean that other records after it are
