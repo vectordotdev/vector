@@ -1,9 +1,10 @@
 use std::collections::{BTreeMap, HashSet};
-use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::{env, ffi::OsString, path::PathBuf};
 
 use anyhow::Result;
 use atty::Stream;
+use once_cell::sync::Lazy;
 
 use super::config::RustToolchainConfig;
 use crate::app::{self, CommandExt as _};
@@ -21,6 +22,35 @@ const TEST_COMMAND: &[&str] = &[
     "--no-fail-fast",
     "--no-default-features",
 ];
+// The upstream container we publish artifacts to on a successful master build.
+const UPSTREAM_IMAGE: &str =
+    "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a";
+
+static CONTAINER_TOOL: Lazy<OsString> =
+    Lazy::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));
+
+fn detect_container_tool() -> OsString {
+    for tool in ["docker", "podman"] {
+        if Command::new(tool)
+            .arg("version")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .and_then(|mut child| child.wait())
+            .map_or(false, |status| status.success())
+        {
+            return OsString::from(String::from(tool));
+        }
+    }
+    critical!("No container tool could be detected.");
+    std::process::exit(1);
+}
+
+fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
+    let mut command = Command::new(&*CONTAINER_TOOL);
+    command.args(args);
+    command
+}
 
 enum RunnerState {
     Running,
@@ -55,10 +85,8 @@ pub trait ContainerTestRunnerBase: TestRunner {
     }
 
     fn stop(&self) -> Result<()> {
-        let mut command = Command::new("docker");
-        command.args(["stop", "--time", "0", &self.container_name()]);
-
-        command.wait(format!("Stopping container {}", self.container_name()))
+        dockercmd(["stop", "--time", "0", &self.container_name()])
+            .wait(format!("Stopping container {}", self.container_name()))
     }
 }
 
@@ -66,8 +94,7 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
     fn get_rust_version(&self) -> &str;
 
     fn state(&self) -> Result<RunnerState> {
-        let mut command = Command::new("docker");
-        command.args(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
+        let mut command = dockercmd(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
 
         for line in command.capture_output()?.lines() {
             if let Some((name, state)) = line.split_once(' ') {
@@ -110,8 +137,7 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
     }
 
     fn ensure_volumes(&self) -> Result<()> {
-        let mut command = Command::new("docker");
-        command.args(["volume", "ls", "--format", "{{.Name}}"]);
+        let mut command = dockercmd(["volume", "ls", "--format", "{{.Name}}"]);
 
         let mut volumes = HashSet::new();
         volumes.insert(VOLUME_TARGET);
@@ -122,10 +148,7 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
         }
 
         for volume in &volumes {
-            let mut command = Command::new("docker");
-            command.args(["volume", "create", volume]);
-
-            command.wait(format!("Creating volume {volume}"))?;
+            dockercmd(["volume", "create", volume]).wait(format!("Creating volume {volume}"))?;
         }
 
         Ok(())
@@ -135,9 +158,8 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
         let dockerfile: PathBuf = [app::path(), "scripts", "integration", "Dockerfile"]
             .iter()
             .collect();
-        let mut command = Command::new("docker");
+        let mut command = dockercmd(["build"]);
         command.current_dir(app::path());
-        command.arg("build");
         if atty::is(Stream::Stdout) {
             command.args(["--progress", "tty"]);
         }
@@ -157,30 +179,23 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
     }
 
     fn start(&self) -> Result<()> {
-        let mut command = Command::new("docker");
-        command.args(["start", &self.container_name()]);
-
-        command.wait(format!("Starting container {}", self.container_name()))
+        dockercmd(["start", &self.container_name()])
+            .wait(format!("Starting container {}", self.container_name()))
     }
 
     fn remove(&self) -> Result<()> {
-        let mut command = Command::new("docker");
-        command.args(["rm", &self.container_name()]);
-
-        command.wait(format!("Removing container {}", self.container_name()))
+        dockercmd(["rm", &self.container_name()])
+            .wait(format!("Removing container {}", self.container_name()))
     }
 
     fn unpause(&self) -> Result<()> {
-        let mut command = Command::new("docker");
-        command.args(["unpause", &self.container_name()]);
-
-        command.wait(format!("Unpausing container {}", self.container_name()))
+        dockercmd(["unpause", &self.container_name()])
+            .wait(format!("Unpausing container {}", self.container_name()))
     }
 
     fn create(&self) -> Result<()> {
-        let mut command = Command::new("docker");
-        command.arg("create");
-        command.args([
+        dockercmd([
+            "create",
             "--name",
             &self.container_name(),
             "--network",
@@ -198,9 +213,8 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
             &self.image_name(),
             "/bin/sleep",
             "infinity",
-        ]);
-
-        command.wait(format!("Creating container {}", self.container_name()))
+        ])
+        .wait(format!("Creating container {}", self.container_name()))
     }
 }
 
@@ -219,8 +233,7 @@ impl IntegrationTestRunner {
     }
 
     pub fn ensure_network(&self) -> Result<()> {
-        let mut command = Command::new("docker");
-        command.args(["network", "ls", "--format", "{{.Name}}"]);
+        let mut command = dockercmd(["network", "ls", "--format", "{{.Name}}"]);
 
         if command
             .capture_output()?
@@ -230,10 +243,7 @@ impl IntegrationTestRunner {
             return Ok(());
         }
 
-        let mut command = Command::new("docker");
-        command.args(["network", "create", &self.network_name()]);
-
-        command.wait("Creating network")
+        dockercmd(["network", "create", &self.network_name()]).wait("Creating network")
     }
 }
 
@@ -241,8 +251,7 @@ impl TestRunner for IntegrationTestRunner {
     fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
         self.verify_state()?;
 
-        let mut command = Command::new("docker");
-        command.arg("exec");
+        let mut command = dockercmd(["exec"]);
         if atty::is(Stream::Stdout) {
             command.arg("--tty");
         }
@@ -298,8 +307,7 @@ impl TestRunner for DockerTestRunner {
     fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
         self.verify_state()?;
 
-        let mut command = Command::new("docker");
-        command.arg("exec");
+        let mut command = dockercmd(["exec"]);
         if atty::is(Stream::Stdout) {
             command.arg("--tty");
         }
@@ -324,8 +332,7 @@ impl ContainerTestRunnerBase for DockerTestRunner {
     }
 
     fn image_name(&self) -> String {
-        // The upstream container we publish artifacts to on a successful master build.
-        "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a".to_string()
+        env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
     }
 }
 

@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use clap::Args;
@@ -29,23 +29,18 @@ impl Cli {
         if self.debug && self.release {
             bail!("Can only set one of `--debug` and `--release`");
         }
-        let mode = if self.release { "--release" } else { "--debug" };
 
         let features = features::load_and_extract(&self.config)?;
-
-        app::exec(
-            Path::new("cargo"),
-            [
-                "--no-default-features",
-                "--features",
-                &features,
-                mode,
-                "--",
-                "--config",
-                self.config.to_str().expect("Invalid config file name"),
-            ]
-            .into_iter()
-            .chain(self.args.iter().map(String::as_str)),
-        )
+        let mut args = vec!["run", "--no-default-features", "--features", &features];
+        if self.release {
+            args.push("--release");
+        }
+        args.extend([
+            "--",
+            "--config",
+            self.config.to_str().expect("Invalid config file name"),
+        ]);
+        args.extend(self.args.iter().map(String::as_str));
+        app::exec("cargo", args)
     }
 }

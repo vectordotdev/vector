@@ -54,7 +54,7 @@ export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
 # Set version
-export VERSION ?= $(shell scripts/version.sh)
+export VERSION ?= $(shell cargo vdev version)
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
@@ -451,7 +451,7 @@ check-all: check-scripts check-deny check-component-docs
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check component-features
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
@@ -459,43 +459,43 @@ check-clippy: ## Check code with Clippy
 
 .PHONY: check-docs
 check-docs: ## Check that all /docs file are valid
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-docs.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check docs
 
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-fmt.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check fmt
 
 .PHONY: check-style
 check-style: ## Check that all files are styled properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check style
 
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-markdown.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check markdown
 
 .PHONY: check-version
 check-version: ## Check that Vector's version is correct accounting for recent changes
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-version.rb
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check version
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-examples.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check examples
 
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check scripts
 
 .PHONY: check-deny
 check-deny: ## Check advisories licenses and sources for crate dependencies
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-deny.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check deny
 
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check events
 
 .PHONY: check-component-docs
 check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-docs.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check component-docs
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -516,7 +516,7 @@ target/artifacts/vector-${VERSION}-%.tar.gz: target/%/release/vector.tar.gz
 
 .PHONY: package
 package: build ## Build the Vector archive
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/package-archive.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev package archive
 
 .PHONY: package-x86_64-unknown-linux-gnu-all
 package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # Build all x86_64 GNU packages
@@ -561,37 +561,37 @@ package-armv7-unknown-linux-musleabihf: target/artifacts/vector-${VERSION}-armv7
 
 .PHONY: package-deb-x86_64-unknown-linux-gnu
 package-deb-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
 
 .PHONY: package-deb-x86_64-unknown-linux-musl
 package-deb-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
 
 .PHONY: package-deb-armv7-gnu
 package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
 
 # rpms
 
 .PHONY: package-rpm-x86_64-unknown-linux-gnu
 package-rpm-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 .PHONY: package-rpm-x86_64-unknown-linux-musl
 package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 musl rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 .PHONY: package-rpm-armv7-gnu
 package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 ##@ Releasing
 
@@ -600,35 +600,31 @@ release: release-prepare generate release-commit ## Release a new Vector version
 
 .PHONY: release-commit
 release-commit: ## Commits release changes
-	@scripts/release-commit.rb
+	@cargo vdev release commit
 
 .PHONY: release-docker
 release-docker: ## Release to Docker Hub
-	@scripts/build-docker.sh
+	@cargo vdev release docker
 
 .PHONY: release-github
 release-github: ## Release to Github
-	@scripts/release-github.sh
+	@cargo vdev release github
 
 .PHONY: release-homebrew
 release-homebrew: ## Release to vectordotdev Homebrew tap
-	@scripts/release-homebrew.sh
+	@cargo vdev release homebrew
 
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights
-	@scripts/release-prepare.rb
+	@cargo vdev release prepare
 
 .PHONY: release-push
 release-push: ## Push new Vector version
-	@scripts/release-push.sh
-
-.PHONY: release-rollback
-release-rollback: ## Rollback pending release changes
-	@scripts/release-rollback.rb
+	@cargo vdev release push
 
 .PHONY: release-s3
 release-s3: ## Release artifacts to S3
-	@scripts/release-s3.sh
+	@cargo vdev release s3
 
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
@@ -657,17 +653,17 @@ clean: environment-clean ## Clean everything
 .PHONY: fmt
 fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check style --fix
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
-	scripts/generate-manifests.sh
+	cargo vdev generate manifests
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
 	${MAYBE_ENVIRONMENT_EXEC} cargo build $(if $(findstring true,$(CI)),--quiet,)
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
-	${MAYBE_ENVIRONMENT_EXEC} scripts/generate-component-docs.rb /tmp/vector-config-schema.json \
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev generate component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: signoff
@@ -689,7 +685,7 @@ endif
 
 .PHONY: version
 version: ## Get the current Vector version
-	@scripts/version.sh
+	@cargo vdev version
 
 .PHONY: git-hooks
 git-hooks: ## Add Vector-local git hooks for commit sign-off
