@@ -619,7 +619,7 @@ impl<'a> Compiler<'a> {
                             .with_span(func.span)
                             .with_notes(Note::solution(
                                 "using the metadata path syntax instead",
-                                vec![format!("{}", target_path)],
+                                vec![format!("{target_path}")],
                             )),
                     )),
                     MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
@@ -627,7 +627,7 @@ impl<'a> Compiler<'a> {
                             .with_span(func.span)
                             .with_notes(Note::solution(
                                 "using the \"get_secret\" function instead",
-                                vec![format!("get_secret(\"{}\")", secret_key)],
+                                vec![format!("get_secret(\"{secret_key}\")")],
                             )),
                     )),
                 }
@@ -642,7 +642,7 @@ impl<'a> Compiler<'a> {
                             .with_span(func.span)
                             .with_notes(Note::solution(
                                 "using the metadata path syntax instead",
-                                vec![format!("{} = {}", target_path, args.required_expr("value"))],
+                                vec![format!("{target_path} = {}", args.required_expr("value"))],
                             )),
                     )),
                     MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
@@ -669,7 +669,7 @@ impl<'a> Compiler<'a> {
                             .with_span(func.span)
                             .with_notes(Note::solution(
                                 "using the metadata path syntax instead",
-                                vec![format!("del({})", target_path)],
+                                vec![format!("del({target_path})")],
                             )),
                     )),
                     MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
@@ -677,7 +677,7 @@ impl<'a> Compiler<'a> {
                             .with_span(func.span)
                             .with_notes(Note::solution(
                                 "using the \"remove_secret\" function instead",
-                                vec![format!("remove_secret(\"{}\")", secret_key)],
+                                vec![format!("remove_secret(\"{secret_key}\")")],
                             )),
                     )),
                 }

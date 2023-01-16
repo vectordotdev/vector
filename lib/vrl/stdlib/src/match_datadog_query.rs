@@ -125,7 +125,7 @@ impl Filter<Value> for VrlFilter {
         match field {
             // Tags need to check the element value.
             Field::Tag(tag) => {
-                let starts_with = format!("{}:", tag);
+                let starts_with = format!("{tag}:");
 
                 resolve_value(
                     buf,
@@ -186,7 +186,7 @@ impl Filter<Value> for VrlFilter {
             }
             // Individual tags are compared by element key:value.
             Field::Tag(tag) => {
-                let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
+                let value_bytes = Value::Bytes(format!("{tag}:{to_match}").into());
 
                 resolve_value(
                     buf,
@@ -214,7 +214,7 @@ impl Filter<Value> for VrlFilter {
         match field {
             // Default fields are matched by word boundary.
             Field::Default(_) => {
-                let re = word_regex(&format!("{}*", prefix));
+                let re = word_regex(&format!("{prefix}*"));
 
                 resolve_value(
                     buf,
@@ -223,7 +223,7 @@ impl Filter<Value> for VrlFilter {
             }
             // Tags are recursed until a match is found.
             Field::Tag(tag) => {
-                let starts_with = format!("{}:{}", tag, prefix);
+                let starts_with = format!("{tag}:{prefix}");
 
                 resolve_value(
                     buf,
@@ -260,7 +260,7 @@ impl Filter<Value> for VrlFilter {
                 )
             }
             Field::Tag(tag) => {
-                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+                let re = wildcard_regex(&format!("{tag}:{wildcard}"));
 
                 resolve_value(
                     buf,

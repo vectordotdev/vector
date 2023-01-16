@@ -6,10 +6,7 @@ use tokio::sync::Mutex;
 use super::limited_queue::LimitedSender;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    variants::{
-        disk_v1,
-        disk_v2::{self, ProductionFilesystem},
-    },
+    variants::disk_v2::{self, ProductionFilesystem},
     Bufferable, WhenFull,
 };
 
@@ -19,9 +16,6 @@ pub enum SenderAdapter<T: Bufferable> {
     /// The in-memory channel buffer.
     InMemory(LimitedSender<T>),
 
-    /// The disk v1 buffer.
-    DiskV1(disk_v1::Writer<T>),
-
     /// The disk v2 buffer.
     DiskV2(Arc<Mutex<disk_v2::Writer<T, ProductionFilesystem>>>),
 }
@@ -29,12 +23,6 @@ pub enum SenderAdapter<T: Bufferable> {
 impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
     fn from(v: LimitedSender<T>) -> Self {
         Self::InMemory(v)
-    }
-}
-
-impl<T: Bufferable> From<disk_v1::Writer<T>> for SenderAdapter<T> {
-    fn from(v: disk_v1::Writer<T>) -> Self {
-        Self::DiskV1(v)
     }
 }
 
@@ -51,10 +39,6 @@ where
     pub(crate) async fn send(&mut self, item: T) -> crate::Result<()> {
         match self {
             Self::InMemory(tx) => tx.send(item).await.map_err(Into::into),
-            Self::DiskV1(writer) => {
-                writer.send(item).await;
-                Ok(())
-            }
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
@@ -78,7 +62,6 @@ where
                 .try_send(item)
                 .map(|()| None)
                 .or_else(|e| Ok(Some(e.into_inner()))),
-            Self::DiskV1(writer) => Ok(writer.try_send(item)),
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
@@ -99,10 +82,6 @@ where
     pub(crate) async fn flush(&mut self) -> crate::Result<()> {
         match self {
             Self::InMemory(_) => Ok(()),
-            Self::DiskV1(writer) => {
-                writer.flush();
-                Ok(())
-            }
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
                 writer.flush().await.map_err(|e| {
@@ -118,7 +97,7 @@ where
     pub fn capacity(&self) -> Option<usize> {
         match self {
             Self::InMemory(tx) => Some(tx.available_capacity()),
-            Self::DiskV1(_) | Self::DiskV2(_) => None,
+            Self::DiskV2(_) => None,
         }
     }
 }

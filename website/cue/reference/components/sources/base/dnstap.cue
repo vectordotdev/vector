@@ -50,7 +50,7 @@ base: components: sources: dnstap: configuration: {
 			language, but it is most intuitive to use an octal number.
 			"""
 		required: false
-		type: number: examples: ["0o777", "0o754", "0o777"]
+		type: uint: examples: ["0o777", "0o754", "0o777"]
 	}
 	socket_path: {
 		description: """
@@ -69,7 +69,7 @@ base: components: sources: dnstap: configuration: {
 			This should not typically needed to be changed.
 			"""
 		required: false
-		type: number: {}
+		type: uint: unit: "bytes"
 	}
 	socket_send_buffer_size: {
 		description: """
@@ -78,6 +78,6 @@ base: components: sources: dnstap: configuration: {
 			This should not typically needed to be changed.
 			"""
 		required: false
-		type: number: {}
+		type: uint: unit: "bytes"
 	}
 }

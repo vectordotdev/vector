@@ -337,7 +337,8 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 				}
 			}
 			method: {
-				required: true
+				description: "The framing method."
+				required:    true
 				type: string: enum: {
 					bytes:               "Event data is not delimited at all."
 					character_delimited: "Event data is delimited by a single ASCII (7-bit) character."
@@ -372,7 +373,8 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			required: true
+			description: "A key/value pair."
+			required:    true
 			type: string: {}
 		}
 	}

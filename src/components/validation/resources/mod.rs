@@ -2,7 +2,7 @@ mod event;
 mod http;
 
 use codecs::{
-    decoding::{self, DeserializerConfig},
+    decoding::{self, DeserializerConfig, NewlineDelimitedDecoderOptions},
     encoding::{
         self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig, TextSerializerConfig,
     },
@@ -11,10 +11,10 @@ use codecs::{
 use tokio::sync::mpsc;
 use vector_core::{config::DataType, event::Event};
 
-use crate::codecs::{DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
+use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
 pub use self::event::TestEvent;
-pub use self::http::HttpConfig;
+pub use self::http::HttpResourceConfig;
 
 use super::sync::{Configuring, TaskCoordinator};
 
@@ -43,16 +43,8 @@ pub enum ResourceCodec {
 
     /// Component decodes events.
     ///
-    /// As opposed to `DecodingWithFramer`, this variant uses the default framing method defined by
-    /// the decoding itself.
-    ///
     /// Generally speaking, only sources decode: going from an encoded form to `Event`.
     Decoding(DecodingConfig),
-
-    /// Component decodes events, with a specific framer.
-    ///
-    /// Generally speaking, only sources decode: going from an encoded form to `Event`.
-    DecodingWithFraming(DecodingConfig, decoding::FramingConfig),
 }
 
 impl ResourceCodec {
@@ -65,9 +57,7 @@ impl ResourceCodec {
         match self {
             Self::Encoding(encoding) => encoding.config().input_type(),
             Self::EncodingWithFraming(encoding) => encoding.config().1.input_type(),
-            Self::Decoding(decoding) | Self::DecodingWithFraming(decoding, _) => {
-                decoding.config().output_type()
-            }
+            Self::Decoding(decoding) => decoding.config().output_type(),
         }
     }
 
@@ -94,16 +84,36 @@ impl ResourceCodec {
                 )
             }
             Self::Decoding(config) => (
-                decoder_framing_to_encoding_framer(&config.config().default_stream_framing()),
-                deserializer_config_to_serializer(config.config()),
-            ),
-            Self::DecodingWithFraming(config, framing) => (
-                decoder_framing_to_encoding_framer(framing),
+                decoder_framing_to_encoding_framer(config.framing()),
                 deserializer_config_to_serializer(config.config()),
             ),
         };
 
         Encoder::<encoding::Framer>::new(framer, serializer)
+    }
+
+    /// Gets a decoder for this codec.
+    ///
+    /// The decoder is generated as an inverse to the input codec: if an encoding configuration was
+    /// given, we generate a decoder that satisfies that encoding configuration, and vise versa.
+    pub fn into_decoder(&self) -> Decoder {
+        let (framer, deserializer) = match self {
+            Self::Decoding(config) => return config.build(),
+            Self::Encoding(config) => (
+                encoder_framing_to_decoding_framer(config.config().default_stream_framing()),
+                serializer_config_to_deserializer(config.config()),
+            ),
+            Self::EncodingWithFraming(config) => {
+                let (maybe_framing, serializer) = config.config();
+                let framing = maybe_framing.clone().unwrap_or(FramingConfig::Bytes);
+                (
+                    encoder_framing_to_decoding_framer(framing),
+                    serializer_config_to_deserializer(serializer),
+                )
+            }
+        };
+
+        Decoder::new(framer, deserializer)
     }
 }
 
@@ -169,6 +179,40 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
     framing_config.build()
 }
 
+fn serializer_config_to_deserializer(config: &SerializerConfig) -> decoding::Deserializer {
+    let deserializer_config = match config {
+        SerializerConfig::Avro { .. } => todo!(),
+        SerializerConfig::Gelf => DeserializerConfig::Gelf,
+        SerializerConfig::Json(_) => DeserializerConfig::Json,
+        SerializerConfig::Logfmt => todo!(),
+        SerializerConfig::Native => DeserializerConfig::Native,
+        SerializerConfig::NativeJson => DeserializerConfig::NativeJson,
+        SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
+    };
+
+    deserializer_config.build()
+}
+
+fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decoding::Framer {
+    let framing_config = match framing {
+        encoding::FramingConfig::Bytes => decoding::FramingConfig::Bytes,
+        encoding::FramingConfig::CharacterDelimited {
+            character_delimited,
+        } => decoding::FramingConfig::CharacterDelimited {
+            character_delimited: decoding::CharacterDelimitedDecoderOptions {
+                delimiter: character_delimited.delimiter,
+                max_length: None,
+            },
+        },
+        encoding::FramingConfig::LengthDelimited => decoding::FramingConfig::LengthDelimited,
+        encoding::FramingConfig::NewlineDelimited => decoding::FramingConfig::NewlineDelimited {
+            newline_delimited: NewlineDelimitedDecoderOptions::default(),
+        },
+    };
+
+    framing_config.build()
+}
+
 /// Direction that the resource is operating in.
 pub enum ResourceDirection {
     /// Resource will have the component pull data from it, or pull data from the component.
@@ -203,11 +247,11 @@ pub enum ResourceDirection {
 /// validation runner to create an instance of them, such as spawning an HTTP server if a source has
 /// specified an HTTP resource in the "pull" direction.
 pub enum ResourceDefinition {
-    Http(HttpConfig),
+    Http(HttpResourceConfig),
 }
 
-impl From<HttpConfig> for ResourceDefinition {
-    fn from(config: HttpConfig) -> Self {
+impl From<HttpResourceConfig> for ResourceDefinition {
+    fn from(config: HttpResourceConfig) -> Self {
         Self::Http(config)
     }
 }

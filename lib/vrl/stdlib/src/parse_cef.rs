@@ -261,7 +261,7 @@ fn parse_header_value(input: &str) -> IResult<&str, String, VerboseError<&str>> 
     preceded(
         opt(char('|')),
         alt((
-            map(peek(char('|')), |_| "".to_string()),
+            map(peek(char('|')), |_| String::new()),
             escaped_transform(
                 take_till1(|c: char| c == '\\' || c == '|'),
                 '\\',
@@ -281,7 +281,7 @@ fn parse_key_value(input: &str) -> IResult<&str, (&str, String), VerboseError<&s
 
 fn parse_value(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     alt((
-        map(peek(parse_key), |_| "".to_string()),
+        map(peek(parse_key), |_| String::new()),
         escaped_transform(
             take_till1_input(|input| alt((tag("\\"), tag("="), parse_key))(input).is_ok()),
             '\\',
@@ -385,15 +385,15 @@ mod test {
     fn test_parse_empty_value() {
         assert_eq!(
             Ok(vec![
-                ("src".to_string(), "".into()),
+                ("src".to_string(), String::new()),
                 ("dst".to_string(), "2.1.2.2".into()),
                 ("cefVersion".to_string(), "1".into()),
                 ("deviceVendor".to_string(), "Security".into()),
                 ("deviceProduct".to_string(), "threatmanager".into()),
-                ("deviceVersion".to_string(), "".into()),
+                ("deviceVersion".to_string(), String::new()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "".into()),
+                ("severity".to_string(), String::new()),
             ]),
             parse("CEF:1|Security|threatmanager||100|worm successfully stopped||src= dst=2.1.2.2")
                 .map(Iterator::collect)

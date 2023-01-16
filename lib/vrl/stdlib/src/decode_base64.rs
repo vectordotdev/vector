@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use ::value::Value;
+use base64::Engine as _;
 use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
@@ -18,12 +19,12 @@ fn decode_base64(charset: Option<Value>, value: Value) -> Resolved {
         Base64Charset::UrlSafe => base64::alphabet::URL_SAFE,
     };
     let value = value.try_bytes()?;
-    let engine = base64::engine::fast_portable::FastPortable::from(
+    let engine = base64::engine::GeneralPurpose::new(
         &alphabet,
-        base64::engine::fast_portable::FastPortableConfig::default(),
+        base64::engine::general_purpose::GeneralPurposeConfig::new(),
     );
 
-    match base64::decode_engine(value, &engine) {
+    match engine.decode(value) {
         Ok(s) => Ok(Value::from(Bytes::from(s))),
         Err(_) => Err("unable to decode value to base64".into()),
     }

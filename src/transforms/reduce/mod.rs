@@ -78,6 +78,9 @@ pub struct ReduceConfig {
     ///   the last received timestamp value.
     /// - Numeric values are summed.
     #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "An individual merge strategy."
+    ))]
     pub merge_strategies: IndexMap<String, MergeStrategy>,
 
     /// A condition used to distinguish the final event of a transaction.

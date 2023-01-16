@@ -67,6 +67,7 @@ pub struct SyslogConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
     /// Listen on TCP.
     Tcp {

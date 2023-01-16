@@ -222,7 +222,8 @@ base: components: sinks: kafka: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			required: true
+			description: "A librdkafka configuration option."
+			required:    true
 			type: string: {}
 		}
 	}

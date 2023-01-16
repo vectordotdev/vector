@@ -7,9 +7,21 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 
 			AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
 			configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+
+			This option has been deprecated, the `access_keys` option should be used instead.
 			"""
 		required: false
 		type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
+	}
+	access_keys: {
+		description: """
+			An optional list of access keys to authenticate requests against.
+
+			AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
+			configured, `access_keys` should be set to the same value. Otherwise, all requests will be allowed.
+			"""
+		required: false
+		type: array: items: type: string: examples: ["A94A8FE5CCB19BA61C4C08", "B94B8FE5CCB19BA61C4C12"]
 	}
 	acknowledgements: {
 		description: """

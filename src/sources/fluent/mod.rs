@@ -1,6 +1,7 @@
 use std::io::{self, Read};
 use std::net::SocketAddr;
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
 use codecs::{BytesDeserializerConfig, StreamDecodingError};
@@ -456,7 +457,7 @@ impl Decoder for FluentDecoder {
             src.advance(byte_size);
 
             let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
-                let base64_encoded_message = base64::encode(&src);
+                let base64_encoded_message = BASE64_STANDARD.encode(&src);
                 emit!(FluentMessageDecodeError {
                     error: &error,
                     base64_encoded_message
@@ -924,7 +925,7 @@ mod tests {
         for (tag, value) in fields {
             record.insert((*tag).into(), rmpv::Value::String((*value).into()).into());
         }
-        let chunk = with_chunk.then(|| base64::encode(uuid::Uuid::new_v4().as_bytes()));
+        let chunk = with_chunk.then(|| BASE64_STANDARD.encode(uuid::Uuid::new_v4().as_bytes()));
         let req = FluentMessage::MessageWithOptions(
             tag.into(),
             FluentTimestamp::Unix(Utc::now()),

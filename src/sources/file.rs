@@ -4,8 +4,10 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use file_source::{
+    calculate_ignore_before,
     paths_provider::glob::{Glob, MatchOptions},
     Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
+    ReadFromConfig,
 };
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use lookup::{
@@ -243,13 +245,15 @@ fn default_line_delimiter() -> String {
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The strategy used to uniquely identify files.\n\nThis is important for checkpointing when file rotation is used."
+))]
 pub enum FingerprintConfig {
     /// Read lines from the beginning of the file and compute a checksum over them.
     Checksum {
         /// Maximum number of bytes to use, from the lines that are read, for generating the checksum.
-        ///
-        /// TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
-        /// bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
+        // TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
+        // bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
         #[serde(alias = "fingerprint_bytes")]
         bytes: Option<usize>,
 
@@ -267,7 +271,9 @@ pub enum FingerprintConfig {
         lines: usize,
     },
 
-    /// Use the [device and inode](https://en.wikipedia.org/wiki/Inode) as the identifier.
+    /// Use the [device and inode][inode] as the identifier.
+    ///
+    /// [inode]: https://en.wikipedia.org/wiki/Inode
     #[serde(rename = "device_and_inode")]
     DevInode,
 }
@@ -284,26 +290,6 @@ impl Default for FingerprintConfig {
 
 const fn default_lines() -> usize {
     1
-}
-/// File position to use when reading a new file.
-#[configurable_component]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ReadFromConfig {
-    /// Read from the beginning of the file.
-    Beginning,
-
-    /// Start reading from the current end of the file.
-    End,
-}
-
-impl From<ReadFromConfig> for ReadFrom {
-    fn from(rfc: ReadFromConfig) -> Self {
-        match rfc {
-            ReadFromConfig::Beginning => ReadFrom::Beginning,
-            ReadFromConfig::End => ReadFrom::End,
-        }
-    }
 }
 
 impl From<FingerprintConfig> for FingerprintStrategy {
@@ -480,9 +466,7 @@ pub fn file_source(
         return Box::pin(future::ready(Err(())));
     }
 
-    let ignore_before = config
-        .ignore_older_secs
-        .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
+    let ignore_before = calculate_ignore_before(config.ignore_older_secs);
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown_ms);
     let (ignore_checkpoints, read_from) = reconcile_position_options(
         config.start_at_beginning,
