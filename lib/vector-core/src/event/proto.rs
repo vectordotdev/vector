@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use chrono::TimeZone;
 use ordered_float::NotNan;
 
@@ -207,7 +209,7 @@ impl From<Metric> for event::Metric {
             .timestamp
             .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
-        let mut tags = MetricTags(
+        let mut tags = MetricTags(Arc::new(
             metric
                 .tags_v2
                 .into_iter()
@@ -222,7 +224,7 @@ impl From<Metric> for event::Metric {
                     )
                 })
                 .collect(),
-        );
+        ));
         // The current Vector encoding includes copies of the "single" values of tags in `tags_v2`
         // above. This `extend` will re-add those values, forcing them to become the last added in
         // the value set.
@@ -426,7 +428,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
             .collect();
         // These are the full tag values.
         let tags_v2 = tags
-            .0
+            .into_inner()
             .into_iter()
             .map(|(tag, values)| {
                 let values = values

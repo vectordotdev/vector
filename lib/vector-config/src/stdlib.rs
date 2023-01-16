@@ -6,6 +6,7 @@ use std::{
         NonZeroU8, NonZeroUsize,
     },
     path::PathBuf,
+    sync::Arc,
     time::Duration,
 };
 
@@ -300,5 +301,27 @@ impl Configurable for Duration {
         Ok(crate::schema::generate_struct_schema(
             properties, required, None,
         ))
+    }
+}
+
+impl<T: Configurable> Configurable for Arc<T> {
+    fn is_optional() -> bool {
+        T::is_optional()
+    }
+
+    fn referenceable_name() -> Option<&'static str> {
+        T::referenceable_name()
+    }
+
+    fn metadata() -> Metadata<Self> {
+        todo!("FIXME T::metadata().into()")
+    }
+
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        T::generate_schema(gen)
+    }
+
+    fn validate_metadata(_metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        todo!("FIXME T::validate_metadata(metadata)")
     }
 }
