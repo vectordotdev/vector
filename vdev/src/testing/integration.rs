@@ -29,7 +29,7 @@ fn compose_command(
 
 fn apply_env_vars(command: &mut Command, config: &Environment, integration: &str) {
     if let Some(version) = config.get("version") {
-        let version_env = format!("{}_VERSION", integration.to_uppercase());
+        let version_env = format!("{}_VERSION", integration.replace('-', "_").to_uppercase());
         command.env(version_env, version);
     }
 }
