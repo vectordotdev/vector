@@ -227,3 +227,184 @@ do some seemingly overly complicated things with timestamps. It is worth
 bearing this in mind when looking through existing new code.
 
 All new sources should work like the above.
+
+# Schema
+  
+All sources need to specify their schema - that is a definition of the 
+shape of the event that it will create.
+
+The schema definition is returned from the `outputs` function defined
+by the `SourceConfig` trait.
+
+```rust
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+```
+
+Most sources have a decoder option that will specify the initial schema. One 
+can retrieve the schema by calling:
+
+```rust
+  let schema_definition = self
+      .decoding
+      .schema_definition(log_namespace)
+```
+
+We need to add the metadata that has been adding to the Vector namespace:
+
+```rust
+      .with_standard_vector_source_metadata()
+```
+
+Next we need ta add any source metadata that is created by the source.
+
+```rust
+      .with_source_metadata(
+          NatsSourceConfig::NAME,
+          legacy_subject_key_field,
+          &owned_value_path!("subject"),
+          Kind::bytes(),
+          None,
+      );
+```
+
+Let's look at the parameters:
+
+```rust
+    pub fn with_source_metadata(
+        self,
+        source_name: &str,
+        legacy_path: Option<LegacyKey<OwnedValuePath>>,
+        vector_path: &OwnedValuePath,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self
+```
+
+## source_name
+
+The name of the source - typically something like `NatsSourceConfig::NAME`
+
+## legacy_path
+
+The pathname of the field when inserting in the Legacy namespace. This should be the
+same value as used when inserting the data with `insert_source_metadata`.
+
+## vector_path
+
+The pathname of the field when inserting in the Vector namespace. This should be the
+same value as used when inserting the data with `insert_source_metadata`.
+
+## kind
+
+This is the type the data will be. This is covered in detail below.
+
+## meaning
+
+Some fields are given a meaning. It is possible in VRL to refer to a field by it's 
+meaning regardless of what name has been given to it. Fields with the following meaning
+are used in Vector:
+
+- message
+- timestamp
+- severity (?)
+
+TODO Where can I get a list of all the supported meanings?
+
+Most fields will not have a given meaning, in which case just pass `None`.
+
+
+## Kind
+
+The core principle behind schemas is defining the type, or kind, of data that will
+exist in this field. The following kinds are supported:
+
+### bytes
+
+Any string value.
+
+### integer
+
+An integer value - in Vector this will be a signed 64 bit integer.
+
+### float
+
+A 64 bit float value.
+
+### boolean
+
+Boolean value - either `true` or `false`.
+
+
+### timestamp
+
+A timestamp in the UTC timezone.
+
+### array
+
+An array of values. It is possible to specify the type for any element
+within the array eg. this array will be an array of strings.
+
+```rust
+Kind::array(Collection::empty().with_unknown(Kind::bytes()))
+````
+
+It is also possible to specify the type for specifix indexes in the
+array eg. this array will  have a string at index 0 and and integer
+at index 1:
+
+```rust
+Kind::array(Collection::empty()
+                .with_known(0, Kind::bytes())
+                .with_known(1, Kind::integer()))
+```
+
+These can also be combined. For example an array of strings apart
+from the third index, which will be a timestamp:
+
+```rust
+Kind::array(Collection::empty().with_unknown(Kind::bytes())
+                .with_known(3, Kind::timestamp()))
+````
+
+### object
+
+An object is a map of keys to values. Similar to an array, an object 
+can specify the type for all fields as well as the type for specific
+fields.
+
+An object where all fields will be strings, but wo don't specify what
+those field names are:
+
+```rust
+Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+````
+
+An object with two fields - `reason` containing a string and  `value`
+containing an integer:
+
+```rust
+Kind::object(Collection::empty()
+                .with_known("reason", Kind::bytes())
+                .with_known("value", Kind::integer()))
+```
+
+
+### Multiple types
+
+It is possible to represent a field that could be one of several type.
+
+For example, a string or an integer:
+
+```rust
+Kind::bytes().or_integer()
+```
+
+Often a field may not exist at all, for that we have `or_undefined()`.
+For example, an object with a field called `reason` that may not exist, 
+but if it does it will be a string:
+
+```rust
+Kind::object(Collection::empty()
+              .with_known("reason", Kind::bytes().or_undefined()))
+```
