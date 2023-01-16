@@ -229,7 +229,7 @@ impl Metric {
         self.data.time.timestamp
     }
 
-    /// Gets a reference to the interval (in milliseconds) coverred by this metric, if it exists.
+    /// Gets a reference to the interval (in milliseconds) covered by this metric, if it exists.
     #[inline]
     pub fn interval_ms(&self) -> Option<NonZeroU32> {
         self.data.time.interval_ms
