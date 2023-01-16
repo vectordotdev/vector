@@ -104,7 +104,7 @@ A few details about the Datadog Agents & [Datadog metrics](https://docs.datadogh
     [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/aggregator/sender.go#L227-L252)
   * Dogstatsd metrics are converted to the `MetricSample` structure
     [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/dogstatsd/enrich.go#L87-L137) However Datadog Agents
-    metrics are transformed before being sent, ultimately metrics accounts for two differents kind of payload:
+    metrics are transformed before being sent, ultimately metrics accounts for two different kind of payload:
 * The count, gauge and rate series kind of payload, sent to `/api/v1/series` using the [JSON schema officially
   documented](https://docs.datadoghq.com/api/latest/metrics) with few undocumented [additional
   fields](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/series.go#L45-L57), but this align very well
