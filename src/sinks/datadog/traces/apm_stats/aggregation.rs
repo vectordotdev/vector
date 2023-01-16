@@ -103,7 +103,7 @@ pub struct Aggregator {
     /// The oldeest timestamp we will allow for the current time bucket.
     oldest_timestamp: u64,
 
-    /// Env asociated with the Agent.
+    /// Env associated with the Agent.
     agent_env: Option<String>,
 
     /// Hostname associated with the Agent.
