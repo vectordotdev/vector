@@ -73,7 +73,7 @@ check for compliance, but if we forget to write that unit test, or don't update 
 we want to change the behavior for, say, all sources... then our compliance checking can quickly
 become out-of-sync with reality.
 
-This goes double for commuinity contributions: while the Vector authors might have learned over time
+This goes double for community contributions: while the Vector authors might have learned over time
 to make sure they're emitting the right metrics, and so on, it's essentially impossible for a
 first-time contributor to know to do so unless there is some mechanism in place to tell them to do
 so.
