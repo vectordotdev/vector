@@ -200,7 +200,7 @@ With `customConfig` a Vector configuration can be provided in raw YAML and is pa
 through a `tpl` function to allow for the evaluation of Helm templates contained within.
 Below is an example of values using `customConfig` and templating.
 
-```yaml title="cusomConfig.yaml"
+```yaml title="customConfig.yaml"
 customConfig:
   data_dir: "/custom-data-dir"
   healthchecks:
