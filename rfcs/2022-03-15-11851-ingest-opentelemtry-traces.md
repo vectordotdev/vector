@@ -126,7 +126,7 @@ Based on the [usecases](#usecases) previously detailed the implementation will w
 top-level requirements:
 
 - A Vector trace event shall only contain data relative to one single trace, i.e. traces sources shall create one event
-  for each indivual trace ID and its associated spans and metadata.
+  for each individual trace ID and its associated spans and metadata.
 - Use the Opentelemetry trace format as the common denominator and base the Vector internal representation to ensure :
   - A clear reference point for conversion between trace formats
   - Avoid destructive manipulation by transforms and keep traces object fully functional even after heavy modifications
