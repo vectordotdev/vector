@@ -397,7 +397,7 @@ where
                 .layer(DecompressionLayer::new())
                 .service(http_client);
 
-            // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emmited
+            // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emitted
             // in `HttpClient::send`.
             let response = decompression_service.call(request).await?;
 
