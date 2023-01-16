@@ -279,7 +279,7 @@ is rather verbose and comes with complex nested field. The [Datadog approach][sp
 (e.g. the links field is ignored) or encode the complete field into a text representation (e.g. events are encoded using
 JSON) and include the resulting value into the tags (a.k.a Meta) map.
 
-This makes the opposite conversion a bit complicated if we want it to be completely symetrical but there was already an
+This makes the opposite conversion a bit complicated if we want it to be completely symmetrical but there was already an
 [attempt][otlp-dd-trace-receiver] allow Datadog traces ingestion in the OpenTelemetry collector. While this PR was
 closed unmerged this provide a valuable example. Anyways the [otlp-and-other-formats][OpenTelemetry] acknowledges that
 some of the OpenTelemetry construct ends up being stored as tags or annotations in other formats.
