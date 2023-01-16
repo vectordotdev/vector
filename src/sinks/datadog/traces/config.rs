@@ -188,7 +188,7 @@ impl DatadogTracesConfig {
             Arc::clone(&apm_stats_aggregator),
         )?;
 
-        // shutdown= Sender that the sink signals when input stream is exhauseted.
+        // shutdown= Sender that the sink signals when input stream is exhausted.
         // tripwire= Receiver that APM stats flush thread listens for exit signal on.
         let (shutdown, tripwire) = channel::<Sender<()>>();
 
