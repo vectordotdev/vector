@@ -133,7 +133,7 @@ impl<T: EstimatedJsonEncodedSizeOf + Copy> EstimatedJsonEncodedSizeOf for NotNan
     }
 }
 
-/// JSON only support string keys, so `K` is constrainted to anything that can be converted into a
+/// JSON only support string keys, so `K` is constrained to anything that can be converted into a
 /// `str`.
 impl<K, V> EstimatedJsonEncodedSizeOf for BTreeMap<K, V>
 where
@@ -156,7 +156,7 @@ where
     }
 }
 
-/// JSON only support string keys, so `K` is constrainted to anything that can be converted into a
+/// JSON only support string keys, so `K` is constrained to anything that can be converted into a
 /// `str`.
 impl<K, V, S> EstimatedJsonEncodedSizeOf for HashMap<K, V, S>
 where
