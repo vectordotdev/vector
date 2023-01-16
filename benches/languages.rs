@@ -249,7 +249,7 @@ fn benchmark_configs(
 ) {
     vector::test_util::trace_init();
 
-    // only used for debug assertions so assigned to supress unused warning
+    // only used for debug assertions so assigned to suppress unused warning
     let _ = output;
 
     let num_lines = 10_000;

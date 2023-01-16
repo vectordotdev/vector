@@ -264,7 +264,7 @@ releases: "0.19.0": {
 			scopes: ["elasticsearch sink"]
 			description: """
 				A new config option has been added to the `elasticsearch` sink
-				to allow supressing the `type` field from being sent by Vector.
+				to allow suppressing the `type` field from being sent by Vector.
 				This field is deprecated in Elasticsearch v7 and will be removed
 				in v8.
 				"""

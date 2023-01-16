@@ -195,7 +195,7 @@ releases: "0.21.0": {
 				`vector tap`:
 
 				* It now supports tapping inputs via `--inputs-of`
-				* It now reports when the component id patterns provided do not match. It supports `--quiet` to supress
+				* It now reports when the component id patterns provided do not match. It supports `--quiet` to suppress
 				  these messages.
 				* A `--meta` flag was added to include metadata about which component the output events came from.
 
