@@ -600,7 +600,7 @@ const fn validate_payload_size_limits(
     //
     // This only matters for series metrics at the moment, since sketches are encoded in a single
     // shot to their Protocol Buffers representation.  We're "wasting" `header_len` bytes in the
-    // case of sketches, but we're alsdo talking about like 10 bytes: not enough to care about.
+    // case of sketches, but we're also talking about like 10 bytes: not enough to care about.
     let header_len = max_uncompressed_header_len();
     if uncompressed_limit <= header_len {
         return None;
