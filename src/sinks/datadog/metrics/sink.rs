@@ -234,7 +234,7 @@ fn collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) -> Vec<Me
                     should_advance = false;
                 } else {
                     // We hit a counter that _doesn't_ match, but we can't just skip
-                    // it because we also need to evaulate it against all the
+                    // it because we also need to evaluate it against all the
                     // counters that come after it, so we only increment the index
                     // for this inner loop.
                     //
