@@ -241,7 +241,7 @@ releases: "0.23.0": {
 			type: "fix"
 			scopes: ["tag_cardinality_limit transform"]
 			description: """
-				The `tag_cardinality_limit` now corretly deserializes the `action` option. Previously it would return an
+				The `tag_cardinality_limit` now correctly deserializes the `action` option. Previously it would return an
 				error when trying to configure this option.
 				"""
 			pr_numbers: [12979]

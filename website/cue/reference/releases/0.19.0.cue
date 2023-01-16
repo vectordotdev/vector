@@ -336,7 +336,7 @@ releases: "0.19.0": {
 				The `max_length` option available on some `decoding` framers for
 				sources previously caused Vector to stop decoding a given input
 				stream (like a TCP connection) when a frame that was too big was
-				encountered. It now corretly just discards that frame and
+				encountered. It now correctly just discards that frame and
 				continues.
 				"""
 			pr_numbers: [10568]
