@@ -989,7 +989,7 @@ fn bson_size(value: &Bson) -> usize {
         Bson::Symbol(value) => value.size_of(),
         Bson::Decimal128(value) => value.bytes().size_of(),
         Bson::DbPointer(_) => {
-            // DbPointer parts are not public and cannot be evaludated
+            // DbPointer parts are not public and cannot be evaluated
             0
         }
         Bson::Null | Bson::Undefined | Bson::MaxKey | Bson::MinKey => 0,
