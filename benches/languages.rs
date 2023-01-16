@@ -319,7 +319,7 @@ fn benchmark_configs(
                             for output_line in &output_lines {
                                 let actual: serde_json::map::Map<String, serde_json::Value> =
                                     serde_json::from_str(output_line).unwrap();
-                                // avoids asserting the actual == expected as the socket trasform
+                                // avoids asserting the actual == expected as the socket transform
                                 // adds dynamic keys like timestamp
                                 for (key, value) in output.iter() {
                                     assert_eq!(Some(value), actual.get(key), "for key {}", key,);
