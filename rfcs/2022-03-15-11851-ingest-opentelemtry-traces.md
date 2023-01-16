@@ -68,7 +68,7 @@ A completely different usecase is traces sampling, but it cover two major variat
   p99, this would require comparison against histogram / sketches.
 
 Another valuable identified usecase is the ability to provide seamless conversion between any kind of Vector supported
-traces, this means that the Vector internal traces representation shall be flexible enough to acomodate conversion
+traces, this means that the Vector internal traces representation shall be flexible enough to accommodate conversion
 to/from any trace format in sources and sinks that work with traces. Given the traction from the Opentelemetry project,
 and the fact that it [comes with a variety of fields][otlp-trace-proto-def] to cover most usecases.
 
