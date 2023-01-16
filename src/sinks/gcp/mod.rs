@@ -26,6 +26,7 @@ pub struct GcpTypedResource {
 
     /// Type-specific labels.
     #[serde(flatten)]
+    #[configurable(metadata(docs::additional_props_description = "A type-specific label."))]
     pub labels: std::collections::HashMap<String, String>,
 }
 

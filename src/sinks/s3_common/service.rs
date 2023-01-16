@@ -5,6 +5,7 @@ use aws_sdk_s3::{
     types::{ByteStream, SdkError},
     Client as S3Client,
 };
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
@@ -111,7 +112,7 @@ impl Service<S3Request> for S3Service {
             .content_type
             .or_else(|| Some("text/x-log".to_owned()));
 
-        let content_md5 = base64::encode(md5::Md5::digest(&request.body));
+        let content_md5 = BASE64_STANDARD.encode(md5::Md5::digest(&request.body));
 
         let tagging = options.tags.map(|tags| {
             let mut tagging = url::form_urlencoded::Serializer::new(String::new());

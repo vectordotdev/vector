@@ -61,17 +61,29 @@ base: components: sources: demo_logs: configuration: {
 	}
 	format: {
 		description: "The format of the randomly generated output."
-		required:    false
-		type: string: {
-			default: "json"
-			enum: {
-				apache_common: "Randomly generated logs in [Apache common](\\(urls.apache_common)) format."
-				apache_error:  "Randomly generated logs in [Apache error](\\(urls.apache_error)) format."
-				bsd_syslog:    "Randomly generated logs in Syslog format ([RFC 3164](\\(urls.syslog_3164)))."
-				json:          "Randomly generated HTTP server logs in [JSON](\\(urls.json)) format."
-				shuffle:       "Lines are chosen at random from the list specified using `lines`."
-				syslog:        "Randomly generated logs in Syslog format ([RFC 5424](\\(urls.syslog_5424)))."
-			}
+		required:    true
+		type: string: enum: {
+			apache_common: """
+				Randomly generated logs in [Apache common][apache_common] format.
+				[apache_common]: https://httpd.apache.org/docs/current/logs.html#common
+				"""
+			apache_error: """
+				Randomly generated logs in [Apache error][apache_error] format.
+				[apache_error]: https://httpd.apache.org/docs/current/logs.html#errorlog
+				"""
+			bsd_syslog: """
+				Randomly generated logs in Syslog format ([RFC 3164][syslog_3164]).
+				[syslog_3164]: https://tools.ietf.org/html/rfc3164
+				"""
+			json: """
+				Randomly generated HTTP server logs in [JSON][json] format.
+				[json]: https://en.wikipedia.org/wiki/JSON
+				"""
+			shuffle: "Lines are chosen at random from the list specified using `lines`."
+			syslog: """
+				Randomly generated logs in Syslog format ([RFC 5424][syslog_5424]).
+				[syslog_5424]: https://tools.ietf.org/html/rfc5424
+				"""
 		}
 	}
 	framing: {
@@ -157,13 +169,17 @@ base: components: sources: demo_logs: configuration: {
 			`interval` to `0.0`.
 			"""
 		required: false
-		type: float: default: 1.0
+		type: float: {
+			default: 1.0
+			examples: [1.0, 0.1, 0.01]
+			unit: "seconds"
+		}
 	}
 	lines: {
 		description:   "The list of lines to output."
 		relevant_when: "format = \"shuffle\""
 		required:      true
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["line1", "line2"]
 	}
 	sequence: {
 		description:   "If `true`, each output line starts with an increasing sequence number, beginning with 0."

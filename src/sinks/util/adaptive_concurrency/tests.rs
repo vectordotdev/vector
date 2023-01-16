@@ -426,7 +426,7 @@ async fn run_test(params: TestParams) -> TestResults {
     let demo_logs = DemoLogsConfig::repeat(
         vec!["line 1".into()],
         params.requests,
-        params.interval,
+        Duration::from_secs_f64(params.interval),
         None,
     );
     config.add_source("in", demo_logs);

@@ -71,7 +71,7 @@ base: components: sources: dnstap: configuration: {
 			This should not typically needed to be changed.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: unit: "bytes"
 	}
 	socket_send_buffer_size: {
 		description: """

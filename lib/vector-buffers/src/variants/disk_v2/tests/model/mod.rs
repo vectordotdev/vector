@@ -3,13 +3,12 @@ use std::{
     io::Cursor,
     sync::{
         atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     task::Poll,
 };
 
 use crossbeam_queue::SegQueue;
-use parking_lot::Mutex;
 use proptest::{prop_assert, prop_assert_eq, proptest};
 use temp_dir::TempDir;
 use tokio::runtime::Builder;
@@ -64,12 +63,12 @@ impl FilesystemModel {
     }
 
     fn open_file(&self, id: u16) -> Option<FileModel> {
-        let files = self.files.lock();
+        let files = self.files.lock().expect("poisoned");
         files.get(&id).cloned()
     }
 
     fn create_file(&self, id: u16) -> Option<FileModel> {
-        let mut files = self.files.lock();
+        let mut files = self.files.lock().expect("poisoned");
         if files.contains_key(&id) {
             return None;
         }
@@ -81,7 +80,7 @@ impl FilesystemModel {
     }
 
     fn delete_file(&self, id: u16) -> bool {
-        let mut files = self.files.lock();
+        let mut files = self.files.lock().expect("poisoned");
         files.remove(&id).is_some()
     }
 }

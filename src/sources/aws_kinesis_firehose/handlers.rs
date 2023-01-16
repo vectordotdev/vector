@@ -1,5 +1,6 @@
 use std::io::Read;
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::StreamDecodingError;
@@ -195,7 +196,9 @@ fn decode_record(
     record: &EncodedFirehoseRecord,
     compression: Compression,
 ) -> Result<Bytes, RecordDecodeError> {
-    let buf = base64::decode(record.data.as_bytes()).context(Base64Snafu {})?;
+    let buf = BASE64_STANDARD
+        .decode(record.data.as_bytes())
+        .context(Base64Snafu {})?;
 
     if buf.is_empty() {
         return Ok(Bytes::default());

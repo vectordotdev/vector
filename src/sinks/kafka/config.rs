@@ -70,6 +70,9 @@ pub struct KafkaSinkConfig {
     ///
     /// [config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "A librdkafka configuration option."
+    ))]
     pub librdkafka_options: HashMap<String, String>,
 
     /// The log field name to use for the Kafka headers.

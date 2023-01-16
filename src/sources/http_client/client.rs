@@ -9,7 +9,6 @@ use snafu::ResultExt;
 use std::collections::HashMap;
 use tokio_util::codec::Decoder as _;
 
-use crate::sources::util::http_client;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
@@ -26,6 +25,7 @@ use crate::{
     tls::{TlsConfig, TlsSettings},
     Result,
 };
+use crate::{components::validation::*, sources::util::http_client};
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
@@ -53,6 +53,7 @@ pub struct HttpClientConfig {
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
     /// appended to any parameters manually provided in the `endpoint` option.
     #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     pub query: HashMap<String, Vec<String>>,
 
     /// Decoder to use on the HTTP responses.
@@ -66,8 +67,10 @@ pub struct HttpClientConfig {
     pub framing: FramingConfig,
 
     /// Headers to apply to the HTTP requests.
+    ///
     /// One or more values for the same header can be provided.
     #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
     pub headers: HashMap<String, Vec<String>>,
 
     /// Specifies the action of the HTTP request.
@@ -127,8 +130,7 @@ impl SourceConfig for HttpClientConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         // build the decoder
-        let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+        let decoder = self.get_decoding_config(Some(log_namespace)).build();
 
         let content_type = self.decoding.content_type(&self.framing).to_string();
 
@@ -167,6 +169,54 @@ impl SourceConfig for HttpClientConfig {
 
     fn can_acknowledge(&self) -> bool {
         false
+    }
+}
+
+impl ValidatableComponent for HttpClientConfig {
+    fn component_name(&self) -> &'static str {
+        Self::NAME
+    }
+
+    fn component_type(&self) -> ComponentType {
+        ComponentType::Source
+    }
+
+    fn component_configuration(&self) -> ComponentConfiguration {
+        ComponentConfiguration::Source(self.clone().into())
+    }
+
+    fn external_resource(&self) -> Option<ExternalResource> {
+        let uri = Uri::from_maybe_shared(self.endpoint.clone())
+            .expect("should not fail to build request URI");
+        let method = Some(self.method.into());
+        let decoding_config = self.get_decoding_config(None);
+
+        Some(ExternalResource::new(
+            ResourceDirection::Pull,
+            HttpResourceConfig::from_parts(uri, method),
+            decoding_config,
+        ))
+    }
+}
+
+impl HttpClientConfig {
+    #[cfg(test)]
+    pub fn validation() -> Self {
+        Self {
+            endpoint: "http://127.0.0.1:9898/logs".to_string(),
+            scrape_interval_secs: 1,
+            decoding: DeserializerConfig::Json,
+            ..Default::default()
+        }
+    }
+
+    fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
+        let decoding = self.decoding.clone();
+        let framing = self.framing.clone();
+        let log_namespace =
+            log_namespace.unwrap_or_else(|| self.log_namespace.unwrap_or(false).into());
+
+        DecodingConfig::new(framing, decoding, log_namespace)
     }
 }
 

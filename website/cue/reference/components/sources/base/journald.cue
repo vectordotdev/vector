@@ -46,7 +46,8 @@ base: components: sources: journald: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			required: true
+			description: "A field/value pair."
+			required:    true
 			type: array: items: type: string: {}
 		}
 	}
@@ -70,7 +71,8 @@ base: components: sources: journald: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			required: true
+			description: "A field/value pair."
+			required:    true
 			type: array: items: type: string: {}
 		}
 	}
