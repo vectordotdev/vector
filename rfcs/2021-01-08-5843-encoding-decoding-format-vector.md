@@ -27,7 +27,7 @@ I'm fairly certain that this should not require a docs entry as it's largely int
 
 Unfortunately in most of my research I've pretty well come to the conclusion that encoding formats as a domain are rife with technical and political failures. That is to say, in some regard or another, every format from JSON to Bincode is going to force a tradeoff between correctness, performance, features or tooling and maintenance overhead. Inlined below here is a reasonable starting point on performance. It's taken from the [NoProto project](https://github.com/only-cliches/NoProto) since they're regularly updating their benchmarks. They've also done an excellent job of enumerating some of the aspects to consider when making a decision of this nature and their read on the space very much mirrors my own thinking in many ways.
 
-For the below data, Encodes and Decodes are ops/sec so higher is better while size before and after compression lower is better. This list is far from exhaustive and specifcially lacks a serde_json comparison which is unfortunate but other benches out there do include them (though obviously a different benchmark makes cross comparison difficult).
+For the below data, Encodes and Decodes are ops/sec so higher is better while size before and after compression lower is better. This list is far from exhaustive and specifically lacks a serde_json comparison which is unfortunate but other benches out there do include them (though obviously a different benchmark makes cross comparison difficult).
 
 | Library           | Encode | Decode All | Decode 1 | Update 1 | Size (bytes) | Size (Zlib) |
 | ----------------- | ------ | ---------- | -------- | -------- | ------------ | ----------- |
