@@ -2,7 +2,9 @@ use std::{path::Path, path::PathBuf, process::Command};
 
 use anyhow::{bail, Context, Result};
 
-use super::runner::{ContainerTestRunnerBase as _, IntegrationTestRunner, NETWORK_ENV_VAR};
+use super::runner::{
+    ContainerTestRunnerBase as _, IntegrationTestRunner, CONTAINER_TOOL, NETWORK_ENV_VAR,
+};
 use super::{config::Environment, config::IntegrationTestConfig, state};
 use crate::app::CommandExt as _;
 
@@ -16,7 +18,9 @@ fn compose_command(
         .display()
         .to_string();
 
-    let mut command = Command::new("docker-compose");
+    let mut command = CONTAINER_TOOL.clone();
+    command.push("-compose");
+    let mut command = Command::new(command);
     command.args(["--file", &compose_file]);
     command.args(args);
     command.current_dir(test_dir);
