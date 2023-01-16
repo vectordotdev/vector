@@ -420,7 +420,7 @@ Correctness validator.
 
 The validation runner itself is responsible for collecting all of this information and providing it
 to the validator, rather than the validator having to collect it for itself. As a benefit, this
-means that validators themselves could also be unit tested rather easily, rathering than having to
+means that validators themselves could also be unit tested rather easily, rather than having to
 mutate global state, or singleton objects, to ensure their logic is correctly driven.
 
 #### The component runner
