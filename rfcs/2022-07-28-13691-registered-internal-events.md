@@ -13,7 +13,7 @@ solving that problem that can then be applied incrementally to the most expensiv
 
 - Custom registered metric in the `SourceSender` that should be an `InternalEvent`:
   https://github.com/vectordotdev/vector/pull/13611
-- Performance boost from emiiting events once per batch:
+- Performance boost from emitting events once per batch:
   https://github.com/vectordotdev/vector/pull/13739
 
 ## Scope
