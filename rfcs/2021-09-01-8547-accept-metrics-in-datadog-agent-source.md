@@ -80,7 +80,7 @@ The current `dd_url` endpoint configuration has a [conditional
 behavior](https://github.com/DataDog/datadog-agent/blob/main/pkg/config/config.go#L1199-L1201) (also
 [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/forwarder_health.go#L131-L143)). I.e. if
 `dd_url` contains a known pattern (i.e. it has a suffix that matches a Datadog site) some extra hostname manipulation
-happens. But overal, the following paths are expected to be supported on the host behind `dd_url`:
+happens. But overall, the following paths are expected to be supported on the host behind `dd_url`:
 
 * `/api/v1/validate` for API key validation
 * `/api/v1/check_run` for check submission
