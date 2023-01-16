@@ -409,7 +409,7 @@ configuration: {
 								"""
 							required: true
 							type: array: {
-								examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrappper"]]
+								examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrapper"]]
 								items: type: string: {}
 							}
 						}
