@@ -1399,7 +1399,7 @@ mod tests {
         // granularity.
         //
         // This test uses a far larger range of values, and takes 60-70 seconds, hence why we've
-        // guared it here behind a cfg flag.
+        // guarded it here behind a cfg flag.
         let config = Config::default();
         let min_value = 1.0e-6;
         let max_value = i64::MAX as f32;
