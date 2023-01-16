@@ -178,7 +178,7 @@ And finally API key management will be the same as it is for other Datadog sourc
 
 ### Implementation
 
-Each group is relatively independant:
+Each group is relatively independent:
 
 * Reorganise the `datadog_agent` source:
   * Extend the `named_outputs` feature, that is available four transforms, to sources so they can expose multiple named
