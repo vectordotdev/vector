@@ -992,7 +992,7 @@ fn generate_enum_variant_subschema(
 /// Sometimes, however, we must refer to them with their disambiguated form: `T::<...>`. This is due
 /// to a limitation in syntax parsing between types in statement versus expression position.
 ///
-/// Statement position would be somehwere like declaring a field on a struct, where using angle
+/// Statement position would be somewhere like declaring a field on a struct, where using angle
 /// brackets has no ambiguous meaning, as you can't compare two items as part of declaring a struct
 /// field. Conversely, expression position implies anywhere we could normally provide an expression,
 /// and expressions can certainly contain comparisons. As such, we need to use the disambiguated
