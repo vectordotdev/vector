@@ -3745,7 +3745,7 @@ device_parsers:
     model_replacement: '$1'
 
   #########
-  # Papayre
+  # Papyre
   # @ref: http://grammata.es/
   #########
   - regex: '; *(papyre)[ _\-]([^;/]+?)(?: Build|\) AppleWebKit)'
