@@ -1,7 +1,7 @@
 # RFC 11851 - 2022-03-15 - Opentelemetry traces source
 
 This RFC aims to describes how to add an OpenTelemetry traces source to Vector and also address Vector internals
-adjustement required for future extension to other trace types.
+adjustment required for future extension to other trace types.
 
 ## Context
 
