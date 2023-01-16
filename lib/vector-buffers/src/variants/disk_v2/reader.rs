@@ -862,7 +862,7 @@ where
 
                     // We have to remove 1 from the event count here because otherwise the ID would
                     // be the _next_ record's ID we'd expect, not the last ID of the record we are
-                    // ackowledged up to. (Record IDs start at N and consume up to N+M-1 where M is
+                    // acknowledged up to. (Record IDs start at N and consume up to N+M-1 where M is
                     // the number of events in the record, which is how we can determine the event
                     // count from the record IDs alone, without having to read every record in the
                     // buffer during startup.)
