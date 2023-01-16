@@ -5,6 +5,7 @@ use http::Request;
 use http::StatusCode;
 use hyper::Body;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::http::Auth;
 use crate::http::HttpClient;
@@ -71,7 +72,7 @@ pub struct DatabendHttpResponse {
     pub session_id: String,
     pub session: Option<BTreeMap<String, String>>,
     pub schema: Vec<DatabendHttpResponseSchemaField>,
-    pub data: Vec<Vec<String>>,
+    pub data: Vec<Vec<Value>>,
     pub state: String,
     pub error: Option<DatabendHttpResponseError>,
     // pub stats: BTreeMap<String, String>,

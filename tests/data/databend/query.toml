@@ -1,0 +1,35 @@
+[query]
+max_active_sessions = 256
+wait_timeout_mills = 5000
+
+# Databend Query HTTP Handler.
+http_handler_host = "0.0.0.0"
+http_handler_port = 8000
+
+tenant_id = "default"
+cluster_id = "default"
+
+[[query.users]]
+name = "vector"
+auth_type = "no_password"
+
+[log]
+
+[log.file]
+level = "WARN"
+format = "text"
+dir = "./.databend/logs"
+
+[meta]
+endpoints = ["0.0.0.0:9191"]
+username = "root"
+password = "root"
+
+[storage]
+type = "s3"
+
+[storage.s3]
+bucket = "databend"
+endpoint_url = "http://minio:9000"
+access_key_id = "minioadmin"
+secret_access_key = "minioadmin"

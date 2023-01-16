@@ -1,0 +1,57 @@
+version: "3"
+
+services:
+  minio:
+    image: docker.io/minio/minio
+    ports:
+      - "9000:9000"
+    command: server /data
+    volumes:
+      - ${PWD}/tests/data/databend/data:/data
+  createbuckets:
+    image: docker.io/minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "/usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin; /usr/bin/mc rm -r --force myminio/databend; /usr/bin/mc mb myminio/databend; exit 0;"
+  databend:
+    image: docker.io/datafuselabs/databend
+    depends_on:
+      - minio
+      - createbuckets
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${PWD}/tests/data/databend/query.toml:/databend-query.toml:ro
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "nextest"
+      - "run"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "databend-integration-tests"
+      - "--lib"
+      - "::databend::"
+    environment:
+      - DATABEND_ENDPOINT=http://databend:8000
+    depends_on:
+      - databend
+    volumes:
+      - ${PWD}:/code
+      - target:/code/target
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+volumes:
+  target: {}
+  cargogit: {}
+  cargoregistry: {}
