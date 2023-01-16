@@ -55,7 +55,7 @@ components: _nats: {
 			type: object: options: {
 				strategy: {
 					common:      false
-					description: "The strategy used to authenticate with the NATS server. See https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro. For TLS Client Certiificate Auth, use the TLS configuration."
+					description: "The strategy used to authenticate with the NATS server. See https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro. For TLS Client Certificate Auth, use the TLS configuration."
 					required:    false
 					type: string: {
 						default: "user_password"
