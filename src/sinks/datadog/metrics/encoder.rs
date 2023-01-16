@@ -81,7 +81,7 @@ impl FinishError {
     pub const fn as_error_type(&self) -> &'static str {
         match self {
             Self::CompressionFailed { .. } => "compression_failed",
-            Self::PendingEncodeFailed { .. } => "pendiong_encode_failed",
+            Self::PendingEncodeFailed { .. } => "pending_encode_failed",
             Self::TooLarge { .. } => "too_large",
         }
     }
