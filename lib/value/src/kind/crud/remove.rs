@@ -170,7 +170,7 @@ impl Kind {
 enum CompactOptions {
     /// Compaction will always happen.
     Always,
-    /// Compaction may or may not happen. Both possibilites should be merged together.
+    /// Compaction may or may not happen. Both possibilities should be merged together.
     Maybe,
     /// Compaction will never happen.
     Never,
