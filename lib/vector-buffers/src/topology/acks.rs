@@ -790,7 +790,7 @@ mod tests {
                                 },
                                 PendingMarkerLength::Assumed(_) => panic!("should never have an assumed length at back"),
                                 PendingMarkerLength::Unknown => {
-                                    // Now that we have an ID range, we have enough infornation to
+                                    // Now that we have an ID range, we have enough information to
                                     // give the unknown length marker an assumed length.
                                     let len = id.wrapping_sub(back_id);
                                     let (_, back_len_mut) = marker_stack.back_mut().expect("must exist");
