@@ -96,22 +96,11 @@ pub async fn http_query(
     auth: Option<Auth>,
     request: DatabendHttpRequest,
 ) -> Result<DatabendHttpResponse, DatabendError> {
-    let api_uri = format!("{}v1/query", endpoint);
-    let req_body = Body::from(
-        crate::serde::json::to_bytes(&request)
-            .map_err(|err| DatabendError::Encode {
-                error: err,
-                message: "query request".to_string(),
-            })?
-            .freeze(),
-    );
+    let api_uri = endpoint.append_path("/v1/query")?.to_string();
+    let req_body = Body::from(crate::serde::json::to_bytes(&request)?.freeze());
     let mut request = Request::post(api_uri)
         .header("Content-Type", "application/json")
-        .body(req_body)
-        .map_err(|err| DatabendError::Http {
-            error: err,
-            message: "query request".to_string(),
-        })?;
+        .body(req_body)?;
     if let Some(a) = auth {
         a.apply(&mut request);
     }
@@ -130,18 +119,9 @@ pub async fn http_query(
         });
     }
 
-    let body_bytes = hyper::body::to_bytes(response.into_body())
-        .await
-        .map_err(|err| DatabendError::Hyper {
-            error: err,
-            message: "query response".to_string(),
-        })?;
+    let body_bytes = hyper::body::to_bytes(response.into_body()).await?;
 
-    let resp: DatabendHttpResponse =
-        serde_json::from_slice(&body_bytes).map_err(|err| DatabendError::Decode {
-            error: err,
-            message: "query response".to_string(),
-        })?;
+    let resp: DatabendHttpResponse = serde_json::from_slice(&body_bytes)?;
 
     match resp.error {
         Some(err) => Err(DatabendError::Server {
@@ -165,13 +145,7 @@ pub async fn upload_with_presigned(
     data: Bytes,
 ) -> Result<(), DatabendError> {
     let req_body = Body::from(data);
-    let request =
-        Request::put(presigned.url)
-            .body(req_body)
-            .map_err(|err| DatabendError::Http {
-                error: err,
-                message: "presigned upload".to_string(),
-            })?;
+    let request = Request::put(presigned.url).body(req_body)?;
 
     let response = client
         .send(request)

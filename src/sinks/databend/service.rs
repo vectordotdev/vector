@@ -112,22 +112,20 @@ impl DatabendService {
         }
     }
 
-    pub(crate) fn new_stage_location(&self) -> String {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
+    pub(crate) fn new_stage_location(&self) -> Result<String, DatabendError> {
+        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
         let suffix = thread_rng()
             .sample_iter(&Alphanumeric)
             .take(8)
             .map(char::from)
             .collect::<String>();
-        format!(
+        Ok(format!(
             "@~/vector/{}/{}/{}-{}",
             self.database,
             self.table,
             now.as_secs(),
             suffix,
-        )
+        ))
     }
 
     pub(crate) async fn get_presigned_url(
@@ -158,11 +156,7 @@ impl DatabendService {
 
         // resp.data[0]: [ "PUT", "{\"host\":\"s3.us-east-2.amazonaws.com\"}", "https://s3.us-east-2.amazonaws.com/query-storage-xxxxx/tnxxxxx/stage/user/xxxx/xxx?" ]
         let method = resp.data[0][0].clone();
-        let headers: BTreeMap<String, String> = serde_json::from_str(resp.data[0][1].as_str())
-            .map_err(|err| DatabendError::Decode {
-                error: err,
-                message: "get presigned url".to_string(),
-            })?;
+        let headers: BTreeMap<String, String> = serde_json::from_str(resp.data[0][1].as_str())?;
         let mut url = resp.data[0][2].clone();
 
         // HACK: tmp fix for aliyun internal endpoint
@@ -227,7 +221,7 @@ impl Service<DatabendRequest> for DatabendService {
         let metadata = request.get_metadata();
 
         let future = async move {
-            let stage_location = service.new_stage_location();
+            let stage_location = service.new_stage_location()?;
             let presigned_resp = service.get_presigned_url(&stage_location).await?;
             upload_with_presigned(service.client.clone(), presigned_resp, request.data).await?;
             service.insert_with_stage(&stage_location).await?;
