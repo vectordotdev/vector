@@ -87,12 +87,14 @@ components: sinks: databend: {
 			body: """
 				The `Databend` sink will do a 3-step batch sink by default:
 				1. Get a presigned url for object storage before a batch by the query:
-				```
-				PRESIGN UPLOAD @stage_name/stage_path;
-				```
+				    ```sql
+				    PRESIGN UPLOAD @stage_name/stage_path;
+				    ```
+				    The `stage_name` default to user stage: `~`.
+				    The `stage_path` generated from: `vector/{database}/{table}/{timestamp}-{random_suffix}`
 				2. Format data into ndjson, and upload directly into object storage with the presigned url.
-				3. Insert with the uploaded file with stage attachment in previous step:
-				  https://databend.rs/doc/sql-commands/dml/dml-insert#insert-with-stage-attachment
+				3. Insert with the uploaded file with stage attachment in previous step.
+				    ref: https://databend.rs/doc/sql-commands/dml/dml-insert#insert-with-stage-attachment
 				"""
 		}
 	}
