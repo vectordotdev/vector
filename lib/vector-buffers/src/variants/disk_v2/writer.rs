@@ -398,7 +398,7 @@ where
             "must always be able to fit at least one record into a data file"
         );
 
-        // We subtract the length of the record header from our allowe maximum record size, because we have to make sure
+        // We subtract the length of the record header from our allowed maximum record size, because we have to make sure
         // that when we go to actually wrap and serialize the encoded record, we're limiting the actual bytes we write
         // to disk to within `max_record_size`.
         //
