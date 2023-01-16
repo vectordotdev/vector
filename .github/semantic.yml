@@ -47,7 +47,7 @@ scopes:
   - exceptions # Anything related to Vector's exception events.
   - external docs # Anything related to Vector's external, public documentation
   - filtering # Anything related to filtering within Vector
-  - healthchecks # Anything related to Vector's healtchecks
+  - healthchecks # Anything related to Vector's healthchecks
   - internal docs # Anything related to Vector's internal documentation
   - logs # Anything related to Vector's log events
   - metrics # Anything related to Vector's metrics events

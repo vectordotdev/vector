@@ -331,7 +331,7 @@ releases: "0.18.0": {
 			scopes: ["influxdb_logs sink", "influxdb_metrics sink"]
 			description: """
 				The `influxdb_metrics` and `influxdb_logs` sinks now use `/ping` for
-				heathchecks rather than `/health` to work with Influx DB 2 Cloud.
+				healthchecks rather than `/health` to work with Influx DB 2 Cloud.
 				"""
 		},
 		{
