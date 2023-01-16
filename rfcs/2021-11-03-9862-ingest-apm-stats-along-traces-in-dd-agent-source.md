@@ -257,7 +257,7 @@ alternative would be to handle different Datadog Agent in a dedicated source:
   would probably became an alias for `datadog_logs` or `datadog_metrics` before being deprecated),
 
 This would lead to the following config, functionally identical to the [snippet above](#user-experience), a bit longer
-but still very straighforward and easily readable (note that having multiple binding addresses may translate to more
+but still very straightforward and easily readable (note that having multiple binding addresses may translate to more
 parameter in later work around helm charts):
 
 ```toml
