@@ -306,7 +306,7 @@ option.
 will borrow most of the OpenTelemetry to allow straightforward trace conversion to the newer Vector internal
 representation. Regarding `datadog_agent` source and `datadog_traces` sink the conversion to/from this newer trace
 representation will follow existing logic and ensure that standard usecases (like introducing Vector between the Datadog
-intake and the `trace agent`) do not signigicantly change the end-to-end behaviour. Some top-level information (Like
+intake and the `trace agent`) do not significantly change the end-to-end behaviour. Some top-level information (Like
 trace ID, trace-wide tags/metrics, the original format) are likely to be added to the internal trace representation for
 efficiency and convenience.
 Trace would not get native `VrlTarget` representation anymore, there is a bigger discussion there that should probably
