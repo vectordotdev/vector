@@ -105,7 +105,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
     VERSION_TAG="test-$TEST_RUN_ID"
     BASE_TAG="debian"
 
-    # Build docker image with Vector - the same way it's done for releses. Don't
+    # Build docker image with Vector - the same way it's done for releases. Don't
     # do the push - we'll handle it later.
     REPO="$CONTAINER_IMAGE_REPO" \
       CHANNEL="test" \
