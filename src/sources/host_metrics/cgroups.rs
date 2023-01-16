@@ -311,7 +311,7 @@ impl CGroup {
     }
 
     /// Open the file and read its contents. Returns `Ok(Some(filename))` if the file was read
-    /// successfully, `Ok(None)` if it didn't exist, and `Err(…)` if an error happend during the
+    /// successfully, `Ok(None)` if it didn't exist, and `Err(…)` if an error happened during the
     /// process.
     async fn open_read(
         &self,
