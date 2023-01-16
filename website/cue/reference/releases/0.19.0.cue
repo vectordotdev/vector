@@ -93,7 +93,7 @@ releases: "0.19.0": {
 			type: "enhancement"
 			scopes: ["influxdb_logs sink"]
 			description: """
-				A couple of enhancments have been made to the `influxdb_logs`
+				A couple of enhancements have been made to the `influxdb_logs`
 				sink to modify how Vector encodes events.
 
 				A `measurement` config field was added to allow overriding the
