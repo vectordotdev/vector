@@ -7,7 +7,7 @@ pub trait AsMetadata: Sized {
     /// Converts this metadata value into its integer representation.
     fn into_u32(self) -> u32;
 
-    /// Converts an integer repentation of metadata into its real type, if possible.
+    /// Converts an integer representation of metadata into its real type, if possible.
     ///
     /// If the given integer does not represent a valid representation of the given metadata type,
     /// possibly due to including bits not valid for the type, and so on, then `None` will be
