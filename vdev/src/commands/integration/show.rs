@@ -1,8 +1,6 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Args;
-use std::path::PathBuf;
 
-use crate::app;
 use crate::testing::{config::IntegrationTestConfig, state};
 
 /// Show information about integrations
@@ -17,21 +15,18 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         match self.integration {
             None => {
-                let mut entries = vec![];
-                let root_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
-                for entry in root_dir
-                    .read_dir()
-                    .with_context(|| format!("failed to read directory {}", root_dir.display()))?
-                {
-                    let entry = entry?;
-                    if entry.path().is_dir() {
-                        entries.push(entry.file_name().into_string().unwrap());
-                    }
-                }
-                entries.sort();
-
-                for integration in &entries {
-                    display!("{integration}");
+                let entries = IntegrationTestConfig::collect_all()?;
+                let width = entries
+                    .keys()
+                    .fold(0, |width, entry| width.max(entry.len()));
+                for (integration, config) in entries {
+                    let environments = config
+                        .environments()
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    display!("{integration:width$}  {environments}");
                 }
             }
             Some(integration) => {

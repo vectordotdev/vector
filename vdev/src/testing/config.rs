@@ -86,10 +86,9 @@ impl IntegrationTestConfig {
         Ok((test_dir, config))
     }
 
-    #[allow(dead_code)]
-    pub fn collect_all(root: &str) -> Result<BTreeMap<String, Self>> {
+    pub fn collect_all() -> Result<BTreeMap<String, Self>> {
         let mut configs = BTreeMap::new();
-        let tests_dir: PathBuf = [root, "scripts", "integration"].iter().collect();
+        let tests_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
         for entry in tests_dir.read_dir()? {
             let entry = entry?;
             if !entry.path().is_dir() {
