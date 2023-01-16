@@ -836,7 +836,7 @@ proptest! {
             // itself, input actions, and the sequencer.
             //
             // At the very top, we have our input actions, which are mapped one-to-one with the
-            // possible actions that can influence the disk buffer: reaading records, writing
+            // possible actions that can influence the disk buffer: reading records, writing
             // records, flushing writes, and acknowledging reads.
             //
             // After that, we have the model itself, which essentially a barebones re-implementation
