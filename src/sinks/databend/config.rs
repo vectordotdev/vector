@@ -18,8 +18,8 @@ use crate::{
 };
 
 use super::{
+    api::{DatabendAPIClient, DatabendHttpRequest},
     event_encoder::DatabendEventEncoder,
-    healthcheck::select_one,
     service::{DatabendRetryLogic, DatabendService},
     sink::DatabendSink,
 };
@@ -95,19 +95,20 @@ impl SinkConfig for DatabendConfig {
             auth: auth.clone(),
             ..self.clone()
         };
-        let health_client = self.build_client(&cx)?;
-        let healthcheck = select_one(health_client, endpoint.clone(), auth.clone()).boxed();
+        let health_client =
+            DatabendAPIClient::new(self.build_client(&cx)?, endpoint.clone(), auth.clone());
+        let healthcheck = select_one(health_client).boxed();
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let client = self.build_client(&cx)?;
         let database = match config.database {
             None => "default".to_string(),
             Some(db) => db,
         };
         let table = config.table.clone();
-        let service = DatabendService::new(client, endpoint, auth, database, table);
+        let client = DatabendAPIClient::new(self.build_client(&cx)?, endpoint, auth);
+        let service = DatabendService::new(client, database, table);
         let service = ServiceBuilder::new()
             .settings(request_settings, DatabendRetryLogic)
             .service(service);
@@ -132,4 +133,10 @@ impl SinkConfig for DatabendConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
+}
+
+pub(crate) async fn select_one(client: DatabendAPIClient) -> crate::Result<()> {
+    let req = DatabendHttpRequest::new("SELECT 1".to_string());
+    client.query(req).await?;
+    Ok(())
 }

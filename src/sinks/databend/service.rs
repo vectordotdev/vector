@@ -13,12 +13,9 @@ use vector_common::internal_event::CountByteSize;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::stream::DriverResponse;
 
-use crate::http::{Auth, HttpClient};
 use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::util::UriSerde;
 
-use super::api::{http_query, upload_with_presigned};
-use super::api::{DatabendHttpRequest, DatabendPresignedResponse};
+use super::api::{DatabendAPIClient, DatabendHttpRequest, DatabendPresignedResponse};
 use super::error::DatabendError;
 
 #[derive(Clone)]
@@ -47,9 +44,7 @@ impl RetryLogic for DatabendRetryLogic {
 
 #[derive(Clone)]
 pub struct DatabendService {
-    client: HttpClient,
-    endpoint: UriSerde,
-    auth: Option<Auth>,
+    client: DatabendAPIClient,
     database: String,
     table: String,
 }
@@ -97,16 +92,12 @@ impl DriverResponse for DatabendResponse {
 
 impl DatabendService {
     pub(crate) const fn new(
-        client: HttpClient,
-        endpoint: UriSerde,
-        auth: Option<Auth>,
+        client: DatabendAPIClient,
         database: String,
         table: String,
     ) -> DatabendService {
         DatabendService {
             client,
-            endpoint,
-            auth,
             database,
             table,
         }
@@ -133,13 +124,7 @@ impl DatabendService {
         stage_location: &str,
     ) -> Result<DatabendPresignedResponse, DatabendError> {
         let req = DatabendHttpRequest::new(format!("PRESIGN UPLOAD {}", stage_location));
-        let resp = http_query(
-            self.client.clone(),
-            self.endpoint.clone(),
-            self.auth.clone(),
-            req,
-        )
-        .await?;
+        let resp = self.client.query(req).await?;
 
         if resp.data.len() != 1 {
             return Err(DatabendError::Server {
@@ -194,15 +179,7 @@ impl DatabendService {
             Some(file_format_options),
             Some(copy_options),
         );
-
-        let _ = http_query(
-            self.client.clone(),
-            self.endpoint.clone(),
-            self.auth.clone(),
-            req,
-        )
-        .await?;
-
+        let _ = self.client.query(req).await?;
         Ok(())
     }
 }
@@ -223,7 +200,10 @@ impl Service<DatabendRequest> for DatabendService {
         let future = async move {
             let stage_location = service.new_stage_location()?;
             let presigned_resp = service.get_presigned_url(&stage_location).await?;
-            upload_with_presigned(service.client.clone(), presigned_resp, request.data).await?;
+            service
+                .client
+                .upload_with_presigned(presigned_resp, request.data)
+                .await?;
             service.insert_with_stage(&stage_location).await?;
             Ok(DatabendResponse { metadata })
         };

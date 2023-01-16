@@ -5,19 +5,16 @@ pub enum DatabendError {
     #[snafu(display("Server responded with an error: {}, {}", code, message))]
     Server { code: i64, message: String },
 
-    #[snafu(display("Failed to make HTTP(S) request: {}: {}", message, error))]
-    Request {
-        error: crate::http::HttpError,
-        message: String,
-    },
+    #[snafu(display("Parse response failed: {}", response))]
+    Parser { response: String },
 
-    #[snafu(display("Component Internal error: {}", message))]
-    Internal { message: String },
+    #[snafu(display("Client error: {}", message))]
+    Client { message: String },
 }
 
 impl From<crate::Error> for DatabendError {
     fn from(error: crate::Error) -> Self {
-        Self::Internal {
+        Self::Client {
             message: error.to_string(),
         }
     }
@@ -25,7 +22,7 @@ impl From<crate::Error> for DatabendError {
 
 impl From<serde_json::Error> for DatabendError {
     fn from(error: serde_json::Error) -> Self {
-        Self::Internal {
+        Self::Client {
             message: error.to_string(),
         }
     }
@@ -33,7 +30,7 @@ impl From<serde_json::Error> for DatabendError {
 
 impl From<std::time::SystemTimeError> for DatabendError {
     fn from(error: std::time::SystemTimeError) -> Self {
-        Self::Internal {
+        Self::Client {
             message: error.to_string(),
         }
     }
@@ -41,7 +38,7 @@ impl From<std::time::SystemTimeError> for DatabendError {
 
 impl From<http::Error> for DatabendError {
     fn from(error: http::Error) -> Self {
-        Self::Internal {
+        Self::Client {
             message: error.to_string(),
         }
     }
@@ -49,7 +46,15 @@ impl From<http::Error> for DatabendError {
 
 impl From<hyper::Error> for DatabendError {
     fn from(error: hyper::Error) -> Self {
-        Self::Internal {
+        Self::Client {
+            message: error.to_string(),
+        }
+    }
+}
+
+impl From<crate::http::HttpError> for DatabendError {
+    fn from(error: crate::http::HttpError) -> Self {
+        Self::Client {
             message: error.to_string(),
         }
     }

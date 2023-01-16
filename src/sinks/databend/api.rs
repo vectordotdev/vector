@@ -69,7 +69,7 @@ pub struct DatabendHttpResponseError {
 pub struct DatabendHttpResponse {
     pub id: String,
     pub session_id: String,
-    pub session: BTreeMap<String, String>,
+    pub session: Option<BTreeMap<String, String>>,
     pub schema: Vec<DatabendHttpResponseSchemaField>,
     pub data: Vec<Vec<String>>,
     pub state: String,
@@ -78,58 +78,8 @@ pub struct DatabendHttpResponse {
     // pub affect: Option<String>,
     pub stats_uri: String,
     pub final_uri: String,
-    pub next_uri: String,
+    pub next_uri: Option<String>,
     pub kill_uri: String,
-}
-
-// pub async fn query_page(
-//     client: HttpClient,
-//     next_url: String,
-//     auth: Option<Auth>,
-//     query_id: String,
-// ) -> Result<DatabendHttpResponse, DatabendError> {
-// }
-
-pub async fn http_query(
-    client: HttpClient,
-    endpoint: UriSerde,
-    auth: Option<Auth>,
-    request: DatabendHttpRequest,
-) -> Result<DatabendHttpResponse, DatabendError> {
-    let api_uri = endpoint.append_path("/v1/query")?.to_string();
-    let req_body = Body::from(crate::serde::json::to_bytes(&request)?.freeze());
-    let mut request = Request::post(api_uri)
-        .header("Content-Type", "application/json")
-        .body(req_body)?;
-    if let Some(a) = auth {
-        a.apply(&mut request);
-    }
-    let response = client
-        .send(request)
-        .await
-        .map_err(|err| DatabendError::Request {
-            error: err,
-            message: "query request".to_string(),
-        })?;
-
-    if response.status() != StatusCode::OK {
-        return Err(DatabendError::Server {
-            code: response.status().as_u16() as i64,
-            message: "Http Status not OK for query request".to_string(),
-        });
-    }
-
-    let body_bytes = hyper::body::to_bytes(response.into_body()).await?;
-
-    let resp: DatabendHttpResponse = serde_json::from_slice(&body_bytes)?;
-
-    match resp.error {
-        Some(err) => Err(DatabendError::Server {
-            code: err.code,
-            message: err.message,
-        }),
-        None => Ok(resp),
-    }
 }
 
 #[derive(Debug)]
@@ -139,28 +89,119 @@ pub struct DatabendPresignedResponse {
     pub url: String,
 }
 
-pub async fn upload_with_presigned(
+#[derive(Clone)]
+pub struct DatabendAPIClient {
     client: HttpClient,
-    presigned: DatabendPresignedResponse,
-    data: Bytes,
-) -> Result<(), DatabendError> {
-    let req_body = Body::from(data);
-    let request = Request::put(presigned.url).body(req_body)?;
+    endpoint: UriSerde,
+    auth: Option<Auth>,
+}
 
-    let response = client
-        .send(request)
-        .await
-        .map_err(|err| DatabendError::Request {
-            error: err,
-            message: "presigned upload".to_string(),
-        })?;
-
-    if response.status() != StatusCode::OK {
-        return Err(DatabendError::Server {
-            code: response.status().as_u16() as i64,
-            message: "Presigned Upload Failed".to_string(),
-        });
+impl DatabendAPIClient {
+    pub const fn new(client: HttpClient, endpoint: UriSerde, auth: Option<Auth>) -> Self {
+        Self {
+            client,
+            endpoint,
+            auth,
+        }
     }
 
-    Ok(())
+    fn get_page_url(&self, next_uri: &str) -> Result<String, DatabendError> {
+        let api_uri = self.endpoint.append_path(next_uri)?;
+        Ok(api_uri.to_string())
+    }
+
+    fn get_query_url(&self) -> Result<String, DatabendError> {
+        let api_uri = self.endpoint.append_path("/v1/query")?;
+        Ok(api_uri.to_string())
+    }
+
+    async fn do_request(
+        &self,
+        url: String,
+        req: Option<DatabendHttpRequest>,
+    ) -> Result<DatabendHttpResponse, DatabendError> {
+        let body = match req {
+            Some(r) => {
+                let body = serde_json::to_vec(&r)?;
+                Body::from(body)
+            }
+            None => Body::empty(),
+        };
+        let mut request = Request::post(url)
+            .header("Content-Type", "application/json")
+            .body(body)?;
+        if let Some(a) = &self.auth {
+            a.apply(&mut request);
+        }
+        let response = self.client.send(request).await?;
+        if response.status() != StatusCode::OK {
+            return Err(DatabendError::Server {
+                code: response.status().as_u16() as i64,
+                message: "Http Status not OK".to_string(),
+            });
+        }
+        let body_bytes = hyper::body::to_bytes(response.into_body()).await?;
+        let resp: DatabendHttpResponse =
+            serde_json::from_slice(&body_bytes).map_err(|e| DatabendError::Server {
+                code: 0,
+                message: format!(
+                    "Failed to parse response: {}: {}",
+                    e,
+                    String::from_utf8_lossy(&body_bytes)
+                ),
+            })?;
+        match resp.error {
+            Some(err) => Err(DatabendError::Server {
+                code: err.code,
+                message: err.message,
+            }),
+            None => Ok(resp),
+        }
+    }
+
+    pub async fn query_page(
+        &self,
+        next_uri: String,
+    ) -> Result<DatabendHttpResponse, DatabendError> {
+        let url = self.get_page_url(&next_uri)?;
+        self.do_request(url, None).await
+    }
+
+    pub async fn query(
+        &self,
+        req: DatabendHttpRequest,
+    ) -> Result<DatabendHttpResponse, DatabendError> {
+        let url = self.get_query_url()?;
+        let resp = self.do_request(url, Some(req)).await?;
+        match resp.next_uri {
+            None => Ok(resp),
+            Some(_) => {
+                let mut resp = resp;
+                let mut next_uri = resp.next_uri.clone();
+                while let Some(uri) = next_uri {
+                    let next_resp = self.query_page(uri).await?;
+                    resp.data.extend(next_resp.data);
+                    next_uri = next_resp.next_uri.clone();
+                }
+                Ok(resp)
+            }
+        }
+    }
+
+    pub async fn upload_with_presigned(
+        &self,
+        presigned: DatabendPresignedResponse,
+        data: Bytes,
+    ) -> Result<(), DatabendError> {
+        let req_body = Body::from(data);
+        let request = Request::put(presigned.url).body(req_body)?;
+        let response = self.client.send(request).await?;
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            _ => Err(DatabendError::Server {
+                code: response.status().as_u16() as i64,
+                message: "Presigned Upload Failed".to_string(),
+            }),
+        }
+    }
 }
