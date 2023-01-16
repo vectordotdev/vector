@@ -890,7 +890,7 @@ proptest! {
                 // doing the next operation.
                 tokio::task::yield_now().await;
 
-                // We manully check if the sequencer has any write operations left, either
+                // We manually check if the sequencer has any write operations left, either
                 // in-flight or yet-to-be-triggered, and if none are left, we mark the writer
                 // closed.  This allows us to properly inform the model that reads should start
                 // returning `None` if there's no more flushed records left vs being blocked on
