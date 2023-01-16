@@ -12,7 +12,7 @@ fn compose_command(
     test_dir: &Path,
     args: impl IntoIterator<Item = &'static str>,
 ) -> Result<Command> {
-    let compose_path: PathBuf = [test_dir, Path::new("docker-compose.yml")].iter().collect();
+    let compose_path: PathBuf = [test_dir, Path::new("compose.yaml")].iter().collect();
     let compose_file = dunce::canonicalize(compose_path)
         .context("Could not canonicalize docker compose path")?
         .display()
