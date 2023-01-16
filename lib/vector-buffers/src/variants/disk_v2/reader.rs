@@ -983,7 +983,7 @@ where
                 // We got a valid record, so keep the token.
                 Ok(Some(token)) => break token,
                 // A length-delimited payload was read, but we failed to deserialize it as a valid
-                // record, or we deseralized it and the checksum was invalid.  Either way, we're not
+                // record, or we deserialized it and the checksum was invalid.  Either way, we're not
                 // sure the rest of the data file is even valid, so roll to the next file.
                 //
                 // TODO: Explore the concept of putting a data file into a "one more attempt to read
