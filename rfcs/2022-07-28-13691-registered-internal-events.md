@@ -211,7 +211,7 @@ struct RunningSource {
 
 ## Rationale
 
-- This interface for registered internal event handles is notationally equivalent to the existing
+- This interface for registered internal event handles is notionally equivalent to the existing
   `InternalEvent` interface, using field names and named types for all data.
 
 ## Drawbacks
