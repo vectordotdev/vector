@@ -351,7 +351,7 @@ async fn start_vector() -> (
     );
 
     let api_key = std::env::var("TEST_DATADOG_API_KEY")
-        .expect("couldn't find the Datatog api key in environment variables");
+        .expect("couldn't find the Datadog api key in environment variables");
     assert!(!api_key.is_empty(), "TEST_DATADOG_API_KEY required");
     let cfg = cfg.replace("atoken", &api_key);
 
