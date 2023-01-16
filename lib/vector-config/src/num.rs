@@ -43,7 +43,7 @@ pub trait ConfigurableNumber {
     /// The integral numeric type.
     ///
     /// We parameterize the "integral" numeric type in this way to allow generating the schema for wrapper types such as
-    /// `NonZeroU64`, where the overall type must be represented as `NonZeroU64` but the integeral numeric type that
+    /// `NonZeroU64`, where the overall type must be represented as `NonZeroU64` but the integral numeric type that
     /// we're constraining against is `u64`.
     type Numeric: Bounded + ToPrimitive + Zero + One;
 
