@@ -145,7 +145,7 @@ The implementation would then consist in:
      and not the rest of the flow.
 
 **Regarding the tagging issue:** A -possibly temporary- work-around would be to store incoming tags with the complete
-"key:value" string as the key and an empty value to store those in the extisting map Vector uses to store
+"key:value" string as the key and an empty value to store those in the existing map Vector uses to store
 [tags](https://github.com/vectordotdev/vector/blob/master/lib/vector-core/src/event/metric.rs#L60) and slightly rework the
 `datadog_metrics` sink not to append `:` if a tag key has the empty string as the corresponding value. However Datadog
 best practices can be followed with the current Vector data model, so unless something unforeseen or unexpected demand
