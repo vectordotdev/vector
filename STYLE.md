@@ -258,7 +258,7 @@ most portable and well-tested. In cases where the standard library atomics canno
 when using a 64-bit atomic but wanting to support a 32-bit platform, or support a platform without
 atomic instructions at all, we prefer to use
 **[`crossbeam-utils`](https://docs.rs/crossbeam-utils)** and its `AtomicCell` helper. This type will
-automatically handle either using native atomic support or ensuring mutally exclusive access, and
+automatically handle either using native atomic support or ensuring mutually exclusive access, and
 handle it in a transparent way. It uses a fixed acquire/release ordering that generally provides the
 expected behavior when using atomics, but may not be suitable for usages which require stronger
 ordering.

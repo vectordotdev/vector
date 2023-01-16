@@ -191,7 +191,7 @@ extraContainerPorts:
 
 ## Using `customConfig`
 
-The `customConfig` key is mututally exclusive with the now deprecated configuration
+The `customConfig` key is mutually exclusive with the now deprecated configuration
 keys, if any values are provided to `customConfig` any pre-generated config we provide
 by default will not be templated. Please review the sections above to see example
 conversions between the deprecated keys and the new `customConfig` based options.
