@@ -73,7 +73,7 @@ where
 
     /// A record reported that it contained more events than the number of bytes when encoded.
     ///
-    /// This is nonsensicial because we don't intend to ever support encoding zero-sized types
+    /// This is nonsensical because we don't intend to ever support encoding zero-sized types
     /// through the buffer, and the logic we use to count the number of actual events in the buffer
     /// transitively depends on not being able to represent more than one event per encoded byte.
     #[snafu(display(

@@ -58,7 +58,7 @@ pub(crate) fn create_crc32c_hasher() -> Hasher {
 /// on-disk sizes for various elements, and account for those in size limits, etc.
 pub(crate) const fn align16(amount: usize) -> usize {
     // The amount must be less than `MAX_ALIGNABLE_AMOUNT` otherwise we'll overflow trying to align it, ending up with a
-    // nonsensicial value.
+    // nonsensical value.
     assert!(
         amount <= MAX_ALIGNABLE_AMOUNT,
         "`amount` must be less than `MAX_ALIGNABLE_AMOUNT`"
