@@ -1247,7 +1247,7 @@ components: sources: internal_metrics: {
 				"glob_failed":                 "The glob pattern match operation failed."
 				"http_error":                  "The HTTP request resulted in an error code."
 				"invalid_metric":              "The metric was invalid."
-				"kafka_offset_update":         "The comsumer offset update failed."
+				"kafka_offset_update":         "The consumer offset update failed."
 				"kafka_read":                  "The message from Kafka was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."
