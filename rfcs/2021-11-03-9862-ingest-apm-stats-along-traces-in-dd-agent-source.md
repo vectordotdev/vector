@@ -182,7 +182,7 @@ Each group is relatively independent:
 
 * Reorganise the `datadog_agent` source:
   * Extend the `named_outputs` feature, that is available four transforms, to sources so they can expose multiple named
-    outputs (`<SRC_ID>.<OUTPUT_NAME>)`). The feature for transform was initialy add in [this PR][named-outputs-pr],
+    outputs (`<SRC_ID>.<OUTPUT_NAME>)`). The feature for transform was initially add in [this PR][named-outputs-pr],
     subsequent work on it is tracked [here][[named-outputs-improvements].
   * Add the following `named_outputs` in the `datadog_agent`: `<SRC_ID>.traces`, `<SRC_ID>.apm_stats`,
     `<SRC_ID>.metrics`, `<SRC_ID>.logs`. Note that the non suffixed output should have a predictable behaviour, so we
