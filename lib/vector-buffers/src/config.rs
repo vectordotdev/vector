@@ -141,7 +141,7 @@ pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(500) }
 }
 
-/// Disk usage configurtion for disk-backed buffers.
+/// Disk usage configuration for disk-backed buffers.
 #[derive(Debug)]
 pub struct DiskUsage {
     id: ComponentKey,
