@@ -121,7 +121,7 @@
 // TODO: Should we always apply the transparent marker to fields when they're the only field in a
 // tuple struct/tuple variant? There's also some potential interplay with using the `derived` helper
 // attribute on the tuple struct/tuple variant itself to signal that we want to pull the
-// title/description from the field instead, which coluld be useful when using newtype wrappers
+// title/description from the field instead, which could be useful when using newtype wrappers
 // around existing/remote types for the purpose of making them `Configurable`.
 #![deny(warnings)]
 
