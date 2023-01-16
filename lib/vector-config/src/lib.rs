@@ -74,7 +74,7 @@
 // create duplicate schemas for T" standpoint, but could manifest as a non-obvious divergence.
 //
 // TODO: We need to figure out how to handle aliases. Looking previously, it seemed like we might
-// need to do some very ugly combinatorial explosion stuff to define a schema per perumtation of all
+// need to do some very ugly combinatorial explosion stuff to define a schema per permutation of all
 // aliased fields in a config. We might be able to get away with using a combination of `allOf` and
 // `oneOf` where we define a subschema for the non-aliased fields, and then a subschema using
 // `oneOf`for each aliased field -- allowing it to match any of the possible field names for that
