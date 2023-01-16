@@ -244,7 +244,7 @@ As an intentionally buried lede - I wrote this in the hopes that folks would sha
 
 ## Prior Art
 
-Per the data format itself - I haven't found any single conglomerate conlusion about _any_ encoding format. However, existing projects using HTTP/2 and Protobufs (or gRPC over Tonic and Protobufs) are about a dime a dozen. These protocols and formats are used together in just about anything anymore.
+Per the data format itself - I haven't found any single conglomerate conclusion about _any_ encoding format. However, existing projects using HTTP/2 and Protobufs (or gRPC over Tonic and Protobufs) are about a dime a dozen. These protocols and formats are used together in just about anything anymore.
 
 ## Drawbacks
 
