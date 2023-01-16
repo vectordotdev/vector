@@ -5,101 +5,106 @@ use anyhow::{bail, Context, Result};
 use super::runner::{
     ContainerTestRunnerBase as _, IntegrationTestRunner, CONTAINER_TOOL, NETWORK_ENV_VAR,
 };
-use super::{config::Environment, config::IntegrationTestConfig, state};
+use super::{config::Environment, config::IntegrationTestConfig, state::EnvsDir};
 use crate::app::CommandExt as _;
 
-fn compose_command(
-    test_dir: &Path,
-    args: impl IntoIterator<Item = &'static str>,
-) -> Result<Command> {
-    let compose_path: PathBuf = [test_dir, Path::new("compose.yaml")].iter().collect();
-    let compose_file = dunce::canonicalize(compose_path)
-        .context("Could not canonicalize docker compose path")?
-        .display()
-        .to_string();
-
-    let mut command = CONTAINER_TOOL.clone();
-    command.push("-compose");
-    let mut command = Command::new(command);
-    command.args(["--file", &compose_file]);
-    command.args(args);
-    command.current_dir(test_dir);
-    Ok(command)
+pub struct IntegrationTest {
+    integration: String,
+    environment: String,
+    test_dir: PathBuf,
+    config: IntegrationTestConfig,
+    envs_dir: EnvsDir,
+    runner: IntegrationTestRunner,
 }
 
-fn apply_env_vars(command: &mut Command, config: &Environment, integration: &str) {
-    if let Some(version) = config.get("version") {
-        let version_env = format!("{}_VERSION", integration.replace('-', "_").to_uppercase());
-        command.env(version_env, version);
-    }
-}
+impl IntegrationTest {
+    pub fn new(integration: impl Into<String>, environment: impl Into<String>) -> Result<Self> {
+        let integration = integration.into();
+        let environment = environment.into();
+        let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
+        let envs_dir = EnvsDir::new(&integration);
+        let runner = IntegrationTestRunner::new(integration.clone())?;
 
-pub fn start(integration: &str, environment: &str) -> Result<()> {
-    let (test_dir, config) = IntegrationTestConfig::load(integration)?;
-
-    let envs_dir = state::EnvsDir::new(integration);
-    let runner = IntegrationTestRunner::new(integration.to_owned())?;
-    runner.ensure_network()?;
-
-    let mut command = compose_command(&test_dir, ["up", "--detach"])?;
-    command.env(NETWORK_ENV_VAR, runner.network_name());
-
-    let environments = config.environments();
-    let cmd_config = match environments.get(environment) {
-        Some(config) => config,
-        None => bail!("unknown environment: {}", environment),
-    };
-
-    if envs_dir.exists(environment) {
-        bail!("environment is already up");
+        Ok(Self {
+            integration,
+            environment,
+            test_dir,
+            config,
+            envs_dir,
+            runner,
+        })
     }
 
-    if let Some(env_vars) = config.env {
-        command.envs(env_vars);
-    }
+    pub fn start(&self) -> Result<()> {
+        self.runner.ensure_network()?;
 
-    apply_env_vars(&mut command, cmd_config, integration);
+        let environments = self.config.environments();
+        let cmd_config = match environments.get(&self.environment) {
+            Some(config) => config,
+            None => bail!("unknown environment: {}", self.environment),
+        };
 
-    waiting!("Starting environment {environment}");
-    command.run()?;
-
-    envs_dir.save(environment, cmd_config)
-}
-
-pub fn stop(integration: &str, environment: &str, force: bool) -> Result<()> {
-    let (test_dir, config) = IntegrationTestConfig::load(integration)?;
-    let envs_dir = state::EnvsDir::new(integration);
-    let runner = IntegrationTestRunner::new(integration.to_owned())?;
-
-    let mut command = compose_command(&test_dir, ["down", "--timeout", "0"])?;
-    command.env(NETWORK_ENV_VAR, runner.network_name());
-
-    let cmd_config: Environment = if envs_dir.exists(environment) {
-        envs_dir.read_config(environment)?
-    } else if force {
-        let environments = config.environments();
-        if let Some(config) = environments.get(environment) {
-            config.clone()
-        } else {
-            bail!("unknown environment: {environment}");
+        if self.envs_dir.exists(&self.environment) {
+            bail!("environment is already up");
         }
-    } else {
-        bail!("environment is not up");
-    };
 
-    if let Some(env_vars) = config.env {
-        command.envs(env_vars);
+        self.run_compose("Starting", &["up", "--detach"], cmd_config)?;
+
+        self.envs_dir.save(&self.environment, cmd_config)
     }
 
-    apply_env_vars(&mut command, &cmd_config, integration);
+    pub fn stop(&self, force: bool) -> Result<()> {
+        let cmd_config: Environment = if self.envs_dir.exists(&self.environment) {
+            self.envs_dir.read_config(&self.environment)?
+        } else if force {
+            let environments = self.config.environments();
+            if let Some(config) = environments.get(&self.environment) {
+                config.clone()
+            } else {
+                bail!("unknown environment: {}", self.environment);
+            }
+        } else {
+            bail!("environment is not up");
+        };
 
-    waiting!("Stopping environment {environment}");
-    command.run()?;
+        self.run_compose("Stopping", &["down", "--timeout", "0"], &cmd_config)?;
 
-    envs_dir.remove(environment)?;
-    if envs_dir.list_active()?.is_empty() {
-        runner.stop()?;
+        self.envs_dir.remove(&self.environment)?;
+        if self.envs_dir.list_active()?.is_empty() {
+            self.runner.stop()?;
+        }
+
+        Ok(())
     }
 
-    Ok(())
+    fn run_compose(&self, action: &str, args: &[&'static str], config: &Environment) -> Result<()> {
+        let compose_path: PathBuf = [&self.test_dir, Path::new("compose.yaml")].iter().collect();
+        let compose_file = dunce::canonicalize(compose_path)
+            .context("Could not canonicalize docker compose path")?
+            .display()
+            .to_string();
+
+        let mut command = CONTAINER_TOOL.clone();
+        command.push("-compose");
+        let mut command = Command::new(command);
+        command.args(["--file", &compose_file]);
+        command.args(args);
+
+        command.current_dir(&self.test_dir);
+
+        command.env(NETWORK_ENV_VAR, self.runner.network_name());
+        if let Some(env_vars) = &self.config.env {
+            command.envs(env_vars);
+        }
+        if let Some(version) = config.get("version") {
+            let version_env = format!(
+                "{}_VERSION",
+                self.integration.replace('-', "_").to_uppercase()
+            );
+            command.env(version_env, version);
+        }
+
+        waiting!("{action} environment {}", self.environment);
+        command.run()
+    }
 }

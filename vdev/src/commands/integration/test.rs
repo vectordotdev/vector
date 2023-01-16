@@ -2,7 +2,9 @@ use anyhow::{bail, Result};
 use clap::Args;
 use std::collections::BTreeMap;
 
-use crate::testing::{config::IntegrationTestConfig, integration, runner::*, state};
+use crate::testing::{
+    config::IntegrationTestConfig, integration::IntegrationTest, runner::*, state,
+};
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -51,15 +53,16 @@ impl Cli {
                 continue;
             }
 
+            let integration = IntegrationTest::new(&self.integration, env_name)?;
             let env_active = envs_dir.exists(env_name);
             if !env_active {
-                integration::start(&self.integration, env_name)?;
+                integration.start()?;
             }
 
             runner.test(&env_vars, &args)?;
 
             if !env_active {
-                integration::stop(&self.integration, env_name, false)?;
+                integration.stop(false)?;
             }
         }
 

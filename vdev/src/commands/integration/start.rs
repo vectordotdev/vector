@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::integration;
+use crate::testing::integration::IntegrationTest;
 
 /// Start an environment
 #[derive(Args, Debug)]
@@ -16,6 +16,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        integration::start(&self.integration, &self.environment)
+        IntegrationTest::new(self.integration, self.environment)?.start()
     }
 }

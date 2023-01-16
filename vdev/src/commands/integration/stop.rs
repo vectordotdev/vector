@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::integration;
+use crate::testing::integration::IntegrationTest;
 
 /// Stop an environment
 #[derive(Args, Debug)]
@@ -20,6 +20,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        integration::stop(&self.integration, &self.environment, self.force)
+        IntegrationTest::new(self.integration, self.environment)?.stop(self.force)
     }
 }
