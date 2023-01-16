@@ -221,7 +221,7 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
 
 /// Receives the stats payloads from the Receiver channels from both of the server instances.
 /// If either of the servers does not respond with a stats payload, the test will fail.
-/// The lastest received stats payload is the only one considered. This is the same logic that the
+/// The latest received stats payload is the only one considered. This is the same logic that the
 /// Datadog UI follows.
 /// Wait for up to 35 seconds for the stats payload to arrive. The Agent can take some time to send
 /// the stats out.
