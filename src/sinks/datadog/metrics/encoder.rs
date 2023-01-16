@@ -757,7 +757,7 @@ mod tests {
 
     #[test]
     fn incorrect_metric_for_endpoint_causes_error() {
-        // Series metrics can't gbo to the sketches endpoint.
+        // Series metrics can't go to the sketches endpoint.
         let mut sketch_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
             .expect("default payload size limits should be valid");
         let series_result = sketch_encoder.try_encode(get_simple_counter());
@@ -767,7 +767,7 @@ mod tests {
         ));
 
         // And sketches can't go to the series endpoint.
-        // Series metrics can't gbo to the sketches endpoint.
+        // Series metrics can't go to the sketches endpoint.
         let mut series_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series, None)
             .expect("default payload size limits should be valid");
         let sketch_result = series_encoder.try_encode(get_simple_sketch());
