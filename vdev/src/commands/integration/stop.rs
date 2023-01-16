@@ -1,9 +1,8 @@
 use anyhow::{bail, Result};
 use clap::Args;
-use serde_json::Value;
 
 use crate::app::CommandExt as _;
-use crate::testing::{config::IntegrationTestConfig, runner::*, state};
+use crate::testing::{config::Environment, config::IntegrationTestConfig, runner::*, state};
 
 /// Stop an environment
 #[derive(Args, Debug)]
@@ -29,19 +28,18 @@ impl Cli {
         let mut command = super::compose_command(&test_dir, ["down", "--timeout", "0"])?;
         command.env(NETWORK_ENV_VAR, runner.network_name());
 
-        let json = if envs_dir.exists(&self.environment) {
+        let cmd_config: Environment = if envs_dir.exists(&self.environment) {
             envs_dir.read_config(&self.environment)?
         } else if self.force {
             let environments = config.environments();
             if let Some(config) = environments.get(&self.environment) {
-                serde_json::to_string(config)?
+                config.clone()
             } else {
                 bail!("unknown environment: {}", self.environment);
             }
         } else {
             bail!("environment is not up");
         };
-        let cmd_config: Value = serde_json::from_str(&json)?;
 
         if let Some(env_vars) = config.env {
             command.envs(env_vars);

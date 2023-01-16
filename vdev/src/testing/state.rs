@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 
+use super::config::Environment;
 use crate::platform;
 
 const CONFIG_FILE: &str = "config.json";
@@ -50,26 +51,25 @@ impl EnvsDir {
         Ok(environments)
     }
 
-    pub fn save(&self, environment: &str, config: &str) -> Result<()> {
+    pub fn save(&self, environment: &str, config: &Environment) -> Result<()> {
         let mut path = self.path.join(environment);
         if !path.is_dir() {
             fs::create_dir_all(&path)
                 .with_context(|| format!("failed to create directory {path:?}"))?;
         }
 
+        let config = serde_json::to_string(&config)?;
         path.push(CONFIG_FILE);
-        fs::write(&path, config)
-            .with_context(|| format!("failed to write file {}", path.display()))?;
-
-        Ok(())
+        fs::write(&path, config).with_context(|| format!("failed to write file {path:?}"))
     }
 
-    pub fn read_config(&self, environment: &str) -> Result<String> {
+    pub fn read_config(&self, environment: &str) -> Result<Environment> {
         let mut config_file = self.path.join(environment);
         config_file.push(CONFIG_FILE);
 
-        fs::read_to_string(&config_file)
-            .with_context(|| format!("failed to write file {}", config_file.display()))
+        let json = fs::read_to_string(&config_file)
+            .with_context(|| format!("failed to write file {config_file:?}"))?;
+        serde_json::from_str(&json).with_context(|| format!("invalid contents in {config_file:?}"))
     }
 
     pub fn remove(&self, environment: &str) -> Result<()> {

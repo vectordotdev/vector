@@ -1,11 +1,11 @@
+use std::collections::{BTreeMap, HashMap};
+use std::fs;
+use std::path::{Path, PathBuf};
+
 use anyhow::{bail, Context, Result};
 use hashlink::LinkedHashMap;
 use itertools::{self, Itertools};
 use serde::Deserialize;
-
-use std::collections::BTreeMap;
-use std::fs;
-use std::path::{Path, PathBuf};
 
 use crate::app;
 
@@ -41,6 +41,8 @@ pub struct IntegrationTestConfig {
     matrix: Vec<LinkedHashMap<String, Vec<String>>>,
 }
 
+pub type Environment = HashMap<String, String>;
+
 impl IntegrationTestConfig {
     fn parse_file(config_file: &Path) -> Result<Self> {
         let contents = fs::read_to_string(config_file)
@@ -55,16 +57,16 @@ impl IntegrationTestConfig {
         Ok(config)
     }
 
-    pub fn environments(&self) -> LinkedHashMap<String, LinkedHashMap<String, String>> {
+    pub fn environments(&self) -> LinkedHashMap<String, Environment> {
         let mut environments = LinkedHashMap::new();
 
         for matrix in &self.matrix {
             for product in matrix.values().multi_cartesian_product() {
-                let mut config = LinkedHashMap::new();
-                for (variable, &value) in matrix.keys().zip(product.iter()) {
-                    config.insert(variable.clone(), value.clone());
-                }
-
+                let config: Environment = matrix
+                    .keys()
+                    .zip(product.iter())
+                    .map(|(variable, &value)| (variable.clone(), value.clone()))
+                    .collect();
                 environments.insert(product.iter().join("-"), config);
             }
         }

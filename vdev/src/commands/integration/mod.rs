@@ -1,7 +1,8 @@
 use std::{path::Path, path::PathBuf, process::Command};
 
 use anyhow::{Context, Result};
-use serde_json::Value;
+
+use crate::testing::config::Environment;
 
 crate::cli_subcommands! {
     "Manage integration test environments"
@@ -28,9 +29,9 @@ pub(self) fn compose_command(
     Ok(command)
 }
 
-pub(self) fn apply_env_vars(command: &mut Command, config: &Value, integration: &str) {
-    let version_env = format!("{}_VERSION", integration.to_uppercase());
-    if let Some(number) = config.get("version") {
-        command.env(version_env, number.as_str().unwrap());
+pub(self) fn apply_env_vars(command: &mut Command, config: &Environment, integration: &str) {
+    if let Some(version) = config.get("version") {
+        let version_env = format!("{}_VERSION", integration.to_uppercase());
+        command.env(version_env, version);
     }
 }

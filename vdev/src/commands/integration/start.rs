@@ -1,6 +1,5 @@
 use anyhow::{bail, Result};
 use clap::Args;
-use serde_json::Value;
 
 use crate::app::CommandExt as _;
 use crate::testing::{config::IntegrationTestConfig, runner::*, state};
@@ -28,11 +27,10 @@ impl Cli {
         command.env(NETWORK_ENV_VAR, runner.network_name());
 
         let environments = config.environments();
-        let json = match environments.get(&self.environment) {
-            Some(config) => serde_json::to_string(config)?,
+        let cmd_config = match environments.get(&self.environment) {
+            Some(config) => config,
             None => bail!("unknown environment: {}", self.environment),
         };
-        let cmd_config: Value = serde_json::from_str(&json)?;
 
         if envs_dir.exists(&self.environment) {
             bail!("environment is already up");
@@ -42,12 +40,12 @@ impl Cli {
             command.envs(env_vars);
         }
 
-        super::apply_env_vars(&mut command, &cmd_config, &self.integration);
+        super::apply_env_vars(&mut command, cmd_config, &self.integration);
 
         waiting!("Starting environment {}", &self.environment);
         command.run()?;
 
-        envs_dir.save(&self.environment, &json)?;
+        envs_dir.save(&self.environment, cmd_config)?;
         Ok(())
     }
 }
