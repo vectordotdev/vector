@@ -282,7 +282,7 @@ JSON) and include the resulting value into the tags (a.k.a Meta) map.
 This makes the opposite conversion a bit complicated if we want it to be completely symetrical but there was already an
 [attempt][otlp-dd-trace-receiver] allow Datadog traces ingestion in the OpenTelemetry collector. While this PR was
 closed unmerged this provide a valuable example. Anyways the [otlp-and-other-formats][OpenTelemetry] acknowledges that
-some of the OpenTelemetry contruct ends up being stored as tags or annotations in other formats.
+some of the OpenTelemetry construct ends up being stored as tags or annotations in other formats.
 
 Anyway the OpenTelemetry to Datadog traces conversion is dictacted by existing implementations in both the `trace-agent`
 and the Datadog exporter as users will expect a consistent behaviour from one solution to another. The same
