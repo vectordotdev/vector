@@ -137,7 +137,7 @@ top-level requirements:
 A new `opentelemetry` source with a named output `traces` (future extension would cover `metrics` then `logs`):
 
 - The gRPC variant would use Tonic to spawn a gRPC server (like the `vector` source in its v2 variation) and directly
-  use the [offical gRPC service definitions][otlp-grpc-def], only the traces gRPC service will be accepted, this should be
+  use the [official gRPC service definitions][otlp-grpc-def], only the traces gRPC service will be accepted, this should be
   relatively easy to extend it to support metrics and logs gRPC services.
 - HTTP variant would use a Warp server and attempt to decode protobuf payloads, as per the [specification][otlp-http],
   payloads are encoded using protobuf either in binary format or in JSON format ([Protobuf schemas][otlp-proto-def]).
