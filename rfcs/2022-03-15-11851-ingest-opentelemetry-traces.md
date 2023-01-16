@@ -319,7 +319,7 @@ The APM stats computation can be seen as a generic way to compute some statistic
 points have been discussed:
 
 - While [APM stats][apm-stats-proto] may be useful outside Datadog context, as they are somehow standard metrics, and
-  they could theoritically be useful to any metric backends, but as of today it seems unlikely that this will ever
+  they could theoretically be useful to any metric backends, but as of today it seems unlikely that this will ever
   happen. So third-party usage of APM stats won't be addressed until there is demand for it.
 - APM stats are essentially a Datadog things, and if metrics should be extracted from traces at some point in the
   feature this would probably materialize as a `traces_to_metric` transform, but the exact scope and the usefulness of
