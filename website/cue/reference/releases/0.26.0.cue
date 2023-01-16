@@ -41,7 +41,7 @@ releases: "0.26.0": {
 			scopes: ["sources: kafka"]
 			description: """
 				The `kafka` source now flushes commits when a rebalance event occurs. This avoids
-				issues with commiting offsets to partitions the Vector instance no longer is
+				issues with committing offsets to partitions the Vector instance no longer is
 				consuming.
 				"""
 			pr_numbers: [10434]
