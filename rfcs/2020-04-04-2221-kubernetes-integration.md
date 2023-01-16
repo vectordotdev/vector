@@ -1490,7 +1490,7 @@ We should also consider integrating with tools like [Vault] and [redoctober].
 - Suggest setting up proper RBAC rules for cluster operators and users;
   [`audit2rbac`](https://github.com/liggitt/audit2rbac) is a useful tool to
   help with this.
-- Suggest using [Pod Security Policies][k8s_docs_pod_security_policiy]
+- Suggest using [Pod Security Policies][k8s_docs_pod_security_policy]
   ([API][k8s_api_pod_security_policy]).
 - Suggest using [NetworkPolicy][k8s_api_network_policy].
 - Suggest running [kube-bench].
@@ -1693,7 +1693,7 @@ See [motivation](#motivation).
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 [k8s_docs_pod_lifecycle_container_probes]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
-[k8s_docs_pod_security_policiy]: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
+[k8s_docs_pod_security_policy]: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
 [k8s_docs_pod]: https://kubernetes.io/docs/concepts/workloads/pods/pod/
 [k8s_docs_priority_class]: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass
 [k8s_docs_rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
