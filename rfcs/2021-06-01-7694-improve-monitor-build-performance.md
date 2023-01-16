@@ -54,7 +54,7 @@ that waste time and effort to debug.
 
 ### Use of a better linker
 
-As mentioned above, much time is spenting in the linker phase of building Vector, where the many
+As mentioned above, much time is spent in the linker phase of building Vector, where the many
 dependent crates that make up Vector are bundled together to produce a final executable.  For most
 users building Rust projects today, they're using their system linker, which is single-threaded.
 However, newer linkers exist that can exploit the parallelism of today's multi-core systems and
