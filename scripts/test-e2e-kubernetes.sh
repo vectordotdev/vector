@@ -78,7 +78,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
     CONTAINER_IMAGE_REPO="${CONTAINER_IMAGE_REPO:-"localhost/vector-test"}"
   else
     # If not using `minikube cache`, it's mandatory to have a push access to the
-    # repo, so we don't offer a default value and explicilty require the user to
+    # repo, so we don't offer a default value and explicitly require the user to
     # specify a `CONTAINER_IMAGE_REPO`.
     CONTAINER_IMAGE_REPO="${CONTAINER_IMAGE_REPO:?"You have to specify CONTAINER_IMAGE_REPO to upload the test image to."}"
   fi
