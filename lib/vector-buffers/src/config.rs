@@ -262,7 +262,7 @@ impl BufferType {
     /// # Errors
     ///
     /// If a required parameter is missing, or if there is an error building the topology itself, an
-    /// error variant will be returned desribing the error
+    /// error variant will be returned describing the error
     pub fn add_to_builder<T>(
         &self,
         builder: &mut TopologyBuilder<T>,
