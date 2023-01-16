@@ -625,7 +625,7 @@ impl ByteSizeOf for Bucket {
 
 /// A single quantile observation.
 ///
-/// Quantiles themselves are "cut points diviing the range of a probability distribution into
+/// Quantiles themselves are "cut points dividing the range of a probability distribution into
 /// continuous intervals with equal probabilities". [[1][quantiles_wikipedia]].
 ///
 /// We use quantiles to measure the value along these probability distributions for representing
