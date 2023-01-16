@@ -298,7 +298,7 @@ itself for use cases where pooling is desired.
 
 Synchronization can be a very common sight when writing multi-threaded code in any language, and
 this document does not aim to familiarize you with all of the common synchronization primitives and
-their intended usage. Instesd, however, there are some caveats that you must be aware of when using
+their intended usage. Instead, however, there are some caveats that you must be aware of when using
 synchronization primitives in synchronous versus asynchronous code.
 
 Generally speaking, developers will lean on the synchronization primitives in `std::sync`, such as
