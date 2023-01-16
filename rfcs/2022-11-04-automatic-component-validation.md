@@ -102,7 +102,7 @@ scenario that looked more like Vector running in a customer's environment than a
 
 This runner would run within a unit test itself, being fed a list of components to validate, as well
 as the test cases (set of input events and expected outcome i.e. success vs failure) for that
-componment, and would run each test case in isolation, as described above. Any failing test case,
+component, and would run each test case in isolation, as described above. Any failing test case,
 that is to say, the outcome of the test was not valid, would entirely fail the overall test.
 
 Components themselves would be responsible for implementing a new trait that provided the necessary
