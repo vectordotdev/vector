@@ -295,7 +295,7 @@ idempotent:
 
 There is no particular field or subset of metadata that would prevent idempotency in that case. This remains a strong
 requirement and shall be applicable to all third party trace format that will be converted to/from the upcoming Vector
-internal representation for similare scenarios.
+internal representation for similar scenarios.
 
 **Note**: The [Rust OpenTelemetry implementation][otlp-rust] implement a conversion from OpenTelemetry traces to the
 Datadog `trace-agent` format. This is not the purpose of this RFC, and with the OpenTelemetry traces format being

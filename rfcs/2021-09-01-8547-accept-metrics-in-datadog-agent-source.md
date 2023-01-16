@@ -204,7 +204,7 @@ Instead of being done in the Agent, the request routing could be implemented eit
 
 1. In Vector, that would receive both metric and non-metric payload, simply proxying non-metric payload directly to
    Datadog without further processing.
-2. Or in a third party middle layer (e.g. haproxy or similare). It could leverage the [documented
+2. Or in a third party middle layer (e.g. haproxy or similar). It could leverage the [documented
    haproxy](https://docs.datadoghq.com/agent/proxy/?tab=agentv6v7#haproxy) setup for Agent to divert selected routes to
    Vector, but it would have the advantage of resolving any migrations, not-yet-supported-metric-route in Vector and
    alleviate the need of modifying the Agent.
