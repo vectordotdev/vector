@@ -26,7 +26,7 @@ pub const MINIMUM_MAX_RECORD_SIZE: usize = align16(RECORD_HEADER_LEN + 1);
 // We want to ensure a reasonable time before we `fsync`/flush to disk, and 500ms should provide that for non-critical
 // workloads.
 //
-// Practically, it's far more definitive than `disk_v1` which does not definitvely `fsync` at all, at least with how we
+// Practically, it's far more definitive than `disk_v1` which does not definitely `fsync` at all, at least with how we
 // have it configured.
 pub const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 
