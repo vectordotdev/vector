@@ -95,7 +95,6 @@ components: sinks: databend: {
 				  https://databend.rs/doc/sql-commands/dml/dml-insert#insert-with-stage-attachment
 				"""
 		}
-
 	}
 
 	telemetry: metrics: {
