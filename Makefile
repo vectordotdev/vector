@@ -482,7 +482,7 @@ check-examples: ## Check that the config/examples files are valid
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check examples
 
 .PHONY: check-scripts
-check-scripts: ## Check that scipts do not have common mistakes
+check-scripts: ## Check that scripts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check scripts
 
 .PHONY: check-deny
