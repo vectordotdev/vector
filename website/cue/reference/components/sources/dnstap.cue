@@ -56,6 +56,8 @@ components: sources: dnstap: {
 				System-wide setting of max socket send buffer size (i.e. value of '/proc/sys/net/core/wmem_max' on Linux) may need adjustment accordingly.
 				""",
 		]
+
+		socket_file_mode: type: uint: examples: [0o777, 0o754, 0o777]
 	}
 
 	output: logs: event: {

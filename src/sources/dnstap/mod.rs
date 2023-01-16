@@ -66,11 +66,6 @@ pub struct DnstapConfig {
     ///
     /// Note that the file mode value can be specified in any numeric format supported by your configuration
     /// language, but it is most intuitive to use an octal number.
-    #[configurable(metadata(
-        docs::examples = "0o777",
-        docs::examples = "0o754",
-        docs::examples = "0o777",
-    ))]
     pub socket_file_mode: Option<u32>,
 
     /// The size, in bytes, of the receive buffer used for the socket.

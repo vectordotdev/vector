@@ -50,7 +50,7 @@ base: components: sources: dnstap: configuration: {
 			language, but it is most intuitive to use an octal number.
 			"""
 		required: false
-		type: uint: examples: ["0o777", "0o754", "0o777"]
+		type: uint: {}
 	}
 	socket_path: {
 		description: """
