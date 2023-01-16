@@ -677,7 +677,7 @@ mod tests {
             ],
         );
 
-        // When we have a fized-size marker whose required acked marker ID lands right on the
+        // When we have a fixed-size marker whose required acked marker ID lands right on the
         // current acked marker ID, it should not be eligible unless there are enough unclaimed
         // acks to actually account for it:
         run_test_case(
