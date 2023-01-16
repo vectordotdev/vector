@@ -118,7 +118,7 @@ between the two. Upgrading is easy:
 -  type = "prometheus"
 +  type = "prometheus_exporter"
 -  namespace = "..."
-+  default_namesapce = "..."
++  default_namespace = "..."
 ```
 
 ### Deprecation: The `reduce` transform `identifier_fields` was renamed to `group_by` {#fourth}
