@@ -67,7 +67,7 @@ metrics - [RFC][dd-agent-metric-rfc]), unrelated, metric stream coming out of th
 Vector event ingested representing APM stats will have to be routed along with traces, and most often they will follow a
 different path that other plain metrics/logs received from a `core-agent`. Thus it is suggested to re-arrange the
 `datadog_agent` source, many option are available (Additional details on what exactly are "Datadog Agents" can be
-found in the trace support [RFC][trace-support-pr] and may provide relevant context for undermentionned points):
+found in the trace support [RFC][trace-support-pr] and may provide relevant context for undermentioned points):
 
 * Keeping a single `datadog_agent` source:
   * and add a settings to switch between agent kind: `agent: <TYPE>` where `<TYPE>`
