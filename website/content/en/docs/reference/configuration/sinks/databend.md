@@ -1,6 +1,6 @@
 ---
 title: Databend
-description: Deliver log data to [Databend](https://databend.rs)
+description: Deliver log data to the [Databend](https://databend.rs) database
 kind: sink
 layout: component
 tags: ["datafuselabs", "databend", "component", "sink", "storage", "logs"]
