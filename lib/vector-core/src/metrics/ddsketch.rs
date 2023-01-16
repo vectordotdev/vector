@@ -192,7 +192,7 @@ impl Bin {
 /// Datadog made some slight tweaks to configuration values and in-memory layout to optimize it for
 /// insertion performance within the agent.
 ///
-/// We've mimiced the agent version of `DDSketch` here in order to support a future where we can
+/// We've mimicked the agent version of `DDSketch` here in order to support a future where we can
 /// take sketches shipped by the agent, handle them internally, merge them, and so on, without any
 /// loss of accuracy, eventually forwarding them to Datadog ourselves.
 ///
