@@ -1,8 +1,7 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Args;
 
-use crate::app::CommandExt as _;
-use crate::testing::{config::Environment, config::IntegrationTestConfig, runner::*, state};
+use crate::testing::integration;
 
 /// Stop an environment
 #[derive(Args, Debug)]
@@ -21,40 +20,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let (test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
-        let envs_dir = state::EnvsDir::new(&self.integration);
-        let runner = IntegrationTestRunner::new(self.integration.clone())?;
-
-        let mut command = super::compose_command(&test_dir, ["down", "--timeout", "0"])?;
-        command.env(NETWORK_ENV_VAR, runner.network_name());
-
-        let cmd_config: Environment = if envs_dir.exists(&self.environment) {
-            envs_dir.read_config(&self.environment)?
-        } else if self.force {
-            let environments = config.environments();
-            if let Some(config) = environments.get(&self.environment) {
-                config.clone()
-            } else {
-                bail!("unknown environment: {}", self.environment);
-            }
-        } else {
-            bail!("environment is not up");
-        };
-
-        if let Some(env_vars) = config.env {
-            command.envs(env_vars);
-        }
-
-        super::apply_env_vars(&mut command, &cmd_config, &self.integration);
-
-        waiting!("Stopping environment {}", &self.environment);
-        command.run()?;
-
-        envs_dir.remove(&self.environment)?;
-        if envs_dir.list_active()?.is_empty() {
-            runner.stop()?;
-        }
-
-        Ok(())
+        integration::stop(&self.integration, &self.environment, self.force)
     }
 }

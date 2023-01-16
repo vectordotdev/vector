@@ -1,8 +1,7 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Args;
 
-use crate::app::CommandExt as _;
-use crate::testing::{config::IntegrationTestConfig, runner::*, state};
+use crate::testing::integration;
 
 /// Start an environment
 #[derive(Args, Debug)]
@@ -17,35 +16,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let (test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
-
-        let envs_dir = state::EnvsDir::new(&self.integration);
-        let runner = IntegrationTestRunner::new(self.integration.clone())?;
-        runner.ensure_network()?;
-
-        let mut command = super::compose_command(&test_dir, ["up", "--detach"])?;
-        command.env(NETWORK_ENV_VAR, runner.network_name());
-
-        let environments = config.environments();
-        let cmd_config = match environments.get(&self.environment) {
-            Some(config) => config,
-            None => bail!("unknown environment: {}", self.environment),
-        };
-
-        if envs_dir.exists(&self.environment) {
-            bail!("environment is already up");
-        }
-
-        if let Some(env_vars) = config.env {
-            command.envs(env_vars);
-        }
-
-        super::apply_env_vars(&mut command, cmd_config, &self.integration);
-
-        waiting!("Starting environment {}", &self.environment);
-        command.run()?;
-
-        envs_dir.save(&self.environment, cmd_config)?;
-        Ok(())
+        integration::start(&self.integration, &self.environment)
     }
 }

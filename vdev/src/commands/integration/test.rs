@@ -1,10 +1,8 @@
 use anyhow::{bail, Result};
 use clap::Args;
 use std::collections::BTreeMap;
-use std::process::Command;
 
-use crate::app::CommandExt as _;
-use crate::testing::{config::IntegrationTestConfig, runner::*, state};
+use crate::testing::{config::IntegrationTestConfig, integration, runner::*, state};
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -22,7 +20,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let (test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
+        let (_test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
         let runner = IntegrationTestRunner::new(self.integration.clone())?;
         let envs_dir = state::EnvsDir::new(&self.integration);
         let envs = config.environments();
@@ -48,53 +46,20 @@ impl Cli {
         runner.ensure_network()?;
 
         let active_envs = envs_dir.list_active()?;
-        for (env_name, env_config) in envs {
-            if !(active_envs.is_empty() || active_envs.contains(&env_name)) {
+        for env_name in envs.keys() {
+            if !(active_envs.is_empty() || active_envs.contains(env_name)) {
                 continue;
             }
 
-            let env_active = envs_dir.exists(&env_name);
+            let env_active = envs_dir.exists(env_name);
             if !env_active {
-                let mut command = Command::new("cargo");
-                command.current_dir(&test_dir);
-                command.env(NETWORK_ENV_VAR, runner.network_name());
-                command.args(["run", "--quiet", "--", "start"]);
-
-                let json = serde_json::to_string(&env_config)?;
-                command.arg(&json);
-
-                if let Some(env_vars) = &config.env {
-                    command.envs(env_vars);
-                }
-
-                waiting!("Starting environment {}", env_name);
-                command.run()?;
-
-                envs_dir.save(&env_name, &json)?;
+                integration::start(&self.integration, env_name)?;
             }
 
             runner.test(&env_vars, &args)?;
 
             if !env_active {
-                let mut command = Command::new("cargo");
-                command.current_dir(&test_dir);
-                command.env(NETWORK_ENV_VAR, runner.network_name());
-                command.args([
-                    "run",
-                    "--quiet",
-                    "--",
-                    "stop",
-                    &envs_dir.read_config(&env_name)?,
-                ]);
-
-                if let Some(env_vars) = &config.env {
-                    command.envs(env_vars);
-                }
-
-                waiting!("Stopping environment {}", env_name);
-                command.run()?;
-
-                envs_dir.remove(&env_name)?;
+                integration::stop(&self.integration, env_name, false)?;
             }
         }
 
