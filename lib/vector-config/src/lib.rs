@@ -172,7 +172,7 @@ where
     N: Configurable + ConfigurableNumber,
 {
     // In `Validation::ensure_conformance`, we do some checks on any supplied numeric bounds to try and ensure they're
-    // no larger than the largest f64 value where integer/floasting-point conversions are still lossless.  What we
+    // no larger than the largest f64 value where integer/floating-point conversions are still lossless.  What we
     // cannot do there, however, is ensure that the bounds make sense for the type on the Rust side, such as a user
     // supplying a negative bound which would be fine for `i64`/`f64` but not for `u64`. That's where this function
     // comes in.
