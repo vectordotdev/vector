@@ -159,7 +159,7 @@ The second option would have to provide a way to store, at least, all fields fro
 If we consider the protobuf definiton for both Datadog and OpenTelemetry, it is clear that the OpenTelemetry from come
 with extra structured fields that are not present in Datadog traces. However having a generic key/value container in
 virtually all traces formats can be used to store data that do not have a dedicated field in some format. As a reflexion
-basis the Datadog and OpenTelemetry are provided belown, there is no hard semantic differences.
+basis the Datadog and OpenTelemetry are provided below, there is no hard semantic differences.
 
 Datadog [newer trace format][otlp-trace-proto-def] (condensed):
 
