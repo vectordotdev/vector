@@ -1309,7 +1309,7 @@ whatsoever, it's possible to just deploy Vector as a
 
 While nothing prevents users from manually configuring Vector for gathering data
 from the host OS, it's very hard for us to offer sane defaults that would work
-out-of-the-box for all clusters, since there's a miriad of configurations.
+out-of-the-box for all clusters, since there's a myriad of configurations.
 
 We can consider offering some kind of user-selectable presets for well known
 popular setups - like AWS and CGP.
