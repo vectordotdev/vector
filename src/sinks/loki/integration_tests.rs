@@ -458,7 +458,7 @@ async fn out_of_order_rewrite() {
 
     let mut expected = events.clone();
     let time = get_timestamp(&expected[batch_size - 1]);
-    // timestamp is rewriten with latest timestamp of the first batch
+    // timestamp is rewritten with latest timestamp of the first batch
     expected[batch_size]
         .as_mut_log()
         .insert(log_schema().timestamp_key(), time);
