@@ -1695,7 +1695,7 @@ mod test {
     }
 
     #[test]
-    fn ampersat_in_query() {
+    fn ampersand_in_query() {
         test(
             data(r#".@foo .bar.@ook"#),
             vec![
