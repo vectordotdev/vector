@@ -268,7 +268,7 @@ where
 
     /// Attempts to read a record.
     ///
-    /// Records are prececded by a length delimiter, a fixed-size integer (currently 8 bytes) that
+    /// Records are preceded by a length delimiter, a fixed-size integer (currently 8 bytes) that
     /// tells the reader how many more bytes to read in order to completely read the next record.
     ///
     /// If there are no more bytes to read, we return early in order to allow the caller to wait
