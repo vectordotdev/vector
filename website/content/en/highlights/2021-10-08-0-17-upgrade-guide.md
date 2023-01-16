@@ -95,7 +95,7 @@ mechanism has been optimized in this release to take into account the
 variance between request response times. This has come with changes to
 the configuration as well. The option to control the RTT threshold
 value, `rtt_threshold_ratio`, has been replaced by the RTT variance
-calcuation. It has been replaced by
+calculation. It has been replaced by
 [`rtt_deviation_scale`][rtt_deviation_scale] which can be used to adjust
 the scale factor applied to this value.
 
