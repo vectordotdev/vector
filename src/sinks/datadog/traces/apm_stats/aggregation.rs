@@ -100,7 +100,7 @@ pub struct Aggregator {
     /// which the associated bucket will calculate statistics.
     buckets: BTreeMap<u64, Bucket>,
 
-    /// The oldeest timestamp we will allow for the current time bucket.
+    /// The oldest timestamp we will allow for the current time bucket.
     oldest_timestamp: u64,
 
     /// Env associated with the Agent.
