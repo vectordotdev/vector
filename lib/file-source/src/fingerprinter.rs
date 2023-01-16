@@ -307,7 +307,7 @@ mod test {
         };
 
         let empty = prepare_test("empty.log", b"");
-        let incomlete_line = prepare_test("incomlete_line.log", b"missing newline char");
+        let incomplete_line = prepare_test("incomplete_line.log", b"missing newline char");
         let one_line = prepare_test("one_line.log", b"hello world\n");
         let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
         let one_line_continued =
@@ -327,7 +327,7 @@ mod test {
         let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
 
         assert!(run(&empty).is_err());
-        assert!(run(&incomlete_line).is_err());
+        assert!(run(&incomplete_line).is_err());
         assert!(run(&incomplete_under_max_line_length_by_one).is_err());
 
         assert!(run(&one_line).is_ok());
@@ -367,8 +367,8 @@ mod test {
             path
         };
 
-        let incomlete_lines = prepare_test(
-            "incomlete_lines.log",
+        let incomplete_lines = prepare_test(
+            "incomplete_lines.log",
             b"missing newline char\non second line",
         );
         let two_lines = prepare_test("two_lines.log", b"hello world\nfrom vector\n");
@@ -386,7 +386,7 @@ mod test {
         let mut buf = Vec::new();
         let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
 
-        assert!(run(&incomlete_lines).is_err());
+        assert!(run(&incomplete_lines).is_err());
 
         assert!(run(&two_lines).is_ok());
         assert!(run(&two_lines_duplicate).is_ok());
