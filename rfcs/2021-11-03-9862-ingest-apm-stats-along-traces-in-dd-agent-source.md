@@ -236,7 +236,7 @@ Regarding the fact that we could ignore/drop incoming APM stats:
 
 * Either completely drop APM stats, but this is not really an option as it would lead to user experience degradation
 * Or disable sampling on the `trace-agent` side and compute APM stats in the `datadog-trace` sink, this could work but
-  this is a lot for a initial implementation (it would required plain ddsketch suppor on top of the computation logic)
+  this is a lot for a initial implementation (it would required plain ddsketch support on top of the computation logic)
   and to match the accuracy of current APM stats, Vector would have to receive 100% of traces, which may not always be
   possible. But this would pave the wayfor generic APM stats computation wherever the traces come from.
 
