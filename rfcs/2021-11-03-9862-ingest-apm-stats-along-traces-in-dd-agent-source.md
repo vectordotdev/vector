@@ -139,7 +139,7 @@ be done later in the topology on both APM stats and traces.
 
 In order to avoid complex and unreliable `route` transforms to properly differentiate logs from traces (as the latter
 will be represented as logs inside Vector), and plain metrics (received from the core Agent) from APM stats metrics
-(received from the `trace-agent`) we can plan to extand the behaviour that was added to the [remap
+(received from the `trace-agent`) we can plan to extend the behaviour that was added to the [remap
 transform][failed-event-routing]. This would translate to the following kind of config, easy to read, easy to adapt:
 
 ```toml
