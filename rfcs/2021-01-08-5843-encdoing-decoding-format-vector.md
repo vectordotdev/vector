@@ -9,7 +9,7 @@ There has been an ongoing discussion of what format Vector-to-Vector communicati
 
 ## Motivation
 
-The question posed by @binarylogic in #5843 is a good definition for the motivation of this change: "How do we transmit data from one Vector instance to another while being mindful of the public contract we create?" Clearly sending metrics from one Vector instance to another should preserve all metric data upon ingestion downstream but there are still concerns around exposing an undocumented format to users in the context of these operations. This discussion continues to come up and we really need a canonincal and definitive decision around what shape this takes so that when we expand our components our contract is explicitly codified.
+The question posed by @binarylogic in #5843 is a good definition for the motivation of this change: "How do we transmit data from one Vector instance to another while being mindful of the public contract we create?" Clearly sending metrics from one Vector instance to another should preserve all metric data upon ingestion downstream but there are still concerns around exposing an undocumented format to users in the context of these operations. This discussion continues to come up and we really need a canonical and definitive decision around what shape this takes so that when we expand our components our contract is explicitly codified.
 
 ## Internal Proposal
 
