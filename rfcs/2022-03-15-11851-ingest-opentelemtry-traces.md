@@ -284,7 +284,7 @@ This makes the opposite conversion a bit complicated if we want it to be complet
 closed unmerged this provide a valuable example. Anyways the [otlp-and-other-formats][OpenTelemetry] acknowledges that
 some of the OpenTelemetry construct ends up being stored as tags or annotations in other formats.
 
-Anyway the OpenTelemetry to Datadog traces conversion is dictacted by existing implementations in both the `trace-agent`
+Anyway the OpenTelemetry to Datadog traces conversion is dictated by existing implementations in both the `trace-agent`
 and the Datadog exporter as users will expect a consistent behaviour from one solution to another. The same
 consideration applies for APM stats computation, as [official implementations][apm-stats-computation] already provides a
 reference that defines what should be done to get the same result with Vector in the loop. The other way, from Datadog to
