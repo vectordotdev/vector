@@ -232,9 +232,9 @@ pub struct Context<'ctx> {
     execution_engine: inkwell::execution_engine::ExecutionEngine<'ctx>,
     module: inkwell::module::Module<'ctx>,
     builder: inkwell::builder::Builder<'ctx>,
-    function: inkwelll::values::FunctionValue<'ctx>,
-    context_ref: inkwelll::values::PointerValue<'ctx>,
-    result_ref: inkwelll::values::PointerValue<'ctx>,
+    function: inkwell::values::FunctionValue<'ctx>,
+    context_ref: inkwell::values::PointerValue<'ctx>,
+    result_ref: inkwell::values::PointerValue<'ctx>,
     ...
 }
 ```
