@@ -105,7 +105,7 @@ pub enum Encoding {
         ///
         /// If enabled, this will generally cause the output to be spread across more lines, with
         /// more indentation, resulting in an easy-to-read form for humans.  The opposite of this
-        /// would be the standard output, which eschews whitespace for the most succient output.
+        /// would be the standard output, which eschews whitespace for the most succinct output.
         pretty: bool,
     },
 
