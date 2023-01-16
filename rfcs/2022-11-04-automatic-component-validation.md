@@ -153,7 +153,7 @@ inputs, how to build the component, and so on.
 
 The intent is to generate the implementation of this trait automatically if at all possible, even if
 only partially. As noted above, there's significant overlap with the already present traits such as
-`SourceConfig`, but they aren't directly deriveable. For example, the `http_server` source has an
+`SourceConfig`, but they aren't directly derivable. For example, the `http_server` source has an
 implementation of `SourceConfig` where it describes its only resources as a TCP socket at a given
 port. This is the resource the source itself needs to listen for HTTP traffic on that port. This is
 all fine and good, but the component runner cares about what external resources need to be provided
