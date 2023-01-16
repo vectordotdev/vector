@@ -493,7 +493,7 @@ async fn out_of_order_per_partition() {
     }
 
     // So, since all of the events are of the same partition, and if there is concurrency,
-    // then if ordering inside paritions isn't upheld, the big line events will take longer
+    // then if ordering inside partitions isn't upheld, the big line events will take longer
     // time to flush than small line events so loki will receive smaller ones before large
     // ones hence out of order events.
     test_out_of_order_events(OutOfOrderAction::Drop, batch_size, events.clone(), events).await;
