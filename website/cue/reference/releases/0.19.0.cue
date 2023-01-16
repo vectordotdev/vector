@@ -11,7 +11,7 @@ releases: "0.19.0": {
 				We are in the process of replacing our current disk buffer
 				implementation, which leverages LevelDB in a way that doesn't
 				quite match common LevelDB use-cases, with a custom
-				implementaion specific to Vector's needs. The end result is
+				implementation specific to Vector's needs. The end result is
 				faster disk buffers.
 				"""
 		},
