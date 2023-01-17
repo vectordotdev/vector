@@ -12,7 +12,7 @@ base: components: sources: nats: configuration: {
 				type: object: options: path: {
 					description: "Path to credentials file."
 					required:    true
-					type: string: {}
+					type: string: examples: ["/etc/nats/nats.creds"]
 				}
 			}
 			nkey: {
@@ -224,7 +224,7 @@ base: components: sources: nats: configuration: {
 	subject: {
 		description: "The NATS subject to pull messages from."
 		required:    true
-		type: string: {}
+		type: string: examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
 	}
 	subject_key_field: {
 		description: "The `NATS` subject key."
@@ -333,6 +333,6 @@ base: components: sources: nats: configuration: {
 			The URL must take the form of `nats://server:port`.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["nats://demo.nats.io", "nats://127.0.0.1:4222"]
 	}
 }

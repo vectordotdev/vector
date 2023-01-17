@@ -45,6 +45,8 @@ pub struct NatsSourceConfig {
     /// The NATS URL to connect to.
     ///
     /// The URL must take the form of `nats://server:port`.
+    #[configurable(metadata(docs::examples = "nats://demo.nats.io"))]
+    #[configurable(metadata(docs::examples = "nats://127.0.0.1:4222"))]
     url: String,
 
     /// A name assigned to the NATS connection.
@@ -52,6 +54,11 @@ pub struct NatsSourceConfig {
     connection_name: String,
 
     /// The NATS subject to pull messages from.
+    #[configurable(metadata(docs::examples = "foo"))]
+    #[configurable(metadata(docs::examples = "time.us.east"))]
+    #[configurable(metadata(docs::examples = "time.*.east"))]
+    #[configurable(metadata(docs::examples = "time.>"))]
+    #[configurable(metadata(docs::examples = ">"))]
     subject: String,
 
     /// NATS Queue Group to join.
