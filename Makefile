@@ -445,7 +445,7 @@ check: ## Run prerequisite code checks
 
 .PHONY: check-all
 check-all: ## Check everything
-check-all: check-fmt check-clippy check-style check-docs
+check-all: check-fmt check-clippy check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts check-deny check-component-docs
 
@@ -464,10 +464,6 @@ check-docs: ## Check that all /docs file are valid
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check fmt
-
-.PHONY: check-style
-check-style: ## Check that all files are styled properly
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check style
 
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
@@ -653,7 +649,6 @@ clean: environment-clean ## Clean everything
 .PHONY: fmt
 fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check style --fix
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
