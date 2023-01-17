@@ -18,7 +18,7 @@ pub(super) fn build_block(
 ) -> crate::Result<Block> {
     let mut b = Block::new();
     for ev in &events {
-        b.push(get_row_from_events(&schema, ev.into_log())?)
+        b.push(get_row_from_events(&schema, ev.clone().into_log())?)
             .map_err(Box::new)?;
     }
     Ok(b)
