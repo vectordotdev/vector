@@ -9,7 +9,7 @@ use tokio::{
 use vector_config::configurable_component;
 use vector_core::metric_tags;
 
-use super::{filter_result_sync, FilterList, HostMetrics, MetricsBuffer};
+use super::{default_all_devices, filter_result_sync, FilterList, HostMetrics, MetricsBuffer};
 use crate::event::MetricTags;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
@@ -38,9 +38,8 @@ pub(crate) struct CGroupsConfig {
 
     /// Lists of cgroup name patterns to include or exclude in gathering
     /// usage metrics.
-    ///
-    /// Defaults to including all cgroups.
     #[configurable(metadata(docs::examples = "example_cgroups()"))]
+    #[serde(default = "default_all_devices")]
     groups: FilterList,
 
     /// Base cgroup directory, for testing use only

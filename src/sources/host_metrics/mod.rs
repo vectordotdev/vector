@@ -148,6 +148,13 @@ fn example_devices() -> FilterList {
     }
 }
 
+fn default_all_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["*".try_into().unwrap()]),
+        excludes: None,
+    }
+}
+
 impl_generate_config_from_default!(HostMetricsConfig);
 
 #[async_trait::async_trait]

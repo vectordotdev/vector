@@ -7,7 +7,7 @@ use vector_core::metric_tags;
 
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
 
-use super::{example_devices, filter_result, FilterList, HostMetrics};
+use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
 /// Options for the “filesystem” metrics collector.
 #[configurable_component]
@@ -15,25 +15,19 @@ use super::{example_devices, filter_result, FilterList, HostMetrics};
 pub struct FilesystemConfig {
     /// Lists of device name patterns to include or exclude in gathering
     /// usage metrics.
-    ///
-    /// Defaults to including all devices.
-    #[serde(default)]
+    #[serde(default = "default_all_devices")]
     #[configurable(metadata(docs::examples = "example_devices()"))]
     devices: FilterList,
 
     /// Lists of filesystem name patterns to include or exclude in gathering
     /// usage metrics.
-    ///
-    /// Defaults to including all filesystems.
-    #[serde(default)]
+    #[serde(default = "default_all_devices")]
     #[configurable(metadata(docs::examples = "example_filesystems()"))]
     filesystems: FilterList,
 
     /// Lists of mount point path patterns to include or exclude in gathering
     /// usage metrics.
-    ///
-    /// Defaults to including all mount points.
-    #[serde(default)]
+    #[serde(default = "default_all_devices")]
     #[configurable(metadata(docs::examples = "example_mountpoints()"))]
     mountpoints: FilterList,
 }

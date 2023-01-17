@@ -4,7 +4,7 @@ use heim::units::information::byte;
 use vector_config::configurable_component;
 use vector_core::metric_tags;
 
-use super::{example_devices, filter_result, FilterList, HostMetrics};
+use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
 /// Options for the “disk” metrics collector.
 #[configurable_component]
@@ -12,9 +12,8 @@ use super::{example_devices, filter_result, FilterList, HostMetrics};
 pub struct DiskConfig {
     /// Lists of device name patterns to include or exclude in gathering
     /// I/O utilization metrics.
-    ///
-    /// Defaults to including all devices.
     #[configurable(metadata(docs::examples = "example_devices()"))]
+    #[serde(default = "default_all_devices")]
     devices: FilterList,
 }
 
