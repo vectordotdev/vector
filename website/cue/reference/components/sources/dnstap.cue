@@ -13,6 +13,7 @@ components: sources: dnstap: {
 	}
 
 	features: {
+		auto_generated: true
 		acknowledgements: false
 		multiline: enabled: false
 		receive: {

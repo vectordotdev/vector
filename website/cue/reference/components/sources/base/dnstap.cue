@@ -20,7 +20,7 @@ base: components: sources: dnstap: configuration: {
 		type: uint: {}
 	}
 	max_frame_length: {
-		description: "Max dnstap frame length that the dnstap source can handle."
+		description: "Max DNSTAP frame length that the dnstap source can handle."
 		required:    false
 		type: uint: {
 			default: 102400
@@ -56,7 +56,7 @@ base: components: sources: dnstap: configuration: {
 		description: """
 			Absolute path to the socket file to read DNSTAP data from.
 
-			The DNS server must be configured to receive its DNSTAP data from this socket file. The socket file will be created
+			The DNS server must be configured to send its DNSTAP data to this socket file. The socket file will be created
 			if it doesn't already exist when the source first starts.
 			"""
 		required: true
