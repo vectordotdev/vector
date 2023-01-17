@@ -9,7 +9,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        app::exec::<&str>("check-style.sh", [], true)?;
+        app::exec::<&str>("scripts/check-style.sh", [], true)?;
         app::exec("cargo", ["fmt", "--", "--check"], true)
     }
 }
