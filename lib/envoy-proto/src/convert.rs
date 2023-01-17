@@ -214,9 +214,7 @@ fn prost_struct_to_value(st: Struct) -> Value {
 
 fn prost_value_to_value(val: &prost_types::Value) -> Value {
     match val.kind.clone() {
-        Some(kind) => {
-            prost_kind_to_value(kind)
-        }
+        Some(kind) => prost_kind_to_value(kind),
         None => Value::Null,
     }
 }
@@ -228,12 +226,9 @@ fn prost_kind_to_value(kind: prost_types::value::Kind) -> Value {
         prost_types::value::Kind::StringValue(s) => Value::Bytes(s.into()),
         prost_types::value::Kind::BoolValue(b) => Value::Boolean(b),
         prost_types::value::Kind::StructValue(st) => prost_struct_to_value(st),
-        prost_types::value::Kind::ListValue(l) => Value::Array(
-            l.values
-                .iter()
-                .map(prost_value_to_value)
-                .collect(),
-        ),
+        prost_types::value::Kind::ListValue(l) => {
+            Value::Array(l.values.iter().map(prost_value_to_value).collect())
+        }
     }
 }
 

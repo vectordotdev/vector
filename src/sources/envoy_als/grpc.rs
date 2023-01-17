@@ -1,4 +1,7 @@
-use crate::{internal_events::StreamClosedError, shutdown::ShutdownSignal, SourceSender};
+use crate::{
+    internal_events::GrpcError, internal_events::StreamClosedError, shutdown::ShutdownSignal,
+    SourceSender,
+};
 use envoy_proto::envoy::service::accesslog::v3::{
     access_log_service_server::AccessLogService, stream_access_logs_message::Identifier,
     stream_access_logs_message::LogEntries, StreamAccessLogsMessage, StreamAccessLogsResponse,
@@ -37,14 +40,12 @@ impl AccessLogService for Service {
             tokio::select! {
                 _ = &mut shutdown => break,
                 stream_msg = in_stream.message() => {
-                    match self.handle_message(stream_msg, &mut stream_identifier).await {
-                        Ok(_) => {},
-                        Err(err) => {
-                            match err {
-                                StreamError::StreamClosed => break,
-                                StreamError::Grpc(status) => {
-                                    return Err(status);
-                                }
+                    if let Err(err) = self.handle_message(stream_msg, &mut stream_identifier).await {
+                        match err {
+                            StreamError::StreamClosed => break,
+                            StreamError::Grpc(status) => {
+                                emit!(GrpcError{error: status.clone()});
+                                return Err(status);
                             }
                         }
                     }
@@ -68,7 +69,7 @@ impl Service {
                     self.process_logs(msg, stream_identifier).await?;
                 }
                 None => {
-                    debug!("Sender closed stream");
+                    // Envoy gracefully closed the stream
                     return Err(StreamError::StreamClosed);
                 }
             },
