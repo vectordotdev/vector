@@ -1,6 +1,7 @@
-use std::{borrow::Cow, env, ffi::OsStr, path::PathBuf, process::Command, time::Duration};
+pub use std::process::Command;
+use std::{borrow::Cow, env, ffi::OsStr, path::PathBuf, process::ExitStatus, time::Duration};
 
-use anyhow::{anyhow, bail, Context as _, Result};
+use anyhow::{bail, Context as _, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 use once_cell::sync::OnceCell;
@@ -29,41 +30,53 @@ pub fn set_repo_dir() -> Result<()> {
 
 /// Overlay some extra helper functions onto `std::process::Command`
 pub trait CommandExt {
-    fn with_path(program: &str) -> Self;
+    fn script(script: &str) -> Self;
+    fn in_repo(&mut self) -> &mut Self;
     fn capture_output(&mut self) -> Result<String>;
-    fn run(&mut self) -> Result<()>;
+    fn check_run(&mut self) -> Result<()>;
+    fn run(&mut self) -> Result<ExitStatus>;
     fn wait(&mut self, message: impl Into<Cow<'static, str>>) -> Result<()>;
+    fn pre_exec(&self);
 }
 
 impl CommandExt for Command {
-    fn with_path(program: &str) -> Self {
-        let mut command = Command::new(program);
-        command.current_dir(path());
-        command
+    /// Create a new command to execute the named script in the repository `scripts` directory.
+    fn script(script: &str) -> Self {
+        Command::new([path(), "scripts", script].into_iter().collect::<PathBuf>())
     }
 
+    /// Set the command's working directory to the repository directory.
+    fn in_repo(&mut self) -> &mut Self {
+        self.current_dir(path())
+    }
+
+    /// Run the command and capture its output.
     fn capture_output(&mut self) -> Result<String> {
+        self.pre_exec();
         Ok(String::from_utf8(self.output()?.stdout)?)
     }
 
-    fn run(&mut self) -> Result<()> {
-        let status = self.status()?;
+    /// Run the command and catch its exit code.
+    fn run(&mut self) -> Result<ExitStatus> {
+        self.pre_exec();
+        self.status().map_err(Into::into)
+    }
+
+    fn check_run(&mut self) -> Result<()> {
+        let status = self.run()?;
         if status.success() {
             Ok(())
         } else {
-            bail!(
-                "command: {} {}\nfailed with exit code: {}",
-                self.get_program().to_str().expect("Invalid program name"),
-                self.get_args()
-                    .map(|arg| arg.to_str().expect("Invalid command argument"))
-                    .collect::<Vec<_>>()
-                    .join(" "),
-                status.code().unwrap()
-            )
+            let exit = status.code().unwrap();
+            bail!("command: {self:?}\n  failed with exit code: {exit}")
         }
     }
 
+    /// Run the command, capture its output, and display a progress bar while it's
+    /// executing. Intended to be used for long-running processes with little interaction.
     fn wait(&mut self, message: impl Into<Cow<'static, str>>) -> Result<()> {
+        self.pre_exec();
+
         let progress_bar = get_progress_bar()?;
         progress_bar.set_message(message);
 
@@ -84,50 +97,32 @@ impl CommandExt for Command {
             )
         }
     }
+
+    /// Print out a pre-execution debug message.
+    fn pre_exec(&self) {
+        debug!("Executing: {self:?}");
+        if let Some(cwd) = self.get_current_dir() {
+            debug!("  in working directory {cwd:?}");
+        }
+    }
 }
 
+/// Short-cut wrapper to create a new command, feed in the args, set the working directory, and then
+/// run it, checking the resulting exit code.
 pub fn exec<T: AsRef<OsStr>>(
-    command: impl AsRef<OsStr>,
+    program: &str,
     args: impl IntoIterator<Item = T>,
+    in_repo: bool,
 ) -> Result<()> {
-    _exec(command.as_ref(), args, None)
-}
-
-pub fn exec_script<T: AsRef<OsStr>>(script: &str, args: impl IntoIterator<Item = T>) -> Result<()> {
-    let script: PathBuf = [path(), "scripts", script].into_iter().collect();
-    _exec(script.as_ref(), args, None)
-}
-
-pub fn exec_in_repo<T: AsRef<OsStr>>(
-    command: impl AsRef<OsStr>,
-    args: impl IntoIterator<Item = T>,
-) -> Result<()> {
-    _exec(command.as_ref(), args, Some(path().as_ref()))
-}
-
-fn _exec<T: AsRef<OsStr>>(
-    command: &OsStr,
-    args: impl IntoIterator<Item = T>,
-    cwd: Option<&OsStr>,
-) -> Result<()> {
-    let mut command = Command::new(command);
+    let mut command = match program.strip_prefix("scripts/") {
+        Some(script) => Command::script(script),
+        None => Command::new(program),
+    };
     command.args(args);
-    if let Some(cwd) = cwd {
-        command.current_dir(cwd);
+    if in_repo {
+        command.in_repo();
     }
-    debug!("Executing: {command:?}");
-    if let Some(cwd) = cwd {
-        debug!("  in working directory {cwd:?}");
-    }
-    match command
-        .spawn()
-        .with_context(|| format!("Could not spawn {command:?}"))?
-        .wait()
-        .context("Could not wait for program exit")?
-    {
-        status if status.success() => Ok(()),
-        status => Err(anyhow!("Command failed, exit code {status}")),
-    }
+    command.check_run()
 }
 
 fn get_progress_bar() -> Result<ProgressBar> {

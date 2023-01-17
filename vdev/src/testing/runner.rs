@@ -175,7 +175,7 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
         ]);
 
         waiting!("Building image {}", self.image_name());
-        command.run()
+        command.check_run()
     }
 
     fn start(&self) -> Result<()> {
@@ -266,7 +266,7 @@ impl TestRunner for IntegrationTestRunner {
         command.args(TEST_COMMAND);
         command.args(args);
 
-        command.run()
+        command.check_run()
     }
 }
 
@@ -322,7 +322,7 @@ impl TestRunner for DockerTestRunner {
         command.args(TEST_COMMAND);
         command.args(args);
 
-        command.run()
+        command.check_run()
     }
 }
 
@@ -360,6 +360,6 @@ impl TestRunner for LocalTestRunner {
             command.env(key, value);
         }
 
-        command.run()
+        command.check_run()
     }
 }

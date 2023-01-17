@@ -45,10 +45,7 @@ pub fn changed_files() -> Result<Vec<String>> {
 }
 
 fn capture_output(args: &[&str]) -> Result<String> {
-    let mut command = Command::with_path("git");
-    command.args(args);
-
-    command.capture_output()
+    Command::new("git").in_repo().args(args).capture_output()
 }
 
 fn is_warning_line(line: &str) -> bool {

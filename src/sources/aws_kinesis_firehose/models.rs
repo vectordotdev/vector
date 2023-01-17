@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FirehoseRequest {
+    pub access_key: Option<String>,
     pub request_id: String,
 
     #[serde(with = "ts_milliseconds")]

@@ -1,6 +1,8 @@
+use std::process::Command;
+
 use anyhow::Result;
 
-use crate::app;
+use crate::app::CommandExt as _;
 
 /// Update Kubernetes manifests from latest stable release and create a new Cue file for the new
 /// release
@@ -10,7 +12,11 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        app::exec_in_repo::<&str>("scripts/generate-manifests.sh", [])?;
-        app::exec_in_repo::<&str>("scripts/generate-release-cue.rb", [])
+        Command::script("generate-manifests.sh")
+            .in_repo()
+            .check_run()?;
+        Command::script("generate-release-cue.rb")
+            .in_repo()
+            .check_run()
     }
 }
