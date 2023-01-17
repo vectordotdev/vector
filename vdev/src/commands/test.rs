@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Args;
 use std::collections::BTreeMap;
 
+use crate::platform;
 use crate::testing::{config::RustToolchainConfig, runner::get_agent_test_runner};
 
 /// Execute tests
@@ -20,35 +21,33 @@ pub struct Cli {
     env: Option<Vec<String>>,
 }
 
+fn parse_env(env: Vec<String>) -> BTreeMap<String, String> {
+    env.into_iter()
+        .map(|entry| {
+            let split = entry.split_once('=');
+            #[allow(clippy::map_unwrap_or)]
+            split
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .unwrap_or_else(|| (entry, String::new()))
+        })
+        .collect()
+}
+
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let toolchain_config = RustToolchainConfig::parse()?;
         let runner = get_agent_test_runner(self.container, toolchain_config.channel);
-
-        let mut env_vars = BTreeMap::new();
-        if let Some(extra_env_vars) = &self.env {
-            for entry in extra_env_vars {
-                if let Some((key, value)) = entry.split_once('=') {
-                    env_vars.insert(key.to_string(), value.to_string());
-                } else {
-                    env_vars.insert(entry.to_string(), String::new());
-                }
-            }
-        }
 
         let mut args = vec!["--workspace".to_string()];
         if let Some(extra_args) = &self.args {
             args.extend(extra_args.clone());
 
             if !(self.container || extra_args.contains(&"--features".to_string())) {
-                if cfg!(windows) {
-                    args.extend(["--features".to_string(), "default-msvc".to_string()]);
-                } else {
-                    args.extend(["--features".to_string(), "default".to_string()]);
-                }
+                let features = platform::default_features();
+                args.extend(["--features".to_string(), features.to_string()]);
             }
         }
 
-        runner.test(&env_vars, &args)
+        runner.test(&parse_env(self.env.unwrap_or_default()), &args)
     }
 }

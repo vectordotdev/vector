@@ -32,13 +32,11 @@ impl Cli {
         }
 
         command.arg("--features");
-        if !self.feature.is_empty() {
-            command.args([self.feature.join(",")]);
-        } else if cfg!(windows) {
-            command.arg("default-msvc");
+        if self.feature.is_empty() {
+            command.arg(platform::default_features());
         } else {
-            command.arg("default");
-        };
+            command.arg(self.feature.join(","));
+        }
 
         if let Some(target) = self.target.as_deref() {
             command.args(["--target", target]);
