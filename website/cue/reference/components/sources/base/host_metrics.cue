@@ -23,8 +23,6 @@ base: components: sources: host_metrics: configuration: {
 				description: """
 					Lists of cgroup name patterns to include or exclude in gathering
 					usage metrics.
-
-					Defaults to including all cgroups.
 					"""
 				required: false
 				type: object: {
@@ -49,7 +47,10 @@ base: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 							required: false
-							type: array: items: type: string: {}
+							type: array: {
+								default: ["*"]
+								items: type: string: {}
+							}
 						}
 					}
 				}
@@ -96,8 +97,6 @@ base: components: sources: host_metrics: configuration: {
 			description: """
 				Lists of device name patterns to include or exclude in gathering
 				I/O utilization metrics.
-
-				Defaults to including all devices.
 				"""
 			required: false
 			type: object: {
@@ -122,7 +121,10 @@ base: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 						required: false
-						type: array: items: type: string: {}
+						type: array: {
+							default: ["*"]
+							items: type: string: {}
+						}
 					}
 				}
 			}
@@ -136,8 +138,6 @@ base: components: sources: host_metrics: configuration: {
 				description: """
 					Lists of device name patterns to include or exclude in gathering
 					usage metrics.
-
-					Defaults to including all devices.
 					"""
 				required: false
 				type: object: {
@@ -162,7 +162,10 @@ base: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 							required: false
-							type: array: items: type: string: {}
+							type: array: {
+								default: ["*"]
+								items: type: string: {}
+							}
 						}
 					}
 				}
@@ -171,8 +174,6 @@ base: components: sources: host_metrics: configuration: {
 				description: """
 					Lists of filesystem name patterns to include or exclude in gathering
 					usage metrics.
-
-					Defaults to including all filesystems.
 					"""
 				required: false
 				type: object: {
@@ -197,7 +198,10 @@ base: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 							required: false
-							type: array: items: type: string: {}
+							type: array: {
+								default: ["*"]
+								items: type: string: {}
+							}
 						}
 					}
 				}
@@ -206,8 +210,6 @@ base: components: sources: host_metrics: configuration: {
 				description: """
 					Lists of mount point path patterns to include or exclude in gathering
 					usage metrics.
-
-					Defaults to including all mount points.
 					"""
 				required: false
 				type: object: {
@@ -232,7 +234,10 @@ base: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 							required: false
-							type: array: items: type: string: {}
+							type: array: {
+								default: ["*"]
+								items: type: string: {}
+							}
 						}
 					}
 				}
@@ -251,8 +256,6 @@ base: components: sources: host_metrics: configuration: {
 			description: """
 				Lists of device name patterns to include or exclude in gathering
 				network utilization metrics.
-
-				Defaults to including all devices.
 				"""
 			required: false
 			type: object: {
@@ -277,7 +280,10 @@ base: components: sources: host_metrics: configuration: {
 																The patterns are matched using globbing.
 																"""
 						required: false
-						type: array: items: type: string: {}
+						type: array: {
+							default: ["*"]
+							items: type: string: {}
+						}
 					}
 				}
 			}
