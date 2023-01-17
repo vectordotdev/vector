@@ -2,7 +2,12 @@ package metadata
 
 base: components: sources: socket: configuration: {
 	address: {
-		description:   "The address to listen for connections on."
+		description: """
+			The address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+			systemd socket activation.
+
+			If a socket address is used, it _must_ include a port.
+			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
 		type: {
@@ -14,7 +19,7 @@ base: components: sources: socket: configuration: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: {}
+		type: uint: unit: "concurrency"
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
@@ -172,9 +177,11 @@ base: components: sources: socket: configuration: {
 			The maximum buffer size, in bytes, of incoming messages.
 
 			Messages larger than this are truncated.
+
+			This option is deprecated. Configure `max_length` on the framing config instead.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: unit: "bytes"
 	}
 	mode: {
 		description: "The type of socket to use."
@@ -194,7 +201,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
 		required:      true
-		type: string: {}
+		type: string: examples: ["/path/to/socket"]
 	}
 	port_key: {
 		description: """
@@ -218,7 +225,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: uint: {}
+		type: uint: unit: "bytes"
 	}
 	shutdown_timeout_secs: {
 		description:   "The timeout, in seconds, before a connection is forcefully closed during shutdown."
@@ -238,7 +245,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
 		required:      false
-		type: uint: {}
+		type: uint: examples: ["0o777", "0o600", "508"]
 	}
 	tls: {
 		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate"
