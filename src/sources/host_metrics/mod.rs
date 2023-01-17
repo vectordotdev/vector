@@ -51,7 +51,7 @@ pub enum Collector {
     /// Metrics related to filesystem space utilization.
     Filesystem,
 
-    /// Load average metrics.
+    /// Metrics related to the system load average.
     Load,
 
     /// Metrics related to the host.
@@ -124,7 +124,7 @@ const fn default_scrape_interval() -> Duration {
     Duration::from_secs(15)
 }
 
-fn default_namespace() -> Option<String> {
+pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
@@ -139,6 +139,13 @@ const fn example_collectors() -> [&'static str; 8] {
         "memory",
         "network",
     ]
+}
+
+fn example_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["sda".try_into().unwrap()]),
+        excludes: Some(vec!["dm-*".try_into().unwrap()]),
+    }
 }
 
 impl_generate_config_from_default!(HostMetricsConfig);

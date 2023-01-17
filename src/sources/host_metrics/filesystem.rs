@@ -7,7 +7,7 @@ use vector_core::metric_tags;
 
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
 
-use super::{filter_result, FilterList, HostMetrics};
+use super::{example_devices, filter_result, FilterList, HostMetrics};
 
 /// Options for the “filesystem” metrics collector.
 #[configurable_component]
@@ -36,13 +36,6 @@ pub struct FilesystemConfig {
     #[serde(default)]
     #[configurable(metadata(docs::examples = "example_mountpoints()"))]
     mountpoints: FilterList,
-}
-
-fn example_devices() -> FilterList {
-    FilterList {
-        includes: Some(vec!["sda".try_into().unwrap()]),
-        excludes: Some(vec!["dm-*".try_into().unwrap()]),
-    }
 }
 
 fn example_filesystems() -> FilterList {

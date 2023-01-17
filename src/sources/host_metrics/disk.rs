@@ -4,7 +4,7 @@ use heim::units::information::byte;
 use vector_config::configurable_component;
 use vector_core::metric_tags;
 
-use super::{filter_result, FilterList, HostMetrics};
+use super::{example_devices, filter_result, FilterList, HostMetrics};
 
 /// Options for the “disk” metrics collector.
 #[configurable_component]
@@ -16,13 +16,6 @@ pub struct DiskConfig {
     /// Defaults to including all devices.
     #[configurable(metadata(docs::examples = "example_devices()"))]
     devices: FilterList,
-}
-
-fn example_devices() -> FilterList {
-    FilterList {
-        includes: Some(vec!["sda".try_into().unwrap()]),
-        excludes: Some(vec!["dm-*".try_into().unwrap()]),
-    }
 }
 
 impl HostMetrics {

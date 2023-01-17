@@ -9,7 +9,7 @@ use vector_core::metric_tags;
 
 use crate::internal_events::HostMetricsScrapeDetailError;
 
-use super::{filter_result, FilterList, HostMetrics};
+use super::{example_devices, filter_result, FilterList, HostMetrics};
 
 /// Options for the “network” metrics collector.
 #[configurable_component]
@@ -22,13 +22,6 @@ pub struct NetworkConfig {
     #[serde(default)]
     #[configurable(metadata(docs::examples = "example_devices()"))]
     devices: FilterList,
-}
-
-fn example_devices() -> FilterList {
-    FilterList {
-        includes: Some(vec!["sda".try_into().unwrap()]),
-        excludes: Some(vec!["dm-*".try_into().unwrap()]),
-    }
 }
 
 impl HostMetrics {
