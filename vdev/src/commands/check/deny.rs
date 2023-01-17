@@ -9,7 +9,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        app::exec_in_repo(
+        app::exec(
             "cargo",
             [
                 "deny",
@@ -19,6 +19,7 @@ impl Cli {
                 "check",
                 "all",
             ],
+            true,
         )
     }
 }

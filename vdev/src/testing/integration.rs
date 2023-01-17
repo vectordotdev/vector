@@ -105,6 +105,6 @@ impl IntegrationTest {
         }
 
         waiting!("{action} environment {}", self.environment);
-        command.run()
+        command.check_run()
     }
 }
