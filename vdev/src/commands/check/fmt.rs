@@ -9,6 +9,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        app::exec_in_repo("cargo", ["fmt", "--", "--check"])
+        app::exec::<&str>("check-style.sh", [], true)?;
+        app::exec("cargo", ["fmt", "--", "--check"], true)
     }
 }

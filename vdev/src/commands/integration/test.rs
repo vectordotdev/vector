@@ -68,7 +68,7 @@ impl Cli {
                 }
 
                 waiting!("Starting environment {}", env_name);
-                command.run()?;
+                command.check_run()?;
 
                 state::save_env(&envs_dir, &env_name, &json)?;
             }
@@ -92,7 +92,7 @@ impl Cli {
                 }
 
                 waiting!("Stopping environment {}", env_name);
-                command.run()?;
+                command.check_run()?;
 
                 state::remove_env(&envs_dir, &env_name)?;
             }
