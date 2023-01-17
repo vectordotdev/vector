@@ -2,7 +2,7 @@ version: '3'
 
 services:
   mock-ec2-metadata:
-    image: docker.io/timberiodev/mock-ec2-metadata:${AWS_VERSION}
+    image: public.ecr.aws/aws-ec2/amazon-ec2-metadata-mock:v1.11.2
   mock-localstack:
     image: docker.io/localstack/localstack-full:0.11.6
     environment:
@@ -19,3 +19,5 @@ networks:
   default:
     name: ${VECTOR_NETWORK}
     external: true
+    networks:
+      - backend
