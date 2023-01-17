@@ -2,9 +2,9 @@
 
 This walks through the steps required to add log namespacing to a given source.
 
-Log Namespacing as a new feature in Vector that allows different fields of the Log 
+Log Namespacing is a new feature in Vector that allows different fields of the Log 
 event to be kept under separate namespaces, thus avoiding conflicts where two different
-fields try to have the same name. Log Namespacing does not apply to Metric events.
+fields try to use the same name. Log Namespacing does not apply to Metric events.
 
 ## Config
 
@@ -18,7 +18,7 @@ Add the following field to the `Config` struct:
 ```
 
 Currently, because log namespacing is an unreleased feature we add the `docs::hidden`
-metadata so it doesn't appear in the documentation.
+attribute so it doesn't appear in the documentation.
 
 ## Build
 
@@ -79,15 +79,34 @@ This needs to be the log event that is being populated.
 #### legacy_key
 
 This is the name of the field the timestamp is to be inserted into
-when using the Legacy Namespace. This will typically be values returned
-by calls to `log_schema().source_type_key()` and `log_schema().timestamp_key()`.
+when using the Legacy Namespace. 
 
-#### metdata_key
+The value for this field comes from a number of different places.
+
+- For fields that are typically found in most log events the value will 
+be returned by calls to `log_schema()` eg. `log_schema().source_type_key()` 
+or `log_schema().timestamp_key()`.
+- Some sources allow the user to specify the field name that a given
+value will be placed in. For example, the `kafka` source will allow the
+user to specify the `topic_key` - the field name that will contain the 
+kafka `topic` the event was consumed from.  
+- Other sources just hardcode this value. For example the `dnstap` source
+creates an event with an object, most of these field names are hardcoded.
+
+#### metadata_key
 
 The name of the field when it is inserted into the Vector namespace. This 
-will be `path!("ingest_timestamp")` or `path!(source_type)`. The field names
+will be `path!("ingest_timestamp")` or `path!("source_type")`. The field names
 can be hardcoded since they are going into the Vector namespace, so conflicts
 with other field names cannot occur.
+
+It should be noted that the values for these field names are typically 
+hardcoded. With the `kafka` source, for example, it was possible to configure
+the field name that the `topic` was inserted into. In the Vector namespace
+this field name is just hardcoded to `topic`. Allowing the user to configure
+the fieldname was only necessary to prevent name conflicts with other values
+from the event. This is no longer an issue as these values are now placed in a 
+separate namespace to the event data.
 
 #### value
 
@@ -97,7 +116,11 @@ For the ingest timestamp this will be `chrono::Utc::now()`. Source type will be
 the `NAME` property of the `Config` struct. `NAME` is provided by the 
 `configurable_component` macro. You may need to include `use vector_config::NamedComponent;`.
 
-### insert_standard_vector_source_metadata
+For batches of events, each event in the batch should use a precalculated
+`Utc::now()` so they all share the same timestamp.
+
+
+### insert_standard_vector_source_metadata(...)
 
 A utility function has been provided that can be used in a lot of cases to 
 insert both these fields into the Vector namespace:
@@ -119,8 +142,6 @@ should go into the source metadata. Examples of source metadata are
 - The Kafka topic when pulling from a Kafka stream.
 - Severity and Facility fields from a Syslog message.
 - The file path when pulling data from a file.
-- The timestamp extracted from the message (this can be different to the time
-  the message was ingested.)
 
 To insert source metadata:
 
@@ -215,9 +236,9 @@ of different things.
 - Ingest timestamp - This is the timestamp when the event was received
   by Vector. This should go in the Vector metadata.
 - Timestamp - This should be any timestamp extracted from the incoming 
-  message. No timestamp 
+  message.
   
-It is worth noticing that existing sources have not always been consistent
+It is worth recognising that existing sources have not always been consistent
 with this. Some sources would insert a timestamp that is extracted from the
 event but default to the ingest timestamp if it didn't exist. Others insert 
 the timestamp extracted from the event and don't insert a timestamp at all
