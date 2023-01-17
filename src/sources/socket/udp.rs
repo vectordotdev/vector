@@ -37,8 +37,8 @@ use crate::{
 #[serde(deny_unknown_fields)]
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
-    /// The address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
-    /// systemd socket activation.
+    /// The socket address to listen for connections on, or `systemd{#N}`
+    /// to use the Nth socket passed by systemd socket activation.
     ///
     /// If a socket address is used, it _must_ include a port.
     #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
@@ -91,6 +91,7 @@ pub struct UdpConfig {
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
 }
 

@@ -3,8 +3,8 @@ package metadata
 base: components: sources: statsd: configuration: {
 	address: {
 		description: """
-			The address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
-			systemd socket activation.
+			The socket address to listen for connections on, or `systemd{#N}`
+			to use the Nth socket passed by systemd socket activation.
 
 			If a socket address is used, it _must_ include a port.
 			"""

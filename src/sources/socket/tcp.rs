@@ -24,8 +24,8 @@ use super::{default_host_key, SocketConfig};
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    /// The address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
-    /// systemd socket activation.
+    /// The socket address to listen for connections on, or `systemd{#N}`
+    /// to use the Nth socket passed by systemd socket activation.
     ///
     /// If a socket address is used, it _must_ include a port.
     #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
@@ -82,7 +82,6 @@ pub struct TcpConfig {
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
-    #[configurable(metadata(docs::type_unit = "concurrency"))]
     pub connection_limit: Option<u32>,
 
     #[configurable(derived)]
@@ -94,6 +93,7 @@ pub struct TcpConfig {
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
 }
 

@@ -3,8 +3,8 @@ package metadata
 base: components: sources: socket: configuration: {
 	address: {
 		description: """
-			The address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
-			systemd socket activation.
+			The socket address to listen for connections on, or `systemd{#N}`
+			to use the Nth socket passed by systemd socket activation.
 
 			If a socket address is used, it _must_ include a port.
 			"""
@@ -19,7 +19,7 @@ base: components: sources: socket: configuration: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: unit: "concurrency"
+		type: uint: {}
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
@@ -166,11 +166,6 @@ base: components: sources: socket: configuration: {
 			required:    false
 			type: uint: {}
 		}
-	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global setting."
-		required:    false
-		type: bool: {}
 	}
 	max_length: {
 		description: """
