@@ -252,7 +252,7 @@ impl ValidatableComponent for SimpleHttpConfig {
 
         let external_resource = ExternalResource::new(
             ResourceDirection::Push,
-            HttpResourceConfig::from_parts(uri, Some(config.method.clone().into())),
+            HttpResourceConfig::from_parts(uri, Some(config.method.into())),
             config
                 .get_decoding_config()
                 .expect("should not fail to get decoding config"),

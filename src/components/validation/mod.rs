@@ -102,12 +102,12 @@ impl ValidationConfiguration {
     }
 
     /// Gets the name of the component.
-    pub fn component_name(&self) -> &'static str {
+    pub const fn component_name(&self) -> &'static str {
         self.component_name
     }
 
     /// Gets the type of the component.
-    pub fn component_type(&self) -> ComponentType {
+    pub const fn component_type(&self) -> ComponentType {
         self.component_type
     }
 
