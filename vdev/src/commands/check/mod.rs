@@ -9,7 +9,6 @@ crate::cli_subcommands! {
     mod fmt,
     mod markdown,
     scripts,
-    style,
     version,
 }
 
@@ -43,11 +42,6 @@ crate::script_wrapper! {
 crate::script_wrapper! {
     scripts = "Check that scripts do not have common mistakes"
         => "check-scripts.sh"
-}
-
-crate::script_wrapper! {
-    style = "Check that all files are styled properly"
-        => "check-style.sh"
 }
 
 crate::script_wrapper! {
