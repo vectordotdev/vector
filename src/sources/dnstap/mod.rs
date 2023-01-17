@@ -30,7 +30,7 @@ use vector_core::config::{LegacyKey, LogNamespace};
 #[configurable_component(source("dnstap"))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
-    /// Max dnstap frame length that the dnstap source can handle.
+    /// Max DNSTAP frame length that the dnstap source can handle.
     #[serde(default = "default_max_frame_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_frame_length: usize,
@@ -46,7 +46,7 @@ pub struct DnstapConfig {
 
     /// Absolute path to the socket file to read DNSTAP data from.
     ///
-    /// The DNS server must be configured to receive its DNSTAP data from this socket file. The socket file will be created
+    /// The DNS server must be configured to send its DNSTAP data to this socket file. The socket file will be created
     /// if it doesn't already exist when the source first starts.
     pub socket_path: PathBuf,
 
