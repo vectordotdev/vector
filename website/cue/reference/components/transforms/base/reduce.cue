@@ -63,7 +63,7 @@ base: components: transforms: reduce: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: "Strategies for merging events."
+			description: "An individual merge strategy."
 			required:    true
 			type: string: enum: {
 				array:          "Append each value to an array."

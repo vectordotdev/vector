@@ -37,35 +37,7 @@ components: sources: internal_logs: {
 		platform_name: null
 	}
 
-	configuration: {
-		host_key: {
-			category:    "Context"
-			common:      false
-			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-
-				Set to "" to suppress this key.
-				"""
-			required:    false
-			type: string: {
-				default: "host"
-			}
-		}
-		pid_key: {
-			category: "Context"
-			common:   false
-			description: """
-				The key name added to each event representing the current process ID.
-
-				Set to "" to suppress this key.
-				"""
-			required: false
-			type: string: {
-				default: "pid"
-			}
-		}
-	}
+	configuration: base.components.sources.internal_logs.configuration
 
 	output: logs: line: {
 		description: "An individual log or trace message."

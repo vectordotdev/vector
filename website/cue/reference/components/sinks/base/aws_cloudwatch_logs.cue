@@ -386,7 +386,8 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 				description: "Additional HTTP headers to add to every HTTP request."
 				required:    false
 				type: object: options: "*": {
-					required: true
+					description: "An HTTP request header."
+					required:    true
 					type: string: {}
 				}
 			}

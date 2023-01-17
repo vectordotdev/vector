@@ -110,6 +110,8 @@ where
 mod tests {
     use crate::{
         components::validation::{Runner, StandardValidators},
+        sinks::http::HttpSinkConfig,
+        sources::http_client::HttpClientConfig,
         sources::http_server::SimpleHttpConfig,
     };
 
@@ -122,11 +124,14 @@ mod tests {
         //
         // However, as that would require every component we get back from those mechanisms to implement
         // `Component`, we can't (yet) use them, so here's we're approximating that logic by creating
-        // our own static version of a single component -- the `http_server` source -- and handing it
-        // back.
+        // our own static version of components and handing them back.
         //
-        // Yes, we're leaking an object. It's a test, who cares.
-        vec![Box::leak(Box::new(SimpleHttpConfig::default()))]
+        // Yes, we're leaking objects. It's a test, who cares.
+        vec![
+            Box::leak(Box::new(SimpleHttpConfig::validation())),
+            Box::leak(Box::new(HttpClientConfig::validation())),
+            Box::leak(Box::new(HttpSinkConfig::validation())),
+        ]
     }
 
     #[tokio::test]

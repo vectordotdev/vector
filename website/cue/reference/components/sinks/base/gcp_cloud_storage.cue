@@ -373,7 +373,8 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			required: true
+			description: "A key/value pair."
+			required:    true
 			type: string: {}
 		}
 	}
