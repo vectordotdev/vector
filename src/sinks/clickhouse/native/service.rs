@@ -10,12 +10,12 @@ use vector_common::{internal_event::CountByteSize, Error};
 use vector_core::event::Event;
 use vector_core::stream::DriverResponse;
 
-pub(super) struct ClickhouseResponse {
+pub(super) struct NativeClickhouseResponse {
     pub(super) event_count: usize,
     pub(super) event_byte_size: usize,
 }
 
-impl DriverResponse for ClickhouseResponse {
+impl DriverResponse for NativeClickhouseResponse {
     fn event_status(&self) -> EventStatus {
         EventStatus::Delivered
     }
@@ -51,7 +51,7 @@ pub(super) struct ClickhouseService {
 }
 
 impl Service<NativeClickhouseRequest> for ClickhouseService {
-    type Response = ClickhouseResponse;
+    type Response = NativeClickhouseResponse;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -74,7 +74,7 @@ impl Service<NativeClickhouseRequest> for ClickhouseService {
             let block = build_block(schema, request.events)?;
             let mut handle = pool.get_handle().await?;
             handle.insert(table, block).await?;
-            Ok(ClickhouseResponse {
+            Ok(NativeClickhouseResponse {
                 event_count,
                 event_byte_size,
             })

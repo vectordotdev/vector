@@ -95,7 +95,6 @@ impl NativeClickhouseSink {
 impl StreamSink<Event> for NativeClickhouseSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
-            //.map(|e| e.into_log())
             .map(|mut event| EventData {
                 byte_size: event.size_of(),
                 finalizers: event.take_finalizers(),

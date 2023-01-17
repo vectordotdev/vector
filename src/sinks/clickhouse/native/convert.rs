@@ -18,7 +18,7 @@ pub(super) fn build_block(
 ) -> crate::Result<Block> {
     let mut b = Block::new();
     for ev in &events {
-        b.push(get_row_from_events(&schema, &ev.clone().into_log())?)
+        b.push(get_row_from_events(&schema, ev.clone().into_log())?)
             .map_err(Box::new)?;
     }
     Ok(b)
@@ -26,7 +26,7 @@ pub(super) fn build_block(
 
 fn get_row_from_events(
     schema: &Vec<(String, SqlType)>,
-    event: &LogEvent,
+    event: LogEvent,
 ) -> crate::Result<Vec<(String, CHValue)>> {
     let mut row = Vec::with_capacity(schema.len());
     for (col_name, ty) in schema {
