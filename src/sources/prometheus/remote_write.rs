@@ -29,6 +29,7 @@ pub struct PrometheusRemoteWriteConfig {
     /// The address to accept connections on.
     ///
     /// The address _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:9090"))]
     address: SocketAddr,
 
     #[configurable(derived)]

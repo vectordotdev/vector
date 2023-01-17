@@ -26,7 +26,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 			The address _must_ include a port.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["0.0.0.0:9090"]
 	}
 	auth: {
 		description: "HTTP Basic authentication configuration."
