@@ -35,6 +35,11 @@ impl DecodingConfig {
         &self.decoding
     }
 
+    /// Get the framing configuration.
+    pub const fn framing(&self) -> &FramingConfig {
+        &self.framing
+    }
+
     /// Builds a `Decoder` from the provided configuration.
     pub fn build(&self) -> Decoder {
         // Build the framer.

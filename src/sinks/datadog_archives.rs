@@ -218,6 +218,7 @@ pub struct S3Options {
     pub storage_class: Option<S3StorageClass>,
 
     /// The tag-set for the object.
+    #[configurable(metadata(docs::additional_props_description = "A single tag."))]
     pub tags: Option<BTreeMap<String, String>>,
 }
 
@@ -248,6 +249,7 @@ pub struct GcsConfig {
     /// For more information, see [Custom metadata][custom_metadata].
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
+    #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
     metadata: Option<HashMap<String, String>>,
 
     #[serde(flatten)]

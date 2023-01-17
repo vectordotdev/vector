@@ -313,7 +313,14 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     strategy:
       matrix:
-        container: ["ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","ubuntu:22.04","debian:9","debian:10","debian:11"]
+        container:
+          - ubuntu:14.04
+          - ubuntu:16.04
+          - ubuntu:18.04
+          - ubuntu:20.04
+          - ubuntu:22.04
+          - debian:10
+          - debian:11
     container:
       image: ${{ matrix.container }}
     steps:
@@ -358,6 +365,7 @@ jobs:
         container:
           - "quay.io/centos/centos:stream8"
           - "quay.io/centos/centos:stream9"
+          - "amazonlinux:1"
           - "amazonlinux:2"
           - "fedora:34"
           - "fedora:35"

@@ -24,7 +24,8 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let mut command = Command::with_path("cargo");
+        let mut command = Command::new("cargo");
+        command.in_repo();
         command.args(["build", "--no-default-features"]);
 
         if self.release {
@@ -38,16 +39,13 @@ impl Cli {
             command.arg("default-msvc");
         } else {
             command.arg("default");
-        };
+        }
 
-        if let Some(target) = self.target.as_deref() {
-            command.args(["--target", target]);
-        } else {
-            command.args(["--target", &platform::default_target()]);
-        };
+        let target = self.target.unwrap_or_else(platform::default_target);
+        command.args(["--target", &target]);
 
         waiting!("Building Vector");
-        command.run()?;
+        command.check_run()?;
 
         Ok(())
     }
