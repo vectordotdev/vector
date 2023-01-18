@@ -217,32 +217,12 @@ struct ReduceState {
 }
 
 impl ReduceState {
-    fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
-        let (value, metadata) = e.into_parts();
-
-        let fields = if let Value::Object(fields) = value {
-            fields
-                .into_iter()
-                .filter_map(|(k, v)| {
-                    if let Some(strat) = strategies.get(&k) {
-                        match get_value_merger(v, strat) {
-                            Ok(m) => Some((k, m)),
-                            Err(error) => {
-                                warn!(message = "Failed to create merger.", field = ?k, %error);
-                                None
-                            }
-                        }
-                    } else {
-                        Some((k, v.into()))
-                    }
-                })
-                .collect()
-        } else {
-            HashMap::new()
-        };
+    fn new() -> Self {
+        let fields = HashMap::new();
+        let metadata = EventMetadata::default();
 
         Self {
-            events: 1,
+            events: 0,
             stale_since: Instant::now(),
             fields,
             metadata,
@@ -368,7 +348,9 @@ impl Reduce {
     fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
         match self.reduce_merge_states.entry(discriminant) {
             hash_map::Entry::Vacant(entry) => {
-                entry.insert(ReduceState::new(event, &self.merge_strategies));
+                let mut state = ReduceState::new();
+                state.add_event(event, &self.merge_strategies);
+                entry.insert(state);
             }
             hash_map::Entry::Occupied(mut entry) => {
                 entry.get_mut().add_event(event, &self.merge_strategies);
@@ -377,7 +359,7 @@ impl Reduce {
     }
 
     fn transform_one(&mut self, output: &mut Vec<Event>, event: Event) {
-        let (mut starts_here, event) = match &self.starts_when {
+        let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
         };
@@ -392,7 +374,7 @@ impl Reduce {
 
         if let Some(max_events) = self.max_events {
             if max_events == 1 {
-                starts_here = true;
+                ends_here = true;
             } else if let Some(entry) = self.reduce_merge_states.get(&discriminant) {
                 // The current event will finish this set
                 if entry.events + 1 == max_events {
@@ -413,9 +395,11 @@ impl Reduce {
                     state.add_event(event, &self.merge_strategies);
                     state.flush().into()
                 }
-                None => ReduceState::new(event, &self.merge_strategies)
-                    .flush()
-                    .into(),
+                None => {
+                    let mut state = ReduceState::new();
+                    state.add_event(event, &self.merge_strategies);
+                    state.flush().into()
+                },
             })
         } else {
             self.push_or_new_reduce_state(event, discriminant)
@@ -725,7 +709,6 @@ max_events = 0
 group_by = [ "id" ]
 merge_strategies.id = "retain"
 merge_strategies.message = "array"
-expire_after_ms = 100
 max_events = 1
             "#,
         )
@@ -752,8 +735,6 @@ max_events = 1
             let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["message"], vec!["test 2"].into());
 
-            // NB receiving the last event may take as long as the duration set by expire_after_ms
-            // and the flush interval, as max_events=1 does not currently flush events through immediately
             let output_3 = out.recv().await.unwrap().into_log();
             assert_eq!(output_3["message"], vec!["test 3"].into());
 
