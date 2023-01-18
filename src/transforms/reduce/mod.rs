@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::{
     collections::{hash_map, HashMap},
+    num::NonZeroUsize,
     pin::Pin,
     time::{Duration, Instant},
 };
@@ -51,7 +52,7 @@ pub struct ReduceConfig {
     pub flush_period_ms: Duration,
 
     /// The maximum number of events to group together.
-    pub max_events: Option<usize>,
+    pub max_events: Option<NonZeroUsize>,
 
     /// An ordered list of fields by which to group events.
     ///
@@ -329,7 +330,11 @@ impl Reduce {
             .map(|c| c.build(enrichment_tables))
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
-        let max_events = config.max_events;
+        let max_events = if let Some(max) = config.max_events {
+            Some(max.into())
+        } else {
+            None
+        };
 
         Ok(Reduce {
             expire_after: config.expire_after_ms,
@@ -376,7 +381,7 @@ impl Reduce {
     }
 
     fn transform_one(&mut self, output: &mut Vec<Event>, event: Event) {
-        let (starts_here, event) = match &self.starts_when {
+        let (mut starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
         };
@@ -390,7 +395,9 @@ impl Reduce {
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);
 
         if let Some(max_events) = self.max_events {
-            if let Some(entry) = self.reduce_merge_states.get(&discriminant) {
+            if max_events == 1 {
+                starts_here = true;
+            } else if let Some(entry) = self.reduce_merge_states.get(&discriminant) {
                 // The current event will finish this set
                 if entry.events + 1 == max_events {
                     ends_here = true;
@@ -697,13 +704,78 @@ group_by = [ "request_id" ]
     }
 
     #[tokio::test]
+    async fn max_events_0() {
+        let reduce_config = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "id" ]
+merge_strategies.id = "retain"
+merge_strategies.message = "array"
+max_events = 0
+            "#,
+        );
+
+        match reduce_config {
+            Ok(_conf) => assert!(false, "max_events=0 should be rejected."),
+            Err(err) => assert!(err.to_string().contains(
+                "invalid value: integer `0`, expected a nonzero usize for key `max_events`"
+            )),
+        }
+    }
+
+    #[tokio::test]
+    async fn max_events_1() {
+        let reduce_config = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "id" ]
+merge_strategies.id = "retain"
+merge_strategies.message = "array"
+expire_after_ms = 100
+max_events = 1
+            "#,
+        )
+        .unwrap();
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let mut e_1 = LogEvent::from("test 1");
+            e_1.insert("id", "1");
+
+            let mut e_2 = LogEvent::from("test 2");
+            e_2.insert("id", "1");
+
+            let mut e_3 = LogEvent::from("test 3");
+            e_3.insert("id", "1");
+
+            for event in vec![e_1.into(), e_2.into(), e_3.into()] {
+                tx.send(event).await.unwrap();
+            }
+
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], vec!["test 1"].into());
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_2["message"], vec!["test 2"].into());
+
+            // NB receiving the last event may take as long as the duration set by expire_after_ms
+            // and the flush interval, as max_events=1 does not currently flush events through immediately
+            let output_3 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_3["message"], vec!["test 3"].into());
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn max_events() {
         let reduce_config = toml::from_str::<ReduceConfig>(
             r#"
-                group_by = [ "id" ]
+group_by = [ "id" ]
 merge_strategies.id = "retain"
 merge_strategies.message = "array"
-                max_events = 3
+max_events = 3
             "#,
         )
         .unwrap();
