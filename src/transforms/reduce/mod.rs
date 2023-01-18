@@ -330,11 +330,7 @@ impl Reduce {
             .map(|c| c.build(enrichment_tables))
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
-        let max_events = if let Some(max) = config.max_events {
-            Some(max.into())
-        } else {
-            None
-        };
+        let max_events = config.max_events.map(|max| max.into());
 
         Ok(Reduce {
             expire_after: config.expire_after_ms,
@@ -715,7 +711,7 @@ max_events = 0
         );
 
         match reduce_config {
-            Ok(_conf) => assert!(false, "max_events=0 should be rejected."),
+            Ok(_conf) => unreachable!("max_events=0 should be rejected."),
             Err(err) => assert!(err.to_string().contains(
                 "invalid value: integer `0`, expected a nonzero usize for key `max_events`"
             )),
