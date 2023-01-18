@@ -487,7 +487,7 @@ impl Source {
         let node_selector = prepare_node_selector(self_node_name.as_str())?;
 
         // If the user passed a custom Kubeconfig use it, otherwise
-        // we attempt to load the local kube-config, followed by the
+        // we attempt to load the local kubeconfig, followed by the
         // in-cluster environment variables
         let client_config = match &config.kube_config_file {
             Some(kc) => {
