@@ -3,6 +3,8 @@ use serde_derive_internals::{attr as serde_attr, Ctxt};
 use syn::{spanned::Spanned, Attribute, ExprPath, Lit, Meta, MetaNameValue, NestedMeta};
 
 const ERR_FIELD_MISSING_DESCRIPTION: &str = "field must have a description -- i.e. `/// This is a widget...` or `#[configurable(description = \"...\")] -- or derive it from the underlying type of the field by specifying `#[configurable(derived)]`";
+const ERR_FIELD_IMPLICIT_TRANSPARENT: &str =
+    "field in a newtype wrapper should not be manually marked as `derived`/`transparent`";
 
 pub fn try_extract_doc_title_description(
     attributes: &[Attribute],
@@ -142,6 +144,10 @@ pub fn get_default_exprpath() -> ExprPath {
 
 pub fn err_field_missing_description<T: Spanned>(field: &T) -> darling::Error {
     darling::Error::custom(ERR_FIELD_MISSING_DESCRIPTION).with_span(field)
+}
+
+pub fn err_field_implicit_transparent<T: Spanned>(field: &T) -> darling::Error {
+    darling::Error::custom(ERR_FIELD_IMPLICIT_TRANSPARENT).with_span(field)
 }
 
 pub fn get_serde_default_value(default: &serde_attr::Default) -> Option<ExprPath> {

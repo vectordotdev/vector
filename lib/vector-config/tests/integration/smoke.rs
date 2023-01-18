@@ -62,7 +62,7 @@ impl From<Template> for String {
 /// A period of time.
 #[derive(Clone)]
 #[configurable_component]
-pub struct SpecialDuration(#[configurable(transparent)] u64);
+pub struct SpecialDuration(u64);
 
 /// Controls the batching behavior of events.
 #[derive(Clone)]
@@ -157,11 +157,11 @@ pub struct TlsConfig {
 #[serde(untagged)]
 pub enum SocketListenAddr {
     /// A literal socket address.
-    SocketAddr(#[configurable(derived)] SocketAddr),
+    SocketAddr(SocketAddr),
 
     /// A file descriptor identifier passed by systemd.
     #[serde(deserialize_with = "parse_systemd_fd")]
-    SystemdFd(#[configurable(transparent)] usize),
+    SystemdFd(usize),
 }
 
 fn parse_systemd_fd<'de, D>(des: D) -> Result<usize, D::Error>
@@ -320,10 +320,10 @@ pub struct AdvancedSinkConfig {
 #[serde(untagged)]
 pub enum TagConfig {
     /// A single tag value.
-    Plain(#[configurable(transparent)] Option<Template>),
+    Plain(Option<Template>),
 
     /// An array of values to give to the same tag name.
-    Multi(#[configurable(transparent)] Vec<Option<Template>>),
+    Multi(Vec<Option<Template>>),
 }
 
 impl GenerateConfig for AdvancedSinkConfig {
@@ -422,7 +422,7 @@ pub struct VectorConfigV2 {
 #[serde(untagged)]
 pub enum VectorSourceConfig {
     /// Configuration for version two.
-    V2(#[configurable(derived)] VectorConfigV2),
+    V2(VectorConfigV2),
 }
 
 impl GenerateConfig for VectorSourceConfig {
@@ -445,10 +445,10 @@ impl GenerateConfig for VectorSourceConfig {
 #[serde(tag = "type")]
 pub enum SourceConfig {
     /// Simple source.
-    Simple(#[configurable(derived)] SimpleSourceConfig),
+    Simple(SimpleSourceConfig),
 
     /// Vector source.
-    Vector(#[configurable(derived)] VectorSourceConfig),
+    Vector(VectorSourceConfig),
 }
 
 /// Collection of various sinks available in Vector.
@@ -457,10 +457,10 @@ pub enum SourceConfig {
 #[serde(tag = "type")]
 pub enum SinkConfig {
     /// Simple sink.
-    Simple(#[configurable(derived)] SimpleSinkConfig),
+    Simple(SimpleSinkConfig),
 
     /// Advanced sink.
-    Advanced(#[configurable(derived)] AdvancedSinkConfig),
+    Advanced(AdvancedSinkConfig),
 }
 
 #[derive(Clone)]

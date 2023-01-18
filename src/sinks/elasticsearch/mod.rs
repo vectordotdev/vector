@@ -47,7 +47,7 @@ pub enum ElasticsearchAuth {
     },
 
     /// Amazon OpenSearch Service-specific authentication.
-    Aws(#[configurable(derived)] AwsAuthentication),
+    Aws(AwsAuthentication),
 }
 
 /// Indexing mode.

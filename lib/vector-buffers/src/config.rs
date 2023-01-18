@@ -322,10 +322,10 @@ impl BufferType {
 )]
 pub enum BufferConfig {
     /// A single stage buffer topology.
-    Single(#[configurable(transparent)] BufferType),
+    Single(BufferType),
 
     /// A chained buffer topology.
-    Chained(#[configurable(transparent)] Vec<BufferType>),
+    Chained(Vec<BufferType>),
 }
 
 impl Default for BufferConfig {

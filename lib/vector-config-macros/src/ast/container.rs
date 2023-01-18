@@ -199,9 +199,17 @@ impl<'a> Container<'a> {
                         serde_ast::Style::Struct
                         | serde_ast::Style::Tuple
                         | serde_ast::Style::Newtype => {
+                            let is_newtype_wrapper_field =
+                                matches!(style, serde_ast::Style::Newtype);
                             let fields = fields
                                 .iter()
-                                .map(|field| Field::from_ast(field, virtual_newtype.is_some()))
+                                .map(|field| {
+                                    Field::from_ast(
+                                        field,
+                                        virtual_newtype.is_some(),
+                                        is_newtype_wrapper_field,
+                                    )
+                                })
                                 .collect_darling_results(&mut accumulator);
 
                             (Data::Struct(style.into(), fields), false)
