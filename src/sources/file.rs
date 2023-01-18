@@ -1333,7 +1333,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_key_unacknowledged() {
+    async fn file_key_no_acknowledge() {
         file_key(NoAcks).await
     }
 
