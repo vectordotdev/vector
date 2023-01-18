@@ -140,16 +140,10 @@ impl DatabendService {
         }
 
         // resp.data[0]: [ "PUT", "{\"host\":\"s3.us-east-2.amazonaws.com\"}", "https://s3.us-east-2.amazonaws.com/query-storage-xxxxx/tnxxxxx/stage/user/xxxx/xxx?" ]
-        let method = resp.data[0][0].clone().to_string();
+        let method = resp.data[0][0].clone();
         let headers: BTreeMap<String, String> =
-            serde_json::from_str(resp.data[0][1].to_string().as_str())?;
-        let mut url = resp.data[0][2].clone().to_string();
-
-        // HACK: tmp fix for aliyun internal endpoint
-        // should be fixed by: https://github.com/datafuselabs/opendal/issues/1128
-        if url.contains(".aliyuncs.com") {
-            url = url.replace("-internal", "");
-        }
+            serde_json::from_str(resp.data[0][1].clone().as_str())?;
+        let url = resp.data[0][2].clone();
 
         if method != "PUT" {
             return Err(DatabendError::Server {
