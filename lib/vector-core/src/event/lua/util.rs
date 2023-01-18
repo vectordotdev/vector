@@ -53,5 +53,5 @@ pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     Ok(Utc
         .ymd(year, month, day)
         .and_hms_nano_opt(hour, min, sec, nano)
-        .expect("invalid datetime"))
+        .expect("invalid timestamp"))
 }

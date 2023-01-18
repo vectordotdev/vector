@@ -122,9 +122,9 @@ mod tests {
                 "Key3" => "Value3",
             )))
             .with_timestamp(Some(
-                Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
-                    .single()
-                    .expect("invalid datetime"),
+                Utc.ymd(2018, 11, 14)
+                    .and_hms_nano_opt(8, 9, 10, 11)
+                    .expect("invalid timestamp"),
             )),
         );
 

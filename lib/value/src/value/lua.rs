@@ -110,7 +110,7 @@ pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     Ok(Utc
         .ymd(year, month, day)
         .and_hms_nano_opt(hour, min, sec, nano)
-        .expect("invalid datetime"))
+        .expect("invalid timestamp"))
 }
 
 #[cfg(test)]
@@ -169,9 +169,9 @@ mod test {
             (
                 "{year=2020, month=3, day=15, hour=18, min=37, sec=8, nanosec=666666666}",
                 Value::Timestamp(
-                    Utc.with_ymd_and_hms(2020, 3, 15, 18, 37, 8)
-                        .single()
-                        .expect("invalid datetime"),
+                    Utc.ymd(2020, 3, 15)
+                        .and_hms_nano_opt(18, 37, 8, 666_666_666)
+                        .expect("invalid timestamp"),
                 ),
             ),
         ];
@@ -255,9 +255,9 @@ mod test {
             ),
             (
                 Value::Timestamp(
-                    Utc.with_ymd_and_hms(2020, 3, 15, 18, 37, 8)
-                        .single()
-                        .expect("invalid datetime"),
+                    Utc.ymd(2020, 3, 15)
+                        .and_hms_nano_opt(18, 37, 8, 666_666_666)
+                        .expect("invalid timestamp"),
                 ),
                 r#"
                 function (value)
