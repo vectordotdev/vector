@@ -983,7 +983,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
-            config.max_length = 11;
+            config.max_length = Some(11);
             let address = init_udp_with_config(tx, config).await;
 
             send_lines_udp(
@@ -1019,7 +1019,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
-            config.max_length = 10;
+            config.max_length = Some(10);
             config.framing = CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
             }

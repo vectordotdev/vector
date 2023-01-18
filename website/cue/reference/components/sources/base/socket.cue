@@ -6,8 +6,8 @@ base: components: sources: socket: configuration: {
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
 		type: {
-			number: examples: ["systemd", "systemd#3"]
-			string: examples: ["0.0.0.0:9000"]
+			number: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
+			string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 		}
 	}
 	connection_limit: {

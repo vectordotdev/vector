@@ -3,9 +3,12 @@ mod tcp;
 #[cfg(feature = "sources-utils-net-udp")]
 mod udp;
 
-use std::{fmt, net::SocketAddr};
+use std::{
+    fmt,
+    net::{SocketAddr, ToSocketAddrs},
+};
 
-use serde::{de, Deserialize, Deserializer};
+use snafu::Snafu;
 use vector_config::configurable_component;
 
 use crate::config::{Protocol, Resource};
@@ -15,6 +18,21 @@ pub use self::tcp::{TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker};
 #[cfg(feature = "sources-utils-net-udp")]
 pub use self::udp::try_bind_udp_socket;
 
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub enum SocketListenAddrParseError {
+    #[snafu(display("Unable to parse as socket address"))]
+    SocketAddrParse,
+    //#[snafu(display("Unable to deserialize string input"))]
+    //StringDeserialize,
+    #[snafu(display("# after \"systemd\" must be a valid integer"))]
+    UsizeParse,
+    #[snafu(display("Systemd indices start from 1, found 0"))]
+    OneBased,
+    // last case evaluated must explain all valid formats accepted
+    #[snafu(display("Must be a valid IPv4/IPv6 address with port, or start with \"systemd\""))]
+    UnableToParse,
+}
+
 /// A listening address that can be given directly or be managed via `systemd` socket activation.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,15 +41,15 @@ pub use self::udp::try_bind_udp_socket;
 The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by systemd socket activation.
 
 If a socket address is used, it _must_ include a port."))]
+#[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
+#[configurable(metadata(docs::examples = "systemd"))]
+#[configurable(metadata(docs::examples = "systemd#3"))]
 pub enum SocketListenAddr {
     /// An IPv4/IPv6 address and port.
-    #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
     SocketAddr(#[configurable(derived)] SocketAddr),
 
     /// A file descriptor identifier that is given from, and managed by, the socket activation feature of `systemd`.
-    #[serde(deserialize_with = "parse_systemd_fd")]
-    #[configurable(metadata(docs::examples = "systemd"))]
-    #[configurable(metadata(docs::examples = "systemd#3"))]
+    //#[serde(deserialize_with = "parse_systemd_fd")]
     SystemdFd(#[configurable(transparent)] usize),
 }
 
@@ -74,21 +92,57 @@ impl From<SocketAddr> for SocketListenAddr {
     }
 }
 
-fn parse_systemd_fd<'de, D>(des: D) -> Result<usize, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: &'de str = Deserialize::deserialize(des)?;
-    match s {
-        "systemd" => Ok(0),
-        s if s.starts_with("systemd#") => s[8..]
-            .parse::<usize>()
-            .map_err(de::Error::custom)?
-            .checked_sub(1)
-            .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
-        _ => Err(de::Error::custom("must start with \"systemd\"")),
+impl From<usize> for SocketListenAddr {
+    fn from(fd: usize) -> Self {
+        Self::SystemdFd(fd)
     }
 }
+
+impl TryFrom<&str> for SocketListenAddr {
+    type Error = SocketListenAddrParseError;
+
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        println!("got input {}", input);
+        // first attempt to parse the string into a SocketAddr directly
+        match input.to_socket_addrs() {
+            Ok(mut socket_addrs) => socket_addrs
+                .next()
+                .ok_or_else(|| Self::Error::SocketAddrParse)
+                .map(|s| s.into()),
+            // then attempt to parse a systemd file descriptor
+            Err(_) => {
+                let fd: usize = match input {
+                    "systemd" => Ok(0),
+                    s if s.starts_with("systemd#") => s[8..]
+                        .parse::<usize>()
+                        .map_err(|_| Self::Error::UsizeParse)?
+                        .checked_sub(1)
+                        .ok_or_else(|| Self::Error::OneBased),
+                    // otherwise fail
+                    _ => Err(Self::Error::UnableToParse),
+                }?;
+
+                Ok(fd.into())
+            }
+        }
+    }
+}
+
+//fn parse_systemd_fd<'de, D>(des: D) -> Result<usize, D::Error>
+//where
+//    D: Deserializer<'de>,
+//{
+//    let s: &'de str = Deserialize::deserialize(des)?;
+//    match s {
+//        "systemd" => Ok(0),
+//        s if s.starts_with("systemd#") => s[8..]
+//            .parse::<usize>()
+//            .map_err(de::Error::custom)?
+//            .checked_sub(1)
+//            .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
+//        _ => Err(de::Error::custom("must start with \"systemd\"")),
+//    }
+//}
 
 #[cfg(test)]
 mod test {

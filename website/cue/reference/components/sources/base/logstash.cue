@@ -23,8 +23,8 @@ base: components: sources: logstash: configuration: {
 		description: "The address to listen for connections on."
 		required:    true
 		type: {
-			number: examples: ["systemd", "systemd#3"]
-			string: examples: ["0.0.0.0:9000"]
+			number: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
+			string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 		}
 	}
 	connection_limit: {
