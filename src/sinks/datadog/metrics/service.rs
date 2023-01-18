@@ -89,7 +89,7 @@ impl DatadogMetricsRequest {
             .header("DD-API-KEY", api_key)
             // TODO: The Datadog Agent sends this header to indicate the version of the Go library
             // it uses which contains the Protocol Buffers definitions used for the Sketches API.
-            // We've copypastaed the proto file for now -- `proto/ddsketch.rs`, a partial chunk of
+            // We've copypasted the proto file for now -- `proto/ddsketch.rs`, a partial chunk of
             // `DataDog/agent-payload/proto/metrics/agent_payload.proto` -- and are thus hardcoding
             // the version that we copypasted from.
             //

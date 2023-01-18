@@ -105,13 +105,13 @@ pub enum Encoding {
         ///
         /// If enabled, this will generally cause the output to be spread across more lines, with
         /// more indentation, resulting in an easy-to-read form for humans.  The opposite of this
-        /// would be the standard output, which eschews whitespace for the most succient output.
+        /// would be the standard output, which eschews whitespace for the most succinct output.
         pretty: bool,
     },
 
     #[configurable(description = "MessagePack encoding.")]
     MessagePack(
-        /// Starting offset for fields something something this is a fake description anyways.
+        /// Starting offset for fields something this is a fake description anyways.
         u64,
     ),
 }

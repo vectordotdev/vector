@@ -482,7 +482,7 @@ components: sources: host_metrics: {
 		memory_shared_bytes:           _host & _memory_linux & {description:                 "The number of bytes of main memory shared between processes."}
 		memory_swap_free_bytes:        _host & _memory_gauge & {description:                 "The number of free bytes of swap space."}
 		memory_swapped_in_bytes_total: _host & _memory_counter & _memory_nowin & {
-			description: "The number of bytes that have been swapped in to main memory."
+			description: "The number of bytes that have been swapped into main memory."
 		}
 		memory_swapped_out_bytes_total: _host & _memory_counter & _memory_nowin & {
 			description: "The number of bytes that have been swapped out from main memory."

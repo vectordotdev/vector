@@ -268,7 +268,7 @@ where
 
     /// Attempts to read a record.
     ///
-    /// Records are prececded by a length delimiter, a fixed-size integer (currently 8 bytes) that
+    /// Records are preceded by a length delimiter, a fixed-size integer (currently 8 bytes) that
     /// tells the reader how many more bytes to read in order to completely read the next record.
     ///
     /// If there are no more bytes to read, we return early in order to allow the caller to wait
@@ -862,7 +862,7 @@ where
 
                     // We have to remove 1 from the event count here because otherwise the ID would
                     // be the _next_ record's ID we'd expect, not the last ID of the record we are
-                    // ackowledged up to. (Record IDs start at N and consume up to N+M-1 where M is
+                    // acknowledged up to. (Record IDs start at N and consume up to N+M-1 where M is
                     // the number of events in the record, which is how we can determine the event
                     // count from the record IDs alone, without having to read every record in the
                     // buffer during startup.)
@@ -983,7 +983,7 @@ where
                 // We got a valid record, so keep the token.
                 Ok(Some(token)) => break token,
                 // A length-delimited payload was read, but we failed to deserialize it as a valid
-                // record, or we deseralized it and the checksum was invalid.  Either way, we're not
+                // record, or we deserialized it and the checksum was invalid.  Either way, we're not
                 // sure the rest of the data file is even valid, so roll to the next file.
                 //
                 // TODO: Explore the concept of putting a data file into a "one more attempt to read
@@ -993,7 +993,7 @@ where
                 // reading, we might actually encounter a valid record.
                 //
                 // Theoretically, based on both the validation done by `rkyv` and the checksum, it
-                // should be incredibly incredibly unlikely to read a valid record after getting a
+                // should be incredibly unlikely to read a valid record after getting a
                 // corrupted record if there was missing data or more invalid data.  We use
                 // checksumming to assert errors within a given chunk of the payload, so one payload
                 // being corrupted doesn't always, in fact, mean that other records after it are

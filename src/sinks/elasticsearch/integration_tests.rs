@@ -164,7 +164,7 @@ async fn structures_events_correctly() {
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-    // make sure writes all all visible
+    // make sure writes are all visible
     flush(common).await.unwrap();
 
     let response = reqwest::Client::new()
@@ -566,7 +566,7 @@ async fn run_insert_tests_with_config(
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));
 
-    // make sure writes all all visible
+    // make sure writes are all visible
     flush(common).await.expect("Flushing writes failed");
 
     let client = create_http_client();
@@ -655,7 +655,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
         .map(|common| common.base_url.clone())
         .collect::<Vec<_>>();
 
-    // make sure writes all all visible
+    // make sure writes are all visible
     for common in commons {
         let _ = flush(common).await;
     }

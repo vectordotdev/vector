@@ -414,7 +414,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_legacy_namespace() {
-        let gziped_record = {
+        let gzipped_record = {
             let mut buf = Vec::new();
             let mut gz = GzEncoder::new(RECORD.as_bytes(), flate2::Compression::fast());
             gz.read_to_end(&mut buf).unwrap();
@@ -441,7 +441,7 @@ mod tests {
                 Compression::Gzip,
                 true,
                 RECORD.as_bytes(),
-                gziped_record,
+                gzipped_record,
             ),
             (
                 Compression::None,
@@ -515,7 +515,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_vector_namespace() {
-        let gziped_record = {
+        let gzipped_record = {
             let mut buf = Vec::new();
             let mut gz = GzEncoder::new(RECORD.as_bytes(), flate2::Compression::fast());
             gz.read_to_end(&mut buf).unwrap();
@@ -542,7 +542,7 @@ mod tests {
                 Compression::Gzip,
                 true,
                 RECORD.as_bytes(),
-                gziped_record,
+                gzipped_record,
             ),
             (
                 Compression::None,

@@ -81,7 +81,7 @@ impl FinishError {
     pub const fn as_error_type(&self) -> &'static str {
         match self {
             Self::CompressionFailed { .. } => "compression_failed",
-            Self::PendingEncodeFailed { .. } => "pendiong_encode_failed",
+            Self::PendingEncodeFailed { .. } => "pending_encode_failed",
             Self::TooLarge { .. } => "too_large",
         }
     }
@@ -600,7 +600,7 @@ const fn validate_payload_size_limits(
     //
     // This only matters for series metrics at the moment, since sketches are encoded in a single
     // shot to their Protocol Buffers representation.  We're "wasting" `header_len` bytes in the
-    // case of sketches, but we're alsdo talking about like 10 bytes: not enough to care about.
+    // case of sketches, but we're also talking about like 10 bytes: not enough to care about.
     let header_len = max_uncompressed_header_len();
     if uncompressed_limit <= header_len {
         return None;
@@ -759,7 +759,7 @@ mod tests {
 
     #[test]
     fn incorrect_metric_for_endpoint_causes_error() {
-        // Series metrics can't gbo to the sketches endpoint.
+        // Series metrics can't go to the sketches endpoint.
         let mut sketch_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
             .expect("default payload size limits should be valid");
         let series_result = sketch_encoder.try_encode(get_simple_counter());
@@ -769,7 +769,7 @@ mod tests {
         ));
 
         // And sketches can't go to the series endpoint.
-        // Series metrics can't gbo to the sketches endpoint.
+        // Series metrics can't go to the sketches endpoint.
         let mut series_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series, None)
             .expect("default payload size limits should be valid");
         let sketch_result = series_encoder.try_encode(get_simple_sketch());

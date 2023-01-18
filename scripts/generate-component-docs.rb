@@ -1519,7 +1519,7 @@ end
 # This provides a mechanism to fix up any inconsistencies that are created during the resolution
 # process that would otherwise be very complex to fix in the resolution codepath. Sometimes,
 # inconsistencies are only present after resolving merged subschemas, and so on, and so this
-# function serves as a spot to do such reconcilation, as it is called right before returning a
+# function serves as a spot to do such reconciliation, as it is called right before returning a
 # resolved schema.
 def reconcile_resolved_schema!(resolved_schema)
   @logger.debug "Reconciling resolved schema..."

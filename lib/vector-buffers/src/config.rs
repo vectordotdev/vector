@@ -141,7 +141,7 @@ pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(500) }
 }
 
-/// Disk usage configurtion for disk-backed buffers.
+/// Disk usage configuration for disk-backed buffers.
 #[derive(Debug)]
 pub struct DiskUsage {
     id: ComponentKey,
@@ -262,7 +262,7 @@ impl BufferType {
     /// # Errors
     ///
     /// If a required parameter is missing, or if there is an error building the topology itself, an
-    /// error variant will be returned desribing the error
+    /// error variant will be returned describing the error
     pub fn add_to_builder<T>(
         &self,
         builder: &mut TopologyBuilder<T>,

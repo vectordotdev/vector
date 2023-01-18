@@ -252,7 +252,7 @@ impl Runner {
             // drive output collection to allow forward progress to be made, etc.)
 
             // We sleep for one second here because while we do wait for the component topology to
-            // mark itself as started, starting the topology does not necessaryily mean that all
+            // mark itself as started, starting the topology does not necessarily mean that all
             // component tasks are actually ready for input, etc.
             //
             // TODO: The above problem is bigger than just component validation, and affects a lot

@@ -324,7 +324,7 @@ impl Attributes {
         //
         // If the field is part of a virtual newtype, this means the container has instructed `serde` to
         // (de)serialize it as some entirely different type. This means the original field will never show up in a
-        // schema, because the schema of the thing being (de)esrialized is some `T`, not `ContainerType`. Simply put,
+        // schema, because the schema of the thing being (de)serialized is some `T`, not `ContainerType`. Simply put,
         // like a field that is flattened or not visible, it makes no sense to require a description or title for fields
         // in a virtual newtype.
         if self.description.is_none()

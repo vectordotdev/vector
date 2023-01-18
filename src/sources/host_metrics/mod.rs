@@ -269,7 +269,7 @@ impl HostMetrics {
             }
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
-                    message: "Failed to load load average info",
+                    message: "Failed to load average info",
                     error,
                 });
             }

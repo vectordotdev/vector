@@ -458,7 +458,7 @@ releases: "0.24.0": {
 			scopes: ["sources"]
 			description: """
 				The `file`, `journald`, and `kafka` sources no longer halt when end-to-end
-				acknowledegments are enabled and an attached sink returns an error. This was
+				acknowledgments are enabled and an attached sink returns an error. This was
 				a change in v0.23.0, but we backed it out to pursue improved error handling in
 				sinks.
 				"""

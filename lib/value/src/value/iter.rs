@@ -3,7 +3,7 @@ use std::{marker::PhantomData, ops::IndexMut};
 use crate::Value;
 
 impl Value {
-    /// Create an iterater over the `Value`.
+    /// Create an iterator over the `Value`.
     ///
     /// For non-collection types, this returns a single-item iterator similar to
     /// `Option`'s iterator implementation.

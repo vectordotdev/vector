@@ -44,7 +44,7 @@ pub fn try_extract_doc_title_description(
         // Just a single grouped line/paragraph, so we emit that as the description.
         1 => (None, none_if_empty(grouped_lines.remove(0))),
         // Two or more grouped lines/paragraphs, so the first one is the title, and the rest are the
-        // description, which we concatentate together with newlines, since the description at least
+        // description, which we concatenate together with newlines, since the description at least
         // needs to be a single string.
         _ => {
             let title = grouped_lines.remove(0);

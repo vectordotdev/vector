@@ -6,7 +6,7 @@ set -euo pipefail
 # SUMMARY
 #
 #   Checks that there are no changed machine-generated component Cue files after running the
-#   generatation step via `make generate-component-docs`.
+#   generation step via `make generate-component-docs`.
 #
 #   This should only be run in CI, after calling `make generate-component-docs`, as it depends on
 #   the presence of dirty files in the working directory to detect if the machine-generated files

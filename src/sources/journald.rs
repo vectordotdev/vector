@@ -1341,7 +1341,7 @@ mod tests {
 
     #[test]
     fn command_options() {
-        let path = PathBuf::from("jornalctl");
+        let path = PathBuf::from("journalctl");
 
         let journal_dir = None;
         let current_boot_only = false;

@@ -536,7 +536,7 @@ impl<'a> DnstapParser<'a> {
             self.event_schema
                 .dns_query_message_schema()
                 .opt_pseudo_section(),
-            &msg.opt_pserdo_section,
+            &msg.opt_pseudo_section,
         );
 
         self.parent_key_path.segments.pop();
