@@ -24,13 +24,7 @@ use super::{default_host_key, SocketConfig};
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    /// The socket address to listen for connections on, or `systemd{#N}`
-    /// to use the Nth socket passed by systemd socket activation.
-    ///
-    /// If a socket address is used, it _must_ include a port.
-    #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
-    #[configurable(metadata(docs::examples = "systemd"))]
-    #[configurable(metadata(docs::examples = "systemd#3"))]
+    #[configurable(derived)]
     address: SocketListenAddr,
 
     #[configurable(derived)]

@@ -6,8 +6,8 @@ base: components: sources: syslog: configuration: {
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
 		type: {
-			number: {}
-			string: {}
+			number: examples: ["systemd", "systemd#3"]
+			string: examples: ["0.0.0.0:9000"]
 		}
 	}
 	connection_limit: {

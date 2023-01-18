@@ -2,17 +2,12 @@ package metadata
 
 base: components: sources: statsd: configuration: {
 	address: {
-		description: """
-			The socket address to listen for connections on, or `systemd{#N}`
-			to use the Nth socket passed by systemd socket activation.
-
-			If a socket address is used, it _must_ include a port.
-			"""
+		description:   "A listening address that can be given directly or be managed via `systemd` socket activation."
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
 		type: {
-			number: examples: ["0.0.0.0:8125", "systemd", "systemd#3"]
-			string: examples: ["0.0.0.0:8125", "systemd", "systemd#3"]
+			number: examples: ["systemd", "systemd#3"]
+			string: examples: ["0.0.0.0:9000"]
 		}
 	}
 	connection_limit: {

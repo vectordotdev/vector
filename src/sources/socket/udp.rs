@@ -37,13 +37,7 @@ use crate::{
 #[serde(deny_unknown_fields)]
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
-    /// The socket address to listen for connections on, or `systemd{#N}`
-    /// to use the Nth socket passed by systemd socket activation.
-    ///
-    /// If a socket address is used, it _must_ include a port.
-    #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
-    #[configurable(metadata(docs::examples = "systemd"))]
-    #[configurable(metadata(docs::examples = "systemd#3"))]
+    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The maximum buffer size, in bytes, of incoming messages.

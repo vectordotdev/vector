@@ -36,9 +36,9 @@ pub struct UnixConfig {
     ///
     /// Note that the file mode value can be specified in any numeric format supported by your configuration
     /// language, but it is most intuitive to use an octal number.
-    #[configurable(metadata(docs::examples = "0o777"))]
-    #[configurable(metadata(docs::examples = "0o600"))]
-    #[configurable(metadata(docs::examples = "508"))]
+    #[configurable(metadata(docs::examples = 0o777))]
+    #[configurable(metadata(docs::examples = 0o600))]
+    #[configurable(metadata(docs::examples = 508))]
     pub socket_file_mode: Option<u32>,
 
     /// The maximum buffer size, in bytes, of incoming messages.

@@ -19,12 +19,19 @@ pub use self::udp::try_bind_udp_socket;
 #[configurable_component]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(untagged)]
+#[configurable(metadata(docs::enum_tag_description = "
+The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by systemd socket activation.
+
+If a socket address is used, it _must_ include a port."))]
 pub enum SocketListenAddr {
     /// An IPv4/IPv6 address and port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
     SocketAddr(#[configurable(derived)] SocketAddr),
 
     /// A file descriptor identifier that is given from, and managed by, the socket activation feature of `systemd`.
     #[serde(deserialize_with = "parse_systemd_fd")]
+    #[configurable(metadata(docs::examples = "systemd"))]
+    #[configurable(metadata(docs::examples = "systemd#3"))]
     SystemdFd(#[configurable(transparent)] usize),
 }
 
