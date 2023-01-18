@@ -20,6 +20,15 @@ pub enum TestEvent {
     Modified { modified: bool, event: EventData },
 }
 
+impl TestEvent {
+    pub fn into_event(self) -> Event {
+        match self {
+            Self::Passthrough(event) => event.into_event(),
+            Self::Modified { event, .. } => event.into_event(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub enum EventData {

@@ -1,9 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::{path::PathBuf, process::Command};
 
 use anyhow::{bail, Result};
 use clap::Args;
 
-use crate::{app, features};
+use crate::{app::CommandExt as _, features};
 
 /// Run `vector` with the minimum set of features required by the config file
 #[derive(Args, Debug)]
@@ -29,23 +29,19 @@ impl Cli {
         if self.debug && self.release {
             bail!("Can only set one of `--debug` and `--release`");
         }
-        let mode = if self.release { "--release" } else { "--debug" };
 
         let features = features::load_and_extract(&self.config)?;
-
-        app::exec(
-            Path::new("cargo"),
-            [
-                "--no-default-features",
-                "--features",
-                &features,
-                mode,
-                "--",
-                "--config",
-                self.config.to_str().expect("Invalid config file name"),
-            ]
-            .into_iter()
-            .chain(self.args.iter().map(String::as_str)),
-        )
+        let mut command = Command::new("cargo");
+        command.args(["run", "--no-default-features", "--features", &features]);
+        if self.release {
+            command.arg("--release");
+        }
+        command.args([
+            "--",
+            "--config",
+            self.config.to_str().expect("Invalid config file name"),
+        ]);
+        command.args(self.args);
+        command.check_run()
     }
 }

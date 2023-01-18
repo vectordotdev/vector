@@ -11,13 +11,15 @@ use http::{
 use hyper::Body;
 use indexmap::IndexMap;
 use tokio_util::codec::Encoder as _;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
+    components::validation::*,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
+    register_validatable_component,
     sinks::util::{
         self,
         http::{BatchedHttpSink, HttpEventEncoder, RequestConfig},
@@ -127,6 +129,21 @@ pub enum HttpMethod {
 
     /// PATCH.
     Patch,
+}
+
+impl From<HttpMethod> for Method {
+    fn from(http_method: HttpMethod) -> Self {
+        match http_method {
+            HttpMethod::Head => Self::HEAD,
+            HttpMethod::Get => Self::GET,
+            HttpMethod::Post => Self::POST,
+            HttpMethod::Put => Self::PUT,
+            HttpMethod::Patch => Self::PATCH,
+            HttpMethod::Delete => Self::DELETE,
+            HttpMethod::Options => Self::OPTIONS,
+            HttpMethod::Trace => Self::TRACE,
+        }
+    }
 }
 
 impl GenerateConfig for HttpSinkConfig {
@@ -244,6 +261,43 @@ impl SinkConfig for HttpSinkConfig {
         &self.acknowledgements
     }
 }
+
+impl ValidatableComponent for HttpSinkConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        use codecs::{JsonSerializerConfig, MetricTagValues};
+        use std::str::FromStr;
+
+        let config = Self {
+            uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
+                .expect("should never fail to parse"),
+            method: Some(HttpMethod::Post),
+            encoding: EncodingConfigWithFraming::new(
+                None,
+                JsonSerializerConfig::new(MetricTagValues::Full).into(),
+                Transformer::default(),
+            ),
+            auth: None,
+            headers: None,
+            compression: Compression::default(),
+            batch: BatchConfig::default(),
+            request: RequestConfig::default(),
+            tls: None,
+            acknowledgements: AcknowledgementsConfig::default(),
+            payload_prefix: String::new(),
+            payload_suffix: String::new(),
+        };
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(config.uri.uri.clone(), config.method.map(Into::into)),
+            config.encoding.clone(),
+        );
+
+        ValidationConfiguration::from_sink(Self::NAME, config, Some(external_resource))
+    }
+}
+
+register_validatable_component!(HttpSinkConfig);
 
 pub struct HttpSinkEventEncoder {
     encoder: Encoder<Framer>,

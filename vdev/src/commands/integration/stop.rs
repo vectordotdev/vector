@@ -49,7 +49,7 @@ impl Cli {
         }
 
         waiting!("Stopping environment {}", &self.environment);
-        command.run()?;
+        command.check_run()?;
 
         state::remove_env(&envs_dir, &self.environment)?;
         if state::active_envs(&envs_dir)?.is_empty() {

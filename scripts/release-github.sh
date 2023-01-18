@@ -7,7 +7,7 @@ set -euo pipefail
 #
 #   Uploads target/artifacts to Github releases
 
-VERSION="${VECTOR_VERSION:-"$(scripts/version.sh)"}"
+VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 
 gh release --repo "vectordotdev/vector" \
   create "v${VERSION}" \

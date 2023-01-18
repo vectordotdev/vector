@@ -254,17 +254,17 @@ base: components: sinks: kafka: configuration: {
 			mechanism: {
 				description: "The SASL mechanism to use."
 				required:    false
-				type: string: {}
+				type: string: examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
 			}
 			password: {
 				description: "The SASL password."
 				required:    false
-				type: string: {}
+				type: string: examples: ["password"]
 			}
 			username: {
 				description: "The SASL username."
 				required:    false
-				type: string: {}
+				type: string: examples: ["username"]
 			}
 		}
 	}

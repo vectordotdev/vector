@@ -15,12 +15,10 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let mut command = Command::with_path(&self.args[0]);
-        if self.args.len() > 1 {
-            command.args(&self.args[1..]);
-        }
-
-        let status = command.status()?;
+        let status = Command::new(&self.args[0])
+            .in_repo()
+            .args(&self.args[1..])
+            .run()?;
         std::process::exit(status.code().unwrap_or(1));
     }
 }

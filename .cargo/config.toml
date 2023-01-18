@@ -1,5 +1,5 @@
 [alias]
-vdev = "run --package vdev --"
+vdev = "run --quiet --package vdev --"
 
 [target.'cfg(all())']
 rustflags = [

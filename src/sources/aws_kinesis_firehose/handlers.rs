@@ -21,6 +21,7 @@ use vector_core::{
     event::BatchNotifier,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::SecretTarget;
 use warp::reject;
 
 use super::{
@@ -42,6 +43,7 @@ use crate::{
 #[derive(Clone)]
 pub(super) struct Context {
     pub(super) compression: Compression,
+    pub(super) store_access_key: bool,
     pub(super) decoder: Decoder,
     pub(super) acknowledgements: bool,
     pub(super) bytes_received: Registered<BytesReceived>,
@@ -128,6 +130,15 @@ pub(super) async fn firehose(
                                 path!("source_arn"),
                                 source_arn.to_owned(),
                             );
+
+                            if context.store_access_key {
+                                if let Some(access_key) = &request.access_key {
+                                    log.metadata_mut().secrets_mut().insert_secret(
+                                        "aws_kinesis_firehose_access_key",
+                                        access_key,
+                                    );
+                                }
+                            }
                         }
                     }
 

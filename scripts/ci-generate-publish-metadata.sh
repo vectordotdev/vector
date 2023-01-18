@@ -22,7 +22,7 @@ CURRENT_DATE=$(date +%Y-%m-%d)
 echo "vector_build_desc=${GIT_SHA} ${CURRENT_DATE}" >> "${GITHUB_OUTPUT}"
 
 # Figure out what our release channel is.
-CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
+CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
 echo "vector_release_channel=${CHANNEL}" >> "${GITHUB_OUTPUT}"
 
 # Depending on the channel, this influences which Cloudsmith repository we publish to.
