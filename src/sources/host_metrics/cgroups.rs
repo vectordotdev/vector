@@ -9,7 +9,7 @@ use tokio::{
 use vector_config::configurable_component;
 use vector_core::metric_tags;
 
-use super::{filter_result_sync, FilterList, HostMetrics, MetricsBuffer};
+use super::{default_all_devices, filter_result_sync, FilterList, HostMetrics, MetricsBuffer};
 use crate::event::MetricTags;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
@@ -25,17 +25,26 @@ pub(crate) struct CGroupsConfig {
     /// The number of levels of the cgroups hierarchy for which to report metrics.
     ///
     /// A value of `1` means just the root or named cgroup.
-    #[derivative(Default(value = "100"))]
+    #[derivative(Default(value = "default_levels()"))]
+    #[serde(default = "default_levels")]
+    #[configurable(metadata(docs::examples = 1))]
+    #[configurable(metadata(docs::examples = 3))]
     levels: usize,
 
     /// The base cgroup name to provide metrics for.
+    #[configurable(metadata(docs::examples = "/"))]
+    #[configurable(metadata(docs::examples = "system.slice/snapd.service"))]
     pub(super) base: Option<PathBuf>,
 
-    /// Lists of group name patterns to include or exclude.
+    /// Lists of cgroup name patterns to include or exclude in gathering
+    /// usage metrics.
+    #[configurable(metadata(docs::examples = "example_cgroups()"))]
+    #[serde(default = "default_all_devices")]
     groups: FilterList,
 
     /// Base cgroup directory, for testing use only
     #[serde(skip_serializing)]
+    #[configurable(metadata(docs::hidden))]
     base_dir: Option<PathBuf>,
 }
 
@@ -59,6 +68,17 @@ enum CGroupsError {
 }
 
 type CGroupsResult<T> = Result<T, CGroupsError>;
+
+const fn default_levels() -> usize {
+    100
+}
+
+fn example_cgroups() -> FilterList {
+    FilterList {
+        includes: Some(vec!["user.slice/*".try_into().unwrap()]),
+        excludes: Some(vec!["*.service".try_into().unwrap()]),
+    }
+}
 
 impl HostMetrics {
     pub(super) async fn cgroups_metrics(&self, output: &mut MetricsBuffer) {
