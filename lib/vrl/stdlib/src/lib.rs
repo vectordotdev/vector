@@ -52,6 +52,8 @@ mod contains;
 mod decode_base16;
 #[cfg(feature = "decode_base64")]
 mod decode_base64;
+#[cfg(feature = "decode_gzip")]
+mod decode_gzip;
 #[cfg(feature = "decode_mime_q")]
 mod decode_mime_q;
 #[cfg(feature = "decode_percent")]
@@ -349,6 +351,8 @@ pub use contains::Contains;
 pub use decode_base16::DecodeBase16;
 #[cfg(feature = "decode_base64")]
 pub use decode_base64::DecodeBase64;
+#[cfg(feature = "decode_gzip")]
+pub use decode_gzip::DecodeGzip;
 #[cfg(feature = "decode_mime_q")]
 pub use decode_mime_q::DecodeMimeQ;
 #[cfg(feature = "decode_percent")]
@@ -646,6 +650,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(DecodeBase16),
         #[cfg(feature = "decode_base64")]
         Box::new(DecodeBase64),
+        #[cfg(feature = "decode_gzip")]
+        Box::new(DecodeGzip),
         #[cfg(feature = "decode_percent")]
         Box::new(DecodePercent),
         #[cfg(feature = "decode_mime_q")]
