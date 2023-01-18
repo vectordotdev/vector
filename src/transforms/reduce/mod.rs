@@ -399,7 +399,7 @@ impl Reduce {
                     let mut state = ReduceState::new();
                     state.add_event(event, &self.merge_strategies);
                     state.flush().into()
-                },
+                }
             })
         } else {
             self.push_or_new_reduce_state(event, discriminant)
