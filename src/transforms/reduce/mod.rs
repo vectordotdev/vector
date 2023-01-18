@@ -705,7 +705,8 @@ merge_strategies.id = "retain"
 merge_strategies.message = "array"
                 max_events = 3
             "#,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
@@ -729,15 +730,28 @@ merge_strategies.message = "array"
             let mut e_6 = LogEvent::from("test 6");
             e_6.insert("id", "1");
 
-            for event in vec![e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into(), e_6.into()] {
+            for event in vec![
+                e_1.into(),
+                e_2.into(),
+                e_3.into(),
+                e_4.into(),
+                e_5.into(),
+                e_6.into(),
+            ] {
                 tx.send(event).await.unwrap();
             }
 
             let output_1 = out.recv().await.unwrap().into_log();
-            assert_eq!(output_1["message"], vec!["test 1", "test 2", "test 3"].into());
+            assert_eq!(
+                output_1["message"],
+                vec!["test 1", "test 2", "test 3"].into()
+            );
 
             let output_2 = out.recv().await.unwrap().into_log();
-            assert_eq!(output_2["message"], vec!["test 4", "test 5", "test 6"].into());
+            assert_eq!(
+                output_2["message"],
+                vec!["test 4", "test 5", "test 6"].into()
+            );
 
             drop(tx);
             topology.stop().await;
