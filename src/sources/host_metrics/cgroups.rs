@@ -44,6 +44,7 @@ pub(crate) struct CGroupsConfig {
 
     /// Base cgroup directory, for testing use only
     #[serde(skip_serializing)]
+    #[configurable(metadata(docs::hidden))]
     base_dir: Option<PathBuf>,
 }
 
