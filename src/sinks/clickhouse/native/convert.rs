@@ -119,7 +119,7 @@ fn into_clickhouse_value(v: Option<&Value>, target_type: &SqlType) -> CResult {
         SqlType::Int8 => into_integer(v, |t| CHValue::Int8(t as i8)),
         SqlType::Int16 => into_integer(v, |t| CHValue::Int16(t as i16)),
         SqlType::Int32 => into_integer(v, |t| CHValue::Int32(t as i32)),
-        SqlType::Int64 => into_integer(v, |t| CHValue::Int64(t)),
+        SqlType::Int64 => into_integer(v, CHValue::Int64),
         SqlType::String => into_string(v),
         SqlType::FixedString(len) => into_fixed_string(v, *len),
         SqlType::Float32 => into_float(v, true),
