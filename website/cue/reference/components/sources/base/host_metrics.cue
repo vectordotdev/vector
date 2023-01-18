@@ -14,11 +14,6 @@ base: components: sources: host_metrics: configuration: {
 				required:    false
 				type: string: examples: ["/", "system.slice/snapd.service"]
 			}
-			base_dir: {
-				description: "Base cgroup directory, for testing use only"
-				required:    false
-				type: string: {}
-			}
 			groups: {
 				description: """
 					Lists of cgroup name patterns to include or exclude in gathering
