@@ -352,7 +352,10 @@ impl<'a> DnstapParser<'a> {
                 "ns",
             );
 
-            let timestamp = Utc.timestamp(time_sec.try_into().unwrap(), query_time_nsec);
+            let timestamp = Utc
+                .timestamp_opt(time_sec.try_into().unwrap(), query_time_nsec)
+                .single()
+                .expect("invalid timestamp");
             self.insert(
                 self.event_schema.dnstap_root_data_schema().timestamp(),
                 timestamp,

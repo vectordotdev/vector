@@ -722,7 +722,9 @@ mod tests {
     }
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+        Utc.ymd(2018, 11, 14)
+            .and_hms_nano_opt(8, 9, 10, 11)
+            .expect("invalid timestamp")
     }
 
     fn tags() -> MetricTags {
