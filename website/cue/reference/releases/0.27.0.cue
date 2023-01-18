@@ -7,21 +7,21 @@ releases: "0.27.0": {
 	whats_next: []
 
 	description: """
-			The Vector team is pleased to announce version 0.27.0!
+		The Vector team is pleased to announce version 0.27.0!
 
-			This release includes the usual litany of smaller enhancements and bug fixes as well as:
+		This release includes the usual litany of smaller enhancements and bug fixes as well as:
 
-			- Support for a new metric tag data model that supports a wider range of tags than the
-			  simple key/value pairs previously allowed including tags that are not key/value as
-			  well as tag keys that appear multiple times, with different values. See [the release
-			  highlight](/highlights/2022-12-22-enhanced-metric-tags) for more details about this
-			  feature and how to enable it.
-			- Support for tracing memory allocations within Vector to aid in troubleshooting
-			  Vector's memory use. See the [announcement blog post](/blog/tracking-allocations/) for
-			  more details about this feature and how to enable it.
+		- Support for a new metric tag data model that supports a wider range of tags than the
+		  simple key/value pairs previously allowed including tags that are not key/value as
+		  well as tag keys that appear multiple times, with different values. See [the release
+		  highlight](/highlights/2022-12-22-enhanced-metric-tags) for more details about this
+		  feature and how to enable it.
+		- Support for tracing memory allocations within Vector to aid in troubleshooting
+		  Vector's memory use. See the [announcement blog post](/blog/tracking-allocations/) for
+		  more details about this feature and how to enable it.
 
-			Be sure to check out the [upgrade guide](/highlights/2023-01-17-0-27-0-upgrade-guide) for
-			breaking changes in this release.
+		Be sure to check out the [upgrade guide](/highlights/2023-01-17-0-27-0-upgrade-guide) for
+		breaking changes in this release.
 		"""
 
 	changelog: [
