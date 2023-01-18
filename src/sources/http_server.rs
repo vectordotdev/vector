@@ -39,7 +39,7 @@ use crate::{
 #[configurable_component(source("http"))]
 #[configurable(metadata(deprecated))]
 #[derive(Clone, Debug)]
-pub struct HttpConfig(#[configurable(derived)] SimpleHttpConfig);
+pub struct HttpConfig(SimpleHttpConfig);
 
 impl GenerateConfig for HttpConfig {
     fn generate_config() -> toml::Value {

@@ -16,11 +16,11 @@ pub mod geoip;
 #[enum_dispatch(EnrichmentTableConfig)]
 pub enum EnrichmentTables {
     /// File.
-    File(#[configurable(derived)] file::FileConfig),
+    File(file::FileConfig),
 
     /// GeoIP.
     #[cfg(feature = "enrichment-tables-geoip")]
-    Geoip(#[configurable(derived)] geoip::GeoipConfig),
+    Geoip(geoip::GeoipConfig),
 }
 
 // We can't use `enum_dispatch` here because it doesn't support associated constants.

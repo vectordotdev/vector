@@ -45,14 +45,14 @@ use vector_core::config::LogNamespace;
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum StatsdConfig {
     /// Listen on TCP.
-    Tcp(#[configurable(derived)] TcpConfig),
+    Tcp(TcpConfig),
 
     /// Listen on UDP.
-    Udp(#[configurable(derived)] UdpConfig),
+    Udp(UdpConfig),
 
     /// Listen on UDS. (Unix domain socket)
     #[cfg(unix)]
-    Unix(#[configurable(derived)] UnixConfig),
+    Unix(UnixConfig),
 }
 
 /// UDP configuration for the `statsd` source.

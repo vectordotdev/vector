@@ -537,7 +537,7 @@ pub enum MetricSketch {
     ///
     /// [ddsketch]: https://www.vldb.org/pvldb/vol12/p2195-masson.pdf
     /// [ddagent]: https://github.com/DataDog/datadog-agent
-    AgentDDSketch(#[configurable(derived)] AgentDDSketch),
+    AgentDDSketch(AgentDDSketch),
 }
 
 impl MetricSketch {

@@ -119,7 +119,7 @@ const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 pub enum StackdriverLogName {
     /// The billing account ID to which to publish logs.
     #[serde(rename = "billing_account_id")]
-    BillingAccount(#[configurable(transparent)] String),
+    BillingAccount(String),
 
     /// The folder ID to which to publish logs.
     ///
@@ -127,13 +127,13 @@ pub enum StackdriverLogName {
     ///
     /// [folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
     #[serde(rename = "folder_id")]
-    Folder(#[configurable(transparent)] String),
+    Folder(String),
 
     /// The organization ID to which to publish logs.
     ///
     /// This would be the identifier assigned to your organization on Google Cloud Platform.
     #[serde(rename = "organization_id")]
-    Organization(#[configurable(transparent)] String),
+    Organization(String),
 
     /// The project ID to which to publish logs.
     ///
@@ -142,7 +142,7 @@ pub enum StackdriverLogName {
     /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     #[derivative(Default)]
     #[serde(rename = "project_id")]
-    Project(#[configurable(transparent)] String),
+    Project(String),
 }
 
 /// A monitored resource.

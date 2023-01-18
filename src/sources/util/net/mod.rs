@@ -21,11 +21,11 @@ pub use self::udp::try_bind_udp_socket;
 #[serde(untagged)]
 pub enum SocketListenAddr {
     /// An IPv4/IPv6 address and port.
-    SocketAddr(#[configurable(derived)] SocketAddr),
+    SocketAddr(SocketAddr),
 
     /// A file descriptor identifier that is given from, and managed by, the socket activation feature of `systemd`.
     #[serde(deserialize_with = "parse_systemd_fd")]
-    SystemdFd(#[configurable(transparent)] usize),
+    SystemdFd(usize),
 }
 
 impl SocketListenAddr {
