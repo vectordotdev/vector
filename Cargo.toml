@@ -176,7 +176,7 @@ aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features 
 aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["rustls"], optional = true }
 aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["rustls"], optional = true }
 aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sigv4 = { version = "0.51.0", default-features = false, features = ["sign-http"], optional = true }
+aws-sigv4 = { version = "0.53.0", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "0.51.0", default-features = false, features = ["rustls"], optional = true }
 aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
@@ -319,7 +319,7 @@ tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["
 toml = { version = "0.5.10", default-features = false }
 tonic = { version = "0.8", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
-typetag = { version = "0.2.4", default-features = false }
+typetag = { version = "0.2.5", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.3", default-features = false }
@@ -365,7 +365,7 @@ tokio = { version = "1.24.1", features = ["test-util"] }
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
-wiremock = "0.5.16"
+wiremock = "0.5.17"
 zstd = { version = "0.12.2", default-features = false }
 
 [patch.crates-io]

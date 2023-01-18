@@ -205,6 +205,16 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 			}
 		}
 	}
+	store_access_key: {
+		description: """
+			Whether or not to store the AWS Firehose Access Key in event secrets.
+
+			If set to `true`, when incoming requests contains an Access Key sent by AWS Firehose, it will be kept in the
+			event secrets as "aws_kinesis_firehose_access_key".
+			"""
+		required: true
+		type: bool: {}
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
