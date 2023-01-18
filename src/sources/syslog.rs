@@ -769,7 +769,9 @@ mod test {
             let expected = expected.as_mut_log();
             expected.insert(
                 log_schema().timestamp_key(),
-                Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
+                Utc.ymd(2019, 2, 13)
+                    .and_hms_opt(19, 48, 34)
+                    .expect("invalid timestamp"),
             );
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("host", "74794bfb6795");
@@ -807,7 +809,9 @@ mod test {
             let expected = expected.as_mut_log();
             expected.insert(
                 log_schema().timestamp_key(),
-                Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
+                Utc.ymd(2019, 2, 13)
+                    .and_hms_opt(19, 48, 34)
+                    .expect("invalid timestamp"),
             );
             expected.insert(log_schema().host_key(), "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
@@ -918,7 +922,11 @@ mod test {
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
-            let expected_date: DateTime<Utc> = Local.ymd(year, 2, 13).and_hms(20, 7, 26).into();
+            let expected_date: DateTime<Utc> = Local
+                .ymd(year, 2, 13)
+                .and_hms_opt(20, 7, 26)
+                .expect("invalid timestamp")
+                .into();
             expected.insert(log_schema().timestamp_key(), expected_date);
             expected.insert(log_schema().host_key(), "74794bfb6795");
             expected.insert(log_schema().source_type_key(), "syslog");
@@ -947,7 +955,11 @@ mod test {
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
-            let expected_date: DateTime<Utc> = Local.ymd(year, 2, 13).and_hms(21, 31, 56).into();
+            let expected_date: DateTime<Utc> = Local
+                .ymd(year, 2, 13)
+                .and_hms_opt(21, 31, 56)
+                .expect("invalid timestamp")
+                .into();
             expected.insert(log_schema().timestamp_key(), expected_date);
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("host", "74794bfb6795");

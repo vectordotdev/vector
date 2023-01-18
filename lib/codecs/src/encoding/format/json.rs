@@ -121,7 +121,11 @@ mod tests {
                 "key1" => "value1",
                 "Key3" => "Value3",
             )))
-            .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11))),
+            .with_timestamp(Some(
+                Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                    .single()
+                    .expect("invalid datetime"),
+            )),
         );
 
         let bytes = serialize(JsonSerializerConfig::default(), event);

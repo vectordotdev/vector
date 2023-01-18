@@ -544,7 +544,7 @@ bench_function! {
     format_timestamp => vrl_stdlib::FormatTimestamp;
 
     iso_6801 {
-        args: func_args![value: Utc.timestamp(10, 0), format: "%+"],
+        args: func_args![value: Utc.timestamp_opt(10, 0).single().expect("invalid timestamp"), format: "%+"],
         want: Ok("1970-01-01T00:00:10+00:00"),
     }
 }
@@ -1335,11 +1335,11 @@ bench_function! {
             "subscription_filters":  ["Destination"],
             "log_events": [{
                 "id":  "35683658089614582423604394983260738922885519999578275840",
-                "timestamp":  (Utc.timestamp(1600110569, 39000000)),
+                "timestamp":  (Utc.timestamp_opt(1600110569, 39000000).single().expect("invalid timestamp")),
                 "message":  r#"{"bytes":26780,"datetime":"14/Sep/2020:11:45:41 -0400","host":"157.130.216.193","method":"PUT","protocol":"HTTP/1.0","referer":"https://www.principalcross-platform.io/markets/ubiquitous","request":"/expedite/convergence","source_type":"stdin","status":301,"user-identifier":"-"}"#,
             }, {
                 "id":  "35683658089659183914001456229543810359430816722590236673",
-                "timestamp":  (Utc.timestamp(1600110569, 41000000)),
+                "timestamp":  (Utc.timestamp_opt(1600110569, 41000000).single().expect("invalid timestamp")),
                 "message":  r#"{"bytes":17707,"datetime":"14/Sep/2020:11:45:41 -0400","host":"109.81.244.252","method":"GET","protocol":"HTTP/2.0","referer":"http://www.investormission-critical.io/24/7/vortals","request":"/scale/functionalities/optimize","source_type":"stdin","status":502,"user-identifier":"feeney1708"}"#,
             }]
         }))

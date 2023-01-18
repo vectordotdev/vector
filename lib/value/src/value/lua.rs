@@ -107,7 +107,10 @@ pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     let min = t.raw_get("min")?;
     let sec = t.raw_get("sec")?;
     let nano = t.raw_get::<_, Option<u32>>("nanosec")?.unwrap_or(0);
-    Ok(Utc.ymd(year, month, day).and_hms_nano(hour, min, sec, nano))
+    Ok(Utc
+        .ymd(year, month, day)
+        .and_hms_opt(hour, min, sec)
+        .expect("invalid datetime"))
 }
 
 #[cfg(test)]
@@ -149,15 +152,27 @@ mod test {
             ),
             (
                 "os.date('!*t', 1584297428)",
-                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms(18, 37, 8)),
+                Value::Timestamp(
+                    Utc.ymd(2020, 3, 15)
+                        .and_hms_opt(18, 37, 8)
+                        .expect("invalid timestamp"),
+                ),
             ),
             (
                 "{year=2020, month=3, day=15, hour=18, min=37, sec=8}",
-                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms(18, 37, 8)),
+                Value::Timestamp(
+                    Utc.ymd(2020, 3, 15)
+                        .and_hms_opt(18, 37, 8)
+                        .expect("invalid timestamp"),
+                ),
             ),
             (
                 "{year=2020, month=3, day=15, hour=18, min=37, sec=8, nanosec=666666666}",
-                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms_nano(18, 37, 8, 666_666_666)),
+                Value::Timestamp(
+                    Utc.with_ymd_and_hms(2020, 3, 15, 18, 37, 8)
+                        .single()
+                        .expect("invalid datetime"),
+                ),
             ),
         ];
 
@@ -239,7 +254,11 @@ mod test {
                 "#,
             ),
             (
-                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms_nano(18, 37, 8, 666_666_666)),
+                Value::Timestamp(
+                    Utc.with_ymd_and_hms(2020, 3, 15, 18, 37, 8)
+                        .single()
+                        .expect("invalid datetime"),
+                ),
                 r#"
                 function (value)
                     local expected = os.date("!*t", 1584297428)

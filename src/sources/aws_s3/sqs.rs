@@ -459,9 +459,11 @@ impl IngestorProcess {
 
         let metadata = object.metadata;
 
-        let timestamp = object
-            .last_modified
-            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()));
+        let timestamp = object.last_modified.map(|ts| {
+            Utc.timestamp_opt(ts.secs(), ts.subsec_nanos())
+                .single()
+                .expect("invalid timestamp")
+        });
 
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(

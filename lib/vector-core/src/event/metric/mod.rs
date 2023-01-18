@@ -646,7 +646,9 @@ mod test {
     use super::*;
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+            .single()
+            .expect("invalid datetime")
     }
 
     fn tags() -> MetricTags {

@@ -83,7 +83,9 @@ async fn cloudwatch_metrics_put_data() {
                 },
             )
             .with_timestamp(Some(
-                Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
+                Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                    .single()
+                    .expect("invalid datetime"),
             )),
         );
         events.push(event);

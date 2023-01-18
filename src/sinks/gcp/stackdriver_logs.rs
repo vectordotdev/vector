@@ -493,7 +493,11 @@ mod tests {
         log.insert("anumber", Value::Bytes("100".into()));
         log.insert(
             "timestamp",
-            Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
+            Value::Timestamp(
+                Utc.ymd(2020, 1, 1)
+                    .and_hms_opt(12, 30, 0)
+                    .expect("invalid timestamp"),
+            ),
         );
 
         let json = encoder.encode_event(Event::from(log)).unwrap();

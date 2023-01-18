@@ -49,6 +49,8 @@ pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     let hour = t.raw_get("hour")?;
     let min = t.raw_get("min")?;
     let sec = t.raw_get("sec")?;
-    let nano = t.raw_get::<_, Option<u32>>("nanosec")?.unwrap_or(0);
-    Ok(Utc.ymd(year, month, day).and_hms_nano(hour, min, sec, nano))
+    Ok(Utc
+        .ymd(year, month, day)
+        .and_hms_opt(hour, min, sec)
+        .expect("invalid datetime"))
 }

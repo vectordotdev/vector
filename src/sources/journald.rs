@@ -655,7 +655,12 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
                 .parse::<u64>()
                 .ok()
         })
-        .map(|ts| chrono::Utc.timestamp((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000));
+        .map(|ts| {
+            chrono::Utc
+                .timestamp_opt((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000)
+                .single()
+                .expect("invalid timestamp")
+        });
 
     // Add timestamp.
     match log_namespace {
@@ -1387,7 +1392,12 @@ mod tests {
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
-        Value::Timestamp(chrono::Utc.timestamp(secs, usecs))
+        Value::Timestamp(
+            chrono::Utc
+                .timestamp_opt(secs, usecs)
+                .single()
+                .expect("invalid timestamp"),
+        )
     }
 
     fn priority(event: &Event) -> Value {
