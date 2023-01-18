@@ -26,6 +26,7 @@ use crate::{
         GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
     },
     event::{Event, Value},
+    register_validatable_component,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
         http::{add_query_parameters, HttpMethod},
@@ -135,14 +136,6 @@ pub struct SimpleHttpConfig {
 }
 
 impl SimpleHttpConfig {
-    #[cfg(test)]
-    pub fn validation() -> Self {
-        Self {
-            decoding: Some(DeserializerConfig::Json),
-            ..Default::default()
-        }
-    }
-
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         let mut schema_definition = self
@@ -248,43 +241,28 @@ impl Default for SimpleHttpConfig {
 impl_generate_config_from_default!(SimpleHttpConfig);
 
 impl ValidatableComponent for SimpleHttpConfig {
-    fn component_name(&self) -> &'static str {
-        Self::NAME
-    }
+    fn validation_configuration() -> ValidationConfiguration {
+        let config = Self {
+            decoding: Some(DeserializerConfig::Json),
+            ..Default::default()
+        };
 
-    fn component_type(&self) -> ComponentType {
-        ComponentType::Source
-    }
+        let listen_addr_http = format!("http://{}/", config.address);
+        let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
 
-    fn component_configuration(&self) -> ComponentConfiguration {
-        ComponentConfiguration::Source(self.clone().into())
-    }
-
-    fn external_resource(&self) -> Option<ExternalResource> {
-        let scheme = self
-            .tls
-            .as_ref()
-            .and_then(|tls| tls.enabled)
-            .map(|e| if e { "https" } else { "http" })
-            .unwrap_or("http");
-        let uri = Uri::builder()
-            .scheme(scheme)
-            .authority(self.address.to_string())
-            .path_and_query(self.path.clone())
-            .build()
-            .expect("should not fail to build request URI");
-        let method = Some(self.method.into());
-        let decoding_config = self
-            .get_decoding_config()
-            .expect("should not fail to get decoding config");
-
-        Some(ExternalResource::new(
+        let external_resource = ExternalResource::new(
             ResourceDirection::Push,
-            HttpResourceConfig::from_parts(uri, method),
-            decoding_config,
-        ))
+            HttpResourceConfig::from_parts(uri, Some(config.method.into())),
+            config
+                .get_decoding_config()
+                .expect("should not fail to get decoding config"),
+        );
+
+        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
     }
 }
+
+register_validatable_component!(SimpleHttpConfig);
 
 const fn default_http_method() -> HttpMethod {
     HttpMethod::Post
