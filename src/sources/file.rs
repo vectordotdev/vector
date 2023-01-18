@@ -1437,7 +1437,7 @@ mod tests {
 
     #[cfg(target_os = "linux")] // see #7988
     #[tokio::test]
-    async fn file_start_position_server_restart_unacknowledged() {
+    async fn file_start_position_server_restart_no_acknowledge() {
         file_start_position_server_restart(NoAcks).await
     }
 
@@ -1545,7 +1545,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_start_position_server_restart_with_file_rotation_unacknowledged() {
+    async fn file_start_position_server_restart_with_file_rotation_no_acknowledge() {
         file_start_position_server_restart_with_file_rotation(NoAcks).await
     }
 
