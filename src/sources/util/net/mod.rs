@@ -22,8 +22,6 @@ pub use self::udp::try_bind_udp_socket;
 pub enum SocketListenAddrParseError {
     #[snafu(display("Unable to parse as socket address"))]
     SocketAddrParse,
-    //#[snafu(display("Unable to deserialize string input"))]
-    //StringDeserialize,
     #[snafu(display("# after \"systemd\" must be a valid integer"))]
     UsizeParse,
     #[snafu(display("Systemd indices start from 1, found 0"))]
@@ -37,6 +35,7 @@ pub enum SocketListenAddrParseError {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(untagged)]
+#[serde(try_from = "String", into = "String")]
 #[configurable(metadata(docs::enum_tag_description = "
 The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by systemd socket activation.
 
@@ -49,7 +48,6 @@ pub enum SocketListenAddr {
     SocketAddr(#[configurable(derived)] SocketAddr),
 
     /// A file descriptor identifier that is given from, and managed by, the socket activation feature of `systemd`.
-    //#[serde(deserialize_with = "parse_systemd_fd")]
     SystemdFd(#[configurable(transparent)] usize),
 }
 
@@ -98,10 +96,10 @@ impl From<usize> for SocketListenAddr {
     }
 }
 
-impl TryFrom<&str> for SocketListenAddr {
+impl TryFrom<String> for SocketListenAddr {
     type Error = SocketListenAddrParseError;
 
-    fn try_from(input: &str) -> Result<Self, Self::Error> {
+    fn try_from(input: String) -> Result<Self, Self::Error> {
         println!("got input {}", input);
         // first attempt to parse the string into a SocketAddr directly
         match input.to_socket_addrs() {
@@ -111,7 +109,7 @@ impl TryFrom<&str> for SocketListenAddr {
                 .map(|s| s.into()),
             // then attempt to parse a systemd file descriptor
             Err(_) => {
-                let fd: usize = match input {
+                let fd: usize = match input.as_str() {
                     "systemd" => Ok(0),
                     s if s.starts_with("systemd#") => s[8..]
                         .parse::<usize>()
@@ -128,21 +126,20 @@ impl TryFrom<&str> for SocketListenAddr {
     }
 }
 
-//fn parse_systemd_fd<'de, D>(des: D) -> Result<usize, D::Error>
-//where
-//    D: Deserializer<'de>,
-//{
-//    let s: &'de str = Deserialize::deserialize(des)?;
-//    match s {
-//        "systemd" => Ok(0),
-//        s if s.starts_with("systemd#") => s[8..]
-//            .parse::<usize>()
-//            .map_err(de::Error::custom)?
-//            .checked_sub(1)
-//            .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
-//        _ => Err(de::Error::custom("must start with \"systemd\"")),
-//    }
-//}
+impl From<SocketListenAddr> for String {
+    fn from(addr: SocketListenAddr) -> String {
+        match addr {
+            SocketListenAddr::SocketAddr(addr) => addr.to_string(),
+            SocketListenAddr::SystemdFd(fd) => {
+                if fd == 0 {
+                    "systemd".to_owned()
+                } else {
+                    format!("systemd#{}", fd)
+                }
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -158,7 +155,7 @@ mod test {
     }
 
     #[test]
-    fn parse_socket_listen_addr() {
+    fn parse_socket_listen_addr_success() {
         let test: Config = toml::from_str(r#"addr="127.1.2.3:1234""#).unwrap();
         assert_eq!(
             test.addr,
@@ -171,5 +168,20 @@ mod test {
         assert_eq!(test.addr, SocketListenAddr::SystemdFd(0));
         let test: Config = toml::from_str(r#"addr="systemd#3""#).unwrap();
         assert_eq!(test.addr, SocketListenAddr::SystemdFd(2));
+    }
+
+    #[test]
+    fn parse_socket_listen_addr_fail() {
+        // no port specified
+        let test: Result<Config, toml::de::Error> = toml::from_str(r#"addr="127.1.2.3""#);
+        assert!(test.is_err());
+
+        // one based
+        let test: Result<Config, toml::de::Error> = toml::from_str(r#"addr="systemd#0""#);
+        assert!(test.is_err());
+
+        // typo
+        let test: Result<Config, toml::de::Error> = toml::from_str(r#"addr="system""#);
+        assert!(test.is_err());
     }
 }
