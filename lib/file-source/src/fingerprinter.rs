@@ -96,8 +96,8 @@ impl Fingerprinter {
                 buffer.resize(self.max_line_length, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
-                fingerprinter_read_until(fp, b'\n', lines, buffer)?;
-                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
+                let bytes_read = fingerprinter_read_until(fp, b'\n', lines, buffer)?;
+                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
                 Ok(FirstLinesChecksum(fingerprint))
             }
         }
@@ -180,8 +180,35 @@ impl Fingerprinter {
                 buffer.resize(self.max_line_length, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
-                fingerprinter_read_until(fp, b'\n', lines, buffer)?;
+                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer)?;
                 let fingerprint = LEGACY_FINGERPRINT_CRC.checksum(&buffer[..]);
+                Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
+            }
+            _ => Ok(None),
+        }
+    }
+    /// For upgrades from legacy strategy version
+    /// <https://github.com/vectordotdev/vector/issues/15700>
+    pub fn get_legacy_first_lines_checksum(
+        &self,
+        path: &Path,
+        buffer: &mut Vec<u8>,
+    ) -> Result<Option<FileFingerprint>, io::Error> {
+        match self.strategy {
+            FingerprintStrategy::Checksum {
+                ignored_header_bytes,
+                bytes: _,
+                lines,
+            }
+            | FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes,
+                lines,
+            } => {
+                buffer.resize(self.max_line_length, 0u8);
+                let mut fp = fs::File::open(path)?;
+                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
+                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer)?;
+                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
             _ => Ok(None),
@@ -189,7 +216,8 @@ impl Fingerprinter {
     }
 }
 
-fn fingerprinter_read_until(
+/// Saved for backwards compatibility.
+fn fingerprinter_read_until_and_zerofill_buf(
     mut r: impl Read,
     delim: u8,
     mut count: usize,
@@ -215,10 +243,40 @@ fn fingerprinter_read_until(
                 }
             }
         }
-
         buf = &mut buf[read..];
     }
     Ok(())
+}
+
+fn fingerprinter_read_until(
+    mut r: impl Read,
+    delim: u8,
+    mut count: usize,
+    mut buf: &mut [u8],
+) -> io::Result<usize> {
+    let mut total_read = 0;
+    'main: while !buf.is_empty() {
+        let read = match r.read(buf) {
+            Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "EOF reached")),
+            Ok(n) => n,
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+
+        for (pos, &c) in buf[..read].iter().enumerate() {
+            if c == delim {
+                if count <= 1 {
+                    total_read += pos + 1;
+                    break 'main;
+                } else {
+                    count -= 1;
+                }
+            }
+        }
+        total_read += read;
+        buf = &mut buf[read..];
+    }
+    Ok(total_read)
 }
 
 #[cfg(test)]
