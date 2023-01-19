@@ -185,7 +185,7 @@ base: components: sources: http: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: examples: ["[\"User-Agent\", \"X-My-Custom-Header\"]"]
+			items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
 		}
 	}
 	method: {
@@ -228,7 +228,7 @@ base: components: sources: http: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: examples: ["[\"application\", \"source\"]"]
+			items: type: string: examples: ["application", "source"]
 		}
 	}
 	strict_path: {

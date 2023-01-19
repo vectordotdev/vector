@@ -87,14 +87,16 @@ pub struct SimpleHttpConfig {
     ///
     /// These will override any values included in the JSON payload with conflicting names.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "[\"User-Agent\", \"X-My-Custom-Header\"]"))]
+    #[configurable(metadata(docs::examples = "User-Agent"))]
+    #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
     headers: Vec<String>,
 
     /// A list of URL query parameters to include in the log event.
     ///
     /// These will override any values included in the body with conflicting names.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "[\"application\", \"source\"]"))]
+    #[configurable(metadata(docs::examples = "application"))]
+    #[configurable(metadata(docs::examples = "source"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
