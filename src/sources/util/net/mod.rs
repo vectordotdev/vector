@@ -31,15 +31,14 @@ pub enum SocketListenAddrParseError {
     UnableToParse,
 }
 
-/// A listening address that can be given directly or be managed via `systemd` socket activation.
+/// The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+/// systemd socket activation.
+///
+/// If a socket address is used, it _must_ include a port.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(untagged)]
 #[serde(try_from = "String", into = "String")]
-#[configurable(metadata(docs::enum_tag_description = "
-The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by systemd socket activation.
-
-If a socket address is used, it _must_ include a port."))]
 #[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
 #[configurable(metadata(docs::examples = "systemd"))]
 #[configurable(metadata(docs::examples = "systemd#3"))]

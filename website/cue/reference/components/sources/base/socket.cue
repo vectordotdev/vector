@@ -2,7 +2,12 @@ package metadata
 
 base: components: sources: socket: configuration: {
 	address: {
-		description:   "A listening address that can be given directly or be managed via `systemd` socket activation."
+		description: """
+			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+			systemd socket activation.
+
+			If a socket address is used, it _must_ include a port.
+			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
 		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
@@ -11,7 +16,7 @@ base: components: sources: socket: configuration: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: {}
+		type: uint: unit: "concurrency"
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
@@ -156,7 +161,7 @@ base: components: sources: socket: configuration: {
 		type: object: options: time_secs: {
 			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	max_length: {
