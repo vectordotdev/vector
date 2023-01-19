@@ -47,6 +47,11 @@ base: components: transforms: reduce: configuration: {
 			items: type: string: examples: ["request_id", "user_id", "transaction_id"]
 		}
 	}
+	max_events: {
+		description: "The maximum number of events to group together."
+		required:    false
+		type: uint: {}
+	}
 	merge_strategies: {
 		description: """
 			A map of field names to custom merge strategies.
