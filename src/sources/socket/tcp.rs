@@ -17,7 +17,7 @@ use crate::{
     tls::TlsSourceConfig,
 };
 
-use super::{default_host_key, SocketConfig};
+use super::{default_host_key, default_max_length, SocketConfig};
 
 /// TCP configuration for the `socket` source.
 #[serde_as]
@@ -35,8 +35,12 @@ pub struct TcpConfig {
     /// Messages larger than this are truncated.
     ///
     /// This option is deprecated. Configure `max_length` on the framing config instead.
+    // TODO: this option is noted as deprecated in the source build function in mod.rs , but
+    // behaviorally there are inconsistencies when adapting the from_address() function to use framing
+    // instead of max_length. Merits further investigation.
     #[configurable(deprecated)]
     #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[serde(default = "default_max_length")]
     max_length: Option<usize>,
 
     /// The timeout before a connection is forcefully closed during shutdown.
@@ -102,18 +106,17 @@ fn default_port_key() -> OptionalValuePath {
 
 impl TcpConfig {
     pub fn from_address(address: SocketListenAddr) -> Self {
-        let decoding = default_decoding();
         Self {
             address,
             keepalive: None,
-            max_length: None,
+            max_length: default_max_length(),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: default_host_key(),
             port_key: default_port_key(),
             tls: None,
             receive_buffer_bytes: None,
-            framing: Some(decoding.default_stream_framing()),
-            decoding,
+            framing: None,
+            decoding: default_decoding(),
             connection_limit: None,
             log_namespace: None,
         }

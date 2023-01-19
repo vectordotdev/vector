@@ -19,7 +19,7 @@ use crate::{
     SourceSender,
 };
 
-use super::{default_host_key, SocketConfig};
+use super::{default_host_key, default_max_length, SocketConfig};
 
 /// Unix domain socket configuration for the `socket` source.
 #[configurable_component]
@@ -46,7 +46,11 @@ pub struct UnixConfig {
     /// Messages larger than this are truncated.
     ///
     /// This option is deprecated. Configure `max_length` on the framing config instead.
+    // TODO: this option is noted as deprecated in the source build function in mod.rs , but
+    // behaviorally there are inconsistencies when adapting the new() function to use framing
+    // instead of max_length. Merits further investigation.
     #[configurable(deprecated)]
+    #[serde(default = "default_max_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_length: Option<usize>,
 
@@ -78,14 +82,13 @@ pub struct UnixConfig {
 
 impl UnixConfig {
     pub fn new(path: PathBuf) -> Self {
-        let decoding = default_decoding();
         Self {
             path,
             socket_file_mode: None,
-            max_length: None,
+            max_length: default_max_length(),
             host_key: default_host_key(),
-            framing: Some(decoding.default_stream_framing()),
-            decoding,
+            framing: None,
+            decoding: default_decoding(),
             log_namespace: None,
         }
     }

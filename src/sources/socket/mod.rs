@@ -337,6 +337,10 @@ pub(crate) fn default_host_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
 }
 
+fn default_max_length() -> Option<usize> {
+    Some(crate::serde::default_max_length())
+}
+
 #[cfg(test)]
 mod test {
     use std::{

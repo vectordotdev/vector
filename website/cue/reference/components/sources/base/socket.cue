@@ -173,7 +173,10 @@ base: components: sources: socket: configuration: {
 			This option is deprecated. Configure `max_length` on the framing config instead.
 			"""
 		required: false
-		type: uint: unit: "bytes"
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
 	}
 	mode: {
 		description: "The type of socket to use."
