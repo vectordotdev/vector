@@ -90,20 +90,20 @@ or `log_schema().timestamp_key()`.
 value will be placed in. For example, the `kafka` source will allow the
 user to specify the `topic_key` - the field name that will contain the 
 kafka `topic` the event was consumed from.  
-- Other sources just hardcode this value. For example the `dnstap` source
-creates an event with an object where most of the field names are hardcoded.
+- Other sources just hard code this value. For example the `dnstap` source
+creates an event with an object where most of the field names are hard coded.
 
 #### metadata_key
 
 The name of the field when it is inserted into the Vector namespace. This 
 will be `path!("ingest_timestamp")` or `path!("source_type")`. The field names
-can be hardcoded since they are going into the Vector namespace, so conflicts
+can be hard coded since they are going into the Vector namespace, so conflicts
 with other field names cannot occur.
 
 It should be noted that the values for these field names are typically 
-hardcoded. With the `kafka` source, for example, it was possible to configure
+hard coded. With the `kafka` source, for example, it was possible to configure
 the field name that the `topic` was inserted into. In the Vector namespace
-this field name is just hardcoded to `topic`. Allowing the user to configure
+this field name is just hard coded to `topic`. Allowing the user to configure
 the fieldname was only necessary to prevent name conflicts with other values
 from the event. This is no longer an issue as these values are now placed in a 
 separate namespace to the event data.
@@ -231,7 +231,7 @@ Other fields should be inserted into the event like:
 ## Timestamps
 
 We need to talk about timestamps. A timestamp can represent a number 
-of different things.
+of different things:
 
 - Ingest timestamp - This is the timestamp when the event was received
   by Vector. This should go in the Vector metadata.
@@ -252,8 +252,8 @@ configure custom field names for metadata.
 
 # Schema
   
-All sources need to specify their schema - that is a definition of the 
-shape of the event that it will create.
+All sources need to specify their schema - a definition of the shape of the
+event that it will create.
 
 The schema definition is returned from the `outputs` function defined
 by the `SourceConfig` trait.
@@ -278,7 +278,7 @@ We need to add the metadata that has been adding to the Vector namespace:
       .with_standard_vector_source_metadata()
 ```
 
-Next we need ta add any source metadata that is created by the source.
+Next we need to add any source metadata that is created by the source.
 
 ```rust
       .with_source_metadata(
@@ -329,9 +329,13 @@ are used in Vector:
 
 - message
 - timestamp
-- severity (?)
+- severity
+- host
+- service
+- source
+- tags
 
-TODO Where can I get a list of all the supported meanings?
+This list is not definitive and likely to be updated over time.
 
 Most fields will not have a given meaning, in which case just pass `None`.
 
@@ -372,7 +376,7 @@ Kind::array(Collection::empty().with_unknown(Kind::bytes()))
 ````
 
 It is also possible to specify the type for specifix indexes in the
-array eg. this array will  have a string at index 0 and and integer
+array eg. this array will have a string at index 0 and an integer
 at index 1:
 
 ```rust
@@ -395,14 +399,14 @@ An object is a map of keys to values. Similar to an array, an object
 can specify the type for all fields as well as the type for specific
 fields.
 
-An object where all fields will be strings, but wo don't specify what
+An object where all fields will be strings, but doesn't specify what
 those field names are:
 
 ```rust
 Kind::object(Collection::empty().with_unknown(Kind::bytes()))
 ````
 
-An object with two fields - `reason` containing a string and  `value`
+An object with two fields - `reason` containing a string and `value`
 containing an integer:
 
 ```rust
@@ -414,7 +418,7 @@ Kind::object(Collection::empty()
 
 ### Multiple types
 
-It is possible to represent a field that could be one of several type.
+It is possible to represent a field that could be one of several types.
 
 For example, a string or an integer:
 
