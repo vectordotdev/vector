@@ -1,12 +1,27 @@
+use std::ffi::{OsStr, OsString};
 pub use std::process::Command;
-use std::{borrow::Cow, env, ffi::OsStr, path::PathBuf, process::ExitStatus, time::Duration};
+use std::{borrow::Cow, env, path::PathBuf, process::ExitStatus, time::Duration};
 
 use anyhow::{bail, Context as _, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 
 use crate::config::Config;
+
+// Use the `bash` interpreter included as part of the standard `git` install for our default shell
+// if nothing is specified in the environment.
+#[cfg(windows)]
+const DEFAULT_SHELL: &str = "C:\\Program Files\\Git\\bin\\bash.EXE";
+
+// This default is not currently used on non-Windows, so this is just a placeholder for now.
+#[cfg(not(windows))]
+const DEFAULT_SHELL: &str = "/bin/sh";
+
+// Extract the shell from the environment variable `$SHELL` and substitute the above default value
+// if it isn't set.
+static SHELL: Lazy<OsString> =
+    Lazy::new(|| (env::var_os("SHELL").unwrap_or_else(|| DEFAULT_SHELL.into())));
 
 static VERBOSITY: OnceCell<LevelFilter> = OnceCell::new();
 static CONFIG: OnceCell<Config> = OnceCell::new();
@@ -42,7 +57,16 @@ pub trait CommandExt {
 impl CommandExt for Command {
     /// Create a new command to execute the named script in the repository `scripts` directory.
     fn script(script: &str) -> Self {
-        Command::new([path(), "scripts", script].into_iter().collect::<PathBuf>())
+        let path: PathBuf = [path(), "scripts", script].into_iter().collect();
+        if cfg!(windows) {
+            // On Windows, all scripts must be run through an explicit interpreter.
+            let mut command = Command::new(&*SHELL);
+            command.arg(path);
+            command
+        } else {
+            // On all other systems, we can run scripts directly.
+            Command::new(path)
+        }
     }
 
     /// Set the command's working directory to the repository directory.
