@@ -306,15 +306,17 @@ base: components: sinks: clickhouse: configuration: {
 	sql_table_col_def: {
 		description: """
 			The ClickHouse table column definition.
-			If `use_native_proto` is `true`, this field must be configured!
-			The key represents not only the column name of ClickHouse table but also the key of the log.
+
+			If `use_native_proto` is `true`, this field must be configured.
+
+			The key represents column name in ClickHouse and the value is the column type in ClickHouse. Each log field is mapped to the corresponding column name in ClickHouse.
 			The value currently only supports these types:
-			_type: UInt(8,16,32,64), Int(8,16,32,64), String, FixedString(Int), Float(32,64), Date, DateTime, IPv(4,6),
-			Array(_type), Nullable(_type), Map(String, _type).
+			`_type`: `UInt(8,16,32,64)`, `Int(8,16,32,64)`, `String`, `FixedString(Int)`, `Float(32,64)`, `Date`, `DateTime`, `IPv(4,6)`,
+			`Array(_type)`, `Nullable(_type)`, `Map(String, _type)`.
 
 			Note: for now, empty space is not acceptable in type definition, which means:
-			Map(String,UInt8), Nullable(Date) are valid.
-			Map( String, UInt8), Nullable(Date ) are invalid.
+			`Map(String,UInt8)`, `Nullable(Date)` are valid.
+			`Map( String, UInt8)`, `Nullable(Date )` are invalid.
 			"""
 		required: false
 		type: object: {
@@ -328,7 +330,7 @@ base: components: sinks: clickhouse: configuration: {
 			options: {
 				"*": {
 					common:      false
-					description: "ClickHouse table definition"
+					description: "ClickHouse table definition."
 					required:    false
 					type: string: {
 						default: null

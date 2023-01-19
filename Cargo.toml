@@ -251,6 +251,7 @@ chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 chrono-tz = { version = "0.6.3", default-features = false, features = ["serde"], optional = true }
 cidr-utils = { version = "0.5.10", default-features = false }
 clap = { version = "4.0.32", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+# clickhouse-rs has no actual released on crates.io or a distinct git tag. That is why we depend on a specific commit.
 clickhouse-rs = { git = "https://github.com/suharev7/clickhouse-rs", rev="e40016b", features = ["tokio_io", "tls"], optional = true }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false }

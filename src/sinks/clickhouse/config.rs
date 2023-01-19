@@ -33,13 +33,15 @@ pub struct ClickhouseConfig {
     /// The database that contains the table that data will be inserted into.
     #[configurable(metadata(docs::examples = "mydatabase"))]
     pub database: Option<String>,
-    /// If true`, ClickHouse Native Protocol is used. Defaults to `false`, using `JSONEachRow` over HTTP.
+
+    /// If `true`, ClickHouse Native Protocol is used. Defaults to `false`, using `JSONEachRow` over HTTP.
     #[serde(default)]
     pub use_native_proto: bool,
 
     /// Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema.
     #[serde(default)]
     pub skip_unknown_fields: bool,
+
     /// SQL table column definition. For example: {"col1":"String", "col_2":"Nullable(UInt16)", ...}
     #[serde(default)]
     pub sql_table_col_def: BTreeMap<String, String>,
