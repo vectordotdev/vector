@@ -13,7 +13,7 @@ components: sources: prometheus_remote_write: {
 	}
 
 	features: {
-		auto_generated: true
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
@@ -49,7 +49,7 @@ components: sources: prometheus_remote_write: {
 		platform_name: null
 	}
 
-	configuration:  base.components.sources.prometheus_remote_write.configuration
+	configuration: base.components.sources.prometheus_remote_write.configuration
 
 	output: metrics: {
 		counter: output._passthrough_counter
