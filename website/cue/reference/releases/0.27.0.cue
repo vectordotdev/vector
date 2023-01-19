@@ -61,7 +61,7 @@ releases: "0.27.0": {
 			type: "enhancement"
 			scopes: ["vrl: compiler"]
 			description: """
-				VRL no longer rejects querying an object retured by the `merge` function. This fixes
+				VRL no longer rejects querying an object returned by the `merge` function. This fixes
 				programs that look like:
 
 				```
