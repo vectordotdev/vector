@@ -29,28 +29,7 @@ components: sinks: blackhole: {
 		notices: []
 	}
 
-	configuration: {
-		print_interval_secs: {
-			common:      false
-			description: "The number of seconds between reporting a summary of activity. Set to `0` to disable reporting."
-			required:    false
-			type: uint: {
-				default: 1
-				examples: [10]
-				unit: "seconds"
-			}
-		}
-		rate: {
-			common:      false
-			description: "Rates the amount of events that the sink can consume per second."
-			required:    false
-			type: uint: {
-				default: null
-				examples: [1000]
-				unit: null
-			}
-		}
-	}
+	configuration: base.components.sinks.blackhole.configuration
 
 	input: {
 		logs: true

@@ -53,8 +53,8 @@ impl StreamSink<EventArray> for BlackholeSink {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("blackhole".into())));
 
-        if self.config.print_interval_secs > 0 {
-            let interval_dur = Duration::from_secs(self.config.print_interval_secs);
+        if self.config.print_interval_secs.as_secs() > 0 {
+            let interval_dur = self.config.print_interval_secs;
             tokio::spawn(async move {
                 let mut print_interval = interval(interval_dur);
                 loop {
