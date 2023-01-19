@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
-
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
+use tokio::time::Duration;
 use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, event::Event};
 
@@ -17,8 +18,7 @@ use crate::{
     sources::{
         self,
         util::http_client::{
-            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
-            HttpClientBuilder, HttpClientContext,
+            build_url, call, GenericHttpClientInputs, HttpClientBuilder, HttpClientContext,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -40,29 +40,28 @@ enum ConfigError {
 }
 
 /// Configuration for the `prometheus_scrape` source.
+#[serde_as]
 #[configurable_component(source("prometheus_scrape"))]
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
+    #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
 
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    scrape_interval_secs: Duration,
 
-    /// Overrides the name of the tag used to add the instance to each metric.
+    /// The tag name added to each event representing the scraped instance's host:port.    
     ///
     /// The tag value will be the host/port of the scraped instance.
-    ///
-    /// By default, `"instance"` is used.
     instance_tag: Option<String>,
 
-    /// Overrides the name of the tag used to add the endpoint to each metric.
+    /// The tag name added to each event representing the scraped instance's endpoint.
     ///
     /// The tag value will be the endpoint of the scraped instance.
-    ///
-    /// By default, `"endpoint"` is used.
     endpoint_tag: Option<String>,
 
     /// Controls how tag conflicts are handled if the scraped source has tags to be added.
@@ -81,6 +80,7 @@ pub struct PrometheusScrapeConfig {
     /// scraping the `/federate` endpoint.
     #[serde(default)]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
+    #[configurable(metadata(docs::examples = "query_example()"))]
     query: HashMap<String, Vec<String>>,
 
     #[configurable(derived)]
@@ -88,6 +88,20 @@ pub struct PrometheusScrapeConfig {
 
     #[configurable(derived)]
     auth: Option<Auth>,
+}
+
+fn query_example() -> serde_json::Value {
+    serde_json::json! ({
+        "match[]": [
+            "{job=\"somejob\"}",
+            "{__name__=~\"job:.*\"}"
+        ]
+    })
+}
+
+/// The default interval to call the http endpoint if none is configured.
+pub(crate) const fn default_scrape_interval_secs() -> Duration {
+    Duration::from_secs(15)
 }
 
 impl GenerateConfig for PrometheusScrapeConfig {
@@ -125,7 +139,7 @@ impl SourceConfig for PrometheusScrapeConfig {
 
         let inputs = GenericHttpClientInputs {
             urls,
-            interval_secs: self.scrape_interval_secs,
+            interval_secs: self.scrape_interval_secs.as_secs(),
             headers: HashMap::new(),
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
@@ -329,7 +343,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -362,7 +376,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -413,7 +427,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -478,7 +492,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -533,7 +547,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -646,7 +660,7 @@ mod test {
                 endpoint_tag: None,
                 honor_labels: false,
                 query: HashMap::new(),
-                scrape_interval_secs: 1,
+                scrape_interval_secs: Duration::from_secs(1),
                 tls: None,
                 auth: None,
             },
@@ -731,7 +745,7 @@ mod integration_tests {
     async fn scrapes_metrics() {
         let config = PrometheusScrapeConfig {
             endpoints: vec!["http://localhost:9090/metrics".into()],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
