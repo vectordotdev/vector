@@ -165,7 +165,7 @@ releases: "0.27.0": {
 			type: "fix"
 			scopes: ["sink: elasticsearch"]
 			description: """
-				The `elasticsearch` sink now accepts reading compressed responess. It uses the
+				The `elasticsearch` sink now accepts reading compressed responses. It uses the
 				`compression` option to set an `Accept-Encoding` option in requests to Elasticsearch.
 				"""
 			pr_numbers: [15478]
