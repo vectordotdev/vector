@@ -4,7 +4,7 @@ This walks through the steps required to add log namespacing to a given source.
 
 Log Namespacing is a new feature in Vector that allows different fields of the Log 
 event to be kept under separate namespaces, thus avoiding conflicts where two different
-fields try to use the same name. Log Namespacing does not apply to Metric events.
+fields try to use the same name. Log Namespacing does not apply to Metric or Trace events.
 
 ## Config
 
@@ -91,7 +91,7 @@ value will be placed in. For example, the `kafka` source will allow the
 user to specify the `topic_key` - the field name that will contain the 
 kafka `topic` the event was consumed from.  
 - Other sources just hardcode this value. For example the `dnstap` source
-creates an event with an object, most of these field names are hardcoded.
+creates an event with an object where most of the field names are hardcoded.
 
 #### metadata_key
 
@@ -137,7 +137,7 @@ insert both these fields into the Vector namespace:
 ### Source Metadata
 
 Other fields that describe the event - but are not the actual data for the event
-should go into the source metadata. Examples of source metadata are 
+should go into the source metadata. Examples of source metadata are:
 
 - The Kafka topic when pulling from a Kafka stream.
 - Severity and Facility fields from a Syslog message.
