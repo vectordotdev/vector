@@ -6,12 +6,9 @@ use tokio::{
     fs::{self, File},
     io::AsyncReadExt,
 };
-use vector_config::configurable_component;
 use vector_core::metric_tags;
 
-use super::{
-    default_all_devices, filter_result_sync, CGroupsConfig, FilterList, HostMetrics, MetricsBuffer,
-};
+use super::{filter_result_sync, CGroupsConfig, HostMetrics, MetricsBuffer};
 use crate::event::MetricTags;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
