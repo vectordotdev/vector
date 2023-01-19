@@ -5,10 +5,7 @@ base: components: sources: syslog: configuration: {
 		description:   "The address to listen for connections on."
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: {
-			number: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
-			string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
-		}
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
