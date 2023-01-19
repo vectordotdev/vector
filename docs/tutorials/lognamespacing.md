@@ -247,7 +247,8 @@ maintain backward compatibility there is a few areas in the code base that
 do some seemingly overly complicated things with timestamps. It is worth 
 bearing this in mind when looking through existing new code.
 
-All new sources should work like the above.
+All new sources should work like the above and should not permit users to
+configure custom field names for metadata.
 
 # Schema
   
