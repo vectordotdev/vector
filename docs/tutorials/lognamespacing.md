@@ -2,7 +2,7 @@
 
 This walks through the steps required to add log namespacing to a given source.
 
-Log Namespacing is a new feature in Vector that allows different fields of the Log 
+Log Namespacing is a new feature in Vector that allows different fields of the Log
 event to be kept under separate namespaces, thus avoiding conflicts where two different
 fields try to use the same name. Log Namespacing does not apply to Metric or Trace events.
 
@@ -35,12 +35,12 @@ impl SourceConfig for DnstapConfig {
 The `cx.log_namespace` function gives us a `LogNamespace` enum that we can use to
 set the fields in the appropriate section of the Event.
 
-This `log_namespace` variable needs to be passed to any functions that will insert 
+This `log_namespace` variable needs to be passed to any functions that will insert
 data into the log event that is emitted by the source.
 
 ### Vector metadata
 
-The Vector namespace contains data pertinent to how the event was ingested into 
+The Vector namespace contains data pertinent to how the event was ingested into
 Vector. Currently two fields need to be added to this namespace - `ingest_timestamp`
 and `source_type`:
 
@@ -51,7 +51,7 @@ and `source_type`:
       path!("ingest_timestamp"),
       chrono::Utc::now(),
   );
-            
+
   self.log_namespace.insert_vector_metadata(
       &mut log_event,
       path!(self.source_type_key()),
@@ -69,7 +69,7 @@ If we look at the parameters to `insert_vector_metadata`:
         legacy_key: impl ValuePath<'a>,
         metadata_key: impl ValuePath<'a>,
         value: impl Into<Value>,
-    ) 
+    )
 ```
 
 #### log
@@ -79,41 +79,41 @@ This needs to be the log event that is being populated.
 #### legacy_key
 
 This is the name of the field the timestamp is to be inserted into
-when using the Legacy Namespace. 
+when using the Legacy Namespace.
 
 The value for this field comes from a number of different places.
 
-- For fields that are typically found in most log events the value will 
-be returned by calls to `log_schema()` eg. `log_schema().source_type_key()` 
+- For fields that are typically found in most log events the value will
+be returned by calls to `log_schema()` eg. `log_schema().source_type_key()`
 or `log_schema().timestamp_key()`.
 - Some sources allow the user to specify the field name that a given
 value will be placed in. For example, the `kafka` source will allow the
-user to specify the `topic_key` - the field name that will contain the 
-kafka `topic` the event was consumed from.  
+user to specify the `topic_key` - the field name that will contain the
+kafka `topic` the event was consumed from.
 - Other sources just hard code this value. For example the `dnstap` source
 creates an event with an object where most of the field names are hard coded.
 
 #### metadata_key
 
-The name of the field when it is inserted into the Vector namespace. This 
+The name of the field when it is inserted into the Vector namespace. This
 will be `path!("ingest_timestamp")` or `path!("source_type")`. The field names
 can be hard coded since they are going into the Vector namespace, so conflicts
 with other field names cannot occur.
 
-It should be noted that the values for these field names are typically 
+It should be noted that the values for these field names are typically
 hard coded. With the `kafka` source, for example, it was possible to configure
 the field name that the `topic` was inserted into. In the Vector namespace
 this field name is just hard coded to `topic`. Allowing the user to configure
 the fieldname was only necessary to prevent name conflicts with other values
-from the event. This is no longer an issue as these values are now placed in a 
+from the event. This is no longer an issue as these values are now placed in a
 separate namespace to the event data.
 
 #### value
 
-The actual value to be placed into the field. 
+The actual value to be placed into the field.
 
 For the ingest timestamp this will be `chrono::Utc::now()`. Source type will be
-the `NAME` property of the `Config` struct. `NAME` is provided by the 
+the `NAME` property of the `Config` struct. `NAME` is provided by the
 `configurable_component` macro. You may need to include `use vector_config::NamedComponent;`.
 
 For batches of events, each event in the batch should use a precalculated
@@ -122,7 +122,7 @@ For batches of events, each event in the batch should use a precalculated
 
 ### insert_standard_vector_source_metadata(...)
 
-A utility function has been provided that can be used in a lot of cases to 
+A utility function has been provided that can be used in a lot of cases to
 insert both these fields into the Vector namespace:
 
 ```rust
@@ -165,7 +165,7 @@ Let's look at the parameters:
         legacy_key: Option<LegacyKey<impl ValuePath<'a>>>,
         metadata_key: impl ValuePath<'a>,
         value: impl Into<Value>,
-    ) 
+    )
 ```
 
 #### source_name
@@ -179,16 +179,16 @@ The log event to populate.
 #### legacy_key
 
 The field name to populate for the legacy namespace. Pass `None` if
-this field should not be inserted for Legacy. Because there is a 
-possibility that the field might conflict with another field that 
-is already in the event what to do in the case of conflicts must 
+this field should not be inserted for Legacy. Because there is a
+possibility that the field might conflict with another field that
+is already in the event what to do in the case of conflicts must
 also be specified. `LegacyKey::Overwrite` will overwrite the existing
 value with this value. `LegacyKey::InsertIfEmpty` keeps the original
-value. 
+value.
 
 #### metadata_key
 
-The name of the path to insert into the Source metadata when in 
+The name of the path to insert into the Source metadata when in
 the Vector namespace. Because there is no chance of conflicting names
 here, this is typically just a hard coded value. eg. `path!("topic")`
 
@@ -198,12 +198,12 @@ The actual value that is to be inserted into the metadata.
 
 ## The event
 
-The main log event should contain only the real log message that the 
-event is representing. 
+The main log event should contain only the real log message that the
+event is representing.
 
 For the Vector namespace the data should be at the top level and not
 contained in any subfields. For an event that is a single String value -
-typically, in the Legacy namespace this will be inserted in a field 
+typically, in the Legacy namespace this will be inserted in a field
 called `message`. In the Vector namespace the event will be just this
 String value.
 
@@ -230,28 +230,28 @@ Other fields should be inserted into the event like:
 
 ## Timestamps
 
-We need to talk about timestamps. A timestamp can represent a number 
+We need to talk about timestamps. A timestamp can represent a number
 of different things:
 
 - Ingest timestamp - This is the timestamp when the event was received
   by Vector. This should go in the Vector metadata.
-- Timestamp - This should be any timestamp extracted from the incoming 
+- Timestamp - This should be any timestamp extracted from the incoming
   message.
-  
+
 It is worth recognising that existing sources have not always been consistent
 with this. Some sources would insert a timestamp that is extracted from the
-event but default to the ingest timestamp if it didn't exist. Others insert 
+event but default to the ingest timestamp if it didn't exist. Others insert
 the timestamp extracted from the event and don't insert a timestamp at all
-if it didn't exist. Others will always insert the ingest timestamp. To 
+if it didn't exist. Others will always insert the ingest timestamp. To
 maintain backward compatibility there is a few areas in the code base that
-do some seemingly overly complicated things with timestamps. It is worth 
+do some seemingly overly complicated things with timestamps. It is worth
 bearing this in mind when looking through existing new code.
 
 All new sources should work like the above and should not permit users to
 configure custom field names for metadata.
 
 # Schema
-  
+
 All sources need to specify their schema - a definition of the shape of the
 event that it will create.
 
@@ -263,7 +263,7 @@ by the `SourceConfig` trait.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 ```
 
-Most sources have a decoder option that will specify the initial schema. One 
+Most sources have a decoder option that will specify the initial schema. One
 can retrieve the schema by calling:
 
 ```rust
@@ -323,7 +323,7 @@ This is the type the data will be. This is covered in detail below.
 
 ## meaning
 
-Some fields are given a meaning. It is possible in VRL to refer to a field by it's 
+Some fields are given a meaning. It is possible in VRL to refer to a field by it's
 meaning regardless of what name has been given to it. Fields with the following meaning
 are used in Vector:
 
@@ -395,7 +395,7 @@ Kind::array(Collection::empty().with_unknown(Kind::bytes())
 
 ### object
 
-An object is a map of keys to values. Similar to an array, an object 
+An object is a map of keys to values. Similar to an array, an object
 can specify the type for all fields as well as the type for specific
 fields.
 
@@ -427,7 +427,7 @@ Kind::bytes().or_integer()
 ```
 
 Often a field may not exist at all, for that we have `or_undefined()`.
-For example, an object with a field called `reason` that may not exist, 
+For example, an object with a field called `reason` that may not exist,
 but if it does it will be a string:
 
 ```rust
