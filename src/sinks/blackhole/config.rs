@@ -33,7 +33,6 @@ pub struct BlackholeConfig {
     ///
     /// By default, there is no limit.
     #[configurable(metadata(docs::examples = 1000))]
-    #[configurable(metadata(docs::type_unit = "events per second"))]
     pub rate: Option<usize>,
 
     #[configurable(derived)]
