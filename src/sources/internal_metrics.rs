@@ -21,7 +21,7 @@ use crate::{
 #[serde_as]
 #[configurable_component(source("internal_metrics"))]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     /// The interval between metric gathering, in seconds.
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
@@ -49,7 +49,7 @@ impl Default for InternalMetricsConfig {
 /// Tag configuration for the `internal_metrics` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, default)]
 pub struct TagsConfig {
     /// Overrides the name of the tag used to add the peer host to each metric.
     ///
@@ -67,6 +67,7 @@ pub struct TagsConfig {
     ///
     ///
     /// By default, this is not set and the tag will not be automatically added.
+    #[configurable(metadata(docs::examples = "pid"))]
     pub pid_key: Option<String>,
 }
 
@@ -104,11 +105,7 @@ impl SourceConfig for InternalMetricsConfig {
         let interval = self.scrape_interval_secs;
 
         // namespace for created metrics is already "vector" by default.
-        let namespace = if self.namespace != "vector" {
-            Some(self.namespace.clone())
-        } else {
-            None
-        };
+        let namespace = self.namespace.clone();
 
         let host_key = match self.tags.host_key.as_str() {
             "" => None,
@@ -145,7 +142,7 @@ impl SourceConfig for InternalMetricsConfig {
 }
 
 struct InternalMetrics<'a> {
-    namespace: Option<String>,
+    namespace: String,
     host_key: Option<String>,
     pid_key: Option<String>,
     controller: &'a Controller,
@@ -173,8 +170,8 @@ impl<'a> InternalMetrics<'a> {
             let batch = metrics.into_iter().map(|mut metric| {
                 // A metric starts out with a default "vector" namespace, but will be overridden
                 // if an explicit namespace is provided to this source.
-                if let Some(namespace) = &self.namespace {
-                    metric = metric.with_namespace(Some(namespace));
+                if self.namespace != "vector" {
+                    metric = metric.with_namespace(Some(self.namespace.clone()));
                 }
 
                 if let Some(host_key) = &self.host_key {
