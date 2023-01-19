@@ -222,8 +222,11 @@ base: components: sources: nats: configuration: {
 		type: string: {}
 	}
 	subject: {
-		description: "The NATS subject to pull messages from."
-		required:    true
+		description: """
+			The NATS [subject][nats_subject] to pull messages from.
+			[nats_subject]: https://docs.nats.io/nats-concepts/subjects
+			"""
+		required: true
 		type: string: examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
 	}
 	subject_key_field: {
@@ -331,8 +334,9 @@ base: components: sources: nats: configuration: {
 			The NATS URL to connect to.
 
 			The URL must take the form of `nats://server:port`.
+			If the port is not specified it defaults to 4222.
 			"""
 		required: true
-		type: string: examples: ["nats://demo.nats.io", "nats://127.0.0.1:4222"]
+		type: string: examples: ["nats://demo.nats.io", "nats://127.0.0.1:4242"]
 	}
 }
