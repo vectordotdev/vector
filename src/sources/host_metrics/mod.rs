@@ -1,4 +1,7 @@
-use std::{path::Path, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
@@ -39,7 +42,6 @@ mod network;
 #[serde(rename_all = "lowercase")]
 pub enum Collector {
     /// Metrics related to Linux control groups.
-    #[cfg(target_os = "linux")]
     CGroups,
 
     /// Metrics related to CPU utilization.
@@ -102,10 +104,9 @@ pub struct HostMetricsConfig {
     #[serde(default = "default_namespace")]
     pub namespace: Option<String>,
 
-    #[cfg(target_os = "linux")]
     #[configurable(derived)]
     #[serde(default)]
-    pub(crate) cgroups: cgroups::CGroupsConfig,
+    pub cgroups: CGroupsConfig,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -118,6 +119,40 @@ pub struct HostMetricsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub network: network::NetworkConfig,
+}
+
+/// Options for the “cgroups” (controller groups) metrics collector.
+///
+/// This collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(default)]
+pub struct CGroupsConfig {
+    /// The number of levels of the cgroups hierarchy for which to report metrics.
+    ///
+    /// A value of `1` means just the root or named cgroup.
+    #[derivative(Default(value = "default_levels()"))]
+    #[serde(default = "default_levels")]
+    #[configurable(metadata(docs::examples = 1))]
+    #[configurable(metadata(docs::examples = 3))]
+    levels: usize,
+
+    /// The base cgroup name to provide metrics for.
+    #[configurable(metadata(docs::examples = "/"))]
+    #[configurable(metadata(docs::examples = "system.slice/snapd.service"))]
+    pub(super) base: Option<PathBuf>,
+
+    /// Lists of cgroup name patterns to include or exclude in gathering
+    /// usage metrics.
+    #[configurable(metadata(docs::examples = "example_cgroups()"))]
+    #[serde(default = "default_all_devices")]
+    groups: FilterList,
+
+    /// Base cgroup directory, for testing use only
+    #[serde(skip_serializing)]
+    #[configurable(metadata(docs::hidden))]
+    base_dir: Option<PathBuf>,
 }
 
 const fn default_scrape_interval() -> Duration {
@@ -152,6 +187,17 @@ fn default_all_devices() -> FilterList {
     FilterList {
         includes: Some(vec!["*".try_into().unwrap()]),
         excludes: None,
+    }
+}
+
+const fn default_levels() -> usize {
+    100
+}
+
+fn example_cgroups() -> FilterList {
+    FilterList {
+        includes: Some(vec!["user.slice/*".try_into().unwrap()]),
+        excludes: Some(vec!["*.service".try_into().unwrap()]),
     }
 }
 
