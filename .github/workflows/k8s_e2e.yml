@@ -74,7 +74,7 @@ jobs:
           name: e2e-test-deb-package
           path: target/artifacts/*
 
-  # Github Actions don't support `matrix` at the job-level `if:` condition.
+  # GitHub Actions don't support `matrix` at the job-level `if:` condition.
   # We apply this workaround - compute `matrix` in a preceding job, and assign
   # it's value dynamically at the actual test job.
   # This approach can be advanced further by, for instance, dynamically

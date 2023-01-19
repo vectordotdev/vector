@@ -17,7 +17,7 @@ pub type BuildResult = std::result::Result<ConfigBuilder, Vec<String>>;
 #[enum_dispatch(ProviderConfig)]
 pub enum Providers {
     /// HTTP.
-    Http(#[configurable(derived)] http::HttpConfig),
+    Http(http::HttpConfig),
 }
 
 // We can't use `enum_dispatch` here because it doesn't support associated constants.

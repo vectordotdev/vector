@@ -34,19 +34,19 @@ pub struct SocketConfig {
 #[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum Mode {
     /// Listen on TCP.
-    Tcp(#[configurable(derived)] tcp::TcpConfig),
+    Tcp(tcp::TcpConfig),
 
     /// Listen on UDP.
-    Udp(#[configurable(derived)] udp::UdpConfig),
+    Udp(udp::UdpConfig),
 
     /// Listen on a Unix domain socket (UDS), in datagram mode.
     #[cfg(unix)]
-    UnixDatagram(#[configurable(derived)] unix::UnixConfig),
+    UnixDatagram(unix::UnixConfig),
 
     /// Listen on a Unix domain socket (UDS), in stream mode.
     #[cfg(unix)]
     #[serde(alias = "unix")]
-    UnixStream(#[configurable(derived)] unix::UnixConfig),
+    UnixStream(unix::UnixConfig),
 }
 
 impl SocketConfig {

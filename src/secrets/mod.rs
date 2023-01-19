@@ -15,11 +15,11 @@ mod test;
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SecretBackends {
     /// Exec.
-    Exec(#[configurable(derived)] exec::ExecBackend),
+    Exec(exec::ExecBackend),
 
     /// Test.
     #[configurable(metadata(docs::hidden))]
-    Test(#[configurable(derived)] test::TestBackend),
+    Test(test::TestBackend),
 }
 
 // We can't use `enum_dispatch` here because it doesn't support associated constants.

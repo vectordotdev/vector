@@ -22,10 +22,10 @@ use crate::{
 // The following regex aims to extract a pair of strings, the first being the secret backend name
 // and the second being the secret key. Here are some matching & non-matching examples:
 // - "SECRET[backend.secret_name]" will match and capture "backend" and "secret_name"
-// - "SECRET[backend.secret.name]" will match and catpure "backend" and "secret.name"
-// - "SECRET[backend..secret.name]" will match and catpure "backend" and ".secret.name"
+// - "SECRET[backend.secret.name]" will match and capture "backend" and "secret.name"
+// - "SECRET[backend..secret.name]" will match and capture "backend" and ".secret.name"
 // - "SECRET[secret_name]" will not match
-// - "SECRET[.secret.name]" wil not match
+// - "SECRET[.secret.name]" will not match
 static COLLECTOR: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
 

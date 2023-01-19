@@ -127,7 +127,7 @@ impl<'a> Container<'a> {
         Attributes::from_attributes(&input.attrs)
             .and_then(|attrs| attrs.finalize(&input.attrs))
             // We successfully parsed the derive input through both `serde` itself and our own attribute parsing, so
-            // build our data container based on whether or not we have a struct, enum, and do any neccessary
+            // build our data container based on whether or not we have a struct, enum, and do any necessary
             // validation, etc.
             .and_then(|attrs| {
                 let tagging: Tagging = serde.attrs.tag().into();
@@ -199,9 +199,17 @@ impl<'a> Container<'a> {
                         serde_ast::Style::Struct
                         | serde_ast::Style::Tuple
                         | serde_ast::Style::Newtype => {
+                            let is_newtype_wrapper_field =
+                                matches!(style, serde_ast::Style::Newtype);
                             let fields = fields
                                 .iter()
-                                .map(|field| Field::from_ast(field, virtual_newtype.is_some()))
+                                .map(|field| {
+                                    Field::from_ast(
+                                        field,
+                                        virtual_newtype.is_some(),
+                                        is_newtype_wrapper_field,
+                                    )
+                                })
                                 .collect_darling_results(&mut accumulator);
 
                             (Data::Struct(style.into(), fields), false)

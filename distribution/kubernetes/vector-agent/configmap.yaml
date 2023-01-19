@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.26.0-distroless-libc"
+    app.kubernetes.io/version: "0.27.0-distroless-libc"
 data:
   agent.yaml: |
     data_dir: /vector-data-dir

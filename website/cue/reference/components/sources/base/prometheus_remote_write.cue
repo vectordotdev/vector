@@ -21,12 +21,12 @@ base: components: sources: prometheus_remote_write: configuration: {
 	}
 	address: {
 		description: """
-			The address to accept connections on.
+			The socket address to accept connections on.
 
 			The address _must_ include a port.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["0.0.0.0:9090"]
 	}
 	auth: {
 		description: "HTTP Basic authentication configuration."

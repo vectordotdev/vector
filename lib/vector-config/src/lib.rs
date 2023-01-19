@@ -74,7 +74,7 @@
 // create duplicate schemas for T" standpoint, but could manifest as a non-obvious divergence.
 //
 // TODO: We need to figure out how to handle aliases. Looking previously, it seemed like we might
-// need to do some very ugly combinatorial explosion stuff to define a schema per perumtation of all
+// need to do some very ugly combinatorial explosion stuff to define a schema per permutation of all
 // aliased fields in a config. We might be able to get away with using a combination of `allOf` and
 // `oneOf` where we define a subschema for the non-aliased fields, and then a subschema using
 // `oneOf`for each aliased field -- allowing it to match any of the possible field names for that
@@ -121,7 +121,7 @@
 // TODO: Should we always apply the transparent marker to fields when they're the only field in a
 // tuple struct/tuple variant? There's also some potential interplay with using the `derived` helper
 // attribute on the tuple struct/tuple variant itself to signal that we want to pull the
-// title/description from the field instead, which coluld be useful when using newtype wrappers
+// title/description from the field instead, which could be useful when using newtype wrappers
 // around existing/remote types for the purpose of making them `Configurable`.
 #![deny(warnings)]
 
@@ -172,7 +172,7 @@ where
     N: Configurable + ConfigurableNumber,
 {
     // In `Validation::ensure_conformance`, we do some checks on any supplied numeric bounds to try and ensure they're
-    // no larger than the largest f64 value where integer/floasting-point conversions are still lossless.  What we
+    // no larger than the largest f64 value where integer/floating-point conversions are still lossless.  What we
     // cannot do there, however, is ensure that the bounds make sense for the type on the Rust side, such as a user
     // supplying a negative bound which would be fine for `i64`/`f64` but not for `u64`. That's where this function
     // comes in.

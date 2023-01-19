@@ -33,6 +33,7 @@ use crate::{
 use super::{ResourceCodec, ResourceDirection, TestEvent};
 
 /// An HTTP resource.
+#[derive(Clone)]
 pub struct HttpResourceConfig {
     uri: Uri,
     method: Option<Method>,

@@ -80,9 +80,10 @@ pub struct MetricConfig {
 #[serde(untagged)]
 pub enum TagConfig {
     /// A single tag value.
-    Plain(#[configurable(transparent)] Option<Template>),
+    Plain(Option<Template>),
+
     /// An array of values to give to the same tag name.
-    Multi(#[configurable(transparent)] Vec<Option<Template>>),
+    Multi(Vec<Option<Template>>),
 }
 
 /// Specification of the type of an individual metric, and any associated data.
@@ -92,7 +93,7 @@ pub enum TagConfig {
 #[configurable(metadata(docs::enum_tag_description = "The type of metric to create."))]
 pub enum MetricTypeConfig {
     /// A counter.
-    Counter(#[configurable(derived)] CounterConfig),
+    Counter(CounterConfig),
 
     /// A histogram.
     Histogram,
@@ -425,7 +426,9 @@ mod tests {
     }
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+        Utc.ymd(2018, 11, 14)
+            .and_hms_nano_opt(8, 9, 10, 11)
+            .expect("invalid timestamp")
     }
 
     fn create_event(key: &str, value: impl Into<Value> + std::fmt::Debug) -> Event {

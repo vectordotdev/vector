@@ -314,7 +314,7 @@ mod tests {
 
         integer {
              args: func_args![value: 1_431_648_000],
-             want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms(0, 0, 0)),
+             want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms_opt(0, 0, 0).expect("invalid timestamp")),
              tdef: TypeDef::timestamp().fallible(),
         }
 

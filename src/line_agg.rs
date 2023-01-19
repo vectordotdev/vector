@@ -712,7 +712,7 @@ mod tests {
         // Tests if multiline aggregation updates
         // it's timeout every time it get's a new line.
         // To test this we are emitting a single large
-        // multiline but drip feeding it into the aggreagator
+        // multiline but drip feeding it into the aggregator
         // with 1ms delay.
 
         let n: usize = 1000;

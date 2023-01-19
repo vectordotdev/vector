@@ -44,10 +44,10 @@ pub enum SocketListenAddrParseError {
 #[configurable(metadata(docs::examples = "systemd#3"))]
 pub enum SocketListenAddr {
     /// An IPv4/IPv6 address and port.
-    SocketAddr(#[configurable(derived)] SocketAddr),
+    SocketAddr(SocketAddr),
 
     /// A file descriptor identifier that is given from, and managed by, the socket activation feature of `systemd`.
-    SystemdFd(#[configurable(transparent)] usize),
+    SystemdFd(usize),
 }
 
 impl SocketListenAddr {

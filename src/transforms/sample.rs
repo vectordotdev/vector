@@ -161,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn genreate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<SampleConfig>();
     }
 

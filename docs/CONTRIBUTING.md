@@ -13,7 +13,7 @@ Vector team member will find this document useful.
   - [Git Branches](#git-branches)
   - [Git Commits](#git-commits)
     - [Style](#style)
-  - [Github Pull Requests](#github-pull-requests)
+  - [GitHub Pull Requests](#github-pull-requests)
     - [Title](#title)
     - [Reviews & Approvals](#reviews--approvals)
     - [Merge Style](#merge-style)
@@ -82,7 +82,7 @@ Please ensure your commits are small and focused; they should tell a story of
 your change. This helps reviewers to follow your changes, especially for more
 complex changes.
 
-### Github Pull Requests
+### GitHub Pull Requests
 
 Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).
 

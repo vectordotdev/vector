@@ -46,7 +46,7 @@ impl Cli {
         }
 
         waiting!("Starting environment {}", &self.environment);
-        command.run()?;
+        command.check_run()?;
 
         state::save_env(&envs_dir, &self.environment, &json)?;
         Ok(())

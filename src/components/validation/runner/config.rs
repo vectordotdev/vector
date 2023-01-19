@@ -2,7 +2,7 @@ use crate::{
     components::validation::{
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
-        ComponentConfiguration, ComponentType, ValidatableComponent,
+        ComponentConfiguration, ComponentType, ValidationConfiguration,
     },
     config::ConfigBuilder,
     sinks::{vector::VectorConfig as VectorSinkConfig, Sinks},
@@ -24,19 +24,19 @@ pub struct TopologyBuilder {
 
 impl TopologyBuilder {
     /// Creates a component topology for the given component configuration.
-    pub fn from_component<C: ValidatableComponent>(component: C) -> Self {
-        let component_configuration = component.component_configuration();
+    pub fn from_configuration(configuration: &ValidationConfiguration) -> Self {
+        let component_configuration = configuration.component_configuration();
         match component_configuration {
             ComponentConfiguration::Source(source) => {
-                debug_assert_eq!(component.component_type(), ComponentType::Source);
+                debug_assert_eq!(configuration.component_type(), ComponentType::Source);
                 Self::from_source(source)
             }
             ComponentConfiguration::Transform(transform) => {
-                debug_assert_eq!(component.component_type(), ComponentType::Transform);
+                debug_assert_eq!(configuration.component_type(), ComponentType::Transform);
                 Self::from_transform(transform)
             }
             ComponentConfiguration::Sink(sink) => {
-                debug_assert_eq!(component.component_type(), ComponentType::Sink);
+                debug_assert_eq!(configuration.component_type(), ComponentType::Sink);
                 Self::from_sink(sink)
             }
         }

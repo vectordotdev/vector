@@ -683,7 +683,10 @@ mod tests {
             let mut event = LogEvent::from(line.to_string()).with_batch_notifier(&batch);
             event.insert(format!("key{}", i).as_str(), format!("value{}", i));
 
-            let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
+            let timestamp = Utc
+                .ymd(1970, 1, 1)
+                .and_hms_nano_opt(0, 0, (i as u32) + 1, 0)
+                .expect("invalid timestamp");
             event.insert("timestamp", timestamp);
             event.insert("source_type", "file");
 

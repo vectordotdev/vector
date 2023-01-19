@@ -34,7 +34,7 @@ pub enum PrometheusRemoteWriteAuth {
     },
 
     /// Amazon Prometheus Service-specific authentication.
-    Aws(#[configurable(derived)] AwsAuthentication),
+    Aws(AwsAuthentication),
 }
 
 fn default_histogram_buckets() -> Vec<f64> {

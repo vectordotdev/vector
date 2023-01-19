@@ -23,6 +23,7 @@ use crate::{
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(
     access_keys: Vec<String>,
+    store_access_key: bool,
     record_compression: Compression,
     decoder: codecs::Decoder,
     acknowledgements: bool,
@@ -32,6 +33,7 @@ pub fn firehose(
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     let context = handlers::Context {
         compression: record_compression,
+        store_access_key,
         decoder,
         acknowledgements,
         bytes_received,

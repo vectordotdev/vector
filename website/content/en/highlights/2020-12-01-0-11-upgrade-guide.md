@@ -110,7 +110,7 @@ structure may change if it contained `.` characters in the keys.
 ### Deprecation: The `prometheus` sink has been renamed to `prometheus_exporter` {#first}
 
 The `prometheus` sink has been renamed to `prometheus_exporter` since 0.11
-introduced a new `prometheus_remote_write` sink. This renaming distringuishes
+introduced a new `prometheus_remote_write` sink. This renaming distinguishes
 between the two. Upgrading is easy:
 
 ```diff title="vector.toml"
@@ -118,7 +118,7 @@ between the two. Upgrading is easy:
 -  type = "prometheus"
 +  type = "prometheus_exporter"
 -  namespace = "..."
-+  default_namesapce = "..."
++  default_namespace = "..."
 ```
 
 ### Deprecation: The `reduce` transform `identifier_fields` was renamed to `group_by` {#fourth}

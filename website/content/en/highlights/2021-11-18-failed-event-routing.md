@@ -18,7 +18,7 @@ component, the event was either dropped or was forwarded to the next step of the
 process.
 
 With this new release, you can configure Vector to send events that fail to
-process down a different pipeline, without any manual work-around, to catch
+process down a different pipeline, without any manual workaround, to catch
 errors, tag, fanout, or filter. In other words, users can now handle failed
 events in a way the user sees fit, such as routing the failed events to another
 sink for storage, inspection, and replay. We are piloting this feature with the

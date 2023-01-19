@@ -50,14 +50,14 @@ use vector_core::config::LogNamespace;
 #[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum StatsdConfig {
     /// Listen on TCP.
-    Tcp(#[configurable(derived)] TcpConfig),
+    Tcp(TcpConfig),
 
     /// Listen on UDP.
-    Udp(#[configurable(derived)] UdpConfig),
+    Udp(UdpConfig),
 
     /// Listen on a Unix domain Socket (UDS).
     #[cfg(unix)]
-    Unix(#[configurable(derived)] UnixConfig),
+    Unix(UnixConfig),
 }
 
 /// UDP configuration for the `statsd` source.

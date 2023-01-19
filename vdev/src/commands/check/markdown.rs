@@ -9,7 +9,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        app::exec_in_repo(
+        app::exec(
             "markdownlint",
             [
                 "--config",
@@ -22,6 +22,7 @@ impl Cli {
                 "target",
                 ".",
             ],
+            true,
         )
     }
 }
