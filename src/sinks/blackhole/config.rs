@@ -20,7 +20,7 @@ const fn default_print_interval_secs() -> Duration {
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct BlackholeConfig {
-    /// The number of seconds between reporting a summary of activity.
+    /// The interval between reporting a summary of activity.
     ///
     /// Set to `0` to disable reporting.
     #[derivative(Default(value = "default_print_interval_secs()"))]
