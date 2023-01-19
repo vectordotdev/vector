@@ -16,7 +16,7 @@ base: components: sources: internal_metrics: configuration: {
 	}
 	tags: {
 		description: "Tag configuration for the `internal_metrics` source."
-		required:    true
+		required:    false
 		type: object: options: {
 			host_key: {
 				description: """
@@ -40,7 +40,7 @@ base: components: sources: internal_metrics: configuration: {
 					By default, this is not set and the tag will not be automatically added.
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["pid"]
 			}
 		}
 	}
