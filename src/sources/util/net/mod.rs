@@ -174,7 +174,8 @@ mod test {
         let test: Result<Config, toml::de::Error> = toml::from_str(r#"addr="127.1.2.3""#);
         assert!(test.is_err());
 
-        // one based
+        // systemd fd indexing should be one based not zero.
+        // the user should leave off the {#N} to get the fd 0.
         let test: Result<Config, toml::de::Error> = toml::from_str(r#"addr="systemd#0""#);
         assert!(test.is_err());
 

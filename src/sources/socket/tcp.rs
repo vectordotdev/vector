@@ -30,7 +30,7 @@ pub struct TcpConfig {
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    /// The maximum buffer size, in bytes, of incoming messages.
+    /// The maximum buffer size of incoming messages.
     ///
     /// Messages larger than this are truncated.
     ///
@@ -39,7 +39,7 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     max_length: Option<usize>,
 
-    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
+    /// The timeout before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     shutdown_timeout_secs: Duration,
@@ -69,7 +69,7 @@ pub struct TcpConfig {
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
-    /// The size, in bytes, of the receive buffer used for each connection.
+    /// The size of the receive buffer used for each connection.
     ///
     /// Generally this should not need to be configured.
     #[configurable(metadata(docs::type_unit = "bytes"))]

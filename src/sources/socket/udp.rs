@@ -40,7 +40,7 @@ pub struct UdpConfig {
     #[configurable(derived)]
     address: SocketListenAddr,
 
-    /// The maximum buffer size, in bytes, of incoming messages.
+    /// The maximum buffer size of incoming messages.
     ///
     /// Messages larger than this are truncated.
     #[serde(default = "default_max_length")]
@@ -69,7 +69,7 @@ pub struct UdpConfig {
     #[serde(default = "default_port_key")]
     port_key: OptionalValuePath,
 
-    /// The size, in bytes, of the receive buffer used for the listening socket.
+    /// The size of the receive buffer used for the listening socket.
     ///
     /// Generally this should not need to be configured.
     #[configurable(metadata(docs::type_unit = "bytes"))]

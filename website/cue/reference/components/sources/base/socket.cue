@@ -166,7 +166,7 @@ base: components: sources: socket: configuration: {
 	}
 	max_length: {
 		description: """
-			The maximum buffer size, in bytes, of incoming messages.
+			The maximum buffer size of incoming messages.
 
 			Messages larger than this are truncated.
 
@@ -211,7 +211,7 @@ base: components: sources: socket: configuration: {
 	}
 	receive_buffer_bytes: {
 		description: """
-			The size, in bytes, of the receive buffer used for each connection.
+			The size of the receive buffer used for each connection.
 
 			Generally this should not need to be configured.
 			"""
@@ -220,7 +220,7 @@ base: components: sources: socket: configuration: {
 		type: uint: unit: "bytes"
 	}
 	shutdown_timeout_secs: {
-		description:   "The timeout, in seconds, before a connection is forcefully closed during shutdown."
+		description:   "The timeout before a connection is forcefully closed during shutdown."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: uint: {

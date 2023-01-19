@@ -67,7 +67,7 @@ pub struct UdpConfig {
     #[configurable(derived)]
     address: SocketListenAddr,
 
-    /// The size, in bytes, of the receive buffer used for each connection.
+    /// The size of the receive buffer used for each connection.
     ///
     /// Generally this should not need to be configured.
     receive_buffer_bytes: Option<usize>,
@@ -102,7 +102,7 @@ pub struct TcpConfig {
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     shutdown_timeout_secs: Duration,
 
-    /// The size, in bytes, of the receive buffer used for each connection.
+    /// The size of the receive buffer used for each connection.
     ///
     /// Generally this should not need to be configured.
     #[configurable(metadata(docs::type_unit = "bytes"))]

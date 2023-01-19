@@ -41,7 +41,7 @@ pub struct UnixConfig {
     #[configurable(metadata(docs::examples = 508))]
     pub socket_file_mode: Option<u32>,
 
-    /// The maximum buffer size, in bytes, of incoming messages.
+    /// The maximum buffer size of incoming messages.
     ///
     /// Messages larger than this are truncated.
     ///
