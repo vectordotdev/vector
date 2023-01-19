@@ -8,7 +8,7 @@ crate::cli_subcommands! {
     examples,
     mod fmt,
     mod markdown,
-    scripts,
+    mod scripts,
     version,
 }
 
@@ -37,11 +37,6 @@ crate::script_wrapper! {
 crate::script_wrapper! {
     examples = "Check that the config/example files are valid"
         => "check-examples.sh"
-}
-
-crate::script_wrapper! {
-    scripts = "Check that scripts do not have common mistakes"
-        => "check-scripts.sh"
 }
 
 crate::script_wrapper! {
