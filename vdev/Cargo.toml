@@ -13,7 +13,7 @@ atty = "0.2.14"
 cached = "0.42.0"
 clap = { version = "4.0.18", features = ["derive"] }
 clap-verbosity-flag = "2.0.0"
-clap_complete = "4.0.5"
+clap_complete = "4.1.0"
 confy = "0.5.1"
 directories = "4.0.1"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
