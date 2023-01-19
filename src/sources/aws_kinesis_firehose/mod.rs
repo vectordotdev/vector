@@ -28,7 +28,7 @@ mod models;
 #[configurable_component(source("aws_kinesis_firehose"))]
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     #[configurable(metadata(docs::examples = "0.0.0.0:443"))]
     #[configurable(metadata(docs::examples = "localhost:443"))]
     address: SocketAddr,

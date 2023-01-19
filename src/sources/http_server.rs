@@ -70,7 +70,7 @@ impl SourceConfig for HttpConfig {
 #[configurable_component(source("http_server"))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     address: SocketAddr,
 
     /// The expected encoding of received data.
