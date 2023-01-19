@@ -165,7 +165,9 @@ pub(super) fn udp(
             }
         }
 
-        let mut max_length = config.max_length.unwrap_or(default_max_length().unwrap());
+        let mut max_length = config
+            .max_length
+            .unwrap_or_else(|| default_max_length().unwrap());
 
         if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
             max_length = std::cmp::min(max_length, receive_buffer_bytes);

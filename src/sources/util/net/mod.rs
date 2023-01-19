@@ -100,12 +100,11 @@ impl TryFrom<String> for SocketListenAddr {
     type Error = SocketListenAddrParseError;
 
     fn try_from(input: String) -> Result<Self, Self::Error> {
-        println!("got input {}", input);
         // first attempt to parse the string into a SocketAddr directly
         match input.to_socket_addrs() {
             Ok(mut socket_addrs) => socket_addrs
                 .next()
-                .ok_or_else(|| Self::Error::SocketAddrParse)
+                .ok_or(Self::Error::SocketAddrParse)
                 .map(|s| s.into()),
             // then attempt to parse a systemd file descriptor
             Err(_) => {
@@ -115,7 +114,7 @@ impl TryFrom<String> for SocketListenAddr {
                         .parse::<usize>()
                         .map_err(|_| Self::Error::UsizeParse)?
                         .checked_sub(1)
-                        .ok_or_else(|| Self::Error::OneBased),
+                        .ok_or(Self::Error::OneBased),
                     // otherwise fail
                     _ => Err(Self::Error::UnableToParse),
                 }?;

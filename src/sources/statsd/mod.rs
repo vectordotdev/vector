@@ -47,6 +47,7 @@ use vector_core::config::LogNamespace;
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
+#[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum StatsdConfig {
     /// Listen on TCP.
     Tcp(#[configurable(derived)] TcpConfig),
