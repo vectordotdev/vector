@@ -1,32 +1,6 @@
 package metadata
 
 base: components: sinks: console: configuration: {
-	acknowledgements: {
-		description: """
-			Controls how acknowledgements are handled for this sink.
-
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
-
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
-			"""
-		required: false
-		type: object: options: enabled: {
-			description: """
-				Whether or not end-to-end acknowledgements are enabled.
-
-				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
-				before acknowledging them at the source.
-
-				Enabling or disabling acknowledgements at the sink level takes precedence over any global
-				[`acknowledgements`][global_acks] configuration.
-
-				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-				"""
-			required: false
-			type: bool: {}
-		}
-	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
 		required:    true
@@ -174,13 +148,13 @@ base: components: sinks: console: configuration: {
 		}
 	}
 	target: {
-		description: "Output target."
+		description: "The [standard stream](\\(urls.standard_streams)) to write to."
 		required:    false
 		type: string: {
 			default: "stdout"
 			enum: {
-				stderr: "Standard error."
-				stdout: "Standard output."
+				stderr: "Write output to [STDERR](\\(urls.stderr)."
+				stdout: "Write output to [STDOUT](\\(urls.stdout)."
 			}
 		}
 	}

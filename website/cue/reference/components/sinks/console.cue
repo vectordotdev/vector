@@ -18,12 +18,7 @@ components: sinks: console: {
 		send: {
 			compression: enabled: false
 			encoding: {
-				enabled: true
-				codec: {
-					enabled: true
-					framing: true
-					enum: ["json", "text"]
-				}
+				enabled: false
 			}
 			request: enabled: false
 			tls: enabled:     false
@@ -40,6 +35,7 @@ components: sinks: console: {
 		notices: []
 	}
 
+	configuration: base.components.sinks.console.configuration
 	configuration: {
 		target: {
 			common:      true
