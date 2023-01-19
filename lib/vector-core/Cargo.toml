@@ -71,7 +71,7 @@ vector-config-macros = { path = "../vector-config-macros" }
 vrl-lib = { package = "vrl", path = "../vrl/vrl" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.7.0"
+security-framework = "2.8.0"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.21"
