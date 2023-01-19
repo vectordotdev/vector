@@ -21,7 +21,7 @@ use super::{http_sink::build_http_sink, native::build_native_sink};
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
-    /// The endpoint of the Clickhouse server.
+    /// The endpoint of the ClickHouse server.
     #[serde(alias = "host")]
     #[configurable(metadata(docs::examples = "http://localhost:8123"))]
     pub endpoint: UriSerde,
@@ -37,7 +37,7 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub use_native_proto: bool,
 
-    /// Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema.
+    /// Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema.
     #[serde(default)]
     pub skip_unknown_fields: bool,
     /// SQL table column definition. For example: {"col1":"String", "col_2":"Nullable(UInt16)", ...}

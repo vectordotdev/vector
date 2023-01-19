@@ -159,7 +159,7 @@ base: components: sinks: clickhouse: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint of the Clickhouse server."
+		description: "The endpoint of the ClickHouse server."
 		required:    true
 		type: string: examples: ["http://localhost:8123", "tcp://localhost:9000"]
 	}
@@ -294,7 +294,7 @@ base: components: sinks: clickhouse: configuration: {
 		}
 	}
 	skip_unknown_fields: {
-		description: "Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema."
+		description: "Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema."
 		required:    false
 		type: bool: default: false
 	}
@@ -305,9 +305,9 @@ base: components: sinks: clickhouse: configuration: {
 	}
 	sql_table_col_def: {
 		description: """
-			The clickhouse table column definition.
+			The ClickHouse table column definition.
 			If `use_native_proto` is `true`, this field must be configured!
-			The key represents not only the column name of clickhouse table but also the key of the log.
+			The key represents not only the column name of ClickHouse table but also the key of the log.
 			The value currently only supports these types:
 			_type: UInt(8,16,32,64), Int(8,16,32,64), String, FixedString(Int), Float(32,64), Date, DateTime, IPv(4,6),
 			Array(_type), Nullable(_type), Map(String, _type).
@@ -328,7 +328,7 @@ base: components: sinks: clickhouse: configuration: {
 			options: {
 				"*": {
 					common:      false
-					description: "clickhouse table definition"
+					description: "ClickHouse table definition"
 					required:    false
 					type: string: {
 						default: null
