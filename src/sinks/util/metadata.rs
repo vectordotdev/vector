@@ -7,7 +7,7 @@ use vector_common::request_metadata::RequestMetadata;
 
 use super::request_builder::EncodeResult;
 
-#[derive(Default, Clone)]
+#[derive(Clone, Default)]
 pub struct RequestMetadataBuilder {
     event_count: usize,
     events_byte_size: usize,
@@ -38,9 +38,13 @@ impl RequestMetadataBuilder {
         }
     }
 
-    pub fn increment(&mut self, event_count: usize, events_byte_size: usize) {
-        self.event_count += event_count;
-        self.events_byte_size += events_byte_size;
+    pub fn track_event<E>(&mut self, event: E)
+    where
+        E: ByteSizeOf + EstimatedJsonEncodedSizeOf,
+    {
+        self.event_count += 1;
+        self.events_byte_size += event.size_of();
+        self.events_estimated_json_encoded_byte_size += event.estimated_json_encoded_size_of();
     }
 
     pub fn with_request_size(&self, size: NonZeroUsize) -> RequestMetadata {
