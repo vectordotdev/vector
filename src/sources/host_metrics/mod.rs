@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, time::Duration};
 
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
@@ -6,6 +6,7 @@ use glob::{Pattern, PatternError};
 #[cfg(not(windows))]
 use heim::units::ratio::ratio;
 use heim::units::time::second;
+use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_common::internal_event::{
@@ -32,33 +33,34 @@ mod memory;
 mod network;
 
 /// Collector types.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Collector {
-    /// CGroups.
+    /// Metrics related to Linux control groups.
     #[cfg(target_os = "linux")]
     CGroups,
 
-    /// CPU.
+    /// Metrics related to CPU utilization.
     Cpu,
 
-    /// Disk.
+    /// Metrics related to disk I/O utilization.
     Disk,
 
-    /// Filesystem.
+    /// Metrics related to filesystem space utilization.
     Filesystem,
 
-    /// Load average.
+    /// Metrics related to the system load average.
     Load,
 
-    /// Host.
+    /// Metrics related to the host.
     Host,
 
-    /// Memory.
+    /// Metrics related to memory utilization.
     Memory,
 
-    /// Network.
+    /// Metrics related to network utilization.
     Network,
 }
 
@@ -67,30 +69,35 @@ pub enum Collector {
 #[derive(Clone, Debug, Default)]
 pub(self) struct FilterList {
     /// Any patterns which should be included.
+    ///
+    /// The patterns are matched using globbing.
     includes: Option<Vec<PatternWrapper>>,
 
     /// Any patterns which should be excluded.
+    ///
+    /// The patterns are matched using globbing.
     excludes: Option<Vec<PatternWrapper>>,
 }
 
 /// Configuration for the `host_metrics` source.
+#[serde_as]
 #[configurable_component(source("host_metrics"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct HostMetricsConfig {
     /// The interval between metric gathering, in seconds.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_scrape_interval")]
-    pub scrape_interval_secs: f64,
+    pub scrape_interval_secs: Duration,
 
     /// The list of host metric collector services to use.
     ///
     /// Defaults to all collectors.
+    #[configurable(metadata(docs::examples = "example_collectors()"))]
     pub collectors: Option<Vec<Collector>>,
 
     /// Overrides the default namespace for the metrics emitted by the source.
-    ///
-    /// By default, `host` is used.
     #[derivative(Default(value = "default_namespace()"))]
     #[serde(default = "default_namespace")]
     pub namespace: Option<String>,
@@ -113,12 +120,39 @@ pub struct HostMetricsConfig {
     pub network: network::NetworkConfig,
 }
 
-const fn default_scrape_interval() -> f64 {
-    15.0
+const fn default_scrape_interval() -> Duration {
+    Duration::from_secs(15)
 }
 
-fn default_namespace() -> Option<String> {
+pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
+}
+
+const fn example_collectors() -> [&'static str; 8] {
+    [
+        "cgroups",
+        "cpu",
+        "disk",
+        "filesystem",
+        "load",
+        "host",
+        "memory",
+        "network",
+    ]
+}
+
+fn example_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["sda".try_into().unwrap()]),
+        excludes: Some(vec!["dm-*".try_into().unwrap()]),
+    }
+}
+
+fn default_all_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["*".try_into().unwrap()]),
+        excludes: None,
+    }
 }
 
 impl_generate_config_from_default!(HostMetricsConfig);
@@ -146,11 +180,11 @@ impl SourceConfig for HostMetricsConfig {
 impl HostMetricsConfig {
     /// Set the interval to collect internal metrics.
     pub fn scrape_interval_secs(&mut self, value: f64) {
-        self.scrape_interval_secs = value;
+        self.scrape_interval_secs = Duration::from_secs_f64(value);
     }
 
     async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
-        let duration = time::Duration::from_secs_f64(self.scrape_interval_secs);
+        let duration = self.scrape_interval_secs;
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
         let generator = HostMetrics::new(self);
@@ -476,6 +510,14 @@ impl TryFrom<String> for PatternWrapper {
     }
 }
 
+impl TryFrom<&str> for PatternWrapper {
+    type Error = PatternError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        value.to_string().try_into()
+    }
+}
+
 impl From<PatternWrapper> for String {
     fn from(pattern: PatternWrapper) -> Self {
         pattern.0.to_string()
@@ -768,7 +810,7 @@ pub(self) mod tests {
     #[tokio::test]
     async fn source_compliance() {
         let config = HostMetricsConfig {
-            scrape_interval_secs: 1.0,
+            scrape_interval_secs: Duration::from_secs(1),
             ..Default::default()
         };
 
