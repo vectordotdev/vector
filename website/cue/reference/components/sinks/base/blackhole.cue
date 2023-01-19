@@ -49,8 +49,11 @@ base: components: sinks: blackhole: configuration: {
 			By default, there is no limit.
 			"""
 		required: false
-		type: uint: examples: [
-			1000,
-		]
+		type: uint: {
+			examples: [
+				1000,
+			]
+			unit: "events per second"
+		}
 	}
 }
