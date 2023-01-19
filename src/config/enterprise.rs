@@ -546,8 +546,8 @@ fn setup_metrics_reporting(
         // While the default namespace for internal metrics is already "vector",
         // setting the namespace here is meant for clarity and resistance
         // against any future or accidental changes.
-        namespace: Some("vector".to_owned()),
-        scrape_interval_secs: datadog.reporting_interval_secs,
+        namespace: "vector".to_owned(),
+        scrape_interval_secs: Duration::from_secs_f64(datadog.reporting_interval_secs),
         ..Default::default()
     };
 
