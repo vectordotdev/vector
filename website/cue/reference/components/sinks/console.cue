@@ -13,7 +13,7 @@ components: sinks: console: {
 	}
 
 	features: {
-		auto_generated: true
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: false
 		send: {
@@ -42,7 +42,6 @@ components: sinks: console: {
 	}
 
 	configuration: base.components.sinks.console.configuration
-
 
 	input: {
 		logs: true
