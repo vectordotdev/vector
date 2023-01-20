@@ -712,10 +712,14 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
                     self.time = Time::Provided(time);
                 } else if let Some(t) = t.as_f64() {
-                    self.time = Time::Provided(Utc.timestamp(
-                        t.floor() as i64,
-                        (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
-                    ));
+                    self.time = Time::Provided(
+                        Utc.timestamp_opt(
+                            t.floor() as i64,
+                            (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
+                        )
+                        .single()
+                        .expect("invalid timestamp"),
+                    );
                 } else {
                     return Err(ApiError::InvalidDataFormat { event: self.events }.into());
                 }
@@ -870,9 +874,11 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
     }
 
     let ts = if t < SEC_CUTOFF {
-        Utc.timestamp(t, 0)
+        Utc.timestamp_opt(t, 0).single().expect("invalid timestamp")
     } else if t < MILLISEC_CUTOFF {
-        Utc.timestamp_millis(t)
+        Utc.timestamp_millis_opt(t)
+            .single()
+            .expect("invalid timestamp")
     } else {
         Utc.timestamp_nanos(t)
     };
@@ -2002,9 +2008,15 @@ mod tests {
     fn parse_timestamps() {
         let cases = vec![
             Utc::now(),
-            Utc.ymd(1971, 11, 7).and_hms(1, 1, 1),
-            Utc.ymd(2011, 8, 5).and_hms(1, 1, 1),
-            Utc.ymd(2189, 11, 4).and_hms(2, 2, 2),
+            Utc.ymd(1971, 11, 7)
+                .and_hms_opt(1, 1, 1)
+                .expect("invalid timestamp"),
+            Utc.ymd(2011, 8, 5)
+                .and_hms_opt(1, 1, 1)
+                .expect("invalid timestamp"),
+            Utc.ymd(2189, 11, 4)
+                .and_hms_opt(2, 2, 2)
+                .expect("invalid timestamp"),
         ];
 
         for case in cases {

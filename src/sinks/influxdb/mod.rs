@@ -851,7 +851,7 @@ mod tests {
             "http://localhost:9999",
             "api/v2/write",
             &[
-                ("org", Some("Orgazniation name".to_owned())),
+                ("org", Some("Organization name".to_owned())),
                 ("bucket", Some("Bucket=name".to_owned())),
                 ("none", None),
             ],
@@ -859,7 +859,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             uri,
-            "http://localhost:9999/api/v2/write?org=Orgazniation+name&bucket=Bucket%3Dname"
+            "http://localhost:9999/api/v2/write?org=Organization+name&bucket=Bucket%3Dname"
         );
     }
 

@@ -214,6 +214,7 @@ fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decod
 }
 
 /// Direction that the resource is operating in.
+#[derive(Clone)]
 pub enum ResourceDirection {
     /// Resource will have the component pull data from it, or pull data from the component.
     ///
@@ -246,6 +247,7 @@ pub enum ResourceDirection {
 /// definitions generally include the bare minimum amount of information to allow the component
 /// validation runner to create an instance of them, such as spawning an HTTP server if a source has
 /// specified an HTTP resource in the "pull" direction.
+#[derive(Clone)]
 pub enum ResourceDefinition {
     Http(HttpResourceConfig),
 }
@@ -270,6 +272,7 @@ impl From<HttpResourceConfig> for ResourceDefinition {
 /// the direction of the resource, such that a "pull" resource used with a source implies the source
 /// will pull data from the external resource, whereas a "pull" resource used with a sink implies
 /// the external resource must pull the data from the sink.
+#[derive(Clone)]
 pub struct ExternalResource {
     direction: ResourceDirection,
     definition: ResourceDefinition,

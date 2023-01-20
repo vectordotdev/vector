@@ -18,7 +18,7 @@ fn get_controller() -> &'static Controller {
     Controller::get().expect("Metrics system not initialized. Please report.")
 }
 
-/// Sums an iteratable of `&Metric`, by folding metric values. Convenience function typically
+/// Sums an iterable of `&Metric`, by folding metric values. Convenience function typically
 /// used to get aggregate metrics.
 pub fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option<Metric> {
     let mut iter = metrics.into_iter();
@@ -36,7 +36,7 @@ pub fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option
     ))
 }
 
-/// Sums an iteratable of `Metric`, by folding metric values. Convenience function typically
+/// Sums an iterable of `Metric`, by folding metric values. Convenience function typically
 /// used to get aggregate metrics.
 fn sum_metrics_owned<I: IntoIterator<Item = Metric>>(metrics: I) -> Option<Metric> {
     let mut iter = metrics.into_iter();

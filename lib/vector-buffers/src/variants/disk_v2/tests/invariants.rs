@@ -667,7 +667,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             drop(ledger);
 
             // Now, we need to load the data file we just left off on and modify it so that it
-            // appears corrupted and triggers the writer to skip it during initiailization, thus
+            // appears corrupted and triggers the writer to skip it during initialization, thus
             // pushing the writer to skip to next data file.  We do this by simply truncating it in
             // the middle of record, which _also_ has the effect that the data file is technically
             // not full anymore.

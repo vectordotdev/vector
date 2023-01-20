@@ -13,6 +13,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     http::Auth,
+    register_validatable_component,
     serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
@@ -173,43 +174,29 @@ impl SourceConfig for HttpClientConfig {
 }
 
 impl ValidatableComponent for HttpClientConfig {
-    fn component_name(&self) -> &'static str {
-        Self::NAME
-    }
+    fn validation_configuration() -> ValidationConfiguration {
+        let uri = Uri::from_static("http://127.0.0.1:9898/logs");
 
-    fn component_type(&self) -> ComponentType {
-        ComponentType::Source
-    }
-
-    fn component_configuration(&self) -> ComponentConfiguration {
-        ComponentConfiguration::Source(self.clone().into())
-    }
-
-    fn external_resource(&self) -> Option<ExternalResource> {
-        let uri = Uri::from_maybe_shared(self.endpoint.clone())
-            .expect("should not fail to build request URI");
-        let method = Some(self.method.into());
-        let decoding_config = self.get_decoding_config(None);
-
-        Some(ExternalResource::new(
-            ResourceDirection::Pull,
-            HttpResourceConfig::from_parts(uri, method),
-            decoding_config,
-        ))
-    }
-}
-
-impl HttpClientConfig {
-    #[cfg(test)]
-    pub fn validation() -> Self {
-        Self {
-            endpoint: "http://127.0.0.1:9898/logs".to_string(),
+        let config = Self {
+            endpoint: uri.to_string(),
             scrape_interval_secs: 1,
             decoding: DeserializerConfig::Json,
             ..Default::default()
-        }
-    }
+        };
 
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Pull,
+            HttpResourceConfig::from_parts(uri, Some(config.method.into())),
+            config.get_decoding_config(None),
+        );
+
+        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
+    }
+}
+
+register_validatable_component!(HttpClientConfig);
+
+impl HttpClientConfig {
     fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
         let decoding = self.decoding.clone();
         let framing = self.framing.clone();

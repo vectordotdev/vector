@@ -253,7 +253,7 @@ the features corresponding to these components in `Cargo.toml`.
 Sinks may implement a health check as a means for validating their configuration
 against the environment and external systems. Ideally, this allows the system to
 inform users of problems such as insufficient credentials, unreachable
-endpoints, non-existent tables, etc. They're not perfect, however, since it's
+endpoints, nonexistent tables, etc. They're not perfect, however, since it's
 impossible to exhaustively check for issues that may happen at runtime.
 
 When implementing health checks, we prefer false positives to false negatives.

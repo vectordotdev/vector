@@ -42,7 +42,6 @@ pub enum FieldMatchConfig {
             docs::examples = "field1",
             docs::examples = "parent.child_field"
         ))]
-        #[configurable(transparent)]
         Vec<String>,
     ),
 
@@ -55,7 +54,6 @@ pub enum FieldMatchConfig {
             docs::examples = "host",
             docs::examples = "hostname"
         ))]
-        #[configurable(transparent)]
         Vec<String>,
     ),
 }

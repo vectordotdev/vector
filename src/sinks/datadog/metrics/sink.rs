@@ -160,7 +160,7 @@ where
 }
 
 fn collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) -> Vec<Metric> {
-    // NOTE: Astute observers may recognize that this behavior could also be acheived by using
+    // NOTE: Astute observers may recognize that this behavior could also be achieved by using
     // `Vec::dedup_by`, but the clincher is that `dedup_by` requires a sorted vector to begin with.
     //
     // This function is designed to collapse duplicate counters even if the metrics are unsorted,
@@ -234,7 +234,7 @@ fn collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) -> Vec<Me
                     should_advance = false;
                 } else {
                     // We hit a counter that _doesn't_ match, but we can't just skip
-                    // it because we also need to evaulate it against all the
+                    // it because we also need to evaluate it against all the
                     // counters that come after it, so we only increment the index
                     // for this inner loop.
                     //

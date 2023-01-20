@@ -989,7 +989,7 @@ fn bson_size(value: &Bson) -> usize {
         Bson::Symbol(value) => value.size_of(),
         Bson::Decimal128(value) => value.bytes().size_of(),
         Bson::DbPointer(_) => {
-            // DbPointer parts are not public and cannot be evaludated
+            // DbPointer parts are not public and cannot be evaluated
             0
         }
         Bson::Null | Bson::Undefined | Bson::MaxKey | Bson::MinKey => 0,
@@ -1006,7 +1006,7 @@ fn document_size(doc: &Document) -> usize {
 /// URI components: https://docs.mongodb.com/manual/reference/connection-string/#components
 /// It's not possible to use [url::Url](https://docs.rs/url/2.1.1/url/struct.Url.html) because connection string can have multiple hosts.
 /// Would be nice to serialize [ClientOptions][https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html] to String, but it's not supported.
-/// `endpoint` argument would not be required, but field `original_uri` in `ClieotnOptions` is private.
+/// `endpoint` argument would not be required, but field `original_uri` in `ClientOptions` is private.
 /// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
 /// Based on ClientOptions::parse_uri -- https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708
 fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {

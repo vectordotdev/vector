@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # SUMMARY
 #
-#   Uploads target/artifacts to Github releases
+#   Uploads target/artifacts to GitHub releases
 
 VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 

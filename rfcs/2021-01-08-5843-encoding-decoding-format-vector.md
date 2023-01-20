@@ -9,7 +9,7 @@ There has been an ongoing discussion of what format Vector-to-Vector communicati
 
 ## Motivation
 
-The question posed by @binarylogic in #5843 is a good definition for the motivation of this change: "How do we transmit data from one Vector instance to another while being mindful of the public contract we create?" Clearly sending metrics from one Vector instance to another should preserve all metric data upon ingestion downstream but there are still concerns around exposing an undocumented format to users in the context of these operations. This discussion continues to come up and we really need a canonincal and definitive decision around what shape this takes so that when we expand our components our contract is explicitly codified.
+The question posed by @binarylogic in #5843 is a good definition for the motivation of this change: "How do we transmit data from one Vector instance to another while being mindful of the public contract we create?" Clearly sending metrics from one Vector instance to another should preserve all metric data upon ingestion downstream but there are still concerns around exposing an undocumented format to users in the context of these operations. This discussion continues to come up and we really need a canonical and definitive decision around what shape this takes so that when we expand our components our contract is explicitly codified.
 
 ## Internal Proposal
 
@@ -27,7 +27,7 @@ I'm fairly certain that this should not require a docs entry as it's largely int
 
 Unfortunately in most of my research I've pretty well come to the conclusion that encoding formats as a domain are rife with technical and political failures. That is to say, in some regard or another, every format from JSON to Bincode is going to force a tradeoff between correctness, performance, features or tooling and maintenance overhead. Inlined below here is a reasonable starting point on performance. It's taken from the [NoProto project](https://github.com/only-cliches/NoProto) since they're regularly updating their benchmarks. They've also done an excellent job of enumerating some of the aspects to consider when making a decision of this nature and their read on the space very much mirrors my own thinking in many ways.
 
-For the below data, Encodes and Decodes are ops/sec so higher is better while size before and after compression lower is better. This list is far from exhaustive and specifcially lacks a serde_json comparison which is unfortunate but other benches out there do include them (though obviously a different benchmark makes cross comparison difficult).
+For the below data, Encodes and Decodes are ops/sec so higher is better while size before and after compression lower is better. This list is far from exhaustive and specifically lacks a serde_json comparison which is unfortunate but other benches out there do include them (though obviously a different benchmark makes cross comparison difficult).
 
 | Library           | Encode | Decode All | Decode 1 | Update 1 | Size (bytes) | Size (Zlib) |
 | ----------------- | ------ | ---------- | -------- | -------- | ------------ | ----------- |
@@ -57,7 +57,7 @@ These four concerns don't fully enumerate the problem but I think they're a real
 
 It might not be totally clear from the serialization benchmark examples but while protobufs are inherently slow in some respects, they're _still_ more performant than raw JSON implementations and even MessagePack or CBOR. And their maintenance cost has already been paid since we're using them today. Any schema based data format is likely going to have better perf than something schemaless. The schema itself is obviously part of the tooling overhead here but I'd argue that if we cared _more_ about tooling overhead than we did about performance and sustainability we'd probably be writing this project in something other than Rust.
 
-With regards to the tansport and the suggested path of implementing gRPC we have to keep both perf and kubernetes issues in mind. [TCP causes us some problems in our K8s integration today](https://github.com/vectordotdev/vector/issues/2070) and unfortunately this problem has quite a bit more context to it than can sanely be shared in this RFC. Suffice to say that any choice we make here has repurcussions on our deployment architecture and ultimately gRPC with Protobufs provides us what we think are the right tradeoffs for our implementation.
+With regards to the transport and the suggested path of implementing gRPC we have to keep both perf and kubernetes issues in mind. [TCP causes us some problems in our K8s integration today](https://github.com/vectordotdev/vector/issues/2070) and unfortunately this problem has quite a bit more context to it than can sanely be shared in this RFC. Suffice to say that any choice we make here has repercussions on our deployment architecture and ultimately gRPC with Protobufs provides us what we think are the right tradeoffs for our implementation.
 
 This brings us to the question of _why_ gRPC instead of HTTP/2 or even HTTP/3 for that matter. There are benefits in HTTP/3 but not _really_ around throughput performance as much as reliability and behavior. HTTP/3 being based on UDP means that in the case of fetching multiple objects simultaneously in the case of a dropped packet only the single interrupted stream is blocked as opposed to all streams being blocked head of line. While this might be useful behavior, the cost of writing and maintaining something in HTTP/3 will (likely) initially be much higher. Available libraries in Rust are fairly low-level and don't provide much in the way of quality abstraction for consumers, which doesn't even cover the major glaring issue that Http/3 as a protocol hasn't fully proliferated or become ubiquitous and novelty at this stage of the project is probably not what we want. That alone makes me feel like it should be avoided initially.
 
@@ -244,7 +244,7 @@ As an intentionally buried lede - I wrote this in the hopes that folks would sha
 
 ## Prior Art
 
-Per the data format itself - I haven't found any single conglomerate conlusion about _any_ encoding format. However, existing projects using HTTP/2 and Protobufs (or gRPC over Tonic and Protobufs) are about a dime a dozen. These protocols and formats are used together in just about anything anymore.
+Per the data format itself - I haven't found any single conglomerate conclusion about _any_ encoding format. However, existing projects using HTTP/2 and Protobufs (or gRPC over Tonic and Protobufs) are about a dime a dozen. These protocols and formats are used together in just about anything anymore.
 
 ## Drawbacks
 

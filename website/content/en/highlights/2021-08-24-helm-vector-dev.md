@@ -14,7 +14,7 @@ badges:
 Vector's new home for helm charts is at https://helm.vector.dev!
 
 We made this change as part of migrating the helm charts from our old AWS S3 bucket hosting to
-Github Pages via [vectordotdev/helm-charts](https://github.com/vectordotdev/helm-charts). This new domain
+GitHub Pages via [vectordotdev/helm-charts](https://github.com/vectordotdev/helm-charts). This new domain
 will also allow us to swap hosting in the future without any user impact.
 
 Vector’s 0.16.x release will be the last version that publishes charts to both

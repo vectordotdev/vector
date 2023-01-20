@@ -116,9 +116,9 @@ export function VectorExecuteButton() {
 }
 ```
 
-### Javascript
+### JavaScript
 
-Example usage in vanilla Javascript
+Example usage in vanilla JavaScript
 
 ```javascript
 import init, { run_vrl } from "./vrl_web_playground.js";
