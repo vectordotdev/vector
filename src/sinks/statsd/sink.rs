@@ -6,6 +6,7 @@ use futures_util::{
     StreamExt,
 };
 use tower::Service;
+use vector_common::internal_event::Protocol;
 use vector_core::{
     event::Event,
     sink::StreamSink,
@@ -14,13 +15,15 @@ use vector_core::{
 
 use crate::sinks::util::SinkBuilderExt;
 
-use super::{normalizer::StatsdNormalizer, service::StatsdRequest};
+use super::{
+    normalizer::StatsdNormalizer, request_builder::StatsdRequestBuilder, service::StatsdRequest,
+};
 
 pub(crate) struct StatsdSink<S> {
     service: S,
     batch_settings: BatcherSettings,
     request_builder: StatsdRequestBuilder,
-    protocol: String,
+    protocol: Protocol,
 }
 
 impl<S> StatsdSink<S>
@@ -35,7 +38,7 @@ where
         service: S,
         batch_settings: BatcherSettings,
         request_builder: StatsdRequestBuilder,
-        protocol: String,
+        protocol: Protocol,
     ) -> Self {
         Self {
             service,
@@ -60,7 +63,7 @@ where
             //
             // We do this as for different socket modes, there are optimal request sizes to use to
             // ensure the highest rate of delivery, such as staying with the MTU for UDP, etc.
-            .incremental_request_builder(self.request_builder.clone())
+            .incremental_request_builder(self.request_builder)
             // This unrolls the vector of request results that our request builder generates.
             .flat_map(stream::iter)
             // Generating requests _can_ fail, so we log and filter out errors here.

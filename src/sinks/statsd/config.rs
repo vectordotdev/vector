@@ -1,6 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use async_trait::async_trait;
+use vector_common::internal_event::Protocol;
 use vector_config::{component::GenerateConfig, configurable_component};
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
@@ -9,14 +10,28 @@ use vector_core::{
 
 use crate::{
     config::{SinkConfig, SinkContext},
+    internal_events::SocketMode,
     sinks::{
         util::{
-            tcp::TcpSinkConfig, udp::UdpSinkConfig, unix::UnixSinkConfig, BatchConfig,
-            SinkBatchSettings,
+            service::udp::{UdpConnector, UdpConnectorConfig},
+            tcp::TcpSinkConfig,
+            unix::UnixSinkConfig,
+            BatchConfig, SinkBatchSettings,
         },
         Healthcheck,
     },
 };
+
+use super::{request_builder::StatsdRequestBuilder, sink::StatsdSink};
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StatsdDefaultBatchSettings;
+
+impl SinkBatchSettings for StatsdDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1000);
+    const MAX_BYTES: Option<usize> = Some(1300);
+    const TIMEOUT_SECS: f64 = 1.0;
+}
 
 /// Configuration for the `statsd` sink.
 #[configurable_component(sink("statsd"))]
@@ -31,6 +46,10 @@ pub struct StatsdSinkConfig {
 
     #[serde(flatten)]
     pub mode: Mode,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch: BatchConfig<StatsdDefaultBatchSettings>,
 
     #[configurable(derived)]
     #[serde(
@@ -51,32 +70,11 @@ pub enum Mode {
     Tcp(TcpSinkConfig),
 
     /// Send over UDP.
-    Udp(StatsdUdpConfig),
+    Udp(UdpConnectorConfig),
 
     /// Send over a Unix domain socket (UDS).
     #[cfg(unix)]
     Unix(UnixSinkConfig),
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct StatsdDefaultBatchSettings;
-
-impl SinkBatchSettings for StatsdDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = Some(1000);
-    const MAX_BYTES: Option<usize> = Some(1300);
-    const TIMEOUT_SECS: f64 = 1.0;
-}
-
-/// UDP configuration.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct StatsdUdpConfig {
-    #[serde(flatten)]
-    pub udp: UdpSinkConfig,
-
-    #[configurable(derived)]
-    #[serde(default)]
-    pub batch: BatchConfig<StatsdDefaultBatchSettings>,
 }
 
 fn default_address() -> SocketAddr {
@@ -85,12 +83,15 @@ fn default_address() -> SocketAddr {
 
 impl GenerateConfig for StatsdSinkConfig {
     fn generate_config() -> toml::Value {
+        let address = default_address();
+
         toml::Value::try_from(&Self {
             default_namespace: None,
-            mode: Mode::Udp(StatsdUdpConfig {
-                batch: Default::default(),
-                udp: UdpSinkConfig::from_address(default_address().to_string()),
-            }),
+            mode: Mode::Udp(UdpConnectorConfig::from_address(
+                address.ip().to_string(),
+                address.port(),
+            )),
+            batch: Default::default(),
             acknowledgements: Default::default(),
         })
         .unwrap()
@@ -100,21 +101,27 @@ impl GenerateConfig for StatsdSinkConfig {
 #[async_trait]
 impl SinkConfig for StatsdSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batcher_settings = self.batch_settings.into_batcher_settings()?;
-        let request_builder = StatsdRequestBuilder::new(self.default_namespace.clone())?;
+        let batcher_settings = self.batch.into_batcher_settings()?;
 
-        let (service, protocol) = match &self.mode {
+        let (service, healthcheck, socket_mode) = match &self.mode {
             Mode::Tcp(config) => config.build(Default::default(), encoder),
             Mode::Udp(config) => {
-                let (service, healthcheck) = config.udp.build_service()?;
+                let connector = UdpConnector::from(config.clone());
+                let service = connector.service();
+                let healthcheck = connector.healthcheck();
+
+                (service, healthcheck, SocketMode::Udp)
             }
             #[cfg(unix)]
             Mode::Unix(config) => config.build(Default::default(), encoder),
         };
 
-        let sink = StatsdSink::new(service, request_builder, batcher_settings, protocol);
+        let request_builder =
+            StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode)?;
+        let protocol = Protocol::from(socket_mode.as_str());
+        let sink = StatsdSink::new(service, batcher_settings, request_builder, protocol);
 
-        Ok(VectorSink::from_event_streamsink(sink))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input(&self) -> Input {
@@ -123,5 +130,15 @@ impl SinkConfig for StatsdSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::StatsdSinkConfig;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StatsdSinkConfig>();
     }
 }

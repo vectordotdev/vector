@@ -179,17 +179,16 @@ fn collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) -> Vec<Me
     let mut idx = 0;
     let now_ts = Utc::now().timestamp();
 
-    // For each metric, see if it's a counter. If so, we check the rest of the metrics
-    // _after_ it to see if they share the same series _and_ timestamp, when converted
-    // to a Unix timestamp. If they match, we take that counter's value and merge it
-    // with our "current" counter metric, and then drop the secondary one from the
-    // vector.
+    // For each metric, see if it's a counter. If so, we check the rest of the metrics _after_ it to
+    // see if they share the same series _and_ timestamp, when converted to a Unix timestamp. If
+    // they match, we take that counter's value and merge it with our "current" counter metric, and
+    // then drop the secondary one from the vector.
     //
     // For any non-counter, we simply ignore it and leave it as-is.
     while idx < metrics.len() {
-        let curr_idx = idx;
-        let counter_ts = match metrics[curr_idx].value() {
-            MetricValue::Counter { .. } => metrics[curr_idx]
+        let outer_idx = idx;
+        let outer_counter_ts = match metrics[outer_idx].value() {
+            MetricValue::Counter { .. } => metrics[outer_idx]
                 .data()
                 .timestamp()
                 .map(|dt| dt.timestamp())
@@ -204,54 +203,65 @@ fn collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) -> Vec<Me
         let mut accumulated_value = 0.0;
         let mut accumulated_finalizers = EventFinalizers::default();
 
-        // Now go through each metric _after_ the current one to see if it matches the
-        // current metric: is a counter, with the same name and timestamp. If it is, we
-        // accumulate its value and then remove it.
+        // Now go through each metric _after_ the current one to see if it matches the current
+        // metric: is a counter, with the same name and timestamp. If it is, we accumulate its value
+        // and then remove it.
         //
         // Otherwise, we skip it.
-        let mut is_disjoint = false;
+        let mut should_advance_outer = true;
         let mut had_match = false;
-        let mut inner_idx = curr_idx + 1;
+        let mut inner_idx = outer_idx + 1;
         while inner_idx < metrics.len() {
-            let mut should_advance = true;
+            let mut should_advance_inner = true;
             if let MetricValue::Counter { value } = metrics[inner_idx].value() {
-                let other_counter_ts = metrics[inner_idx]
-                    .data()
-                    .timestamp()
-                    .map(|dt| dt.timestamp())
-                    .unwrap_or(now_ts);
-                if metrics[curr_idx].series() == metrics[inner_idx].series()
-                    && counter_ts == other_counter_ts
-                {
+                let counters_match = {
+                    let outer_counter_series = metrics[outer_idx].series();
+                    let inner_counter_series = metrics[inner_idx].series();
+                    let inner_counter_ts = metrics[inner_idx]
+                        .data()
+                        .timestamp()
+                        .map(|dt| dt.timestamp())
+                        .unwrap_or(now_ts);
+
+                    outer_counter_series == inner_counter_series
+                        && outer_counter_ts == inner_counter_ts
+                };
+
+                if counters_match {
                     had_match = true;
 
-                    // Collapse this counter by accumulating its value, and its
-                    // finalizers, and removing it from the original vector of metrics.
+                    // Collapse this counter by accumulating its value, and its finalizers, and
+                    // removing it from the original vector of metrics.
                     accumulated_value += *value;
 
                     let mut old_metric = metrics.swap_remove(inner_idx);
                     accumulated_finalizers.merge(old_metric.metadata_mut().take_finalizers());
-                    should_advance = false;
+
+                    // We don't advance the inner loop index because since we just moved a
+                    // yet-unseen metric into the slot of the metric we just collapsed, advancing
+                    // past the current inner index would cause the inner loop to never evaluate the
+                    // moved metric.
+                    should_advance_inner = false;
                 } else {
-                    // We hit a counter that _doesn't_ match, but we can't just skip
-                    // it because we also need to evaluate it against all the
-                    // counters that come after it, so we only increment the index
-                    // for this inner loop.
-                    //
-                    // As well, we mark ourselves to stop incrementing the outer
-                    // index if we find more counters to accumulate, because we've
-                    // hit a disjoint counter here. While we may be continuing to
-                    // shrink the count of remaining metrics from accumulating,
-                    // we have to ensure this counter we just visited is visited by
-                    // the outer loop.
-                    is_disjoint = true;
+                    // We hit a counter that _doesn't_ match, but since we need to ensure we
+                    // evaluate all counters, we stop ourselves from advancing the outer loop index
+                    // for the remainder of the inner loop.
+                    should_advance_outer = false;
                 }
             }
 
-            if should_advance {
+            // If we didn't consume/accumulate a counter in this iteration, we advance our inner
+            // loop index.  Likewise, we can only advance the outer loop index if we advanced the
+            // inner loop index because we don't want the outer loop to skip any metrics that we
+            // moved when accumulating.
+            if should_advance_inner {
                 inner_idx += 1;
 
-                if !is_disjoint {
+                if should_advance_outer {
+                    // We advance `idx`, which is where `outer_idx` is derived from, rather than
+                    // `outer_idx` directly, since we need `outer_idx` to be stable so that the
+                    // logic below has a stable index to get the mutable reference to the outer
+                    // counter.
                     idx += 1;
                 }
             }
@@ -259,7 +269,9 @@ fn collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) -> Vec<Me
 
         // If we had matches during the accumulator phase, update our original counter.
         if had_match {
-            let metric = metrics.get_mut(curr_idx).expect("current index must exist");
+            let metric = metrics
+                .get_mut(outer_idx)
+                .expect("current index must exist");
             match metric.value_mut() {
                 MetricValue::Counter { value } => {
                     *value += accumulated_value;
@@ -368,6 +380,30 @@ mod tests {
 
         let expected_counter_value = input.len() as f64 * counter_value;
         let expected = vec![create_counter("basic", expected_counter_value)];
+        let actual = collapse_counters_by_series_and_timestamp(input);
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn collapse_identical_metrics_counter_mixed() {
+        let counter_value = 42.0;
+        let input = vec![
+            create_counter("basic1", counter_value),
+            create_counter("basic2", counter_value),
+            create_counter("basic3", counter_value),
+            create_counter("basic1", counter_value),
+            create_counter("basic4", counter_value),
+            create_counter("basic3", counter_value),
+            create_counter("basic1", counter_value),
+        ];
+
+        let expected = vec![
+            create_counter("basic1", counter_value * 3.0),
+            create_counter("basic2", counter_value),
+            create_counter("basic3", counter_value * 2.0),
+            create_counter("basic4", counter_value),
+        ];
         let actual = collapse_counters_by_series_and_timestamp(input);
 
         assert_eq!(expected, actual);

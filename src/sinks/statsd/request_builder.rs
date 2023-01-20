@@ -4,11 +4,13 @@ use tokio_util::codec::Encoder;
 use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::{EventFinalizers, Finalizable, Metric};
 
-use super::{
-    encoder::StatsdEncoder,
-    service::StatsdRequest,
+use super::{encoder::StatsdEncoder, service::StatsdRequest};
+use crate::{
+    internal_events::SocketMode,
+    sinks::util::{
+        metadata::RequestMetadataBuilder, request_builder::EncodeResult, IncrementalRequestBuilder,
+    },
 };
-use crate::{sinks::util::{metadata::RequestMetadataBuilder, IncrementalRequestBuilder, request_builder::EncodeResult}, internal_events::SocketMode};
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
@@ -21,7 +23,7 @@ impl RequestBuilderError {
     /// dropped as a result.
     pub const fn into_parts(self) -> (&'static str, &'static str, u64) {
         match self {
-            Self::FailedToBuild { reason } => ("Failed to build the request builder.", reason, 0)
+            Self::FailedToBuild { reason } => ("Failed to build the request builder.", reason, 0),
         }
     }
 }
@@ -52,16 +54,25 @@ impl StatsdRequestBuilder {
             SocketMode::Tcp | SocketMode::Unix => 8192,
         };
 
-        Ok(Self {
+        Ok(Self::from_encoder_and_max_size(encoder, request_max_size))
+    }
+
+    fn from_encoder_and_max_size(encoder: StatsdEncoder, request_max_size: usize) -> Self {
+        Self {
             encoder,
             request_max_size,
             encode_buf: BytesMut::with_capacity(8192),
-        })
+        }
     }
 }
 
-impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder
-{
+impl Clone for StatsdRequestBuilder {
+    fn clone(&self) -> Self {
+        Self::from_encoder_and_max_size(self.encoder.clone(), self.request_max_size)
+    }
+}
+
+impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
     type Metadata = (EventFinalizers, RequestMetadata);
     type Payload = Vec<u8>;
     type Request = StatsdRequest;
@@ -103,12 +114,16 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder
                 // it, as we need to be able to stick at least one encoded metric into each request.
                 if !was_encoded {
                     self.encode_buf.clear();
-                    let _ = self.encoder.encode(&metric, &mut self.encode_buf)
+                    let _ = self
+                        .encoder
+                        .encode(&metric, &mut self.encode_buf)
                         .expect("should not fail to encode metric REMOVE ME AFTER TESTING");
                 }
 
                 let request_buf_len = request_buf.len();
-                if request_buf_len != 0 && (request_buf_len + self.encode_buf.len() > self.request_max_size) {
+                if request_buf_len != 0
+                    && (request_buf_len + self.encode_buf.len() > self.request_max_size)
+                {
                     break;
                 }
 
@@ -125,7 +140,10 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder
                 let encode_result = EncodeResult::uncompressed(request_buf);
                 let request_metadata = request_metadata_builder.build(&encode_result);
 
-                results.push(Ok(((finalizers, request_metadata), encode_result.into_payload())));
+                results.push(Ok((
+                    (finalizers, request_metadata),
+                    encode_result.into_payload(),
+                )));
             }
         }
 

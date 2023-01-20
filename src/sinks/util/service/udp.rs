@@ -9,6 +9,8 @@ use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tower::Service;
 
+use vector_config::configurable_component;
+
 use crate::{
     dns,
     internal_events::{
@@ -21,7 +23,7 @@ use crate::{
 #[derive(Debug, Snafu)]
 pub enum UdpError {
     #[snafu(display("Address was invalid: {}", reason))]
-    InvalidAddress { reason: &'static str },
+    InvalidAddress { reason: String },
 
     #[snafu(display("Failed to bind UDP socket: {}.", source))]
     FailedToBind { source: std::io::Error },
@@ -42,52 +44,96 @@ pub enum UdpError {
     ServiceSocketChannelClosed,
 }
 
+/// Hostname and port tuple.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(try_from = "String", into = "String")]
+struct HostAndPort {
+    /// Hostname.
+    host: String,
+
+    /// Port.
+    port: u16,
+}
+
+impl TryFrom<String> for HostAndPort {
+    type Error = UdpError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let uri = value
+            .parse::<http::Uri>()
+            .map_err(|e| UdpError::InvalidAddress {
+                reason: e.to_string(),
+            })?;
+        let host = uri
+            .host()
+            .ok_or(UdpError::InvalidAddress {
+                reason: "missing host".to_string(),
+            })?
+            .to_string();
+        let port = uri.port_u16().ok_or(UdpError::InvalidAddress {
+            reason: "missing port".to_string(),
+        })?;
+
+        Ok(Self { host, port })
+    }
+}
+
+impl From<HostAndPort> for String {
+    fn from(value: HostAndPort) -> Self {
+        format!("{}:{}", value.host, value.port)
+    }
+}
+
+/// `UdpConnector` configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UdpConnectorConfig {
+    /// The address to connect to.
+    ///
+    /// The address _must_ include a port.
+    address: HostAndPort,
+
+    /// The size of the socket's send buffer, in bytes.
+    ///
+    /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
+    send_buffer_size: Option<usize>,
+}
+
+impl UdpConnectorConfig {
+    pub fn from_address(host: String, port: u16) -> Self {
+        Self {
+            address: HostAndPort { host, port },
+            send_buffer_size: None,
+        }
+    }
+}
+
+impl From<UdpConnectorConfig> for UdpConnector {
+    fn from(config: UdpConnectorConfig) -> Self {
+        Self {
+            address: config.address,
+            send_buffer_size: config.send_buffer_size,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct UdpConnector {
-    host: String,
-    port: u16,
+    address: HostAndPort,
     send_buffer_size: Option<usize>,
 }
 
 impl UdpConnector {
-    /// Creates a new `UdpConnector` configured to send to the given address.
-    ///
-    /// The `address` must be a valid URI containing both the host and port to send to.
-    pub fn new(address: String) -> crate::Result<Self> {
-        let uri = address.parse::<http::Uri>()?;
-        let host = uri
-            .host()
-            .ok_or(UdpError::InvalidAddress {
-                reason: "missing host",
-            })?
-            .to_string();
-        let port = uri.port_u16().ok_or(UdpError::InvalidAddress {
-            reason: "missing port",
-        })?;
-
-        Ok(Self {
-            host,
-            port,
-            send_buffer_size: None,
-        })
-    }
-
-    /// Sets the size of the socket send buffer, in bytes.
-    ///
-    /// This configures the `SO_SNDBUF` option on the socket.
-    pub fn set_send_buffer_size(&mut self, size: usize) {
-        self.send_buffer_size = Some(size);
-    }
-
     async fn connect(&self) -> Result<UdpSocket, UdpError> {
         let ip = dns::Resolver
-            .lookup_ip(self.host.clone())
+            .lookup_ip(self.address.host.clone())
             .await
             .context(FailedToResolveSnafu)?
             .next()
             .ok_or(UdpError::NoAddresses)?;
 
-        let addr = SocketAddr::new(ip, self.port);
+        let addr = SocketAddr::new(ip, self.address.port);
         let bind_address = find_bind_address(&addr);
 
         let socket = UdpSocket::bind(bind_address)

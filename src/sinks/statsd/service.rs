@@ -1,6 +1,5 @@
 use std::task::{Context, Poll};
 
-use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use tower::Service;
 use vector_common::{
@@ -42,15 +41,16 @@ pub struct StatsdResponse {
 
 impl DriverResponse for StatsdResponse {
     fn event_status(&self) -> EventStatus {
-        if self.error.is_none() {
-            EventStatus::Delivered
-        } else {
-            EventStatus::Errored
-        }
+        // If we generated a response, that implies our send concluded without any I/O errors, so we
+        // assume things were delivered.
+        EventStatus::Delivered
     }
 
     fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.metadata.event_count(), self.metadata.events_byte_size())
+        CountByteSize(
+            self.metadata.event_count(),
+            self.metadata.events_byte_size(),
+        )
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -69,9 +69,7 @@ impl<T> StatsdService<T> {
     /// The `transport` service is responsible for sending the actual encoded requests to the downstream
     /// endpoint.
     pub fn with_transport(transport: T) -> Self {
-        Self {
-            transport,
-        }
+        Self { transport }
     }
 }
 
@@ -79,26 +77,30 @@ impl<T> Service<StatsdRequest> for StatsdService<T>
 where
     T: Service<Vec<u8>>,
     T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    T::Future: Send + Sync,
 {
     type Response = StatsdResponse;
     type Error = Box<dyn std::error::Error + Send + Sync>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        self.transport.poll_ready(cx)
-            .map_err(Into::into)
+        self.transport.poll_ready(cx).map_err(Into::into)
     }
 
     fn call(&mut self, request: StatsdRequest) -> Self::Future {
-        let StatsdRequest { payload, finalizers, metadata } = request;
+        let StatsdRequest {
+            payload,
+            finalizers,
+            metadata,
+        } = request;
 
         let send_future = self.transport.call(payload);
 
         Box::pin(async move {
-            match send_future.await {
-                Ok(_) => Ok(StatsdResponse { metadata }),
-                Err(e) => e.into(),
-            }
+            send_future
+                .await
+                .map(|_| StatsdResponse { metadata })
+                .map_err(Into::into)
         })
     }
 }
