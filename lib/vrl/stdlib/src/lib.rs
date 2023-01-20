@@ -56,6 +56,8 @@ mod decode_base64;
 mod decode_mime_q;
 #[cfg(feature = "decode_percent")]
 mod decode_percent;
+#[cfg(feature = "decode_zstd")]
+mod decode_zstd;
 #[cfg(feature = "decrypt")]
 mod decrypt;
 #[cfg(feature = "del")]
@@ -74,6 +76,8 @@ mod encode_key_value;
 mod encode_logfmt;
 #[cfg(feature = "encode_percent")]
 mod encode_percent;
+#[cfg(feature = "encode_zstd")]
+mod encode_zstd;
 #[cfg(feature = "encrypt")]
 mod encrypt;
 #[cfg(feature = "ends_with")]
@@ -353,6 +357,8 @@ pub use decode_base64::DecodeBase64;
 pub use decode_mime_q::DecodeMimeQ;
 #[cfg(feature = "decode_percent")]
 pub use decode_percent::DecodePercent;
+#[cfg(feature = "decode_zstd")]
+pub use decode_zstd::DecodeZstd;
 #[cfg(feature = "decrypt")]
 pub use decrypt::Decrypt;
 #[cfg(feature = "del")]
@@ -371,6 +377,8 @@ pub use encode_key_value::EncodeKeyValue;
 pub use encode_logfmt::EncodeLogfmt;
 #[cfg(feature = "encode_percent")]
 pub use encode_percent::EncodePercent;
+#[cfg(feature = "encode_zstd")]
+pub use encode_zstd::EncodeZstd;
 #[cfg(feature = "encrypt")]
 pub use encrypt::Encrypt;
 #[cfg(feature = "ends_with")]
@@ -650,6 +658,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(DecodePercent),
         #[cfg(feature = "decode_mime_q")]
         Box::new(DecodeMimeQ),
+        #[cfg(feature = "decode_zstd")]
+        Box::new(DecodeZstd),
         #[cfg(feature = "decrypt")]
         Box::new(Decrypt),
         #[cfg(feature = "del")]
@@ -668,6 +678,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeLogfmt),
         #[cfg(feature = "encode_percent")]
         Box::new(EncodePercent),
+        #[cfg(feature = "encode_zstd")]
+        Box::new(EncodeZstd),
         #[cfg(feature = "encrypt")]
         Box::new(Encrypt),
         #[cfg(feature = "ends_with")]
