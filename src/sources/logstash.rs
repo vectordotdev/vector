@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::time::Duration;
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -39,8 +39,9 @@ use crate::{
 #[configurable_component(source("logstash"))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
-    #[configurable(derived)]
-    address: SocketListenAddr,
+    /// The socket address to listen for connections on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:5044"))]
+    address: SocketAddr,
 
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
@@ -113,7 +114,7 @@ impl LogstashConfig {
 impl Default for LogstashConfig {
     fn default() -> Self {
         Self {
-            address: SocketListenAddr::SocketAddr("0.0.0.0:5044".parse().unwrap()),
+            address: SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 5044),
             keepalive: None,
             tls: None,
             receive_buffer_bytes: None,
@@ -148,8 +149,10 @@ impl SourceConfig for LogstashConfig {
             .and_then(|k| k.path);
 
         let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+        let address = SocketListenAddr::SocketAddr(self.address);
+
         source.run(
-            self.address,
+            address,
             self.keepalive,
             shutdown_secs,
             tls,
@@ -172,7 +175,7 @@ impl SourceConfig for LogstashConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![self.address.as_tcp_resource()]
+        vec![Resource::tcp(self.address)]
     }
 
     fn can_acknowledge(&self) -> bool {

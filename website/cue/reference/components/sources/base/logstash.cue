@@ -20,14 +20,9 @@ base: components: sources: logstash: configuration: {
 		}
 	}
 	address: {
-		description: """
-			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
-			systemd socket activation.
-
-			If a socket address is used, it _must_ include a port.
-			"""
-		required: true
-		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
+		description: "The socket address to listen for connections on."
+		required:    true
+		type: string: examples: ["0.0.0.0:5044"]
 	}
 	connection_limit: {
 		description: "The maximum number of TCP connections that will be allowed at any given time."
