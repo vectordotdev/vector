@@ -106,7 +106,7 @@ pub struct HostMetricsConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub cgroups: CGroupsConfig,
+    pub cgroups: Option<CGroupsConfig>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -208,6 +208,12 @@ impl SourceConfig for HostMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         init_roots();
 
+        // if !cfg!(unix) {
+        //     if self.cgroups.is_some() {
+        //         return Err("cgroups collector is only available on Unix systems".into());
+        //     }
+        // };
+
         let mut config = self.clone();
         config.namespace = config.namespace.filter(|namespace| !namespace.is_empty());
 
@@ -276,7 +282,8 @@ impl HostMetrics {
 
     #[cfg(target_os = "linux")]
     pub fn new(config: HostMetricsConfig) -> Self {
-        let root_cgroup = cgroups::CGroupRoot::new(&config.cgroups);
+        let cgroups = config.cgroups.clone().unwrap_or_default();
+        let root_cgroup = cgroups::CGroupRoot::new(&cgroups);
         Self {
             config,
             root_cgroup,

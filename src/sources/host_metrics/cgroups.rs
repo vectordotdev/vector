@@ -63,17 +63,19 @@ struct CGroupRecurser<'a> {
     buffer: String,
     load_cpu: bool,
     load_memory: bool,
-    config: &'a CGroupsConfig,
+    config: CGroupsConfig,
 }
 
 impl<'a> CGroupRecurser<'a> {
     fn new(host: &'a HostMetrics, output: &'a mut MetricsBuffer) -> Self {
+        let cgroups = host.config.cgroups.clone().unwrap_or_default();
+
         Self {
             output,
             buffer: String::new(),
             load_cpu: true,
             load_memory: true,
-            config: &host.config.cgroups,
+            config: cgroups,
         }
     }
 
@@ -119,7 +121,7 @@ impl<'a> CGroupRecurser<'a> {
             }
 
             if level < self.config.levels {
-                let groups = &self.config.groups;
+                let groups = self.config.groups.clone();
                 if let Some(children) =
                     filter_result_sync(cgroup.children().await, "Failed to load cgroups children.")
                 {
