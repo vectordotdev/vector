@@ -5,7 +5,9 @@ base: components: sources: datadog_agent: configuration: {
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -78,17 +80,17 @@ base: components: sources: datadog_agent: configuration: {
 		}
 	}
 	disable_logs: {
-		description: "If this setting is set to `true`, logs won't be accepted by the component."
+		description: "If this is set to `true`, logs won't be accepted by the component."
 		required:    false
 		type: bool: default: false
 	}
 	disable_metrics: {
-		description: "If this setting is set to `true`, metrics won't be accepted by the component."
+		description: "If this is set to `true`, metrics won't be accepted by the component."
 		required:    false
 		type: bool: default: false
 	}
 	disable_traces: {
-		description: "If this setting is set to `true`, traces won't be accepted by the component."
+		description: "If this is set to `true`, traces won't be accepted by the component."
 		required:    false
 		type: bool: default: false
 	}
@@ -169,17 +171,18 @@ base: components: sources: datadog_agent: configuration: {
 	}
 	multiple_outputs: {
 		description: """
-			If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
+			If this is set to `true` logs, metrics and traces will be sent to different outputs.
 
-			For a source component named `agent`, the received logs, metrics, and traces can then be accessed by specifying
-			`agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the inputs to other components.
+			For a source component named `agent`, the received logs, metrics, and traces can then be
+			configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
+			`agent.traces`, respectively.
 			"""
 		required: false
 		type: bool: default: false
 	}
 	store_api_key: {
 		description: """
-			When incoming events contain a Datadog API key, if this setting is set to `true` the key will be
+			If this is set to `true`, when incoming events contain a Datadog API key, it will be
 			stored in the event metadata and will be used if the event is sent to a Datadog sink.
 			"""
 		required: false

@@ -67,27 +67,28 @@ pub struct DatadogAgentConfig {
     #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
 
-    /// When incoming events contain a Datadog API key, if this setting is set to `true` the key will be
+    /// If this is set to `true`, when incoming events contain a Datadog API key, it will be
     /// stored in the event metadata and will be used if the event is sent to a Datadog sink.
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 
-    /// If this setting is set to `true`, logs won't be accepted by the component.
+    /// If this is set to `true`, logs won't be accepted by the component.
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
 
-    /// If this setting is set to `true`, metrics won't be accepted by the component.
+    /// If this is set to `true`, metrics won't be accepted by the component.
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
 
-    /// If this setting is set to `true`, traces won't be accepted by the component.
+    /// If this is set to `true`, traces won't be accepted by the component.
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
 
-    /// If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
+    /// If this is set to `true` logs, metrics and traces will be sent to different outputs.
     ///
-    /// For a source component named `agent`, the received logs, metrics, and traces can then be accessed by specifying
-    /// `agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the inputs to other components.
+    /// For a source component named `agent`, the received logs, metrics, and traces can then be
+    /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
+    /// `agent.traces`, respectively.
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 

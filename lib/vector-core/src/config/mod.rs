@@ -153,7 +153,8 @@ impl Output {
 #[configurable_component]
 #[configurable(title = "Controls how acknowledgements are handled by this source.")]
 #[configurable(
-    description = "This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. \
+    description = "This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
 Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
@@ -161,6 +162,7 @@ See [End-to-end Acknowledgements][e2e_acks] for more information on how event ac
 [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 [e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/"
 )]
+#[configurable(deprecated)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SourceAcknowledgementsConfig {
     /// Whether or not end-to-end acknowledgements are enabled for this source.
