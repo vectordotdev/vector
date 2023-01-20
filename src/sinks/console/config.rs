@@ -44,7 +44,6 @@ pub struct ConsoleSinkConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    #[configurable(metadata(docs::hidden))]
     pub acknowledgements: AcknowledgementsConfig,
 }
 

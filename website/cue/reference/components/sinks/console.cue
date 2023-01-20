@@ -13,6 +13,7 @@ components: sinks: console: {
 	}
 
 	features: {
+		auto_generated: true
 		acknowledgements: true
 		healthcheck: enabled: false
 		send: {
@@ -36,20 +37,6 @@ components: sinks: console: {
 	}
 
 	configuration: base.components.sinks.console.configuration
-	configuration: {
-		target: {
-			common:      true
-			description: "The [standard stream](\(urls.standard_streams)) to write to."
-			required:    false
-			type: string: {
-				default: "stdout"
-				enum: {
-					stdout: "Output will be written to [STDOUT](\(urls.stdout))"
-					stderr: "Output will be written to [STDERR](\(urls.stderr))"
-				}
-			}
-		}
-	}
 
 	input: {
 		logs: true
