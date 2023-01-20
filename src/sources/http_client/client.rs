@@ -53,10 +53,15 @@ pub struct HttpClientConfig {
 
     /// Custom parameters for the HTTP request query string.
     ///
-    /// One or more values for the same parameter key can be provided. The parameters provided in this option are
-    /// appended to any parameters manually provided in the `endpoint` option.
+    /// One or more values for the same parameter key can be provided.
+    ///
+    /// The parameters provided in this option are appended to any parameters
+    /// manually provided in the `endpoint` option.
     #[serde(default)]
-    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "A query string parameter and it's value(s)."
+    ))]
+    #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: HashMap<String, Vec<String>>,
 
     /// Decoder to use on the HTTP responses.
@@ -73,10 +78,13 @@ pub struct HttpClientConfig {
     ///
     /// One or more values for the same header can be provided.
     #[serde(default)]
-    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and it's value(s)."
+    ))]
+    #[configurable(metadata(docs::examples = "headers_examples()"))]
     pub headers: HashMap<String, Vec<String>>,
 
-    /// Specifies the action of the HTTP request.
+    /// Specifies the method of the HTTP request.
     #[serde(default = "default_http_method")]
     pub method: HttpMethod,
 
@@ -96,6 +104,40 @@ pub struct HttpClientConfig {
 
 const fn default_http_method() -> HttpMethod {
     HttpMethod::Get
+}
+
+fn query_examples() -> HashMap<String, Vec<String>> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("field".to_owned(), vec!["value".to_owned()]),
+            (
+                "fruit".to_owned(),
+                vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
+            ),
+        ]
+        .into_iter(),
+    )
+}
+
+fn headers_examples() -> HashMap<String, Vec<String>> {
+    HashMap::<_, _>::from_iter(
+        [
+            (
+                "Accept".to_owned(),
+                vec!["text/plain".to_owned(), "text/html".to_owned()],
+            ),
+            (
+                "X-My-Custom-Header".to_owned(),
+                vec![
+                    "a".to_owned(),
+                    "vector".to_owned(),
+                    "of".to_owned(),
+                    "values".to_owned(),
+                ],
+            ),
+        ]
+        .into_iter(),
+    )
 }
 
 impl Default for HttpClientConfig {
