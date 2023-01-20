@@ -6,11 +6,7 @@ use http::StatusCode;
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    http::Auth,
-    http::HttpClient,
-    sinks::util::UriSerde,
-};
+use crate::{http::Auth, http::HttpClient, sinks::util::UriSerde};
 
 use super::error::DatabendError;
 
@@ -105,6 +101,14 @@ impl DatabendAPIClient {
             endpoint,
             auth,
         }
+    }
+
+    pub fn get_protocol(&self) -> &str {
+        self.endpoint.uri.scheme_str().unwrap_or("http")
+    }
+
+    pub fn get_endpoint(&self) -> &str {
+        &self.endpoint.uri.host().unwrap_or("unknown")
     }
 
     fn get_page_url(&self, next_uri: &str) -> Result<String, DatabendError> {

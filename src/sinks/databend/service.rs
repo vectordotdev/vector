@@ -13,7 +13,7 @@ use vector_common::internal_event::CountByteSize;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::stream::DriverResponse;
 
-use crate::sinks::util::retries::RetryLogic;
+use crate::{internal_events::EndpointBytesSent, sinks::util::retries::RetryLogic};
 
 use super::{
     api::{DatabendAPIClient, DatabendHttpRequest, DatabendPresignedResponse},
@@ -192,16 +192,24 @@ impl Service<DatabendRequest> for DatabendService {
 
     fn call(&mut self, request: DatabendRequest) -> Self::Future {
         let service = self.clone();
-        let metadata = request.get_metadata();
 
         let future = async move {
+            let metadata = request.get_metadata();
             let stage_location = service.new_stage_location()?;
+            let protocol = service.client.get_protocol();
+            let endpoint = service.client.get_endpoint();
+            let byte_size = request.data.len();
             let presigned_resp = service.get_presigned_url(&stage_location).await?;
             service
                 .client
                 .upload_with_presigned(presigned_resp, request.data)
                 .await?;
             service.insert_with_stage(&stage_location).await?;
+            emit!(EndpointBytesSent {
+                byte_size,
+                protocol: protocol,
+                endpoint: endpoint
+            });
             Ok(DatabendResponse { metadata })
         };
         Box::pin(future)
