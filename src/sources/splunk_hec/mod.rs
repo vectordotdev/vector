@@ -59,7 +59,7 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// The address _must_ include a port.
     #[serde(default = "default_socket_address")]
