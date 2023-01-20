@@ -86,6 +86,7 @@ pub struct DatadogAgentConfig {
 
     /// If this is set to `true` logs, metrics and traces will be sent to different outputs.
     ///
+    ///
     /// For a source component named `agent`, the received logs, metrics, and traces can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
     /// `agent.traces`, respectively.
