@@ -40,6 +40,7 @@ use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentT
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
     /// The socket address to listen for connections on.
+    #[configurable(metadata(docs::examples = "0.0.0.0:24224"))]
     address: SocketAddr,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
@@ -69,7 +70,7 @@ pub struct FluentConfig {
 impl GenerateConfig for FluentConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            address: SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 2442),
+            address: SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 24224),
             keepalive: None,
             tls: None,
             receive_buffer_bytes: None,
