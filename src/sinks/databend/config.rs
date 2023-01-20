@@ -47,11 +47,8 @@ pub struct DatabendConfig {
     pub compression: Compression,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub transformer: Transformer,
+    #[serde(default)]
+    pub encoding: Transformer,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -114,7 +111,7 @@ impl SinkConfig for DatabendConfig {
             .service(service);
 
         let encoder = DatabendEventEncoder {
-            transformer: self.transformer.clone(),
+            transformer: self.encoding.clone(),
         };
 
         let sink = DatabendSink {

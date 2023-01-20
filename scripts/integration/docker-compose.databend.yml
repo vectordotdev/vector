@@ -3,11 +3,7 @@ version: "3"
 services:
   minio:
     image: docker.io/minio/minio
-    ports:
-      - "9000:9000"
     command: server /data
-    volumes:
-      - ${PWD}/tests/data/databend/data:/data
   createbuckets:
     image: docker.io/minio/mc
     depends_on:
@@ -16,13 +12,16 @@ services:
       /bin/sh -c "/usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin; /usr/bin/mc rm -r --force myminio/databend; /usr/bin/mc mb myminio/databend; exit 0;"
   databend:
     image: docker.io/datafuselabs/databend
+    environment:
+      - QUERY_DEFAULT_USER=vector
+      - QUERY_DEFAULT_PASSWORD=vector
+      - QUERY_STORAGE_TYPE=s3
+      - AWS_S3_ENDPOINT=http://minio:9000
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
     depends_on:
       - minio
       - createbuckets
-    ports:
-      - "8000:8000"
-    volumes:
-      - ${PWD}/tests/data/databend/query.toml:/databend-query.toml:ro
 
   runner:
     build:
@@ -43,6 +42,8 @@ services:
       - "::databend::"
     environment:
       - DATABEND_ENDPOINT=http://databend:8000
+      - DATABEND_USER=vector
+      - DATABEND_PASSWORD=vector
     depends_on:
       - databend
     volumes:

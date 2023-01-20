@@ -17,6 +17,14 @@ fn databend_endpoint() -> String {
     std::env::var("DATABEND_ENDPOINT").unwrap_or_else(|_| "http://localhost:8000".into())
 }
 
+fn databend_user() -> String {
+    std::env::var("DATABEND_USER").unwrap_or_else(|_| "vector".into())
+}
+
+fn databend_password() -> String {
+    std::env::var("DATABEND_PASSWORD").unwrap_or_else(|_| "vector".into())
+}
+
 fn gen_table() -> String {
     format!("test_{}", random_string(10).to_lowercase())
 }
@@ -35,8 +43,8 @@ async fn insert_events() {
     let table = gen_table();
     let endpoint: UriSerde = databend_endpoint().parse().unwrap();
     let auth = Some(Auth::Basic {
-        user: "vector".to_string(),
-        password: SensitiveString::from("".to_string()),
+        user: databend_user(),
+        password: SensitiveString::from(databend_password()),
     });
 
     let mut batch = BatchConfig::default();

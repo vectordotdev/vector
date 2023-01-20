@@ -15,8 +15,10 @@ use vector_core::stream::DriverResponse;
 
 use crate::sinks::util::retries::RetryLogic;
 
-use super::api::{DatabendAPIClient, DatabendHttpRequest, DatabendPresignedResponse};
-use super::error::DatabendError;
+use super::{
+    api::{DatabendAPIClient, DatabendHttpRequest, DatabendPresignedResponse},
+    error::DatabendError,
+};
 
 #[derive(Clone)]
 pub struct DatabendRetryLogic;

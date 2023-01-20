@@ -8,12 +8,12 @@ use vector_core::sink::StreamSink;
 use vector_core::stream::BatcherSettings;
 use vector_core::ByteSizeOf;
 
-use crate::sinks::util::metadata::RequestMetadataBuilder;
-use crate::sinks::util::service::Svc;
-use crate::sinks::util::SinkBuilderExt;
+use crate::sinks::util::{metadata::RequestMetadataBuilder, service::Svc, SinkBuilderExt};
 
-use super::event_encoder::DatabendEventEncoder;
-use super::service::{DatabendRequest, DatabendRetryLogic, DatabendService};
+use super::{
+    event_encoder::DatabendEventEncoder,
+    service::{DatabendRequest, DatabendRetryLogic, DatabendService},
+};
 
 /// Data for a single event.
 pub(crate) struct EventData {

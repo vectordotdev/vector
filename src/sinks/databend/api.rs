@@ -6,9 +6,11 @@ use http::StatusCode;
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 
-use crate::http::Auth;
-use crate::http::HttpClient;
-use crate::sinks::util::UriSerde;
+use crate::{
+    http::Auth,
+    http::HttpClient,
+    sinks::util::UriSerde,
+};
 
 use super::error::DatabendError;
 
