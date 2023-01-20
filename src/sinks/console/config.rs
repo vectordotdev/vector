@@ -12,17 +12,23 @@ use crate::{
     sinks::{console::sink::WriterSink, Healthcheck, VectorSink},
 };
 
-/// The [standard stream](\(urls.standard_streams)) to write to.
+/// The [standard stream][standard_streams] to write to.
+///
+/// [standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
-    /// Write output to [STDOUT](\(urls.stdout).
+    /// Write output to [STDOUT][stdout]
+    ///
+    /// [stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
     #[derivative(Default)]
     Stdout,
 
-    /// Write output to [STDERR](\(urls.stderr).
+    /// Write output to [STDERR][stderr]
+    ///
+    /// [stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
     Stderr,
 }
 

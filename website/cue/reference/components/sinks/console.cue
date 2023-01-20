@@ -38,6 +38,7 @@ components: sinks: console: {
 
 	configuration: base.components.sinks.console.configuration
 
+
 	input: {
 		logs: true
 		metrics: {
