@@ -68,6 +68,8 @@ mod downcase;
 mod encode_base16;
 #[cfg(feature = "encode_base64")]
 mod encode_base64;
+#[cfg(feature = "encode_gzip")]
+mod encode_gzip;
 #[cfg(feature = "encode_json")]
 mod encode_json;
 #[cfg(feature = "encode_key_value")]
@@ -367,6 +369,8 @@ pub use downcase::Downcase;
 pub use encode_base16::EncodeBase16;
 #[cfg(feature = "encode_base64")]
 pub use encode_base64::EncodeBase64;
+#[cfg(feature = "encode_gzip")]
+pub use encode_gzip::EncodeGzip;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
 #[cfg(feature = "encode_key_value")]
@@ -666,6 +670,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeBase16),
         #[cfg(feature = "encode_base64")]
         Box::new(EncodeBase64),
+        #[cfg(feature = "encode_gzip")]
+        Box::new(EncodeGzip),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
         #[cfg(feature = "encode_key_value")]
