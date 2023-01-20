@@ -20,7 +20,7 @@ base: components: sources: logstash: configuration: {
 		}
 	}
 	address: {
-		description: "The address to listen for connections on."
+		description: "The socket address to listen for connections on."
 		required:    true
 		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}

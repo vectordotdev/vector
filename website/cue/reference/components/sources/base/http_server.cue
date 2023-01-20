@@ -20,7 +20,7 @@ base: components: sources: http_server: configuration: {
 		}
 	}
 	address: {
-		description: "The address to listen for connections on."
+		description: "The socket address to listen for connections on."
 		required:    true
 		type: string: {}
 	}

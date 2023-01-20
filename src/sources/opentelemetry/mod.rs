@@ -69,7 +69,7 @@ pub struct OpentelemetryConfig {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct GrpcConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
     #[configurable(metadata(docs::examples = "0.0.0.0:4317", docs::examples = "localhost:4317"))]
@@ -93,7 +93,7 @@ fn example_grpc_config() -> GrpcConfig {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct HttpConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
     #[configurable(metadata(docs::examples = "0.0.0.0:4318", docs::examples = "localhost:4318"))]
