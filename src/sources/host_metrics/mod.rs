@@ -210,10 +210,13 @@ fn default_cgroups_config() -> Option<CGroupsConfig> {
 
     #[cfg(not(target_os = "linux"))]
     {
-        return None;
+        None
     }
 
-    Some(CGroupsConfig::default())
+    #[cfg(target_os = "linux")]
+    {
+        Some(CGroupsConfig::default())
+    }
 }
 
 impl_generate_config_from_default!(HostMetricsConfig);
