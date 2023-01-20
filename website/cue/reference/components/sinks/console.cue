@@ -19,7 +19,12 @@ components: sinks: console: {
 		send: {
 			compression: enabled: false
 			encoding: {
-				enabled: false
+				enabled: true
+				codec: {
+					enabled: true
+					framing: true
+					enum: ["json", "text"]
+				}
 			}
 			request: enabled: false
 			tls: enabled:     false
