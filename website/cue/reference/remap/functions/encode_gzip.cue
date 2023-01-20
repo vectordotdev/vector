@@ -28,10 +28,10 @@ remap: functions: encode_gzip: {
 		{
 			title: "Encode to Gzip"
 			source: #"""
-				encoded_text = encode_gzip("please encode me")
+				encoded_text = encode_gzip!("please encode me")
 				encode_base64(encoded_text)
 				"""#
-			return: "H4sIACblyWMAAyvISU0sTlVIzUvOT0lVyE3lAgClSiA4EQAAAA=="
+			return: "H4sIAAAAAAAA/yvISU0sTlVIzUvOT0lVyE0FAI4R4vcQAAAA"
 		},
 	]
 }

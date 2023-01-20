@@ -23,7 +23,7 @@ remap: functions: decode_gzip: {
 		{
 			title: "Decode Gzip data"
 			source: #"""
-				encoded_text = decode_base64!("H4sIAKviyWMAA6vML1XISCxLVSguTU5OLS5OK83JqVRISU3OT0lNUchN5QIAA01iGCEAAAA=")
+				encoded_text = decode_base64!("H4sIAHEAymMAA6vML1XISCxLVSguTU5OLS5OK83JqVRISU3OT0lNUchNBQD7BGDaIAAAAA==")
 				decode_gzip!(encoded_text)
 				"""#
 			return: "you have successfully decoded me"

@@ -32,7 +32,7 @@ impl Function for EncodeGzip {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "demo string",
-            source: r#"encode_base64(encode_gzip("encode_me"))"#,
+            source: r#"encode_base64(encode_gzip!("encode_me"))"#,
             result: Ok("H4sIAAAAAAAA/0vNS85PSY3PTQUAN7ZBnAkAAAA="),
         }]
     }
