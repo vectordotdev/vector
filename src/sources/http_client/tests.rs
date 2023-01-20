@@ -48,7 +48,7 @@ async fn bytes_decoding() {
 
     run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
-        interval: INTERVAL_SECS,
+        interval: INTERVAL,
         query: HashMap::new(),
         decoding: default_decoding(),
         framing: default_framing_message_based(),
