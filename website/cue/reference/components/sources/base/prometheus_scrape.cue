@@ -102,10 +102,13 @@ base: components: sources: prometheus_scrape: configuration: {
 			type: array: items: type: string: {}
 		}
 	}
-	scrape_interval_secs: {
-		description: "The interval between scrapes, in seconds."
+	scrape_interval: {
+		description: "The interval between scrapes."
 		required:    false
-		type: uint: default: 15
+		type: uint: {
+			default: 15
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
