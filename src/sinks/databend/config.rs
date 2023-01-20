@@ -47,7 +47,10 @@ pub struct DatabendConfig {
     pub compression: Compression,
 
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub encoding: Transformer,
 
     #[configurable(derived)]
