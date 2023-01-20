@@ -226,11 +226,10 @@ impl SourceConfig for HostMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         init_roots();
 
-        // if !cfg!(unix) {
-        //     if self.cgroups.is_some() {
-        //         return Err("cgroups collector is only available on Unix systems".into());
-        //     }
-        // };
+        #[cfg(not(target_os = "linux"))]
+        if self.cgroups.is_some() {
+            return Err("cgroups collector is only available on Linux systems".into());
+        }
 
         let mut config = self.clone();
         config.namespace = config.namespace.filter(|namespace| !namespace.is_empty());
