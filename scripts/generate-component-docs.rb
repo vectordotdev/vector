@@ -9,9 +9,6 @@ rescue LoadError => e
   exit 1
 end
 
-# Enable CGroups in order to generate Linux-specific docs on all platforms.
-ENV['VECTOR_USE_CGROUPS'] = 'true'
-
 DEBUG_LEVEL = 1
 INFO_LEVEL = 2
 ERROR_LEVEL = 3
