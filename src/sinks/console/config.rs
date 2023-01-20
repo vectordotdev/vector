@@ -26,7 +26,7 @@ pub enum Target {
     #[derivative(Default)]
     Stdout,
 
-    /// Write output to [STDERR][stderr]
+    /// Write output to [STDERR][stderr].
     ///
     /// [stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
     Stderr,
