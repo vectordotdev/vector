@@ -207,8 +207,8 @@ impl Service<DatabendRequest> for DatabendService {
             service.insert_with_stage(&stage_location).await?;
             emit!(EndpointBytesSent {
                 byte_size,
-                protocol: protocol,
-                endpoint: endpoint
+                protocol,
+                endpoint,
             });
             Ok(DatabendResponse { metadata })
         };

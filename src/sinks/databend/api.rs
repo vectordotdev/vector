@@ -108,7 +108,7 @@ impl DatabendAPIClient {
     }
 
     pub fn get_endpoint(&self) -> &str {
-        &self.endpoint.uri.host().unwrap_or("unknown")
+        self.endpoint.uri.host().unwrap_or("unknown")
     }
 
     fn get_page_url(&self, next_uri: &str) -> Result<String, DatabendError> {
