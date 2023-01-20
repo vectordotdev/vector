@@ -151,6 +151,7 @@ impl Output {
 /// setting, as it is deprecated, and we still need to maintain a way to expose it in the
 /// documentation before it's removed while also making sure people know it shouldn't be used.
 #[configurable_component]
+#[configurable(deprecated)]
 #[configurable(title = "Controls how acknowledgements are handled by this source.")]
 #[configurable(
     description = "This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
@@ -162,7 +163,6 @@ See [End-to-end Acknowledgements][e2e_acks] for more information on how event ac
 [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 [e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/"
 )]
-#[configurable(deprecated)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SourceAcknowledgementsConfig {
     /// Whether or not end-to-end acknowledgements are enabled for this source.
