@@ -1,9 +1,10 @@
-use std::{path::Path, path::PathBuf, process::Command};
+use std::{collections::BTreeMap, path::Path, path::PathBuf, process::Command};
 
 use anyhow::{bail, Context, Result};
 
 use super::runner::{
-    ContainerTestRunnerBase as _, IntegrationTestRunner, CONTAINER_TOOL, NETWORK_ENV_VAR,
+    ContainerTestRunnerBase as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL,
+    NETWORK_ENV_VAR,
 };
 use super::{config::Environment, config::IntegrationTestConfig, state::EnvsDir};
 use crate::app::CommandExt as _;
@@ -33,6 +34,23 @@ impl IntegrationTest {
             envs_dir,
             runner,
         })
+    }
+
+    pub fn env_exists(&self) -> bool {
+        self.envs_dir.exists(&self.environment)
+    }
+
+    pub fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
+        let active = self.env_exists();
+        if !active {
+            self.start()?;
+        }
+
+        self.runner.test(env_vars, args)?;
+        if !active {
+            self.stop(false)?;
+        }
+        Ok(())
     }
 
     pub fn start(&self) -> Result<()> {
