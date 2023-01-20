@@ -88,7 +88,7 @@ base: components: sources: host_metrics: configuration: {
 					memory:     "Metrics related to memory utilization."
 					network:    "Metrics related to network utilization."
 				}
-				examples: ["cpu", "load"]
+				examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network"]
 			}
 		}
 	}

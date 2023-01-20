@@ -168,8 +168,17 @@ pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-const fn example_collectors() -> [&'static str; 2] {
-    ["cpu", "load"]
+const fn example_collectors() -> [&'static str; 8] {
+    [
+        "cgroups",
+        "cpu",
+        "disk",
+        "filesystem",
+        "load",
+        "host",
+        "memory",
+        "network",
+    ]
 }
 
 fn default_collectors() -> Option<Vec<Collector>> {
