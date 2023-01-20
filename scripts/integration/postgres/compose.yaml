@@ -9,8 +9,8 @@ services:
     - POSTGRES_PASSWORD=vector
     volumes:
     - socket:/var/run/postgresql
-    - ../../../../tests/data/postgres-init.sh:/postgres-init.sh:ro
-    - ../../../../tests/data/ca:/certs:ro
+    - ../../../tests/data/postgres-init.sh:/postgres-init.sh:ro
+    - ../../../tests/data/ca:/certs:ro
 
 networks:
   default:

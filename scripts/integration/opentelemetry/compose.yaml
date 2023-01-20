@@ -4,7 +4,7 @@ services:
   opentelemetry-collector:
     image: docker.io/otel/opentelemetry-collector-contrib:${OPENTELEMETRY_VERSION}
     volumes:
-    - ../../../../tests/data/opentelemetry/config.yaml:/etc/otelcol-contrib/config.yaml
+    - ../../../tests/data/opentelemetry/config.yaml:/etc/otelcol-contrib/config.yaml
 
 networks:
   default:

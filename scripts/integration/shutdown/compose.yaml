@@ -29,8 +29,8 @@ services:
     - 9092:9092
     - 9093:9093
     volumes:
-    - ../../../../tests/data/kafka.p12:/certs/kafka.p12:ro
-    - ../../../../tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+    - ../../../tests/data/kafka.p12:/certs/kafka.p12:ro
+    - ../../../tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
 
 networks:
   default:

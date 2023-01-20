@@ -8,11 +8,11 @@ services:
   nginx:
     image: docker.io/nginx:${NGINX_VERSION}
     volumes:
-    - ../../../../tests/data/nginx/:/etc/nginx:ro
+    - ../../../tests/data/nginx/:/etc/nginx:ro
   nginx-proxy:
     image: docker.io/nginx:${NGINX_VERSION}
     volumes:
-    - ../../../../tests/data/nginx/:/etc/nginx:ro
+    - ../../../tests/data/nginx/:/etc/nginx:ro
 
 networks:
   default:
