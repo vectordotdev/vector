@@ -30,7 +30,7 @@ use vector_core::config::{LegacyKey, LogNamespace};
 #[configurable_component(source("dnstap"))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
-    /// Max DNSTAP frame length that the dnstap source can handle.
+    /// Max DNSTAP frame length that the dnstap source will accept.
     #[serde(default = "default_max_frame_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_frame_length: usize,
