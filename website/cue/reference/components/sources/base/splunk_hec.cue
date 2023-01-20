@@ -65,7 +65,7 @@ base: components: sources: splunk_hec: configuration: {
 	}
 	address: {
 		description: """
-			The address to listen for connections on.
+			The socket address to listen for connections on.
 
 			The address _must_ include a port.
 			"""

@@ -38,7 +38,7 @@ use crate::{
 #[configurable_component(source("logstash"))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     address: SocketListenAddr,
 
     #[configurable(derived)]
