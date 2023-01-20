@@ -29,7 +29,7 @@ base: components: sinks: blackhole: configuration: {
 	}
 	print_interval_secs: {
 		description: """
-			The number of seconds between reporting a summary of activity.
+			The interval between reporting a summary of activity.
 
 			Set to `0` to disable reporting.
 			"""
