@@ -26,8 +26,8 @@ impl Function for DecodeGzip {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "demo string",
-            source: r#"decode_gzip!("736F6D6520737472696E672076616C7565")"#,
-            result: Ok(r#"some string value"#),
+            source: r#"decode_gzip!(decode_base64!("H4sIANz6yWMAAyvISU0sTlVISU3OT0lVyE3lAgBGv7dVEQAAAA=="))"#,
+            result: Ok(r#"please decode me"#),
         }]
     }
 
@@ -78,7 +78,8 @@ mod tests {
     fn get_encoded_bytes(text: &str) -> Vec<u8> {
         let mut buf = Vec::new();
         let mut gz = GzEncoder::new(text.as_bytes(), flate2::Compression::fast());
-        gz.read_to_end(&mut buf).unwrap();
+        gz.read_to_end(&mut buf)
+            .expect("Cannot encode bytes with Gzip encoder");
         buf
     }
 
