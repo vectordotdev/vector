@@ -20,7 +20,7 @@ components: sources: datadog_agent: {
 
 	features: {
 		acknowledgements: true
-		auto_generated: true
+		auto_generated:   true
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
