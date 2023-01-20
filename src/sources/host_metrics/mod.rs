@@ -105,7 +105,8 @@ pub struct HostMetricsConfig {
     pub namespace: Option<String>,
 
     #[configurable(derived)]
-    #[serde(default)]
+    #[derivative(Default(value = "default_cgroups_config()"))]
+    #[serde(default = "default_cgroups_config")]
     pub cgroups: Option<CGroupsConfig>,
 
     #[configurable(derived)]
@@ -199,6 +200,20 @@ fn example_cgroups() -> FilterList {
         includes: Some(vec!["user.slice/*".try_into().unwrap()]),
         excludes: Some(vec!["*.service".try_into().unwrap()]),
     }
+}
+
+fn default_cgroups_config() -> Option<CGroupsConfig> {
+    // Check env variable to allow generating docs on non-linux systems.
+    if std::env::var("VECTOR_USE_CGROUPS").is_ok() {
+        return Some(CGroupsConfig::default());
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        return None;
+    }
+
+    Some(CGroupsConfig::default())
 }
 
 impl_generate_config_from_default!(HostMetricsConfig);
