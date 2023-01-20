@@ -250,7 +250,7 @@ bearing this in mind when looking through existing new code.
 All new sources should work like the above and should not permit users to
 configure custom field names for metadata.
 
-# Schema
+## Schema
 
 All sources need to specify their schema - a definition of the shape of the
 event that it will create.
@@ -303,25 +303,25 @@ Let's look at the parameters:
     ) -> Self
 ```
 
-## source_name
+### source_name
 
 The name of the source - typically something like `NatsSourceConfig::NAME`
 
-## legacy_path
+### legacy_path
 
 The pathname of the field when inserting in the Legacy namespace. This should be the
 same value as used when inserting the data with `insert_source_metadata`.
 
-## vector_path
+### vector_path
 
 The pathname of the field when inserting in the Vector namespace. This should be the
 same value as used when inserting the data with `insert_source_metadata`.
 
-## kind
+### kind
 
 This is the type the data will be. This is covered in detail below.
 
-## meaning
+### meaning
 
 Some fields are given a meaning. It is possible in VRL to refer to a field by it's
 meaning regardless of what name has been given to it. Fields with the following meaning
@@ -340,33 +340,33 @@ This list is not definitive and likely to be updated over time.
 Most fields will not have a given meaning, in which case just pass `None`.
 
 
-## Kind
+### Kind
 
 The core principle behind schemas is defining the type, or kind, of data that will
 exist in this field. The following kinds are supported:
 
-### bytes
+#### bytes
 
 Any string value.
 
-### integer
+#### integer
 
 An integer value - in Vector this will be a signed 64 bit integer.
 
-### float
+#### float
 
 A 64 bit float value.
 
-### boolean
+#### boolean
 
 Boolean value - either `true` or `false`.
 
 
-### timestamp
+#### timestamp
 
 A timestamp in the UTC timezone.
 
-### array
+#### array
 
 An array of values. It is possible to specify the type for any element
 within the array eg. this array will be an array of strings.
@@ -393,7 +393,7 @@ Kind::array(Collection::empty().with_unknown(Kind::bytes())
                 .with_known(3, Kind::timestamp()))
 ````
 
-### object
+#### object
 
 An object is a map of keys to values. Similar to an array, an object
 can specify the type for all fields as well as the type for specific
@@ -416,7 +416,7 @@ Kind::object(Collection::empty()
 ```
 
 
-### Multiple types
+#### Multiple types
 
 It is possible to represent a field that could be one of several types.
 
