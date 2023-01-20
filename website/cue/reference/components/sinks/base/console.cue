@@ -184,12 +184,12 @@ base: components: sinks: console: configuration: {
 			default: "stdout"
 			enum: {
 				stderr: """
-					Write output to [STDERR][stderr]
+					Write output to [STDERR][stderr].
 
 					[stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
 					"""
 				stdout: """
-					Write output to [STDOUT][stdout]
+					Write output to [STDOUT][stdout].
 
 					[stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
 					"""
