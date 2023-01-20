@@ -13,6 +13,13 @@ remap: functions: encode_gzip: {
 			required:    true
 			type: ["string"]
 		},
+		{
+			name:        "compression_level"
+			description: "The default compression level."
+			required:    false
+			type: ["integer"]
+			default: 6
+		},
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
