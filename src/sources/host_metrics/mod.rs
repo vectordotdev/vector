@@ -42,6 +42,8 @@ mod network;
 #[serde(rename_all = "lowercase")]
 pub enum Collector {
     /// Metrics related to Linux control groups.
+    ///
+    /// Only available on Linux.
     CGroups,
 
     /// Metrics related to CPU utilization.
@@ -97,6 +99,8 @@ pub struct HostMetricsConfig {
     ///
     /// Defaults to all collectors.
     #[configurable(metadata(docs::examples = "example_collectors()"))]
+    #[derivative(Default(value = "default_collectors()"))]
+    #[serde(default = "default_collectors")]
     pub collectors: Option<Vec<Collector>>,
 
     /// Overrides the default namespace for the metrics emitted by the source.
@@ -164,17 +168,31 @@ pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-const fn example_collectors() -> [&'static str; 8] {
-    [
-        "cgroups",
-        "cpu",
-        "disk",
-        "filesystem",
-        "load",
-        "host",
-        "memory",
-        "network",
-    ]
+const fn example_collectors() -> [&'static str; 2] {
+    ["cpu", "load"]
+}
+
+fn default_collectors() -> Option<Vec<Collector>> {
+    let mut collectors = vec![
+        Collector::Cpu,
+        Collector::Disk,
+        Collector::Filesystem,
+        Collector::Load,
+        Collector::Host,
+        Collector::Memory,
+        Collector::Network,
+    ];
+
+    #[cfg(target_os = "linux")]
+    {
+        collectors.push(Collector::CGroups);
+    }
+    #[cfg(not(target_os = "linux"))]
+    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+        collectors.push(Collector::CGroups);
+    }
+
+    Some(collectors)
 }
 
 fn example_devices() -> FilterList {
@@ -204,7 +222,7 @@ fn example_cgroups() -> FilterList {
 
 fn default_cgroups_config() -> Option<CGroupsConfig> {
     // Check env variable to allow generating docs on non-linux systems.
-    if std::env::var("VECTOR_USE_CGROUPS").is_ok() {
+    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
         return Some(CGroupsConfig::default());
     }
 
@@ -227,8 +245,10 @@ impl SourceConfig for HostMetricsConfig {
         init_roots();
 
         #[cfg(not(target_os = "linux"))]
-        if self.cgroups.is_some() {
-            return Err("cgroups collector is only available on Linux systems".into());
+        {
+            if self.cgroups.is_some() || self.has_collector(Collector::CGroups) {
+                return Err("CGroups collector is only available on Linux systems".into());
+            }
         }
 
         let mut config = self.clone();
