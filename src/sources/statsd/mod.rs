@@ -109,7 +109,7 @@ pub struct TcpConfig {
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
-    #[configurable(metadata(docs::type_unit = "concurrency"))]
+    #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 }
 

@@ -16,7 +16,7 @@ base: components: sources: socket: configuration: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: unit: "concurrency"
+		type: uint: unit: "connections"
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."

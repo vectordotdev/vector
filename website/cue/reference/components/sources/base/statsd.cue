@@ -16,7 +16,7 @@ base: components: sources: statsd: configuration: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: unit: "concurrency"
+		type: uint: unit: "connections"
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
