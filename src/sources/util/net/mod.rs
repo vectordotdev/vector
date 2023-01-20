@@ -3,10 +3,7 @@ mod tcp;
 #[cfg(feature = "sources-utils-net-udp")]
 mod udp;
 
-use std::{
-    fmt,
-    net::{SocketAddr, ToSocketAddrs},
-};
+use std::{fmt, net::SocketAddr};
 
 use snafu::Snafu;
 use vector_config::configurable_component;
@@ -100,11 +97,9 @@ impl TryFrom<String> for SocketListenAddr {
 
     fn try_from(input: String) -> Result<Self, Self::Error> {
         // first attempt to parse the string into a SocketAddr directly
-        match input.to_socket_addrs() {
-            Ok(mut socket_addrs) => socket_addrs
-                .next()
-                .ok_or(Self::Error::SocketAddrParse)
-                .map(|s| s.into()),
+        match input.parse::<SocketAddr>() {
+            Ok(socket_addr) => Ok(socket_addr.into()),
+
             // then attempt to parse a systemd file descriptor
             Err(_) => {
                 let fd: usize = match input.as_str() {
@@ -114,6 +109,7 @@ impl TryFrom<String> for SocketListenAddr {
                         .map_err(|_| Self::Error::UsizeParse)?
                         .checked_sub(1)
                         .ok_or(Self::Error::OneBased),
+
                     // otherwise fail
                     _ => Err(Self::Error::UnableToParse),
                 }?;
