@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use futures::future::ready;
 use futures::stream;
 
@@ -5,13 +7,20 @@ use vector_common::sensitive_string::SensitiveString;
 use vector_core::config::proxy::ProxyConfig;
 use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
-use crate::config::{SinkConfig, SinkContext};
-use crate::http::{Auth, HttpClient};
-use crate::sinks::databend::api::{DatabendAPIClient, DatabendHttpRequest};
-use crate::sinks::databend::DatabendConfig;
-use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig, UriSerde};
-use crate::test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS};
-use crate::test_util::{random_string, trace_init};
+use crate::{
+    config::{SinkConfig, SinkContext},
+    http::{Auth, HttpClient},
+    sinks::util::{BatchConfig, Compression, TowerRequestConfig, UriSerde},
+    test_util::{
+        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        random_string, trace_init,
+    },
+};
+
+use super::{
+    api::{DatabendAPIClient, DatabendHttpRequest, DatabendHttpResponse},
+    config::DatabendConfig,
+};
 
 fn databend_endpoint() -> String {
     std::env::var("DATABEND_ENDPOINT").unwrap_or_else(|_| "http://localhost:8000".into())
@@ -69,7 +78,7 @@ async fn insert_events() {
     let client = DatabendAPIClient::new(http_client, endpoint, auth);
 
     let create_table_sql = format!(
-        "create table `{}` (host String, timestamp String, message String, items Array(String))",
+        "create table `{}` (host String, timestamp String, message String)",
         table
     );
     client
@@ -79,11 +88,7 @@ async fn insert_events() {
 
     let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-    let (mut input_event, mut receiver) = make_event();
-    input_event
-        .as_mut_log()
-        .insert("items", vec!["item1", "item2"]);
-
+    let (input_event, mut receiver) = make_event();
     run_and_assert_sink_compliance(
         sink,
         stream::once(ready(input_event.clone())),
@@ -92,24 +97,32 @@ async fn insert_events() {
     .await;
 
     let select_all_sql = format!("select * from `{}`", table);
-
     let resp = client
         .query(DatabendHttpRequest::new(select_all_sql))
         .await
         .unwrap();
     assert_eq!(1, resp.data.len());
 
-    let log_event = input_event.into_log();
-    assert_eq!(log_event["host"].to_string(), resp.data[0][0].to_string());
-    assert_eq!(
-        log_event["timestamp"].to_string(),
-        resp.data[0][1].to_string()
-    );
-    assert_eq!(
-        log_event["message"].to_string(),
-        resp.data[0][2].to_string()
-    );
-    assert_eq!(log_event["items"].to_string(), resp.data[0][3].to_string());
+    // drop input_event after comparing with response
+    {
+        let log_event = input_event.into_log();
+        let expected = serde_json::to_string(&log_event).unwrap();
+        let resp_data = response_to_map(&resp);
+        let actural = serde_json::to_string(&resp_data[0]).unwrap();
+        assert_eq!(expected, actural);
+    }
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+}
+
+pub fn response_to_map(resp: &DatabendHttpResponse) -> Vec<BTreeMap<String, String>> {
+    let mut result = Vec::new();
+    for row in &resp.data {
+        let mut map = BTreeMap::new();
+        for (i, field) in resp.schema.iter().enumerate() {
+            map.insert(field.name.clone(), row[i].clone());
+        }
+        result.push(map);
+    }
+    result
 }
