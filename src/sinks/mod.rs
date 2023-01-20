@@ -193,7 +193,7 @@ pub enum Sinks {
 
     /// Databend.
     #[cfg(feature = "sinks-databend")]
-    Databend(#[configurable(derived)] databend::DatabendConfig),
+    Databend(databend::DatabendConfig),
 
     /// Datadog Archives.
     #[cfg(feature = "sinks-datadog_archives")]
