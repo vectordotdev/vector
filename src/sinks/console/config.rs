@@ -20,7 +20,7 @@ use crate::{
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
-    /// Write output to [STDOUT][stdout]
+    /// Write output to [STDOUT][stdout].
     ///
     /// [stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
     #[derivative(Default)]
