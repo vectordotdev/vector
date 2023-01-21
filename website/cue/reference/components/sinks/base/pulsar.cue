@@ -83,6 +83,17 @@ base: components: sinks: pulsar: configuration: {
 			}
 		}
 	}
+	batch: {
+		description: "Event batching behavior."
+		required:    false
+		type: object: options: {
+			max_events: {
+				description: "The maximum size of a batch, in events, before it is flushed."
+				required:    false
+				type: uint: {}
+			}
+		}
+	}
 	compression: {
 		description: "Supported compression types for Pulsar."
 		required:    false
