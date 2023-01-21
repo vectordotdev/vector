@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 use clap::Args;
 
@@ -20,12 +22,14 @@ impl Cli {
                     .keys()
                     .fold(0, |width, entry| width.max(entry.len()));
                 for (integration, config) in entries {
+                    let envs_dir = state::EnvsDir::new(&integration);
+                    let active_envs = envs_dir.list_active()?;
                     let environments = config
                         .environments()
                         .keys()
-                        .cloned()
+                        .map(|environment| format(&active_envs, environment))
                         .collect::<Vec<_>>()
-                        .join(" ");
+                        .join("  ");
                     display!("{integration:width$}  {environments}");
                 }
             }
@@ -38,14 +42,18 @@ impl Cli {
 
                 display!("Environments:");
                 for environment in config.environments().keys() {
-                    if active_envs.contains(environment) {
-                        display!("  {} (active)", environment);
-                    } else {
-                        display!("  {}", environment);
-                    }
+                    display!("  {}", format(&active_envs, environment));
                 }
             }
         }
         Ok(())
+    }
+}
+
+fn format(active_envs: &HashSet<String>, environment: &str) -> String {
+    if active_envs.contains(environment) {
+        format!("{environment} (active)")
+    } else {
+        environment.into()
     }
 }
