@@ -27,7 +27,7 @@ base: components: sources: fluent: configuration: {
 	connection_limit: {
 		description: "The maximum number of TCP connections that will be allowed at any given time."
 		required:    false
-		type: uint: unit: "connections"
+		type: uint: {}
 	}
 	keepalive: {
 		description: "TCP keepalive settings for socket-based components."
@@ -40,17 +40,12 @@ base: components: sources: fluent: configuration: {
 	}
 	receive_buffer_bytes: {
 		description: """
-			The size of the receive buffer used for each connection.
+			The size, in bytes, of the receive buffer used for each connection.
 
-			This generally should not need to be changed.
+			This should not typically needed to be changed.
 			"""
 		required: false
-		type: uint: {
-			examples: [
-				"65536",
-			]
-			unit: "bytes"
-		}
+		type: uint: {}
 	}
 	tls: {
 		description: "TlsEnableableConfig for `sources`, adding metadata from the client certificate"

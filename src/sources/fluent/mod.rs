@@ -44,17 +44,14 @@ pub struct FluentConfig {
     address: SocketAddr,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
-    #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    /// The size of the receive buffer used for each connection.
+    /// The size, in bytes, of the receive buffer used for each connection.
     ///
-    /// This generally should not need to be changed.
-    #[configurable(metadata(docs::type_unit = "bytes"))]
-    #[configurable(metadata(docs::examples = "65536"))]
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
 
     #[configurable(derived)]
