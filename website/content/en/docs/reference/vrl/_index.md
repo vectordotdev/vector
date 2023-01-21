@@ -115,6 +115,8 @@ acquainted with Vector and VRL:
 {{< jump "/docs/setup/quickstart" >}} {{< jump "/guides/level-up/transformation"
 >}}
 
+There is an online [VRL playground][vrl_playground], where you can play with VRL.
+
 ## The goals of VRL {#goals}
 
 VRL is built by the Vector team and its development is guided by two core goals,
@@ -170,3 +172,4 @@ VRL has some core concepts that you should be aware of as you dive in.
 [rust]: https://rust-lang.org
 [rust_security]: https://thenewstack.io/microsoft-rust-is-the-industrys-best-chance-at-safe-systems-programming/
 [vrl_error_handling]: /docs/reference/vrl/errors#handling
+[vrl_playground]: https://playground.vrl.dev
