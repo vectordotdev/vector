@@ -7,7 +7,7 @@ use hashlink::LinkedHashMap;
 use itertools::{self, Itertools};
 use serde::Deserialize;
 
-use crate::app;
+use crate::{app, util};
 
 const FILE_NAME: &str = "test.yaml";
 
@@ -91,13 +91,14 @@ impl IntegrationTestConfig {
         let tests_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
         for entry in tests_dir.read_dir()? {
             let entry = entry?;
-            if !entry.path().is_dir() {
-                continue;
+            if entry.path().is_dir() {
+                let config_file: PathBuf =
+                    [entry.path().to_str().unwrap(), FILE_NAME].iter().collect();
+                if util::exists(&config_file)? {
+                    let config = Self::parse_file(&config_file)?;
+                    configs.insert(entry.file_name().into_string().unwrap(), config);
+                }
             }
-
-            let config_file: PathBuf = [entry.path().to_str().unwrap(), FILE_NAME].iter().collect();
-            let config = Self::parse_file(&config_file)?;
-            configs.insert(entry.file_name().into_string().unwrap(), config);
         }
 
         Ok(configs)
