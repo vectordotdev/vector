@@ -16,6 +16,7 @@ use hyper_proxy::ProxyConnector;
 use snafu::{ResultExt, Snafu};
 use tower::Service;
 use tracing::Instrument;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
@@ -234,24 +235,27 @@ impl<B> fmt::Debug for HttpClient<B> {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
 pub enum Auth {
     /// Basic authentication.
     ///
-    /// The username and password are concatenated and encoded via base64.
+    /// The username and password are concatenated and encoded via [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
     Basic {
         /// The username to send.
         user: String,
 
         /// The password to send.
-        password: String,
+        password: SensitiveString,
     },
 
     /// Bearer authentication.
     ///
-    /// A bearer token (OAuth2, JWT, etc) is passed as-is.
+    /// The bearer token value (OAuth2, JWT, etc) is passed as-is.
     Bearer {
         /// The bearer token to send.
-        token: String,
+        token: SensitiveString,
     },
 }
 
@@ -284,10 +288,10 @@ impl Auth {
     pub fn apply_headers_map(&self, map: &mut HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
-                let auth = Authorization::basic(user, password);
+                let auth = Authorization::basic(user.as_str(), password.inner());
                 map.typed_insert(auth);
             }
-            Auth::Bearer { token } => match Authorization::bearer(token) {
+            Auth::Bearer { token } => match Authorization::bearer(token.inner()) {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },

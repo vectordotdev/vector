@@ -1,9 +1,10 @@
 use futures::StreamExt;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
@@ -20,7 +21,7 @@ use crate::{
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     /// The interval between metric gathering, in seconds.
-    #[derivative(Default(value = "2.0"))]
+    #[derivative(Default(value = "1.0"))]
     pub scrape_interval_secs: f64,
 
     #[configurable(derived)]
@@ -28,7 +29,7 @@ pub struct InternalMetricsConfig {
 
     /// Overrides the default namespace for the metrics emitted by the source.
     ///
-    /// By default, `vector` is used.
+    /// Overrides the default namespace.
     pub namespace: Option<String>,
 }
 
@@ -47,14 +48,12 @@ impl InternalMetricsConfig {
 pub struct TagsConfig {
     /// Sets the name of the tag to use to add the current hostname to each metric.
     ///
-    /// The value will be the current hostname for wherever Vector is running.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     pub host_key: Option<String>,
 
     /// Sets the name of the tag to use to add the current process ID to each metric.
     ///
-    /// The value will be the current process ID for Vector itself.
     ///
     /// By default, this is not set and the tag will not be automatically added.
     pub pid_key: Option<String>,
@@ -122,6 +121,7 @@ struct InternalMetrics<'a> {
 
 impl<'a> InternalMetrics<'a> {
     async fn run(mut self) -> Result<(), ()> {
+        let events_received = register!(EventsReceived);
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
         while interval.next().await.is_some() {
@@ -130,10 +130,10 @@ impl<'a> InternalMetrics<'a> {
 
             let metrics = self.controller.capture_metrics();
             let count = metrics.len();
-            let byte_size = metrics.size_of();
+            let byte_size = metrics.estimated_json_encoded_size_of();
 
             emit!(InternalMetricsBytesReceived { byte_size });
-            emit!(EventsReceived { count, byte_size });
+            events_received.emit(CountByteSize(count, byte_size));
 
             let batch = metrics.into_iter().map(|mut metric| {
                 // A metric starts out with a default "vector" namespace, but will be overridden
@@ -144,11 +144,11 @@ impl<'a> InternalMetrics<'a> {
 
                 if let Some(host_key) = &self.host_key {
                     if let Ok(hostname) = &hostname {
-                        metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+                        metric.replace_tag(host_key.to_owned(), hostname.to_owned());
                     }
                 }
                 if let Some(pid_key) = &self.pid_key {
-                    metric.insert_tag(pid_key.to_owned(), pid.clone());
+                    metric.replace_tag(pid_key.to_owned(), pid.clone());
                 }
                 metric
             });
@@ -168,6 +168,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use metrics::{counter, gauge, histogram};
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -252,8 +253,7 @@ mod tests {
             _ => panic!("wrong type"),
         }
 
-        let mut labels = BTreeMap::new();
-        labels.insert(String::from("host"), String::from("foo"));
+        let labels = metric_tags!("host" => "foo");
         assert_eq!(Some(&labels), output["quux"].tags());
     }
 

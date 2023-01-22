@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{
@@ -9,7 +10,10 @@ use super::{
 };
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
-    util::{request_builder::EncodeResult, Compression, RequestBuilder},
+    util::{
+        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+        RequestBuilder,
+    },
 };
 
 pub struct HecLogsRequestBuilder {
@@ -18,9 +22,7 @@ pub struct HecLogsRequestBuilder {
 }
 
 #[derive(Debug, Clone)]
-pub struct RequestMetadata {
-    events_count: usize,
-    events_byte_size: usize,
+pub struct HecRequestMetadata {
     finalizers: EventFinalizers,
     partition: Option<Arc<str>>,
     source: Option<String>,
@@ -30,7 +32,7 @@ pub struct RequestMetadata {
 }
 
 impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRequestBuilder {
-    type Metadata = RequestMetadata;
+    type Metadata = HecRequestMetadata;
     type Events = Vec<HecProcessedEvent>;
     type Encoder = HecLogsEncoder;
     type Payload = Bytes;
@@ -48,16 +50,15 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
     fn split_input(
         &self,
         input: (Option<Partitioned>, Vec<HecProcessedEvent>),
-    ) -> (Self::Metadata, Self::Events) {
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (mut partition, mut events) = input;
 
         let finalizers = events.take_finalizers();
-        let events_byte_size: usize = events.iter().map(|e| e.metadata.event_byte_size).sum();
+
+        let builder = RequestMetadataBuilder::from_events(&events);
 
         (
-            RequestMetadata {
-                events_count: events.len(),
-                events_byte_size,
+            HecRequestMetadata {
                 finalizers,
                 partition: partition.as_ref().and_then(|p| p.token.clone()),
                 source: partition.as_mut().and_then(|p| p.source.take()),
@@ -65,25 +66,26 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
                 index: partition.as_mut().and_then(|p| p.index.take()),
                 host: partition.as_mut().and_then(|p| p.host.take()),
             },
+            builder,
             events,
         )
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        hec_metadata: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         HecRequest {
             body: payload.into_payload(),
-            finalizers: metadata.finalizers,
-            events_count: metadata.events_count,
-            events_byte_size: metadata.events_byte_size,
-            passthrough_token: metadata.partition,
-            source: metadata.source,
-            sourcetype: metadata.sourcetype,
-            index: metadata.index,
-            host: metadata.host,
+            finalizers: hec_metadata.finalizers,
+            passthrough_token: hec_metadata.partition,
+            source: hec_metadata.source,
+            sourcetype: hec_metadata.sourcetype,
+            index: hec_metadata.index,
+            host: hec_metadata.host,
+            metadata,
         }
     }
 }

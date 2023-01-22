@@ -55,6 +55,7 @@ impl<'a> HecData<'a> {
 pub struct HecLogsEncoder {
     pub transformer: Transformer,
     pub encoder: crate::codecs::Encoder<()>,
+    pub auto_extract_timestamp: bool,
 }
 
 impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
@@ -92,9 +93,20 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                             HecEvent::Text(String::from_utf8_lossy(&bytes))
                         };
 
-                        let mut hec_data =
-                            HecData::new(hec_event, metadata.fields, metadata.timestamp);
-                        hec_data.host = metadata.host.map(|host| host.to_string_lossy());
+                        let mut hec_data = HecData::new(
+                            hec_event,
+                            metadata.fields,
+                            // If auto_extract_timestamp is set we don't want to pass the timestamp in the
+                            // event since we want Splunk to extract it from the message.
+                            if self.auto_extract_timestamp {
+                                None
+                            } else {
+                                metadata.timestamp
+                            },
+                        );
+                        hec_data.host = metadata
+                            .host
+                            .map(|host| host.to_string_lossy().into_owned());
                         hec_data.index = metadata.index;
                         hec_data.source = metadata.source;
                         hec_data.sourcetype = metadata.sourcetype;

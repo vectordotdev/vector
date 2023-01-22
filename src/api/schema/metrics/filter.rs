@@ -27,7 +27,7 @@ pub fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option
     Some(iter.fold(
         m.clone(),
         |mut m1, m2| {
-            if m1.update(&m2) {
+            if m1.update(m2) {
                 m1
             } else {
                 m2.clone()
@@ -192,7 +192,10 @@ pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
     get_controller()
         .capture_metrics()
         .into_iter()
-        .filter_map(|m| m.tag_matches("component_id", component_key.id()).then(|| m))
+        .filter_map(|m| {
+            m.tag_matches("component_id", component_key.id())
+                .then_some(m)
+        })
         .collect()
 }
 
@@ -215,6 +218,34 @@ pub fn component_counter_metrics(
                 let m = sum_metrics_owned(metrics)?;
                 match m.value() {
                     MetricValue::Counter { value }
+                        if cache.insert(id, *value).unwrap_or(0.00) < *value =>
+                    {
+                        Some(m)
+                    }
+                    _ => None,
+                }
+            })
+            .collect()
+    })
+}
+
+/// Returns a stream of `Vec<Metric>`, where `metric_name` matches the name of the metric
+/// (e.g. "processed_events_total"), and the value is derived from `MetricValue::Gauge`. Uses a
+/// local cache to match against the `component_id` of a metric, to return results only when
+/// the value of a current iteration is greater than the previous. This is useful for the client
+/// to be notified as metrics increase without returning 'empty' or identical results.
+pub fn component_gauge_metrics(
+    interval: i32,
+    filter_fn: &'static MetricFilterFn,
+) -> impl Stream<Item = Vec<Metric>> {
+    let mut cache = BTreeMap::new();
+
+    component_to_filtered_metrics(interval, filter_fn).map(move |map| {
+        map.into_iter()
+            .filter_map(|(id, metrics)| {
+                let m = sum_metrics_owned(metrics)?;
+                match m.value() {
+                    MetricValue::Gauge { value }
                         if cache.insert(id, *value).unwrap_or(0.00) < *value =>
                     {
                         Some(m)

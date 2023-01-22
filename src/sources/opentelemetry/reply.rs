@@ -17,7 +17,7 @@ where
     let mut buf = BytesMut::with_capacity(1024);
     Protobuf {
         inner: val.encode(&mut buf).map(|_| buf.to_vec()).map_err(|err| {
-            tracing::error!("http::reply::protobuf() error: {}", err);
+            error!("Failed to encode value: {}", err);
         }),
     }
 }

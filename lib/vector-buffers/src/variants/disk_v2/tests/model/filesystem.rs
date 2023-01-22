@@ -4,12 +4,11 @@ use std::{
     fmt, io,
     path::{Path, PathBuf},
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, Mutex},
     task::{Context, Poll},
 };
 
 use async_trait::async_trait;
-use parking_lot::Mutex;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use crate::variants::disk_v2::{
@@ -114,7 +113,7 @@ pub struct TestMmap {
 impl From<Arc<Mutex<FileInner>>> for TestMmap {
     fn from(inner: Arc<Mutex<FileInner>>) -> Self {
         let buf = {
-            let mut guard = inner.lock();
+            let mut guard = inner.lock().expect("poisoned");
             guard.consume_buf()
         };
 
@@ -128,7 +127,7 @@ impl From<Arc<Mutex<FileInner>>> for TestMmap {
 impl Drop for TestMmap {
     fn drop(&mut self) {
         let buf = self.buf.take().expect("buf must exist");
-        let mut inner = self.inner.lock();
+        let mut inner = self.inner.lock().expect("poisoned");
         inner.return_buf(buf);
     }
 }
@@ -154,7 +153,7 @@ impl AsyncRead for TestFile {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         let new_read_pos = {
-            let mut inner = self.inner.lock();
+            let mut inner = self.inner.lock().expect("poisoned");
             let src = inner.buf.as_mut().expect("file buf consumed");
 
             let cap = buf.remaining();
@@ -183,7 +182,7 @@ impl AsyncWrite for TestFile {
             return Err(io_err_permission_denied()).into();
         }
 
-        let mut inner = self.inner.lock();
+        let mut inner = self.inner.lock().expect("poisoned");
         let dst = inner.buf.as_mut().expect("file buf consumed");
         dst.extend_from_slice(buf);
 
@@ -212,7 +211,7 @@ impl AsyncFile for TestFile {
     #[instrument(skip(self), level = "debug")]
     async fn metadata(&self) -> io::Result<Metadata> {
         let len = {
-            let inner = self.inner.lock();
+            let inner = self.inner.lock().expect("poisoned");
             inner.buf.as_ref().expect("file buf consumed").len()
         };
 
@@ -284,7 +283,7 @@ pub struct TestFilesystem {
 
 impl fmt::Debug for TestFilesystem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let inner = self.inner.lock();
+        let inner = self.inner.lock().expect("poisoned");
         f.debug_struct("TestFilesystem")
             .field("files", &inner.files)
             .finish()
@@ -312,12 +311,12 @@ impl Filesystem for TestFilesystem {
     type MutableMemoryMap = TestMmap;
 
     async fn open_file_writable(&self, path: &Path) -> io::Result<Self::File> {
-        let mut inner = self.inner.lock();
+        let mut inner = self.inner.lock().expect("poisoned");
         Ok(inner.open_file_writable(path))
     }
 
     async fn open_file_writable_atomic(&self, path: &Path) -> io::Result<Self::File> {
-        let mut inner = self.inner.lock();
+        let mut inner = self.inner.lock().expect("poisoned");
         match inner.open_file_writable_atomic(path) {
             Some(file) => Ok(file),
             None => Err(io_err_already_exists()),
@@ -325,7 +324,7 @@ impl Filesystem for TestFilesystem {
     }
 
     async fn open_file_readable(&self, path: &Path) -> io::Result<Self::File> {
-        let mut inner = self.inner.lock();
+        let mut inner = self.inner.lock().expect("poisoned");
         match inner.open_file_readable(path) {
             Some(file) => Ok(file),
             None => Err(io_err_not_found()),
@@ -333,7 +332,7 @@ impl Filesystem for TestFilesystem {
     }
 
     async fn open_mmap_readable(&self, path: &Path) -> io::Result<Self::MemoryMap> {
-        let mut inner = self.inner.lock();
+        let mut inner = self.inner.lock().expect("poisoned");
         match inner.open_mmap_readable(path) {
             Some(mmap) => Ok(mmap),
             None => Err(io_err_not_found()),
@@ -341,7 +340,7 @@ impl Filesystem for TestFilesystem {
     }
 
     async fn open_mmap_writable(&self, path: &Path) -> io::Result<Self::MutableMemoryMap> {
-        let mut inner = self.inner.lock();
+        let mut inner = self.inner.lock().expect("poisoned");
         match inner.open_mmap_writable(path) {
             Some(mmap) => Ok(mmap),
             None => Err(io_err_not_found()),
@@ -349,7 +348,7 @@ impl Filesystem for TestFilesystem {
     }
 
     async fn delete_file(&self, path: &Path) -> io::Result<()> {
-        let mut inner = self.inner.lock();
+        let mut inner = self.inner.lock().expect("poisoned");
         if inner.delete_file(path) {
             Ok(())
         } else {

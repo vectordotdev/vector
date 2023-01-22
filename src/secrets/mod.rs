@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use enum_dispatch::enum_dispatch;
 use vector_config::{configurable_component, NamedComponent};
@@ -18,7 +18,7 @@ pub enum SecretBackends {
     Exec(#[configurable(derived)] exec::ExecBackend),
 
     /// Test.
-    #[configurable(metadata(hidden))]
+    #[configurable(metadata(docs::hidden))]
     Test(#[configurable(derived)] test::TestBackend),
 }
 

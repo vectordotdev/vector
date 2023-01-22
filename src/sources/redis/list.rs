@@ -1,11 +1,8 @@
 use redis::{aio::ConnectionManager, AsyncCommands, RedisResult};
 use snafu::{ResultExt, Snafu};
-use vector_common::internal_event::{BytesReceived, Registered};
 
-use super::{handle_line, Method};
-use crate::{
-    codecs, config::SourceContext, internal_events::RedisReceiveEventError, sources::Source,
-};
+use super::{InputHandler, Method};
+use crate::{internal_events::RedisReceiveEventError, sources::Source};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -13,55 +10,40 @@ enum BuildError {
     Connection { source: redis::RedisError },
 }
 
-pub async fn watch(
-    client: redis::Client,
-    bytes_received: Registered<BytesReceived>,
-    key: String,
-    redis_key: Option<String>,
-    method: Method,
-    decoder: codecs::Decoder,
-    cx: SourceContext,
-) -> crate::Result<Source> {
-    let mut conn = client
-        .get_tokio_connection_manager()
-        .await
-        .context(ConnectionSnafu {})?;
+impl InputHandler {
+    pub(super) async fn watch(mut self, method: Method) -> crate::Result<Source> {
+        let mut conn = self
+            .client
+            .get_tokio_connection_manager()
+            .await
+            .context(ConnectionSnafu {})?;
 
-    Ok(Box::pin(async move {
-        let mut shutdown = cx.shutdown;
-        let mut tx = cx.out;
-        loop {
-            let res = match method {
-                Method::Rpop => tokio::select! {
-                    res = brpop(&mut conn, &key) => res,
-                    _ = &mut shutdown => break
-                },
-                Method::Lpop => tokio::select! {
-                    res = blpop(&mut conn, &key) => res,
-                    _ = &mut shutdown => break
-                },
-            };
+        Ok(Box::pin(async move {
+            let mut shutdown = self.cx.shutdown.clone();
+            loop {
+                let res = match method {
+                    Method::Rpop => tokio::select! {
+                        res = brpop(&mut conn, &self.key) => res,
+                        _ = &mut shutdown => break
+                    },
+                    Method::Lpop => tokio::select! {
+                        res = blpop(&mut conn, &self.key) => res,
+                        _ = &mut shutdown => break
+                    },
+                };
 
-            match res {
-                Err(error) => emit!(RedisReceiveEventError::from(error)),
-                Ok(line) => {
-                    if let Err(()) = handle_line(
-                        line,
-                        &key,
-                        redis_key.as_deref(),
-                        decoder.clone(),
-                        &bytes_received,
-                        &mut tx,
-                    )
-                    .await
-                    {
-                        break;
+                match res {
+                    Err(error) => emit!(RedisReceiveEventError::from(error)),
+                    Ok(line) => {
+                        if let Err(()) = self.handle_line(line).await {
+                            break;
+                        }
                     }
                 }
             }
-        }
-        Ok(())
-    }))
+            Ok(())
+        }))
+    }
 }
 
 async fn brpop(conn: &mut ConnectionManager, key: &str) -> RedisResult<String> {

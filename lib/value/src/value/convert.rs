@@ -5,6 +5,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
+use std::sync::Arc;
 
 use crate::value::regex::ValueRegex;
 use crate::{Kind, Value};
@@ -310,10 +311,7 @@ impl From<Cow<'_, str>> for Value {
 
 impl<T: Into<Self>> From<Option<T>> for Value {
     fn from(value: Option<T>) -> Self {
-        match value {
-            None => Self::Null,
-            Some(v) => v.into(),
-        }
+        value.map_or(Self::Null, Into::into)
     }
 }
 
@@ -355,9 +353,15 @@ impl FromIterator<(String, Self)> for Value {
     }
 }
 
+impl From<Arc<Regex>> for Value {
+    fn from(r: Arc<Regex>) -> Self {
+        Self::Regex(ValueRegex::new(r))
+    }
+}
+
 impl From<Regex> for Value {
     fn from(r: Regex) -> Self {
-        Self::Regex(ValueRegex::new(r))
+        Self::Regex(ValueRegex::new(Arc::new(r)))
     }
 }
 

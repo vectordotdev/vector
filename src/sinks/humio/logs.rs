@@ -1,4 +1,5 @@
 use codecs::JsonSerializerConfig;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::host_key;
@@ -28,7 +29,7 @@ const HOST: &str = "https://cloud.humio.com";
 #[serde(deny_unknown_fields)]
 pub struct HumioLogsConfig {
     /// The Humio ingestion token.
-    pub(super) token: String,
+    pub(super) token: SensitiveString,
 
     /// The base URL of the Humio instance.
     #[serde(alias = "host")]
@@ -37,7 +38,6 @@ pub struct HumioLogsConfig {
     /// The source of events sent to this sink.
     ///
     /// Typically the filename the logs originated from. Maps to `@source` in Humio.
-    #[configurable(metadata(templateable))]
     pub(super) source: Option<Template>,
 
     #[configurable(derived)]
@@ -46,7 +46,6 @@ pub struct HumioLogsConfig {
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
     /// If unset, Humio will default it to none.
-    #[configurable(metadata(templateable))]
     pub(super) event_type: Option<Template>,
 
     /// Overrides the name of the log field used to grab the hostname to send to Humio.
@@ -76,7 +75,6 @@ pub struct HumioLogsConfig {
     /// For more information, see [Humio’s Format of Data][humio_data_format].
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
-    #[configurable(metadata(templateable))]
     #[serde(default)]
     pub(super) index: Option<Template>,
 
@@ -125,10 +123,10 @@ pub fn timestamp_nanos_key() -> Option<String> {
 impl GenerateConfig for HumioLogsConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            token: "${HUMIO_TOKEN}".to_owned(),
+            token: "${HUMIO_TOKEN}".to_owned().into(),
             endpoint: None,
             source: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             event_type: None,
             indexed_fields: vec![],
             index: None,
@@ -184,6 +182,7 @@ impl HumioLogsConfig {
             },
             timestamp_key: timestamp_key(),
             endpoint_target: EndpointTarget::Event,
+            auto_extract_timestamp: None,
         }
     }
 }
@@ -354,10 +353,10 @@ mod integration_tests {
         batch.max_events = Some(1);
 
         HumioLogsConfig {
-            token: token.to_string(),
+            token: token.to_string().into(),
             endpoint: Some(humio_address()),
             source: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             event_type: None,
             host_key: log_schema().host_key().to_string(),
             indexed_fields: vec![],

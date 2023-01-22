@@ -14,7 +14,10 @@ components: sinks: http: {
 
 	features: {
 		acknowledgements: true
-		healthcheck: enabled: true
+		healthcheck: {
+			enabled:  true
+			uses_uri: true
+		}
 		send: {
 			batch: {
 				enabled:      true
@@ -88,16 +91,42 @@ components: sinks: http: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
 			}
 		}
-		healthcheck: type: object: options: uri: {
-			common: false
+		method: {
+			description: "The HTTP method to use."
+			required:    false
+			common:      false
+			type: string: {
+				default: "POST"
+				enum: {
+					PUT:  "PUT"
+					POST: "POST"
+				}
+			}
+		}
+		payload_prefix: {
 			description: """
-				The full URI to make HTTP health check request to. This should include the protocol and host,
-				but can also include the port, path, and any other valid part of a URI.
+				A string to prefix the payload with.
+
+				This option is ignored if the encoding is not character delimited JSON.
+				If specified, the `payload_suffix`must also be specified and together they must produce a valid JSON object.
 				"""
 			required: false
 			type: string: {
-				default: null
-				examples: ["https://10.22.212.22:9000/health"]
+				default: ""
+				examples: ["{\"data\":"]
+			}
+		}
+		payload_suffix: {
+			description: """
+				A string to suffix the payload with.
+
+				This option is ignored if the encoding is not character delimited JSON.
+				If specified, the `payload_prefix`must also be specified and together they must produce a valid JSON object.
+				"""
+			required: false
+			type: string: {
+				default: ""
+				examples: ["}"]
 			}
 		}
 	}

@@ -7,15 +7,14 @@ use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_common::internal_event::{
-    ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol,
+    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
 };
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
-    event::{Event, EventStatus, Finalizable},
+    event::{EstimatedJsonEncodedSizeOf, Event, EventStatus, Finalizable},
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::StreamSink,
@@ -62,7 +61,7 @@ pub struct NatsSinkConfig {
     connection_name: String,
 
     /// The NATS subject to publish messages to.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::templateable))]
     subject: String,
 
     /// The NATS URL to connect to.
@@ -87,7 +86,7 @@ impl GenerateConfig for NatsSinkConfig {
             acknowledgements: Default::default(),
             auth: None,
             connection_name: "vector".into(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             subject: "from.vector".into(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
@@ -163,6 +162,7 @@ impl NatsSink {
 impl StreamSink<Event> for NatsSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let bytes_sent = register!(BytesSent::from(Protocol::TCP));
+        let events_sent = register!(EventsSent::from(Output(None)));
 
         while let Some(mut event) = input.next().await {
             let finalizers = event.take_finalizers();
@@ -182,7 +182,7 @@ impl StreamSink<Event> for NatsSink {
 
             self.transformer.transform(&mut event);
 
-            let event_byte_size = event.size_of();
+            let event_byte_size = event.estimated_json_encoded_size_of();
 
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {
@@ -200,11 +200,7 @@ impl StreamSink<Event> for NatsSink {
                 Ok(_) => {
                     finalizers.update_status(EventStatus::Delivered);
 
-                    emit!(EventsSent {
-                        byte_size: event_byte_size,
-                        count: 1,
-                        output: None
-                    });
+                    events_sent.emit(CountByteSize(1, event_byte_size));
                     bytes_sent.emit(ByteSize(bytes.len()));
                 }
             }
@@ -292,7 +288,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -318,15 +314,15 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".into(),
-                    password: "natspass".into(),
+                    user: "natsuser".to_string(),
+                    password: "natspass".to_string().into(),
                 },
             }),
         };
@@ -346,15 +342,15 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".into(),
-                    password: "wrongpass".into(),
+                    user: "natsuser".to_string(),
+                    password: "wrongpass".to_string().into(),
                 },
             }),
         };
@@ -377,14 +373,14 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
-                    value: "secret".into(),
+                    value: "secret".to_string().into(),
                 },
             }),
         };
@@ -407,14 +403,14 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
-                    value: "wrongsecret".into(),
+                    value: "wrongsecret".to_string().into(),
                 },
             }),
         };
@@ -437,7 +433,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -468,7 +464,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -499,7 +495,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -531,7 +527,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -557,7 +553,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -591,7 +587,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -623,7 +619,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -659,7 +655,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
         SinkContext,
     },
     sinks::{
-        elasticsearch::{ElasticsearchAuth, ElasticsearchConfig},
+        elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchConfig},
         util::{http::RequestConfig, Compression},
         Healthcheck, VectorSink,
     },
@@ -33,7 +34,7 @@ pub struct AxiomConfig {
     org_id: Option<String>,
 
     /// The Axiom API token.
-    token: String,
+    token: SensitiveString,
 
     /// The Axiom dataset to write to.
     dataset: String,
@@ -90,7 +91,7 @@ impl SinkConfig for AxiomConfig {
         // This configuration wraps the Elasticsearch config to minimize the
         // amount of code.
         let elasticsearch_config = ElasticsearchConfig {
-            endpoint: self.build_endpoint(),
+            endpoints: vec![self.build_endpoint()],
             compression: self.compression,
             auth: Some(ElasticsearchAuth::Basic {
                 user: "axiom".to_string(),
@@ -99,6 +100,7 @@ impl SinkConfig for AxiomConfig {
             query: Some(query),
             tls: self.tls.clone(),
             request,
+            api_version: ElasticsearchApiVersion::V6,
             ..Default::default()
         };
 
@@ -335,7 +337,7 @@ mod integration_tests {
 
         let config = AxiomConfig {
             url: Some(url.clone()),
-            token: token.clone(),
+            token: token.clone().into(),
             dataset: dataset.clone(),
             ..Default::default()
         };

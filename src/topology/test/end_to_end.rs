@@ -24,7 +24,7 @@ pub async fn respond(
     tx.send(())
         .await
         .expect("Error sending 'before' status from test server");
-    waiter.lock().await;
+    let _ = waiter.lock().await;
     Ok(Response::builder()
         .status(status)
         .body(Body::empty())
@@ -104,7 +104,7 @@ uri = "http://{address2}/"
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
-    let (_topology, _shutdown) = topology::start_validated(config, diff, pieces)
+    let (_topology, _) = topology::start_validated(config, diff, pieces)
         .await
         .unwrap();
 

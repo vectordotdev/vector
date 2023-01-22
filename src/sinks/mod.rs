@@ -4,16 +4,19 @@ use snafu::Snafu;
 
 pub mod util;
 
+#[cfg(feature = "sinks-amqp")]
+pub mod amqp;
 #[cfg(feature = "sinks-apex")]
 pub mod apex;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
 pub mod aws_cloudwatch_metrics;
-#[cfg(feature = "sinks-aws_kinesis_firehose")]
-pub mod aws_kinesis_firehose;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-pub mod aws_kinesis_streams;
+#[cfg(any(
+    feature = "sinks-aws_kinesis_streams",
+    feature = "sinks-aws_kinesis_firehose",
+))]
+pub mod aws_kinesis;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
 #[cfg(feature = "sinks-aws_sqs")]
@@ -99,7 +102,8 @@ use vector_config::{configurable_component, NamedComponent};
 pub use vector_core::{config::Input, sink::VectorSink};
 
 use crate::config::{
-    unit_test::UnitTestSinkConfig, AcknowledgementsConfig, Resource, SinkConfig, SinkContext,
+    unit_test::{UnitTestSinkConfig, UnitTestStreamSinkConfig},
+    AcknowledgementsConfig, Resource, SinkConfig, SinkContext,
 };
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
@@ -131,6 +135,10 @@ pub enum HealthcheckError {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(SinkConfig)]
 pub enum Sinks {
+    /// AMQP.
+    #[cfg(feature = "sinks-amqp")]
+    Amqp(#[configurable(derived)] amqp::AmqpSinkConfig),
+
     /// Apex Logs.
     #[cfg(feature = "sinks-apex")]
     Apex(#[configurable(derived)] apex::ApexSinkConfig),
@@ -147,11 +155,10 @@ pub enum Sinks {
 
     /// AWS Kinesis Firehose.
     #[cfg(feature = "sinks-aws_kinesis_firehose")]
-    AwsKinesisFirehose(#[configurable(derived)] aws_kinesis_firehose::KinesisFirehoseSinkConfig),
-
+    AwsKinesisFirehose(#[configurable(derived)] aws_kinesis::firehose::KinesisFirehoseSinkConfig),
     /// AWS Kinesis Streams.
     #[cfg(feature = "sinks-aws_kinesis_streams")]
-    AwsKinesisStreams(#[configurable(derived)] aws_kinesis_streams::KinesisSinkConfig),
+    AwsKinesisStreams(#[configurable(derived)] aws_kinesis::streams::KinesisStreamsSinkConfig),
 
     /// AWS S3.
     #[cfg(feature = "sinks-aws_s3")]
@@ -184,6 +191,10 @@ pub enum Sinks {
     /// Console.
     #[cfg(feature = "sinks-console")]
     Console(#[configurable(derived)] console::ConsoleSinkConfig),
+
+    /// Datadog Archives.
+    #[cfg(feature = "sinks-datadog_archives")]
+    DatadogArchives(#[configurable(derived)] datadog_archives::DatadogArchivesSinkConfig),
 
     /// Datadog Events.
     #[cfg(feature = "sinks-datadog_events")]
@@ -352,6 +363,9 @@ pub enum Sinks {
     /// Unit test.
     UnitTest(#[configurable(derived)] UnitTestSinkConfig),
 
+    /// Unit test stream.
+    UnitTestStream(#[configurable(derived)] UnitTestStreamSinkConfig),
+
     /// Vector.
     #[cfg(feature = "sinks-vector")]
     Vector(#[configurable(derived)] vector::VectorConfig),
@@ -366,6 +380,8 @@ impl NamedComponent for Sinks {
 
     fn get_component_name(&self) -> &'static str {
         match self {
+            #[cfg(feature = "sinks-amqp")]
+            Self::Amqp(config) => config.get_component_name(),
             #[cfg(feature = "sinks-apex")]
             Self::Apex(config) => config.get_component_name(),
             #[cfg(feature = "sinks-aws_cloudwatch_logs")]
@@ -392,6 +408,8 @@ impl NamedComponent for Sinks {
             Self::Clickhouse(config) => config.get_component_name(),
             #[cfg(feature = "sinks-console")]
             Self::Console(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-datadog_archives")]
+            Self::DatadogArchives(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_events")]
             Self::DatadogEvents(config) => config.get_component_name(),
             #[cfg(feature = "sinks-datadog_logs")]
@@ -473,6 +491,7 @@ impl NamedComponent for Sinks {
             #[cfg(test)]
             Self::TestPanic(config) => config.get_component_name(),
             Self::UnitTest(config) => config.get_component_name(),
+            Self::UnitTestStream(config) => config.get_component_name(),
             #[cfg(feature = "sinks-vector")]
             Self::Vector(config) => config.get_component_name(),
             #[cfg(feature = "sinks-websocket")]

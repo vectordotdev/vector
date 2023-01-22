@@ -136,15 +136,15 @@ impl fmt::Display for Data {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Data::None => write!(f, "null"),
-            Data::Boolean(val) => write!(f, "{}", val),
-            Data::I64(val) => write!(f, "{}", val),
-            Data::U64(val) => write!(f, "{}", val),
-            Data::F32(val) => write!(f, "{}", val),
-            Data::F64(val) => write!(f, "{}", val),
-            Data::I128(val) => write!(f, "{}", val),
-            Data::U128(val) => write!(f, "{}", val),
-            Data::Char(val) => write!(f, "{}", val),
-            Data::String(val) => write!(f, "{}", val),
+            Data::Boolean(val) => write!(f, "{val}"),
+            Data::I64(val) => write!(f, "{val}"),
+            Data::U64(val) => write!(f, "{val}"),
+            Data::F32(val) => write!(f, "{val}"),
+            Data::F64(val) => write!(f, "{val}"),
+            Data::I128(val) => write!(f, "{val}"),
+            Data::U128(val) => write!(f, "{val}"),
+            Data::Char(val) => write!(f, "{val}"),
+            Data::String(val) => write!(f, "{val}"),
         }
     }
 }
@@ -180,13 +180,13 @@ impl<'a> KeyValueSerializer<'a> {
 
     fn descend(mut self, child: impl fmt::Display) -> Self {
         self.key.push(self.separator);
-        write!(&mut self.key, "{}", child).expect("Shouldn't be reachable.");
+        write!(&mut self.key, "{child}").expect("Shouldn't be reachable.");
         self
     }
 
     fn child(&mut self, child: impl fmt::Display) -> KeyValueSerializer<'_> {
         KeyValueSerializer {
-            key: format!("{}{}{}", self.key, self.separator, child),
+            key: format!("{}{}{child}", self.key, self.separator),
             separator: self.separator,
             output: self.output,
         }
@@ -228,7 +228,7 @@ impl<'a> Serializer for KeyValueSerializer<'a> {
     }
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
-        self.process(Data::I64(v as i64))
+        self.process(Data::I64(v))
     }
 
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
@@ -243,7 +243,7 @@ impl<'a> Serializer for KeyValueSerializer<'a> {
     }
 
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
-        self.process(Data::U64(v as u64))
+        self.process(Data::U64(v))
     }
 
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {

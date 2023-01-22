@@ -5,9 +5,9 @@ use syn::{
     parse_macro_input, parse_quote, spanned::Spanned, token::Colon2, DeriveInput, ExprPath, Ident,
     PathArguments, Type,
 };
-use vector_config_common::{attributes::CustomAttribute, validation::Validation};
+use vector_config_common::validation::Validation;
 
-use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
+use crate::ast::{Container, Data, Field, LazyCustomAttribute, Style, Tagging, Variant};
 
 pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
     // Parse our input token stream as a derive input, and process the container, and the
@@ -138,11 +138,11 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
         fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::vec::Vec::new();
 
-            let schema_metadata = <Self as ::vector_config::Configurable>::metadata();
+            let enum_metadata = <Self as ::vector_config::Configurable>::metadata();
             #(#mapped_variants)*
 
-            let mut schema = ::vector_config::schema::generate_composite_schema(&subschemas);
-            ::vector_config::schema::apply_metadata(&mut schema, schema_metadata);
+            let mut schema = ::vector_config::schema::generate_one_of_schema(&subschemas);
+            ::vector_config::schema::apply_metadata(&mut schema, enum_metadata);
 
             Ok(schema)
         }
@@ -167,14 +167,13 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
 
     let spanned_generate_schema = quote_spanned! {field.span()=>
-        ::vector_config::schema::get_or_generate_schema(schema_gen, #field_metadata_ref.as_subschema())?
+        ::vector_config::schema::get_or_generate_schema(schema_gen, #field_metadata_ref)?
     };
 
     quote! {
         #field_metadata
 
         let mut subschema = #spanned_generate_schema;
-        ::vector_config::schema::apply_metadata(&mut subschema, #field_metadata_ref);
     }
 }
 
@@ -268,6 +267,8 @@ fn build_named_struct_generate_schema_fn(
             let metadata = <Self as ::vector_config::Configurable>::metadata();
             #(#mapped_fields)*
 
+            let had_unflatted_properties = !properties.is_empty();
+
             let additional_properties = None;
             let mut schema = ::vector_config::schema::generate_struct_schema(
                 properties,
@@ -277,6 +278,16 @@ fn build_named_struct_generate_schema_fn(
 
             // If we have any flattened subschemas, deal with them now.
             if !flattened_subschemas.is_empty() {
+                // A niche case here is if all fields were flattened, which would leave our main
+                // schema as simply validating that the value is an object, and _nothing_ else.
+                //
+                // That's kind of useless, and ends up as noise in the schema, so if we didn't have
+                // any of our own unflattened properties, then steal the first flattened subschema
+                // and swap our main schema for it before flattening things overall.
+                if !had_unflatted_properties {
+                    schema = flattened_subschemas.remove(0);
+                }
+
                 ::vector_config::schema::convert_to_flattened_schema(&mut schema, flattened_subschemas);
             }
 
@@ -346,6 +357,21 @@ fn generate_container_metadata(
     let maybe_deprecated = get_metadata_deprecated(meta_ident, container.deprecated());
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, container.metadata());
 
+    // We add a special metadata that informs consumers of the schema what the "tagging mode" of
+    // this enum is. This is important because when we're using the schema to generate
+    // documentation, it can be hard to generate something that is as succinct as how you might
+    // otherwise describe the configuration behavior using natural language. Additionally, we
+    // typically allow deserialization such that fields are overlapped, and if variants had, for
+    // example, 3 shared fields between all variants, and each variant only had 1 unique field, we
+    // wouldn't want to relist all the shared fields per variant.... we just want to be able to
+    // describe which variant has to be used for its unique (variant specific) fields to be
+    // relevant.
+    let enum_metadata_attrs = container
+        .tagging()
+        .map(|tagging| tagging.as_enum_metadata());
+    let enum_metadata =
+        get_metadata_custom_attributes(meta_ident, enum_metadata_attrs.into_iter().flatten());
+
     quote! {
         let mut #meta_ident = ::vector_config::Metadata::default();
         #maybe_title
@@ -353,6 +379,7 @@ fn generate_container_metadata(
         #maybe_default_value
         #maybe_deprecated
         #maybe_custom_attributes
+        #enum_metadata
     }
 }
 
@@ -360,12 +387,60 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let field_ty = field.ty();
     let field_schema_ty = get_field_schema_ty(field);
 
+    // Our rules around how we generate this metadata are slightly complex, but here it goes:
+    //
+    // - All `Configurable` types define their own metadata, which at a minimum is their
+    //   description. It can optionally include things like validation rules, and custom attributes,
+    //   of which we use to better document types for downstream consumption. An example would be
+    //   specifying the integer type (signed vs unsigned vs floating point) as JSON Schema does not
+    //   differentiate between the three.
+    // - Building on that, there are types like `bool` or `u64` (scalars, essentially) where having
+    //   a description for the `Configurable` implementation on `bool` or `u64` makes no sense,
+    //   because the type name is self-describing. These types set the "transparent" flag in their
+    //   metadata to indicate that they intentionally have no description and that it's fine to not
+    //   emit a description in the schema for this type.
+    // - Scalars are also not "referenceable" which means their schema is used inline, not pointed
+    //   to by a schema reference.
+    // - All other types, whether they have a derive-based or hand-written implementation of
+    //   `Configurable` should have a referenceable name.
+    // - When using a referenceable type for a named field (struct or enum variant), it can be
+    //   annotated with a derive helper attribute called `derived`, which informs the codegen that
+    //   the title/description for that field should come from the field type's schema itself.
+    //
+    // Now that we've laid out the rules and invariants, let's talk about this code below.
+    //
+    // For non-referenceable types, their schema -- and thus their metadata -- will be used inline
+    // as the schema for the field, so we want to simply _merge_ our field's metadata into the field
+    // type's metadata.
+    //
+    // For referenceable types, their schema will be referred to by an identifier, and the
+    // definition attached to that identifier will carry the field type's metadata. Any metadata
+    // specified on the field itself should live solely on the field's schema (which can exist
+    // alongside the schema reference) and vice versa.
     let spanned_metadata = quote_spanned! {field.span()=>
-        <#field_schema_ty as ::vector_config::Configurable>::metadata()
+        if <#field_schema_ty as ::vector_config::Configurable>::referenceable_name().is_none() {
+            <#field_schema_ty as ::vector_config::Configurable>::metadata()
+        } else {
+            ::vector_config::Metadata::default()
+        }
     };
 
     let maybe_title = get_metadata_title(meta_ident, field.title());
     let maybe_description = get_metadata_description(meta_ident, field.description());
+    let maybe_clear_title_description = field
+        .title()
+        .or_else(|| field.description())
+        .is_some()
+        .then(|| {
+            quote! {
+                // Fields with a title/description of their own cannot merge with the title/description
+                // of the field type itself, as this will generally lead to confusing output, so we
+                // explicitly clear the title/description first if we're about to set our own
+                // title/description.
+                #meta_ident.clear_title();
+                #meta_ident.clear_description();
+            }
+        });
     let maybe_default_value = if field_ty != field_schema_ty {
         get_metadata_default_value_delegated(meta_ident, field_schema_ty, field.default_value())
     } else {
@@ -378,6 +453,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
 
     quote! {
         let mut #meta_ident = #spanned_metadata;
+        #maybe_clear_title_description
         #maybe_title
         #maybe_description
         #maybe_default_value
@@ -402,6 +478,20 @@ fn generate_variant_metadata(
         get_metadata_transparent(meta_ident, variant.tagging() == &Tagging::None);
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, variant.metadata());
 
+    // We add a special metadata key (`logical_name`) that informs consumers of the schema what the
+    // variant name is for this variant's subschema. While the doc comments being coerced into title
+    // and/or description are typically good enough, sometimes we need a more mechanical mapping of
+    // the variant's name since shoving it into the title would mean doc comments with redundant
+    // information.
+    //
+    // You can think of this as an enum-specific additional title.
+    let logical_name_attrs = vec![LazyCustomAttribute::kv(
+        "logical_name",
+        variant.ident().to_string(),
+    )];
+    let variant_logical_name =
+        get_metadata_custom_attributes(meta_ident, logical_name_attrs.into_iter());
+
     // We specifically use `()` as the type here because we need to generate the metadata for this
     // variant, but there's no unique concrete type for a variant, only the type of the enum
     // container it exists within. We also don't want to use the metadata of the enum container, as
@@ -413,6 +503,27 @@ fn generate_variant_metadata(
         #maybe_deprecated
         #maybe_transparent
         #maybe_custom_attributes
+        #variant_logical_name
+    }
+}
+
+fn generate_variant_tag_metadata(
+    meta_ident: &Ident,
+    variant: &Variant<'_>,
+) -> proc_macro2::TokenStream {
+    // For enum variant tags, all we care about is shuttling the title/description of the variant
+    // itself along with the tag field to make downstream consumption and processing easier.
+    let maybe_title = get_metadata_title(meta_ident, variant.title());
+    let maybe_description = get_metadata_description(meta_ident, variant.description());
+
+    // We specifically use `()` as the type here because we need to generate the metadata for this
+    // variant, but there's no unique concrete type for a variant, only the type of the enum
+    // container it exists within. We also don't want to use the metadata of the enum container, as
+    // it might have values that would conflict with the metadata of this specific variant.
+    quote! {
+        let mut #meta_ident = ::vector_config::Metadata::<()>::default();
+        #maybe_title
+        #maybe_description
     }
 }
 
@@ -500,18 +611,17 @@ fn get_metadata_validation(
 
 fn get_metadata_custom_attributes(
     meta_ident: &Ident,
-    custom_attributes: impl Iterator<Item = CustomAttribute>,
+    custom_attributes: impl Iterator<Item = LazyCustomAttribute>,
 ) -> proc_macro2::TokenStream {
     let mapped_custom_attributes = custom_attributes
         .map(|attr| match attr {
-            CustomAttribute::Flag(key) => quote! {
-                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::Flag(#key.to_string()));
+            LazyCustomAttribute::Flag(key) => quote! {
+                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::flag(#key));
             },
-            CustomAttribute::KeyValue { key, value } => quote! {
-                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::KeyValue {
-                    key: #key.to_string(),
-                    value: #value.to_string(),
-                });
+            LazyCustomAttribute::KeyValue { key, value } => quote! {
+                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::kv(
+                    #key, #value
+                ));
             },
         });
 
@@ -579,18 +689,20 @@ fn generate_enum_struct_named_variant_schema(
     let mapped_fields = variant.fields().iter().map(generate_named_enum_field);
 
     quote! {
-        let mut properties = ::vector_config::indexmap::IndexMap::new();
-        let mut required = ::std::collections::BTreeSet::new();
+        {
+            let mut properties = ::vector_config::indexmap::IndexMap::new();
+            let mut required = ::std::collections::BTreeSet::new();
 
-        #(#mapped_fields)*
+            #(#mapped_fields)*
 
-        #post_fields
+            #post_fields
 
-        let mut subschema = ::vector_config::schema::generate_struct_schema(
-            properties,
-            required,
-            None
-        );
+            ::vector_config::schema::generate_struct_schema(
+                properties,
+                required,
+                None
+            )
+        }
     }
 }
 
@@ -600,14 +712,26 @@ fn generate_enum_newtype_struct_variant_schema(variant: &Variant<'_>) -> proc_ma
     // metadata or anything, since things like defaults can't travel from the enum
     // container to a specific variant anyways.
     let field = variant.fields().first().expect("must exist");
-    generate_struct_field(field)
-}
-
-fn generate_enum_unit_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStream {
-    let variant_name = variant.name();
+    let field_schema = generate_struct_field(field);
 
     quote! {
-        let mut subschema = ::vector_config::schema::generate_const_string_schema(#variant_name.to_string());
+        {
+            #field_schema
+            subschema
+        }
+    }
+}
+
+fn generate_enum_variant_tag_schema(variant: &Variant<'_>) -> proc_macro2::TokenStream {
+    let variant_name = variant.name();
+    let apply_variant_tag_metadata = generate_enum_variant_tag_apply_metadata(variant);
+
+    quote! {
+        {
+            let mut tag_subschema = ::vector_config::schema::generate_const_string_schema(#variant_name.to_string());
+            #apply_variant_tag_metadata
+            tag_subschema
+        }
     }
 }
 
@@ -621,9 +745,7 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
     //   Unit,
     // }
     let variant_name = variant.name();
-    let apply_variant_metadata = generate_enum_variant_apply_metadata(variant);
-
-    match variant.tagging() {
+    let variant_schema = match variant.tagging() {
         // The variant is represented "externally" by wrapping the contents of the variant as an
         // object pointed to by a property whose name is the name of the variant.
         //
@@ -645,7 +767,7 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
                 ),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
                 Style::Newtype => (true, generate_enum_newtype_struct_variant_schema(variant)),
-                Style::Unit => (false, generate_enum_unit_variant_schema(variant)),
+                Style::Unit => (false, generate_enum_variant_tag_schema(variant)),
             };
 
             // In external mode, we don't wrap the schema for unit variants, because they're
@@ -653,27 +775,11 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
             //
             // TODO: we can maybe reuse the existing struct schema gen stuff here, but we'd need
             // a way to force being required + customized metadata
-            let variant_schema = if wrapped {
-                quote! {
-                    #variant_schema
-
-                    let mut wrapper_properties = ::vector_config::indexmap::IndexMap::new();
-                    let mut wrapper_required = ::std::collections::BTreeSet::new();
-
-                    wrapper_properties.insert(#variant_name.to_string(), subschema);
-                    wrapper_required.insert(#variant_name.to_string());
-
-                    let mut subschema = ::vector_config::schema::generate_struct_schema(
-                        wrapper_properties,
-                        wrapper_required,
-                        None
-                    );
-                }
+            if wrapped {
+                generate_single_field_struct_schema(variant_name, variant_schema)
             } else {
                 variant_schema
-            };
-
-            generate_enum_variant_subschema(variant, variant_schema)
+            }
         }
         // The variant is represented "internally" by adding a new property to the contents of the
         // variant whose name is the value of `tag` and must match the name of the variant.
@@ -693,12 +799,10 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
 
                 // Just generate the tag field directly and pass it along to be included in the
                 // struct schema.
+                let tag_schema = generate_enum_variant_tag_schema(variant);
                 let tag_field = quote! {
                     {
-                        let mut subschema = ::vector_config::schema::generate_const_string_schema(#variant_name.to_string());
-                        #apply_variant_metadata
-
-                        if let Some(_) = properties.insert(#tag.to_string(), subschema) {
+                        if let Some(_) = properties.insert(#tag.to_string(), #tag_schema) {
                             panic!(#tag_already_contained);
                         }
 
@@ -707,10 +811,7 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
                         }
                     }
                 };
-                let variant_schema =
-                    generate_enum_struct_named_variant_schema(variant, Some(tag_field));
-
-                generate_enum_variant_subschema(variant, variant_schema)
+                generate_enum_struct_named_variant_schema(variant, Some(tag_field))
             }
             Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
             Style::Newtype => {
@@ -721,47 +822,27 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
                 // As such, we generate the schema for the single field, like we would normally do for a newtype
                 // variant, and then we follow the struct flattening logic where we layer on our tag field schema on the
                 // schema of the wrapped field... and since it has to be a struct or map to be valid for `serde`, that
-                // means it will also be an object schema in both cases, which means our flatteneing logic will be
+                // means it will also be an object schema in both cases, which means our flattening logic will be
                 // correct if the caller is doing The Right Thing (tm).
-                let wrapped_variant_schema = generate_enum_newtype_struct_variant_schema(variant);
+                let newtype_schema = generate_enum_newtype_struct_variant_schema(variant);
+                let tag_schema = generate_enum_variant_tag_schema(variant);
 
-                let variant_schema = quote! {
-                    let mut subschema = {
-                        let tag_schema = ::vector_config::schema::generate_internal_tagged_variant_schema(#tag.to_string(), #variant_name.to_string());
-                        let mut flattened_subschemas = ::std::vec::Vec::new();
-                        flattened_subschemas.push(tag_schema);
+                quote! {
+                    let tag_schema = ::vector_config::schema::generate_internal_tagged_variant_schema(#tag.to_string(), #tag_schema);
+                    let mut flattened_subschemas = ::std::vec::Vec::new();
+                    flattened_subschemas.push(tag_schema);
 
-                        #wrapped_variant_schema
+                    let mut newtype_schema = #newtype_schema;
+                    ::vector_config::schema::convert_to_flattened_schema(&mut newtype_schema, flattened_subschemas);
 
-                        ::vector_config::schema::convert_to_flattened_schema(&mut subschema, flattened_subschemas);
-
-                        subschema
-                    };
-                };
-
-                generate_enum_variant_subschema(variant, variant_schema)
+                    newtype_schema
+                }
             }
             Style::Unit => {
                 // Internally-tagged unit variants are basically just a play on externally-tagged
                 // struct variants.
-                let variant_schema = generate_enum_unit_variant_schema(variant);
-                let variant_schema = quote! {
-                    #variant_schema
-
-                    let mut wrapper_properties = ::vector_config::indexmap::IndexMap::new();
-                    let mut wrapper_required = ::std::collections::BTreeSet::new();
-
-                    wrapper_properties.insert(#tag.to_string(), subschema);
-                    wrapper_required.insert(#tag.to_string());
-
-                    let mut subschema = ::vector_config::schema::generate_struct_schema(
-                        wrapper_properties,
-                        wrapper_required,
-                        None
-                    );
-                };
-
-                generate_enum_variant_subschema(variant, variant_schema)
+                let variant_schema = generate_enum_variant_tag_schema(variant);
+                generate_single_field_struct_schema(tag, variant_schema)
             }
         },
         // The variant is represented "adjacent" to the content, such that the variant name is in a
@@ -782,43 +863,34 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
             // For struct-type variants, just generate their schema as normal, and we'll wrap it up
             // in a new object.  For unit variants, adjacent tagging is identical to internal
             // tagging, so we handle that one by hand.
-            let tag_schema = generate_enum_unit_variant_schema(variant);
-            let maybe_variant_schema = match variant.style() {
+            let tag_schema = generate_enum_variant_tag_schema(variant);
+            let maybe_content_schema = match variant.style() {
                 Style::Struct => Some(generate_enum_struct_named_variant_schema(variant, None)),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
                 Style::Newtype => Some(generate_enum_newtype_struct_variant_schema(variant)),
                 Style::Unit => None,
             }
-            .map(|schema| {
+            .map(|content_schema| {
                 quote! {
-                    #schema
-                    wrapper_properties.insert(#content.to_string(), subschema);
+                    wrapper_properties.insert(#content.to_string(), #content_schema);
                     wrapper_required.insert(#content.to_string());
                 }
             });
 
-            let apply_variant_metadata = generate_enum_variant_apply_metadata(variant);
-
             quote! {
-                {
-                    let mut wrapper_properties = ::vector_config::indexmap::IndexMap::new();
-                    let mut wrapper_required = ::std::collections::BTreeSet::new();
+                let mut wrapper_properties = ::vector_config::indexmap::IndexMap::new();
+                let mut wrapper_required = ::std::collections::BTreeSet::new();
 
-                    #tag_schema
-                    wrapper_properties.insert(#tag.to_string(), subschema);
-                    wrapper_required.insert(#tag.to_string());
+                wrapper_properties.insert(#tag.to_string(), #tag_schema);
+                wrapper_required.insert(#tag.to_string());
 
-                    #maybe_variant_schema
+                #maybe_content_schema
 
-                    let mut subschema = ::vector_config::schema::generate_struct_schema(
-                        wrapper_properties,
-                        wrapper_required,
-                        None
-                    );
-                    #apply_variant_metadata
-
-                    subschemas.push(subschema);
-                }
+                ::vector_config::schema::generate_struct_schema(
+                    wrapper_properties,
+                    wrapper_required,
+                    None
+                )
             }
         }
         Tagging::None => {
@@ -845,16 +917,35 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
             //
             // TODO: actually implement the aforementioned higher-level check
 
-            let variant_schema = match variant.style() {
+            match variant.style() {
                 Style::Struct => generate_enum_struct_named_variant_schema(variant, None),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
                 Style::Newtype => generate_enum_newtype_struct_variant_schema(variant),
-                Style::Unit => {
-                    quote! { let mut subschema = ::vector_config::schema::generate_null_schema(); }
-                }
-            };
+                Style::Unit => quote! { ::vector_config::schema::generate_null_schema() },
+            }
+        }
+    };
 
-            generate_enum_variant_subschema(variant, variant_schema)
+    generate_enum_variant_subschema(variant, variant_schema)
+}
+
+fn generate_single_field_struct_schema(
+    property_name: &str,
+    property_schema: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    quote! {
+        {
+            let mut wrapper_properties = ::vector_config::indexmap::IndexMap::new();
+            let mut wrapper_required = ::std::collections::BTreeSet::new();
+
+            wrapper_properties.insert(#property_name.to_string(), #property_schema);
+            wrapper_required.insert(#property_name.to_string());
+
+            ::vector_config::schema::generate_struct_schema(
+                wrapper_properties,
+                wrapper_required,
+                None
+            )
         }
     }
 }
@@ -869,6 +960,16 @@ fn generate_enum_variant_apply_metadata(variant: &Variant<'_>) -> proc_macro2::T
     }
 }
 
+fn generate_enum_variant_tag_apply_metadata(variant: &Variant<'_>) -> proc_macro2::TokenStream {
+    let variant_tag_metadata_ref = Ident::new("variant_tag_metadata", Span::call_site());
+    let variant_tag_metadata = generate_variant_tag_metadata(&variant_tag_metadata_ref, variant);
+
+    quote! {
+        #variant_tag_metadata
+        ::vector_config::schema::apply_metadata(&mut tag_subschema, #variant_tag_metadata_ref);
+    }
+}
+
 fn generate_enum_variant_subschema(
     variant: &Variant<'_>,
     variant_schema: proc_macro2::TokenStream,
@@ -877,7 +978,7 @@ fn generate_enum_variant_subschema(
 
     quote! {
         {
-            #variant_schema
+            let mut subschema = { #variant_schema };
             #apply_variant_metadata
 
             subschemas.push(subschema);

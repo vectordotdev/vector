@@ -167,7 +167,7 @@ pub fn init_test() {
 fn has_tags(metric: &Metric, names: &[&str]) -> bool {
     metric
         .tags()
-        .map(|tags| names.iter().all(|name| tags.contains_key(*name)))
+        .map(|tags| names.iter().all(|name| tags.contains_key(name)))
         .unwrap_or_else(|| names.is_empty())
 }
 
@@ -217,10 +217,7 @@ impl ComponentTester {
                     .map(|m| {
                         let tags = m
                             .tags()
-                            .map(|t| {
-                                let tag_keys = t.keys().cloned().collect::<Vec<_>>();
-                                format!("{{{}}}", tag_keys.join(","))
-                            })
+                            .map(|t| format!("{{{}}}", itertools::join(t.keys(), ",")))
                             .unwrap_or_default();
                         format!("\n    -> Found similar metric `{}{}`", m.name(), tags)
                     })
@@ -291,6 +288,18 @@ where
 {
     run_and_assert_source_advanced(source, |_| {}, None, Some(event_count), &SOURCE_TESTS, tags)
         .await
+}
+
+/// Runs and returns a future and asserts that the provided test specification passes.
+#[track_caller]
+pub async fn assert_source_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    init_test();
+
+    let result = f.await;
+
+    COMPONENT_TESTS_ERROR.assert(tags);
+
+    result
 }
 
 /// Runs source tests with timeout and asserts error path compliance.

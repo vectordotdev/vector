@@ -128,22 +128,22 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 Vector is an end-to-end, unified, open data platform.
 
-|                     | **Vector** | Beats | Fluentbit | Fluentd | Logstash | Splunk UF | Splunk HF |
-|--------------------:|:----------:|:-----:|:---------:|:-------:|:--------:|:---------:|:---------:|
-|      **End-to-end** |   **✓**    |       |           |         |          |           |           |
-|               Agent |   **✓**    |   ✓   |     ✓     |         |          |     ✓     |           |
-|          Aggregator |   **✓**    |       |           |    ✓    |    ✓     |           |     ✓     |
-|         **Unified** |   **✓**    |       |           |         |          |           |           |
-|                Logs |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
-|             Metrics |   **✓**    |   ⚠   |     ⚠     |    ⚠    |    ⚠     |     ⚠     |     ⚠     |
-|              Traces |     🚧      |       |           |         |          |           |           |
-|            **Open** |   **✓**    |       |     ✓     |    ✓    |          |           |           |
-|         Open-source |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |           |           |
-|      Vendor-neutral |   **✓**    |       |     ✓     |    ✓    |          |           |           |
-|     **Reliability** |   **✓**    |       |           |         |          |           |           |
-|         Memory-safe |   **✓**    |       |           |         |          |           |           |
-| Delivery guarantees |   **✓**    |       |           |         |          |     ✓     |     ✓     |
-|          Multi-core |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+|                     | **Vector** | Beats | Fluentbit | Fluentd | Logstash | Splunk UF | Splunk HF | Telegraf |
+|--------------------:|:----------:|:-----:|:---------:|:-------:|:--------:|:---------:|:---------:|:--------:|
+|      **End-to-end** |   **✓**    |       |           |         |          |           |           |     ✓    |
+|               Agent |   **✓**    |   ✓   |     ✓     |         |          |     ✓     |           |     ✓    |
+|          Aggregator |   **✓**    |       |           |    ✓    |    ✓     |           |     ✓     |     ✓    |
+|         **Unified** |   **✓**    |       |           |         |          |           |           |     ✓    |
+|                Logs |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |     ✓    |
+|             Metrics |   **✓**    |   ⚠   |     ⚠     |    ⚠    |    ⚠     |     ⚠     |     ⚠     |     ✓    |
+|              Traces |     🚧     |       |           |         |          |           |           |          |
+|            **Open** |   **✓**    |       |     ✓     |    ✓    |          |           |           |     ✓    |
+|         Open-source |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |           |           |     ✓    |
+|      Vendor-neutral |   **✓**    |       |     ✓     |    ✓    |          |           |           |     ✓    |
+|     **Reliability** |   **✓**    |       |           |         |          |           |           |          |
+|         Memory-safe |   **✓**    |       |           |         |          |           |           |     ✓    |
+| Delivery guarantees |   **✓**    |       |           |         |          |     ✓     |     ✓     |          |
+|          Multi-core |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |     ✓    |
 
 
 ⚠ = Not interoperable, metrics are represented as structured logs
@@ -203,7 +203,6 @@ Vector is an end-to-end, unified, open data platform.
 [docs.sources]: https://vector.dev/docs/reference/configuration/sources/
 [docs.transforms.dedupe]: https://vector.dev/docs/reference/configuration/transforms/dedupe/
 [docs.transforms.filter]: https://vector.dev/docs/reference/configuration/transforms/filter/
-[docs.transforms.geoip]: https://vector.dev/docs/reference/configuration/transforms/geoip/
 [docs.transforms.log_to_metric]: https://vector.dev/docs/reference/configuration/transforms/log_to_metric/
 [docs.transforms.lua]: https://vector.dev/docs/reference/configuration/transforms/lua/
 [docs.transforms.remap]: https://vector.dev/docs/reference/configuration/transforms/remap/
@@ -226,5 +225,5 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_test_harness]: https://github.com/vectordotdev/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
 [urls.vector_versioning_policy]: https://github.com/vectordotdev/vector/blob/master/VERSIONING.md
-[urls.vote_feature]: https://github.com/vectordotdev/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
+[urls.vote_feature]: https://github.com/vectordotdev/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22type%3A+feature%22
 

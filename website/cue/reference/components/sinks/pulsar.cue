@@ -16,7 +16,12 @@ components: sinks: pulsar: {
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
-			compression: enabled: false
+			compression: {
+				enabled: true
+				default: "none"
+				algorithms: ["none", "lz4", "zlib", "zstd", "snappy"]
+				levels: ["none"]
+			}
 			encoding: {
 				enabled: true
 				codec: {
@@ -133,6 +138,15 @@ components: sinks: pulsar: {
 			required:    true
 			type: string: {
 				examples: ["topic-1234"]
+			}
+		}
+		partition_key_field: {
+			common:      false
+			description: "Log field name to use as Pulsar message key."
+			required:    false
+			type: string: {
+				default: null
+				examples: ["message", "my_field"]
 			}
 		}
 	}

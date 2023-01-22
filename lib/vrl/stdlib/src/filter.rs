@@ -13,7 +13,7 @@ where
                     Ok(v) => v
                         .as_boolean()
                         .expect("compiler guarantees boolean return type")
-                        .then(|| Ok((key, value))),
+                        .then_some(Ok((key, value))),
                     Err(err) => Some(Err(err)),
                 },
             )
@@ -28,14 +28,14 @@ where
                     Ok(v) => v
                         .as_boolean()
                         .expect("compiler guarantees boolean return type")
-                        .then(|| Ok(value)),
+                        .then_some(Ok(value)),
                     Err(err) => Some(Err(err)),
                 },
             )
             .collect::<Result<Vec<_>>>()
             .map(Into::into),
 
-        _ => unreachable!("function requires collection types as input"),
+        _ => Err("function requires collection types as input".into()),
     }
 }
 

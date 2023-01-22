@@ -1,11 +1,11 @@
 use darling::{error::Accumulator, util::Flag, FromAttributes};
+use proc_macro2::Ident;
 use serde_derive_internals::ast as serde_ast;
 use syn::spanned::Spanned;
-use vector_config_common::attributes::CustomAttribute;
 
 use super::{
     util::{try_extract_doc_title_description, DarlingResultIterator},
-    Field, Metadata, Style, Tagging,
+    Field, LazyCustomAttribute, Metadata, Style, Tagging,
 };
 
 /// A variant in an enum.
@@ -48,6 +48,11 @@ impl<'a> Variant<'a> {
             tagging,
         };
         accumulator.finish_with(variant)
+    }
+
+    /// Ident of the variant.
+    pub fn ident(&self) -> &Ident {
+        &self.original.ident
     }
 
     /// Style of the variant.
@@ -140,7 +145,7 @@ impl<'a> Variant<'a> {
     /// Whether or not this variant is visible during either serialization or deserialization.
     ///
     /// This is derived from whether any of the `serde` visibility attributes are applied: `skip`,
-    /// `skip_serializing, and `skip_deserializing`. Unless the variant is skipped entirely, it will
+    /// `skip_serializing`, and `skip_deserializing`. Unless the variant is skipped entirely, it will
     /// be considered visible and part of the schema.
     pub fn visible(&self) -> bool {
         self.attrs.visible
@@ -151,7 +156,7 @@ impl<'a> Variant<'a> {
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
     /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
     /// metadata to be attached directly to variants.
-    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+    pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
         self.attrs
             .metadata
             .clone()

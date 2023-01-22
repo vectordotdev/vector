@@ -1,7 +1,7 @@
 ---
 title: Install Vector using RPM
 short: RPM
-weight: 7
+weight: 8
 ---
 
 RPM Package Manager is a free and open source package management system for installing and managing software on Fedora, CentOS, OpenSUSE, OpenMandriva, Red Hat Enterprise Linux, and related Linux-based systems. This covers installing and managing Vector through the RPM package repository.
@@ -32,6 +32,6 @@ sudo rpm -e vector
 
 ## Management
 
-{{< jump "/docs/administration/management" "apt-dpkg-rpm-yum" >}}
+{{< jump "/docs/administration/management" "apt-dpkg-rpm-yum-pacman" >}}
 
 [rpm]: https://rpm.org/

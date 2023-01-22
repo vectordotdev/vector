@@ -8,13 +8,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use futures::{
-    future::{self},
-    pin_mut,
-    sink::SinkExt,
-    stream::BoxStream,
-    Sink, Stream, StreamExt,
-};
+use futures::{pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::TcpStream, time};
 use tokio_tungstenite::{
@@ -30,8 +24,10 @@ use tokio_tungstenite::{
 };
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    internal_event::{ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol},
-    ByteSizeOf,
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+    },
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -189,7 +185,7 @@ impl PingInterval {
     }
 
     async fn tick(&mut self) -> time::Instant {
-        future::poll_fn(|cx| self.poll_tick(cx)).await
+        std::future::poll_fn(|cx| self.poll_tick(cx)).await
     }
 }
 
@@ -261,6 +257,7 @@ impl WebSocketSink {
         let mut last_pong = Instant::now();
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
+        let events_sent = register!(EventsSent::from(Output(None)));
 
         loop {
             let result = tokio::select! {
@@ -294,7 +291,7 @@ impl WebSocketSink {
 
                     self.transformer.transform(&mut event);
 
-                    let event_byte_size = event.size_of();
+                    let event_byte_size = event.estimated_json_encoded_size_of();
 
                     let mut bytes = BytesMut::new();
                     let res = match self.encoder.encode(event, &mut bytes) {
@@ -305,11 +302,7 @@ impl WebSocketSink {
                             let message_len = message.len();
 
                             ws_sink.send(message).await.map(|_| {
-                                emit!(EventsSent {
-                                    count: 1,
-                                    byte_size: event_byte_size,
-                                    output: None
-                                });
+                                events_sent.emit(CountByteSize(1, event_byte_size));
                                 bytes_sent.emit(ByteSize(message_len));
                             })
                         },
@@ -406,7 +399,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
@@ -422,14 +415,14 @@ mod tests {
         trace_init();
 
         let auth = Some(Auth::Bearer {
-            token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string(),
+            token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string().into(),
         });
         let auth_clone = auth.clone();
         let addr = next_addr();
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
@@ -459,7 +452,7 @@ mod tests {
                     ..Default::default()
                 },
             }),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             ping_timeout: None,
             ping_interval: None,
             acknowledgements: Default::default(),
@@ -477,7 +470,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
@@ -560,7 +553,7 @@ mod tests {
                                     if let Some(h) = hdr {
                                         match a {
                                             Auth::Bearer { token } => {
-                                                if format!("Bearer {}", token)
+                                                if format!("Bearer {}", token.inner())
                                                     != h.to_str().unwrap()
                                                 {
                                                     return Err(

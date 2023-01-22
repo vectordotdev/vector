@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use lookup::event_path;
+use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -44,15 +44,15 @@ impl GelfDeserializerConfig {
             Kind::object(Collection::empty()),
             [log_namespace],
         )
-        .with_field(VERSION, Kind::bytes(), None)
-        .with_field(HOST, Kind::bytes(), None)
-        .with_field(SHORT_MESSAGE, Kind::bytes(), None)
-        .optional_field(FULL_MESSAGE, Kind::bytes(), None)
-        .optional_field(TIMESTAMP, Kind::timestamp(), None)
-        .optional_field(LEVEL, Kind::integer(), None)
-        .optional_field(FACILITY, Kind::bytes(), None)
-        .optional_field(LINE, Kind::integer(), None)
-        .optional_field(FILE, Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(VERSION), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(HOST), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(SHORT_MESSAGE), Kind::bytes(), None)
+        .optional_field(&owned_value_path!(FULL_MESSAGE), Kind::bytes(), None)
+        .optional_field(&owned_value_path!(TIMESTAMP), Kind::timestamp(), None)
+        .optional_field(&owned_value_path!(LEVEL), Kind::integer(), None)
+        .optional_field(&owned_value_path!(FACILITY), Kind::bytes(), None)
+        .optional_field(&owned_value_path!(LINE), Kind::integer(), None)
+        .optional_field(&owned_value_path!(FILE), Kind::bytes(), None)
         // Every field with an underscore (_) prefix will be treated as an additional field.
         // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
         // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
@@ -79,7 +79,7 @@ impl GelfDeserializer {
 
     /// Builds a LogEvent from the parsed GelfMessage.
     /// The logic follows strictly the documented GELF standard.
-    fn message_to_event(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
+    fn message_to_event(&self, parsed: &GelfMessage) -> vector_common::Result<Event> {
         let mut log = LogEvent::from_str_legacy(parsed.short_message.to_string());
 
         // GELF spec defines the version as 1.1 which has not changed since 2013
@@ -193,7 +193,7 @@ impl Deserializer for GelfDeserializer {
         &self,
         bytes: Bytes,
         _log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let line = std::str::from_utf8(&bytes)?;
         let line = line.trim();
 
@@ -210,15 +210,15 @@ mod tests {
     use bytes::Bytes;
     use chrono::{DateTime, NaiveDateTime, Utc};
     use lookup::event_path;
-    use pretty_assertions::assert_eq;
     use serde_json::json;
+    use similar_asserts::assert_eq;
     use smallvec::SmallVec;
     use value::Value;
     use vector_core::{config::log_schema, event::Event};
 
     fn deserialize_gelf_input(
         input: &serde_json::Value,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let config = GelfDeserializerConfig;
         let deserializer = config.build();
         let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());

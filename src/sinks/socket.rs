@@ -32,14 +32,15 @@ pub struct SocketSinkConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
-    /// TCP.
+    /// Send over TCP.
     Tcp(#[configurable(transparent)] TcpMode),
 
-    /// UDP.
+    /// Send over UDP.
     Udp(#[configurable(transparent)] UdpMode),
 
-    /// Unix Domain Socket.
+    /// Send over a Unix domain socket (UDS).
     #[cfg(unix)]
     Unix(#[configurable(transparent)] UnixMode),
 }
@@ -104,7 +105,7 @@ impl SocketSinkConfig {
         Self::new(
             Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(address),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements,
         )
@@ -194,7 +195,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Udp(UdpMode {
                 config: UdpSinkConfig::from_address(addr.to_string()),
-                encoding: JsonSerializerConfig::new().into(),
+                encoding: JsonSerializerConfig::default().into(),
             }),
             acknowledgements: Default::default(),
         };
@@ -244,7 +245,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(addr.to_string()),
-                encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };
@@ -283,7 +284,6 @@ mod test {
     //
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
-    #[cfg(feature = "listenfd")]
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use std::{
@@ -295,7 +295,7 @@ mod test {
             task::Poll,
         };
 
-        use futures::{channel::mpsc, future, FutureExt, SinkExt, StreamExt};
+        use futures::{channel::mpsc, FutureExt, SinkExt, StreamExt};
         use tokio::{
             io::{AsyncRead, AsyncWriteExt, ReadBuf},
             net::TcpStream,
@@ -328,7 +328,7 @@ mod test {
                     }),
                     None,
                 ),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };
@@ -368,7 +368,7 @@ mod test {
 
                     let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
 
-                    future::poll_fn(move |cx| loop {
+                    std::future::poll_fn(move |cx| loop {
                         if let Some(fut) = close_rx.as_mut() {
                             if let Poll::Ready(()) = fut.poll_unpin(cx) {
                                 stream
@@ -447,7 +447,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(addr.to_string()),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };

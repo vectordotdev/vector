@@ -10,7 +10,7 @@ use chrono::Duration;
 use codecs::TextSerializerConfig;
 use futures::{stream, StreamExt};
 use http::Uri;
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 
 use super::*;
 use crate::aws::create_client;
@@ -44,7 +44,7 @@ async fn cloudwatch_insert_log_event() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -94,7 +94,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -108,7 +108,7 @@ async fn cloudwatch_insert_log_events_sorted() {
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
-    let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
+    let timestamp = chrono::Utc::now() - Duration::days(1);
 
     let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
 
@@ -117,7 +117,7 @@ async fn cloudwatch_insert_log_events_sorted() {
     let mut doit = false;
     let events = events.map(move |mut events| {
         if doit {
-            let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
+            let timestamp = chrono::Utc::now() - Duration::days(1);
 
             events.iter_logs_mut().for_each(|log| {
                 log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
@@ -163,7 +163,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -183,7 +183,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     let mut events = Vec::new();
     let mut lines = Vec::new();
 
-    let mut add_event = |offset: chrono::Duration| {
+    let mut add_event = |offset: Duration| {
         let line = input_lines.next().unwrap();
         let mut event = LogEvent::from(line.clone());
         event.insert(log_schema().timestamp_key(), now + offset);
@@ -236,7 +236,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -291,7 +291,7 @@ async fn cloudwatch_insert_log_event_batched() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -341,7 +341,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -433,7 +433,7 @@ async fn cloudwatch_healthcheck() {
         stream_name: Template::try_from("test-stream").unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
+        encoding: TextSerializerConfig::default().into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),

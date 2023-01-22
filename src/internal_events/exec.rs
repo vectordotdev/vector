@@ -1,8 +1,11 @@
 use std::time::Duration;
 
+use crate::emit;
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::io_error_code;
@@ -53,6 +56,7 @@ impl InternalEvent for ExecFailedError<'_> {
             error_type = error_type::COMMAND_FAILED,
             error_code = %io_error_code(&self.error),
             stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -87,6 +91,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
             error = %self.error,
             error_type = error_type::TIMED_OUT,
             stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -128,6 +133,7 @@ impl InternalEvent for ExecCommandExecuted<'_> {
             command = %self.command,
             exit_status = %exit_status,
             elapsed_millis = %self.exec_duration.as_millis(),
+            internal_log_rate_limit = true,
         );
         counter!(
             "command_executed_total", 1,
@@ -201,6 +207,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
             error_code = %self.error.to_error_code(),
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -217,5 +224,28 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         );
+    }
+}
+
+pub struct ExecChannelClosedError;
+
+impl InternalEvent for ExecChannelClosedError {
+    fn emit(self) {
+        let exec_reason = "Receive channel closed, unable to send.";
+        error!(
+            message = exec_reason,
+            error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: exec_reason
+        });
     }
 }

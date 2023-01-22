@@ -33,11 +33,8 @@ impl RegionOrEndpoint {
     }
 
     pub fn endpoint(&self) -> crate::Result<Option<Endpoint>> {
-        if let Some(endpoint) = &self.endpoint {
-            Ok(Some(Endpoint::immutable(Uri::from_str(endpoint)?)))
-        } else {
-            Ok(None)
-        }
+        let uri = self.endpoint.as_deref().map(Uri::from_str).transpose()?;
+        Ok(uri.map(Endpoint::immutable))
     }
 
     pub fn region(&self) -> Option<Region> {

@@ -6,17 +6,20 @@ use std::{
         NonZeroU8, NonZeroUsize,
     },
     path::PathBuf,
+    time::Duration,
 };
 
+use indexmap::IndexMap;
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 use serde::Serialize;
-use vector_config_common::validation::Validation;
+use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::{
+    num::ConfigurableNumber,
     schema::{
-        assert_string_schema_for_map, generate_array_schema, generate_bool_schema,
-        generate_map_schema, generate_number_schema, generate_optional_schema, generate_set_schema,
-        generate_string_schema,
+        assert_string_schema_for_map, generate_array_schema, generate_baseline_schema,
+        generate_bool_schema, generate_map_schema, generate_number_schema, generate_set_schema,
+        generate_string_schema, make_schema_optional,
     },
     str::ConfigurableString,
     Configurable, GenerateError, Metadata,
@@ -35,6 +38,13 @@ impl<T> Configurable for Option<T>
 where
     T: Configurable + Serialize,
 {
+    fn referenceable_name() -> Option<&'static str> {
+        match T::referenceable_name() {
+            None => None,
+            Some(_) => Some(std::any::type_name::<Self>()),
+        }
+    }
+
     fn is_optional() -> bool {
         true
     }
@@ -50,11 +60,32 @@ where
         T::metadata().convert()
     }
 
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        // We have to convert from `Metadata<Self>` to `Metadata<T>` which erases the default value.
+        let converted = metadata.convert::<T>();
+        T::validate_metadata(&converted)
+    }
+
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        // Instead of the normal approach of using `get_or_generate_schema`, we manually generate
+        // the schema here. We do this because if `T` isn't a referenceable schema, we'd be
+        // generating the schema directly anyways (i.e. we wouldn't memoize it and return a schema
+        // reference) and if it _is_ a referenceable schema, we need to generate it directly so that
+        // when someone calls `get_or_generate_schema::<Option<T>>`, they get back a schema for `T`
+        // that allows for `null`.
+        //
+        // If we just used `get_or_generate_schema::<T>`, it would generate and memoize the schema
+        // for `T`, and we wouldn't be able to add the optionality (via allowing `null`) to it...
+        // and from testing, it seems like JSON Schema validators don't observe setting `type` on a
+        // schema reference, and we want to avoid composite schemas here if we can because they're
+        // annoying to utilize for non-validation purposes (i.e. configuration documentation).
         let mut inner_metadata = T::metadata();
         inner_metadata.set_transparent();
 
-        generate_optional_schema(gen, inner_metadata)
+        let mut inner_schema = generate_baseline_schema(gen, inner_metadata)?;
+        make_schema_optional(&mut inner_schema)?;
+
+        Ok(inner_schema)
     }
 }
 
@@ -74,9 +105,6 @@ impl Configurable for String {
 impl Configurable for char {
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
         metadata.add_validation(Validation::Length {
             minimum: Some(1),
             maximum: Some(1),
@@ -94,6 +122,14 @@ macro_rules! impl_configuable_numeric {
 	($($ty:ty),+) => {
 		$(
 			impl Configurable for $ty {
+                fn metadata() -> Metadata<Self> {
+                    let mut metadata = Metadata::default();
+                    let numeric_type = <Self as ConfigurableNumber>::class();
+                    metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", numeric_type));
+
+                    metadata
+                }
+
                 fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
                     $crate::__ensure_numeric_validation_bounds::<Self>(metadata)
                 }
@@ -202,8 +238,10 @@ impl Configurable for SocketAddr {
         Some("stdlib::SocketAddr")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("An internet socket address, either IPv4 or IPv6.")
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description("An internet socket address, either IPv4 or IPv6.");
+        metadata
     }
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
@@ -219,15 +257,9 @@ impl Configurable for PathBuf {
         Some("stdlib::PathBuf")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("A file path.")
-    }
-
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
+        metadata.set_description("A file path.");
 
         // Taken from
         // https://stackoverflow.com/questions/44289075/regular-expression-to-validate-windows-and-linux-path-with-extension
@@ -241,5 +273,32 @@ impl Configurable for PathBuf {
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
+    }
+}
+
+// The use of `Duration` is deprecated and will be removed in a future version
+impl Configurable for Duration {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("stdlib::Duration")
+    }
+
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description("An duration of time.");
+        metadata
+    }
+
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        let mut properties = IndexMap::default();
+        properties.insert("secs".into(), generate_number_schema::<u64>());
+        properties.insert("nsecs".into(), generate_number_schema::<u32>());
+
+        let mut required = BTreeSet::default();
+        required.insert("secs".into());
+        required.insert("nsecs".into());
+
+        Ok(crate::schema::generate_struct_schema(
+            properties, required, None,
+        ))
     }
 }

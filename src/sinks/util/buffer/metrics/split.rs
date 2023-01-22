@@ -76,8 +76,8 @@ impl<S: MetricSplit> MetricSplitter<S> {
     }
 }
 
-impl<S: Default> MetricSplitter<S> {
-    pub fn default() -> Self {
+impl<S: Default> Default for MetricSplitter<S> {
+    fn default() -> Self {
         Self {
             splitter: S::default(),
         }
@@ -154,7 +154,7 @@ impl MetricSplit for AggregatedSummarySplitter {
                 for quantile in quantiles {
                     let mut quantile_series = series.clone();
                     quantile_series
-                        .insert_tag(String::from("quantile"), quantile.to_quantile_string());
+                        .replace_tag(String::from("quantile"), quantile.to_quantile_string());
                     let quantile_data = MetricData::from_parts(
                         time,
                         kind,

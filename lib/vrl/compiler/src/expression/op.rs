@@ -147,7 +147,9 @@ impl Expression for Op {
             Or if lhs_def.is_null() => rhs_def,
 
             // not null || ...
-            Or if !(lhs_def.is_superset(&K::null()) || lhs_def.is_superset(&K::boolean())) => {
+            Or if !(lhs_def.is_superset(&K::null()).is_ok()
+                || lhs_def.is_superset(&K::boolean()).is_ok()) =>
+            {
                 lhs_def
             }
 
@@ -400,12 +402,12 @@ mod tests {
 
         let lhs = match lhs.clone().try_into() {
             Ok(v) => v,
-            Err(_) => panic!("not a valid lhs expression: {:?}", lhs),
+            Err(_) => panic!("not a valid lhs expression: {lhs:?}"),
         };
 
         let rhs = match rhs.clone().try_into() {
             Ok(v) => v,
-            Err(_) => panic!("not a valid rhs expression: {:?}", rhs),
+            Err(_) => panic!("not a valid rhs expression: {rhs:?}"),
         };
 
         Op {

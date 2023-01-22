@@ -133,7 +133,6 @@ impl Kind {
 
                 // This is the resulting type, assuming the match succeeded.
                 let match_type = field_kind
-                    .clone()
                     // This type is only valid if the match succeeded, which means this type wasn't undefined.
                     .without_undefined()
                     .get_recursive(match_iter.into_iter());
@@ -408,7 +407,7 @@ mod tests {
                         "a".into(),
                         Kind::integer(),
                     )]))),
-                    path: parse_value_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     want: Kind::integer(),
                 },
             ),
@@ -419,7 +418,7 @@ mod tests {
                         "b".into(),
                         Kind::integer(),
                     )]))),
-                    path: parse_value_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     want: Kind::integer(),
                 },
             ),
@@ -430,7 +429,7 @@ mod tests {
                         Collection::from(BTreeMap::from([("a".into(), Kind::integer())]))
                             .with_unknown(Kind::bytes()),
                     ),
-                    path: parse_value_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     want: Kind::integer(),
                 },
             ),
@@ -441,7 +440,7 @@ mod tests {
                         Collection::from(BTreeMap::from([("b".into(), Kind::integer())]))
                             .with_unknown(Kind::bytes()),
                     ),
-                    path: parse_value_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)").unwrap(),
                     want: Kind::bytes().or_integer(),
                 },
             ),
@@ -455,7 +454,7 @@ mod tests {
                                 Kind::bytes(),
                             )]))),
                     ),
-                    path: parse_value_path(".(a|b).foo"),
+                    path: parse_value_path(".(a|b).foo").unwrap(),
                     want: Kind::bytes().or_undefined(),
                 },
             ),
@@ -468,7 +467,7 @@ mod tests {
                 },
             ),
         ] {
-            assert_eq!(kind.at_path(&path), want, "test: {}", title);
+            assert_eq!(kind.at_path(&path), want, "test: {title}");
         }
     }
 }

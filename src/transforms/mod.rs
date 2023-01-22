@@ -12,15 +12,11 @@ pub mod aws_ec2_metadata;
 pub mod dedupe;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
-#[cfg(feature = "transforms-geoip")]
-pub mod geoip;
 pub mod log_to_metric;
 #[cfg(feature = "transforms-lua")]
 pub mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
-#[cfg(feature = "transforms-pipelines")]
-pub mod pipelines;
 #[cfg(feature = "transforms-reduce")]
 pub mod reduce;
 #[cfg(feature = "transforms-remap")]
@@ -34,18 +30,17 @@ pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
 
-use vector_common::config::ComponentKey;
 use vector_config::{configurable_component, NamedComponent};
 pub use vector_core::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
     TransformOutputsBuf,
 };
 use vector_core::{
-    config::{Input, Output},
+    config::{Input, LogNamespace, Output},
     schema,
 };
 
-use crate::config::{InnerTopology, TransformConfig, TransformContext};
+use crate::config::{TransformConfig, TransformContext};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -78,10 +73,6 @@ pub enum Transforms {
     #[cfg(feature = "transforms-filter")]
     Filter(#[configurable(derived)] filter::FilterConfig),
 
-    /// GeoIP.
-    #[cfg(feature = "transforms-geoip")]
-    Geoip(#[configurable(derived)] geoip::GeoipConfig),
-
     /// Log to metric.
     LogToMetric(#[configurable(derived)] log_to_metric::LogToMetricConfig),
 
@@ -92,15 +83,6 @@ pub enum Transforms {
     /// Metric to log.
     #[cfg(feature = "transforms-metric_to_log")]
     MetricToLog(#[configurable(derived)] metric_to_log::MetricToLogConfig),
-
-    /// Pipelines. (inner)
-    #[cfg(feature = "transforms-pipelines")]
-    #[configurable(metadata(skip_docs))]
-    Pipeline(#[configurable(derived)] pipelines::PipelineConfig),
-
-    /// Pipelines.
-    #[cfg(feature = "transforms-pipelines")]
-    Pipelines(#[configurable(derived)] pipelines::PipelinesConfig),
 
     /// Reduce.
     #[cfg(feature = "transforms-reduce")]
@@ -149,17 +131,11 @@ impl NamedComponent for Transforms {
             Transforms::Dedupe(config) => config.get_component_name(),
             #[cfg(feature = "transforms-filter")]
             Transforms::Filter(config) => config.get_component_name(),
-            #[cfg(feature = "transforms-geoip")]
-            Transforms::Geoip(config) => config.get_component_name(),
             Transforms::LogToMetric(config) => config.get_component_name(),
             #[cfg(feature = "transforms-lua")]
             Transforms::Lua(config) => config.get_component_name(),
             #[cfg(feature = "transforms-metric_to_log")]
             Transforms::MetricToLog(config) => config.get_component_name(),
-            #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipeline(config) => config.get_component_name(),
-            #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipelines(config) => config.get_component_name(),
             #[cfg(feature = "transforms-reduce")]
             Transforms::Reduce(config) => config.get_component_name(),
             #[cfg(feature = "transforms-remap")]
@@ -184,9 +160,23 @@ impl NamedComponent for Transforms {
 
 #[cfg(test)]
 mod test {
+    use futures::Stream;
+    use futures_util::SinkExt;
+    use tokio::sync::mpsc;
+    use tokio_util::sync::PollSender;
     use vector_core::transform::FunctionTransform;
 
-    use crate::{event::Event, transforms::OutputBuffer};
+    use super::Transforms;
+    use crate::{
+        config::{
+            unit_test::{UnitTestStreamSinkConfig, UnitTestStreamSourceConfig},
+            ConfigBuilder,
+        },
+        event::Event,
+        test_util::start_topology,
+        topology::RunningTopology,
+        transforms::OutputBuffer,
+    };
 
     /// Transform a single `Event` through the `FunctionTransform`
     ///
@@ -204,5 +194,30 @@ mod test {
         ft.transform(&mut buf, event);
         assert!(buf.len() <= 1);
         buf.into_events().next()
+    }
+
+    #[allow(dead_code)]
+    pub async fn create_topology<T: Into<Transforms>>(
+        events: impl Stream<Item = Event> + Send + 'static,
+        transform_config: T,
+    ) -> (RunningTopology, mpsc::Receiver<Event>) {
+        let mut builder = ConfigBuilder::default();
+
+        let (tx, rx) = mpsc::channel(1);
+
+        builder.add_source("in", UnitTestStreamSourceConfig::new(events));
+        builder.add_transform("transform", &["in"], transform_config);
+        builder.add_sink(
+            "out",
+            &["transform"],
+            UnitTestStreamSinkConfig::new(
+                PollSender::new(tx).sink_map_err(|error| panic!("{}", error)),
+            ),
+        );
+
+        let config = builder.build().expect("building config should not fail");
+        let (topology, _) = start_topology(config, false).await;
+
+        (topology, rx)
     }
 }

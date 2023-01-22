@@ -58,6 +58,14 @@ components: sources: kubernetes_logs: {
 			type: object: {
 				examples: []
 				options: {
+					container_id: {
+						common:      false
+						description: "Event field for Container id."
+						required:    false
+						type: string: {
+							default: "kubernetes.container_id"
+						}
+					}
 					container_image: {
 						common:      false
 						description: "Event field for Container image."
@@ -130,20 +138,20 @@ components: sources: kubernetes_logs: {
 							default: "kubernetes.pod_node_name"
 						}
 					}
-					pod_uid: {
-						common:      false
-						description: "Event field for Pod uid."
-						required:    false
-						type: string: {
-							default: "kubernetes.pod_uid"
-						}
-					}
 					pod_owner: {
 						common:      false
 						description: "Event field for Pod owner reference."
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_owner"
+						}
+					}
+					pod_uid: {
+						common:      false
+						description: "Event field for Pod uid."
+						required:    false
+						type: string: {
+							default: "kubernetes.pod_uid"
 						}
 					}
 				}
@@ -202,6 +210,28 @@ components: sources: kubernetes_logs: {
 			description: "Optional path to a kubeconfig file readable by Vector. If not set, Vector will try to connect to Kubernetes using in-cluster configuration."
 			required:    false
 			type: string: default: null
+		}
+		ignore_older_secs: {
+			common:      true
+			description: "Ignore files with a data modification date older than the specified number of seconds."
+			required:    false
+			type: uint: {
+				default: null
+				examples: [60 * 10]
+				unit: "seconds"
+			}
+		}
+		read_from: {
+			common:      true
+			description: "In the absence of a checkpoint, this setting tells Vector where to start reading files that are present at startup."
+			required:    false
+			type: string: {
+				default: "beginning"
+				enum: {
+					"beginning": "Read from the beginning of the file."
+					"end":       "Start reading from the current end of the file."
+				}
+			}
 		}
 		self_node_name: {
 			common:      false
@@ -331,6 +361,15 @@ components: sources: kubernetes_logs: {
 					examples: ["\(_directory)/pods/pod-namespace_pod-name_pod-uid/container/1.log"]
 				}
 			}
+			"kubernetes.container_id": {
+				description: "Container id."
+				required:    false
+				common:      true
+				type: string: {
+					default: null
+					examples: ["docker://f24c81dcd531c5d353751c77fe0556a4f602f7714c72b9a58f9b26c0628f1fa6"]
+				}
+			}
 			"kubernetes.container_image": {
 				description: "Container image."
 				required:    false
@@ -419,6 +458,15 @@ components: sources: kubernetes_logs: {
 				type: string: {
 					default: null
 					examples: ["minikube"]
+				}
+			}
+			"kubernetes.pod_owner": {
+				description: "Pod owner."
+				required:    false
+				common:      true
+				type: string: {
+					default: null
+					examples: ["ReplicaSet/coredns-565d847f94"]
 				}
 			}
 			"kubernetes.pod_uid": {

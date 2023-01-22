@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::transform::SyncTransform;
 
 use crate::{
@@ -60,17 +61,10 @@ pub struct RouteConfig {
     /// `<transform_name>.<route_id>`. If an event doesn’t match any route, it will be sent to the
     /// `<transform_name>._unmatched` output.
     ///
-    /// Both `_unmatched`, as well as `_default`, are reserved output names and cannot be used as a
-    /// route name.
-    #[serde(alias = "lanes")]
+    /// Both `_unmatched`, as well as `_default`, are reserved output names and thus cannot be used
+    /// as a route name.
+    #[configurable(metadata(docs::additional_props_description = "An individual route."))]
     route: IndexMap<String, AnyCondition>,
-}
-
-#[cfg(feature = "transforms-pipelines")]
-impl RouteConfig {
-    pub(crate) const fn new(route: IndexMap<String, AnyCondition>) -> Self {
-        Self { route }
-    }
 }
 
 impl GenerateConfig for RouteConfig {
@@ -103,13 +97,21 @@ impl TransformConfig for RouteConfig {
         }
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
         let mut result: Vec<Output> = self
             .route
             .keys()
-            .map(|output_name| Output::default(DataType::all()).with_port(output_name))
+            .map(|output_name| {
+                Output::default(DataType::all())
+                    .with_schema_definition(merged_definition.clone())
+                    .with_port(output_name)
+            })
             .collect();
-        result.push(Output::default(DataType::all()).with_port(UNMATCHED_ROUTE));
+        result.push(
+            Output::default(DataType::all())
+                .with_schema_definition(merged_definition.clone())
+                .with_port(UNMATCHED_ROUTE),
+        );
         result
     }
 
@@ -135,17 +137,6 @@ mod test {
     }
 
     #[test]
-    fn alias_works() {
-        toml::from_str::<RouteConfig>(
-            r#"
-            lanes.first.type = "check_fields"
-            lanes.first."message.eq" = "foo"
-        "#,
-        )
-        .unwrap();
-    }
-
-    #[test]
     fn can_serialize_remap() {
         // We need to serialize the config to check if a config has
         // changed when reloading.
@@ -160,24 +151,6 @@ mod test {
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
             r#"{"route":{"first":{"type":"vrl","source":".message == \"hello world\"","runtime":"ast"}}}"#
-        );
-    }
-
-    #[test]
-    fn can_serialize_check_fields() {
-        // We need to serialize the config to check if a config has
-        // changed when reloading.
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            route.first.type = "check_fields"
-            route.first."message.eq" = "foo"
-        "#,
-        )
-        .unwrap();
-
-        assert_eq!(
-            serde_json::to_string(&config).unwrap(),
-            r#"{"route":{"first":{"type":"check_fields","message.eq":"foo"}}}"#
         );
     }
 

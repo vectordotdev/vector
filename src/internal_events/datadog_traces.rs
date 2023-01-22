@@ -1,17 +1,16 @@
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
 pub struct DatadogTracesEncodingError {
     pub error_message: &'static str,
     pub error_reason: String,
-    pub dropped_events: u64,
+    pub dropped_events: usize,
 }
 
 impl InternalEvent for DatadogTracesEncodingError {
@@ -23,7 +22,7 @@ impl InternalEvent for DatadogTracesEncodingError {
             error_reason = %self.error_reason,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -37,5 +36,29 @@ impl InternalEvent for DatadogTracesEncodingError {
                 reason,
             });
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct DatadogTracesAPMStatsError<E> {
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for DatadogTracesAPMStatsError<E> {
+    fn emit(self) {
+        error!(
+            message = "Failed sending APM stats payload.",
+            error = %self.error,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+
+        // No dropped events because APM stats payloads are not considered events.
     }
 }

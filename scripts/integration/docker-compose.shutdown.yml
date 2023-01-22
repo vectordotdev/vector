@@ -47,7 +47,7 @@ services:
       - "--features"
       - "shutdown-tests"
       - "--test"
-      - "shutdown"
+      - "integration"
       - "--test-threads"
       - "4"
     depends_on:

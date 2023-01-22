@@ -53,7 +53,7 @@ impl OpenGauge {
         }
     }
 
-    #[cfg(all(feature = "sources-utils-unix", unix))]
+    #[cfg(all(feature = "sources-utils-net-unix", unix))]
     pub fn any_open(&self) -> bool {
         self.gauge.load(Ordering::Acquire) != 0
     }

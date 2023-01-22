@@ -3,11 +3,14 @@ use std::time::Duration;
 use futures::{FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
+use serde_with::serde_as;
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::types::Stats;
 use crate::{
@@ -23,25 +26,29 @@ use crate::{
 pub mod types;
 
 /// Configuration for the `eventstoredb_metrics` source.
+#[serde_as]
 #[configurable_component(source("eventstoredb_metrics"))]
 #[derive(Clone, Debug, Default)]
 pub struct EventStoreDbConfig {
-    /// Endpoints to scrape stats from.
+    /// Endpoint to scrape stats from.
     #[serde(default = "default_endpoint")]
+    #[configurable(metadata(docs::examples = "https://localhost:2113/stats"))]
     endpoint: String,
 
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
     ///
     /// By default, `eventstoredb` is used.
+    #[configurable(metadata(docs::examples = "eventstoredb"))]
     default_namespace: Option<String>,
 }
 
-const fn default_scrape_interval_secs() -> u64 {
-    15
+const fn default_scrape_interval_secs() -> Duration {
+    Duration::from_secs(15)
 }
 
 pub fn default_endpoint() -> String {
@@ -72,17 +79,17 @@ impl SourceConfig for EventStoreDbConfig {
 
 fn eventstoredb(
     endpoint: String,
-    interval: u64,
+    interval: Duration,
     namespace: Option<String>,
     mut cx: SourceContext,
 ) -> crate::Result<super::Source> {
-    let mut ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
-        .take_until(cx.shutdown);
+    let mut ticks = IntervalStream::new(tokio::time::interval(interval)).take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
     let client = HttpClient::new(tls_settings, &cx.proxy)?;
     let url: Uri = endpoint.as_str().parse()?;
 
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+    let events_received = register!(EventsReceived);
 
     Ok(Box::pin(
         async move {
@@ -121,9 +128,9 @@ fn eventstoredb(
                             Ok(stats) => {
                                 let metrics = stats.metrics(namespace.clone());
                                 let count = metrics.len();
-                                let byte_size = metrics.size_of();
+                                let byte_size = metrics.estimated_json_encoded_size_of();
 
-                                emit!(EventsReceived { count, byte_size });
+                                events_received.emit(CountByteSize(count, byte_size));
 
                                 if let Err(error) = cx.out.send_batch(metrics).await {
                                     emit!(StreamClosedError { count, error });
@@ -153,7 +160,7 @@ mod integration_tests {
     async fn scrape_something() {
         let config = EventStoreDbConfig {
             endpoint: EVENTSTOREDB_SCRAPE_ADDRESS.to_owned(),
-            scrape_interval_secs: 1,
+            scrape_interval_secs: Duration::from_secs(1),
             default_namespace: None,
         };
 

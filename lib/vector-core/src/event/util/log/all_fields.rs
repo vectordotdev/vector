@@ -95,7 +95,7 @@ impl<'a> FieldsIter<'a> {
                     }
                 }
                 Some(PathComponent::Index(index)) => {
-                    write!(res, "[{}]", index).expect("write to String never fails");
+                    write!(res, "[{index}]").expect("write to String never fails");
                 }
             }
             if let Some(PathComponent::Key(_)) = path_iter.peek() {
@@ -150,8 +150,8 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use pretty_assertions::assert_eq;
     use serde_json::json;
+    use similar_asserts::assert_eq;
 
     use super::{super::test::fields_from_json, *};
 

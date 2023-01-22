@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
-use crate::event::metric::{Metric, MetricKind, MetricValue};
+use crate::event::metric::{Metric, MetricKind, MetricTags, MetricValue};
 
 #[derive(Deserialize)]
 struct BlockIoStat {
@@ -122,7 +122,7 @@ fn counter(
     namespace: Option<String>,
     timestamp: DateTime<Utc>,
     value: f64,
-    tags: BTreeMap<String, String>,
+    tags: MetricTags,
 ) -> Metric {
     Metric::new(
         format!("{}_{}", prefix, name),
@@ -140,7 +140,7 @@ fn gauge(
     namespace: Option<String>,
     timestamp: DateTime<Utc>,
     value: f64,
-    tags: BTreeMap<String, String>,
+    tags: MetricTags,
 ) -> Metric {
     Metric::new(
         format!("{}_{}", prefix, name),
@@ -152,10 +152,10 @@ fn gauge(
     .with_timestamp(Some(timestamp))
 }
 
-fn blkio_tags(item: &BlockIoStat, tags: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+fn blkio_tags(item: &BlockIoStat, tags: &MetricTags) -> MetricTags {
     let mut tags = tags.clone();
-    tags.insert("device".into(), format!("{}:{}", item.major, item.minor));
-    tags.insert("op".into(), item.op.to_lowercase());
+    tags.replace("device".into(), format!("{}:{}", item.major, item.minor));
+    tags.replace("op".into(), item.op.to_lowercase());
     tags
 }
 
@@ -164,7 +164,7 @@ fn blkio_metrics(
     blkio: &BlockIoStats,
     timestamp: DateTime<Utc>,
     namespace: &Option<String>,
-    tags: &BTreeMap<String, String>,
+    tags: &MetricTags,
 ) -> Vec<Metric> {
     let mut metrics = vec![];
 
@@ -256,7 +256,7 @@ fn cpu_metrics(
     cpu: &CpuStats,
     timestamp: DateTime<Utc>,
     namespace: &Option<String>,
-    tags: &BTreeMap<String, String>,
+    tags: &MetricTags,
 ) -> Vec<Metric> {
     // Eight expected metrics not including online_cpus
     let size = 8 + cpu.online_cpus.unwrap_or(0);
@@ -344,7 +344,7 @@ fn cpu_metrics(
             metrics.extend((0..online_cpus).filter_map(|index| {
                 percpu_usage.get(index).map(|value| {
                     let mut tags = tags.clone();
-                    tags.insert("cpu".into(), index.to_string());
+                    tags.replace("cpu".into(), index.to_string());
 
                     counter(
                         "cpu",
@@ -366,7 +366,7 @@ fn memory_metrics(
     memory: &MemoryStats,
     timestamp: DateTime<Utc>,
     namespace: &Option<String>,
-    tags: &BTreeMap<String, String>,
+    tags: &MetricTags,
 ) -> Vec<Metric> {
     let mut metrics = Vec::with_capacity(35);
 
@@ -475,10 +475,10 @@ fn network_metrics(
     network: &NetworkStats,
     timestamp: DateTime<Utc>,
     namespace: &Option<String>,
-    tags: &BTreeMap<String, String>,
+    tags: &MetricTags,
 ) -> Vec<Metric> {
     let mut tags = tags.clone();
-    tags.insert("device".into(), interface.into());
+    tags.replace("device".into(), interface.to_string());
 
     [
         ("receive_bytes_total", network.rx_bytes),
@@ -513,10 +513,10 @@ pub(super) fn parse(
     let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(bytes)?;
 
     for (id, container) in parsed {
-        let mut tags = BTreeMap::new();
-        tags.insert("container_id".into(), id);
+        let mut tags = MetricTags::default();
+        tags.replace("container_id".into(), id);
         if let Some(name) = container.name {
-            tags.insert("container_name".into(), name);
+            tags.replace("container_name".into(), name);
         }
 
         if let Some(blkio) = container.blkio_stats {
@@ -549,6 +549,7 @@ pub(super) fn parse(
 mod test {
     use chrono::{offset::TimeZone, DateTime, Utc};
     use vector_common::assert_event_data_eq;
+    use vector_core::metric_tags;
 
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
@@ -604,19 +605,12 @@ mod test {
                     MetricValue::Counter { value: 0.0 },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        ("device".into(), "202:26368".into()),
-                        ("op".into(), "read".into()),
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "device" => "202:26368",
+                    "op" => "read",
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
                 Metric::new(
                     "blkio_recursive_io_service_bytes_total",
@@ -624,19 +618,12 @@ mod test {
                     MetricValue::Counter { value: 520192.0 },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        ("device".into(), "202:26368".into()),
-                        ("op".into(), "write".into()),
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "device" => "202:26368",
+                    "op" => "write",
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
             ],
         );
@@ -682,17 +669,10 @@ mod test {
                     MetricValue::Gauge { value: 2.0 },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2"
+                )))
                 .with_timestamp(Some(ts())),
                 Metric::new(
                     "cpu_usage_system_jiffies_total",
@@ -702,17 +682,10 @@ mod test {
                     },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
                 Metric::new(
                     "cpu_usage_usermode_jiffies_total",
@@ -720,17 +693,10 @@ mod test {
                     MetricValue::Counter { value: 510000000.0 },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
                 Metric::new(
                     "cpu_usage_kernelmode_jiffies_total",
@@ -738,17 +704,10 @@ mod test {
                     MetricValue::Counter { value: 190000000.0 },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
                 Metric::new(
                     "cpu_usage_total_jiffies_total",
@@ -758,17 +717,10 @@ mod test {
                     },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
                 Metric::new(
                     "cpu_throttling_periods_total",
@@ -776,17 +728,10 @@ mod test {
                     MetricValue::Counter { value: 0.0 },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
                 Metric::new(
                     "cpu_throttled_periods_total",
@@ -794,17 +739,10 @@ mod test {
                     MetricValue::Counter { value: 0.0 },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
                 Metric::new(
                     "cpu_throttled_time_seconds_total",
@@ -812,17 +750,10 @@ mod test {
                     MetricValue::Counter { value: 0.0 },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
                 Metric::new(
                     "cpu_usage_percpu_jiffies_total",
@@ -832,18 +763,11 @@ mod test {
                     },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        ("cpu".into(), "0".into()),
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "cpu" => "0",
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
                 Metric::new(
                     "cpu_usage_percpu_jiffies_total",
@@ -853,18 +777,11 @@ mod test {
                     },
                 )
                 .with_namespace(Some(namespace()))
-                .with_tags(Some(
-                    vec![
-                        ("cpu".into(), "1".into()),
-                        (
-                            "container_id".into(),
-                            "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                        ),
-                        ("container_name".into(), "vector2".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ))
+                .with_tags(Some(metric_tags!(
+                    "cpu" => "1",
+                    "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                    "container_name" => "vector2",
+                )))
                 .with_timestamp(Some(ts())),
             ],
         );
@@ -933,17 +850,10 @@ mod test {
                 MetricValue::Gauge { value: 40120320.0 },
             )
             .with_namespace(Some(namespace()))
-            .with_tags(Some(
-                vec![
-                    (
-                        "container_id".into(),
-                        "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                    ),
-                    ("container_name".into(), "vector2".into())
-                ]
-                .into_iter()
-                .collect()
-            ))
+            .with_tags(Some(metric_tags!(
+                "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                "container_name" => "vector2",
+            )))
             .with_timestamp(Some(ts())),
         );
 
@@ -958,17 +868,10 @@ mod test {
                 MetricValue::Gauge { value: 47177728.0 },
             )
             .with_namespace(Some(namespace()))
-            .with_tags(Some(
-                vec![
-                    (
-                        "container_id".into(),
-                        "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                    ),
-                    ("container_name".into(), "vector2".into())
-                ]
-                .into_iter()
-                .collect()
-            ))
+            .with_tags(Some(metric_tags!(
+                "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                "container_name" => "vector2",
+            )))
             .with_timestamp(Some(ts())),
         );
 
@@ -983,17 +886,10 @@ mod test {
                 MetricValue::Gauge { value: 34885632.0 },
             )
             .with_namespace(Some(namespace()))
-            .with_tags(Some(
-                vec![
-                    (
-                        "container_id".into(),
-                        "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                    ),
-                    ("container_name".into(), "vector2".into())
-                ]
-                .into_iter()
-                .collect()
-            ))
+            .with_tags(Some(metric_tags!(
+                "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                "container_name" => "vector2",
+            )))
             .with_timestamp(Some(ts())),
         );
 
@@ -1008,17 +904,10 @@ mod test {
                 MetricValue::Counter { value: 31131.0 },
             )
             .with_namespace(Some(namespace()))
-            .with_tags(Some(
-                vec![
-                    (
-                        "container_id".into(),
-                        "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                    ),
-                    ("container_name".into(), "vector2".into())
-                ]
-                .into_iter()
-                .collect()
-            ))
+            .with_tags(Some(metric_tags!(
+                "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                "container_name" => "vector2",
+            )))
             .with_timestamp(Some(ts())),
         );
     }
@@ -1059,18 +948,11 @@ mod test {
                 MetricValue::Counter { value: 329932716.0 },
             )
             .with_namespace(Some(namespace()))
-            .with_tags(Some(
-                vec![
-                    ("device".into(), "eth1".into()),
-                    (
-                        "container_id".into(),
-                        "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                    ),
-                    ("container_name".into(), "vector2".into())
-                ]
-                .into_iter()
-                .collect()
-            ))
+            .with_tags(Some(metric_tags!(
+                "device" => "eth1",
+                "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                "container_name" => "vector2",
+            )))
             .with_timestamp(Some(ts())),
         );
 
@@ -1085,18 +967,11 @@ mod test {
                 MetricValue::Counter { value: 2001229.0 },
             )
             .with_namespace(Some(namespace()))
-            .with_tags(Some(
-                vec![
-                    ("device".into(), "eth1".into()),
-                    (
-                        "container_id".into(),
-                        "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
-                    ),
-                    ("container_name".into(), "vector2".into())
-                ]
-                .into_iter()
-                .collect()
-            ))
+            .with_tags(Some(metric_tags!(
+                "device" => "eth1",
+                "container_id" => "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+                "container_name" => "vector2",
+            )))
             .with_timestamp(Some(ts())),
         );
     }

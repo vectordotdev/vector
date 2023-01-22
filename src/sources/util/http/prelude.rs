@@ -5,8 +5,9 @@ use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use tracing::Span;
 use vector_core::{
+    config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
     filters::{
@@ -19,11 +20,11 @@ use warp::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, SourceContext},
+    config::SourceContext,
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
-    sources::http::HttpMethod,
+    sources::util::http::HttpMethod,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
@@ -54,13 +55,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
-        acknowledgements: AcknowledgementsConfig,
+        acknowledgements: SourceAcknowledgementsConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
-        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(acknowledgements);
         Ok(Box::pin(async move {
             let span = Span::current();
             let mut filter: BoxedFilter<()> = match method {
@@ -123,7 +124,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .map(|events| {
                                 emit!(HttpEventsReceived {
                                     count: events.len(),
-                                    byte_size: events.size_of(),
+                                    byte_size: events.estimated_json_encoded_size_of(),
                                     http_path,
                                     protocol,
                                 });
@@ -151,13 +152,20 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
             info!(message = "Building HTTP server.", address = %address);
 
-            let listener = tls.bind(&address).await.unwrap();
-            warp::serve(routes)
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    cx.shutdown.map(|_| ()),
-                )
-                .await;
+            match tls.bind(&address).await {
+                Ok(listener) => {
+                    warp::serve(routes)
+                        .serve_incoming_with_graceful_shutdown(
+                            listener.accept_stream(),
+                            cx.shutdown.map(|_| ()),
+                        )
+                        .await;
+                }
+                Err(error) => {
+                    error!("An error occurred: {:?}.", error);
+                    return Err(());
+                }
+            }
             Ok(())
         }))
     }

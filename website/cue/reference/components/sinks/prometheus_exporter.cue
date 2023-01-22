@@ -66,6 +66,10 @@ components: sinks: prometheus_exporter: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
+		auth: configuration._http_auth & {_args: {
+			password_example: "${PROMETHEUS_PASSWORD}"
+			username_example: "${PROMETHEUS_USERNAME}"
+		}}
 		buckets: {
 			common:      false
 			description: """
@@ -128,7 +132,7 @@ components: sinks: prometheus_exporter: {
 			common:      false
 			description: "Whether or not to strip metric timestamp in the response."
 			required:    false
-			type: bool: default: true
+			type: bool: default: false
 		}
 	}
 
@@ -374,6 +378,15 @@ components: sinks: prometheus_exporter: {
 				downside is that data will be lost if Vector is restarted. This is by design of
 				Prometheus' pull model approach, but is worth noting if restart Vector
 				frequently.
+				"""
+		}
+
+		duplicate_tag_names: {
+			title: "Duplicate tag names"
+			body: """
+				Multiple tags with the same name are invalid within Prometheus and Prometheus
+				will reject a metric with duplicate tag names. When sending a tag with multiple
+				values for each name, Vector will only send the last value specified.
 				"""
 		}
 	}

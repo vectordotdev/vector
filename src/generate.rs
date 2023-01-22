@@ -17,10 +17,10 @@ use vector_core::{buffers::BufferConfig, config::GlobalOptions, default_data_dir
 use crate::config::SinkHealthcheckOptions;
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Whether to skip the generation of global fields.
-    #[clap(short, long)]
+    #[arg(short, long)]
     fragment: bool,
 
     /// Generate expression, e.g. 'stdin/remap,filter/console'
@@ -55,7 +55,7 @@ pub struct Opts {
     expression: String,
 
     /// Generate config as a file
-    #[clap(long, parse(from_os_str))]
+    #[arg(long)]
     file: Option<PathBuf>,
 }
 

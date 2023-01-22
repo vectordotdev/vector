@@ -11,7 +11,8 @@ use vector_buffers::EventCount;
 use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
 
 use super::{
-    Event, EventDataEq, EventFinalizer, EventMutRef, EventRef, LogEvent, Metric, TraceEvent,
+    EstimatedJsonEncodedSizeOf, Event, EventDataEq, EventFinalizer, EventMutRef, EventRef,
+    LogEvent, Metric, TraceEvent,
 };
 use crate::ByteSizeOf;
 
@@ -28,7 +29,7 @@ pub type MetricArray = Vec<Metric>;
 /// of events. This is effectively the same as the standard
 /// `IntoIterator<Item = Event>` implementations, but that would
 /// conflict with the base implementation for the type aliases below.
-pub trait EventContainer: ByteSizeOf {
+pub trait EventContainer: ByteSizeOf + EstimatedJsonEncodedSizeOf {
     /// The type of `Iterator` used to turn this container into events.
     type IntoIter: Iterator<Item = Event>;
 
@@ -126,7 +127,7 @@ impl EventContainer for MetricArray {
 }
 
 /// An array of one of the `Event` variants exclusively.
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EventArray {
     /// An array of type `LogEvent`
     Logs(LogArray),
@@ -226,6 +227,16 @@ impl ByteSizeOf for EventArray {
             Self::Logs(a) => a.allocated_bytes(),
             Self::Metrics(a) => a.allocated_bytes(),
             Self::Traces(a) => a.allocated_bytes(),
+        }
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for EventArray {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        match self {
+            Self::Logs(v) => v.estimated_json_encoded_size_of(),
+            Self::Traces(v) => v.estimated_json_encoded_size_of(),
+            Self::Metrics(v) => v.estimated_json_encoded_size_of(),
         }
     }
 }

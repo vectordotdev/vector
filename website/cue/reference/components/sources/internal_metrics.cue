@@ -50,7 +50,7 @@ components: sources: internal_metrics: {
 			common:      true
 			required:    false
 			type: float: {
-				default: 2.0
+				default: 1.0
 				unit:    "seconds"
 			}
 		}
@@ -851,12 +851,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		lag_time_seconds: {
-			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		logging_driver_errors_total: {
 			description: """
 				The total number of logging driver errors encountered caused by not using either
@@ -984,6 +978,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		source_lag_time_seconds: {
+			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		splunk_pending_acks: {
 			description:       "The number of outstanding Splunk HEC indexer acknowledgement acks."
 			type:              "gauge"
@@ -1084,7 +1084,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of seconds the Vector instance has been up."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _internal_metrics_tags
 		}
 		utf8_convert_errors_total: {
 			description:       "The total number of errors converting bytes to a UTF-8 string in UDP mode."
@@ -1105,6 +1105,33 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		build_info: {
+			description:       "Has a fixed value of 1.0. Contains build information such as Rust and Vector versions."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags & {
+				debug: {
+					description: "Whether this is a debug build of Vector"
+					required:    true
+				}
+				version: {
+					description: "Vector version."
+					required:    true
+				}
+				rust_version: {
+					description: "The Rust version from the package manifest."
+					required:    true
+				}
+				arch: {
+					description: "The target architecture being compiled for. (e.g. x86_64)"
+					required:    true
+				}
+				revision: {
+					description: "Revision identifer, related to versioned releases."
+					required:    true
+				}
+			}
 		}
 		value_limit_reached_total: {
 			description: """

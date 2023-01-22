@@ -74,7 +74,7 @@ async fn start_test(
     let events: Vec<_> = (0..10)
         .map(|index| {
             Event::Metric(Metric::new(
-                &format!("counter_{}", thread_rng().gen::<u32>()),
+                format!("counter_{}", thread_rng().gen::<u32>()),
                 MetricKind::Absolute,
                 MetricValue::Counter {
                     value: index as f64,
@@ -176,6 +176,7 @@ async fn real_endpoint() {
         default_namespace = "fake.test.integration"
     "#};
         let api_key = std::env::var("TEST_DATADOG_API_KEY").unwrap();
+        assert!(!api_key.is_empty(), "$TEST_DATADOG_API_KEY required");
         let config = config.replace("${TEST_DATADOG_API_KEY}", &api_key);
         let (config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
 

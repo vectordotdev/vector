@@ -1,18 +1,17 @@
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
-pub struct DecoderFramingError<'a> {
-    pub error: &'a codecs::decoding::BoxedFramingError,
+pub struct DecoderFramingError<E> {
+    pub error: E,
 }
 
-impl<'a> InternalEvent for DecoderFramingError<'a> {
+impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
     fn emit(self) {
         counter!("decoder_framing_errors_total", 1);
         error!(
@@ -20,6 +19,7 @@ impl<'a> InternalEvent for DecoderFramingError<'a> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -42,6 +42,7 @@ impl<'a> InternalEvent for DecoderDeserializeError<'a> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -64,7 +65,7 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!("encoder_framing_errors_total", 1);
         counter!(
@@ -89,7 +90,7 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!("encoder_serialize_errors_total", 1);
         counter!(
@@ -104,7 +105,7 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
 #[derive(Debug)]
 pub struct EncoderWriteError<'a, E> {
     pub error: &'a E,
-    pub count: u64,
+    pub count: usize,
 }
 
 impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
@@ -115,7 +116,7 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
             error = %self.error,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

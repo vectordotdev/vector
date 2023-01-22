@@ -5,6 +5,7 @@ use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use once_cell::sync::Lazy;
 use serde_json::json;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
@@ -29,14 +30,13 @@ const PATH: &str = "/logs/ingest";
 #[derive(Clone, Debug)]
 pub struct LogdnaConfig {
     /// The Ingestion API key.
-    api_key: String,
+    api_key: SensitiveString,
 
     /// The endpoint to send logs to.
     #[serde(alias = "host")]
     endpoint: Option<UriSerde>,
 
     /// The hostname that will be attached to each batch of events.
-    #[configurable(metadata(templateable))]
     hostname: Template,
 
     /// The MAC address that will be attached to each batch of events.
@@ -46,7 +46,6 @@ pub struct LogdnaConfig {
     ip: Option<String>,
 
     /// The tags that will be attached to each batch of events.
-    #[configurable(metadata(templateable))]
     tags: Option<Vec<Template>>,
 
     #[configurable(derived)]
@@ -287,8 +286,8 @@ impl HttpSink for LogdnaConfig {
             .unwrap();
 
         let auth = Auth::Basic {
-            user: self.api_key.clone(),
-            password: "".to_string(),
+            user: self.api_key.inner().to_string(),
+            password: SensitiveString::default(),
         };
 
         auth.apply(&mut request);

@@ -46,8 +46,10 @@ impl Deserializer for NativeJsonDeserializer {
     fn parse(
         &self,
         bytes: Bytes,
+        // LogNamespace is ignored because Vector owns the data format being consumed and as such there
+        // is no need to change the fields of the event.
         _log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         // It's common to receive empty frames when parsing NDJSON, since it
         // allows multiple empty newlines. We proceed without a warning here.
         if bytes.is_empty() {

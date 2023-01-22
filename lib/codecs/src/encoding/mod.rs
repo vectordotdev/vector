@@ -31,7 +31,7 @@ pub enum Error {
     /// The error occurred while encoding the byte frame boundaries.
     FramingError(BoxedFramingError),
     /// The error occurred while serializing a structured event into bytes.
-    SerializingError(vector_core::Error),
+    SerializingError(vector_common::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -55,6 +55,7 @@ impl From<std::io::Error> for Error {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "method", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The framing method."))]
 pub enum FramingConfig {
     /// Event data is not delimited at all.
     Bytes,
@@ -182,47 +183,75 @@ impl tokio_util::codec::Encoder<()> for Framer {
     }
 }
 
-/// Configuration for building a `Serializer`.
+/// Serializer configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The codec to use for encoding events."))]
 pub enum SerializerConfig {
-    /// Apache Avro serialization.
+    /// Encodes an event as an [Apache Avro][apache_avro] message.
+    ///
+    /// [apache_avro]: https://avro.apache.org/
     Avro {
-        /// Apache Avro serializer options.
+        /// Apache Avro-specific encoder options.
         avro: AvroSerializerOptions,
     },
 
-    /// GELF serialization.
+    /// Encodes an event as a [GELF][gelf] message.
+    ///
+    /// [gelf]: https://docs.graylog.org/docs/gelf
     Gelf,
 
-    /// JSON serialization.
-    Json,
+    /// Encodes an event as [JSON][json].
+    ///
+    /// [json]: https://www.json.org/
+    Json(
+        /// Encoding options specific to the text serializer.
+        JsonSerializerConfig,
+    ),
 
-    /// Logfmt serialization.
+    /// Encodes an event as a [logfmt][logfmt] message.
+    ///
+    /// [logfmt]: https://brandur.org/logfmt
     Logfmt,
 
-    /// Native Vector serialization based on Protocol Buffers.
+    /// Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+    ///
+    /// This codec is **[experimental][experimental]**.
+    ///
+    /// [vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+    /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
 
-    /// Native Vector serialization based on JSON.
+    /// Encodes an event in Vector’s [native JSON format][vector_native_json].
+    ///
+    /// This codec is **[experimental][experimental]**.
+    ///
+    /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+    /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     NativeJson,
 
-    /// No serialization.
+    /// No encoding.
     ///
-    /// This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-    /// they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-    /// while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-    /// event.
+    /// This "encoding" simply uses the `message` field of a log event.
+    ///
+    /// Users should take care if they're modifying their log events (such as by using a `remap`
+    /// transform, etc) and removing the message field while doing additional parsing on it, as this
+    /// could lead to the encoding emitting empty strings for the given event.
     RawMessage,
 
-    /// Plaintext serialization.
+    /// Plain text encoding.
     ///
-    /// This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
-    /// they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
-    /// while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
-    /// event.
-    Text,
+    /// This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+    /// encoding that resembles the Prometheus export format.
+    ///
+    /// Users should take care if they're modifying their log events (such as by using a `remap`
+    /// transform, etc) and removing the message field while doing additional parsing on it, as this
+    /// could lead to the encoding emitting empty strings for the given event.
+    Text(
+        /// Encoding options specific to the text serializer.
+        TextSerializerConfig,
+    ),
 }
 
 impl From<AvroSerializerConfig> for SerializerConfig {
@@ -238,8 +267,8 @@ impl From<GelfSerializerConfig> for SerializerConfig {
 }
 
 impl From<JsonSerializerConfig> for SerializerConfig {
-    fn from(_: JsonSerializerConfig) -> Self {
-        Self::Json
+    fn from(config: JsonSerializerConfig) -> Self {
+        Self::Json(config)
     }
 }
 
@@ -268,8 +297,8 @@ impl From<RawMessageSerializerConfig> for SerializerConfig {
 }
 
 impl From<TextSerializerConfig> for SerializerConfig {
-    fn from(_: TextSerializerConfig) -> Self {
-        Self::Text
+    fn from(config: TextSerializerConfig) -> Self {
+        Self::Text(config)
     }
 }
 
@@ -281,7 +310,7 @@ impl SerializerConfig {
                 AvroSerializerConfig::new(avro.schema.clone()).build()?,
             )),
             SerializerConfig::Gelf => Ok(Serializer::Gelf(GelfSerializerConfig::new().build())),
-            SerializerConfig::Json => Ok(Serializer::Json(JsonSerializerConfig.build())),
+            SerializerConfig::Json(config) => Ok(Serializer::Json(config.build())),
             SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
             SerializerConfig::Native => Ok(Serializer::Native(NativeSerializerConfig.build())),
             SerializerConfig::NativeJson => {
@@ -290,7 +319,33 @@ impl SerializerConfig {
             SerializerConfig::RawMessage => {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
-            SerializerConfig::Text => Ok(Serializer::Text(TextSerializerConfig.build())),
+            SerializerConfig::Text(config) => Ok(Serializer::Text(config.build())),
+        }
+    }
+
+    /// Return an appropriate default framer for the given serializer.
+    pub fn default_stream_framing(&self) -> FramingConfig {
+        match self {
+            // TODO: Technically, Avro messages are supposed to be framed[1] as a vector of
+            // length-delimited buffers -- `len` as big-endian 32-bit unsigned integer, followed by
+            // `len` bytes -- with a "zero-length buffer" to terminate the overall message... which
+            // our length delimited framer obviously will not do.
+            //
+            // This is OK for now, because the Avro serializer is more ceremonial than anything
+            // else, existing to curry serializer config options to Pulsar's native client, not to
+            // actually serialize the bytes themselves... but we're still exposing this method and
+            // we should do so accurately, even if practically it doesn't need to be.
+            //
+            // [1]: https://avro.apache.org/docs/1.11.1/specification/_print/#message-framing
+            SerializerConfig::Avro { .. } | SerializerConfig::Native => {
+                FramingConfig::LengthDelimited
+            }
+            SerializerConfig::Gelf
+            | SerializerConfig::Json(_)
+            | SerializerConfig::Logfmt
+            | SerializerConfig::NativeJson
+            | SerializerConfig::RawMessage
+            | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
         }
     }
 
@@ -301,12 +356,12 @@ impl SerializerConfig {
                 AvroSerializerConfig::new(avro.schema.clone()).input_type()
             }
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::input_type(),
-            SerializerConfig::Json => JsonSerializerConfig.input_type(),
+            SerializerConfig::Json(config) => config.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
-            SerializerConfig::Text => TextSerializerConfig.input_type(),
+            SerializerConfig::Text(config) => config.input_type(),
         }
     }
 
@@ -317,12 +372,12 @@ impl SerializerConfig {
                 AvroSerializerConfig::new(avro.schema.clone()).schema_requirement()
             }
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::schema_requirement(),
-            SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
+            SerializerConfig::Json(config) => config.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
-            SerializerConfig::Text => TextSerializerConfig.schema_requirement(),
+            SerializerConfig::Text(config) => config.schema_requirement(),
         }
     }
 }
@@ -367,7 +422,7 @@ impl Serializer {
     ///
     /// Panics if the serializer does not support encoding to JSON. Call `Serializer::supports_json`
     /// if you need to determine the capability to encode to JSON at runtime.
-    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_core::Error> {
+    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         match self {
             Serializer::Gelf(serializer) => serializer.to_json_value(event),
             Serializer::Json(serializer) => serializer.to_json_value(event),
@@ -432,7 +487,7 @@ impl From<TextSerializer> for Serializer {
 }
 
 impl tokio_util::codec::Encoder<Event> for Serializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {

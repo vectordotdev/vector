@@ -48,6 +48,8 @@ mod vrl;
 
 use std::path::PathBuf;
 
+use float_eq::FloatEq;
+
 #[cfg(feature = "vrl")]
 pub use vrl::compile_vrl;
 
@@ -56,6 +58,8 @@ pub use vector_buffers as buffers;
 pub use vector_common::event_test_util;
 pub use vector_common::{byte_size_of::ByteSizeOf, internal_event};
 
+pub use event::EstimatedJsonEncodedSizeOf;
+
 #[macro_use]
 extern crate tracing;
 
@@ -63,10 +67,8 @@ pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/var/lib/vector/"))
 }
 
-/// Vector's basic error type, dynamically dispatched and safe to send across
-/// threads.
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+pub(crate) use vector_common::{Error, Result};
 
-/// Vector's basic result type, defined in terms of [`Error`] and generic over
-/// `T`.
-pub type Result<T> = std::result::Result<T, Error>;
+pub(crate) fn float_eq(l_value: f64, r_value: f64) -> bool {
+    (l_value.is_nan() && r_value.is_nan()) || l_value.eq_ulps(&r_value, &1)
+}

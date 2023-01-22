@@ -1,6 +1,8 @@
 use enum_dispatch::enum_dispatch;
 use snafu::Snafu;
 
+#[cfg(feature = "sources-amqp")]
+pub mod amqp;
 #[cfg(feature = "sources-apache_metrics")]
 pub mod apache_metrics;
 #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -38,10 +40,10 @@ pub mod gcp_pubsub;
 pub mod heroku_logs;
 #[cfg(feature = "sources-host_metrics")]
 pub mod host_metrics;
-#[cfg(feature = "sources-http")]
-pub mod http;
-#[cfg(feature = "sources-http_scrape")]
-pub mod http_scrape;
+#[cfg(feature = "sources-http_client")]
+pub mod http_client;
+#[cfg(feature = "sources-http_server")]
+pub mod http_server;
 #[cfg(feature = "sources-internal_logs")]
 pub mod internal_logs;
 #[cfg(feature = "sources-internal_metrics")]
@@ -79,13 +81,16 @@ pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
 
-pub(crate) mod util;
+pub mod util;
 
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LogNamespace, Output};
 pub use vector_core::source::Source;
 
-use crate::config::{unit_test::UnitTestSourceConfig, Resource, SourceConfig, SourceContext};
+use crate::config::{
+    unit_test::{UnitTestSourceConfig, UnitTestStreamSourceConfig},
+    Resource, SourceConfig, SourceContext,
+};
 
 /// Common build errors
 #[derive(Debug, Snafu)]
@@ -101,6 +106,10 @@ enum BuildError {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(SourceConfig)]
 pub enum Sources {
+    /// AMQP.
+    #[cfg(feature = "sources-amqp")]
+    Amqp(#[configurable(derived)] amqp::AmqpSourceConfig),
+
     /// Apache HTTP Server (HTTPD) Metrics.
     #[cfg(feature = "sources-apache_metrics")]
     ApacheMetrics(#[configurable(derived)] apache_metrics::ApacheMetricsConfig),
@@ -172,12 +181,16 @@ pub enum Sources {
     HostMetrics(#[configurable(derived)] host_metrics::HostMetricsConfig),
 
     /// HTTP.
-    #[cfg(feature = "sources-http")]
-    Http(#[configurable(derived)] http::SimpleHttpConfig),
+    #[cfg(feature = "sources-http_server")]
+    Http(#[configurable(derived)] http_server::HttpConfig),
 
-    /// HTTP Scrape.
-    #[cfg(feature = "sources-http_scrape")]
-    HttpScrape(#[configurable(derived)] http_scrape::HttpScrapeConfig),
+    /// HTTP Client.
+    #[cfg(feature = "sources-http_client")]
+    HttpClient(#[configurable(derived)] http_client::HttpClientConfig),
+
+    /// HTTP Server.
+    #[cfg(feature = "sources-http_server")]
+    HttpServer(#[configurable(derived)] http_server::SimpleHttpConfig),
 
     /// Internal Logs.
     #[cfg(feature = "sources-internal_logs")]
@@ -280,6 +293,9 @@ pub enum Sources {
     /// Unit test.
     UnitTest(#[configurable(derived)] UnitTestSourceConfig),
 
+    /// Unit test stream.
+    UnitTestStream(#[configurable(derived)] UnitTestStreamSourceConfig),
+
     /// Vector.
     #[cfg(feature = "sources-vector")]
     Vector(#[configurable(derived)] vector::VectorConfig),
@@ -291,6 +307,8 @@ impl NamedComponent for Sources {
 
     fn get_component_name(&self) -> &'static str {
         match self {
+            #[cfg(feature = "sources-amqp")]
+            Self::Amqp(config) => config.get_component_name(),
             #[cfg(feature = "sources-apache_metrics")]
             Self::ApacheMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -325,10 +343,12 @@ impl NamedComponent for Sources {
             Self::HerokuLogs(config) => config.get_component_name(),
             #[cfg(feature = "sources-host_metrics")]
             Self::HostMetrics(config) => config.get_component_name(),
-            #[cfg(feature = "sources-http")]
+            #[cfg(feature = "sources-http_server")]
             Self::Http(config) => config.get_component_name(),
-            #[cfg(feature = "sources-http_scrape")]
-            Self::HttpScrape(config) => config.get_component_name(),
+            #[cfg(feature = "sources-http_client")]
+            Self::HttpClient(config) => config.get_component_name(),
+            #[cfg(feature = "sources-http_server")]
+            Self::HttpServer(config) => config.get_component_name(),
             #[cfg(feature = "sources-internal_logs")]
             Self::InternalLogs(config) => config.get_component_name(),
             #[cfg(feature = "sources-internal_metrics")]
@@ -378,6 +398,7 @@ impl NamedComponent for Sources {
             #[cfg(feature = "sources-syslog")]
             Self::Syslog(config) => config.get_component_name(),
             Self::UnitTest(config) => config.get_component_name(),
+            Self::UnitTestStream(config) => config.get_component_name(),
             #[cfg(feature = "sources-vector")]
             Self::Vector(config) => config.get_component_name(),
         }

@@ -1,11 +1,10 @@
 use std::io::Error;
 
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+};
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::io_error_code;
@@ -24,7 +23,7 @@ impl InternalEvent for NatsEventSendError {
             error_type = error_type::WRITER_FAILED,
             error_code = io_error_code(&self.error),
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

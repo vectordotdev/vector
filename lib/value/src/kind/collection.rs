@@ -7,9 +7,15 @@ use std::collections::BTreeMap;
 
 pub use field::Field;
 pub use index::Index;
+use lookup::lookup_v2::OwnedSegment;
+use lookup::OwnedValuePath;
 pub use unknown::Unknown;
 
 use super::Kind;
+
+pub trait CollectionKey {
+    fn to_segment(&self) -> OwnedSegment;
+}
 
 /// The kinds of a collection (e.g. array or object).
 ///
@@ -121,6 +127,20 @@ impl<T: Ord + Clone> Collection<T> {
         self.unknown.is_exact()
     }
 
+    /// Returns an enum describing if the collection is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> EmptyState {
+        if self.known.is_empty() {
+            if self.unknown_kind().contains_any_defined() {
+                EmptyState::Maybe
+            } else {
+                EmptyState::Always
+            }
+        } else {
+            EmptyState::Never
+        }
+    }
+
     /// Set all "unknown" collection elements to the given kind.
     pub fn set_unknown(&mut self, unknown: impl Into<Kind>) {
         self.unknown = unknown.into().into();
@@ -130,6 +150,13 @@ impl<T: Ord + Clone> Collection<T> {
     #[must_use]
     pub fn with_unknown(mut self, unknown: impl Into<Kind>) -> Self {
         self.set_unknown(unknown);
+        self
+    }
+
+    /// Returns a new collection that includes the known key.
+    #[must_use]
+    pub fn with_known(mut self, key: impl Into<T>, kind: Kind) -> Self {
+        self.known_mut().insert(key.into(), kind);
         self
     }
 
@@ -158,46 +185,6 @@ impl<T: Ord + Clone> Collection<T> {
         self.unknown = self.unknown.to_kind().union(known_unknown).into();
     }
 
-    /// Check if `self` is a superset of `other`.
-    ///
-    /// Meaning, for all known fields in `other`, if the field also exists in `self`, then its type
-    /// needs to be a subset of `self`, otherwise its type needs to be a subset of self's
-    /// `unknown`.
-    ///
-    /// If `self` has known fields not defined in `other`, then `other`'s `unknown` must be
-    /// a superset of those fields defined in `self`.
-    ///
-    /// Additionally, other's `unknown` type needs to be a subset of `self`'s.
-    #[must_use]
-    pub fn is_superset(&self, other: &Self) -> bool {
-        // `self`'s `unknown` needs to be  a superset of `other`'s.
-        if !self.unknown.is_superset(&other.unknown) {
-            return false;
-        }
-
-        // All known fields in `other` need to either be a subset of a matching known field in
-        // `self`, or a subset of self's `unknown` type state.
-        if !other
-            .known
-            .iter()
-            .all(|(key, other_kind)| match self.known.get(key) {
-                Some(self_kind) => self_kind.is_superset(other_kind),
-                None => self.unknown_kind().is_superset(other_kind),
-            })
-        {
-            return false;
-        }
-
-        // All known fields in `self` not known in `other` need to be a superset of other's
-        // `unknown` type state.
-        self.known
-            .iter()
-            .all(|(key, self_kind)| match other.known.get(key) {
-                Some(_) => true,
-                None => self_kind.is_superset(&other.unknown_kind()),
-            })
-    }
-
     /// Merge the `other` collection into `self`.
     ///
     /// The following merge strategies are applied.
@@ -223,13 +210,17 @@ impl<T: Ord + Clone> Collection<T> {
                 }
             } else if other.unknown_kind().contains_any_defined() {
                 if overwrite {
-                    *self_kind = other.unknown_kind();
+                    // the specific field being merged isn't guaranteed to exist, so merge it with the known type of self
+                    *self_kind = other
+                        .unknown_kind()
+                        .without_undefined()
+                        .union(self_kind.clone());
                 } else {
                     self_kind.merge_keep(other.unknown_kind(), overwrite);
                 }
             } else if !overwrite {
                 // other is missing this field, which returns null
-                self_kind.add_null();
+                self_kind.add_undefined();
             }
         }
 
@@ -246,7 +237,7 @@ impl<T: Ord + Clone> Collection<T> {
         } else {
             for (key, other_kind) in other.known {
                 // self is missing this field, which returns null
-                self.known.insert(key, other_kind.or_null());
+                self.known.insert(key, other_kind.or_undefined());
             }
         }
         self.unknown.merge(other.unknown, overwrite);
@@ -264,6 +255,77 @@ impl<T: Ord + Clone> Collection<T> {
             .unwrap_or_else(Kind::never)
             .union(self.unknown_kind().without_undefined())
     }
+}
+
+impl<T: Ord + Clone + CollectionKey> Collection<T> {
+    /// Check if `self` is a superset of `other`.
+    ///
+    /// Meaning, for all known fields in `other`, if the field also exists in `self`, then its type
+    /// needs to be a subset of `self`, otherwise its type needs to be a subset of self's
+    /// `unknown`.
+    ///
+    /// If `self` has known fields not defined in `other`, then `other`'s `unknown` must be
+    /// a superset of those fields defined in `self`.
+    ///
+    /// Additionally, other's `unknown` type needs to be a subset of `self`'s.
+    ///
+    /// # Errors
+    /// If the type is not a superset, a path to one field that doesn't match is returned.
+    /// This is mostly useful for debugging.
+    pub fn is_superset(&self, other: &Self) -> Result<(), OwnedValuePath> {
+        // `self`'s `unknown` needs to be  a superset of `other`'s.
+        self.unknown
+            .is_superset(&other.unknown)
+            .map_err(|path| path.with_field_prefix("<unknown>"))?;
+
+        // All known fields in `other` need to either be a subset of a matching known field in
+        // `self`, or a subset of self's `unknown` type state.
+        for (key, other_kind) in &other.known {
+            match self.known.get(key) {
+                Some(self_kind) => {
+                    self_kind
+                        .is_superset(other_kind)
+                        .map_err(|path| path.with_segment_prefix(key.to_segment()))?;
+                }
+                None => {
+                    self.unknown_kind()
+                        .is_superset(other_kind)
+                        .map_err(|path| path.with_segment_prefix(key.to_segment()))?;
+                }
+            }
+        }
+
+        // All known fields in `self` not known in `other` need to be a superset of other's
+        // `unknown` type state.
+        for (key, self_kind) in &self.known {
+            if other.known.get(key).is_none() {
+                self_kind
+                    .is_superset(&other.unknown_kind())
+                    .map_err(|path| path.with_segment_prefix(key.to_segment()))?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub trait CollectionRemove {
+    type Key: Ord;
+
+    fn remove_known(&mut self, key: &Self::Key);
+}
+
+/// Collections have an "unknown" component, so it can't know in all cases if the value this
+/// collection represents is actually empty/not empty, so the state is represented with 3 variants.
+#[derive(Debug)]
+pub enum EmptyState {
+    // The collection is guaranteed to be empty.
+    Always,
+    // The collection may or may not actually be empty. There is not enough type information to
+    // determine. (There are unknown fields/indices that may exist, but there are no known values.)
+    Maybe,
+    // The collection is guaranteed to NOT be empty.
+    Never,
 }
 
 impl<T: Ord> From<BTreeMap<T, Kind>> for Collection<T> {
@@ -331,6 +393,12 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
+
+    impl CollectionKey for &'static str {
+        fn to_segment(&self) -> OwnedSegment {
+            OwnedSegment::Field((*self).to_string())
+        }
+    }
 
     #[test]
     #[allow(clippy::too_many_lines)]
@@ -427,8 +495,26 @@ mod tests {
                     want: false,
                 },
             ),
+            (
+                "unknown superset of known",
+                TestCase {
+                    this: Collection::from_parts(BTreeMap::new(), Kind::bytes().or_integer()),
+                    other: Collection::empty()
+                        .with_known("foo", Kind::integer())
+                        .with_known("bar", Kind::bytes()),
+                    want: true,
+                },
+            ),
+            (
+                "unknown not superset of known",
+                TestCase {
+                    this: Collection::from_parts(BTreeMap::new(), Kind::bytes().or_integer()),
+                    other: Collection::empty().with_known("foo", Kind::float()),
+                    want: false,
+                },
+            ),
         ]) {
-            assert_eq!(this.is_superset(&other), want, "{}", title);
+            assert_eq!(this.is_superset(&other).is_ok(), want, "{title}");
         }
     }
 
@@ -530,8 +616,8 @@ mod tests {
                     other: Collection::from(BTreeMap::from([("bar", Kind::bytes())])),
                     overwrite: false,
                     want: Collection::from(BTreeMap::from([
-                        ("foo", Kind::integer().or_null()),
-                        ("bar", Kind::bytes().or_null()),
+                        ("foo", Kind::integer().or_undefined()),
+                        ("bar", Kind::bytes().or_undefined()),
                     ])),
                 },
             ),
@@ -558,7 +644,7 @@ mod tests {
                     overwrite: false,
                     want: Collection::from(BTreeMap::from([
                         ("foo", Kind::integer().or_bytes()),
-                        ("bar", Kind::boolean().or_null()),
+                        ("bar", Kind::boolean().or_undefined()),
                     ])),
                 },
             ),
@@ -595,10 +681,19 @@ mod tests {
                     want: Collection::from_unknown(Kind::bytes().or_integer()),
                 },
             ),
+            (
+                "merge known with specific unknown",
+                TestCase {
+                    this: Collection::from(BTreeMap::from([("a", Kind::integer())])),
+                    other: Collection::from_unknown(Kind::float()),
+                    overwrite: true,
+                    want: Collection::from(BTreeMap::from([("a", Kind::integer().or_float())]))
+                        .with_unknown(Kind::float().or_undefined()),
+                },
+            ),
         ] {
             this.merge(other, strategy);
-
-            assert_eq!(this, want, "{}", title);
+            assert_eq!(this, want, "{title}");
         }
     }
 
@@ -683,7 +778,7 @@ mod tests {
         ]) {
             this.anonymize();
 
-            assert_eq!(this, want, "{}", title);
+            assert_eq!(this, want, "{title}");
         }
     }
 
@@ -742,7 +837,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.to_string(), want.to_string(), "{}", title);
+            assert_eq!(this.to_string(), want.to_string(), "{title}");
         }
     }
 
@@ -798,7 +893,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.to_string(), want.to_string(), "{}", title);
+            assert_eq!(this.to_string(), want.to_string(), "{title}");
         }
     }
 
@@ -853,7 +948,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(this.reduced_kind(), want, "{}", title);
+            assert_eq!(this.reduced_kind(), want, "{title}");
         }
     }
 }

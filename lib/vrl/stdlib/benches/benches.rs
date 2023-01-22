@@ -18,12 +18,14 @@ criterion_group!(
               chunks,
               compact,
               contains,
+              decode_base16,
               decode_base64,
               decode_percent,
               decrypt,
               // TODO: Cannot pass a Path to bench_function
               //del,
               downcase,
+              encode_base16,
               encode_base64,
               encode_key_value,
               encode_json,
@@ -68,6 +70,7 @@ criterion_group!(
               is_string,
               is_timestamp,
               join,
+              keys,
               length,
               log,
               r#match,
@@ -142,6 +145,7 @@ criterion_group!(
               // TODO: value is dynamic so we cannot assert equality
               //uuidv4,
               upcase,
+              values,
 );
 criterion_main!(benches);
 
@@ -259,6 +263,15 @@ bench_function! {
 }
 
 bench_function! {
+    decode_base16 => vrl_stdlib::DecodeBase16;
+
+    literal {
+        args: func_args![value: "736f6d652b3d737472696e672f76616c7565"],
+        want: Ok("some+=string/value"),
+    }
+}
+
+bench_function! {
     decode_base64 => vrl_stdlib::DecodeBase64;
 
     literal {
@@ -277,11 +290,34 @@ bench_function! {
 }
 
 bench_function! {
+    decode_mime_q => vrl_stdlib::DecodeMimeQ;
+
+    base_64 {
+        args: func_args![value: "=?utf-8?b?SGVsbG8sIFdvcmxkIQ==?="],
+        want: Ok("Hello, World!"),
+    }
+
+    quoted_printable {
+        args: func_args![value: "Subject: =?iso-8859-1?Q?=A1Hola,_se=F1or!?="],
+        want: Ok("Subject: ¡Hola, señor!"),
+    }
+}
+
+bench_function! {
     downcase => vrl_stdlib::Downcase;
 
     literal {
         args: func_args![value: "FOO"],
         want: Ok("foo")
+    }
+}
+
+bench_function! {
+    encode_base16 => vrl_stdlib::EncodeBase16;
+
+    literal {
+        args: func_args![value: "some+=string/value"],
+        want: Ok("736f6d652b3d737472696e672f76616c7565"),
     }
 }
 
@@ -937,6 +973,15 @@ bench_function! {
 }
 
 bench_function! {
+    keys => vrl_stdlib::Keys;
+
+    literal {
+        args: func_args![value: value!({"key1": "val1", "key2": "val2"})],
+        want: Ok(value!(["key1", "key2"])),
+    }
+}
+
+bench_function! {
     length => vrl_stdlib::Length;
 
     map {
@@ -1328,6 +1373,75 @@ bench_function! {
             "version": 3,
             "vpc_id": "vpc-abcdefab012345678",
         })),
+    }
+}
+
+bench_function! {
+    parse_cef => vrl_stdlib::ParseCef;
+
+    simple {
+        args: func_args! [
+            value: r#"CEF:0|CyberArk|PTA|12.6|1|Suspected credentials theft|8|suser=mike2@prod1.domain.com shost=prod1.domain.com src=1.1.1.1"#
+        ],
+        want: Ok(value!({
+            "cefVersion": "0",
+            "deviceVendor": "CyberArk",
+            "deviceProduct": "PTA",
+            "deviceVersion": "12.6",
+            "deviceEventClassId": "1",
+            "name": "Suspected credentials theft",
+            "severity": "8",
+            "suser": "mike2@prod1.domain.com",
+            "shost": "prod1.domain.com",
+            "src": "1.1.1.1"
+        }))
+    }
+
+    complex {
+        args: func_args! [
+            value: r#"CEF:0|Check Point|VPN-1 & FireWall-1|Check Point|Log|https|Unknown|act=Accept destinationTranslatedAddress=0.0.0.0 destinationTranslatedPort=0 deviceDirection=0 rt=1543270652000 sourceTranslatedAddress=192.168.103.254 sourceTranslatedPort=35398 spt=49363 dpt=443 cs2Label=Rule Name layer_name=Network layer_uuid=b406b732-2437-4848-9741-6eae1f5bf112 match_id=4 parent_rule=0 rule_action=Accept rule_uid=9e5e6e74-aa9a-4693-b9fe-53712dd27bea ifname=eth0 logid=0 loguid={0x5bfc70fc,0x1,0xfe65a8c0,0xc0000001} origin=192.168.101.254 originsicname=CN\=R80,O\=R80_M..6u6bdo sequencenum=1 version=5 dst=52.173.84.157 inzone=Internal nat_addtnl_rulenum=1 nat_rulenum=4 outzone=External product=VPN-1 & FireWall-1 proto=6 service_id=https src=192.168.101.100"#,
+        ],
+        want: Ok(value!({
+            "cefVersion":"0",
+            "deviceVendor":"Check Point",
+            "deviceProduct":"VPN-1 & FireWall-1",
+            "deviceVersion":"Check Point",
+            "deviceEventClassId":"Log",
+            "name":"https",
+            "severity":"Unknown",
+            "act": "Accept",
+            "destinationTranslatedAddress": "0.0.0.0",
+            "destinationTranslatedPort": "0",
+            "deviceDirection": "0",
+            "rt": "1543270652000",
+            "sourceTranslatedAddress": "192.168.103.254",
+            "sourceTranslatedPort": "35398",
+            "spt": "49363",
+            "dpt": "443",
+            "cs2Label": "Rule Name",
+            "layer_name": "Network",
+            "layer_uuid": "b406b732-2437-4848-9741-6eae1f5bf112",
+            "match_id": "4",
+            "parent_rule": "0",
+            "rule_action": "Accept",
+            "rule_uid": "9e5e6e74-aa9a-4693-b9fe-53712dd27bea",
+            "ifname": "eth0",
+            "logid": "0",
+            "loguid": "{0x5bfc70fc,0x1,0xfe65a8c0,0xc0000001}",
+            "origin": "192.168.101.254",
+            "originsicname": "CN=R80,O=R80_M..6u6bdo",
+            "sequencenum": "1",
+            "version": "5",
+            "dst": "52.173.84.157",
+            "inzone": "Internal",
+            "nat_addtnl_rulenum": "1",
+            "nat_rulenum": "4",
+            "outzone": "External",
+            "product": "VPN-1 & FireWall-1",
+            "proto": "6",
+            "service_id": "https",
+            "src": "192.168.101.100",
+        }))
     }
 }
 
@@ -2508,5 +2622,14 @@ bench_function! {
     literal {
         args: func_args![value: "foo"],
         want: Ok("FOO")
+    }
+}
+
+bench_function! {
+    values => vrl_stdlib::Values;
+
+    literal {
+        args: func_args![value: value!({"key1": "val1", "key2": "val2"})],
+        want: Ok(value!(["val1", "val2"])),
     }
 }

@@ -3,6 +3,7 @@ use std::{convert::TryInto, sync::Arc};
 use azure_storage_blobs::prelude::*;
 use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::request_builder::AzureBlobRequestOptions;
@@ -32,7 +33,7 @@ pub struct AzureBlobSinkConfig {
     /// Authentication with access key is the only supported authentication method.
     ///
     /// Either `storage_account`, or this field, must be specified.
-    pub connection_string: Option<String>,
+    pub connection_string: Option<SensitiveString>,
 
     /// The Azure Blob Storage Account name.
     ///
@@ -49,6 +50,17 @@ pub struct AzureBlobSinkConfig {
     /// [az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
     pub storage_account: Option<String>,
 
+    /// The Azure Blob Storage Endpoint URL.
+    ///
+    /// This is used to override the default blob storage endpoint URL in cases where you are using
+    /// credentials read from the environment/managed identities or access tokens without using an
+    /// explicit connection_string (which already explicitly supports overriding the blob endpoint
+    /// URL).
+    ///
+    /// This may only be used with `storage_account` and will be ignored when used with
+    /// `connection_string`.
+    pub endpoint: Option<String>,
+
     /// The Azure Blob Storage Account container name.
     pub(super) container_name: String,
 
@@ -56,7 +68,7 @@ pub struct AzureBlobSinkConfig {
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an blob key that
     /// stores blobs under a particular "directory". If using a prefix for this purpose, it must end
-    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
+    /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     pub blob_prefix: Option<String>,
 
     /// The timestamp format for the time component of the blob key.
@@ -115,13 +127,14 @@ pub struct AzureBlobSinkConfig {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;")),
+            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
             storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),
+            endpoint: None,
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
-            encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::new()).into(),
+            encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::default()).into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -135,9 +148,12 @@ impl GenerateConfig for AzureBlobSinkConfig {
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
-            self.connection_string.clone(),
-            self.storage_account.clone(),
+            self.connection_string
+                .as_ref()
+                .map(|v| v.inner().to_string()),
+            self.storage_account.as_ref().map(|v| v.to_string()),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )?;
 
         let healthcheck = azure_common::config::build_healthcheck(

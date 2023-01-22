@@ -1,12 +1,11 @@
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
+use crate::emit;
 use crate::transforms::lua::v2::BuildError;
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+use vector_common::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
-use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct LuaGcTriggered {
@@ -32,7 +31,7 @@ impl InternalEvent for LuaScriptError {
             error_code = mlua_error_code(&self.error),
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -56,13 +55,14 @@ pub struct LuaBuildError {
 
 impl InternalEvent for LuaBuildError {
     fn emit(self) {
+        let reason = "Error in building lua script.";
         error!(
-            message = "Error in building lua script.",
+            message = reason,
             error = ?self.error,
             error_type = error_type::SCRIPT_FAILED,
             error_code = lua_build_error_code(&self.error),
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -76,6 +76,8 @@ impl InternalEvent for LuaBuildError {
         });
         // deprecated
         counter!("processing_errors_total", 1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
 }
 

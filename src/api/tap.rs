@@ -273,9 +273,9 @@ async fn tap_handler(
                 } = watch_rx.borrow().clone();
 
                 // Remove tap sinks from components that have gone away/can no longer match.
-                let updated_keys = outputs.keys().map(|output| output.output_id.component.clone()).collect::<HashSet<_>>();
+                let output_keys = outputs.keys().map(|output| output.output_id.component.clone()).collect::<HashSet<_>>();
                 sinks.retain(|key, _| {
-                    !removals.contains(key) && updated_keys.contains(key) || {
+                    !removals.contains(key) && output_keys.contains(key) || {
                         debug!(message = "Removing component.", component_id = %key);
                         false
                     }
@@ -418,6 +418,8 @@ async fn tap_handler(
     feature = "transforms-remap",
 ))]
 mod tests {
+    use std::time::Duration;
+
     use futures::StreamExt;
     use tokio::sync::watch;
 
@@ -429,7 +431,7 @@ mod tests {
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
     use crate::test_util::{start_topology, trace_init};
-    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
+    use crate::transforms::log_to_metric::{LogToMetricConfig, MetricConfig, MetricTypeConfig};
     use crate::transforms::remap::RemapConfig;
 
     #[test]
@@ -519,8 +521,14 @@ mod tests {
             MetricValue::Counter { value: 1.0 },
         );
 
-        fanout.send(vec![metric_event].into()).await;
-        fanout.send(vec![log_event].into()).await;
+        fanout
+            .send(vec![metric_event].into())
+            .await
+            .expect("should not fail");
+        fanout
+            .send(vec![log_event].into())
+            .await
+            .expect("should not fail");
 
         // 3rd payload should be the metric event
         assert!(matches!(
@@ -567,7 +575,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Json,
                 ..Default::default()
@@ -583,7 +591,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let source_tap_stream = create_events_stream(
             topology.watch(),
@@ -609,7 +617,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -622,12 +630,13 @@ mod tests {
             "to_metric",
             &["in"],
             LogToMetricConfig {
-                metrics: vec![MetricConfig::Gauge(GaugeConfig {
-                    field: "message".to_string(),
+                metrics: vec![MetricConfig {
+                    field: "message".try_into().expect("Fixed template string"),
                     name: None,
                     namespace: None,
                     tags: None,
-                })],
+                    metric: MetricTypeConfig::Gauge,
+                }],
             },
         );
         config.add_sink(
@@ -640,7 +649,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let source_tap_stream = create_events_stream(
             topology.watch(),
@@ -666,7 +675,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Json,
                 ..Default::default()
@@ -690,7 +699,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let transform_tap_stream = create_events_stream(
             topology.watch(),
@@ -716,7 +725,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -743,7 +752,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let tap_stream = create_events_stream(
             topology.watch(),
@@ -790,7 +799,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -817,7 +826,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let tap_stream = create_events_stream(
             topology.watch(),
@@ -848,7 +857,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -877,7 +886,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let transform_tap_remap_dropped_stream = create_events_stream(
             topology.watch(),
@@ -912,7 +921,7 @@ mod tests {
         config.add_source(
             "in-test1",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 1,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -924,7 +933,7 @@ mod tests {
         config.add_source(
             "in-test2",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 1,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -953,7 +962,7 @@ mod tests {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
         let mut transform_tap_all_outputs_stream = create_events_stream(
             topology.watch(),

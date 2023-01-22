@@ -1,11 +1,8 @@
 use metrics::{counter, gauge};
 use std::borrow::Cow;
-use vector_core::internal_event::InternalEvent;
+use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
+use crate::emit;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
@@ -50,7 +47,7 @@ pub struct FileIoError<'a, P> {
     pub code: &'static str,
     pub message: &'static str,
     pub path: &'a P,
-    pub dropped_events: u64,
+    pub dropped_events: usize,
 }
 
 impl<'a, P: std::fmt::Debug> InternalEvent for FileIoError<'a, P> {
@@ -62,7 +59,7 @@ impl<'a, P: std::fmt::Debug> InternalEvent for FileIoError<'a, P> {
             error_code = %self.code,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -176,7 +173,7 @@ mod source {
                 error_code = "reading_fingerprint",
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,
@@ -210,7 +207,7 @@ mod source {
                 error_code = DELETION_FAILED,
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,
@@ -278,7 +275,7 @@ mod source {
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
                 file = %self.file.display(),
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,
@@ -363,7 +360,7 @@ mod source {
                 error_code = "writing_checkpoints",
                 error_type = error_type::WRITER_FAILED,
                 stage = error_stage::RECEIVING,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
             counter!("checkpoint_write_errors_total", 1);
             counter!(
@@ -390,7 +387,7 @@ mod source {
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
                 path = %self.path.display(),
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,

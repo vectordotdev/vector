@@ -1,10 +1,13 @@
 use std::path::PathBuf;
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
+use lookup::{owned_value_path, path, OwnedValuePath};
+use value::{kind::Collection, Kind};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
@@ -19,8 +22,9 @@ pub use parser::{parse_dnstap_data, DnstapParser};
 
 pub mod schema;
 use dnsmsg_parser::{dns_message, dns_message_parser};
+use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
 pub use schema::DnstapEventSchema;
-use vector_core::config::LogNamespace;
+use vector_core::config::{LegacyKey, LogNamespace};
 
 /// Configuration for the `dnstap` source.
 #[configurable_component(source("dnstap"))]
@@ -37,7 +41,7 @@ pub struct DnstapConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    pub host_key: Option<String>,
+    pub host_key: Option<OptionalValuePath>,
 
     /// Absolute path to the socket file to read DNSTAP data from.
     ///
@@ -66,12 +70,17 @@ pub struct DnstapConfig {
     /// The size, in bytes, of the receive buffer used for the socket.
     ///
     /// This should not typically needed to be changed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub socket_receive_buffer_size: Option<usize>,
 
     /// The size, in bytes, of the send buffer used for the socket.
     ///
     /// This should not typically needed to be changed.
     pub socket_send_buffer_size: Option<usize>,
+
+    /// The namespace to use for logs. This overrides the global settings.
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 fn default_max_frame_length() -> usize {
@@ -90,6 +99,55 @@ impl DnstapConfig {
     fn content_type(&self) -> String {
         "protobuf:dnstap.Dnstap".to_string() //content-type for framestream
     }
+
+    fn event_schema(timestamp_key: &'static str) -> DnstapEventSchema {
+        let mut schema = DnstapEventSchema::new();
+        schema
+            .dnstap_root_data_schema_mut()
+            .set_timestamp(timestamp_key);
+
+        schema
+    }
+
+    pub fn schema_definition(
+        &self,
+        log_namespace: LogNamespace,
+    ) -> vector_core::schema::Definition {
+        let event_schema = Self::event_schema(log_schema().timestamp_key());
+
+        match log_namespace {
+            LogNamespace::Legacy => {
+                let schema = vector_core::schema::Definition::empty_legacy_namespace();
+
+                if self.raw_data_only.unwrap_or(false) {
+                    schema.with_event_field(
+                        &owned_value_path!(log_schema().message_key()),
+                        Kind::bytes(),
+                        Some("message"),
+                    )
+                } else {
+                    event_schema.schema_definition(schema)
+                }
+            }
+            LogNamespace::Vector => {
+                let schema = vector_core::schema::Definition::new_with_default_metadata(
+                    Kind::object(Collection::empty()),
+                    [log_namespace],
+                )
+                .with_standard_vector_source_metadata();
+
+                if self.raw_data_only.unwrap_or(false) {
+                    schema.with_event_field(
+                        &owned_value_path!("message"),
+                        Kind::bytes(),
+                        Some("message"),
+                    )
+                } else {
+                    event_schema.schema_definition(schema)
+                }
+            }
+        }
+    }
 }
 
 impl Default for DnstapConfig {
@@ -104,6 +162,7 @@ impl Default for DnstapConfig {
             socket_file_mode: None,
             socket_receive_buffer_size: None,
             socket_send_buffer_size: None,
+            log_namespace: None,
         }
     }
 }
@@ -113,12 +172,17 @@ impl_generate_config_from_default!(DnstapConfig);
 #[async_trait::async_trait]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
-        let frame_handler = DnstapFrameHandler::new(self);
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let frame_handler = DnstapFrameHandler::new(self, log_namespace);
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = self
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
+        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -138,24 +202,24 @@ pub struct DnstapFrameHandler {
     socket_file_mode: Option<u32>,
     socket_receive_buffer_size: Option<usize>,
     socket_send_buffer_size: Option<usize>,
-    host_key: String,
+    host_key: Option<OwnedValuePath>,
     timestamp_key: String,
+    source_type_key: String,
     bytes_received: Registered<BytesReceived>,
+    log_namespace: LogNamespace,
 }
 
 impl DnstapFrameHandler {
-    pub fn new(config: &DnstapConfig) -> Self {
+    pub fn new(config: &DnstapConfig, log_namespace: LogNamespace) -> Self {
+        let source_type_key = log_schema().source_type_key();
         let timestamp_key = log_schema().timestamp_key();
 
-        let mut schema = DnstapEventSchema::new();
-        schema
-            .dnstap_root_data_schema_mut()
-            .set_timestamp(timestamp_key);
+        let schema = DnstapConfig::event_schema(timestamp_key);
 
-        let host_key = config
-            .host_key
-            .clone()
-            .unwrap_or_else(|| log_schema().host_key().to_string());
+        let host_key = config.host_key.clone().map_or_else(
+            || parse_value_path(log_schema().host_key()).ok(),
+            |k| k.path,
+        );
 
         Self {
             max_frame_length: config.max_frame_length,
@@ -170,7 +234,9 @@ impl DnstapFrameHandler {
             socket_send_buffer_size: config.socket_send_buffer_size,
             host_key,
             timestamp_key: timestamp_key.to_string(),
+            source_type_key: source_type_key.to_string(),
             bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
+            log_namespace,
         }
     }
 }
@@ -195,14 +261,37 @@ impl FrameHandler for DnstapFrameHandler {
 
         let mut log_event = LogEvent::default();
 
+        if self.log_namespace == LogNamespace::Vector {
+            // The timestamp is inserted by the parser which caters for the Legacy namespace.
+            self.log_namespace.insert_vector_metadata(
+                &mut log_event,
+                path!(self.timestamp_key()),
+                path!("ingest_timestamp"),
+                chrono::Utc::now(),
+            );
+        }
+
+        self.log_namespace.insert_vector_metadata(
+            &mut log_event,
+            path!(self.source_type_key()),
+            path!("source_type"),
+            DnstapConfig::NAME,
+        );
+
         if let Some(host) = received_from {
-            log_event.insert(self.host_key().as_str(), host);
+            self.log_namespace.insert_source_metadata(
+                DnstapConfig::NAME,
+                &mut log_event,
+                self.host_key.as_ref().map(LegacyKey::Overwrite),
+                path!("host"),
+                host,
+            );
         }
 
         if self.raw_data_only {
             log_event.insert(
                 self.schema.dnstap_root_data_schema().raw_data(),
-                base64::encode(&frame),
+                BASE64_STANDARD.encode(&frame),
             );
             let event = Event::from(log_event);
             Some(event)
@@ -210,7 +299,7 @@ impl FrameHandler for DnstapFrameHandler {
             match parse_dnstap_data(&self.schema, &mut log_event, frame) {
                 Err(err) => {
                     emit!(DnstapParseError {
-                        error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
+                        error: format!("Dnstap protobuf decode error {:?}.", err)
                     });
                     None
                 }
@@ -221,6 +310,7 @@ impl FrameHandler for DnstapFrameHandler {
             }
         }
     }
+
     fn socket_path(&self) -> PathBuf {
         self.socket_path.clone()
     }
@@ -245,12 +335,80 @@ impl FrameHandler for DnstapFrameHandler {
         self.socket_send_buffer_size
     }
 
-    fn host_key(&self) -> String {
-        self.host_key.clone()
+    fn host_key(&self) -> &Option<OwnedValuePath> {
+        &self.host_key
     }
 
-    fn timestamp_key(&self) -> String {
-        self.timestamp_key.clone()
+    fn source_type_key(&self) -> &str {
+        self.source_type_key.as_str()
+    }
+
+    fn timestamp_key(&self) -> &str {
+        self.timestamp_key.as_str()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simple_matches_schema() {
+        let record = r#"{"dataType":"Message",
+                         "dataTypeId":1,
+                         "messageType":"ClientQuery",
+                         "messageTypeId":5,
+                         "requestData":{
+                           "fullRcode":0,
+                           "header":{
+                             "aa":false,
+                             "ad":true,
+                             "anCount":0,
+                             "arCount":1,
+                             "cd":false,
+                             "id":38339,
+                             "nsCount":0,
+                             "opcode":0,
+                             "qdCount":1,
+                             "qr":0,
+                             "ra":false,
+                             "rcode":0,
+                             "rd":true,
+                             "tc":false},
+                           "opt":{
+                             "do":false,
+                             "ednsVersion":0,
+                             "extendedRcode":0,
+                             "options":[{"optCode":10,
+                                         "optName":"Cookie",
+                                         "optValue":"5JiWq4VYa7U="}],
+                             "udpPayloadSize":1232},
+                           "question":[{"class":"IN","domainName":"whoami.example.org.","questionType":"A","questionTypeId":1}],
+                           "rcodeName":"NoError",
+                           "time":1667909880863224758,
+                           "timePrecision":"ns"},
+                         "serverId":"stephenwakely-Precision-5570",
+                         "serverVersion":"CoreDNS-1.10.0",
+                         "socketFamily":"INET",
+                         "socketProtocol":"UDP",
+                         "sourceAddress":"0.0.0.0",
+                         "sourcePort":54782,
+                         "source_type":"dnstap",
+                         "time":1667909880863224758,
+                         "timePrecision":"ns"
+                         }"#;
+
+        let json: serde_json::Value = serde_json::from_str(record).unwrap();
+        let mut event = Event::from(LogEvent::from(value::Value::from(json)));
+        event.as_mut_log().insert("timestamp", chrono::Utc::now());
+
+        let definition = DnstapConfig::event_schema("timestamp");
+        let schema = vector_core::schema::Definition::empty_legacy_namespace()
+            .with_standard_vector_source_metadata();
+
+        definition
+            .schema_definition(schema)
+            .assert_valid_for_event(&event)
     }
 }
 
@@ -283,7 +441,7 @@ mod integration_tests {
 
                 DnstapConfig {
                     max_frame_length: 102400,
-                    host_key: Some("key".to_string()),
+                    host_key: Some(OptionalValuePath::from(owned_value_path!("key"))),
                     socket_path: socket,
                     raw_data_only: Some(raw_data),
                     multithreaded: Some(false),
@@ -291,6 +449,7 @@ mod integration_tests {
                     socket_file_mode: Some(511),
                     socket_receive_buffer_size: Some(10485760),
                     socket_send_buffer_size: Some(10485760),
+                    log_namespace: None,
                 }
                 .build(SourceContext::new_test(sender, None))
                 .await
@@ -357,7 +516,7 @@ mod integration_tests {
         if raw_data {
             assert_eq!(events.len(), 2);
             assert!(
-                events.iter().all(|v| v.as_log().get("rawData") != None),
+                events.iter().all(|v| v.as_log().get("rawData").is_some()),
                 "No rawData field!"
             );
         } else if query_event == "query" {

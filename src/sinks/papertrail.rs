@@ -6,7 +6,7 @@ use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext, SinkDescription,
+        SinkContext,
     },
     event::Event,
     internal_events::TemplateRenderingError,
@@ -37,7 +37,6 @@ pub struct PapertrailConfig {
     send_buffer_bytes: Option<usize>,
 
     /// The value to use as the `process` in Papertrail.
-    #[configurable(metadata(templateable))]
     process: Option<Template>,
 
     #[configurable(derived)]
@@ -47,10 +46,6 @@ pub struct PapertrailConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<PapertrailConfig>("papertrail")
 }
 
 impl GenerateConfig for PapertrailConfig {
@@ -136,7 +131,7 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
         let host = event
             .as_mut_log()
             .remove(log_schema().host_key())
-            .map(|host| host.to_string_lossy());
+            .map(|host| host.to_string_lossy().into_owned());
 
         let process = self
             .process
@@ -183,7 +178,7 @@ mod tests {
     use std::convert::TryFrom;
 
     use bytes::BytesMut;
-    use codecs::JsonSerializer;
+    use codecs::JsonSerializerConfig;
     use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
     use vector_core::event::{Event, LogEvent};
@@ -227,7 +222,7 @@ mod tests {
             pid: 0,
             process: Some(Template::try_from("{{ process }}").unwrap()),
             transformer: Transformer::new(None, Some(vec!["magic".into()]), None).unwrap(),
-            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         };
 
         let mut bytes = BytesMut::new();

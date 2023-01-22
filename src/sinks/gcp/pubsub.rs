@@ -1,3 +1,4 @@
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
@@ -185,7 +186,7 @@ impl HttpEventEncoder<Value> for PubSubSinkEventEncoder {
         self.encoder.encode(event, &mut bytes).ok()?;
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
-        Some(json!({ "data": base64::encode(&bytes) }))
+        Some(json!({ "data": BASE64_STANDARD.encode(&bytes) }))
     }
 }
 
@@ -249,7 +250,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
+#[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
     use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
@@ -259,6 +260,7 @@ mod integration_tests {
 
     use super::*;
     use crate::gcp;
+    use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         random_events_with_stream, random_string, trace_init,
@@ -277,7 +279,7 @@ mod integration_tests {
             },
             batch: Default::default(),
             request: Default::default(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             tls: Default::default(),
             acknowledgements: Default::default(),
         }
@@ -326,7 +328,7 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (_input, events) = random_events_with_stream(100, 100, Some(batch));
-        sink.run(events).await.expect("Sending events failed");
+        run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
@@ -410,7 +412,9 @@ mod integration_tests {
 
     impl PullMessage {
         fn decode_data(&self) -> TestMessage {
-            let data = base64::decode(&self.data).expect("Invalid base64 data");
+            let data = BASE64_STANDARD
+                .decode(&self.data)
+                .expect("Invalid base64 data");
             let data = String::from_utf8_lossy(&data);
             serde_json::from_str(&data).expect("Invalid message structure")
         }

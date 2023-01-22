@@ -1,14 +1,19 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use futures::FutureExt;
 use http::Uri;
 use indoc::indoc;
 use snafu::ResultExt;
+use tokio::sync::oneshot::{channel, Sender};
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::{proxy::ProxyConfig, AcknowledgementsConfig};
 
-use super::service::TraceApiRetry;
+use super::{
+    apm_stats::{flush_apm_stats_thread, Aggregator},
+    service::TraceApiRetry,
+};
 use crate::{
     common::datadog::get_base_domain,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
@@ -71,7 +76,7 @@ pub struct DatadogTracesConfig {
     /// precedence over the default.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-    pub default_api_key: String,
+    pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
@@ -115,6 +120,7 @@ pub enum DatadogTracesEndpoint {
 }
 
 /// Store traces & APM stats endpoints actual URIs.
+#[derive(Clone)]
 pub struct DatadogTracesEndpointConfiguration {
     traces_endpoint: Uri,
     stats_endpoint: Uri,
@@ -130,16 +136,19 @@ impl DatadogTracesEndpointConfiguration {
 }
 
 impl DatadogTracesConfig {
-    fn generate_traces_endpoint_configuration(
-        &self,
-    ) -> crate::Result<DatadogTracesEndpointConfiguration> {
-        let base_uri = self.endpoint.clone().unwrap_or_else(|| {
+    fn get_base_uri(&self) -> String {
+        self.endpoint.clone().unwrap_or_else(|| {
             format!(
                 "https://trace.agent.{}",
                 get_base_domain(self.site.as_ref(), None)
             )
-        });
+        })
+    }
 
+    fn generate_traces_endpoint_configuration(
+        &self,
+    ) -> crate::Result<DatadogTracesEndpointConfiguration> {
+        let base_uri = self.get_base_uri();
         let traces_endpoint = build_uri(&base_uri, "/api/v0.2/traces")?;
         let stats_endpoint = build_uri(&base_uri, "/api/v0.2/stats")?;
 
@@ -148,36 +157,72 @@ impl DatadogTracesConfig {
             stats_endpoint,
         })
     }
-}
 
-impl DatadogTracesConfig {
     pub fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
-        let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
+        let default_api_key: Arc<str> = Arc::from(self.default_api_key.inner());
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let endpoints = self.generate_traces_endpoint_configuration()?;
+
         let batcher_settings = self
             .batch
             .validate()?
             .limit_max_bytes(BATCH_GOAL_BYTES)?
             .limit_max_events(BATCH_MAX_EVENTS)?
             .into_batcher_settings()?;
+
         let service = ServiceBuilder::new()
             .settings(request_limits, TraceApiRetry)
-            .service(TraceApiService::new(client));
+            .service(TraceApiService::new(client.clone()));
+
+        // Object responsible for caching/processing APM stats from incoming trace events.
+        let apm_stats_aggregator =
+            Arc::new(Mutex::new(Aggregator::new(Arc::clone(&default_api_key))));
+
+        let compression = self.compression.unwrap_or_else(Compression::gzip_default);
+
         let request_builder = DatadogTracesRequestBuilder::new(
             Arc::clone(&default_api_key),
-            endpoints,
-            self.compression.unwrap_or_else(Compression::gzip_default),
+            endpoints.clone(),
+            compression,
             PAYLOAD_LIMIT,
+            Arc::clone(&apm_stats_aggregator),
         )?;
-        let sink = TracesSink::new(service, request_builder, batcher_settings);
+
+        // shutdown= Sender that the sink signals when input stream is exhauseted.
+        // tripwire= Receiver that APM stats flush thread listens for exit signal on.
+        let (shutdown, tripwire) = channel::<Sender<()>>();
+
+        let sink = TracesSink::new(
+            service,
+            request_builder,
+            batcher_settings,
+            shutdown,
+            self.get_protocol(),
+        );
+
+        // Send the APM stats payloads independently of the sink framework.
+        // This is necessary to comply with what the APM stats backend of Datadog expects with
+        // respect to receiving stats payloads.
+        tokio::spawn(flush_apm_stats_thread(
+            tripwire,
+            client,
+            compression,
+            endpoints,
+            Arc::clone(&apm_stats_aggregator),
+        ));
+
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let validate_endpoint =
             get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), None)?;
-        Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
+        Ok(healthcheck(
+            client,
+            validate_endpoint,
+            self.default_api_key.inner().to_string(),
+        )
+        .boxed())
     }
 
     pub fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
@@ -190,6 +235,14 @@ impl DatadogTracesConfig {
             false,
         )?;
         Ok(HttpClient::new(tls_settings, proxy)?)
+    }
+
+    fn get_protocol(&self) -> String {
+        build_uri(&self.get_base_uri(), "")
+            .unwrap()
+            .scheme_str()
+            .unwrap_or("http")
+            .to_string()
     }
 }
 
@@ -220,7 +273,7 @@ fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
 
 #[cfg(test)]
 mod test {
-    use crate::sinks::datadog::traces::DatadogTracesConfig;
+    use super::DatadogTracesConfig;
 
     #[test]
     fn generate_config() {

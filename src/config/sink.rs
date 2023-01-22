@@ -8,25 +8,26 @@ use vector_core::{
     sink::VectorSink,
 };
 
-use super::{schema, ComponentKey, ProxyConfig, Resource};
+use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
 use crate::sinks::{util::UriSerde, Healthcheck, Sinks};
 
 /// Fully resolved sink component.
 #[configurable_component]
+#[configurable(metadata(docs::component_base_type = "sink"))]
 #[derive(Clone, Debug)]
 pub struct SinkOuter<T>
 where
     T: Configurable + Serialize,
 {
-    /// Inputs to the sinks.
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
-    pub inputs: Vec<T>,
+    #[configurable(derived)]
+    pub inputs: Inputs<T>,
 
     /// The full URI to make HTTP healthcheck requests to.
     ///
     /// This must be a valid URI, which requires at least the scheme and host. All other
     /// components -- port, path, etc -- are allowed as well.
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     #[configurable(validation(format = "uri"))]
     healthcheck_uri: Option<UriSerde>,
 
@@ -49,6 +50,7 @@ where
     proxy: ProxyConfig,
 
     #[serde(flatten)]
+    #[configurable(metadata(docs::hidden))]
     pub inner: Sinks,
 }
 
@@ -56,9 +58,13 @@ impl<T> SinkOuter<T>
 where
     T: Configurable + Serialize,
 {
-    pub fn new<I: Into<Sinks>>(inputs: Vec<T>, inner: I) -> SinkOuter<T> {
+    pub fn new<I, IS>(inputs: I, inner: IS) -> SinkOuter<T>
+    where
+        I: IntoIterator<Item = T>,
+        IS: Into<Sinks>,
+    {
         SinkOuter {
-            inputs,
+            inputs: Inputs::from_iter(inputs),
             buffer: Default::default(),
             healthcheck: SinkHealthcheckOptions::default(),
             healthcheck_uri: None,
@@ -72,9 +78,7 @@ where
         for stage in self.buffer.stages() {
             match stage {
                 BufferType::Memory { .. } => {}
-                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
-                    resources.push(Resource::DiskBuffer(id.to_string()))
-                }
+                BufferType::DiskV2 { .. } => resources.push(Resource::DiskBuffer(id.to_string())),
             }
         }
         resources
@@ -106,16 +110,17 @@ where
     where
         U: Configurable + Serialize,
     {
-        let inputs = self.inputs.iter().map(f).collect();
+        let inputs = self.inputs.iter().map(f).collect::<Vec<_>>();
         self.with_inputs(inputs)
     }
 
-    pub(super) fn with_inputs<U>(self, inputs: Vec<U>) -> SinkOuter<U>
+    pub(crate) fn with_inputs<I, U>(self, inputs: I) -> SinkOuter<U>
     where
+        I: IntoIterator<Item = U>,
         U: Configurable + Serialize,
     {
         SinkOuter {
-            inputs,
+            inputs: Inputs::from_iter(inputs),
             inner: self.inner,
             buffer: self.buffer,
             healthcheck: self.healthcheck,

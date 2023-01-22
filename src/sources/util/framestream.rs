@@ -20,6 +20,7 @@ use futures::{
     sink::{Sink, SinkExt},
     stream::{self, StreamExt, TryStreamExt},
 };
+use lookup::OwnedValuePath;
 use tokio::{self, net::UnixListener, task::JoinHandle};
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{length_delimited, Framed};
@@ -325,10 +326,10 @@ impl FrameStreamReader {
 
     fn make_frame(header: ControlHeader, content_type: Option<String>) -> Bytes {
         let mut frame = BytesMut::new();
-        frame.extend(&header.to_u32().to_be_bytes());
+        frame.extend(header.to_u32().to_be_bytes());
         if let Some(s) = content_type {
-            frame.extend(&ControlField::ContentType.to_u32().to_be_bytes()); //field type: ContentType
-            frame.extend(&(s.len() as u32).to_be_bytes()); //length of type
+            frame.extend(ControlField::ContentType.to_u32().to_be_bytes()); //field type: ContentType
+            frame.extend((s.len() as u32).to_be_bytes()); //length of type
             frame.extend(s.as_bytes());
         }
         Bytes::from(frame)
@@ -354,8 +355,9 @@ pub trait FrameHandler {
     fn socket_file_mode(&self) -> Option<u32>;
     fn socket_receive_buffer_size(&self) -> Option<usize>;
     fn socket_send_buffer_size(&self) -> Option<usize>;
-    fn host_key(&self) -> String;
-    fn timestamp_key(&self) -> String;
+    fn host_key(&self) -> &Option<OwnedValuePath>;
+    fn timestamp_key(&self) -> &str;
+    fn source_type_key(&self) -> &str;
 }
 
 /**
@@ -600,6 +602,7 @@ mod test {
         sink::{Sink, SinkExt},
         stream::{self, StreamExt},
     };
+    use lookup::{owned_value_path, path, OwnedValuePath};
     use tokio::{
         self,
         net::UnixStream,
@@ -607,6 +610,7 @@ mod test {
         time::{Duration, Instant},
     };
     use tokio_util::codec::{length_delimited, Framed};
+    use vector_core::config::{LegacyKey, LogNamespace};
 
     use super::{
         build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,
@@ -631,8 +635,10 @@ mod test {
         socket_receive_buffer_size: Option<usize>,
         socket_send_buffer_size: Option<usize>,
         extra_task_handling_routine: F,
-        host_key: String,
+        host_key: Option<OwnedValuePath>,
         timestamp_key: String,
+        source_type_key: String,
+        log_namespace: LogNamespace,
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockFrameHandler<F> {
@@ -647,8 +653,10 @@ mod test {
                 socket_receive_buffer_size: None,
                 socket_send_buffer_size: None,
                 extra_task_handling_routine: extra_routine,
-                host_key: "test_framestream".to_string(),
+                host_key: Some(owned_value_path!("test_framestream")),
                 timestamp_key: "my_timestamp".to_string(),
+                source_type_key: "source_type".to_string(),
+                log_namespace: LogNamespace::Legacy,
             }
         }
     }
@@ -662,15 +670,22 @@ mod test {
         }
 
         fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-            let mut event = LogEvent::from(frame);
-            event.insert(log_schema().source_type_key(), "framestream");
+            let mut log_event = LogEvent::from(frame);
+
+            log_event.insert(log_schema().source_type_key(), "framestream");
             if let Some(host) = received_from {
-                event.insert(self.host_key().as_str(), host);
+                self.log_namespace.insert_source_metadata(
+                    "framestream",
+                    &mut log_event,
+                    self.host_key.as_ref().map(LegacyKey::Overwrite),
+                    path!("host"),
+                    host,
+                )
             }
 
             (self.extra_task_handling_routine.clone())();
 
-            Some(event.into())
+            Some(log_event.into())
         }
 
         fn socket_path(&self) -> PathBuf {
@@ -695,12 +710,16 @@ mod test {
             self.socket_send_buffer_size
         }
 
-        fn host_key(&self) -> String {
-            self.host_key.clone()
+        fn host_key(&self) -> &Option<OwnedValuePath> {
+            &self.host_key
         }
 
-        fn timestamp_key(&self) -> String {
-            self.timestamp_key.clone()
+        fn timestamp_key(&self) -> &str {
+            self.timestamp_key.as_str()
+        }
+
+        fn source_type_key(&self) -> &str {
+            self.source_type_key.as_str()
         }
     }
 
@@ -763,8 +782,8 @@ mod test {
     ) -> Bytes {
         let mut frame = BytesMut::from(&header.to_u32().to_be_bytes()[..]);
         for content_type in content_types {
-            frame.extend(&ControlField::ContentType.to_u32().to_be_bytes());
-            frame.extend(&(content_type.len() as u32).to_be_bytes());
+            frame.extend(ControlField::ContentType.to_u32().to_be_bytes());
+            frame.extend((content_type.len() as u32).to_be_bytes());
             frame.extend(content_type.clone());
         }
         Bytes::from(frame)

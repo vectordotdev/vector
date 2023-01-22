@@ -6,11 +6,11 @@ use tokio::{
     fs::{self, File},
     io::AsyncReadExt,
 };
-use vector_common::btreemap;
 use vector_config::configurable_component;
+use vector_core::metric_tags;
 
 use super::{filter_result_sync, FilterList, HostMetrics, MetricsBuffer};
-use crate::event::metric::MetricTags;
+use crate::event::MetricTags;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 
@@ -253,19 +253,19 @@ impl CGroupRoot {
             let hybrid_test_file = join_path(&hybrid_root, CGROUP_CONTROLLERS);
             let modern_test_file = join_path(&base_dir, CGROUP_CONTROLLERS);
             let cpu_dir = join_path(&base_dir, "cpu");
-            if is_file(&hybrid_test_file) {
+            if is_file(hybrid_test_file) {
                 debug!(
                     message = "Detected hybrid cgroup base directory.",
                     ?base_dir
                 );
                 Mode::Hybrid(base_dir, hybrid_root)
-            } else if is_file(&modern_test_file) {
+            } else if is_file(modern_test_file) {
                 debug!(
                     message = "Detected modern cgroup base directory.",
                     ?base_dir
                 );
                 Mode::Modern(base_dir)
-            } else if is_dir(&cpu_dir) {
+            } else if is_dir(cpu_dir) {
                 debug!(
                     message = "Detected legacy cgroup base directory.",
                     ?base_dir
@@ -300,7 +300,7 @@ impl CGroup {
     }
 
     fn tags(&self) -> MetricTags {
-        btreemap! {
+        metric_tags! {
             "cgroup" => self.name.to_string_lossy(),
             "collector" => "cgroups",
         }
@@ -459,8 +459,8 @@ mod tests {
     use std::io::Write;
     use std::path::{Path, PathBuf};
 
-    use pretty_assertions::{assert_eq, assert_ne};
     use rand::{rngs::ThreadRng, Rng};
+    use similar_asserts::assert_eq;
     use tempfile::TempDir;
     use vector_core::event::Metric;
 

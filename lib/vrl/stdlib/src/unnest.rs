@@ -119,7 +119,7 @@ impl UnnestFn {
         Self {
             path: expression::Query::new(
                 expression::Target::External(PathPrefix::Event),
-                parse_value_path(path),
+                parse_value_path(path).unwrap(),
             ),
         }
     }
@@ -398,9 +398,9 @@ mod tests {
         ];
 
         for case in cases {
-            let path = parse_value_path(case.path);
+            let path = parse_value_path(case.path).unwrap();
             let new = invert_array_at_path(&case.old, &path);
-            assert_eq!(case.new, new, "{}", path);
+            assert_eq!(case.new, new, "{path}");
         }
     }
 

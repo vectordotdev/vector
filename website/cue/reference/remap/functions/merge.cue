@@ -11,7 +11,7 @@ remap: functions: merge: {
 			name:        "to"
 			description: "The object to merge into."
 			required:    true
-			type: ["string"]
+			type: ["object"]
 		},
 		{
 			name:        "from"

@@ -268,7 +268,7 @@ fn parse(input: &str) -> Result<Value> {
         .and_then(|(rest, result)| {
             rest.trim()
                 .is_empty()
-                .then(|| result)
+                .then_some(result)
                 .ok_or_else(|| "could not parse whole line successfully".into())
         })?;
 

@@ -57,7 +57,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
 
         for buf_event in buf_events {
             if let Event::Metric(metric) = buf_event {
-                // Future improvement: put metric type. If type = count, NR metric model requiere an interval.ms field, that is not provided by the Vector Metric model.
+                // Future improvement: put metric type. If type = count, NR metric model requires an interval.ms field, that is not provided by the Vector Metric model.
                 match metric.value() {
                     MetricValue::Gauge { value } => {
                         metric_array.push((

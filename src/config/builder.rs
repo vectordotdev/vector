@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 #[cfg(feature = "enterprise")]
 use serde_json::Value;
 use vector_config::configurable_component;
-use vector_core::{config::GlobalOptions, default_data_dir};
+use vector_core::config::GlobalOptions;
 
 use crate::{
     enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
@@ -36,6 +36,7 @@ pub struct ConfigBuilder {
     pub api: api::Options,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub schema: schema::Options,
 
@@ -82,6 +83,7 @@ pub struct ConfigBuilder {
 #[cfg(feature = "enterprise")]
 #[derive(::serde::Serialize)]
 struct ConfigBuilderHash<'a> {
+    version: String,
     #[cfg(feature = "api")]
     api: &'a api::Options,
     schema: &'a schema::Options,
@@ -160,6 +162,7 @@ fn sort_json_value(value: &mut Value) {
 impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
     fn from(value: &'a ConfigBuilder) -> Self {
         ConfigBuilderHash {
+            version: crate::get_version(),
             #[cfg(feature = "api")]
             api: &value.api,
             schema: &value.schema,
@@ -192,8 +195,7 @@ impl From<Config> for ConfigBuilder {
             transforms,
             tests,
             secret,
-            version: _,
-            expansions: _,
+            hash: _,
         } = config;
 
         let transforms = transforms
@@ -318,41 +320,14 @@ impl ConfigBuilder {
 
         self.provider = with.provider;
 
-        if self.global.proxy.http.is_some() && with.global.proxy.http.is_some() {
-            errors.push("conflicting values for 'proxy.http' found".to_owned());
+        match self.global.merge(with.global) {
+            Err(errs) => errors.extend(errs),
+            Ok(new_global) => self.global = new_global,
         }
-
-        if self.global.proxy.https.is_some() && with.global.proxy.https.is_some() {
-            errors.push("conflicting values for 'proxy.https' found".to_owned());
-        }
-
-        if !self.global.proxy.no_proxy.is_empty() && !with.global.proxy.no_proxy.is_empty() {
-            errors.push("conflicting values for 'proxy.no_proxy' found".to_owned());
-        }
-
-        self.global.proxy = self.global.proxy.merge(&with.global.proxy);
-
-        self.global.expire_metrics = self.global.expire_metrics.or(with.global.expire_metrics);
 
         self.schema.append(with.schema, &mut errors);
 
         self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
-
-        if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
-            self.global.data_dir = with.global.data_dir;
-        } else if with.global.data_dir != default_data_dir()
-            && self.global.data_dir != with.global.data_dir
-        {
-            // If two configs both set 'data_dir' and have conflicting values
-            // we consider this an error.
-            errors.push("conflicting values for 'data_dir' found".to_owned());
-        }
-
-        // If the user has multiple config files, we must *merge* log schemas
-        // until we meet a conflict, then we are allowed to error.
-        if let Err(merge_errors) = self.global.log_schema.merge(&with.global.log_schema) {
-            errors.extend(merge_errors);
-        }
 
         self.healthchecks.merge(with.healthchecks);
 
@@ -457,6 +432,7 @@ mod tests {
             "sources",
             "tests",
             "transforms",
+            "version",
         ];
 
         let builder = ConfigBuilder::default();
@@ -475,14 +451,15 @@ mod tests {
     }
 
     #[test]
-    /// If this hash changes, it means either the `ConfigBuilder` has changed what it
-    /// serializes, or the implementation of `serde_json` has changed. If this test fails, we
-    /// should ideally be able to fix so that the original hash passes!
+    /// If this hash changes, it means either the version of Vector has changed (here it's fixed),
+    /// the `ConfigBuilder` has changed what it serializes, or the implementation of `serde_json` has changed.
+    /// If this test fails, we should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
-        assert_eq!(
-            "bc0825487e137ee1d1fc76c616795d041c4825b4ca5a7236455ea4515238885c",
-            ConfigBuilder::default().sha256_hash()
-        );
+        let expected_hash = "6c98bea9d9e2f3133e2d39ba04592d17f96340a9bc4c8d697b09f5af388a76bd";
+        let builder = ConfigBuilder::default();
+        let mut hash_builder = ConfigBuilderHash::from(&builder);
+        hash_builder.version = "1.2.3".into();
+        assert_eq!(expected_hash, hash_builder.into_hash());
     }
 
     #[test]

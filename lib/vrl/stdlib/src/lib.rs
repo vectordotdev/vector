@@ -28,6 +28,8 @@
 
 mod util;
 
+#[cfg(feature = "abs")]
+mod abs;
 #[cfg(feature = "append")]
 mod append;
 #[cfg(feature = "array")]
@@ -46,8 +48,12 @@ mod chunks;
 mod compact;
 #[cfg(feature = "contains")]
 mod contains;
+#[cfg(feature = "decode_base16")]
+mod decode_base16;
 #[cfg(feature = "decode_base64")]
 mod decode_base64;
+#[cfg(feature = "decode_mime_q")]
+mod decode_mime_q;
 #[cfg(feature = "decode_percent")]
 mod decode_percent;
 #[cfg(feature = "decrypt")]
@@ -56,6 +62,8 @@ mod decrypt;
 mod del;
 #[cfg(feature = "downcase")]
 mod downcase;
+#[cfg(feature = "encode_base16")]
+mod encode_base16;
 #[cfg(feature = "encode_base64")]
 mod encode_base64;
 #[cfg(feature = "encode_json")]
@@ -146,6 +154,8 @@ mod is_string;
 mod is_timestamp;
 #[cfg(feature = "join")]
 mod join;
+#[cfg(feature = "keys")]
+mod keys;
 #[cfg(feature = "length")]
 mod length;
 #[cfg(feature = "log")]
@@ -188,6 +198,8 @@ mod parse_aws_alb_log;
 mod parse_aws_cloudwatch_log_subscription_message;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 mod parse_aws_vpc_flow_log;
+#[cfg(feature = "parse_cef")]
+mod parse_cef;
 #[cfg(feature = "parse_common_log")]
 mod parse_common_log;
 #[cfg(feature = "parse_csv")]
@@ -310,9 +322,13 @@ mod unnest;
 mod upcase;
 #[cfg(feature = "uuid_v4")]
 mod uuid_v4;
+#[cfg(feature = "values")]
+mod values;
 
 // -----------------------------------------------------------------------------
 
+#[cfg(feature = "abs")]
+pub use abs::Abs;
 #[cfg(feature = "append")]
 pub use append::Append;
 #[cfg(feature = "assert")]
@@ -329,8 +345,12 @@ pub use chunks::Chunks;
 pub use compact::Compact;
 #[cfg(feature = "contains")]
 pub use contains::Contains;
+#[cfg(feature = "decode_base16")]
+pub use decode_base16::DecodeBase16;
 #[cfg(feature = "decode_base64")]
 pub use decode_base64::DecodeBase64;
+#[cfg(feature = "decode_mime_q")]
+pub use decode_mime_q::DecodeMimeQ;
 #[cfg(feature = "decode_percent")]
 pub use decode_percent::DecodePercent;
 #[cfg(feature = "decrypt")]
@@ -339,6 +359,8 @@ pub use decrypt::Decrypt;
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::Downcase;
+#[cfg(feature = "encode_base16")]
+pub use encode_base16::EncodeBase16;
 #[cfg(feature = "encode_base64")]
 pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
@@ -429,6 +451,8 @@ pub use is_string::IsString;
 pub use is_timestamp::IsTimestamp;
 #[cfg(feature = "join")]
 pub use join::Join;
+#[cfg(feature = "keys")]
+pub use keys::Keys;
 #[cfg(feature = "length")]
 pub use length::Length;
 #[cfg(feature = "log")]
@@ -461,6 +485,8 @@ pub use parse_aws_alb_log::ParseAwsAlbLog;
 pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubscriptionMessage;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
+#[cfg(feature = "parse_cef")]
+pub use parse_cef::ParseCef;
 #[cfg(feature = "parse_common_log")]
 pub use parse_common_log::ParseCommonLog;
 #[cfg(feature = "parse_csv")]
@@ -583,6 +609,8 @@ pub use unnest::Unnest;
 pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
 pub use uuid_v4::UuidV4;
+#[cfg(feature = "values")]
+pub use values::Values;
 
 #[cfg(feature = "array")]
 pub use crate::array::Array;
@@ -594,6 +622,8 @@ pub use crate::sha1::Sha1;
 #[must_use]
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
+        #[cfg(feature = "abs")]
+        Box::new(Abs),
         #[cfg(feature = "append")]
         Box::new(Append),
         #[cfg(feature = "array")]
@@ -612,16 +642,22 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Compact),
         #[cfg(feature = "contains")]
         Box::new(Contains),
+        #[cfg(feature = "decode_base16")]
+        Box::new(DecodeBase16),
         #[cfg(feature = "decode_base64")]
         Box::new(DecodeBase64),
         #[cfg(feature = "decode_percent")]
         Box::new(DecodePercent),
+        #[cfg(feature = "decode_mime_q")]
+        Box::new(DecodeMimeQ),
         #[cfg(feature = "decrypt")]
         Box::new(Decrypt),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
         Box::new(Downcase),
+        #[cfg(feature = "encode_base16")]
+        Box::new(EncodeBase16),
         #[cfg(feature = "encode_base64")]
         Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
@@ -712,6 +748,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IsTimestamp),
         #[cfg(feature = "join")]
         Box::new(Join),
+        #[cfg(feature = "keys")]
+        Box::new(Keys),
         #[cfg(feature = "length")]
         Box::new(Length),
         #[cfg(feature = "log")]
@@ -750,6 +788,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseAwsCloudWatchLogSubscriptionMessage),
         #[cfg(feature = "parse_aws_vpc_flow_log")]
         Box::new(ParseAwsVpcFlowLog),
+        #[cfg(feature = "parse_cef")]
+        Box::new(ParseCef),
         #[cfg(feature = "parse_common_log")]
         Box::new(ParseCommonLog),
         #[cfg(feature = "parse_csv")]
@@ -872,5 +912,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Upcase),
         #[cfg(feature = "uuid_v4")]
         Box::new(UuidV4),
+        #[cfg(feature = "values")]
+        Box::new(Values),
     ]
 }

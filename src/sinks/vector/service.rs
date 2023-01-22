@@ -6,11 +6,10 @@ use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use prost::Message;
-use proto_event::EventWrapper;
 use tonic::{body::BoxBody, IntoRequest};
-use vector_core::{
-    event::proto as proto_event, internal_event::EventsSent, stream::DriverResponse,
-};
+use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use super::VectorSinkError;
 use crate::{
@@ -38,25 +37,27 @@ impl DriverResponse for VectorResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.events_count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.events_count, self.events_byte_size)
     }
 }
 
 #[derive(Clone, Default)]
 pub struct VectorRequest {
-    pub events: Vec<EventWrapper>,
     pub finalizers: EventFinalizers,
-    pub events_byte_size: usize,
+    pub metadata: RequestMetadata,
+    pub request: proto_vector::PushEventsRequest,
 }
 
 impl Finalizable for VectorRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for VectorRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
     }
 }
 
@@ -73,7 +74,7 @@ impl VectorService {
         });
 
         if compression {
-            proto_client = proto_client.send_gzip();
+            proto_client = proto_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
         }
         Self {
             client: proto_client,
@@ -83,11 +84,12 @@ impl VectorService {
     }
 }
 
-impl tower::Service<VectorRequest> for VectorService {
+impl Service<VectorRequest> for VectorService {
     type Response = VectorResponse;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         // Readiness check of the client is done through the `push_events()`
         // call happening inside `call()`. That check blocks until the client is
@@ -97,19 +99,17 @@ impl tower::Service<VectorRequest> for VectorService {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
-        let events_count = list.events.len();
-        let events_byte_size = list.events_byte_size;
+        let byte_size = list.request.encoded_len();
+        let events_count = list.get_metadata().event_count();
+        let events_byte_size = list.get_metadata().events_byte_size();
 
-        let request = proto_vector::PushEventsRequest {
-            events: list.events,
-        };
-        let byte_size = request.encoded_len();
         let future = async move {
             service
                 .client
-                .push_events(request.into_request())
+                .push_events(list.request.into_request())
                 .map_ok(|_response| {
                     emit!(EndpointBytesSent {
                         byte_size,
@@ -135,15 +135,17 @@ pub struct HyperSvc {
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
 }
 
-impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
+impl Service<hyper::Request<BoxBody>> for HyperSvc {
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
         let uri = Uri::builder()
             .scheme(self.uri.scheme().unwrap().clone())

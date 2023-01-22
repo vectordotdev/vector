@@ -20,29 +20,31 @@ where
         None
     }
 
-    /// Gets the human-readable description of this value, if any.
-    ///
-    /// For standard types, this will be `None`. Commonly, custom types would implement this
-    /// directly, while fields using standard types would provide a field-specific description that
-    /// would be used instead of the default descrption.
-    fn description() -> Option<&'static str> {
-        None
-    }
-
     /// Whether or not this value is optional.
+    ///
+    /// This is specifically used to determine when a field is inherently optional, such as a field
+    /// that is a true map like `HashMap<K, V>`. This doesn't apply to objects (i.e. structs)
+    /// because structs are implicitly non-optional: they have a fixed shape and size, and so on.
+    ///
+    /// Maps, by definition, are inherently free-form, and thus inherently optional. Thus, this
+    /// method should likely not be overridden except for implementing `Configurable` for map
+    /// types. If you're using it for something else, you are expected to know what you're doing.
     fn is_optional() -> bool {
         false
     }
 
     /// Gets the metadata for this value.
     fn metadata() -> Metadata<Self> {
-        let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
-        metadata
+        Metadata::default()
     }
 
+    /// Validates the given metadata against this type.
+    ///
+    /// This allows for validating specific aspects of the given metadata, such as validation
+    /// bounds, and so on, to ensure they are valid for the given type. In some cases, such as with
+    /// numeric types, there is a limited amount of validation that can occur within the
+    /// `Configurable` derive macro, and additional validation must happen at runtime when the
+    /// `Configurable` trait is being used, which this method allows for.
     fn validate_metadata(_metadata: &Metadata<Self>) -> Result<(), GenerateError> {
         Ok(())
     }

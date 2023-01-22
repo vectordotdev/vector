@@ -162,6 +162,8 @@ pub async fn load_from_paths_with_provider_and_secrets(
 
     let (new_config, build_warnings) = builder.build_with_warnings()?;
 
+    validation::check_buffer_preconditions(&new_config).await?;
+
     for warning in secrets_warning
         .into_iter()
         .chain(load_warnings)
@@ -333,10 +335,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::load_builder_from_paths;
-    use crate::{
-        config::{ComponentKey, ConfigPath},
-        transforms::pipelines::PipelinesConfig,
-    };
+    use crate::config::{ComponentKey, ConfigPath};
 
     #[test]
     fn load_namespacing_folder() {
@@ -351,25 +350,12 @@ mod tests {
             .transforms
             .contains_key(&ComponentKey::from("apache_parser")));
         assert!(builder
-            .transforms
-            .contains_key(&ComponentKey::from("processing")));
-        assert!(builder
             .sources
             .contains_key(&ComponentKey::from("apache_logs")));
         assert!(builder
             .sinks
             .contains_key(&ComponentKey::from("es_cluster")));
         assert_eq!(builder.tests.len(), 2);
-        let processing = builder
-            .transforms
-            .get(&ComponentKey::from("processing"))
-            .unwrap();
-        let output = serde_json::to_string_pretty(&processing.inner).unwrap();
-        let processing: PipelinesConfig = serde_json::from_str(&output).unwrap();
-        assert!(processing.metrics().as_ref().is_empty());
-        let logs = processing.logs().as_ref();
-        let first = logs.first().unwrap();
-        assert_eq!(first.transforms().len(), 2);
     }
 
     #[test]
@@ -385,7 +371,32 @@ mod tests {
 
     #[test]
     fn load_directory_ignores_unknown_file_formats() {
-        let path = PathBuf::from(".").join("tests").join("config-dir");
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("ignore-unknown");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn load_directory_globals() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("globals");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn load_directory_globals_duplicates() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("globals-duplicate");
         let configs = vec![ConfigPath::Dir(path)];
         let (_, warnings) = load_builder_from_paths(&configs).unwrap();
         assert!(warnings.is_empty());

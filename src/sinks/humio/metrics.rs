@@ -3,6 +3,7 @@ use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::{sink::StreamSink, transform::Transform};
 
@@ -39,7 +40,7 @@ pub struct HumioMetricsConfig {
     transform: MetricToLogConfig,
 
     /// The Humio ingestion token.
-    token: String,
+    token: SensitiveString,
 
     /// The base URL of the Humio instance.
     #[serde(alias = "host")]
@@ -48,13 +49,11 @@ pub struct HumioMetricsConfig {
     /// The source of events sent to this sink.
     ///
     /// Typically the filename the metrics originated from. Maps to `@source` in Humio.
-    #[configurable(metadata(templateable))]
     source: Option<Template>,
 
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
     /// If unset, Humio will default it to none.
-    #[configurable(metadata(templateable))]
     event_type: Option<Template>,
 
     /// Overrides the name of the log field used to grab the hostname to send to Humio.
@@ -84,7 +83,6 @@ pub struct HumioMetricsConfig {
     /// For more information, see [Humio’s Format of Data][humio_data_format].
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
-    #[configurable(metadata(templateable))]
     #[serde(default)]
     index: Option<Template>,
 
@@ -135,7 +133,7 @@ impl SinkConfig for HumioMetricsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),
             source: self.source.clone(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             event_type: self.event_type.clone(),
             host_key: self.host_key.clone(),
             indexed_fields: self.indexed_fields.clone(),
@@ -197,7 +195,8 @@ mod tests {
     use chrono::{offset::TimeZone, Utc};
     use futures::stream;
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
@@ -264,11 +263,7 @@ mod tests {
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 42.0 },
                 )
-                .with_tags(Some(
-                    vec![("os.host".to_string(), "somehost".to_string())]
-                        .into_iter()
-                        .collect(),
-                ))
+                .with_tags(Some(metric_tags!("os.host" => "somehost")))
                 .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1))),
             ),
             Event::from(
@@ -280,11 +275,7 @@ mod tests {
                         statistic: StatisticKind::Histogram,
                     },
                 )
-                .with_tags(Some(
-                    vec![("os.host".to_string(), "somehost".to_string())]
-                        .into_iter()
-                        .collect(),
-                ))
+                .with_tags(Some(metric_tags!("os.host" => "somehost")))
                 .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2))),
             ),
         ];
@@ -300,6 +291,50 @@ mod tests {
         assert_eq!(
             r#"{"event":{"distribution":{"samples":[{"rate":100,"value":1.0},{"rate":200,"value":2.0},{"rate":300,"value":3.0}],"statistic":"histogram"},"kind":"absolute","name":"metric2","tags":{"os.host":"somehost"}},"fields":{},"time":1597784402.0}"#,
             output[1].1
+        );
+    }
+
+    #[tokio::test]
+    async fn multi_value_tags() {
+        let (mut config, cx) = load_sink::<HumioMetricsConfig>(indoc! {r#"
+            token = "atoken"
+            batch.max_events = 1
+            metric_tag_values = "full"
+        "#})
+        .unwrap();
+
+        let addr = test_util::next_addr();
+        // Swap out the endpoint so we can force send it
+        // to our local server
+        let endpoint = format!("http://{}", addr);
+        config.endpoint = Some(endpoint.clone());
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let (rx, _trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
+
+        // Make our test metrics.
+        let metrics = vec![Event::from(
+            Metric::new(
+                "metric1",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 42.0 },
+            )
+            .with_tags(Some(metric_tags!(
+                "code" => "200",
+                "code" => "success"
+            )))
+            .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1))),
+        )];
+
+        let len = metrics.len();
+        run_and_assert_sink_compliance(sink, stream::iter(metrics), &HTTP_SINK_TAGS).await;
+
+        let output = rx.take(len).collect::<Vec<_>>().await;
+        assert_eq!(
+            r#"{"event":{"counter":{"value":42.0},"kind":"incremental","name":"metric1","tags":{"code":["200","success"]}},"fields":{},"time":1597784401.0}"#,
+            output[0].1
         );
     }
 }

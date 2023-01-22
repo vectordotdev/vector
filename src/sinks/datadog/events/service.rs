@@ -8,7 +8,8 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_common::request_metadata::MetaDescriptive;
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
     event::EventStatus,
@@ -30,15 +31,11 @@ impl DriverResponse for DatadogEventsResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.event_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.event_byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
+    fn bytes_sent(&self) -> Option<usize> {
         // HttpBatchService emits EndpointBytesSend
         None
     }
@@ -93,7 +90,7 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
 
         Box::pin(async move {
             http_service.ready().await?;
-            let event_byte_size = req.metadata.event_byte_size;
+            let event_byte_size = req.get_metadata().events_byte_size();
             let http_response = http_service.call(req).await?;
             let event_status = if http_response.is_successful() {
                 EventStatus::Delivered

@@ -54,7 +54,7 @@ fn benchmark_http(c: &mut Criterion) {
                                 auth: Default::default(),
                                 headers: Default::default(),
                                 batch,
-                                encoding: (None::<FramingConfig>, TextSerializerConfig::new())
+                                encoding: (None::<FramingConfig>, TextSerializerConfig::default())
                                     .into(),
                                 request: Default::default(),
                                 tls: Default::default(),

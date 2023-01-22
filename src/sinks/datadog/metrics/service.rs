@@ -10,9 +10,10 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -60,8 +61,8 @@ pub struct DatadogMetricsRequest {
     pub uri: Uri,
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
-    pub batch_size: usize,
     pub raw_bytes: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl DatadogMetricsRequest {
@@ -110,6 +111,12 @@ impl Finalizable for DatadogMetricsRequest {
     }
 }
 
+impl MetaDescriptive for DatadogMetricsRequest {
+    fn get_metadata(&self) -> RequestMetadata {
+        self.metadata
+    }
+}
+
 // Generalized wrapper around the raw response from Hyper.
 #[derive(Debug)]
 pub struct DatadogMetricsResponse {
@@ -118,7 +125,6 @@ pub struct DatadogMetricsResponse {
     batch_size: usize,
     byte_size: usize,
     raw_byte_size: usize,
-    protocol: String,
 }
 
 impl DriverResponse for DatadogMetricsResponse {
@@ -132,16 +138,12 @@ impl DriverResponse for DatadogMetricsResponse {
         }
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.batch_size,
-            byte_size: self.byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.batch_size, self.byte_size)
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.raw_byte_size, &self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
     }
 }
 
@@ -180,9 +182,8 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let byte_size = request.payload.len();
-            let batch_size = request.batch_size;
-            let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
+            let byte_size = request.get_metadata().events_byte_size();
+            let batch_size = request.get_metadata().event_count();
             let raw_byte_size = request.raw_bytes;
 
             let request = request
@@ -205,7 +206,6 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                 batch_size,
                 byte_size,
                 raw_byte_size,
-                protocol,
             })
         })
     }
