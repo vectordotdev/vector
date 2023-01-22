@@ -74,51 +74,74 @@ components: sinks: mqtt: {
 		}
 		port: {
 			description: """
-                                MQTT service port to connect to.
-                                """
+				MQTT service port to connect to.
+				"""
 			required: false
 			type: uint: {
 				default: 1883
 			}
 		}
+		topic: {
+			description: """
+				MQTT publish topic
+				"""
+			required: true
+			type: str: {
+				default: "vector"
+			}
+		}
 		user: {
 			description: """
-                                MQTT username
-                                """
-			required: true
+				MQTT username
+				"""
+			required: false
 			type: str: {}
 		}
 		password: {
 			description: """
-                                MQTT password
-                                """
-			required: true
+				MQTT password
+				"""
+			required: false
 			type: str: {}
+		}
+		quality_of_service: {
+			description: "Supported Quality of Service types for MQTT."
+			required:    false
+			type: string: {
+				default: "exactly_once"
+				enum: {
+					at_least_once: "At least once."
+					at_most_once:  "At most once."
+					exactly_once:  "Exactly once."
+				}
+			}
 		}
 		client_id: {
 			description: """
-                                MQTT client Id
-                                """
+				MQTT client id
+				"""
 			required: false
-			type: str: {}
+			type: str: {
+				default: "vector"
+			}
 		}
 		keep_alive: {
 			description: """
-                                MQTT keep-alive
-                                """
+				MQTT keep-alive
+				"""
 			required: false
 			type: uint: {
 				default: 60
-                        }
+			}
 		}
 		clean_session: {
 			description: """
-                                Removes all the state from queues & instructs the broker to clean all the client state after disconnect.
-                                """
+				Removes all the state from queues & instructs the broker to clean all the client state after disconnect.
+				"""
 			required: false
 			type: bool: {
 				default: false
-                        }
+			}
 		}
 	}
 

@@ -41,18 +41,16 @@ pub struct MqttSinkConfig {
     #[serde(default = "default_keep_alive")]
     pub keep_alive: u16,
 
-    /// Clean MQTT session on login?
+    /// Clean MQTT session on login or not
     #[serde(default = "default_clean_session")]
     pub clean_session: bool,
 
-    /// TLS configuration
     #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
     /// MQTT publish topic (templates allowed)
     pub topic: String,
 
-    /// Encoding configuration
     #[configurable(derived)]
     pub encoding: EncodingConfig,
 
@@ -63,6 +61,26 @@ pub struct MqttSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    pub quality_of_service: MqttQoS,
+}
+
+/// Supported Quality of Service types for MQTT.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum MqttQoS {
+    /// AtLeastOnce.
+    AtLeastOnce,
+
+    /// AtMostOnce.
+    AtMostOnce,
+
+    /// ExactlyOnce.
+    #[derivative(Default)]
+    ExactlyOnce,
 }
 
 const fn default_port() -> u16 {
@@ -97,6 +115,7 @@ impl GenerateConfig for MqttSinkConfig {
             topic: "vector".into(),
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: AcknowledgementsConfig::default(),
+            quality_of_service: Default::default(),
         })
         .unwrap()
     }

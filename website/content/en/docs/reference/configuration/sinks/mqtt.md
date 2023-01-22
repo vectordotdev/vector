@@ -1,6 +1,6 @@
 ---
 title: MQTT
-description: Deliver observability event data to an MQTT broker
+description: Deliver observability event data to an [MQTT](https://mqtt.org) broker
 kind: sink
 layout: component
 tags: ["mqtt", "component", "sink"]

@@ -13,6 +13,7 @@ use vector_core::{
     ByteSizeOf,
 };
 
+use crate::sinks::mqtt::config::MqttQoS;
 use crate::{
     codecs::{Encoder, Transformer},
     emit,
@@ -67,6 +68,7 @@ pub struct MqttSink {
     encoder: Encoder<()>,
     connector: MqttConnector,
     finalizers_queue: VecDeque<EventFinalizers>,
+    quality_of_service: MqttQoS,
     events_sent: Registered<EventsSent>,
     bytes_sent: Registered<BytesSent>,
 }
@@ -83,6 +85,7 @@ impl MqttSink {
             encoder,
             connector,
             finalizers_queue,
+            quality_of_service: config.quality_of_service,
             events_sent: register!(EventsSent::from(Output(None))),
             bytes_sent: register!(BytesSent::from(Protocol("mqtt".into()))),
         })
@@ -156,7 +159,11 @@ impl MqttSink {
                     };
                     let message_len = message.len();
 
-                    let qos = QoS::ExactlyOnce;
+                    let qos = match self.quality_of_service {
+                        MqttQoS::AtLeastOnce => QoS::AtLeastOnce,
+                        MqttQoS::AtMostOnce => QoS::AtMostOnce,
+                        MqttQoS::ExactlyOnce => QoS::ExactlyOnce,
+                    };
                     let retain = false;
                     match client.publish(&topic, qos, retain, message).await {
                         Ok(()) => {
