@@ -85,6 +85,8 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
+#[cfg(feature = "sinks-mqtt")]
+mod mqtt;
 #[cfg(feature = "sinks-nats")]
 mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
@@ -121,8 +123,6 @@ mod udp;
 mod unix;
 #[cfg(feature = "sinks-websocket")]
 mod websocket;
-#[cfg(feature = "sinks-mqtt")]
-mod mqtt;
 
 #[cfg(any(
     feature = "sources-file",
@@ -225,6 +225,8 @@ pub(crate) use self::loki::*;
 pub(crate) use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
+#[cfg(feature = "sinks-mqtt")]
+pub(crate) use self::mqtt::*;
 #[cfg(feature = "sinks-nats")]
 pub(crate) use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
@@ -269,8 +271,6 @@ pub(crate) use self::throttle::*;
 pub(crate) use self::unix::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;
-#[cfg(feature = "sinks-mqtt")]
-pub(crate) use self::mqtt::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
 pub(crate) use self::{

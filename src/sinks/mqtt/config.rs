@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use codecs::JsonSerializerConfig;
 use rand::{thread_rng, Rng};
-use rumqttc::{MqttOptions, Transport, TlsConfiguration};
+use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_config::configurable_component;
 
@@ -10,7 +10,7 @@ use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
-        mqtt::sink::{TlsSnafu, MqttConnector, MqttError, MqttSink},
+        mqtt::sink::{MqttConnector, MqttError, MqttSink, TlsSnafu},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -95,7 +95,7 @@ impl GenerateConfig for MqttSinkConfig {
             clean_session: default_clean_session(),
             tls: None,
             topic: "vector".into(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
@@ -125,8 +125,7 @@ impl SinkConfig for MqttSinkConfig {
 
 impl MqttSinkConfig {
     fn build_connector(&self) -> Result<MqttConnector, MqttError> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, false)
-            .context(TlsSnafu)?;
+        let tls = MaybeTlsSettings::from_config(&self.tls, false).context(TlsSnafu)?;
         let mut options = MqttOptions::new(&self.client_id, &self.host, self.port);
         options.set_keep_alive(Duration::from_secs(self.keep_alive.into()));
         options.set_clean_session(self.clean_session);
@@ -138,7 +137,9 @@ impl MqttSinkConfig {
             let client_auth = None;
             let alpn = Some(vec!["mqtt".into()]);
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
-                ca, client_auth, alpn
+                ca,
+                client_auth,
+                alpn,
             }));
         }
         MqttConnector::new(options, self.topic.clone())

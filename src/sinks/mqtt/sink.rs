@@ -1,25 +1,15 @@
-use std::{
-    collections::VecDeque,
-    fmt::Debug,
-};
+use std::{collections::VecDeque, fmt::Debug};
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use futures::{
-    pin_mut,
-    stream::BoxStream,
-    Stream, StreamExt,
-};
-use rumqttc::{
-    AsyncClient, ClientError, ConnectionError,
-    EventLoop, MqttOptions,
-    QoS,
-};
+use futures::{pin_mut, stream::BoxStream, Stream, StreamExt};
+use rumqttc::{AsyncClient, ClientError, ConnectionError, EventLoop, MqttOptions, QoS};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
+use vector_common::internal_event::{ByteSize, CountByteSize, Output, Protocol, Registered};
 use vector_core::{
-    internal_event::{BytesSent, EventsSent},
     event::EventFinalizers,
+    internal_event::{BytesSent, EventsSent, InternalEventHandle},
     ByteSizeOf,
 };
 
@@ -27,12 +17,10 @@ use crate::{
     codecs::{Encoder, Transformer},
     emit,
     event::{Event, EventStatus, Finalizable},
-    internal_events::{
-        ConnectionOpen, OpenGauge, MqttClientError, MqttConnectionError,
-    },
     internal_events::TemplateRenderingError,
-    sinks::util::StreamSink,
+    internal_events::{ConnectionOpen, MqttClientError, MqttConnectionError, OpenGauge},
     sinks::mqtt::config::MqttSinkConfig,
+    sinks::util::StreamSink,
     template::{Template, TemplateParseError},
     tls::TlsError,
 };
@@ -59,10 +47,7 @@ pub struct MqttConnector {
 impl MqttConnector {
     pub fn new(options: MqttOptions, topic: String) -> Result<Self, MqttError> {
         let topic = Template::try_from(topic).context(TopicTemplateSnafu)?;
-        Ok(Self {
-            options,
-            topic,
-        })
+        Ok(Self { options, topic })
     }
 
     fn connect(&self) -> (AsyncClient, EventLoop) {
@@ -82,13 +67,12 @@ pub struct MqttSink {
     encoder: Encoder<()>,
     connector: MqttConnector,
     finalizers_queue: VecDeque<EventFinalizers>,
+    events_sent: Registered<EventsSent>,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl MqttSink {
-    pub fn new(
-        config: &MqttSinkConfig,
-        connector: MqttConnector,
-    ) -> crate::Result<Self> {
+    pub fn new(config: &MqttSinkConfig, connector: MqttConnector) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -99,6 +83,8 @@ impl MqttSink {
             encoder,
             connector,
             finalizers_queue,
+            events_sent: register!(EventsSent::from(Output(None))),
+            bytes_sent: register!(BytesSent::from(Protocol("mqtt".into()))),
         })
     }
 
@@ -174,15 +160,9 @@ impl MqttSink {
                     let retain = false;
                     match client.publish(&topic, qos, retain, message).await {
                         Ok(()) => {
-                            emit!(EventsSent {
-                                count: 1,
-                                byte_size: event_byte_size,
-                                output: None
-                            });
-                            emit!(BytesSent {
-                                byte_size: message_len,
-                                protocol: "mqtt".into(),
-                            });
+                            self.events_sent.emit(CountByteSize(1, event_byte_size));
+                            self.bytes_sent.emit(ByteSize(message_len));
+
                             self.finalizers_queue.push_back(finalizers);
                         }
                         Err(error) => {
