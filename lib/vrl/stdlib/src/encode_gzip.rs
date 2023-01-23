@@ -13,12 +13,9 @@ fn encode_gzip(value: Value, compression_level: Option<Value>) -> Resolved {
 
     let value = value.try_bytes()?;
     let mut buf = Vec::new();
-    let result = GzEncoder::new(value.as_bytes(), compression_level).read_to_end(&mut buf);
+    let _result = GzEncoder::new(value.as_bytes(), compression_level).read_to_end(&mut buf);
 
-    match result {
-        Ok(_) => Ok(Value::Bytes(buf.into())),
-        Err(_) => Err("unable to encode value with Gzip encoder".into()),
-    }
+    Ok(Value::Bytes(buf.into()))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -32,7 +29,7 @@ impl Function for EncodeGzip {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "demo string",
-            source: r#"encode_base64(encode_gzip!("encode_me"))"#,
+            source: r#"encode_base64(encode_gzip("encode_me"))"#,
             result: Ok("H4sIAAAAAAAA/0vNS85PSY3PTQUAN7ZBnAkAAAA="),
         }]
     }
@@ -89,8 +86,7 @@ impl FunctionExpression for EncodeGzipFn {
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        // Always fallible due to the possibility of encoding errors that VRL can't detect
-        TypeDef::bytes().fallible()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -112,15 +108,15 @@ mod test {
         encode_gzip => EncodeGzip;
 
         with_defaults {
-            args: func_args![value: value!("encode_me")],
-            want: Ok(value!(decode_base64("H4sIAAAAAAAA/0vNS85PSY3PTQUAN7ZBnAkAAAA=").as_bytes())),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![value: value!("you_have_successfully_decoded_me.congratulations.you_are_breathtaking.")],
+            want: Ok(value!(decode_base64("H4sIAAAAAAAA/w3LgQ3AIAgEwI1ciVD8qqmVRKAJ29cBLjWo8weyEIHZHXMmVYhWVHpRRFfb7DHZhy4reQBv0LXB3p2fsVr5AXeBkepGAAAA").as_bytes())),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         with_custom_compression_level {
-            args: func_args![value: value!("encode_me"), compression_level: 2],
-            want: Ok(value!(decode_base64("H4sIAAAAAAAA/0vNS85PSY3PTQUAN7ZBnAkAAAA=").as_bytes())),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![value: value!("you_have_successfully_decoded_me.congratulations.you_are_breathtaking."), compression_level: 9],
+            want: Ok(value!(decode_base64("H4sIAAAAAAAC/w3LgQ3AIAgEwI1ciVD8qqmVRKAJ29cBLjWo8weyEIHZHXMmVYhWVHpRRFfb7DHZhy4reQBv0LXB3p2fsVr5AXeBkepGAAAA").as_bytes())),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }
