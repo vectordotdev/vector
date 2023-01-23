@@ -12,6 +12,15 @@ const BASE_ARGS: [&str; 5] = [
     "vector",
     "--no-default-features",
 ];
+const PARALLEL_ARGS: [&str; 7] = [
+    "--group",
+    "--verbose",
+    "--retries",
+    "2",
+    "scripts/check-one-feature",
+    "{}",
+    ":::",
+];
 
 /// Check that all component features are set up properly
 #[derive(clap::Args, Debug)]
@@ -23,7 +32,7 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         app::set_repo_dir()?;
 
-        let features = extract_features()?.join(" ");
+        let features = extract_features()?;
 
         // Prime the pump to build most of the artifacts
         app::exec(CARGO, BASE_ARGS, true)?;
@@ -45,16 +54,9 @@ impl Cli {
 
         app::exec(
             "parallel",
-            [
-                "--group",
-                "--verbose",
-                "--retries",
-                "2",
-                "scripts/check-one-feature",
-                "{}",
-                ":::",
-                &features,
-            ],
+            PARALLEL_ARGS
+                .into_iter()
+                .chain(features.iter().map(String::as_str)),
             true,
         )
     }
