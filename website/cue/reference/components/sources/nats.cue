@@ -4,7 +4,7 @@ components: sources: nats: {
 	title: "NATS"
 
 	features: {
-		auto_generated: true
+		auto_generated:   true
 		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
@@ -39,7 +39,7 @@ components: sources: nats: {
 		platform_name: null
 	}
 
-	configuration:  base.components.sources.nats.configuration
+	configuration: base.components.sources.nats.configuration
 
 	output: logs: record: {
 		description: "An individual NATS record."
