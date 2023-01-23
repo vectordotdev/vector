@@ -54,7 +54,7 @@ pub struct PrometheusScrapeConfig {
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     scrape_interval_secs: Duration,
 
-    /// The tag name added to each event representing the scraped instance's host:port.    
+    /// The tag name added to each event representing the scraped instance's host:port.
     ///
     /// The tag value will be the host/port of the scraped instance.
     instance_tag: Option<String>,
