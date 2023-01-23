@@ -66,14 +66,14 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             impl #impl_generics ::vector_config::Configurable for #name #ty_generics #where_clause {
                 fn referenceable_name() -> Option<&'static str> {
                     // If the type name we get back from `std::any::type_name` doesn't start with
-                    // the module path, use a concatentated version.
+                    // the module path, use a concatenated version.
                     //
                     // We do this because `std::any::type_name` states it may or may not return a
                     // fully-qualified type path, as that behavior is not stabilized, so we want to
                     // avoid using non-fully-qualified paths since we might encounter collisions
                     // with schema reference names otherwise.
                     //
-                    // The reason we don't _only_ use the manually-concatentated version is because
+                    // The reason we don't _only_ use the manually-concatenated version is because
                     // it's a little difficult to get it to emit a clean name, as we can't emit
                     // pretty-printed tokens directly -- i.e. just emit the tokens that represent
                     // `MyStructName<T, U, ...>` -- and would need to format the string to do so,
@@ -992,7 +992,7 @@ fn generate_enum_variant_subschema(
 /// Sometimes, however, we must refer to them with their disambiguated form: `T::<...>`. This is due
 /// to a limitation in syntax parsing between types in statement versus expression position.
 ///
-/// Statement position would be somehwere like declaring a field on a struct, where using angle
+/// Statement position would be somewhere like declaring a field on a struct, where using angle
 /// brackets has no ambiguous meaning, as you can't compare two items as part of declaring a struct
 /// field. Conversely, expression position implies anywhere we could normally provide an expression,
 /// and expressions can certainly contain comparisons. As such, we need to use the disambiguated

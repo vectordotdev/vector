@@ -29,7 +29,7 @@ base: components: sources: opentelemetry: configuration: {
 			options: {
 				address: {
 					description: """
-						The address to listen for connections on.
+						The socket address to listen for connections on.
 
 						It _must_ include a port.
 						"""
@@ -144,7 +144,7 @@ base: components: sources: opentelemetry: configuration: {
 			options: {
 				address: {
 					description: """
-						The address to listen for connections on.
+						The socket address to listen for connections on.
 
 						It _must_ include a port.
 						"""

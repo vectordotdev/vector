@@ -169,7 +169,7 @@ where
     };
 
     // If the actual numeric type we're generating the schema for is a nonzero variant, and its constraint can't be
-    // represently solely by the normal minimum/maximum bounds, we explicitly add an exclusion for the appropriate zero
+    // represented solely by the normal minimum/maximum bounds, we explicitly add an exclusion for the appropriate zero
     // value of the given numeric type.
     if N::requires_nonzero_exclusion() {
         schema.subschemas = Some(Box::new(SubschemaValidation {
@@ -425,6 +425,9 @@ pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
 where
     T: Configurable + Serialize,
 {
+    // Set env variable to enable generating all schemas, including platform-specific ones.
+    std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
+
     let mut schema_gen = SchemaSettings::draft2019_09().into_generator();
 
     let schema = get_or_generate_schema::<T>(&mut schema_gen, T::metadata())?;

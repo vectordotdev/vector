@@ -48,7 +48,7 @@ suitable for complex data definitions.
 ### Installing CUE
 
 Cue can be [installed](https://cuelang.org/docs/install/) from package managers,
-however it may be necesary to install it from source in order to use the correct
+however it may be necessary to install it from source in order to use the correct
 version that Vector depends on. Currently Vector is using `v0.4.2`. Using a CUE
 version different than this may result in CUE check/build errors. We are aiming
 to improve the developer experience around external tool dependencies ([#15909](https://github.com/vectordotdev/vector/issues/15909)).

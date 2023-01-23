@@ -6,7 +6,7 @@ used by telegraf which scrapes `GetMetricData` on a regular interval.
 
 It is probably worth reviewing [Amazon CloudWatch
 Concepts](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html)
-before looking at this if you you are unfamiliar with CloudWatch.
+before looking at this if you are unfamiliar with CloudWatch.
 
 ## Scope
 

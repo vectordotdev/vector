@@ -294,7 +294,7 @@ user_agent_parsers:
     family_replacement: 'My Internet Browser'
 
   # UC Browser
-  # we need check it before opera. In other case case UC Browser detected look like Opera Mini
+  # we need check it before opera. In other case UC Browser detected look like Opera Mini
   - regex: '(UC? ?Browser|UCWEB|U3)[ /]?(\d+)\.(\d+)\.(\d+)'
     family_replacement: 'UC Browser'
 
@@ -3745,7 +3745,7 @@ device_parsers:
     model_replacement: '$1'
 
   #########
-  # Papayre
+  # Papyre
   # @ref: http://grammata.es/
   #########
   - regex: '; *(papyre)[ _\-]([^;/]+?)(?: Build|\) AppleWebKit)'
@@ -4862,7 +4862,7 @@ device_parsers:
     model_replacement: '$1'
 
   #########
-  # Noka Windows Phones
+  # Nokia Windows Phones
   #########
   - regex: 'Windows Phone [^;]+; .*?IEMobile/[^;\)]+[;\)] ?(?:ARM; ?Touch; ?|Touch; ?|)(?:rv:11; |)(?:NOKIA|Nokia)[^;]*; *(?:NOKIA ?|Nokia ?|LUMIA ?|[Ll]umia ?|)(\d{3,10}[^;\)]*)'
     device_replacement: 'Lumia $1'

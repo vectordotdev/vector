@@ -203,7 +203,7 @@ impl TransformConfig for RemapConfig {
 
         // TODO: We could improve on this by adding support for non-fatal error
         // messages in the topology. This would make the topology responsible
-        // for printing warnings (including potentially emiting metrics),
+        // for printing warnings (including potentially emitting metrics),
         // instead of individual transforms.
         if !warnings.is_empty() {
             warn!(message = "VRL compilation warning.", %warnings);

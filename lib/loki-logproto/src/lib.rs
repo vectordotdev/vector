@@ -99,9 +99,15 @@ mod tests {
 
     #[test]
     fn encode_batch() {
-        let ts1 = Utc.timestamp(1640244790, 0);
+        let ts1 = Utc
+            .timestamp_opt(1640244790, 0)
+            .single()
+            .expect("invalid timestamp");
         let entry1 = Entry(ts1.timestamp_nanos(), "hello".into());
-        let ts2 = Utc.timestamp(1640244791, 0);
+        let ts2 = Utc
+            .timestamp_opt(1640244791, 0)
+            .single()
+            .expect("invalid timestamp");
         let entry2 = Entry(ts2.timestamp_nanos(), "world".into());
         let labels = vec![("source".into(), "protobuf-test".into())]
             .into_iter()

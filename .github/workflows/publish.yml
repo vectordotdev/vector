@@ -577,8 +577,8 @@ jobs:
         run: make release-s3
 
   publish-github:
-    name: Publish to Github
-    # We only publish to Github for versioned releases, not nightlies.
+    name: Publish to GitHub
+    # We only publish to GitHub for versioned releases, not nightlies.
     if: ${{ inputs.mode == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
@@ -641,7 +641,7 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
-      - name: Publish release to Github
+      - name: Publish release to GitHub
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: make release-github

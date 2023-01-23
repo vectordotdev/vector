@@ -1219,7 +1219,7 @@ mod tests {
         // that we check the internal metric data, which, when in this mode, will actually be a
         // sketch (so that we can merge without loss of accuracy).
         //
-        // The render code is actually what will end up rrendering those sketches as aggregated
+        // The render code is actually what will end up rendering those sketches as aggregated
         // summaries in the scrape output.
         let config = PrometheusExporterConfig {
             address: next_addr(), // Not actually bound, just needed to fill config

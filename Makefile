@@ -43,8 +43,8 @@ export CURRENT_DIR = $(shell pwd)
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
 export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a
-# Override to disable building the container, having it pull from the Github packages repo instead
-# TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
+# Override to disable building the container, having it pull from the GitHub packages repo instead
+# TODO: Disable this by default. Blocked by `docker pull` from GitHub Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
 # Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true`
 export ENVIRONMENT_TTY ?= true
@@ -478,7 +478,7 @@ check-examples: ## Check that the config/examples files are valid
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check examples
 
 .PHONY: check-scripts
-check-scripts: ## Check that scipts do not have common mistakes
+check-scripts: ## Check that scripts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check scripts
 
 .PHONY: check-deny
@@ -603,7 +603,7 @@ release-docker: ## Release to Docker Hub
 	@cargo vdev release docker
 
 .PHONY: release-github
-release-github: ## Release to Github
+release-github: ## Release to GitHub
 	@cargo vdev release github
 
 .PHONY: release-homebrew

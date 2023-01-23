@@ -5,7 +5,7 @@ crate::cli_subcommands! {
     mod deny,
     docs,
     events,
-    examples,
+    mod examples,
     mod fmt,
     mod markdown,
     scripts,
@@ -32,11 +32,6 @@ crate::script_wrapper! {
 crate::script_wrapper! {
     events = "Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md"
         => "check-events"
-}
-
-crate::script_wrapper! {
-    examples = "Check that the config/example files are valid"
-        => "check-examples.sh"
 }
 
 crate::script_wrapper! {

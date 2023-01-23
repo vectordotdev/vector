@@ -141,7 +141,7 @@ pub struct Config {
     /// This value specifies not exactly the globbing, but interval
     /// between the polling the files to watch from the `paths_provider`.
     /// This is quite efficient, yet might still create some load of the
-    /// file system; in addition, it is currently coupled with chechsum dumping
+    /// file system; in addition, it is currently coupled with checksum dumping
     /// in the underlying file server, so setting it too low may introduce
     /// a significant overhead.
     glob_minimum_cooldown_ms: usize,
@@ -487,7 +487,7 @@ impl Source {
         let node_selector = prepare_node_selector(self_node_name.as_str())?;
 
         // If the user passed a custom Kubeconfig use it, otherwise
-        // we attempt to load the local kubec-config, followed by the
+        // we attempt to load the local kubeconfig, followed by the
         // in-cluster environment variables
         let client_config = match &config.kube_config_file {
             Some(kc) => {

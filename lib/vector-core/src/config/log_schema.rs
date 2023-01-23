@@ -37,7 +37,7 @@ pub fn log_schema() -> &'static LogSchema {
 /// Log schema.
 ///
 /// A log schema is used by Vector not only to uniformly process the fields of an event, but also to
-/// specify which fields should hold speicifc data that is also set by Vector once an event is
+/// specify which fields should hold specific data that is also set by Vector once an event is
 /// flowing through a topology.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]

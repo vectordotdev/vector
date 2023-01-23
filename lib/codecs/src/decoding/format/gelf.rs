@@ -99,10 +99,11 @@ impl GelfDeserializer {
         }
 
         if let Some(timestamp) = parsed.timestamp {
-            let naive = NaiveDateTime::from_timestamp(
+            let naive = NaiveDateTime::from_timestamp_opt(
                 f64::trunc(timestamp) as i64,
                 f64::fract(timestamp) as u32,
-            );
+            )
+            .expect("invalid timestamp");
             log.insert(
                 log_schema().timestamp_key(),
                 DateTime::<Utc>::from_utc(naive, Utc),
@@ -272,7 +273,7 @@ mod tests {
             )))
         );
         // Vector does not use the nanos
-        let naive = NaiveDateTime::from_timestamp(1385053862, 0);
+        let naive = NaiveDateTime::from_timestamp_opt(1385053862, 0).expect("invalid timestamp");
         assert_eq!(
             log.get(TIMESTAMP),
             Some(&Value::Timestamp(DateTime::<Utc>::from_utc(naive, Utc)))
@@ -302,7 +303,7 @@ mod tests {
         );
     }
 
-    /// Validates deserializiation succeeds for edge case inputs.
+    /// Validates deserialization succeeds for edge case inputs.
     #[test]
     fn gelf_deserializing_edge_cases() {
         // timestamp is set if omitted from input

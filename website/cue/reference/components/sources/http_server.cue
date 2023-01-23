@@ -42,6 +42,7 @@ components: sources: http_server: {
 				enabled_default:        false
 			}
 		}
+		auto_generated: true
 	}
 
 	support: {
@@ -54,104 +55,14 @@ components: sources: http_server: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		address: {
-			description: "The address to accept connections on. The address _must_ include a port."
-			required:    true
-			type: string: {
-				examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
-			}
-		}
-		encoding: {
-			common:      true
-			description: "The expected encoding of received data. Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields."
-			required:    false
-			type: string: {
-				default: "text"
-				enum: {
-					text:   "Newline-delimited text, with each line forming a message."
-					ndjson: "Newline-delimited JSON objects, where each line must contain a JSON object."
-					json:   "Array of JSON objects, which must be a JSON array containing JSON objects."
-					binary: "Binary or text, whole http request body is considered as one message."
-				}
-			}
-		}
-		headers: {
-			common:      false
-			description: "A list of HTTP headers to include in the log event. These will override any values included in the JSON payload with conflicting names."
-			required:    false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["User-Agent", "X-My-Custom-Header"]
-				}
-			}
-		}
-		auth: configuration._http_basic_auth
-		query_parameters: {
-			common:      false
-			description: "A list of URL query parameters to include in the log event. These will override any values included in the body with conflicting names."
-			required:    false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["application", "source"]
-				}
-			}
-		}
-		path: {
-			common:      false
-			description: "The URL path on which log event POST requests shall be sent."
-			required:    false
-			type: string: {
-				default: "/"
-				examples: ["/event/path", "/logs"]
-			}
-		}
-		strict_path: {
-			common: false
-			description: """
-				If set to `true`, only requests using the exact URL path specified in `path` will be accepted;
-				otherwise requests sent to a URL path that starts with the value of `path` will be accepted.
-				With `strict_path` set to `false` and `path` set to `""`, the configured HTTP source will
-				accept requests from any URL path.
-				"""
-			required: false
-			type: bool: default: true
-		}
-		path_key: {
-			common:      false
-			description: "The event key in which the requested URL path used to send the request will be stored."
-			required:    false
-			type: string: {
-				default: "path"
-				examples: ["vector_http_path"]
-			}
-		}
-		method: {
-			common:      false
-			description: "Specifies the action of the HTTP request."
-			required:    false
-			type: string: {
-				default: "POST"
-				enum: {
-					"HEAD":   "HTTP HEAD method."
-					"GET":    "HTTP GET method."
-					"PUT":    "HTTP PUT method."
-					"POST":   "HTTP POST method."
-					"PATCH":  "HTTP PATCH method."
-					"DELETE": "HTTP DELETE method."
-				}
-			}
-		}
-	}
+	configuration: base.components.sources.http_server.configuration
+
 	output: logs: {
 		text: {
 			description: "An individual line from a `text/plain` request"
 			fields: {
 				message: {
-					description:   "The raw line line from the incoming payload."
+					description:   "The raw line from the incoming payload."
 					relevant_when: "encoding == \"text\""
 					required:      true
 					type: string: {

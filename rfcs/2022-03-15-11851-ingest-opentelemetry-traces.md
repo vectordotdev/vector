@@ -1,7 +1,7 @@
 # RFC 11851 - 2022-03-15 - Opentelemetry traces source
 
 This RFC aims to describes how to add an OpenTelemetry traces source to Vector and also address Vector internals
-adjustement required for future extension to other trace types.
+adjustment required for future extension to other trace types.
 
 ## Context
 
@@ -68,7 +68,7 @@ A completely different usecase is traces sampling, but it cover two major variat
   p99, this would require comparison against histogram / sketches.
 
 Another valuable identified usecase is the ability to provide seamless conversion between any kind of Vector supported
-traces, this means that the Vector internal traces representation shall be flexible enough to acomodate conversion
+traces, this means that the Vector internal traces representation shall be flexible enough to accommodate conversion
 to/from any trace format in sources and sinks that work with traces. Given the traction from the Opentelemetry project,
 and the fact that it [comes with a variety of fields][otlp-trace-proto-def] to cover most usecases.
 
@@ -126,7 +126,7 @@ Based on the [usecases](#usecases) previously detailed the implementation will w
 top-level requirements:
 
 - A Vector trace event shall only contain data relative to one single trace, i.e. traces sources shall create one event
-  for each indivual trace ID and its associated spans and metadata.
+  for each individual trace ID and its associated spans and metadata.
 - Use the Opentelemetry trace format as the common denominator and base the Vector internal representation to ensure :
   - A clear reference point for conversion between trace formats
   - Avoid destructive manipulation by transforms and keep traces object fully functional even after heavy modifications
@@ -137,7 +137,7 @@ top-level requirements:
 A new `opentelemetry` source with a named output `traces` (future extension would cover `metrics` then `logs`):
 
 - The gRPC variant would use Tonic to spawn a gRPC server (like the `vector` source in its v2 variation) and directly
-  use the [offical gRPC service definitions][otlp-grpc-def], only the traces gRPC service will be accepted, this should be
+  use the [official gRPC service definitions][otlp-grpc-def], only the traces gRPC service will be accepted, this should be
   relatively easy to extend it to support metrics and logs gRPC services.
 - HTTP variant would use a Warp server and attempt to decode protobuf payloads, as per the [specification][otlp-http],
   payloads are encoded using protobuf either in binary format or in JSON format ([Protobuf schemas][otlp-proto-def]).
@@ -159,7 +159,7 @@ The second option would have to provide a way to store, at least, all fields fro
 If we consider the protobuf definiton for both Datadog and OpenTelemetry, it is clear that the OpenTelemetry from come
 with extra structured fields that are not present in Datadog traces. However having a generic key/value container in
 virtually all traces formats can be used to store data that do not have a dedicated field in some format. As a reflexion
-basis the Datadog and OpenTelemetry are provided belown, there is no hard semantic differences.
+basis the Datadog and OpenTelemetry are provided below, there is no hard semantic differences.
 
 Datadog [newer trace format][otlp-trace-proto-def] (condensed):
 
@@ -279,12 +279,12 @@ is rather verbose and comes with complex nested field. The [Datadog approach][sp
 (e.g. the links field is ignored) or encode the complete field into a text representation (e.g. events are encoded using
 JSON) and include the resulting value into the tags (a.k.a Meta) map.
 
-This makes the opposite conversion a bit complicated if we want it to be completely symetrical but there was already an
+This makes the opposite conversion a bit complicated if we want it to be completely symmetrical but there was already an
 [attempt][otlp-dd-trace-receiver] allow Datadog traces ingestion in the OpenTelemetry collector. While this PR was
 closed unmerged this provide a valuable example. Anyways the [otlp-and-other-formats][OpenTelemetry] acknowledges that
-some of the OpenTelemetry contruct ends up being stored as tags or annotations in other formats.
+some of the OpenTelemetry construct ends up being stored as tags or annotations in other formats.
 
-Anyway the OpenTelemetry to Datadog traces conversion is dictacted by existing implementations in both the `trace-agent`
+Anyway the OpenTelemetry to Datadog traces conversion is dictated by existing implementations in both the `trace-agent`
 and the Datadog exporter as users will expect a consistent behaviour from one solution to another. The same
 consideration applies for APM stats computation, as [official implementations][apm-stats-computation] already provides a
 reference that defines what should be done to get the same result with Vector in the loop. The other way, from Datadog to
@@ -295,7 +295,7 @@ idempotent:
 
 There is no particular field or subset of metadata that would prevent idempotency in that case. This remains a strong
 requirement and shall be applicable to all third party trace format that will be converted to/from the upcoming Vector
-internal representation for similare scenarios.
+internal representation for similar scenarios.
 
 **Note**: The [Rust OpenTelemetry implementation][otlp-rust] implement a conversion from OpenTelemetry traces to the
 Datadog `trace-agent` format. This is not the purpose of this RFC, and with the OpenTelemetry traces format being
@@ -306,7 +306,7 @@ option.
 will borrow most of the OpenTelemetry to allow straightforward trace conversion to the newer Vector internal
 representation. Regarding `datadog_agent` source and `datadog_traces` sink the conversion to/from this newer trace
 representation will follow existing logic and ensure that standard usecases (like introducing Vector between the Datadog
-intake and the `trace agent`) do not signigicantly change the end-to-end behaviour. Some top-level information (Like
+intake and the `trace agent`) do not significantly change the end-to-end behaviour. Some top-level information (Like
 trace ID, trace-wide tags/metrics, the original format) are likely to be added to the internal trace representation for
 efficiency and convenience.
 Trace would not get native `VrlTarget` representation anymore, there is a bigger discussion there that should probably
@@ -319,7 +319,7 @@ The APM stats computation can be seen as a generic way to compute some statistic
 points have been discussed:
 
 - While [APM stats][apm-stats-proto] may be useful outside Datadog context, as they are somehow standard metrics, and
-  they could theoritically be useful to any metric backends, but as of today it seems unlikely that this will ever
+  they could theoretically be useful to any metric backends, but as of today it seems unlikely that this will ever
   happen. So third-party usage of APM stats won't be addressed until there is demand for it.
 - APM stats are essentially a Datadog things, and if metrics should be extracted from traces at some point in the
   feature this would probably materialize as a `traces_to_metric` transform, but the exact scope and the usefulness of
