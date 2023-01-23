@@ -23,7 +23,7 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         app::set_repo_dir()?;
 
-        let features = extract_features()?.join(",");
+        let features = extract_features()?.join(" ");
 
         // Prime the pump to build most of the artifacts
         app::exec(CARGO, BASE_ARGS, true)?;
