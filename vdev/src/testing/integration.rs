@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, path::Path, path::PathBuf, process::Command};
 use anyhow::{bail, Context, Result};
 
 use super::runner::{
-    ContainerTestRunnerBase as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL,
+    ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL,
     NETWORK_ENV_VAR,
 };
 use super::{config::Environment, config::IntegrationTestConfig, state::EnvsDir};

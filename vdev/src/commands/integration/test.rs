@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::runner::{ContainerTestRunnerBase, IntegrationTestRunner};
+use crate::testing::runner::{ContainerTestRunner, IntegrationTestRunner};
 use crate::testing::{config::IntegrationTestConfig, integration::IntegrationTest, state::EnvsDir};
 
 /// Execute integration tests

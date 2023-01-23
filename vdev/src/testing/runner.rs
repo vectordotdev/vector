@@ -51,7 +51,7 @@ fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
     command
 }
 
-enum RunnerState {
+pub enum RunnerState {
     Running,
     Restarting,
     Created,
@@ -74,7 +74,7 @@ pub trait TestRunner {
     fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()>;
 }
 
-pub trait ContainerTestRunnerBase: TestRunner {
+pub trait ContainerTestRunner: TestRunner {
     fn container_name(&self) -> String;
 
     fn image_name(&self) -> String;
@@ -87,9 +87,7 @@ pub trait ContainerTestRunnerBase: TestRunner {
         dockercmd(["stop", "--time", "0", &self.container_name()])
             .wait(format!("Stopping container {}", self.container_name()))
     }
-}
 
-trait ContainerTestRunner: ContainerTestRunnerBase {
     fn get_rust_version(&self) -> &str;
 
     fn state(&self) -> Result<RunnerState> {
@@ -276,7 +274,7 @@ impl TestRunner for IntegrationTestRunner {
     }
 }
 
-impl ContainerTestRunnerBase for IntegrationTestRunner {
+impl ContainerTestRunner for IntegrationTestRunner {
     fn network_name(&self) -> String {
         format!("vector-integration-tests-{}", self.integration)
     }
@@ -291,9 +289,7 @@ impl ContainerTestRunnerBase for IntegrationTestRunner {
     fn image_name(&self) -> String {
         format!("{}:latest", self.container_name())
     }
-}
 
-impl ContainerTestRunner for IntegrationTestRunner {
     fn get_rust_version(&self) -> &str {
         &self.rust_version
     }
@@ -332,17 +328,15 @@ impl TestRunner for DockerTestRunner {
     }
 }
 
-impl ContainerTestRunnerBase for DockerTestRunner {
+impl ContainerTestRunner for DockerTestRunner {
     fn container_name(&self) -> String {
-        format!("vector-test-runner-{}", self.rust_version)
+        format!("vector-test-runner-{}", self.get_rust_version())
     }
 
     fn image_name(&self) -> String {
         env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
     }
-}
 
-impl ContainerTestRunner for DockerTestRunner {
     fn get_rust_version(&self) -> &str {
         &self.rust_version
     }
