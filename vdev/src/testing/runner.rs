@@ -64,7 +64,7 @@ pub enum RunnerState {
 
 pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
     if container {
-        Ok(Box::new(DockerTestRunner::new()?))
+        Ok(Box::new(DockerTestRunner::new()))
     } else {
         Ok(Box::new(LocalTestRunner::new()))
     }
@@ -88,7 +88,12 @@ pub trait ContainerTestRunner: TestRunner {
             .wait(format!("Stopping container {}", self.container_name()))
     }
 
-    fn get_rust_version(&self) -> &str;
+    fn get_rust_version(&self) -> String {
+        match RustToolchainConfig::parse() {
+            Ok(config) => config.channel,
+            Err(error) => fatal!("Could not read `rust-toolchain.toml` file: {error}"),
+        }
+    }
 
     fn state(&self) -> Result<RunnerState> {
         let mut command = dockercmd(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
@@ -224,16 +229,11 @@ pub trait ContainerTestRunner: TestRunner {
 
 pub struct IntegrationTestRunner {
     integration: String,
-    rust_version: String,
 }
 
 impl IntegrationTestRunner {
     pub fn new(integration: String) -> Result<Self> {
-        let rust_version = RustToolchainConfig::parse()?.channel;
-        Ok(Self {
-            integration,
-            rust_version,
-        })
+        Ok(Self { integration })
     }
 
     pub fn ensure_network(&self) -> Result<()> {
@@ -289,20 +289,13 @@ impl ContainerTestRunner for IntegrationTestRunner {
     fn image_name(&self) -> String {
         format!("{}:latest", self.container_name())
     }
-
-    fn get_rust_version(&self) -> &str {
-        &self.rust_version
-    }
 }
 
-pub struct DockerTestRunner {
-    rust_version: String,
-}
+pub struct DockerTestRunner {}
 
 impl DockerTestRunner {
-    pub fn new() -> Result<Self> {
-        let rust_version = RustToolchainConfig::parse()?.channel;
-        Ok(Self { rust_version })
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -336,10 +329,6 @@ impl ContainerTestRunner for DockerTestRunner {
 
     fn image_name(&self) -> String {
         env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
-    }
-
-    fn get_rust_version(&self) -> &str {
-        &self.rust_version
     }
 }
 
