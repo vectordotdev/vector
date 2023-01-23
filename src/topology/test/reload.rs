@@ -26,7 +26,7 @@ fn internal_metrics_source() -> InternalMetricsConfig {
         // race condition in the `topology_disk_buffer_conflict` test below, but it is unclear
         // why. All these tests should work regardless of the scrape interval. This warrants further
         // investigation.
-        scrape_interval_secs: 1.1,
+        scrape_interval_secs: Duration::from_secs_f64(1.1),
         ..Default::default()
     }
 }

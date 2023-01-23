@@ -71,6 +71,10 @@ impl SourceConfig for HttpConfig {
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
     /// The socket address to listen for connections on.
+    ///
+    /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
+    #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
 
     /// The expected encoding of received data.
@@ -83,12 +87,16 @@ pub struct SimpleHttpConfig {
     ///
     /// These will override any values included in the JSON payload with conflicting names.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "User-Agent"))]
+    #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
     headers: Vec<String>,
 
     /// A list of URL query parameters to include in the log event.
     ///
     /// These will override any values included in the body with conflicting names.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "application"))]
+    #[configurable(metadata(docs::examples = "source"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
@@ -106,10 +114,13 @@ pub struct SimpleHttpConfig {
 
     /// The URL path on which log event POST requests shall be sent.
     #[serde(default = "default_path")]
+    #[configurable(metadata(docs::examples = "/event/path"))]
+    #[configurable(metadata(docs::examples = "/logs"))]
     path: String,
 
     /// The event key in which the requested URL path used to send the request will be stored.
     #[serde(default = "default_path_key")]
+    #[configurable(metadata(docs::examples = "vector_http_path"))]
     path_key: OptionalValuePath,
 
     /// Specifies the action of the HTTP request.

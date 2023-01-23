@@ -31,7 +31,7 @@ impl Cli {
                 entries.sort();
 
                 for integration in &entries {
-                    display!("{integration}");
+                    println!("{integration}");
                 }
             }
             Some(integration) => {
@@ -39,15 +39,16 @@ impl Cli {
                 let envs_dir = state::envs_dir(&integration);
                 let active_envs = state::active_envs(&envs_dir)?;
 
-                display!("Test args: {}", config.args.join(" "));
+                println!("Test args: {}", config.args.join(" "));
 
-                display!("Environments:");
+                println!("Environments:");
                 for environment in config.environments().keys() {
-                    if active_envs.contains(environment) {
-                        display!("  {} (active)", environment);
+                    let active = if active_envs.contains(environment) {
+                        " (active)"
                     } else {
-                        display!("  {}", environment);
-                    }
+                        ""
+                    };
+                    println!("  {environment}{active}");
                 }
             }
         }
