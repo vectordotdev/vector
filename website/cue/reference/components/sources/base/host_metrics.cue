@@ -71,18 +71,25 @@ base: components: sources: host_metrics: configuration: {
 			Defaults to all collectors.
 			"""
 		required: false
-		type: array: items: type: string: {
-			enum: {
-				cgroups:    "Metrics related to Linux control groups."
-				cpu:        "Metrics related to CPU utilization."
-				disk:       "Metrics related to disk I/O utilization."
-				filesystem: "Metrics related to filesystem space utilization."
-				host:       "Metrics related to the host."
-				load:       "Metrics related to the system load average."
-				memory:     "Metrics related to memory utilization."
-				network:    "Metrics related to network utilization."
+		type: array: {
+			default: ["cpu", "disk", "filesystem", "load", "host", "memory", "network", "cgroups"]
+			items: type: string: {
+				enum: {
+					cgroups: """
+						Metrics related to Linux control groups.
+
+						Only available on Linux.
+						"""
+					cpu:        "Metrics related to CPU utilization."
+					disk:       "Metrics related to disk I/O utilization."
+					filesystem: "Metrics related to filesystem space utilization."
+					host:       "Metrics related to the host."
+					load:       "Metrics related to the system load average."
+					memory:     "Metrics related to memory utilization."
+					network:    "Metrics related to network utilization."
+				}
+				examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network"]
 			}
-			examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network"]
 		}
 	}
 	disk: {

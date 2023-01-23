@@ -38,7 +38,7 @@ use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentT
 #[configurable_component(source("fluent"))]
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     address: SocketListenAddr,
 
     /// The maximum number of TCP connections that will be allowed at any given time.

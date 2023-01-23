@@ -199,7 +199,7 @@ serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.8", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.91", default-features = false, features = ["raw_value"] }
 serde_with = { version = "2.2.0", default-features = false, features = ["macros", "std"], optional = true }
-serde_yaml = { version = "0.9.16", default-features = false }
+serde_yaml = { version = "0.9.17", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.1", default-features = false, optional = true }
@@ -316,7 +316,7 @@ syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["connect"], optional = true}
-toml = { version = "0.5.10", default-features = false }
+toml = { version = "0.5.11", default-features = false }
 tonic = { version = "0.8", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.5", default-features = false }
@@ -663,7 +663,7 @@ sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-axiom = ["sinks-elasticsearch"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
 sinks-azure_monitor_logs = []
-sinks-blackhole = []
+sinks-blackhole = ["dep:serde_with"]
 sinks-chronicle = []
 sinks-clickhouse = []
 sinks-console = []
