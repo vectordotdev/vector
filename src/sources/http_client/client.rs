@@ -42,13 +42,16 @@ use vector_core::{
 #[configurable_component(source("http_client"))]
 #[derive(Clone, Debug)]
 pub struct HttpClientConfig {
-    /// The HTTP endpoint to collect events from. The full path must be specified.
+    /// The HTTP endpoint to collect events from.
+    ///
+    /// The full path must be specified.
     #[configurable(metadata(docs::examples = "http://127.0.0.1:9898/logs"))]
     pub endpoint: String,
 
     /// The interval between calls.
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(rename = "scrape_interval_secs")]
     pub interval: Duration,
 
     /// Custom parameters for the HTTP request query string.

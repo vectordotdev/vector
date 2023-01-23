@@ -93,8 +93,12 @@ base: components: sources: http_client: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The HTTP endpoint to collect events from. The full path must be specified."
-		required:    true
+		description: """
+			The HTTP endpoint to collect events from.
+
+			The full path must be specified.
+			"""
+		required: true
 		type: string: examples: ["http://127.0.0.1:9898/logs"]
 	}
 	framing: {
@@ -185,14 +189,6 @@ base: components: sources: http_client: configuration: {
 			}
 		}
 	}
-	interval: {
-		description: "The interval between calls."
-		required:    false
-		type: uint: {
-			default: 15
-			unit:    "seconds"
-		}
-	}
 	method: {
 		description: "Specifies the method of the HTTP request."
 		required:    false
@@ -228,6 +224,14 @@ base: components: sources: http_client: configuration: {
 				required:    true
 				type: array: items: type: string: {}
 			}
+		}
+	}
+	scrape_interval_secs: {
+		description: "The interval between calls."
+		required:    false
+		type: uint: {
+			default: 15
+			unit:    "seconds"
 		}
 	}
 	tls: {

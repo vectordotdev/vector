@@ -102,7 +102,7 @@ base: components: sources: prometheus_scrape: configuration: {
 			type: array: items: type: string: {}
 		}
 	}
-	scrape_interval: {
+	scrape_interval_secs: {
 		description: "The interval between scrapes."
 		required:    false
 		type: uint: {
