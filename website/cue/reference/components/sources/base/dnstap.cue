@@ -20,8 +20,12 @@ base: components: sources: dnstap: configuration: {
 		type: uint: {}
 	}
 	max_frame_length: {
-		description: "Max DNSTAP frame length that the dnstap source can handle."
-		required:    false
+		description: """
+			Maximum DNSTAP frame length that the source will accept.
+
+			If any frame is longer than this, it will be discarded.
+			"""
+		required: false
 		type: uint: {
 			default: 102400
 			unit:    "bytes"
