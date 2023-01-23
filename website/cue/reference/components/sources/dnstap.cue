@@ -48,13 +48,13 @@ components: sources: dnstap: {
 	configuration: base.components.sources.dnstap.configuration & {
 		socket_receive_buffer_size: warnings: [
 			"""
-				System-wide setting of max socket send buffer size (i.e. value of '/proc/sys/net/core/wmem_max' on Linux) may need adjustment accordingly.
+				System-wide setting of maximum socket send buffer size (i.e. value of '/proc/sys/net/core/wmem_max' on Linux) may need adjustment accordingly.
 				""",
 		]
 
 		socket_send_buffer_size: warnings: [
 			"""
-				System-wide setting of max socket send buffer size (i.e. value of '/proc/sys/net/core/wmem_max' on Linux) may need adjustment accordingly.
+				System-wide setting of maximum socket send buffer size (i.e. value of '/proc/sys/net/core/wmem_max' on Linux) may need adjustment accordingly.
 				""",
 		]
 

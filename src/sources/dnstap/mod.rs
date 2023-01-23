@@ -30,7 +30,9 @@ use vector_core::config::{LegacyKey, LogNamespace};
 #[configurable_component(source("dnstap"))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
-    /// Max DNSTAP frame length that the dnstap source will accept.
+    /// Maximum DNSTAP frame length that the source will accept.
+    ///
+    /// If any frame is longer than this, it will be discarded.
     #[serde(default = "default_max_frame_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_frame_length: usize,
@@ -78,11 +80,6 @@ pub struct DnstapConfig {
     ///
     /// This should not typically needed to be changed.
     #[configurable(metadata(docs::type_unit = "bytes"))]
-    #[configurable(metadata(
-        docs::warnings = "System-wide setting of max socket send buffer size
-					(i.e. value of '/proc/sys/net/core/wmem_max' on Linux)
-					may need adjustment accordingly."
-    ))]
     pub socket_send_buffer_size: Option<usize>,
 
     /// The namespace to use for logs. This overrides the global settings.
