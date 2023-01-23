@@ -96,6 +96,8 @@ const toToml = (obj) => {
 
 // Convert object to YAML string
 const toYaml = (obj) => {
+  console.log(obj);
+  console.log("-------");
   return `---\n${YAML.stringify(obj)}`;
 }
 
@@ -200,6 +202,7 @@ const makeUseCaseExamples = (component) => {
       const config = example.configuration;
       const extra = Object.fromEntries(Object.entries(config).filter(([_, v]) => v != null));
 
+      console.log(extra);
       let exampleConfig;
 
       if (["transform", "sink"].includes(component.kind)) {
@@ -222,6 +225,7 @@ const makeUseCaseExamples = (component) => {
           }
         }
       }
+      console.log("zork");
 
       // Strip the "log" or "metric" key in the example output
       let output;
@@ -338,6 +342,7 @@ const main = () => {
 
         docs['components'][kind][componentType]['examples'] = useCaseExamples;
 
+        console.log("zork");
         docs['components'][kind][componentType]['example_configs'] = {
           common: {
             toml: toToml(commonExampleConfig),

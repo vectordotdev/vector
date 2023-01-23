@@ -1,32 +1,31 @@
-#![allow(unused_imports)]
 use std::task::Poll;
 
-use super::util::encoding::{write_all, Encoder};
-use super::util::metadata::RequestMetadataBuilder;
-use super::util::{Compression, RequestBuilder, SinkBuilderExt};
-use super::Healthcheck;
-use crate::config::{GenerateConfig, SinkConfig, SinkContext};
-use crate::http::HttpClient;
-use crate::internal_events::SinkRequestBuildError;
+use crate::{
+    config::{GenerateConfig, SinkConfig, SinkContext},
+    http::HttpClient,
+    internal_events::SinkRequestBuildError,
+    sinks::util::{
+        encoding::{write_all, Encoder},
+        metadata::RequestMetadataBuilder,
+        request_builder::EncodeResult,
+        Compression, RequestBuilder, SinkBuilderExt,
+    },
+    sinks::Healthcheck,
+};
 use bytes::Bytes;
-use futures::future::BoxFuture;
-use futures::{stream::BoxStream, StreamExt};
-use snafu::Snafu;
-use vector_common::finalization::EventFinalizers;
-use vector_common::internal_event::CountByteSize;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use futures::{future::BoxFuture, stream::BoxStream, StreamExt};
 use vector_common::{
-    finalization::{EventStatus, Finalizable},
-    internal_event::{BytesSent, EventsSent},
+    finalization::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::CountByteSize,
+    request_metadata::{MetaDescriptive, RequestMetadata},
 };
 use vector_config::configurable_component;
-use vector_core::stream::DriverResponse;
-use vector_core::tls::TlsSettings;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
     event::Event,
     sink::{StreamSink, VectorSink},
-    EstimatedJsonEncodedSizeOf,
+    stream::DriverResponse,
+    tls::TlsSettings,
 };
 
 #[configurable_component(sink("basic"))]
@@ -203,14 +202,9 @@ impl RequestBuilder<Event> for BasicRequestBuilder {
     fn split_input(
         &self,
         mut input: Event,
-    ) -> (
-        Self::Metadata,
-        super::util::metadata::RequestMetadataBuilder,
-        Self::Events,
-    ) {
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let finalizers = input.take_finalizers();
-        // TODO - these need proper numbers.
-        let metadata_builder = RequestMetadataBuilder::new(1, 1, 1);
+        let metadata_builder = RequestMetadataBuilder::from_events(&input);
         (finalizers, metadata_builder, input)
     }
 
@@ -218,12 +212,10 @@ impl RequestBuilder<Event> for BasicRequestBuilder {
         &self,
         metadata: Self::Metadata,
         request_metadata: RequestMetadata,
-        payload: super::util::request_builder::EncodeResult<Self::Payload>,
+        payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let finalizers = metadata;
-
         BasicRequest {
-            finalizers,
+            finalizers: metadata,
             payload: payload.into_payload(),
             metadata: request_metadata,
         }
