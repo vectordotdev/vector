@@ -174,13 +174,25 @@ base: components: sinks: console: configuration: {
 		}
 	}
 	target: {
-		description: "Output target."
-		required:    false
+		description: """
+			The [standard stream][standard_streams] to write to.
+
+			[standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
+			"""
+		required: false
 		type: string: {
 			default: "stdout"
 			enum: {
-				stderr: "Standard error."
-				stdout: "Standard output."
+				stderr: """
+					Write output to [STDERR][stderr].
+
+					[stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
+					"""
+				stdout: """
+					Write output to [STDOUT][stdout].
+
+					[stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
+					"""
 			}
 		}
 	}

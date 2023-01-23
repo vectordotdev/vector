@@ -585,7 +585,7 @@ mod tests {
             "out",
             &["in"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -643,7 +643,7 @@ mod tests {
             "out",
             &["to_metric"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -693,7 +693,7 @@ mod tests {
             "out",
             &["transform"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -746,7 +746,7 @@ mod tests {
             "out",
             &["in"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -820,7 +820,7 @@ mod tests {
             "out",
             &["transform"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -880,7 +880,7 @@ mod tests {
             "out",
             &["transform"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -956,7 +956,7 @@ mod tests {
             "out",
             &["transform"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },

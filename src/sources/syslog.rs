@@ -71,7 +71,7 @@ pub struct SyslogConfig {
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        /// The address to listen for connections on.
+        /// The socket address to listen for connections on.
         address: SocketListenAddr,
 
         #[configurable(derived)]
@@ -91,7 +91,7 @@ pub enum Mode {
 
     /// Listen on UDP.
     Udp {
-        /// The address to listen for messages on.
+        /// The socket address to listen for messages on.
         address: SocketListenAddr,
 
         /// The size, in bytes, of the receive buffer used for the listening socket.

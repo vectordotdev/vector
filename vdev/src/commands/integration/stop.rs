@@ -20,22 +20,19 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        match self.environment {
-            Some(environment) => {
-                IntegrationTest::new(self.integration, environment)?.stop(self.force)
-            }
-            None => {
-                let envs = EnvsDir::new(&self.integration).list_active()?;
-                if envs.is_empty() {
-                    display!("No environments for {:?} are active.", self.integration);
-                } else {
-                    for environment in envs {
-                        IntegrationTest::new(self.integration.clone(), environment)?
-                            .stop(self.force)?;
-                    }
+        if let Some(environment) = self.environment {
+            IntegrationTest::new(self.integration, environment)?.stop(self.force)
+        } else {
+            let envs = EnvsDir::new(&self.integration).list_active()?;
+            if envs.is_empty() {
+                println!("No environments for {:?} are active.", self.integration);
+            } else {
+                for environment in envs {
+                    IntegrationTest::new(self.integration.clone(), environment)?
+                        .stop(self.force)?;
                 }
-                Ok(())
             }
+            Ok(())
         }
     }
 }

@@ -30,7 +30,7 @@ impl Cli {
                         .map(|environment| format(&active_envs, environment))
                         .collect::<Vec<_>>()
                         .join("  ");
-                    display!("{integration:width$}  {environments}");
+                    println!("{integration:width$}  {environments}");
                 }
             }
             Some(integration) => {
@@ -38,11 +38,16 @@ impl Cli {
                 let envs_dir = state::EnvsDir::new(&integration);
                 let active_envs = envs_dir.list_active()?;
 
-                display!("Test args: {}", config.args.join(" "));
+                println!("Test args: {}", config.args.join(" "));
 
-                display!("Environments:");
+                println!("Environments:");
                 for environment in config.environments().keys() {
-                    display!("  {}", format(&active_envs, environment));
+                    let active = if active_envs.contains(environment) {
+                        " (active)"
+                    } else {
+                        ""
+                    };
+                    println!("  {environment}{active}");
                 }
             }
         }
