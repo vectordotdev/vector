@@ -1205,10 +1205,12 @@ mod integration_tests {
 
     async fn source(status: EventStatus) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        let address = SocketAddr::new(next_addr_for_ip(std::net::IpAddr::V4(
+            std::net::Ipv4Addr::UNSPECIFIED,
+        )));
         tokio::spawn(async move {
             FluentConfig {
-                address,
+                address: address.into(),
                 tls: None,
                 keepalive: None,
                 receive_buffer_bytes: None,
