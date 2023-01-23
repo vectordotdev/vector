@@ -22,7 +22,7 @@ base: components: sources: fluent: configuration: {
 	address: {
 		description: "The socket address to listen for connections on."
 		required:    true
-		type: string: examples: ["0.0.0.0:24224"]
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
 		description: "The maximum number of TCP connections that will be allowed at any given time."

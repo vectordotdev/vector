@@ -1,5 +1,5 @@
 use std::io::{self, Read};
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
@@ -40,8 +40,7 @@ use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentT
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
     /// The socket address to listen for connections on.
-    #[configurable(metadata(docs::examples = "0.0.0.0:24224"))]
-    address: SocketAddr,
+    address: SocketListenAddr,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
@@ -73,7 +72,7 @@ pub struct FluentConfig {
 impl GenerateConfig for FluentConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            address: SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 24224),
+            address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
             keepalive: None,
             tls: None,
             receive_buffer_bytes: None,
@@ -98,10 +97,8 @@ impl SourceConfig for FluentConfig {
             .and_then(|tls| tls.client_metadata_key.clone())
             .and_then(|k| k.path);
         let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
-        let address = SocketListenAddr::SocketAddr(self.address);
-
         source.run(
-            address,
+            self.address,
             self.keepalive,
             shutdown_secs,
             tls,
@@ -123,7 +120,7 @@ impl SourceConfig for FluentConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![Resource::tcp(self.address)]
+        vec![self.address.as_tcp_resource()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -950,7 +947,7 @@ mod tests {
     #[test]
     fn output_schema_definition_vector_namespace() {
         let config = FluentConfig {
-            address: SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 2442),
+            address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
             tls: None,
             keepalive: None,
             receive_buffer_bytes: None,
@@ -990,7 +987,7 @@ mod tests {
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = FluentConfig {
-            address: SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 2442),
+            address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
             tls: None,
             keepalive: None,
             receive_buffer_bytes: None,
@@ -1211,7 +1208,7 @@ mod integration_tests {
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
             FluentConfig {
-                address,
+                address: address.into(),
                 tls: None,
                 keepalive: None,
                 receive_buffer_bytes: None,
