@@ -10,7 +10,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        display!("{}", config::path()?.display());
+        println!("{}", config::path()?.display());
 
         Ok(())
     }

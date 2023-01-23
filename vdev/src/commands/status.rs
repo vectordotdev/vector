@@ -10,8 +10,8 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        display!("Branch: {}", git::current_branch()?);
-        display!("Changed files: {}", git::changed_files()?.len());
+        println!("Branch: {}", git::current_branch()?);
+        println!("Changed files: {}", git::changed_files()?.len());
 
         Ok(())
     }

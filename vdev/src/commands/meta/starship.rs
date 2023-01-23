@@ -33,7 +33,7 @@ impl Cli {
             }
         };
 
-        display!("vector{{ {} }}", contexts.join(", "));
+        println!("vector{{ {} }}", contexts.join(", "));
 
         Ok(())
     }

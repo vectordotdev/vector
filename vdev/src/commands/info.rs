@@ -10,27 +10,27 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        display!("Container tool:  {:?}", *runner::CONTAINER_TOOL);
-        display!("Data path:       {:?}", platform::data_dir());
-        display!("Repository:      {:?}", app::path());
-        display!("Shell:           {:?}", *app::SHELL);
+        println!("Container tool:  {:?}", *runner::CONTAINER_TOOL);
+        println!("Data path:       {:?}", platform::data_dir());
+        println!("Repository:      {:?}", app::path());
+        println!("Shell:           {:?}", *app::SHELL);
 
-        display!("\nConfig:");
+        println!("\nConfig:");
         match config::path() {
             Ok(path) => {
-                display!("  Path:        {path:?}");
+                println!("  Path:        {path:?}");
                 match config::load() {
                     Ok(config) => {
-                        display!("  Repository:  {:?}", config.repo);
+                        println!("  Repository:  {:?}", config.repo);
                     }
-                    Err(error) => display!("  Could not load: {error}"),
+                    Err(error) => println!("  Could not load: {error}"),
                 }
             }
-            Err(error) => display!("  Path:  Not found: {error}"),
+            Err(error) => println!("  Path:  Not found: {error}"),
         }
 
-        display!("\nPlatform:");
-        display!("  Default target:  {}", platform::default_target());
+        println!("\nPlatform:");
+        println!("  Default target:  {}", platform::default_target());
         Ok(())
     }
 }

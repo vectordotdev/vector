@@ -42,8 +42,7 @@ fn detect_container_tool() -> OsString {
             return OsString::from(String::from(tool));
         }
     }
-    critical!("No container tool could be detected.");
-    std::process::exit(1);
+    fatal!("No container tool could be detected.");
 }
 
 fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
