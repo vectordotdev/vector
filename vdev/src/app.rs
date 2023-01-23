@@ -20,7 +20,7 @@ const DEFAULT_SHELL: &str = "/bin/sh";
 
 // Extract the shell from the environment variable `$SHELL` and substitute the above default value
 // if it isn't set.
-static SHELL: Lazy<OsString> =
+pub static SHELL: Lazy<OsString> =
     Lazy::new(|| (env::var_os("SHELL").unwrap_or_else(|| DEFAULT_SHELL.into())));
 
 static VERBOSITY: OnceCell<LevelFilter> = OnceCell::new();

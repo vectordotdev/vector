@@ -1,17 +1,4 @@
-macro_rules! display {
-    ($($arg:tt)*) => {{
-        use owo_colors::OwoColorize;
-        println!(
-            "{}",
-            format!($($arg)*)
-                // Simply bold rather than bright white for terminals with white backgrounds
-                .if_supports_color(owo_colors::Stream::Stdout, |text| text.bold())
-        );
-    }};
-}
-
-#[allow(unused_macros)]
-macro_rules! critical {
+macro_rules! fatal {
     ($($arg:tt)*) => {{
         use owo_colors::OwoColorize;
         eprintln!(
@@ -19,6 +6,7 @@ macro_rules! critical {
             format!($($arg)*)
                 .if_supports_color(owo_colors::Stream::Stderr, |text| text.bright_red())
         );
+        std::process::exit(1);
     }};
 }
 
