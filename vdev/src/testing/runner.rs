@@ -64,9 +64,9 @@ pub enum RunnerState {
 
 pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
     if container {
-        Ok(Box::new(DockerTestRunner::new()))
+        Ok(Box::new(DockerTestRunner))
     } else {
-        Ok(Box::new(LocalTestRunner::new()))
+        Ok(Box::new(LocalTestRunner))
     }
 }
 
@@ -291,13 +291,7 @@ impl ContainerTestRunner for IntegrationTestRunner {
     }
 }
 
-pub struct DockerTestRunner {}
-
-impl DockerTestRunner {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+pub struct DockerTestRunner;
 
 impl TestRunner for DockerTestRunner {
     fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
@@ -332,13 +326,7 @@ impl ContainerTestRunner for DockerTestRunner {
     }
 }
 
-pub struct LocalTestRunner {}
-
-impl LocalTestRunner {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+pub struct LocalTestRunner;
 
 impl TestRunner for LocalTestRunner {
     fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
