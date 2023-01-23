@@ -175,12 +175,13 @@ base: components: sources: socket: configuration: {
 		type: uint: {}
 	}
 	mode: {
-		required: true
+		description: "The type of socket to use."
+		required:    true
 		type: string: enum: {
 			tcp:           "Listen on TCP."
 			udp:           "Listen on UDP."
-			unix_datagram: "Listen on UDS, in datagram mode. (Unix domain socket)"
-			unix_stream:   "Listen on UDS, in stream mode. (Unix domain socket)"
+			unix_datagram: "Listen on a Unix domain socket (UDS), in datagram mode."
+			unix_stream:   "Listen on a Unix domain socket (UDS), in stream mode."
 		}
 	}
 	path: {

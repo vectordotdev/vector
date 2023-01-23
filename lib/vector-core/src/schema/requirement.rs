@@ -11,7 +11,7 @@ use super::Definition;
 /// components.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Requirement {
-    /// Semantic meanings confingured for this requirement.
+    /// Semantic meanings configured for this requirement.
     meaning: BTreeMap<&'static str, SemanticMeaning>,
 }
 
@@ -196,7 +196,7 @@ impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::MeaningMissing { identifier } => {
-                write!(f, "missing semantic meaning: {}", identifier)
+                write!(f, "missing semantic meaning: {identifier}")
             }
             Self::MeaningKind {
                 identifier,
@@ -351,7 +351,7 @@ mod tests {
                 Err(ValidationErrors(errors))
             };
 
-            assert_eq!(got, want, "{}", title);
+            assert_eq!(got, want, "{title}");
         }
     }
 }

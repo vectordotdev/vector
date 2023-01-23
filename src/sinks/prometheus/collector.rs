@@ -67,7 +67,7 @@ pub(super) trait MetricCollector {
                             timestamp,
                             name,
                             "_bucket",
-                            bucket_count as f64,
+                            bucket_count,
                             tags,
                             Some(("le", bucket.upper_limit.to_string())),
                         );
@@ -80,7 +80,7 @@ pub(super) trait MetricCollector {
                         tags,
                         Some(("le", "+Inf".to_string())),
                     );
-                    self.emit_value(timestamp, name, "_sum", sum as f64, tags, None);
+                    self.emit_value(timestamp, name, "_sum", sum, tags, None);
                     self.emit_value(timestamp, name, "_count", count as f64, tags, None);
                 }
                 MetricValue::Distribution {
@@ -262,7 +262,7 @@ impl MetricCollector for StringCollector {
     }
 
     fn finish(self) -> String {
-        self.processed.into_iter().map(|(_, value)| value).collect()
+        self.processed.into_values().collect()
     }
 }
 

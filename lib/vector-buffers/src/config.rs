@@ -16,7 +16,7 @@ use crate::{
         builder::{TopologyBuilder, TopologyError},
         channel::{BufferReceiver, BufferSender},
     },
-    variants::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
+    variants::{DiskV2Buffer, MemoryBuffer},
     Bufferable, WhenFull,
 };
 
@@ -34,8 +34,6 @@ pub enum BufferBuildError {
 enum BufferTypeKind {
     #[serde(rename = "memory")]
     Memory,
-    #[serde(rename = "disk_v1")]
-    DiskV1,
     #[serde(rename = "disk")]
     DiskV2,
 }
@@ -99,18 +97,6 @@ impl BufferTypeVisitor {
                     when_full,
                 })
             }
-            BufferTypeKind::DiskV1 => {
-                if max_events.is_some() {
-                    return Err(de::Error::unknown_field(
-                        "max_events",
-                        &["type", "max_size", "when_full"],
-                    ));
-                }
-                Ok(BufferType::DiskV1 {
-                    max_size: max_size.ok_or_else(|| de::Error::missing_field("max_size"))?,
-                    when_full,
-                })
-            }
             BufferTypeKind::DiskV2 => {
                 if max_events.is_some() {
                     return Err(de::Error::unknown_field(
@@ -155,7 +141,7 @@ pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(500) }
 }
 
-/// Disk usage configurtion for disk-backed buffers.
+/// Disk usage configuration for disk-backed buffers.
 #[derive(Debug)]
 pub struct DiskUsage {
     id: ComponentKey,
@@ -211,24 +197,6 @@ pub enum BufferType {
         when_full: WhenFull,
     },
 
-    /// A buffer stage backed by an on-disk database, powered by LevelDB.
-    ///
-    /// This is less performant, but more durable. Data that has been synchronized to disk will not
-    /// be lost if Vector is restarted forcefully or crashes.
-    #[configurable(deprecated)]
-    #[configurable(title = "Events are buffered on disk. (version 1)")]
-    #[serde(rename = "disk_v1")]
-    DiskV1 {
-        /// The maximum size of the buffer on disk.
-        ///
-        /// Must be at least ~256 megabytes (268435488 bytes).
-        max_size: NonZeroU64,
-
-        #[configurable(derived)]
-        #[serde(default)]
-        when_full: WhenFull,
-    },
-
     /// A buffer stage backed by disk.
     ///
     /// This is less performant, but more durable. Data that has been synchronized to disk will not
@@ -277,14 +245,6 @@ impl BufferType {
             None => None,
             Some(global_data_dir) => match self {
                 Self::Memory { .. } => None,
-                Self::DiskV1 { max_size, .. } => {
-                    let data_dir = crate::variants::disk_v1::get_new_style_buffer_dir_path(
-                        &global_data_dir,
-                        id.id(),
-                    );
-
-                    Some(DiskUsage::new(id.clone(), data_dir, *max_size))
-                }
                 Self::DiskV2 { max_size, .. } => {
                     let data_dir = crate::variants::disk_v2::get_disk_v2_data_dir_path(
                         &global_data_dir,
@@ -302,7 +262,7 @@ impl BufferType {
     /// # Errors
     ///
     /// If a required parameter is missing, or if there is an error building the topology itself, an
-    /// error variant will be returned desribing the error
+    /// error variant will be returned describing the error
     pub fn add_to_builder<T>(
         &self,
         builder: &mut TopologyBuilder<T>,
@@ -318,13 +278,6 @@ impl BufferType {
                 max_events,
             } => {
                 builder.stage(MemoryBuffer::new(max_events), when_full);
-            }
-            BufferType::DiskV1 {
-                when_full,
-                max_size,
-            } => {
-                let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
-                builder.stage(DiskV1Buffer::new(id, data_dir, max_size), when_full);
             }
             BufferType::DiskV2 {
                 when_full,
@@ -369,10 +322,10 @@ impl BufferType {
 )]
 pub enum BufferConfig {
     /// A single stage buffer topology.
-    Single(#[configurable(transparent)] BufferType),
+    Single(BufferType),
 
     /// A chained buffer topology.
-    Chained(#[configurable(transparent)] Vec<BufferType>),
+    Chained(Vec<BufferType>),
 }
 
 impl Default for BufferConfig {
@@ -514,17 +467,6 @@ max_events: 42
 
     #[test]
     fn ensure_field_defaults_for_all_types() {
-        check_single_stage(
-            r#"
-          type: disk_v1
-          max_size: 1024
-          "#,
-            BufferType::DiskV1 {
-                max_size: NonZeroU64::new(1024).unwrap(),
-                when_full: WhenFull::Block,
-            },
-        );
-
         check_single_stage(
             r#"
           type: memory

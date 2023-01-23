@@ -127,7 +127,7 @@ Additionally, as part of Vector's vision to be the "one tool" for ingesting and 
 
 ### Having users run telegraf or Prom node exporter and using Vector's prometheus source to scrape it
 
-We could not add the source directly to Vector and instead instruct users to run Telegraf's `postgresl` input or Prometheus' `postgresql_exporter` and point Vector at the resulting data. This would leverage the already supported inputs from those projects.
+We could not add the source directly to Vector and instead instruct users to run Telegraf's `postgresql` input or Prometheus' `postgresql_exporter` and point Vector at the resulting data. This would leverage the already supported inputs from those projects.
 
 I decided against this as it would be in contrast with one of the listed
 principles of Vector:

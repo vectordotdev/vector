@@ -22,8 +22,7 @@ use value::{kind::Collection, Kind};
 use vector_common::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::LogNamespace,
-    config::{log_schema, LegacyKey},
+    config::{log_schema, LegacyKey, LogNamespace},
     schema::Definition,
 };
 
@@ -66,45 +65,57 @@ pub struct OpentelemetryConfig {
 
 /// Configuration for the `opentelemetry` gRPC server.
 #[configurable_component]
+#[configurable(metadata(docs::examples = "example_grpc_config()"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct GrpcConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:4317", docs::examples = "localhost:4317"))]
     address: SocketAddr,
 
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     tls: Option<TlsEnableableConfig>,
+}
+
+fn example_grpc_config() -> GrpcConfig {
+    GrpcConfig {
+        address: "0.0.0.0:4317".parse().unwrap(),
+        tls: None,
+    }
 }
 
 /// Configuration for the `opentelemetry` HTTP server.
 #[configurable_component]
+#[configurable(metadata(docs::examples = "example_http_config()"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct HttpConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:4318", docs::examples = "localhost:4318"))]
     address: SocketAddr,
 
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     tls: Option<TlsEnableableConfig>,
+}
+
+fn example_http_config() -> HttpConfig {
+    HttpConfig {
+        address: "0.0.0.0:4318".parse().unwrap(),
+        tls: None,
+    }
 }
 
 impl GenerateConfig for OpentelemetryConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            grpc: GrpcConfig {
-                address: "0.0.0.0:4317".parse().unwrap(),
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: "0.0.0.0:4318".parse().unwrap(),
-                tls: Default::default(),
-            },
+            grpc: example_grpc_config(),
+            http: example_http_config(),
             acknowledgements: Default::default(),
             log_namespace: None,
         })

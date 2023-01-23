@@ -55,6 +55,7 @@ impl From<std::io::Error> for Error {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "method", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The framing method."))]
 pub enum FramingConfig {
     /// Event data is not delimited at all.
     Bytes,

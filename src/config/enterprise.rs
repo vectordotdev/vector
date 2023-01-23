@@ -530,7 +530,7 @@ fn setup_metrics_reporting(
     // systems' performance. To avoid this, we explicitly set `collectors`.
     let host_metrics = HostMetricsConfig {
         namespace: Some("vector.host".to_owned()),
-        scrape_interval_secs: datadog.reporting_interval_secs,
+        scrape_interval_secs: Duration::from_secs_f64(datadog.reporting_interval_secs),
         collectors: Some(vec![
             Collector::Cpu,
             Collector::Disk,

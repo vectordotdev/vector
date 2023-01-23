@@ -70,7 +70,7 @@ async fn find_entry(message: &str) -> serde_json::value::Value {
         match recent_entries(None)
             .await
             .into_iter()
-            .find(|entry| entry["_raw"].as_str().unwrap_or("").contains(&message))
+            .find(|entry| entry["_raw"].as_str().unwrap_or("").contains(message))
         {
             Some(value) => return value,
             None => std::thread::sleep(std::time::Duration::from_millis(100)),
@@ -429,7 +429,11 @@ async fn splunk_auto_extracted_timestamp() {
 
         event.insert(
             "timestamp",
-            Value::from(Utc.ymd(2020, 3, 5).and_hms(0, 0, 0)),
+            Value::from(
+                Utc.ymd(2020, 3, 5)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp"),
+            ),
         );
 
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
@@ -471,7 +475,11 @@ async fn splunk_non_auto_extracted_timestamp() {
         // With auto_extract_timestamp switched off the timestamp comes from the event timestamp.
         event.insert(
             "timestamp",
-            Value::from(Utc.ymd(2020, 3, 5).and_hms(0, 0, 0)),
+            Value::from(
+                Utc.ymd(2020, 3, 5)
+                    .and_hms_opt(0, 0, 0)
+                    .expect("invalid timestamp"),
+            ),
         );
 
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;

@@ -232,7 +232,8 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 		required:    true
 		type: object: options: {
 			"*": {
-				required: true
+				description: "A type-specific label."
+				required:    true
 				type: string: {}
 			}
 			type: {

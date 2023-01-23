@@ -124,11 +124,13 @@ pub struct JournaldConfig {
     /// A list of sets of field/value pairs to monitor.
     ///
     /// If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
+    #[configurable(metadata(docs::additional_props_description = "A field/value pair."))]
     pub include_matches: Matches,
 
     /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source.
     ///
     /// If `exclude_units` is specified, it will be merged into this list.
+    #[configurable(metadata(docs::additional_props_description = "A field/value pair."))]
     pub exclude_matches: Matches,
 
     /// The directory used to persist file checkpoint positions.
@@ -653,7 +655,12 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
                 .parse::<u64>()
                 .ok()
         })
-        .map(|ts| chrono::Utc.timestamp((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000));
+        .map(|ts| {
+            chrono::Utc
+                .timestamp_opt((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000)
+                .single()
+                .expect("invalid timestamp")
+        });
 
     // Add timestamp.
     match log_namespace {
@@ -1334,7 +1341,7 @@ mod tests {
 
     #[test]
     fn command_options() {
-        let path = PathBuf::from("jornalctl");
+        let path = PathBuf::from("journalctl");
 
         let journal_dir = None;
         let current_boot_only = false;
@@ -1385,7 +1392,12 @@ mod tests {
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
-        Value::Timestamp(chrono::Utc.timestamp(secs, usecs))
+        Value::Timestamp(
+            chrono::Utc
+                .timestamp_opt(secs, usecs)
+                .single()
+                .expect("invalid timestamp"),
+        )
     }
 
     fn priority(event: &Event) -> Value {

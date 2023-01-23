@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
@@ -6,6 +9,7 @@ use glob::{Pattern, PatternError};
 #[cfg(not(windows))]
 use heim::units::ratio::ratio;
 use heim::units::time::second;
+use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_common::internal_event::{
@@ -32,33 +36,35 @@ mod memory;
 mod network;
 
 /// Collector types.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Collector {
-    /// CGroups.
-    #[cfg(target_os = "linux")]
+    /// Metrics related to Linux control groups.
+    ///
+    /// Only available on Linux.
     CGroups,
 
-    /// CPU.
+    /// Metrics related to CPU utilization.
     Cpu,
 
-    /// Disk.
+    /// Metrics related to disk I/O utilization.
     Disk,
 
-    /// Filesystem.
+    /// Metrics related to filesystem space utilization.
     Filesystem,
 
-    /// Load average.
+    /// Metrics related to the system load average.
     Load,
 
-    /// Host.
+    /// Metrics related to the host.
     Host,
 
-    /// Memory.
+    /// Metrics related to memory utilization.
     Memory,
 
-    /// Network.
+    /// Metrics related to network utilization.
     Network,
 }
 
@@ -67,38 +73,45 @@ pub enum Collector {
 #[derive(Clone, Debug, Default)]
 pub(self) struct FilterList {
     /// Any patterns which should be included.
+    ///
+    /// The patterns are matched using globbing.
     includes: Option<Vec<PatternWrapper>>,
 
     /// Any patterns which should be excluded.
+    ///
+    /// The patterns are matched using globbing.
     excludes: Option<Vec<PatternWrapper>>,
 }
 
 /// Configuration for the `host_metrics` source.
+#[serde_as]
 #[configurable_component(source("host_metrics"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct HostMetricsConfig {
     /// The interval between metric gathering, in seconds.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_scrape_interval")]
-    pub scrape_interval_secs: f64,
+    pub scrape_interval_secs: Duration,
 
     /// The list of host metric collector services to use.
     ///
     /// Defaults to all collectors.
+    #[configurable(metadata(docs::examples = "example_collectors()"))]
+    #[derivative(Default(value = "default_collectors()"))]
+    #[serde(default = "default_collectors")]
     pub collectors: Option<Vec<Collector>>,
 
     /// Overrides the default namespace for the metrics emitted by the source.
-    ///
-    /// By default, `host` is used.
     #[derivative(Default(value = "default_namespace()"))]
     #[serde(default = "default_namespace")]
     pub namespace: Option<String>,
 
-    #[cfg(target_os = "linux")]
     #[configurable(derived)]
-    #[serde(default)]
-    pub(crate) cgroups: cgroups::CGroupsConfig,
+    #[derivative(Default(value = "default_cgroups_config()"))]
+    #[serde(default = "default_cgroups_config")]
+    pub cgroups: Option<CGroupsConfig>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -113,12 +126,124 @@ pub struct HostMetricsConfig {
     pub network: network::NetworkConfig,
 }
 
-const fn default_scrape_interval() -> f64 {
-    15.0
+/// Options for the “cgroups” (controller groups) metrics collector.
+///
+/// This collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(default)]
+pub struct CGroupsConfig {
+    /// The number of levels of the cgroups hierarchy for which to report metrics.
+    ///
+    /// A value of `1` means just the root or named cgroup.
+    #[derivative(Default(value = "default_levels()"))]
+    #[serde(default = "default_levels")]
+    #[configurable(metadata(docs::examples = 1))]
+    #[configurable(metadata(docs::examples = 3))]
+    levels: usize,
+
+    /// The base cgroup name to provide metrics for.
+    #[configurable(metadata(docs::examples = "/"))]
+    #[configurable(metadata(docs::examples = "system.slice/snapd.service"))]
+    pub(super) base: Option<PathBuf>,
+
+    /// Lists of cgroup name patterns to include or exclude in gathering
+    /// usage metrics.
+    #[configurable(metadata(docs::examples = "example_cgroups()"))]
+    #[serde(default = "default_all_devices")]
+    groups: FilterList,
+
+    /// Base cgroup directory, for testing use only
+    #[serde(skip_serializing)]
+    #[configurable(metadata(docs::hidden))]
+    base_dir: Option<PathBuf>,
 }
 
-fn default_namespace() -> Option<String> {
+const fn default_scrape_interval() -> Duration {
+    Duration::from_secs(15)
+}
+
+pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
+}
+
+const fn example_collectors() -> [&'static str; 8] {
+    [
+        "cgroups",
+        "cpu",
+        "disk",
+        "filesystem",
+        "load",
+        "host",
+        "memory",
+        "network",
+    ]
+}
+
+fn default_collectors() -> Option<Vec<Collector>> {
+    let mut collectors = vec![
+        Collector::Cpu,
+        Collector::Disk,
+        Collector::Filesystem,
+        Collector::Load,
+        Collector::Host,
+        Collector::Memory,
+        Collector::Network,
+    ];
+
+    #[cfg(target_os = "linux")]
+    {
+        collectors.push(Collector::CGroups);
+    }
+    #[cfg(not(target_os = "linux"))]
+    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+        collectors.push(Collector::CGroups);
+    }
+
+    Some(collectors)
+}
+
+fn example_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["sda".try_into().unwrap()]),
+        excludes: Some(vec!["dm-*".try_into().unwrap()]),
+    }
+}
+
+fn default_all_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["*".try_into().unwrap()]),
+        excludes: None,
+    }
+}
+
+const fn default_levels() -> usize {
+    100
+}
+
+fn example_cgroups() -> FilterList {
+    FilterList {
+        includes: Some(vec!["user.slice/*".try_into().unwrap()]),
+        excludes: Some(vec!["*.service".try_into().unwrap()]),
+    }
+}
+
+fn default_cgroups_config() -> Option<CGroupsConfig> {
+    // Check env variable to allow generating docs on non-linux systems.
+    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+        return Some(CGroupsConfig::default());
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Some(CGroupsConfig::default())
+    }
 }
 
 impl_generate_config_from_default!(HostMetricsConfig);
@@ -127,6 +252,13 @@ impl_generate_config_from_default!(HostMetricsConfig);
 impl SourceConfig for HostMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         init_roots();
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            if self.cgroups.is_some() || self.has_collector(Collector::CGroups) {
+                return Err("CGroups collector is only available on Linux systems".into());
+            }
+        }
 
         let mut config = self.clone();
         config.namespace = config.namespace.filter(|namespace| !namespace.is_empty());
@@ -146,11 +278,11 @@ impl SourceConfig for HostMetricsConfig {
 impl HostMetricsConfig {
     /// Set the interval to collect internal metrics.
     pub fn scrape_interval_secs(&mut self, value: f64) {
-        self.scrape_interval_secs = value;
+        self.scrape_interval_secs = Duration::from_secs_f64(value);
     }
 
     async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
-        let duration = time::Duration::from_secs_f64(self.scrape_interval_secs);
+        let duration = self.scrape_interval_secs;
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
         let generator = HostMetrics::new(self);
@@ -196,7 +328,8 @@ impl HostMetrics {
 
     #[cfg(target_os = "linux")]
     pub fn new(config: HostMetricsConfig) -> Self {
-        let root_cgroup = cgroups::CGroupRoot::new(&config.cgroups);
+        let cgroups = config.cgroups.clone().unwrap_or_default();
+        let root_cgroup = cgroups::CGroupRoot::new(&cgroups);
         Self {
             config,
             root_cgroup,
@@ -269,7 +402,7 @@ impl HostMetrics {
             }
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
-                    message: "Failed to load load average info",
+                    message: "Failed to load average info",
                     error,
                 });
             }
@@ -279,7 +412,7 @@ impl HostMetrics {
     pub async fn host_metrics(&self, output: &mut MetricsBuffer) {
         output.name = "host";
         match heim::host::uptime().await {
-            Ok(time) => output.gauge("uptime", time.get::<second>() as f64, MetricTags::default()),
+            Ok(time) => output.gauge("uptime", time.get::<second>(), MetricTags::default()),
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
                     message: "Failed to load host uptime info",
@@ -289,11 +422,7 @@ impl HostMetrics {
         }
 
         match heim::host::boot_time().await {
-            Ok(time) => output.gauge(
-                "boot_time",
-                time.get::<second>() as f64,
-                MetricTags::default(),
-            ),
+            Ok(time) => output.gauge("boot_time", time.get::<second>(), MetricTags::default()),
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
                     message: "Failed to load host boot time info",
@@ -477,6 +606,14 @@ impl TryFrom<String> for PatternWrapper {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Pattern::new(value.as_ref()).map(PatternWrapper)
+    }
+}
+
+impl TryFrom<&str> for PatternWrapper {
+    type Error = PatternError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        value.to_string().try_into()
     }
 }
 
@@ -772,7 +909,7 @@ pub(self) mod tests {
     #[tokio::test]
     async fn source_compliance() {
         let config = HostMetricsConfig {
-            scrape_interval_secs: 1.0,
+            scrape_interval_secs: Duration::from_secs(1),
             ..Default::default()
         };
 

@@ -59,62 +59,62 @@ enum BuildError {
 pub enum Transforms {
     /// Aggregate.
     #[cfg(feature = "transforms-aggregate")]
-    Aggregate(#[configurable(derived)] aggregate::AggregateConfig),
+    Aggregate(aggregate::AggregateConfig),
 
     /// AWS EC2 metadata.
     #[cfg(feature = "transforms-aws_ec2_metadata")]
-    AwsEc2Metadata(#[configurable(derived)] aws_ec2_metadata::Ec2Metadata),
+    AwsEc2Metadata(aws_ec2_metadata::Ec2Metadata),
 
     /// Dedupe.
     #[cfg(feature = "transforms-dedupe")]
-    Dedupe(#[configurable(derived)] dedupe::DedupeConfig),
+    Dedupe(dedupe::DedupeConfig),
 
     /// Filter.
     #[cfg(feature = "transforms-filter")]
-    Filter(#[configurable(derived)] filter::FilterConfig),
+    Filter(filter::FilterConfig),
 
     /// Log to metric.
-    LogToMetric(#[configurable(derived)] log_to_metric::LogToMetricConfig),
+    LogToMetric(log_to_metric::LogToMetricConfig),
 
     /// Lua.
     #[cfg(feature = "transforms-lua")]
-    Lua(#[configurable(derived)] lua::LuaConfig),
+    Lua(lua::LuaConfig),
 
     /// Metric to log.
     #[cfg(feature = "transforms-metric_to_log")]
-    MetricToLog(#[configurable(derived)] metric_to_log::MetricToLogConfig),
+    MetricToLog(metric_to_log::MetricToLogConfig),
 
     /// Reduce.
     #[cfg(feature = "transforms-reduce")]
-    Reduce(#[configurable(derived)] reduce::ReduceConfig),
+    Reduce(reduce::ReduceConfig),
 
     /// Remap.
     #[cfg(feature = "transforms-remap")]
-    Remap(#[configurable(derived)] remap::RemapConfig),
+    Remap(remap::RemapConfig),
 
     /// Route.
     #[cfg(feature = "transforms-route")]
-    Route(#[configurable(derived)] route::RouteConfig),
+    Route(route::RouteConfig),
 
     /// Sample.
     #[cfg(feature = "transforms-sample")]
-    Sample(#[configurable(derived)] sample::SampleConfig),
+    Sample(sample::SampleConfig),
 
     /// Tag cardinality limit.
     #[cfg(feature = "transforms-tag_cardinality_limit")]
-    TagCardinalityLimit(#[configurable(derived)] tag_cardinality_limit::TagCardinalityLimitConfig),
+    TagCardinalityLimit(tag_cardinality_limit::TagCardinalityLimitConfig),
 
     /// Test (basic).
     #[cfg(test)]
-    TestBasic(#[configurable(derived)] crate::test_util::mock::transforms::BasicTransformConfig),
+    TestBasic(crate::test_util::mock::transforms::BasicTransformConfig),
 
     /// Test (noop).
     #[cfg(test)]
-    TestNoop(#[configurable(derived)] crate::test_util::mock::transforms::NoopTransformConfig),
+    TestNoop(crate::test_util::mock::transforms::NoopTransformConfig),
 
     /// Throttle.
     #[cfg(feature = "transforms-throttle")]
-    Throttle(#[configurable(derived)] throttle::ThrottleConfig),
+    Throttle(throttle::ThrottleConfig),
 }
 
 // We can't use `enum_dispatch` here because it doesn't support associated constants.

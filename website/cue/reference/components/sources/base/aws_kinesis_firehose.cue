@@ -7,9 +7,21 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 
 			AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
 			configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+
+			This option has been deprecated, the `access_keys` option should be used instead.
 			"""
 		required: false
 		type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
+	}
+	access_keys: {
+		description: """
+			An optional list of access keys to authenticate requests against.
+
+			AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
+			configured, `access_keys` should be set to the same value. Otherwise, all requests will be allowed.
+			"""
+		required: false
+		type: array: items: type: string: examples: ["A94A8FE5CCB19BA61C4C08", "B94B8FE5CCB19BA61C4C12"]
 	}
 	acknowledgements: {
 		description: """
@@ -30,7 +42,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 		}
 	}
 	address: {
-		description: "The address to listen for connections on."
+		description: "The socket address to listen for connections on."
 		required:    true
 		type: string: examples: ["0.0.0.0:443", "localhost:443"]
 	}
@@ -192,6 +204,16 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 				none: "Uncompressed."
 			}
 		}
+	}
+	store_access_key: {
+		description: """
+			Whether or not to store the AWS Firehose Access Key in event secrets.
+
+			If set to `true`, when incoming requests contains an Access Key sent by AWS Firehose, it will be kept in the
+			event secrets as "aws_kinesis_firehose_access_key".
+			"""
+		required: true
+		type: bool: {}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

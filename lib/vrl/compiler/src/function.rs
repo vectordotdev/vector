@@ -551,11 +551,11 @@ impl diagnostic::DiagnosticMessage for Error {
                 expr,
             } => vec![
                 Label::primary(
-                    format!(r#"unexpected expression for argument "{}""#, keyword),
+                    format!(r#"unexpected expression for argument "{keyword}""#),
                     Span::default(),
                 ),
                 Label::context(format!("received: {}", expr.as_str()), Span::default()),
-                Label::context(format!("expected: {}", expected), Span::default()),
+                Label::context(format!("expected: {expected}"), Span::default()),
             ],
 
             InvalidEnumVariant {
@@ -564,10 +564,10 @@ impl diagnostic::DiagnosticMessage for Error {
                 variants,
             } => vec![
                 Label::primary(
-                    format!(r#"invalid enum variant for argument "{}""#, keyword),
+                    format!(r#"invalid enum variant for argument "{keyword}""#),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value), Span::default()),
+                Label::context(format!("received: {value}"), Span::default()),
                 Label::context(
                     format!(
                         "expected one of: {}",
@@ -583,7 +583,7 @@ impl diagnostic::DiagnosticMessage for Error {
 
             ExpectedStaticExpression { keyword, expr } => vec![
                 Label::primary(
-                    format!(r#"expected static expression for argument "{}""#, keyword),
+                    format!(r#"expected static expression for argument "{keyword}""#),
                     Span::default(),
                 ),
                 Label::context(format!("received: {}", expr.as_str()), Span::default()),
@@ -594,12 +594,9 @@ impl diagnostic::DiagnosticMessage for Error {
                 value,
                 error,
             } => vec![
-                Label::primary(
-                    format!(r#"invalid argument "{}""#, keyword),
-                    Span::default(),
-                ),
-                Label::context(format!("received: {}", value), Span::default()),
-                Label::context(format!("error: {}", error), Span::default()),
+                Label::primary(format!(r#"invalid argument "{keyword}""#), Span::default()),
+                Label::context(format!("received: {value}"), Span::default()),
+                Label::context(format!("error: {error}"), Span::default()),
             ],
 
             ExpectedFunctionClosure => vec![],
@@ -660,7 +657,7 @@ mod tests {
                 required: false,
             };
 
-            assert_eq!(parameter.kind(), kind, "{}", title);
+            assert_eq!(parameter.kind(), kind, "{title}");
         }
     }
 }

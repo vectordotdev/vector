@@ -152,7 +152,7 @@ async fn parse_invalid_output_targets() {
             value = "any value"
 
           [[tests.outputs]]
-            extract_from = "non-existent"
+            extract_from = "nonexistent"
             [[tests.outputs.conditions]]
               type = "vrl"
               source = ""
@@ -164,7 +164,7 @@ async fn parse_invalid_output_targets() {
         errs,
         vec![indoc! {r#"
             Failed to build test 'broken test':
-              Invalid extract_from target in test 'broken test': 'non-existent' does not exist"#}
+              Invalid extract_from target in test 'broken test': 'nonexistent' does not exist"#}
         .to_owned(),]
     );
 
@@ -178,7 +178,7 @@ async fn parse_invalid_output_targets() {
 
           [[tests]]
             name = "broken test"
-            no_outputs_from = [ "non-existent" ]
+            no_outputs_from = [ "nonexistent" ]
 
           [[tests.inputs]]
             insert_at = "bar"
@@ -191,7 +191,7 @@ async fn parse_invalid_output_targets() {
         errs,
         vec![indoc! {r#"
             Failed to build test 'broken test':
-              Invalid no_outputs_from target in test 'broken test': 'non-existent' does not exist"#}
+              Invalid no_outputs_from target in test 'broken test': 'nonexistent' does not exist"#}
         .to_owned(),]
     );
 }

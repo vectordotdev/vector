@@ -418,6 +418,8 @@ async fn tap_handler(
     feature = "transforms-remap",
 ))]
 mod tests {
+    use std::time::Duration;
+
     use futures::StreamExt;
     use tokio::sync::watch;
 
@@ -573,7 +575,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Json,
                 ..Default::default()
@@ -583,7 +585,7 @@ mod tests {
             "out",
             &["in"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -615,7 +617,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -641,7 +643,7 @@ mod tests {
             "out",
             &["to_metric"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -673,7 +675,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Json,
                 ..Default::default()
@@ -691,7 +693,7 @@ mod tests {
             "out",
             &["transform"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -723,7 +725,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -744,7 +746,7 @@ mod tests {
             "out",
             &["in"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -797,7 +799,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -818,7 +820,7 @@ mod tests {
             "out",
             &["transform"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -855,7 +857,7 @@ mod tests {
         config.add_source(
             "in",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 200,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -878,7 +880,7 @@ mod tests {
             "out",
             &["transform"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },
@@ -919,7 +921,7 @@ mod tests {
         config.add_source(
             "in-test1",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 1,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -931,7 +933,7 @@ mod tests {
         config.add_source(
             "in-test2",
             DemoLogsConfig {
-                interval: 0.01,
+                interval: Duration::from_secs_f64(0.01),
                 count: 1,
                 format: OutputFormat::Shuffle {
                     sequence: false,
@@ -954,7 +956,7 @@ mod tests {
             "out",
             &["transform"],
             BlackholeConfig {
-                print_interval_secs: 1,
+                print_interval_secs: Duration::from_secs(1),
                 rate: None,
                 acknowledgements: Default::default(),
             },

@@ -4,7 +4,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	ack_deadline_seconds: {
 		description: "Deprecated, old name of `ack_deadline_secs`."
 		required:    false
-		type: int: {}
+		type: uint: {}
 	}
 	ack_deadline_secs: {
 		description: """
@@ -13,7 +13,10 @@ base: components: sources: gcp_pubsub: configuration: {
 			Messages that are not acknowledged when this deadline expires may be retransmitted.
 			"""
 		required: false
-		type: int: {}
+		type: uint: {
+			default: 600
+			unit:    "seconds"
+		}
 	}
 	acknowledgements: {
 		description: """
@@ -113,7 +116,10 @@ base: components: sources: gcp_pubsub: configuration: {
 	endpoint: {
 		description: "The endpoint from which to pull data."
 		required:    false
-		type: string: {}
+		type: string: {
+			default: "https://pubsub.googleapis.com"
+			examples: ["https://us-central1-pubsub.googleapis.com"]
+		}
 	}
 	framing: {
 		description: """
@@ -195,6 +201,9 @@ base: components: sources: gcp_pubsub: configuration: {
 			The number of messages in a response to mark a stream as
 			"busy". This is used to determine if more streams should be
 			started.
+
+			The GCP Pub/Sub servers send responses with 100 or more messages when
+			the subscription is busy.
 			"""
 		required: false
 		type: uint: default: 100
@@ -206,7 +215,10 @@ base: components: sources: gcp_pubsub: configuration: {
 			`60`, you may see periodic errors sent from the server.
 			"""
 		required: false
-		type: float: default: 60.0
+		type: float: {
+			default: 60.0
+			unit:    "seconds"
+		}
 	}
 	max_concurrency: {
 		description: "The maximum number of concurrent stream connections to open at once."
@@ -219,7 +231,10 @@ base: components: sources: gcp_pubsub: configuration: {
 			are all busy and so open a new stream.
 			"""
 		required: false
-		type: float: default: 2.0
+		type: float: {
+			default: 2.0
+			unit:    "seconds"
+		}
 	}
 	project: {
 		description: "The project name from which to pull logs."
@@ -234,7 +249,10 @@ base: components: sources: gcp_pubsub: configuration: {
 	retry_delay_secs: {
 		description: "The amount of time, in seconds, to wait between retry attempts after an error."
 		required:    false
-		type: float: {}
+		type: float: {
+			default: 1.0
+			unit:    "seconds"
+		}
 	}
 	skip_authentication: {
 		description: "Skip all authentication handling. For use with integration tests only."

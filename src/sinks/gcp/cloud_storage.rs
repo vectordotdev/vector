@@ -75,6 +75,7 @@ pub struct GcsSinkConfig {
     /// For more information, see [Custom metadata][custom_metadata].
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
+    #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
     metadata: Option<HashMap<String, String>>,
 
     /// A prefix to apply to all object keys.

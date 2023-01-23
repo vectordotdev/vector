@@ -329,7 +329,7 @@ _values: {
 	warnings: [...string] | *[]
 
 	if !required {
-		// `common` specifes that the option is commonly used. It will bring the
+		// `common` specifies that the option is commonly used. It will bring the
 		// option to the top of the documents, surfacing it from other
 		// less common, options.
 		common?: bool

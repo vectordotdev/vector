@@ -305,12 +305,12 @@ impl DiagnosticMessage for Error {
                     .join(": ");
 
                 vec![Label::primary(
-                    format!("regex parse error: {}", error),
+                    format!("regex parse error: {error}"),
                     self.span,
                 )]
             }
             InvalidTimestamp(err) => vec![Label::primary(
-                format!("invalid timestamp format: {}", err),
+                format!("invalid timestamp format: {err}"),
                 self.span,
             )],
 

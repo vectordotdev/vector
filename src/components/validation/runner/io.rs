@@ -89,16 +89,24 @@ impl InputEdge {
         self,
         task_coordinator: &TaskCoordinator<Configuring>,
     ) -> mpsc::Sender<TestEvent> {
-        let (tx, mut rx) = mpsc::channel(1024);
+        let (tx, mut rx) = mpsc::channel::<TestEvent>(1024);
         let started = task_coordinator.track_started();
         let completed = task_coordinator.track_completed();
 
         tokio::spawn(async move {
+            let mut client = self.client;
+
             started.mark_as_done();
 
-            // TODO: Read events from `rx` and send them to the component topology via our Vector
-            // gRPC client that connects to the Vector source.
-            while let Some(_event) = rx.recv().await {}
+            while let Some(test_event) = rx.recv().await {
+                let request = PushEventsRequest {
+                    events: vec![test_event.into_event().into()],
+                };
+
+                if let Err(e) = client.push_events(request).await {
+                    error!(error = ?e, "Failed to send input event to controlled input edge.");
+                }
+            }
 
             completed.mark_as_done();
         });

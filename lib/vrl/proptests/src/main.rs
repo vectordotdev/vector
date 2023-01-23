@@ -93,7 +93,7 @@ prop_compose! {
 prop_compose! {
     fn timestamp_literal() (secs in 0..i64::MAX) -> Literal {
         use chrono::{Utc, TimeZone};
-        Literal::Timestamp(Utc.timestamp(secs, 0).to_string())
+        Literal::Timestamp(Utc.timestamp_opt(secs, 0).single().expect("invalid timestamp").to_string())
     }
 }
 

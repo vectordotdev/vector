@@ -66,14 +66,14 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             impl #impl_generics ::vector_config::Configurable for #name #ty_generics #where_clause {
                 fn referenceable_name() -> Option<&'static str> {
                     // If the type name we get back from `std::any::type_name` doesn't start with
-                    // the module path, use a concatentated version.
+                    // the module path, use a concatenated version.
                     //
                     // We do this because `std::any::type_name` states it may or may not return a
                     // fully-qualified type path, as that behavior is not stabilized, so we want to
                     // avoid using non-fully-qualified paths since we might encounter collisions
                     // with schema reference names otherwise.
                     //
-                    // The reason we don't _only_ use the manually-concatentated version is because
+                    // The reason we don't _only_ use the manually-concatenated version is because
                     // it's a little difficult to get it to emit a clean name, as we can't emit
                     // pretty-printed tokens directly -- i.e. just emit the tokens that represent
                     // `MyStructName<T, U, ...>` -- and would need to format the string to do so,
@@ -167,14 +167,13 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
 
     let spanned_generate_schema = quote_spanned! {field.span()=>
-        ::vector_config::schema::get_or_generate_schema(schema_gen, #field_metadata_ref.as_subschema())?
+        ::vector_config::schema::get_or_generate_schema(schema_gen, #field_metadata_ref)?
     };
 
     quote! {
         #field_metadata
 
         let mut subschema = #spanned_generate_schema;
-        ::vector_config::schema::apply_metadata(&mut subschema, #field_metadata_ref);
     }
 }
 
@@ -418,38 +417,6 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     // definition attached to that identifier will carry the field type's metadata. Any metadata
     // specified on the field itself should live solely on the field's schema (which can exist
     // alongside the schema reference) and vice versa.
-    //
-    // Conflating factors: transparent fields, derived fields, and flattened fields.
-    //
-    // For transparent fields -- where we're _explicitly_ opting out of requiring a
-    // title/description -- there's nothing to do except set the transparent flag on the field
-    // metadata, so that the schema generation code doesn't panic and yell at us about a missing
-    // description.
-    //
-    // For derived fields -- where we're _explictly_ stating that our title/description should come
-    // from the field type itself -- we don't necessarily need to have a title/description on the
-    // field's schema, because it can come from the referenced schema as part of schema processing.
-    // What we do need to do, however, is make sure the schema generation code, similar to
-    // `transparent`, doesn't yell at us that our field is missing a title/description. Thus, we
-    // also set the transparent flag on the field metadata.
-    //
-    // For flattened fields -- where we're taking a schema for a struct, etc, and replacing a single
-    // field with all of the fields in the struct itself -- we're in a similar situation as we are
-    // with derived fields. The struct we're flattening will by definition have to have a
-    // description present, but because we generate the schema on a per-field basis, and then
-    // flatten (merge) the schemas at the end of the schema generation step, we also hit the same
-    // logic/checks that yell at us if no description is present... unless the transparent flag is
-    // set, so we also set the transparent flag on the field metadata.
-    //
-    // We now come to the required logic:
-    //
-    // - if the field's type is referenceable, we start with an empty `Metadata` object, otherwise we
-    //   start with the output from `<T as Configurable>::metadata()`
-    // - if this field is transparent, we set the transparent flag
-    // - if this field is derived or flattened, we don't set the transparent flag, as when we
-    //   generate the schema for the field type, we'll check _then_ to see if the field type's
-    //   schema has a description defined... if it doesn't, and the field schema doesn't have a
-    //   description defined, _then_ we'll panic
     let spanned_metadata = quote_spanned! {field.span()=>
         if <#field_schema_ty as ::vector_config::Configurable>::referenceable_name().is_none() {
             <#field_schema_ty as ::vector_config::Configurable>::metadata()
@@ -1025,7 +992,7 @@ fn generate_enum_variant_subschema(
 /// Sometimes, however, we must refer to them with their disambiguated form: `T::<...>`. This is due
 /// to a limitation in syntax parsing between types in statement versus expression position.
 ///
-/// Statement position would be somehwere like declaring a field on a struct, where using angle
+/// Statement position would be somewhere like declaring a field on a struct, where using angle
 /// brackets has no ambiguous meaning, as you can't compare two items as part of declaring a struct
 /// field. Conversely, expression position implies anywhere we could normally provide an expression,
 /// and expressions can certainly contain comparisons. As such, we need to use the disambiguated
