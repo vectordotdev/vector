@@ -20,8 +20,13 @@ base: components: sources: fluent: configuration: {
 		}
 	}
 	address: {
-		description: "The socket address to listen for connections on."
-		required:    true
+		description: """
+			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+			systemd socket activation.
+
+			If a socket address is used, it _must_ include a port.
+			"""
+		required: true
 		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
@@ -47,7 +52,7 @@ base: components: sources: fluent: configuration: {
 		required: false
 		type: uint: {
 			examples: [
-				"65536",
+				65536,
 			]
 			unit: "bytes"
 		}

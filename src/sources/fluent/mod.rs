@@ -39,7 +39,7 @@ use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentT
 #[configurable_component(source("fluent"))]
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
-    /// The socket address to listen for connections on.
+    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
@@ -53,7 +53,7 @@ pub struct FluentConfig {
     ///
     /// This generally should not need to be changed.
     #[configurable(metadata(docs::type_unit = "bytes"))]
-    #[configurable(metadata(docs::examples = "65536"))]
+    #[configurable(metadata(docs::examples = 65536))]
     receive_buffer_bytes: Option<usize>,
 
     #[configurable(derived)]
