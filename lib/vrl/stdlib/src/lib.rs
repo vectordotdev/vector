@@ -260,6 +260,8 @@ mod replace;
 mod reverse_dns;
 #[cfg(feature = "round")]
 mod round;
+#[cfg(feature = "seahash")]
+mod seahash;
 #[cfg(feature = "set")]
 mod set;
 #[cfg(feature = "sha1")]
@@ -549,6 +551,8 @@ pub use replace::Replace;
 pub use reverse_dns::ReverseDns;
 #[cfg(feature = "round")]
 pub use round::Round;
+#[cfg(feature = "seahash")]
+pub use seahash::Seahash;
 #[cfg(feature = "set")]
 pub use set::Set;
 #[cfg(feature = "sha2")]
@@ -850,6 +854,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ReverseDns),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "seahash")]
+        Box::new(Seahash),
         #[cfg(feature = "set")]
         Box::new(Set),
         #[cfg(feature = "sha1")]
