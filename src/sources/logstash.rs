@@ -39,7 +39,7 @@ use crate::{
 #[configurable_component(source("logstash"))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
-    /// The socket address to listen for connections on.
+    #[configurable(derived)]
     address: SocketListenAddr,
 
     #[configurable(derived)]
@@ -52,6 +52,7 @@ pub struct LogstashConfig {
     ///
     /// This generally should not need to be changed.
     #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
