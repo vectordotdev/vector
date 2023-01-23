@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::time::Duration;
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
@@ -136,7 +137,7 @@ impl SourceConfig for LogstashConfig {
             legacy_host_key_path: parse_value_path(log_schema().host_key()).ok(),
             log_namespace,
         };
-        let shutdown_secs = 30;
+        let shutdown_secs = Duration::from_secs(30);
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
         let tls_client_metadata_key = self
             .tls

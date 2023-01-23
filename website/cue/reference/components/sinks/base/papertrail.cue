@@ -154,7 +154,7 @@ base: components: sinks: papertrail: configuration: {
 		type: object: options: time_secs: {
 			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	process: {

@@ -5,10 +5,7 @@ base: components: sources: syslog: configuration: {
 		description:   "The socket address to listen for connections on."
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: {
-			number: {}
-			string: {}
-		}
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
@@ -37,7 +34,7 @@ base: components: sources: syslog: configuration: {
 		type: object: options: time_secs: {
 			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	max_length: {

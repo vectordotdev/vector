@@ -22,10 +22,7 @@ base: components: sources: fluent: configuration: {
 	address: {
 		description: "The socket address to listen for connections on."
 		required:    true
-		type: {
-			number: {}
-			string: {}
-		}
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
 		description: "The maximum number of TCP connections that will be allowed at any given time."
@@ -38,7 +35,7 @@ base: components: sources: fluent: configuration: {
 		type: object: options: time_secs: {
 			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	receive_buffer_bytes: {

@@ -66,7 +66,7 @@ components: sources: fluent: {
 			required:      false
 			type: uint: {
 				default: null
-				unit:    "concurrency"
+				unit:    "connections"
 			}
 		}
 	}
