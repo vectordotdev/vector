@@ -1,15 +1,8 @@
-use std::{collections::BTreeMap, env, fs::File, io::Read as _};
+use std::env;
 
-use anyhow::{Context, Result};
-use serde::Deserialize;
-use serde_json::Value;
+use anyhow::Result;
 
-use crate::app;
-
-#[derive(Deserialize)]
-struct CargoToml {
-    features: BTreeMap<String, Value>,
-}
+use crate::{app, util::CargoToml};
 
 const CARGO: &str = "cargo";
 const BASE_ARGS: [&str; 5] = [
@@ -68,13 +61,7 @@ impl Cli {
 }
 
 fn extract_features() -> Result<Vec<String>> {
-    let mut text = String::new();
-    File::open("Cargo.toml")
-        .context("Could not open `Cargo.toml`")?
-        .read_to_string(&mut text)
-        .context("Could not read `Cargo.toml`")?;
-    Ok(toml::from_str::<CargoToml>(&text)
-        .context("Could not parse `Cargo.toml`")?
+    Ok(CargoToml::load()?
         .features
         .into_keys()
         .filter(|feature| {
