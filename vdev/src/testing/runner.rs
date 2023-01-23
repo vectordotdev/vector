@@ -62,11 +62,11 @@ pub enum RunnerState {
     Unknown,
 }
 
-pub fn get_agent_test_runner(container: bool, rust_version: String) -> Box<dyn TestRunner> {
+pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
     if container {
-        Box::new(DockerTestRunner::new(rust_version))
+        Ok(Box::new(DockerTestRunner::new()?))
     } else {
-        Box::new(LocalTestRunner::new())
+        Ok(Box::new(LocalTestRunner::new()))
     }
 }
 
@@ -300,8 +300,9 @@ pub struct DockerTestRunner {
 }
 
 impl DockerTestRunner {
-    pub fn new(rust_version: String) -> Self {
-        Self { rust_version }
+    pub fn new() -> Result<Self> {
+        let rust_version = RustToolchainConfig::parse()?.channel;
+        Ok(Self { rust_version })
     }
 }
 
