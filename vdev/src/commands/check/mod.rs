@@ -1,7 +1,7 @@
 crate::cli_subcommands! {
     "Check parts of the Vector code base"
     component_docs,
-    component_features,
+    mod component_features,
     mod deny,
     docs,
     events,
@@ -17,11 +17,6 @@ crate::cli_subcommands! {
 crate::script_wrapper! {
     component_docs = "Check component documentation is up-to-date"
         => "check-component-docs.sh"
-}
-
-crate::script_wrapper! {
-    component_features = "Check that all component features are set up properly"
-        => "check-component-features"
 }
 
 crate::script_wrapper! {
