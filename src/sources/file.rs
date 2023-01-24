@@ -1499,7 +1499,7 @@ mod tests {
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 ignore_checkpoints: Some(true),
-                read_from: Some(ReadFromConfig::Beginning),
+                read_from: ReadFromConfig::Beginning,
                 ..test_default_file_config(&dir)
             };
             let received = run_file_source(&config, false, acking, LogNamespace::Legacy, async {
