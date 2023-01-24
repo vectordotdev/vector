@@ -45,6 +45,7 @@ pub struct SyslogConfig {
     ///
     /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     max_length: usize,
 
     /// Overrides the name of the log field used to add the peer host to each event.
@@ -71,7 +72,10 @@ pub struct SyslogConfig {
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        /// The socket address to listen for connections on.
+        /// The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+        /// systemd socket activation.
+        ///
+        /// If a socket address is used, it _must_ include a port.
         address: SocketListenAddr,
 
         #[configurable(derived)]
@@ -83,6 +87,7 @@ pub enum Mode {
         /// The size, in bytes, of the receive buffer used for each connection.
         ///
         /// This should not typically needed to be changed.
+        #[configurable(metadata(docs::type_unit = "bytes"))]
         receive_buffer_bytes: Option<usize>,
 
         /// The maximum number of TCP connections that will be allowed at any given time.
@@ -97,6 +102,7 @@ pub enum Mode {
         /// The size, in bytes, of the receive buffer used for the listening socket.
         ///
         /// This should not typically needed to be changed.
+        #[configurable(metadata(docs::type_unit = "bytes"))]
         receive_buffer_bytes: Option<usize>,
     },
 
@@ -106,6 +112,7 @@ pub enum Mode {
         /// The Unix socket path.
         ///
         /// This should be an absolute path.
+        #[configurable(metadata(docs::examples = "/path/to/socket"))]
         path: PathBuf,
 
         /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
