@@ -53,17 +53,17 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: unit: "bytes"
+				type: uint: {}
 			}
 			max_events: {
-				description: "The maximum size of a batch before it is flushed."
+				description: "The maximum size of a batch, in events, before it is flushed."
 				required:    false
-				type: uint: unit: "events"
+				type: uint: {}
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch before it is flushed."
+				description: "The maximum age of a batch, in seconds, before it is flushed."
 				required:    false
-				type: float: unit: "seconds"
+				type: float: {}
 			}
 		}
 	}

@@ -31,13 +31,11 @@ base: components: sinks: socket: configuration: {
 		description: """
 			The address to connect to.
 
-			Both IP address and hostname are accepted formats.
-
 			The address _must_ include a port.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: string: examples: ["92.12.333.224:5000", "https://somehost:5000"]
+		type: string: {}
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -213,22 +211,17 @@ base: components: sinks: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix\""
 		required:      true
-		type: string: examples: ["/path/to/socket"]
+		type: string: {}
 	}
 	send_buffer_bytes: {
 		description: """
-			The size of the socket's send buffer.
+			The size, in bytes, of the socket's send buffer.
 
 			If set, the value of the setting is passed via the `SO_SNDBUF` option.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: uint: {
-			examples: [
-				65536,
-			]
-			unit: "bytes"
-		}
+		type: uint: {}
 	}
 	tls: {
 		description:   "Configures the TLS options for incoming/outgoing connections."

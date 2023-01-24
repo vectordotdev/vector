@@ -31,13 +31,11 @@ base: components: sinks: statsd: configuration: {
 		description: """
 			The address to connect to.
 
-			Both IP address and hostname are accepted formats.
-
 			The address _must_ include a port.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: string: examples: ["92.12.333.224:5000", "https://somehost:5000"]
+		type: string: {}
 	}
 	batch: {
 		description:   "Event batching behavior."
@@ -52,17 +50,17 @@ base: components: sinks: statsd: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: unit: "bytes"
+				type: uint: {}
 			}
 			max_events: {
-				description: "The maximum size of a batch before it is flushed."
+				description: "The maximum size of a batch, in events, before it is flushed."
 				required:    false
-				type: uint: unit: "events"
+				type: uint: {}
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch before it is flushed."
+				description: "The maximum age of a batch, in seconds, before it is flushed."
 				required:    false
-				type: float: unit: "seconds"
+				type: float: {}
 			}
 		}
 	}
@@ -74,7 +72,7 @@ base: components: sinks: statsd: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: examples: ["service"]
+		type: string: {}
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
@@ -103,22 +101,17 @@ base: components: sinks: statsd: configuration: {
 			"""
 		relevant_when: "mode = \"unix\""
 		required:      true
-		type: string: examples: ["/path/to/socket"]
+		type: string: {}
 	}
 	send_buffer_bytes: {
 		description: """
-			The size of the socket's send buffer.
+			The size, in bytes, of the socket's send buffer.
 
 			If set, the value of the setting is passed via the `SO_SNDBUF` option.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: uint: {
-			examples: [
-				65536,
-			]
-			unit: "bytes"
-		}
+		type: uint: {}
 	}
 	tls: {
 		description:   "Configures the TLS options for incoming/outgoing connections."

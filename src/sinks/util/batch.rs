@@ -1,7 +1,6 @@
 use std::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 
 use derivative::Derivative;
-use serde_with::serde_as;
 use snafu::Snafu;
 use vector_config::configurable_component;
 use vector_core::stream::BatcherSettings;
@@ -100,7 +99,6 @@ pub struct Unmerged;
 // derives from the consts in `D`? I think _that_ might work... but we don't pull up per-field
 // defaults to the callsite of whatever is using `BatchConfig`, IIRC, so we wouldn't actually show
 // the default value at the callsite? Hmph.
-#[serde_as]
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BatchConfig<D: SinkBatchSettings + Clone, S = Unmerged>
@@ -111,15 +109,12 @@ where
     ///
     /// This is based on the uncompressed size of the batched events, before they are
     /// serialized / compressed.
-    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_bytes: Option<usize>,
 
-    /// The maximum size of a batch before it is flushed.
-    #[configurable(metadata(docs::type_unit = "events"))]
+    /// The maximum size of a batch, in events, before it is flushed.
     pub max_events: Option<usize>,
 
-    /// The maximum age of a batch before it is flushed.
-    #[configurable(metadata(docs::type_unit = "seconds"))]
+    /// The maximum age of a batch, in seconds, before it is flushed.
     pub timeout_secs: Option<f64>,
 
     #[serde(skip)]
