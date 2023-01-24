@@ -16,11 +16,6 @@ components: sinks: pulsar: {
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
-			batch: {
-				enabled:    true
-				common:     true
-				batch_size: null
-			}
 			compression: {
 				enabled: true
 				default: "none"
