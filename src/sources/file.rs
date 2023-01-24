@@ -136,8 +136,10 @@ pub struct FileConfig {
 
     /// The directory used to persist file checkpoint positions.
     ///
-    /// By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
+    /// By default, the global `data_dir` option is used. Make sure the running user has write
+    /// permissions to this directory.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "/var/local/lib/vector/"))]
     pub data_dir: Option<PathBuf>,
 
     /// Enables adding the file offset to each event and sets the name of the log field used.

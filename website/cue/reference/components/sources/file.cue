@@ -15,7 +15,7 @@ components: sources: file: {
 	}
 
 	features: {
-		auto_generated: true
+		auto_generated:   true
 		acknowledgements: true
 		collect: {
 			checkpoint: enabled: true
