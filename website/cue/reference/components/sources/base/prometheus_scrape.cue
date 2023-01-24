@@ -50,11 +50,9 @@ base: components: sources: prometheus_scrape: configuration: {
 	}
 	endpoint_tag: {
 		description: """
-			Overrides the name of the tag used to add the endpoint to each metric.
+			The tag name added to each event representing the scraped instance's endpoint.
 
 			The tag value will be the endpoint of the scraped instance.
-
-			By default, `"endpoint"` is used.
 			"""
 		required: false
 		type: string: {}
@@ -62,7 +60,7 @@ base: components: sources: prometheus_scrape: configuration: {
 	endpoints: {
 		description: "Endpoints to scrape metrics from."
 		required:    true
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["http://localhost:9090/metrics"]
 	}
 	honor_labels: {
 		description: """
@@ -78,11 +76,9 @@ base: components: sources: prometheus_scrape: configuration: {
 	}
 	instance_tag: {
 		description: """
-			Overrides the name of the tag used to add the instance to each metric.
+			The tag name added to each event representing the scraped instance's host:port.
 
 			The tag value will be the host/port of the scraped instance.
-
-			By default, `"instance"` is used.
 			"""
 		required: false
 		type: string: {}
@@ -96,14 +92,19 @@ base: components: sources: prometheus_scrape: configuration: {
 			scraping the `/federate` endpoint.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "A query string parameter."
-			required:    true
-			type: array: items: type: string: {}
+		type: object: {
+			examples: [{
+				"match[]": ["{job=\"somejob\"}", "{__name__=~\"job:.*\"}"]
+			}]
+			options: "*": {
+				description: "A query string parameter."
+				required:    true
+				type: array: items: type: string: {}
+			}
 		}
 	}
 	scrape_interval_secs: {
-		description: "The interval between scrapes."
+		description: "The interval between scrapes, in seconds."
 		required:    false
 		type: uint: {
 			default: 15
