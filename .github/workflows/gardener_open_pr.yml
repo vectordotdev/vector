@@ -1,6 +1,7 @@
 # Add new pull requests to Gardener project board for triage
 
-pull_request:
+on:
+  pull_request:
     types:
       - opened
 
