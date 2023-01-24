@@ -20,7 +20,9 @@ impl Cli {
                 let entries = IntegrationTestConfig::collect_all()?;
                 let width = entries
                     .keys()
-                    .fold(0, |width, entry| width.max(entry.len()));
+                    .fold(16, |width, entry| width.max(entry.len()));
+                println!("{:width$}  Environment Name(s)", "Integration Name");
+                println!("{:width$}  -------------------", "----------------");
                 for (integration, config) in entries {
                     let envs_dir = state::EnvsDir::new(&integration);
                     let active_envs = envs_dir.list_active()?;
