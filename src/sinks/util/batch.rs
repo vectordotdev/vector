@@ -86,20 +86,9 @@ pub struct Merged;
 pub struct Unmerged;
 
 /// Event batching behavior.
-// TODO: We should/could probably derive the impl of `Configurable` such that it uses `D` to get the
-// default batch settings, since we'll need an effective way to encode different defaults for the
-// various sinks. Sort of middleground between "define defaults per-field" and "this type has its
-// own default" but I don't think it will end up being too messy.
-//
-// Differently, maybe we just write a custom `Default` implementation for `BatchConfig` such that it
-// extracts the actual default values from `D`? What gets tricky there is there is that users would
-// need to specify `#[serde(default)]` for that default value to get pulled up correctly, whereas
-// the custom `Configurable` implementation does that automatically for us.
-//
-// Thinking even _more_ about it, maybe we could actually just define a per-field default here that
-// derives from the consts in `D`? I think _that_ might work... but we don't pull up per-field
-// defaults to the callsite of whatever is using `BatchConfig`, IIRC, so we wouldn't actually show
-// the default value at the callsite? Hmph.
+// NOTE: the default values are extracted from the consts in `D`. This generates correct defaults
+// in automatic cue docs generation. Implementations of `SinkBatchSettings` should not specify
+// defaults, since that is satisfied here.
 #[serde_as]
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
@@ -111,14 +100,17 @@ where
     ///
     /// This is based on the uncompressed size of the batched events, before they are
     /// serialized / compressed.
+    #[serde(default = "default_max_bytes::<D>")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_bytes: Option<usize>,
 
     /// The maximum size of a batch before it is flushed.
+    #[serde(default = "default_max_events::<D>")]
     #[configurable(metadata(docs::type_unit = "events"))]
     pub max_events: Option<usize>,
 
     /// The maximum age of a batch before it is flushed.
+    #[serde(default = "default_timeout::<D>")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     pub timeout_secs: Option<f64>,
 
@@ -126,6 +118,18 @@ where
     _d: PhantomData<D>,
     #[serde(skip)]
     _s: PhantomData<S>,
+}
+
+fn default_max_bytes<D: SinkBatchSettings>() -> Option<usize> {
+    D::MAX_BYTES
+}
+
+fn default_max_events<D: SinkBatchSettings>() -> Option<usize> {
+    D::MAX_EVENTS
+}
+
+fn default_timeout<D: SinkBatchSettings>() -> Option<f64> {
+    Some(D::TIMEOUT_SECS)
 }
 
 impl<D: SinkBatchSettings + Clone> BatchConfig<D, Unmerged> {
