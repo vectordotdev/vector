@@ -163,7 +163,7 @@ components: sources: aws_kinesis_firehose: {
 					  event = del(value.log_events)
 					  value |= event
 					  message = string!(del(.message))
-					  merge(value, object!(parse_json!(message))
+					  merge(value, object!(parse_json!(message)))
 					}
 					'''
 
