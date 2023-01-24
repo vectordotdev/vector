@@ -15,6 +15,7 @@ components: sources: splunk_hec: {
 	}
 
 	features: {
+		auto_generated: true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
