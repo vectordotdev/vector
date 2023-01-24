@@ -50,9 +50,10 @@ pub struct PrometheusScrapeConfig {
     endpoints: Vec<String>,
 
     /// The interval between scrapes, in seconds.
-    #[serde(default = "default_scrape_interval_secs")]
+    #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    scrape_interval_secs: Duration,
+    #[serde(rename = "scrape_interval_secs")]
+    interval: Duration,
 
     /// The tag name added to each event representing the scraped instance's host:port.
     ///
@@ -100,7 +101,7 @@ fn query_example() -> serde_json::Value {
 }
 
 /// The default interval to call the http endpoint if none is configured.
-pub(crate) const fn default_scrape_interval_secs() -> Duration {
+pub(crate) const fn default_interval() -> Duration {
     Duration::from_secs(15)
 }
 
@@ -108,7 +109,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
-            scrape_interval_secs: default_scrape_interval_secs(),
+            interval: default_interval(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -139,7 +140,7 @@ impl SourceConfig for PrometheusScrapeConfig {
 
         let inputs = GenericHttpClientInputs {
             urls,
-            interval_secs: self.scrape_interval_secs.as_secs(),
+            interval_secs: self.interval.as_secs(),
             headers: HashMap::new(),
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
@@ -343,7 +344,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: Duration::from_secs(1),
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -376,7 +377,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: Duration::from_secs(1),
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -427,7 +428,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: Duration::from_secs(1),
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -492,7 +493,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: Duration::from_secs(1),
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -547,7 +548,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
-            scrape_interval_secs: Duration::from_secs(1),
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -660,7 +661,7 @@ mod test {
                 endpoint_tag: None,
                 honor_labels: false,
                 query: HashMap::new(),
-                scrape_interval_secs: Duration::from_secs(1),
+                interval: Duration::from_secs(1),
                 tls: None,
                 auth: None,
             },
@@ -745,7 +746,7 @@ mod integration_tests {
     async fn scrapes_metrics() {
         let config = PrometheusScrapeConfig {
             endpoints: vec!["http://localhost:9090/metrics".into()],
-            scrape_interval_secs: Duration::from_secs(1),
+            interval: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
