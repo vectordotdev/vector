@@ -44,14 +44,27 @@ enum BuildError {
 pub struct NatsSourceConfig {
     /// The NATS URL to connect to.
     ///
-    /// The URL must take the form of `nats://server:port`.
+    /// The URL takes the form of `nats://server:port`.
+    /// If the port is not specified it defaults to 4222.
+    #[configurable(metadata(docs::examples = "nats://demo.nats.io"))]
+    #[configurable(metadata(docs::examples = "nats://127.0.0.1:4242"))]
     url: String,
 
-    /// A name assigned to the NATS connection.
+    /// A [name][nats_connection_name] assigned to the NATS connection.
+    ///
+    /// [nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
     #[serde(alias = "name")]
+    #[configurable(metadata(docs::examples = "vector"))]
     connection_name: String,
 
-    /// The NATS subject to pull messages from.
+    /// The NATS [subject][nats_subject] to pull messages from.
+    ///
+    /// [nats_subject]: https://docs.nats.io/nats-concepts/subjects
+    #[configurable(metadata(docs::examples = "foo"))]
+    #[configurable(metadata(docs::examples = "time.us.east"))]
+    #[configurable(metadata(docs::examples = "time.*.east"))]
+    #[configurable(metadata(docs::examples = "time.>"))]
+    #[configurable(metadata(docs::examples = ">"))]
     subject: String,
 
     /// NATS Queue Group to join.
