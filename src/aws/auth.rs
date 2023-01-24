@@ -56,9 +56,11 @@ pub enum AwsAuthentication {
     /// Authenticate using a fixed access key and secret pair.
     AccessKey {
         /// The AWS access key ID.
+        #[configurable(metadata(docs::examples = "AKIAIOSFODNN7EXAMPLE"))]
         access_key_id: SensitiveString,
 
         /// The AWS secret access key.
+        #[configurable(metadata(docs::examples = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))]
         secret_access_key: SensitiveString,
     },
 
@@ -67,9 +69,11 @@ pub enum AwsAuthentication {
     /// Additionally, the specific credential profile to use can be set.
     File {
         /// Path to the credentials file.
+        #[configurable(metadata(docs::examples = "/my/aws/credentials"))]
         credentials_file: String,
 
         /// The credentials profile to use.
+        #[configurable(metadata(docs::examples = "develop"))]
         profile: Option<String>,
     },
 
@@ -78,9 +82,11 @@ pub enum AwsAuthentication {
         /// The ARN of an [IAM role][iam_role] to assume.
         ///
         /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+        #[configurable(metadata(docs::examples = "arn:aws:iam::123456789098:role/my_role"))]
         assume_role: String,
 
         /// Timeout for assuming the role, in seconds.
+        #[configurable(metadata(docs::examples = 30))]
         load_timeout_secs: Option<u64>,
 
         /// Configuration for authenticating with AWS through IMDS.
@@ -91,6 +97,7 @@ pub enum AwsAuthentication {
         ///
         /// If not set, this will default to the configured region
         /// for the service itself.
+        #[configurable(metadata(docs::examples = "us-west-2"))]
         region: Option<String>,
     },
 
@@ -98,6 +105,7 @@ pub enum AwsAuthentication {
     #[derivative(Default)]
     Default {
         /// Timeout for successfully loading any credentials, in seconds.
+        #[configurable(metadata(docs::examples = 30))]
         load_timeout_secs: Option<u64>,
 
         /// Configuration for authenticating with AWS through IMDS.

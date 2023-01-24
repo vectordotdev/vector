@@ -34,7 +34,7 @@ pub enum Compression {
     /// The compression scheme of the object is determined from its `Content-Encoding` and
     /// `Content-Type` metadata, as well as the key suffix (for example, `.gz`).
     ///
-    /// It is set to 'none' if the compression scheme cannot be determined.
+    /// It is set to `none` if the compression scheme cannot be determined.
     #[derivative(Default)]
     Auto,
     /// Uncompressed.
@@ -96,6 +96,7 @@ pub struct AwsS3Config {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
+    #[configurable(derived)]
     multiline: Option<MultilineConfig>,
 
     #[configurable(derived)]

@@ -48,7 +48,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "The AWS access key ID."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
 			}
 			assume_role: {
 				description: """
@@ -58,13 +58,13 @@ base: components: sinks: elasticsearch: configuration: {
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
 			}
 			credentials_file: {
 				description:   "Path to the credentials file."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["/my/aws/credentials"]
 			}
 			imds: {
 				description:   "Configuration for authenticating with AWS through IMDS."
@@ -98,7 +98,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "Timeout for successfully loading any credentials, in seconds."
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: uint: {}
+				type: uint: examples: [30]
 			}
 			password: {
 				description:   "Basic authentication password."
@@ -110,7 +110,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "The credentials profile to use."
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: {}
+				type: string: examples: ["develop"]
 			}
 			region: {
 				description: """
@@ -121,13 +121,13 @@ base: components: sinks: elasticsearch: configuration: {
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: {}
+				type: string: examples: ["us-west-2"]
 			}
 			secret_access_key: {
 				description:   "The AWS secret access key."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 			strategy: {
 				description: "The authentication strategy to use."
@@ -150,14 +150,18 @@ base: components: sinks: elasticsearch: configuration: {
 		required:    false
 		type: object: options: {
 			endpoint: {
-				description: "The API endpoint of the service."
+				description: "Custom endpoint for use with AWS-compatible services."
 				required:    false
-				type: string: {}
+				type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 			}
 			region: {
-				description: "The AWS region to use."
-				required:    false
-				type: string: {}
+				description: """
+					The [AWS region][aws_region] to use.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+					"""
+				required: false
+				type: string: examples: ["us-east-1"]
 			}
 		}
 	}
