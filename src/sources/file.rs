@@ -1376,7 +1376,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                file_key: Some(OptionalValuePath::from(owned_value_path!("source"))),
+                file_key: OptionalValuePath::from(owned_value_path!("source")),
                 ..test_default_file_config(&dir)
             };
 
@@ -1404,7 +1404,6 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                file_key: None,
                 ..test_default_file_config(&dir)
             };
 
@@ -1424,6 +1423,10 @@ mod tests {
             assert_eq!(
                 received[0].as_log().keys().unwrap().collect::<HashSet<_>>(),
                 vec![
+                    default_file_key()
+                        .path
+                        .expect("file key to exist")
+                        .to_string(),
                     log_schema().host_key().to_string(),
                     log_schema().message_key().to_string(),
                     log_schema().timestamp_key().to_string(),
