@@ -15,7 +15,7 @@ remap: functions: sha1: {
 		},
 	]
 	internal_failure_reasons: []
-	return: types: ["integer"]
+	return: types: ["string"]
 
 	examples: [
 		{

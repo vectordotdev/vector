@@ -16,7 +16,7 @@ remap: functions: seahash: {
 		},
 	]
 	internal_failure_reasons: []
-	return: types: ["string"]
+	return: types: ["integer"]
 
 	examples: [
 		{
