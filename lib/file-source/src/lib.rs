@@ -48,6 +48,12 @@ pub enum ReadFromConfig {
     End,
 }
 
+impl Default for ReadFromConfig {
+    fn default() -> Self {
+        Self::Beginning
+    }
+}
+
 impl From<ReadFromConfig> for ReadFrom {
     fn from(rfc: ReadFromConfig) -> Self {
         match rfc {

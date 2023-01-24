@@ -12,7 +12,6 @@ use file_source::{
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use regex::bytes::Regex;
-use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
@@ -68,7 +67,6 @@ enum BuildError {
 }
 
 /// Configuration for the `file` source.
-#[serde_as]
 #[configurable_component(source("file"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -89,6 +87,8 @@ pub struct FileConfig {
     /// Overrides the name of the log field used to add the file path to each event.
     ///
     /// The value will be the full path to the file where the event was read message.
+    ///
+    /// Set to `""` to suppress this key.
     #[serde(default = "default_file_key")]
     #[configurable(metadata(docs::examples = "path"))]
     pub file_key: OptionalValuePath,
@@ -109,14 +109,14 @@ pub struct FileConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub read_from: Option<ReadFromConfig>,
+    pub read_from: ReadFromConfig,
 
     /// Ignore files with a data modification date older than the specified number of seconds.
     #[serde(alias = "ignore_older", default)]
-    #[configurable(metadata(docs::examples = "example_seconds()"))]
+    #[configurable(metadata(docs::examples = 600))]
     pub ignore_older_secs: Option<u64>,
 
-    /// The maximum number of bytes a line can contain before being discarded.
+    /// The maximum size of a line before it will be discarded.
     ///
     /// This protects against malformed lines or tailing incorrect files.
     #[serde(default = "default_max_line_bytes")]
@@ -125,9 +125,9 @@ pub struct FileConfig {
 
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///
-    /// The value is the current hostname.
-    ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "default_host_key")]
@@ -136,8 +136,10 @@ pub struct FileConfig {
 
     /// The directory used to persist file checkpoint positions.
     ///
-    /// By default, the global `data_dir` option is used. Make sure the running user has write
+    /// By default, the [global `data_dir` option][global_data_dir] is used. Make sure the running user has write
     /// permissions to this directory.
+    ///
+    /// [global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
     #[serde(default)]
     #[configurable(metadata(docs::examples = "/var/local/lib/vector/"))]
     pub data_dir: Option<PathBuf>,
@@ -151,9 +153,11 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = "offset"))]
     pub offset_key: Option<OptionalValuePath>,
 
-    /// Delay between file discovery calls, in milliseconds.
+    /// Delay between file discovery calls.
     ///
-    /// This controls the interval at which files are searched. A higher value results in greater chances of some short-lived files being missed between searches, but a lower value increases the performance impact of file discovery.
+    /// This controls the interval at which files are searched. A higher value results in greater
+    /// chances of some short-lived files being missed between searches, but a lower value increases
+    /// the performance impact of file discovery.
     #[serde(
         alias = "glob_minimum_cooldown",
         default = "default_glob_minimum_cooldown_ms"
@@ -175,6 +179,7 @@ pub struct FileConfig {
     ///
     /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub message_start_indicator: Option<String>,
 
@@ -182,12 +187,14 @@ pub struct FileConfig {
     ///
     /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default = "default_multi_line_timeout")]
     pub multi_line_timeout: u64,
 
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
+    #[configurable(derived)]
     #[serde(default)]
     pub multiline: Option<MultilineConfig>,
 
@@ -204,7 +211,9 @@ pub struct FileConfig {
     ///
     /// If not specified, files will not be removed.
     #[serde(alias = "remove_after", default)]
-    #[configurable(metadata(docs::examples = "example_seconds()"))]
+    #[configurable(metadata(docs::examples = 0))]
+    #[configurable(metadata(docs::examples = 5))]
+    #[configurable(metadata(docs::examples = 60))]
     pub remove_after_secs: Option<u64>,
 
     /// String sequence used to separate one file line from another.
@@ -252,10 +261,6 @@ const fn default_max_read_bytes() -> usize {
 
 fn default_line_delimiter() -> String {
     "\n".to_string()
-}
-
-const fn example_seconds() -> u64 {
-    60
 }
 
 /// Configuration for how files should be identified.
@@ -356,7 +361,7 @@ impl Default for FileConfig {
             file_key: default_file_key(),
             start_at_beginning: None,
             ignore_checkpoints: None,
-            read_from: None,
+            read_from: Default::default(),
             ignore_older_secs: None,
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::default(),
@@ -482,7 +487,7 @@ pub fn file_source(
     let (ignore_checkpoints, read_from) = reconcile_position_options(
         config.start_at_beginning,
         config.ignore_checkpoints,
-        config.read_from,
+        Some(config.read_from),
     );
 
     let paths_provider = Glob::new(
@@ -898,7 +903,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert_eq!(config.read_from, Some(ReadFromConfig::Beginning));
+        assert_eq!(config.read_from, ReadFromConfig::Beginning);
 
         let config: FileConfig = toml::from_str(
             r#"
@@ -907,7 +912,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert_eq!(config.read_from, Some(ReadFromConfig::End));
+        assert_eq!(config.read_from, ReadFromConfig::End);
     }
 
     #[test]

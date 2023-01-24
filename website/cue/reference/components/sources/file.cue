@@ -48,7 +48,13 @@ components: sources: file: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.file.configuration
+	configuration: base.components.sources.file.configuration & {
+		remove_after_secs: warnings: [
+			"""
+				Vector’s process must have permission to delete files.
+				""",
+		]
+	}
 
 	output: logs: line: {
 		description: "An individual line from a file. Lines can be merged using the `multiline` options."

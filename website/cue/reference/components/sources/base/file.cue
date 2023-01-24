@@ -23,10 +23,13 @@ base: components: sources: file: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
+			By default, the [global `data_dir` option][global_data_dir] is used. Make sure the running user has write
+			permissions to this directory.
+
+			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["/var/local/lib/vector/"]
 	}
 	encoding: {
 		description: "Character set encoding."
@@ -46,7 +49,7 @@ base: components: sources: file: configuration: {
 				logged.
 				"""
 			required: true
-			type: string: {}
+			type: string: examples: ["utf-16le", "utf-16be"]
 		}
 	}
 	exclude: {
@@ -68,6 +71,8 @@ base: components: sources: file: configuration: {
 			Overrides the name of the log field used to add the file path to each event.
 
 			The value will be the full path to the file where the event was read message.
+
+			Set to `""` to suppress this key.
 			"""
 		required: false
 		type: string: {
@@ -136,9 +141,11 @@ base: components: sources: file: configuration: {
 	}
 	glob_minimum_cooldown_ms: {
 		description: """
-			Delay between file discovery calls, in milliseconds.
+			Delay between file discovery calls.
 
-			This controls the interval at which files are searched. A higher value results in greater chances of some short-lived files being missed between searches, but a lower value increases the performance impact of file discovery.
+			This controls the interval at which files are searched. A higher value results in greater
+			chances of some short-lived files being missed between searches, but a lower value increases
+			the performance impact of file discovery.
 			"""
 		required: false
 		type: uint: {
@@ -150,9 +157,9 @@ base: components: sources: file: configuration: {
 		description: """
 			Overrides the name of the log field used to add the current hostname to each event.
 
-			The value is the current hostname.
-
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
+
+			Set to `""` to suppress this key.
 
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
@@ -184,7 +191,7 @@ base: components: sources: file: configuration: {
 		description: "Ignore files with a data modification date older than the specified number of seconds."
 		required:    false
 		type: uint: examples: [
-			60,
+			600,
 		]
 	}
 	include: {
@@ -204,7 +211,7 @@ base: components: sources: file: configuration: {
 	}
 	max_line_bytes: {
 		description: """
-			The maximum number of bytes a line can contain before being discarded.
+			The maximum size of a line before it will be discarded.
 
 			This protects against malformed lines or tailing incorrect files.
 			"""
@@ -222,24 +229,6 @@ base: components: sources: file: configuration: {
 			unit:    "bytes"
 		}
 	}
-	message_start_indicator: {
-		description: """
-			String value used to identify the start of a multi-line message.
-
-			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-			"""
-		required: false
-		type: string: {}
-	}
-	multi_line_timeout: {
-		description: """
-			How long to wait for more data when aggregating a multi-line message, in milliseconds.
-
-			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-			"""
-		required: false
-		type: uint: default: 1000
-	}
 	multiline: {
 		description: """
 			Multiline aggregation configuration.
@@ -255,7 +244,7 @@ base: components: sources: file: configuration: {
 					This setting must be configured in conjunction with `mode`.
 					"""
 				required: true
-				type: string: {}
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
 			}
 			mode: {
 				description: """
@@ -294,7 +283,7 @@ base: components: sources: file: configuration: {
 			start_pattern: {
 				description: "Regular expression pattern that is used to match the start of a new message."
 				required:    true
-				type: string: {}
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
 			}
 			timeout_ms: {
 				description: """
@@ -303,7 +292,7 @@ base: components: sources: file: configuration: {
 					Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
 					"""
 				required: true
-				type: uint: {}
+				type: uint: examples: [1000, 600000]
 			}
 		}
 	}
@@ -328,9 +317,12 @@ base: components: sources: file: configuration: {
 	read_from: {
 		description: "File position to use when reading a new file."
 		required:    false
-		type: string: enum: {
-			beginning: "Read from the beginning of the file."
-			end:       "Start reading from the current end of the file."
+		type: string: {
+			default: "beginning"
+			enum: {
+				beginning: "Read from the beginning of the file."
+				end:       "Start reading from the current end of the file."
+			}
 		}
 	}
 	remove_after_secs: {
@@ -340,8 +332,6 @@ base: components: sources: file: configuration: {
 			If not specified, files will not be removed.
 			"""
 		required: false
-		type: uint: examples: [
-			60,
-		]
+		type: uint: examples: [0, 5, 60]
 	}
 }
