@@ -11,10 +11,10 @@ base: components: sources: prometheus_scrape: configuration: {
 		required: false
 		type: object: options: {
 			password: {
-				description:   "The password to send."
+				description:   "The basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${PASSWORD}", "password"]
 			}
 			strategy: {
 				description: "The authentication strategy to use."
@@ -35,16 +35,16 @@ base: components: sources: prometheus_scrape: configuration: {
 				}
 			}
 			token: {
-				description:   "The bearer token to send."
+				description:   "The bearer authentication token."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
 				type: string: {}
 			}
 			user: {
-				description:   "The username to send."
+				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${USERNAME}", "username"]
 			}
 		}
 	}
@@ -103,9 +103,12 @@ base: components: sources: prometheus_scrape: configuration: {
 		}
 	}
 	scrape_interval_secs: {
-		description: "The interval between scrapes, in seconds."
+		description: "The interval between scrapes."
 		required:    false
-		type: uint: default: 15
+		type: uint: {
+			default: 15
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description: "TLS configuration."

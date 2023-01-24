@@ -6,10 +6,10 @@ base: components: sources: http_client: configuration: {
 		required:    false
 		type: object: options: {
 			password: {
-				description:   "The password to send."
+				description:   "The basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${PASSWORD}", "password"]
 			}
 			strategy: {
 				description: "The authentication strategy to use."
@@ -30,16 +30,16 @@ base: components: sources: http_client: configuration: {
 				}
 			}
 			token: {
-				description:   "The bearer token to send."
+				description:   "The bearer authentication token."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
 				type: string: {}
 			}
 			user: {
-				description:   "The username to send."
+				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${USERNAME}", "username"]
 			}
 		}
 	}
@@ -94,11 +94,12 @@ base: components: sources: http_client: configuration: {
 	}
 	endpoint: {
 		description: """
-			Endpoint to collect events from. The full path must be specified.
-			Example: "http://127.0.0.1:9898/logs"
+			The HTTP endpoint to collect events from.
+
+			The full path must be specified.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["http://127.0.0.1:9898/logs"]
 	}
 	framing: {
 		description: "Framing to use in the decoding."
@@ -176,14 +177,20 @@ base: components: sources: http_client: configuration: {
 			One or more values for the same header can be provided.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "An HTTP request header."
-			required:    true
-			type: array: items: type: string: {}
+		type: object: {
+			examples: [{
+				Accept: ["text/plain", "text/html"]
+				"X-My-Custom-Header": ["a", "vector", "of", "values"]
+			}]
+			options: "*": {
+				description: "An HTTP request header and it's value(s)."
+				required:    true
+				type: array: items: type: string: {}
+			}
 		}
 	}
 	method: {
-		description: "Specifies the action of the HTTP request."
+		description: "Specifies the method of the HTTP request."
 		required:    false
 		type: string: {
 			default: "GET"
@@ -201,20 +208,31 @@ base: components: sources: http_client: configuration: {
 		description: """
 			Custom parameters for the HTTP request query string.
 
-			One or more values for the same parameter key can be provided. The parameters provided in this option are
-			appended to any parameters manually provided in the `endpoint` option.
+			One or more values for the same parameter key can be provided.
+
+			The parameters provided in this option are appended to any parameters
+			manually provided in the `endpoint` option.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "A query string parameter."
-			required:    true
-			type: array: items: type: string: {}
+		type: object: {
+			examples: [{
+				field: ["value"]
+				fruit: ["mango", "papaya", "kiwi"]
+			}]
+			options: "*": {
+				description: "A query string parameter and it's value(s)."
+				required:    true
+				type: array: items: type: string: {}
+			}
 		}
 	}
 	scrape_interval_secs: {
-		description: "The interval between calls, in seconds."
+		description: "The interval between calls."
 		required:    false
-		type: uint: default: 15
+		type: uint: {
+			default: 15
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
