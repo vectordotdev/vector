@@ -9588,6 +9588,7 @@ dependencies = [
  "datadog-grok",
  "datadog-search-syntax",
  "dns-lookup",
+ "flate2",
  "grok",
  "hex",
  "hostname",
