@@ -28,10 +28,10 @@ remap: functions: encode_zlib: {
 		{
 			title: "Encode to Zlib"
 			source: #"""
-				encoded_text = encode_zlib!("please encode me")
+				encoded_text = encode_zlib("please encode me")
 				encode_base64(encoded_text)
 				"""#
-			return: "H4sIAAAAAAAA/yvISU0sTlVIzUvOT0lVyE0FAI4R4vcQAAAA"
+			return: "eJwryElNLE5VSM1Lzk9JVchNBQA0RQX7"
 		},
 	]
 }

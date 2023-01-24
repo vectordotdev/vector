@@ -23,10 +23,10 @@ remap: functions: decode_zlib: {
 		{
 			title: "Decode Zlib data"
 			source: #"""
-				encoded_text = decode_base64!("H4sIAHEAymMAA6vML1XISCxLVSguTU5OLS5OK83JqVRISU3OT0lNUchNBQD7BGDaIAAAAA==")
+				encoded_text = decode_base64!("eJwNy4ENwCAIBMCNXIlQ/KqplUSgCdvXAS41qPMHshCB2R1zJlWIVlR6UURX2+wx2YcuK3kAb9C1wd6dn7Fa+QH9gRxr")
 				decode_zlib!(encoded_text)
 				"""#
-			return: "you have successfully decoded me"
+			return: "you_have_successfully_decoded_me.congratulations.you_are_breathtaking."
 		},
 	]
 }

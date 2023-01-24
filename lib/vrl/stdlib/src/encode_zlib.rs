@@ -13,12 +13,12 @@ fn encode_zlib(value: Value, compression_level: Option<Value>) -> Resolved {
 
     let value = value.try_bytes()?;
     let mut buf = Vec::new();
-    let result = ZlibEncoder::new(value.as_bytes(), compression_level).read_to_end(&mut buf);
+    // We can safely ignore the error here because the value being read from, `Bytes`, never fails a `read()` call and the value being written to, a `Vec`, never fails a `write()` call
+    ZlibEncoder::new(value.as_bytes(), compression_level)
+        .read_to_end(&mut buf)
+        .expect("zlib compression failed, please report");
 
-    match result {
-        Ok(_) => Ok(Value::Bytes(buf.into())),
-        Err(_) => Err("unable to encode value with Zlib encoder".into()),
-    }
+    Ok(Value::Bytes(buf.into()))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -32,8 +32,8 @@ impl Function for EncodeZlib {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "demo string",
-            source: r#"encode_base64(encode_zlib!("encode_me"))"#,
-            result: Ok("H4sIAAAAAAAA/0vNS85PSY3PTQUAN7ZBnAkAAAA="),
+            source: r#"encode_base64(encode_zlib("encode_me"))"#,
+            result: Ok("eJxLzUvOT0mNz00FABI5A6A="),
         }]
     }
 
@@ -89,8 +89,7 @@ impl FunctionExpression for EncodeZlibFn {
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        // Always fallible due to the possibility of encoding errors that VRL can't detect
-        TypeDef::bytes().fallible()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -112,15 +111,15 @@ mod test {
         encode_zlib => EncodeZlib;
 
         with_defaults {
-            args: func_args![value: value!("encode_me")],
-            want: Ok(value!(decode_base64("H4sIAAAAAAAA/0vNS85PSY3PTQUAN7ZBnAkAAAA=").as_bytes())),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![value: value!("you_have_successfully_decoded_me.congratulations.you_are_breathtaking.")],
+            want: Ok(value!(decode_base64("eJwNy4ENwCAIBMCNXIlQ/KqplUSgCdvXAS41qPMHshCB2R1zJlWIVlR6UURX2+wx2YcuK3kAb9C1wd6dn7Fa+QH9gRxr").as_bytes())),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         with_custom_compression_level {
-            args: func_args![value: value!("encode_me"), compression_level: 2],
-            want: Ok(value!(decode_base64("H4sIAAAAAAAA/0vNS85PSY3PTQUAN7ZBnAkAAAA=").as_bytes())),
-            tdef: TypeDef::bytes().fallible(),
+            args: func_args![value: value!("you_have_successfully_decoded_me.congratulations.you_are_breathtaking."), compression_level: 9],
+            want: Ok(value!(decode_base64("eNoNy4ENwCAIBMCNXIlQ/KqplUSgCdvXAS41qPMHshCB2R1zJlWIVlR6UURX2+wx2YcuK3kAb9C1wd6dn7Fa+QH9gRxr").as_bytes())),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

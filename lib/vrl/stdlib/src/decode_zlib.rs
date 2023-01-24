@@ -26,8 +26,8 @@ impl Function for DecodeZlib {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "demo string",
-            source: r#"decode_zlib!(decode_base64!("H4sIAB8BymMAAyvISU0sTlVISU3OT0lVyE0FAJsZ870QAAAA"))"#,
-            result: Ok(r#"please decode me"#),
+            source: r#"decode_zlib!(decode_base64!("eJxLzUvOT0mNz00FABI5A6A="))"#,
+            result: Ok(r#"encode_me"#),
         }]
     }
 
@@ -94,7 +94,7 @@ mod tests {
 
         wrong_gzip {
             args: func_args![value: value!("some_bytes")],
-            want: Err("unable to decode value with Gzip decoder"),
+            want: Err("unable to decode value with Zlib decoder"),
             tdef: TypeDef::bytes().fallible(),
         }
     ];
