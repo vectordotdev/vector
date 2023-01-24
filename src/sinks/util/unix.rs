@@ -43,6 +43,7 @@ pub struct UnixSinkConfig {
     /// The Unix socket path.
     ///
     /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
     pub path: PathBuf,
 }
 
