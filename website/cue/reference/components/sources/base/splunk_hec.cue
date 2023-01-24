@@ -199,6 +199,6 @@ base: components: sources: splunk_hec: configuration: {
 			If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
 	}
 }

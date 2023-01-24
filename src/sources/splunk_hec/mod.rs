@@ -80,6 +80,7 @@ pub struct SplunkConfig {
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     valid_tokens: Option<Vec<SensitiveString>>,
 
     /// Whether or not to forward the Splunk HEC authentication token with events.
