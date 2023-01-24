@@ -13,6 +13,7 @@ components: sources: dnstap: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		multiline: enabled: false
 		receive: {
@@ -44,91 +45,20 @@ components: sources: dnstap: {
 		notices: []
 	}
 
-	configuration: {
-		max_frame_length: {
-			common:      false
-			description: "Max dnstap frame length that the dnstap source can handle."
-			required:    false
-			type: uint: {
-				default: 102400
-				unit:    "bytes"
-			}
-		}
-		socket_path: {
-			description: """
-				Absolute path of server socket file to which the DNS server is
-				configured to send dnstap data. The socket file will be created
-				by dnstap source component automatically upon startup.
-				"""
-			required: true
-			type: string: {
-				examples: ["/run/bind/dnstap.sock"]
-				syntax: "file_system_path"
-			}
-		}
-		socket_file_mode: {
-			common: true
-			description: """
-				Unix file mode bits to be applied to server socket file
-				as its designated file permissions.
-				Note that the file mode value can be specified in any numeric format
-				supported by TOML, but it'd be more intuitive to use an octal number.
-				Also note that the value specified must be between `0o700` and `0o777`.
-				"""
-			required: false
-			type: uint: {
-				default: null
-				unit:    null
-				examples: [0o777, 0o754, 508]
-			}
-		}
-		socket_receive_buffer_size: {
-			common: false
-			description: """
-				Set receive buffer size of server Unix socket if specified.
-				No change to the default size if omitted.
-				"""
-			required: false
-			type: uint: {
-				default: null
-				unit:    "bytes"
-			}
-			warnings: [
-				"""
-					System-wide setting of max socket receive buffer size
-					(i.e. value of '/proc/sys/net/core/rmem_max' on Linux)
-					may need adjustment accordingly.
-					""",
-			]
-		}
-		socket_send_buffer_size: {
-			common: false
-			description: """
-				Set send buffer size of server Unix socket if specified.
-				No change to the default size if omitted.
-				"""
-			required: false
-			type: uint: {
-				default: null
-				unit:    "bytes"
-			}
-			warnings: [
-				"""
-					System-wide setting of max socket send buffer size
-					(i.e. value of '/proc/sys/net/core/wmem_max' on Linux)
-					may need adjustment accordingly.
-					""",
-			]
-		}
-		raw_data_only: {
-			common: false
-			description: """
-				Whether or not to write out raw dnstap frame data directly
-				(to be encoded in Base64) without any parsing and formatting.
-				"""
-			required: false
-			type: bool: default: false
-		}
+	configuration: base.components.sources.dnstap.configuration & {
+		socket_receive_buffer_size: warnings: [
+			"""
+				System-wide setting of maximum socket send buffer size (i.e. value of '/proc/sys/net/core/wmem_max' on Linux) may need adjustment accordingly.
+				""",
+		]
+
+		socket_send_buffer_size: warnings: [
+			"""
+				System-wide setting of maximum socket send buffer size (i.e. value of '/proc/sys/net/core/wmem_max' on Linux) may need adjustment accordingly.
+				""",
+		]
+
+		socket_file_mode: type: uint: examples: [0o777, 0o754, 0o777]
 	}
 
 	output: logs: event: {
