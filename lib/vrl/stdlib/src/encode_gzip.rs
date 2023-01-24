@@ -13,7 +13,10 @@ fn encode_gzip(value: Value, compression_level: Option<Value>) -> Resolved {
 
     let value = value.try_bytes()?;
     let mut buf = Vec::new();
-    let _result = GzEncoder::new(value.as_bytes(), compression_level).read_to_end(&mut buf);
+    // We can safely ignore the error here because the value being read from, `Bytes`, never fails a `read()` call and the value being written to, a `Vec`, never fails a `write()` call
+    GzEncoder::new(value.as_bytes(), compression_level)
+        .read_to_end(&mut buf)
+        .expect("gzip compression failed, please report");
 
     Ok(Value::Bytes(buf.into()))
 }
