@@ -1,0 +1,8 @@
+args:
+- --features
+- prometheus-integration-tests
+- --lib
+- '::prometheus::'
+
+matrix:
+- version: ['1.8']

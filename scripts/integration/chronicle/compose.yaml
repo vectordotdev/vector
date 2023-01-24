@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  chronicle-emulator:
+    image: docker.io/plork/chronicle-emulator:${CHRONICLE_VERSION}
+    ports:
+    - 3000:3000
+    volumes:
+    - ../chroniclepub.pem:/public.pem
+    command:
+    - -p
+    - /public.pem
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
