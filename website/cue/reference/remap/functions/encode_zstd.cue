@@ -28,10 +28,10 @@ remap: functions: encode_zstd: {
 		{
 			title: "Encode to Zstd"
 			source: #"""
-				encoded_text = encode_zstd!("please encode me")
+				encoded_text = encode_zstd("please encode me")
 				encode_base64(encoded_text)
 				"""#
-			return: "H4sIAAAAAAAA/yvISU0sTlVIzUvOT0lVyE0FAI4R4vcQAAAA"
+			return: "KLUv/QBYgQAAcGxlYXNlIGVuY29kZSBtZQ=="
 		},
 	]
 }

@@ -1,11 +1,11 @@
 use ::value::Value;
-use std::io::Read;
+use nom::AsBytes;
 use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn decode_zstd(value: Value) -> Resolved {
     let value = value.try_bytes()?;
-    let result = zstd::decode_all(value);
+    let result = zstd::decode_all(value.as_bytes());
 
     match result {
         Ok(decoded_bytes) => Ok(Value::Bytes(decoded_bytes.into())),
@@ -24,8 +24,8 @@ impl Function for DecodeZstd {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "demo string",
-            source: r#"decode_zstd!(decode_base64!("H4sIAB8BymMAAyvISU0sTlVISU3OT0lVyE0FAJsZ870QAAAA"))"#,
-            result: Ok(r#"please decode me"#),
+            source: r#"decode_zstd!(decode_base64!("KLUv/QBY/QEAYsQOFKClbQBedqXsb96EWDax/f/F/z+gNU4ZTInaUeAj82KqPFjUzKqhcfDqAIsLvAsnY1bI/N2mHzDixRQA"))"#,
+            result: Ok(r#"you_have_successfully_decoded_me.congratulations.you_are_breathtaking."#),
         }]
     }
 
@@ -70,15 +70,13 @@ impl FunctionExpression for DecodeZstdFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use flate2::read::GzEncoder;
     use nom::AsBytes;
 
     fn get_encoded_bytes(text: &str) -> Vec<u8> {
-        let mut buf = Vec::new();
-        let mut gz = GzEncoder::new(text.as_bytes(), flate2::Compression::fast());
-        gz.read_to_end(&mut buf)
-            .expect("Cannot encode bytes with Gzip encoder");
-        buf
+        let result =
+            zstd::encode_all(text.as_bytes(), 0).expect("Cannot encode bytes with Zstd encoder");
+
+        result
     }
 
     test_function![
@@ -92,7 +90,7 @@ mod tests {
 
         wrong_zstd {
             args: func_args![value: value!("some_bytes")],
-            want: Err("unable to decode value with Gzip decoder"),
+            want: Err("unable to decode value with Zstd decoder"),
             tdef: TypeDef::bytes().fallible(),
         }
     ];

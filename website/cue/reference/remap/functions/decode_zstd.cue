@@ -23,10 +23,10 @@ remap: functions: decode_zstd: {
 		{
 			title: "Decode Zstd data"
 			source: #"""
-				encoded_text = decode_base64!("H4sIAHEAymMAA6vML1XISCxLVSguTU5OLS5OK83JqVRISU3OT0lNUchNBQD7BGDaIAAAAA==")
+				encoded_text = decode_base64!("KLUv/QBY/QEAYsQOFKClbQBedqXsb96EWDax/f/F/z+gNU4ZTInaUeAj82KqPFjUzKqhcfDqAIsLvAsnY1bI/N2mHzDixRQA")
 				decode_zstd!(encoded_text)
 				"""#
-			return: "you have successfully decoded me"
+			return: "you_have_successfully_decoded_me.congratulations.you_are_breathtaking."
 		},
 	]
 }
