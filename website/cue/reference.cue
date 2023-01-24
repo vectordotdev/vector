@@ -309,6 +309,8 @@ _values: {
 	// via the key you use.
 	name: string
 
+	deprecated?: string
+
 	// `relevant_when` clarifies when an option is relevant.
 	//
 	// For example, if an option depends on the value of another option you can
