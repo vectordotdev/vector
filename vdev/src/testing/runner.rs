@@ -227,6 +227,32 @@ pub trait ContainerTestRunner: TestRunner {
     }
 }
 
+impl<T> TestRunner for T
+where
+    T: ContainerTestRunner,
+{
+    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
+        self.verify_state()?;
+
+        let mut command = dockercmd(["exec"]);
+        if atty::is(Stream::Stdout) {
+            command.arg("--tty");
+        }
+
+        command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
+        for (key, value) in env_vars {
+            command.env(key, value);
+            command.args(["--env", key]);
+        }
+
+        command.arg(&self.container_name());
+        command.args(TEST_COMMAND);
+        command.args(args);
+
+        command.check_run()
+    }
+}
+
 pub struct IntegrationTestRunner {
     integration: String,
 }
@@ -251,29 +277,6 @@ impl IntegrationTestRunner {
     }
 }
 
-impl TestRunner for IntegrationTestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
-        self.verify_state()?;
-
-        let mut command = dockercmd(["exec"]);
-        if atty::is(Stream::Stdout) {
-            command.arg("--tty");
-        }
-
-        command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
-        for (key, value) in env_vars {
-            command.env(key, value);
-            command.args(["--env", key]);
-        }
-
-        command.arg(&self.container_name());
-        command.args(TEST_COMMAND);
-        command.args(args);
-
-        command.check_run()
-    }
-}
-
 impl ContainerTestRunner for IntegrationTestRunner {
     fn network_name(&self) -> String {
         format!("vector-integration-tests-{}", self.integration)
@@ -282,7 +285,8 @@ impl ContainerTestRunner for IntegrationTestRunner {
     fn container_name(&self) -> String {
         format!(
             "vector-test-runner-{}-{}",
-            self.integration, self.rust_version
+            self.integration,
+            self.get_rust_version()
         )
     }
 
@@ -292,29 +296,6 @@ impl ContainerTestRunner for IntegrationTestRunner {
 }
 
 pub struct DockerTestRunner;
-
-impl TestRunner for DockerTestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
-        self.verify_state()?;
-
-        let mut command = dockercmd(["exec"]);
-        if atty::is(Stream::Stdout) {
-            command.arg("--tty");
-        }
-
-        command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
-        for (key, value) in env_vars {
-            command.env(key, value);
-            command.args(["--env", key]);
-        }
-
-        command.arg(&self.container_name());
-        command.args(TEST_COMMAND);
-        command.args(args);
-
-        command.check_run()
-    }
-}
 
 impl ContainerTestRunner for DockerTestRunner {
     fn container_name(&self) -> String {
