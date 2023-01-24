@@ -5,7 +5,9 @@ base: components: sources: opentelemetry: configuration: {
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -29,7 +31,7 @@ base: components: sources: opentelemetry: configuration: {
 			options: {
 				address: {
 					description: """
-						The address to listen for connections on.
+						The socket address to listen for connections on.
 
 						It _must_ include a port.
 						"""
@@ -144,7 +146,7 @@ base: components: sources: opentelemetry: configuration: {
 			options: {
 				address: {
 					description: """
-						The address to listen for connections on.
+						The socket address to listen for connections on.
 
 						It _must_ include a port.
 						"""

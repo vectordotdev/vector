@@ -5,7 +5,9 @@ base: components: sources: fluent: configuration: {
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -20,17 +22,19 @@ base: components: sources: fluent: configuration: {
 		}
 	}
 	address: {
-		description: "The address to listen for connections on."
-		required:    true
-		type: {
-			number: {}
-			string: {}
-		}
+		description: """
+			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+			systemd socket activation.
+
+			If a socket address is used, it _must_ include a port.
+			"""
+		required: true
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
 		description: "The maximum number of TCP connections that will be allowed at any given time."
 		required:    false
-		type: uint: {}
+		type: uint: unit: "connections"
 	}
 	keepalive: {
 		description: "TCP keepalive settings for socket-based components."
@@ -38,17 +42,22 @@ base: components: sources: fluent: configuration: {
 		type: object: options: time_secs: {
 			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	receive_buffer_bytes: {
 		description: """
-			The size, in bytes, of the receive buffer used for each connection.
+			The size of the receive buffer used for each connection.
 
-			This should not typically needed to be changed.
+			This generally should not need to be changed.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: {
+			examples: [
+				65536,
+			]
+			unit: "bytes"
+		}
 	}
 	tls: {
 		description: "TlsEnableableConfig for `sources`, adding metadata from the client certificate"

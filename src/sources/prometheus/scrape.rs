@@ -1,11 +1,11 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use tokio::time::Duration;
 use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, event::Event};
 
@@ -18,7 +18,8 @@ use crate::{
     sources::{
         self,
         util::http_client::{
-            build_url, call, GenericHttpClientInputs, HttpClientBuilder, HttpClientContext,
+            build_url, call, default_interval, GenericHttpClientInputs, HttpClientBuilder,
+            HttpClientContext,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -100,11 +101,6 @@ fn query_example() -> serde_json::Value {
     })
 }
 
-/// The default interval to call the http endpoint if none is configured.
-pub(crate) const fn default_interval() -> Duration {
-    Duration::from_secs(15)
-}
-
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -140,7 +136,7 @@ impl SourceConfig for PrometheusScrapeConfig {
 
         let inputs = GenericHttpClientInputs {
             urls,
-            interval_secs: self.interval.as_secs(),
+            interval: self.interval,
             headers: HashMap::new(),
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),

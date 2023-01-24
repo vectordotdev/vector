@@ -2,19 +2,21 @@ package metadata
 
 base: components: sources: statsd: configuration: {
 	address: {
-		description:   "The address to listen for connections on."
+		description: """
+			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+			systemd socket activation.
+
+			If a socket address is used, it _must_ include a port.
+			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: {
-			number: {}
-			string: {}
-		}
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: {}
+		type: uint: unit: "connections"
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
@@ -23,7 +25,7 @@ base: components: sources: statsd: configuration: {
 		type: object: options: time_secs: {
 			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	mode: {
@@ -32,7 +34,7 @@ base: components: sources: statsd: configuration: {
 		type: string: enum: {
 			tcp:  "Listen on TCP."
 			udp:  "Listen on UDP."
-			unix: "Listen on UDS. (Unix domain socket)"
+			unix: "Listen on a Unix domain Socket (UDS)."
 		}
 	}
 	path: {
@@ -43,23 +45,26 @@ base: components: sources: statsd: configuration: {
 			"""
 		relevant_when: "mode = \"unix\""
 		required:      true
-		type: string: {}
+		type: string: examples: ["/path/to/socket"]
 	}
 	receive_buffer_bytes: {
 		description: """
-			The size, in bytes, of the receive buffer used for each connection.
+			The size of the receive buffer used for each connection.
 
-			This should not typically needed to be changed.
+			Generally this should not need to be configured.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: uint: {}
+		type: uint: unit: "bytes"
 	}
 	shutdown_timeout_secs: {
 		description:   "The timeout before a connection is forcefully closed during shutdown."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: default: 30
+		type: uint: {
+			default: 30
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate"

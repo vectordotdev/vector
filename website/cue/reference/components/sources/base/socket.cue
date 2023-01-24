@@ -2,19 +2,21 @@ package metadata
 
 base: components: sources: socket: configuration: {
 	address: {
-		description:   "The address to listen for connections on."
+		description: """
+			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+			systemd socket activation.
+
+			If a socket address is used, it _must_ include a port.
+			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: {
-			number: {}
-			string: {}
-		}
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
 		description:   "The maximum number of TCP connections that will be allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: {}
+		type: uint: unit: "connections"
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
@@ -145,10 +147,12 @@ base: components: sources: socket: configuration: {
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
+			Set to `""` to suppress this key.
+
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {}
+		type: string: default: "host"
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
@@ -157,22 +161,22 @@ base: components: sources: socket: configuration: {
 		type: object: options: time_secs: {
 			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
-	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global setting."
-		required:    false
-		type: bool: {}
 	}
 	max_length: {
 		description: """
-			The maximum buffer size, in bytes, of incoming messages.
+			The maximum buffer size of incoming messages.
 
 			Messages larger than this are truncated.
+
+			This option is deprecated. Configure `max_length` on the framing config instead.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
 	}
 	mode: {
 		description: "The type of socket to use."
@@ -192,7 +196,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
 		required:      true
-		type: string: {}
+		type: string: examples: ["/path/to/socket"]
 	}
 	port_key: {
 		description: """
@@ -201,26 +205,31 @@ base: components: sources: socket: configuration: {
 			The value will be the peer host's port i.e. `9000`.
 
 			By default, `"port"` is used.
+
+			Set to `""` to suppress this key.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: string: {}
+		type: string: default: "port"
 	}
 	receive_buffer_bytes: {
 		description: """
-			The size, in bytes, of the receive buffer used for each connection.
+			The size of the receive buffer used for each connection.
 
-			This should not typically needed to be changed.
+			Generally this should not need to be configured.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: uint: {}
+		type: uint: unit: "bytes"
 	}
 	shutdown_timeout_secs: {
-		description:   "The timeout, in seconds, before a connection is forcefully closed during shutdown."
+		description:   "The timeout before a connection is forcefully closed during shutdown."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: uint: default: 30
+		type: uint: {
+			default: 30
+			unit:    "seconds"
+		}
 	}
 	socket_file_mode: {
 		description: """
@@ -231,7 +240,7 @@ base: components: sources: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix_datagram\" or mode = \"unix_stream\""
 		required:      false
-		type: uint: {}
+		type: uint: examples: [511, 384, 508]
 	}
 	tls: {
 		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate"

@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
+use std::{net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -71,7 +71,7 @@ pub struct SyslogConfig {
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        /// The address to listen for connections on.
+        /// The socket address to listen for connections on.
         address: SocketListenAddr,
 
         #[configurable(derived)]
@@ -91,7 +91,7 @@ pub enum Mode {
 
     /// Listen on UDP.
     Udp {
-        /// The address to listen for messages on.
+        /// The socket address to listen for messages on.
         address: SocketListenAddr,
 
         /// The size, in bytes, of the receive buffer used for the listening socket.
@@ -173,7 +173,7 @@ impl SourceConfig for SyslogConfig {
                     host_key,
                     log_namespace,
                 };
-                let shutdown_secs = 30;
+                let shutdown_secs = Duration::from_secs(30);
                 let tls_config = tls.as_ref().map(|tls| tls.tls_config.clone());
                 let tls_client_metadata_key = tls
                     .as_ref()

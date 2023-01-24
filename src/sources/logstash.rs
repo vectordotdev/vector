@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::time::Duration;
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
@@ -38,7 +39,7 @@ use crate::{
 #[configurable_component(source("logstash"))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
-    /// The address to listen for connections on.
+    #[configurable(derived)]
     address: SocketListenAddr,
 
     #[configurable(derived)]
@@ -47,12 +48,15 @@ pub struct LogstashConfig {
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
-    /// The size, in bytes, of the receive buffer used for each connection.
+    /// The size of the receive buffer used for each connection.
     ///
-    /// This should not typically needed to be changed.
+    /// This generally should not need to be changed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
+    #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
     #[configurable(derived)]
@@ -136,7 +140,7 @@ impl SourceConfig for LogstashConfig {
             legacy_host_key_path: parse_value_path(log_schema().host_key()).ok(),
             log_namespace,
         };
-        let shutdown_secs = 30;
+        let shutdown_secs = Duration::from_secs(30);
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
         let tls_client_metadata_key = self
             .tls
