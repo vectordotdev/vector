@@ -26,7 +26,7 @@ const TEST_COMMAND: &[&str] = &[
 const UPSTREAM_IMAGE: &str =
     "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a";
 
-static CONTAINER_TOOL: Lazy<OsString> =
+pub static CONTAINER_TOOL: Lazy<OsString> =
     Lazy::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));
 
 fn detect_container_tool() -> OsString {
@@ -42,8 +42,7 @@ fn detect_container_tool() -> OsString {
             return OsString::from(String::from(tool));
         }
     }
-    critical!("No container tool could be detected.");
-    std::process::exit(1);
+    fatal!("No container tool could be detected.");
 }
 
 fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
