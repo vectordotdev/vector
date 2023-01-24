@@ -10,10 +10,7 @@ use file_source::{
     ReadFromConfig,
 };
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
-use lookup::{
-    lookup_v2::{parse_value_path, OptionalValuePath},
-    owned_value_path, path, OwnedValuePath,
-};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -92,16 +89,15 @@ pub struct FileConfig {
     /// Overrides the name of the log field used to add the file path to each event.
     ///
     /// The value will be the full path to the file where the event was read message.
-    ///
-    /// By default, `file` is used.
     #[serde(default = "default_file_key")]
     #[configurable(metadata(docs::examples = "path"))]
-    pub file_key: Option<OptionalValuePath>,
+    pub file_key: OptionalValuePath,
 
     /// Whether or not to start reading from the beginning of a new file.
     ///
     /// DEPRECATED: This is a deprecated option -- replaced by `ignore_checkpoints`/`read_from` -- and should be removed.
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub start_at_beginning: Option<bool>,
 
@@ -117,8 +113,7 @@ pub struct FileConfig {
 
     /// Ignore files with a data modification date older than the specified number of seconds.
     #[serde(alias = "ignore_older", default)]
-    #[configurable(metadata(docs::type_unit = "seconds"))]
-    #[configurable(metadata(docs::examples = "600"))]
+    #[configurable(metadata(docs::examples = "example_seconds()"))]
     pub ignore_older_secs: Option<u64>,
 
     /// The maximum number of bytes a line can contain before being discarded.
@@ -135,9 +130,9 @@ pub struct FileConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default)]
+    #[serde(default = "default_host_key")]
     #[configurable(metadata(docs::examples = "hostname"))]
-    pub host_key: Option<OptionalValuePath>,
+    pub host_key: OptionalValuePath,
 
     /// The directory used to persist file checkpoint positions.
     ///
@@ -207,11 +202,8 @@ pub struct FileConfig {
     ///
     /// If not specified, files will not be removed.
     #[serde(alias = "remove_after", default)]
-    #[serde_as(as = "Option<serde_with::DurationSeconds<u64>>")]
-    #[configurable(metadata(docs::examples = "0"))]
-    #[configurable(metadata(docs::examples = "5"))]
-    #[configurable(metadata(docs::examples = "60"))]
-    pub remove_after_secs: Option<Duration>,
+    #[configurable(metadata(docs::examples = "example_seconds()"))]
+    pub remove_after_secs: Option<u64>,
 
     /// String sequence used to separate one file line from another.
     #[serde(default = "default_line_delimiter")]
@@ -236,8 +228,12 @@ fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
 }
 
-fn default_file_key() -> Option<OptionalValuePath> {
-    Some(OptionalValuePath::from(owned_value_path!("file")))
+fn default_file_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("file"))
+}
+
+fn default_host_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
 }
 
 const fn default_glob_minimum_cooldown_ms() -> u64 {
@@ -254,6 +250,10 @@ const fn default_max_read_bytes() -> usize {
 
 fn default_line_delimiter() -> String {
     "\n".to_string()
+}
+
+const fn example_seconds() -> u64 {
+    60
 }
 
 /// Configuration for how files should be identified.
@@ -359,7 +359,7 @@ impl Default for FileConfig {
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::default(),
             ignore_not_found: false,
-            host_key: None,
+            host_key: default_host_key(),
             offset_key: None,
             data_dir: None,
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(), // millis
@@ -419,21 +419,8 @@ impl SourceConfig for FileConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        let file_key = self
-            .file_key
-            .clone()
-            .and_then(|k| k.path)
-            .map(LegacyKey::Overwrite);
-
-        // `host_key` defaults to the `log_schema().host_key()` if it's not configured in the source.
-        let host_key = self
-            .host_key
-            .clone()
-            .map_or_else(
-                || parse_value_path(log_schema().host_key()).ok(),
-                |k| k.path,
-            )
-            .map(LegacyKey::Overwrite);
+        let file_key = self.file_key.clone().path.map(LegacyKey::Overwrite);
+        let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
 
         let offset_key = self
             .offset_key
@@ -530,18 +517,15 @@ pub fn file_source(
             ignore_not_found: config.ignore_not_found,
         },
         oldest_first: config.oldest_first,
-        remove_after: config.remove_after_secs,
+        remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter: FileSourceInternalEventsEmitter,
         handle: tokio::runtime::Handle::current(),
     };
 
     let event_metadata = EventMetadata {
-        host_key: config.host_key.clone().map_or_else(
-            || parse_value_path(log_schema().host_key()).ok(),
-            |k| k.path,
-        ),
+        host_key: config.host_key.clone().path,
         hostname: crate::get_hostname().ok(),
-        file_key: config.file_key.clone().and_then(|k| k.path),
+        file_key: config.file_key.clone().path,
         offset_key: config.offset_key.clone().and_then(|k| k.path),
     };
 

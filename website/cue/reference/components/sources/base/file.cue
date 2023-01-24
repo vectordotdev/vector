@@ -68,8 +68,6 @@ base: components: sources: file: configuration: {
 			Overrides the name of the log field used to add the file path to each event.
 
 			The value will be the full path to the file where the event was read message.
-
-			By default, `file` is used.
 			"""
 		required: false
 		type: string: {
@@ -87,12 +85,6 @@ base: components: sources: file: configuration: {
 			"""
 		required: false
 		type: object: options: {
-			bytes: {
-				description:   "Maximum number of bytes to use, from the lines that are read, for generating the checksum."
-				relevant_when: "strategy = \"checksum\""
-				required:      false
-				type: uint: {}
-			}
 			ignored_header_bytes: {
 				description: """
 					The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
@@ -165,7 +157,10 @@ base: components: sources: file: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: examples: ["hostname"]
+		type: string: {
+			default: "host"
+			examples: ["hostname"]
+		}
 	}
 	ignore_checkpoints: {
 		description: """
@@ -188,8 +183,8 @@ base: components: sources: file: configuration: {
 	ignore_older_secs: {
 		description: "Ignore files with a data modification date older than the specified number of seconds."
 		required:    false
-		type: number: examples: [
-			"600",
+		type: uint: examples: [
+			60,
 		]
 	}
 	include: {
@@ -345,15 +340,8 @@ base: components: sources: file: configuration: {
 			If not specified, files will not be removed.
 			"""
 		required: false
-		type: number: examples: ["0", "5", "60"]
-	}
-	start_at_beginning: {
-		description: """
-			Whether or not to start reading from the beginning of a new file.
-
-			DEPRECATED: This is a deprecated option -- replaced by `ignore_checkpoints`/`read_from` -- and should be removed.
-			"""
-		required: false
-		type: bool: {}
+		type: uint: examples: [
+			60,
+		]
 	}
 }
