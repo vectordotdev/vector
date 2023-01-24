@@ -54,6 +54,7 @@ pub struct NatsSourceConfig {
     ///
     /// [nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
     #[serde(alias = "name")]
+    #[configurable(metadata(docs::examples = "vector"))]
     connection_name: String,
 
     /// The NATS [subject][nats_subject] to pull messages from.

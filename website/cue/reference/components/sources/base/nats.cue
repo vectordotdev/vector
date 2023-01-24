@@ -94,7 +94,9 @@ base: components: sources: nats: configuration: {
 			[nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: [
+			"vector",
+		]
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
