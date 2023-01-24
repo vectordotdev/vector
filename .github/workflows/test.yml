@@ -336,10 +336,7 @@ jobs:
             ${{ runner.os }}-cargo-
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
-      - name: Check style
-        run: make check-style
-      - name: Check code format || needs.changes.outputs.source == 'true'
-        if: needs.changes.outputs.source == 'true'
+      - name: Check code format
         run: make check-fmt
       - name: Check clippy
         if: needs.changes.outputs.source == 'true'

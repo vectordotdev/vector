@@ -71,7 +71,10 @@ impl Arbitrary for LogMsg {
         LogMsg {
             message: Bytes::from(String::arbitrary(g)),
             status: Bytes::from(String::arbitrary(g)),
-            timestamp: Utc.timestamp_millis(u32::arbitrary(g) as i64),
+            timestamp: Utc
+                .timestamp_millis_opt(u32::arbitrary(g) as i64)
+                .single()
+                .expect("invalid timestamp"),
             hostname: Bytes::from(String::arbitrary(g)),
             service: Bytes::from(String::arbitrary(g)),
             ddsource: Bytes::from(String::arbitrary(g)),
@@ -208,7 +211,10 @@ async fn full_payload_v1() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: Utc.timestamp(123, 0),
+                            timestamp: Utc
+                                .timestamp_opt(123, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -231,7 +237,13 @@ async fn full_payload_v1() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(123, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -261,7 +273,10 @@ async fn full_payload_v2() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: Utc.timestamp(123, 0),
+                            timestamp: Utc
+                                .timestamp_opt(123, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -284,7 +299,13 @@ async fn full_payload_v2() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(123, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -314,7 +335,10 @@ async fn no_api_key() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: Utc.timestamp(123, 0),
+                            timestamp: Utc
+                                .timestamp_opt(123, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -337,7 +361,13 @@ async fn no_api_key() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(123, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -367,7 +397,10 @@ async fn api_key_in_url() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("bar"),
-                            timestamp: Utc.timestamp(456, 0),
+                            timestamp: Utc
+                                .timestamp_opt(456, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -390,7 +423,13 @@ async fn api_key_in_url() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(456, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(456, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -423,7 +462,10 @@ async fn api_key_in_query_params() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("bar"),
-                            timestamp: Utc.timestamp(456, 0),
+                            timestamp: Utc
+                                .timestamp_opt(456, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -446,7 +488,13 @@ async fn api_key_in_query_params() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(456, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(456, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -485,7 +533,10 @@ async fn api_key_in_header() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: Utc.timestamp(789, 0),
+                            timestamp: Utc
+                                .timestamp_opt(789, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -508,7 +559,13 @@ async fn api_key_in_header() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(789, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -541,7 +598,10 @@ async fn delivery_failure() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("foo"),
-                        timestamp: Utc.timestamp(123, 0),
+                        timestamp: Utc
+                            .timestamp_opt(123, 0)
+                            .single()
+                            .expect("invalid timestamp"),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -574,7 +634,10 @@ async fn ignores_disabled_acknowledgements() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: Utc.timestamp(123, 0),
+                            timestamp: Utc
+                                .timestamp_opt(123, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -617,7 +680,10 @@ async fn ignores_api_key() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: Utc.timestamp(789, 0),
+                            timestamp: Utc
+                                .timestamp_opt(789, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -640,7 +706,13 @@ async fn ignores_api_key() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
+            assert_eq!(
+                log["timestamp"],
+                Utc.timestamp_opt(789, 0)
+                    .single()
+                    .expect("invalid timestamp")
+                    .into()
+            );
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -923,7 +995,11 @@ async fn decode_sketches() {
             assert_eq!(metric.name(), "dd_sketch");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+                Some(
+                    Utc.ymd(2018, 11, 14)
+                        .and_hms_opt(8, 9, 10)
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_tags(
@@ -1229,7 +1305,10 @@ async fn split_outputs() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: Utc.timestamp(789, 0),
+                            timestamp: Utc
+                                .timestamp_opt(789, 0)
+                                .single()
+                                .expect("invalid timestamp"),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -1865,7 +1944,11 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_gauge");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+                Some(
+                    Utc.ymd(2018, 11, 14)
+                        .and_hms_opt(8, 9, 10)
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
@@ -1888,7 +1971,11 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_gauge");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 11))
+                Some(
+                    Utc.ymd(2018, 11, 14)
+                        .and_hms_opt(8, 9, 11)
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
@@ -1911,7 +1998,11 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_rate");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+                Some(
+                    Utc.ymd(2018, 11, 14)
+                        .and_hms_opt(8, 9, 10)
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_eq!(
@@ -1940,7 +2031,11 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.name(), "dd_count");
             assert_eq!(
                 metric.timestamp(),
-                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 15))
+                Some(
+                    Utc.ymd(2018, 11, 14)
+                        .and_hms_opt(8, 9, 15)
+                        .expect("invalid timestamp")
+                )
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_eq!(

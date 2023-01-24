@@ -1,6 +1,8 @@
 use std::io::{self, Read};
 use std::net::SocketAddr;
+use std::time::Duration;
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
 use codecs::{BytesDeserializerConfig, StreamDecodingError};
@@ -37,18 +39,21 @@ use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentT
 #[configurable_component(source("fluent"))]
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
-    /// The address to listen for connections on.
+    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
+    #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    /// The size, in bytes, of the receive buffer used for each connection.
+    /// The size of the receive buffer used for each connection.
     ///
-    /// This should not typically needed to be changed.
+    /// This generally should not need to be changed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     receive_buffer_bytes: Option<usize>,
 
     #[configurable(derived)]
@@ -84,7 +89,7 @@ impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let source = FluentSource::new(log_namespace);
-        let shutdown_secs = 30;
+        let shutdown_secs = Duration::from_secs(30);
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
         let tls_client_metadata_key = self
             .tls
@@ -456,7 +461,7 @@ impl Decoder for FluentDecoder {
             src.advance(byte_size);
 
             let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
-                let base64_encoded_message = base64::encode(&src);
+                let base64_encoded_message = BASE64_STANDARD.encode(&src);
                 emit!(FluentMessageDecodeError {
                     error: &error,
                     base64_encoded_message
@@ -924,7 +929,7 @@ mod tests {
         for (tag, value) in fields {
             record.insert((*tag).into(), rmpv::Value::String((*value).into()).into());
         }
-        let chunk = with_chunk.then(|| base64::encode(uuid::Uuid::new_v4().as_bytes()));
+        let chunk = with_chunk.then(|| BASE64_STANDARD.encode(uuid::Uuid::new_v4().as_bytes()));
         let req = FluentMessage::MessageWithOptions(
             tag.into(),
             FluentTimestamp::Unix(Utc::now()),

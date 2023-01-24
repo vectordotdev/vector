@@ -37,6 +37,7 @@ impl ComponentType {
 
 /// Component type-specific configuration.
 #[allow(clippy::large_enum_variant)]
+#[derive(Clone)]
 pub enum ComponentConfiguration {
     /// A source component.
     Source(Sources),
@@ -48,101 +49,223 @@ pub enum ComponentConfiguration {
     Sink(Sinks),
 }
 
-pub trait ValidatableComponent: Send + Sync {
-    /// Gets the name of the component.
-    fn component_name(&self) -> &'static str;
-
-    /// Gets the type of the component.
-    fn component_type(&self) -> ComponentType;
-
-    /// Gets the component configuration.
-    ///
-    /// As building a component topology requires strongly-typed values for each component type,
-    /// this method is expected to return a component-type variant of `ComponentConfiguration` that
-    /// can be used to pass the component's configuration to `ConfigBuilder`.
-    ///
-    /// For example, a source is added to `ConfigBuilder` by providing a value that can be converted
-    /// to `Sources`, the "big enum" that has a variant for every configurable source. For a source
-    /// implementing this trait, it would return `ComponentConfiguration::Source(source)`, where
-    /// `source` was a valid of `Sources` that maps to the given component's true configuration
-    /// type.
-    fn component_configuration(&self) -> ComponentConfiguration;
-
-    /// Gets the external resource associated with this component.
-    ///
-    /// For sources and sinks, there is always an "external" resource, whether it's an address to
-    /// listen on for traffic, or a Kafka cluster to send events to, and so on. `ExternalResource`
-    /// defines what that external resource is in a semi-structured way, including the
-    /// directionality i.e. pull vs push.
-    ///
-    /// Components inherently have their external resource either as an input (source) or an output
-    /// (sink). For transforms, they are attached to components on both sides, so they require no
-    /// external resource.
-    // TODO: Should this be a vector for multiple resources? Does anything actually have multiple
-    // external resource dependencies? Not necessarily in the sense of, say, the `file` source
-    // monitoring multiple files, but a component that both listens on a TCP socket _and_ opens a
-    // specific file, etc.
-    fn external_resource(&self) -> Option<ExternalResource>;
+/// Configuration for validating a component.
+///
+/// This type encompasses all of the required information for configuring and validating a
+/// component, including the strongly-typed configuration for building a topology, as well as the
+/// definition of the external resource required to properly interact with the component.
+#[derive(Clone)]
+pub struct ValidationConfiguration {
+    component_name: &'static str,
+    component_type: ComponentType,
+    component_configuration: ComponentConfiguration,
+    external_resource: Option<ExternalResource>,
 }
 
-impl<'a, T> ValidatableComponent for &'a T
-where
-    T: ValidatableComponent + ?Sized,
-{
-    fn component_name(&self) -> &'static str {
-        (*self).component_name()
+impl ValidationConfiguration {
+    /// Creates a new `ValidationConfiguration` for a source.
+    pub fn from_source<C: Into<Sources>>(
+        component_name: &'static str,
+        config: C,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            component_name,
+            component_type: ComponentType::Source,
+            component_configuration: ComponentConfiguration::Source(config.into()),
+            external_resource,
+        }
     }
 
-    fn component_type(&self) -> ComponentType {
-        (*self).component_type()
+    /// Creates a new `ValidationConfiguration` for a transform.
+    pub fn from_transform<C: Into<Transforms>>(component_name: &'static str, config: C) -> Self {
+        Self {
+            component_name,
+            component_type: ComponentType::Source,
+            component_configuration: ComponentConfiguration::Transform(config.into()),
+            external_resource: None,
+        }
     }
 
-    fn component_configuration(&self) -> ComponentConfiguration {
-        (*self).component_configuration()
+    /// Creates a new `ValidationConfiguration` for a sink.
+    pub fn from_sink<C: Into<Sinks>>(
+        component_name: &'static str,
+        config: C,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            component_name,
+            component_type: ComponentType::Sink,
+            component_configuration: ComponentConfiguration::Sink(config.into()),
+            external_resource,
+        }
     }
 
-    fn external_resource(&self) -> Option<ExternalResource> {
-        (*self).external_resource()
+    /// Gets the name of the component.
+    pub const fn component_name(&self) -> &'static str {
+        self.component_name
     }
+
+    /// Gets the type of the component.
+    pub const fn component_type(&self) -> ComponentType {
+        self.component_type
+    }
+
+    /// Gets the configuration of the component.
+    pub fn component_configuration(&self) -> ComponentConfiguration {
+        self.component_configuration.clone()
+    }
+
+    /// Gets the external resource definition for validating the component, if any.
+    pub fn external_resource(&self) -> Option<ExternalResource> {
+        self.external_resource.clone()
+    }
+}
+
+pub trait ValidatableComponent: Send + Sync {
+    /// Gets the validation configuration for this component.
+    ///
+    /// The validation configuration compromises the two main requirements for validating a
+    /// component: how to configure the component in a topology, and what external resources, if
+    /// any, it depends on.
+    fn validation_configuration() -> ValidationConfiguration;
+}
+
+/// Description of a validatable component.
+pub struct ValidatableComponentDescription {
+    validation_configuration: fn() -> ValidationConfiguration,
+}
+
+impl ValidatableComponentDescription {
+    /// Creates a new `ValidatableComponentDescription`.
+    ///
+    /// This creates a validatable component description for a component identified by the given
+    /// component type `V`.
+    pub const fn new<V: ValidatableComponent>() -> Self {
+        Self {
+            validation_configuration: <V as ValidatableComponent>::validation_configuration,
+        }
+    }
+
+    /// Queries the list of validatable components for a component with the given name and component type.
+    pub fn query(
+        component_name: &str,
+        component_type: ComponentType,
+    ) -> Option<ValidationConfiguration> {
+        inventory::iter::<Self>
+            .into_iter()
+            .map(|v| (v.validation_configuration)())
+            .find(|v| v.component_name() == component_name && v.component_type() == component_type)
+    }
+}
+
+inventory::collect!(ValidatableComponentDescription);
+
+#[macro_export]
+macro_rules! register_validatable_component {
+    ($ty:ty) => {
+        ::inventory::submit! {
+            $crate::components::validation::ValidatableComponentDescription::new::<$ty>()
+        }
+    };
 }
 
 #[cfg(all(test, feature = "component-validation-tests"))]
 mod tests {
-    use crate::{
-        components::validation::{Runner, StandardValidators},
-        sources::http_server::SimpleHttpConfig,
+    use std::{
+        collections::VecDeque,
+        path::{Component, Path, PathBuf},
     };
 
-    use super::ValidatableComponent;
+    use test_generator::test_resources;
 
-    fn get_all_validatable_components() -> Vec<&'static dyn ValidatableComponent> {
-        // This method is the theoretical spot where we would collect all components that should be
-        // validated by tapping into the component registration that we do with
-        // `#[configurable_component]`, and so on.
-        //
-        // However, as that would require every component we get back from those mechanisms to implement
-        // `Component`, we can't (yet) use them, so here's we're approximating that logic by creating
-        // our own static version of a single component -- the `http_server` source -- and handing it
-        // back.
-        //
-        // Yes, we're leaking an object. It's a test, who cares.
-        vec![Box::leak(Box::new(SimpleHttpConfig::default()))]
+    use crate::components::validation::{Runner, StandardValidators};
+
+    use super::{ComponentType, ValidatableComponentDescription, ValidationConfiguration};
+
+    #[test_resources("tests/validation/components/**/*.yaml")]
+    fn validate_component(test_case_data_path: &str) {
+        let test_case_data_path = PathBuf::from(test_case_data_path.to_string());
+        if !test_case_data_path.exists() {
+            panic!("Component validation test invoked with path to test case data that could not be found: {}", test_case_data_path.to_string_lossy());
+        }
+
+        let configuration = get_validation_configuration_from_test_case_path(&test_case_data_path)
+            .expect("Failed to find validation configuration from given test case data path.");
+
+        run_validation(configuration, test_case_data_path);
     }
 
-    #[tokio::test]
-    async fn compliance() {
+    fn get_validation_configuration_from_test_case_path(
+        test_case_data_path: &Path,
+    ) -> Result<ValidationConfiguration, String> {
+        // The test case data path should follow a fixed structure where the 2nd to last segment is
+        // the component type, and the last segment -- when the extension is removed -- is the
+        // component name.
+        let mut path_segments = test_case_data_path
+            .components()
+            .filter_map(|c| match c {
+                Component::Normal(path) => Some(Path::new(path)),
+                _ => None,
+            })
+            .collect::<VecDeque<_>>();
+        if path_segments.len() <= 2 {
+            return Err(format!("Test case data path contained {} normal path segment(s), expected at least 2 or more.", path_segments.len()));
+        }
+
+        let component_name = path_segments
+            .pop_back()
+            .and_then(|segment| segment.file_stem().map(|s| s.to_string_lossy().to_string()))
+            .ok_or(format!(
+                "Test case data path '{}' contained unexpected or invalid filename.",
+                test_case_data_path.as_os_str().to_string_lossy()
+            ))?;
+
+        let component_type = path_segments
+            .pop_back()
+            .map(|segment| {
+                segment
+                    .as_os_str()
+                    .to_string_lossy()
+                    .to_string()
+                    .to_ascii_lowercase()
+            })
+            .and_then(|segment| match segment.as_str() {
+                "sources" => Some(ComponentType::Source),
+                "transforms" => Some(ComponentType::Transform),
+                "sinks" => Some(ComponentType::Sink),
+                _ => None,
+            })
+            .ok_or(format!(
+                "Test case data path '{}' contained unexpected or invalid component type.",
+                test_case_data_path.as_os_str().to_string_lossy()
+            ))?;
+
+        // Now that we've theoretically got the component type and component name, try to query the
+        // validatable component descriptions to find it.
+        ValidatableComponentDescription::query(&component_name, component_type).ok_or(format!(
+            "No validation configuration for component '{}' with component type '{}'.",
+            component_name,
+            component_type.as_str()
+        ))
+    }
+
+    fn run_validation(configuration: ValidationConfiguration, test_case_data_path: PathBuf) {
         crate::test_util::trace_init();
 
-        let validatable_components = get_all_validatable_components();
-        for validatable_component in validatable_components {
-            let component_name = validatable_component.component_name();
-            let component_type = validatable_component.component_type();
-            info!(
-                "Running validation for component '{}' (type: {:?})...",
-                component_name, component_type
-            );
+        let component_name = configuration.component_name();
+        info!(
+            "Running validation for component '{}' (type: {:?})...",
+            component_name,
+            configuration.component_type()
+        );
 
-            let mut runner = Runner::from_component(validatable_component);
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let mut runner = Runner::from_configuration(configuration, test_case_data_path);
             runner.add_validator(StandardValidators::ComponentSpec);
 
             match runner.run_validation().await {
@@ -216,6 +339,6 @@ mod tests {
                     component_name, e
                 ),
             }
-        }
+        });
     }
 }

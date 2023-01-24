@@ -14,20 +14,22 @@ base: components: sources: dnstap: configuration: {
 		required: false
 		type: string: {}
 	}
-	log_namespace: {
-		description: "The namespace to use for logs. This overrides the global settings."
-		required:    false
-		type: bool: {}
-	}
 	max_frame_handling_tasks: {
 		description: "Maximum number of frames that can be processed concurrently."
 		required:    false
 		type: uint: {}
 	}
 	max_frame_length: {
-		description: "Maximum length, in bytes, that a frame can be."
-		required:    false
-		type: uint: default: 102400
+		description: """
+			Maximum DNSTAP frame length that the source will accept.
+
+			If any frame is longer than this, it will be discarded.
+			"""
+		required: false
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
 	}
 	multithreaded: {
 		description: "Whether or not to concurrently process DNSTAP frames."
@@ -58,8 +60,8 @@ base: components: sources: dnstap: configuration: {
 		description: """
 			Absolute path to the socket file to read DNSTAP data from.
 
-			The DNS server must be configured to send its DNSTAP data to this socket file. The socket file will be created,
-			if it doesn't already exist, when the source first starts.
+			The DNS server must be configured to send its DNSTAP data to this socket file. The socket file will be created
+			if it doesn't already exist when the source first starts.
 			"""
 		required: true
 		type: string: {}
@@ -71,7 +73,7 @@ base: components: sources: dnstap: configuration: {
 			This should not typically needed to be changed.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: unit: "bytes"
 	}
 	socket_send_buffer_size: {
 		description: """
@@ -80,6 +82,6 @@ base: components: sources: dnstap: configuration: {
 			This should not typically needed to be changed.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: unit: "bytes"
 	}
 }

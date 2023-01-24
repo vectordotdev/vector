@@ -7,11 +7,11 @@ components: sources: [Name=string]: {
 
 	configuration: {
 		if features.collect != _|_ {
-				if features.collect.proxy != _|_ {
-					if features.collect.proxy.enabled {
-						proxy: base.components.sources.configuration.proxy
-					}
+			if features.collect.proxy != _|_ {
+				if features.collect.proxy.enabled {
+					proxy: base.components.sources.configuration.proxy
 				}
+			}
 		}
 
 		if !features.auto_generated {

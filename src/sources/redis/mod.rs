@@ -453,7 +453,7 @@ mod integration_test {
         // Briefly wait to ensure the source is subscribed.
         //
         // TODO: This is a prime example of where being able to check if the shutdown signal had been polled at least
-        // once would serve as the most precise indicator of "is the source ready and waiting to receieve?".
+        // once would serve as the most precise indicator of "is the source ready and waiting to receive?".
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Now create a normal Redis client and use it to publish a bunch of message, which we'll ensure the source consumes.

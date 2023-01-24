@@ -677,7 +677,7 @@ mod tests {
             ],
         );
 
-        // When we have a fized-size marker whose required acked marker ID lands right on the
+        // When we have a fixed-size marker whose required acked marker ID lands right on the
         // current acked marker ID, it should not be eligible unless there are enough unclaimed
         // acks to actually account for it:
         run_test_case(
@@ -790,7 +790,7 @@ mod tests {
                                 },
                                 PendingMarkerLength::Assumed(_) => panic!("should never have an assumed length at back"),
                                 PendingMarkerLength::Unknown => {
-                                    // Now that we have an ID range, we have enough infornation to
+                                    // Now that we have an ID range, we have enough information to
                                     // give the unknown length marker an assumed length.
                                     let len = id.wrapping_sub(back_id);
                                     let (_, back_len_mut) = marker_stack.back_mut().expect("must exist");

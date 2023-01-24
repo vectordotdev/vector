@@ -552,7 +552,7 @@ impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for Wra
         self: Box<Self>,
         stream: Pin<Box<dyn Stream<Item = EventArray> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = EventArray> + Send>> {
-        // This is an aweful lot of boxes
+        // This is an awful lot of boxes
         let stream = stream.flat_map(into_event_stream).boxed();
         Box::new(self.0).transform(stream).map(Into::into).boxed()
     }

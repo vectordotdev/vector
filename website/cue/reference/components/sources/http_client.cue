@@ -136,7 +136,7 @@ components: sources: http_client: {
 				description: "An individual line from a `text/plain` HTTP request"
 				fields: {
 					message: {
-						description:   "The raw line line from the incoming payload."
+						description:   "The raw line from the incoming payload."
 						relevant_when: "encoding == \"text\""
 						required:      true
 						type: string: {

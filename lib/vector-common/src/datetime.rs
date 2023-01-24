@@ -68,7 +68,9 @@ impl TimeZone {
 
 /// Convert a timestamp with a non-UTC time zone into UTC
 pub(super) fn datetime_to_utc<TZ: chrono::TimeZone>(ts: &DateTime<TZ>) -> DateTime<Utc> {
-    Utc.timestamp(ts.timestamp(), ts.timestamp_subsec_nanos())
+    Utc.timestamp_opt(ts.timestamp(), ts.timestamp_subsec_nanos())
+        .single()
+        .expect("invalid timestamp")
 }
 
 impl From<TimeZone> for String {

@@ -25,6 +25,9 @@ pub struct TagCardinalityLimitConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+#[configurable(metadata(
+    docs::enum_tag_description = "Controls the approach taken for tracking tag cardinality."
+))]
 pub enum Mode {
     /// Tracks cardinality exactly.
     ///
@@ -38,7 +41,7 @@ pub enum Mode {
     /// events to pass through the transform even when they contain new tags that exceed the
     /// configured limit. The rate at which this happens can be controlled by changing the value of
     /// `cache_size_per_tag`.
-    Probabilistic(#[configurable(derived)] BloomFilterConfig),
+    Probabilistic(BloomFilterConfig),
 }
 
 /// Bloom filter configuration in probabilistic mode.

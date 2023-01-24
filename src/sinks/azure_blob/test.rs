@@ -18,6 +18,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
         connection_string: Default::default(),
         storage_account: Default::default(),
         container_name: Default::default(),
+        endpoint: Default::default(),
         blob_prefix: Default::default(),
         blob_time_format: Default::default(),
         blob_append_uuid: Default::default(),

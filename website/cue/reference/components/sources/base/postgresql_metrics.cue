@@ -8,11 +8,8 @@ base: components: sources: postgresql_metrics: configuration: {
 			Each endpoint must be in the [Connection URI
 			format](https://www.postgresql.org/docs/current/libpq-connect.html#id-1.7.3.8.3.6).
 			"""
-		required: false
-		type: array: {
-			default: []
-			items: type: string: {}
-		}
+		required: true
+		type: array: items: type: string: examples: ["postgresql://postgres:vector@localhost:5432/postgres"]
 	}
 	exclude_databases: {
 		description: """
@@ -25,7 +22,7 @@ base: components: sources: postgresql_metrics: configuration: {
 			This can be used in conjunction with `include_databases`.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["^postgres$", "^template.*"]
 	}
 	include_databases: {
 		description: """
@@ -39,21 +36,20 @@ base: components: sources: postgresql_metrics: configuration: {
 			This can be used in conjunction with `exclude_databases`.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["^postgres$", "^vector$", "^foo"]
 	}
 	namespace: {
-		description: """
-			Overrides the default namespace for the metrics emitted by the source.
-
-			By default, `postgresql` is used.
-			"""
-		required: false
+		description: "Overrides the default namespace for the metrics emitted by the source."
+		required:    false
 		type: string: default: "postgresql"
 	}
 	scrape_interval_secs: {
-		description: "The interval between scrapes, in seconds."
+		description: "The interval between scrapes."
 		required:    false
-		type: uint: default: 15
+		type: uint: {
+			default: 15
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description: "Configuration of TLS when connecting to PostgreSQL."
@@ -65,7 +61,7 @@ base: components: sources: postgresql_metrics: configuration: {
 				The certificate must be in the DER or PEM (X.509) format.
 				"""
 			required: true
-			type: string: {}
+			type: string: examples: ["certs/ca.pem"]
 		}
 	}
 }

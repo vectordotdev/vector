@@ -130,7 +130,8 @@ base: components: sinks: elasticsearch: configuration: {
 				type: string: {}
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					aws:   "Amazon OpenSearch Service-specific authentication."
 					basic: "HTTP Basic Authentication."
@@ -440,7 +441,8 @@ base: components: sinks: elasticsearch: configuration: {
 		description: "Custom parameters to add to the query string of each request sent to Elasticsearch."
 		required:    false
 		type: object: options: "*": {
-			required: true
+			description: "A query string parameter."
+			required:    true
 			type: string: {}
 		}
 	}
@@ -524,7 +526,8 @@ base: components: sinks: elasticsearch: configuration: {
 				description: "Additional HTTP headers to add to every HTTP request."
 				required:    false
 				type: object: options: "*": {
-					required: true
+					description: "An HTTP request header."
+					required:    true
 					type: string: {}
 				}
 			}

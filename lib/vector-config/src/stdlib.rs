@@ -57,7 +57,7 @@ where
         // Said another way, this allows callers to use `#[configurable(derived)]` on a field of `Option<T>` so long as
         // `T` has a description, and both the optional field and the schema for `T` will get the description... but the
         // description for the optional field can still be overridden independently, etc.
-        T::metadata().convert().as_subschema()
+        T::metadata().convert()
     }
 
     fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
@@ -118,7 +118,7 @@ impl Configurable for char {
 }
 
 // Numbers.
-macro_rules! impl_configuable_numeric {
+macro_rules! impl_configurable_numeric {
 	($($ty:ty),+) => {
 		$(
 			impl Configurable for $ty {
@@ -142,7 +142,7 @@ macro_rules! impl_configuable_numeric {
 	};
 }
 
-impl_configuable_numeric!(
+impl_configurable_numeric!(
     u8,
     u16,
     u32,

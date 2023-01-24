@@ -129,6 +129,11 @@ base: components: sinks: clickhouse: configuration: {
 		required:    false
 		type: string: examples: ["mydatabase"]
 	}
+	date_time_best_effort: {
+		description: "Sets `date_time_input_format` to `best_effort`, allowing ClickHouse to properly parse RFC3339/ISO 8601."
+		required:    false
+		type: bool: default: false
+	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
 		required:    false

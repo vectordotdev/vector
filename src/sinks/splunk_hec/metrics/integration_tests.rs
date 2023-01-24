@@ -170,7 +170,7 @@ async fn splunk_insert_multiple_gauge_metrics() {
 
 // It usually takes ~1 second for the metric to show up in search with all dimensions, so poll
 // multiple times.
-// Note, Splunk automatically addes [host, source, sourcetype] as default metric dimensions
+// Note, Splunk automatically adds [host, source, sourcetype] as default metric dimensions
 // https://docs.splunk.com/Documentation/SplunkCloud/latest/Metrics/Overview
 async fn metric_dimensions_exist(metric_name: &str, expected_dimensions: &[&str]) -> bool {
     for _ in 0..20usize {

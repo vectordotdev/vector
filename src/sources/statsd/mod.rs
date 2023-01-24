@@ -1,4 +1,7 @@
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::{
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    time::Duration,
+};
 
 use bytes::Bytes;
 use codecs::{
@@ -7,6 +10,7 @@ use codecs::{
 };
 use futures::{StreamExt, TryFutureExt};
 use listenfd::ListenFd;
+use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
@@ -42,28 +46,30 @@ use vector_core::config::LogNamespace;
 #[configurable_component(source("statsd"))]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
+#[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum StatsdConfig {
     /// Listen on TCP.
-    Tcp(#[configurable(derived)] TcpConfig),
+    Tcp(TcpConfig),
 
     /// Listen on UDP.
-    Udp(#[configurable(derived)] UdpConfig),
+    Udp(UdpConfig),
 
-    /// Listen on UDS. (Unix domain socket)
+    /// Listen on a Unix domain Socket (UDS).
     #[cfg(unix)]
-    Unix(#[configurable(derived)] UnixConfig),
+    Unix(UnixConfig),
 }
 
 /// UDP configuration for the `statsd` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
-    /// The address to listen for messages on.
+    #[configurable(derived)]
     address: SocketListenAddr,
 
-    /// The size, in bytes, of the receive buffer used for each connection.
+    /// The size of the receive buffer used for each connection.
     ///
-    /// This should not typically needed to be changed.
+    /// Generally this should not need to be configured.
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -77,10 +83,11 @@ impl UdpConfig {
 }
 
 /// TCP configuration for the `statsd` source.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    /// The address to listen for connections on.
+    #[configurable(derived)]
     address: SocketListenAddr,
 
     #[configurable(derived)]
@@ -92,14 +99,17 @@ pub struct TcpConfig {
 
     /// The timeout before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
-    shutdown_timeout_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    shutdown_timeout_secs: Duration,
 
-    /// The size, in bytes, of the receive buffer used for each connection.
+    /// The size of the receive buffer used for each connection.
     ///
-    /// This should not typically needed to be changed.
+    /// Generally this should not need to be configured.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that will be allowed at any given time.
+    #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 }
 
@@ -117,8 +127,8 @@ impl TcpConfig {
     }
 }
 
-const fn default_shutdown_timeout_secs() -> u64 {
-    30
+const fn default_shutdown_timeout_secs() -> Duration {
+    Duration::from_secs(30)
 }
 
 impl GenerateConfig for StatsdConfig {

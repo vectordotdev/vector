@@ -329,7 +329,11 @@ mod tests {
             MetricValue::Counter { value: 42.0 },
         )
         .with_namespace(Some("jvm"))
-        .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)))];
+        .with_timestamp(Some(
+            Utc.ymd(2020, 8, 18)
+                .and_hms_nano_opt(21, 0, 0, 0)
+                .expect("invalid timestamp"),
+        ))];
 
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000",
@@ -344,7 +348,11 @@ mod tests {
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
         )
-        .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)))];
+        .with_timestamp(Some(
+            Utc.ymd(2020, 8, 18)
+                .and_hms_nano_opt(21, 0, 0, 0)
+                .expect("invalid timestamp"),
+        ))];
 
         assert_eq!(
             "ns,metric_type=counter,token=aaa used=42 1597784400000000000",
@@ -361,14 +369,22 @@ mod tests {
                 MetricValue::Counter { value: 42.0 },
             )
             .with_namespace(Some("jvm"))
-            .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0))),
+            .with_timestamp(Some(
+                Utc.ymd(2020, 8, 18)
+                    .and_hms_nano_opt(21, 0, 0, 0)
+                    .expect("invalid timestamp"),
+            )),
             Metric::new(
                 "pool.committed",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 18874368.0 },
             )
             .with_namespace(Some("jvm"))
-            .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 1))),
+            .with_timestamp(Some(
+                Utc.ymd(2020, 8, 18)
+                    .and_hms_nano_opt(21, 0, 0, 1)
+                    .expect("invalid timestamp"),
+            )),
         ];
 
         assert_eq!(
@@ -425,7 +441,7 @@ mod tests {
                 )
                 .with_namespace(Some(*namespace))
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
-                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32))),
+                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano_opt(21, 0, 0, i as u32).expect("invalid timestamp"))),
             );
             events.push(event);
         }

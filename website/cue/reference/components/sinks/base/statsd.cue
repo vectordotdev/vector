@@ -81,15 +81,16 @@ base: components: sinks: statsd: configuration: {
 		type: object: options: time_secs: {
 			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	mode: {
-		required: true
+		description: "The type of socket to use."
+		required:    true
 		type: string: enum: {
-			tcp:  "TCP."
-			udp:  "UDP."
-			unix: "Unix Domain Socket."
+			tcp:  "Send over TCP."
+			udp:  "Send over UDP."
+			unix: "Send over a Unix domain socket (UDS)."
 		}
 	}
 	path: {

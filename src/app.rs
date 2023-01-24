@@ -1,20 +1,23 @@
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, sync::Arc};
 
 use futures::StreamExt;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
+use futures_util::FutureExt;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::{
     runtime::{self, Runtime},
-    sync::mpsc,
+    sync::{mpsc, Mutex},
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
 use crate::config::enterprise::{
-    attach_enterprise_components, report_configuration, report_on_reload, EnterpriseError,
-    EnterpriseMetadata, EnterpriseReporter,
+    attach_enterprise_components, report_configuration, EnterpriseError, EnterpriseMetadata,
+    EnterpriseReporter,
 };
+#[cfg(not(windows))]
+use crate::control_server::ControlServer;
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
 #[cfg(windows)]
@@ -23,10 +26,9 @@ use crate::service;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config::{self},
-    generate, generate_schema, graph, heartbeat, list,
+    config, generate, generate_schema, graph, heartbeat, list,
     signal::{self, SignalTo},
-    topology::{self, RunningTopology},
+    topology::{self, ReloadOutcome, RunningTopology, TopologyController},
     trace, unit_test, validate,
 };
 #[cfg(feature = "api-client")]
@@ -34,10 +36,7 @@ use crate::{tap, top};
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
-use crate::internal_events::{
-    VectorConfigLoadError, VectorQuit, VectorRecoveryError, VectorReloadError, VectorReloaded,
-    VectorStarted, VectorStopped,
-};
+use crate::internal_events::{VectorQuit, VectorStarted, VectorStopped};
 
 use tokio::sync::broadcast::error::RecvError;
 
@@ -289,7 +288,7 @@ impl Application {
             #[cfg(feature = "api")]
             // Assigned to prevent the API terminating when falling out of scope.
             let api_server = if api_config.enabled {
-                use std::sync::{Arc, atomic::AtomicBool};
+                use std::sync::atomic::AtomicBool;
 
                 let api_server = api::Server::start(topology.config(), topology.watch(), Arc::<AtomicBool>::clone(&topology.running));
 
@@ -313,7 +312,7 @@ impl Application {
                 None
             };
 
-            let mut topology_controller = TopologyController {
+            let topology_controller = TopologyController {
                 topology,
                 config_paths,
                 require_healthy: opts.require_healthy,
@@ -322,18 +321,43 @@ impl Application {
                 #[cfg(feature = "api")]
                 api_server,
             };
+            let topology_controller = Arc::new(Mutex::new(topology_controller));
+
+            // If the relevant ENV var is set, start up the control server
+            #[cfg(not(windows))]
+            let control_server_pieces = if let Ok(path) = std::env::var("VECTOR_CONTROL_SOCKET_PATH") {
+                let (shutdown_trigger, tripwire) = stream_cancel::Tripwire::new();
+                match ControlServer::bind(path, Arc::clone(&topology_controller), tripwire) {
+                    Ok(control_server) => {
+                        let server_handle = tokio::spawn(control_server.run());
+                        Some((shutdown_trigger, server_handle))
+                    }
+                    Err(error) => {
+                        error!(message = "Error binding control server.", %error);
+                        // TODO: We should exit non-zero here, but `Application::run` isn't set up
+                        // that way, and we'd need to push everything up to the API server start
+                        // into `Application::prepare`.
+                        return
+                    }
+                }
+            } else {
+                None
+            };
 
             let signal = loop {
                 tokio::select! {
                     signal = signal_rx.recv() => {
                         match signal {
                             Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
+                                let mut topology_controller = topology_controller.lock().await;
                                 let new_config = config_builder.build().map_err(handle_config_errors).ok();
-                                if let Some(signal) = topology_controller.reload(new_config).await {
-                                    break signal;
+                                if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
+                                    break SignalTo::Shutdown;
                                 }
                             }
                             Ok(SignalTo::ReloadFromDisk) => {
+                                let mut topology_controller = topology_controller.lock().await;
+
                                 // Reload paths
                                 if let Some(paths) = config::process_paths(&opts.config_paths_with_formats()) {
                                     topology_controller.config_paths = paths;
@@ -344,8 +368,8 @@ impl Application {
                                     .await
                                     .map_err(handle_config_errors).ok();
 
-                                if let Some(signal) = topology_controller.reload(new_config).await {
-                                    break signal;
+                                if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
+                                    break SignalTo::Shutdown;
                                 }
                             },
                             Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
@@ -355,10 +379,24 @@ impl Application {
                     }
                     // Trigger graceful shutdown if a component crashed, or all sources have ended.
                     _ = graceful_crash.next() => break SignalTo::Shutdown,
-                    _ = topology_controller.sources_finished() => break SignalTo::Shutdown,
+                    _ = sources_finished(Arc::clone(&topology_controller)) => {
+                        info!("All sources have finished.");
+                        break SignalTo::Shutdown
+                    } ,
                     else => unreachable!("Signal streams never end"),
                 }
             };
+
+            // Shut down the control server, if running
+            #[cfg(not(windows))]
+            if let Some((shutdown_trigger, server_handle)) = control_server_pieces {
+                drop(shutdown_trigger);
+                server_handle.await.expect("control server task panicked").expect("control server error");
+            }
+
+            // Once any control server has stopped, we'll have the only reference to the topology
+            // controller and can safely remove it from the Arc/Mutex to shut down the topology.
+            let topology_controller = Arc::try_unwrap(topology_controller).expect("fail to unwrap topology controller").into_inner();
 
             match signal {
                 SignalTo::Shutdown => {
@@ -383,78 +421,36 @@ impl Application {
     }
 }
 
-struct TopologyController {
-    topology: RunningTopology,
-    config_paths: Vec<config::ConfigPath>,
-    require_healthy: Option<bool>,
-    #[cfg(feature = "enterprise")]
-    enterprise_reporter: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
-    #[cfg(feature = "api")]
-    api_server: Option<api::Server>,
-}
+// The `sources_finished` method on `RunningTopology` only considers sources that are currently
+// running at the time the method is called. This presents a problem when the set of running
+// sources can change while we are waiting on the resulting future to resolve.
+//
+// This function resolves that issue by waiting in two stages. The first is the usual asynchronous
+// wait for the future to complete. When it does, we know that all of the sources that existed when
+// the future was built have finished, but we don't know if that's because they were replaced as
+// part of a reload (in which case we don't want to return yet). To differentiate, we acquire the
+// lock on the topology, create a new future, and check whether it resolves immediately or not. If
+// it does resolve, we know all sources are truly finished because we held the lock during the
+// check, preventing anyone else from adding new sources. If it does not resolve, that indicates
+// that new sources have been added since our original call and we should start the process over to
+// continue waiting.
+async fn sources_finished(mutex: Arc<Mutex<TopologyController>>) {
+    loop {
+        // Do an initial async wait while the topology is running, making sure not the hold the
+        // mutex lock while we wait on sources to finish.
+        let initial = {
+            let tc = mutex.lock().await;
+            tc.topology.sources_finished()
+        };
+        initial.await;
 
-impl TopologyController {
-    async fn reload(&mut self, new_config: Option<config::Config>) -> Option<SignalTo> {
-        if new_config.is_none() {
-            emit!(VectorConfigLoadError);
-            return None;
+        // Once the initial signal is tripped, hold lock on the topology while checking again. This
+        // ensures that no other task is adding new sources.
+        let top = mutex.lock().await;
+        if top.topology.sources_finished().now_or_never().is_some() {
+            return;
+        } else {
+            continue;
         }
-        let mut new_config = new_config.unwrap();
-
-        new_config
-            .healthchecks
-            .set_require_healthy(self.require_healthy);
-
-        #[cfg(feature = "enterprise")]
-        // Augment config to enable observability within Datadog, if applicable.
-        match EnterpriseMetadata::try_from(&new_config) {
-            Ok(metadata) => {
-                if let Some(e) = report_on_reload(
-                    &mut new_config,
-                    metadata,
-                    self.config_paths.clone(),
-                    self.enterprise_reporter.as_ref(),
-                ) {
-                    self.enterprise_reporter = Some(e);
-                }
-            }
-            Err(err) => {
-                if let EnterpriseError::MissingApiKey = err {
-                    emit!(VectorReloadError);
-                    return None;
-                }
-            }
-        }
-
-        match self.topology.reload_config_and_respawn(new_config).await {
-            Ok(true) => {
-                #[cfg(feature = "api")]
-                // Pass the new config to the API server.
-                if let Some(ref api_server) = self.api_server {
-                    api_server.update_config(self.topology.config());
-                }
-
-                emit!(VectorReloaded {
-                    config_paths: &self.config_paths
-                })
-            }
-            Ok(false) => emit!(VectorReloadError),
-            // Trigger graceful shutdown for what remains of the topology
-            Err(()) => {
-                emit!(VectorReloadError);
-                emit!(VectorRecoveryError);
-                return Some(SignalTo::Shutdown);
-            }
-        }
-
-        None
-    }
-
-    async fn sources_finished(&self) {
-        self.topology.sources_finished().await;
-    }
-
-    async fn stop(self) {
-        self.topology.stop().await;
     }
 }

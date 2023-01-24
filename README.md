@@ -128,22 +128,22 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 Vector is an end-to-end, unified, open data platform.
 
-|                     | **Vector** | Beats | Fluentbit | Fluentd | Logstash | Splunk UF | Splunk HF |
-|--------------------:|:----------:|:-----:|:---------:|:-------:|:--------:|:---------:|:---------:|
-|      **End-to-end** |   **✓**    |       |           |         |          |           |           |
-|               Agent |   **✓**    |   ✓   |     ✓     |         |          |     ✓     |           |
-|          Aggregator |   **✓**    |       |           |    ✓    |    ✓     |           |     ✓     |
-|         **Unified** |   **✓**    |       |           |         |          |           |           |
-|                Logs |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
-|             Metrics |   **✓**    |   ⚠   |     ⚠     |    ⚠    |    ⚠     |     ⚠     |     ⚠     |
-|              Traces |     🚧      |       |           |         |          |           |           |
-|            **Open** |   **✓**    |       |     ✓     |    ✓    |          |           |           |
-|         Open-source |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |           |           |
-|      Vendor-neutral |   **✓**    |       |     ✓     |    ✓    |          |           |           |
-|     **Reliability** |   **✓**    |       |           |         |          |           |           |
-|         Memory-safe |   **✓**    |       |           |         |          |           |           |
-| Delivery guarantees |   **✓**    |       |           |         |          |     ✓     |     ✓     |
-|          Multi-core |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+|                     | **Vector** | Beats | Fluentbit | Fluentd | Logstash | Splunk UF | Splunk HF | Telegraf |
+|--------------------:|:----------:|:-----:|:---------:|:-------:|:--------:|:---------:|:---------:|:--------:|
+|      **End-to-end** |   **✓**    |       |           |         |          |           |           |     ✓    |
+|               Agent |   **✓**    |   ✓   |     ✓     |         |          |     ✓     |           |     ✓    |
+|          Aggregator |   **✓**    |       |           |    ✓    |    ✓     |           |     ✓     |     ✓    |
+|         **Unified** |   **✓**    |       |           |         |          |           |           |     ✓    |
+|                Logs |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |     ✓    |
+|             Metrics |   **✓**    |   ⚠   |     ⚠     |    ⚠    |    ⚠     |     ⚠     |     ⚠     |     ✓    |
+|              Traces |     🚧     |       |           |         |          |           |           |          |
+|            **Open** |   **✓**    |       |     ✓     |    ✓    |          |           |           |     ✓    |
+|         Open-source |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |           |           |     ✓    |
+|      Vendor-neutral |   **✓**    |       |     ✓     |    ✓    |          |           |           |     ✓    |
+|     **Reliability** |   **✓**    |       |           |         |          |           |           |          |
+|         Memory-safe |   **✓**    |       |           |         |          |           |           |     ✓    |
+| Delivery guarantees |   **✓**    |       |           |         |          |     ✓     |     ✓     |          |
+|          Multi-core |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |     ✓    |
 
 
 ⚠ = Not interoperable, metrics are represented as structured logs

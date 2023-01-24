@@ -6,7 +6,12 @@ releases: "0.26.0": {
 
 	whats_next: []
 
-	known_issues: []
+	known_issues: [
+		"""
+			Annotating namespace labels in the `kubernetes_logs` source cannot be disabled by
+			setting `namespace_labels` to `""`. Fixed in v0.27.0.
+			""",
+	]
 
 	description: """
 		The Vector team is pleased to announce version 0.26.0!
@@ -41,7 +46,7 @@ releases: "0.26.0": {
 			scopes: ["sources: kafka"]
 			description: """
 				The `kafka` source now flushes commits when a rebalance event occurs. This avoids
-				issues with commiting offsets to partitions the Vector instance no longer is
+				issues with committing offsets to partitions the Vector instance no longer is
 				consuming.
 				"""
 			pr_numbers: [10434]
@@ -344,7 +349,7 @@ releases: "0.26.0": {
 		{sha: "943c6165523d91c89ed5c2dd5fa52ace83c93022", date: "2022-11-02 01:02:46 UTC", description: "Fix roadmap voting link in readme", pr_number:                                                         15055, scopes: [], type:                                  "docs", breaking_change:        false, author: "Michael Warkentin", files_count:  1, insertions_count:    1, deletions_count:    1},
 		{sha: "4271431ba8fa6c3b34e7b5315cff3a3daa7fd228", date: "2022-11-02 07:40:17 UTC", description: "Retry whole payload on partial bulk failure", pr_number:                                               14891, scopes: ["elasticsearch sink"], type:              "enhancement", breaking_change: false, author: "Kruno Tomola Fabro", files_count: 3, insertions_count:    123, deletions_count:  20},
 		{sha: "5e582447cb3919eba12891c9178b365423075356", date: "2022-11-02 02:57:58 UTC", description: "add `LogNamespace` getter functions", pr_number:                                                       15054, scopes: ["core"], type:                            "chore", breaking_change:       false, author: "Nathan Fox", files_count:         1, insertions_count:    37, deletions_count:   0},
-		{sha: "3b7916b82e28979a1121508f1926164fe03f60e9", date: "2022-11-02 01:44:05 UTC", description: "Update usages of deprecated set-output in Github Actions", pr_number:                                  15058, scopes: ["ci"], type:                              "chore", breaking_change:       false, author: "Jesse Szwedko", files_count:      1, insertions_count:    5, deletions_count:    5},
+		{sha: "3b7916b82e28979a1121508f1926164fe03f60e9", date: "2022-11-02 01:44:05 UTC", description: "Update usages of deprecated set-output in GitHub Actions", pr_number:                                  15058, scopes: ["ci"], type:                              "chore", breaking_change:       false, author: "Jesse Szwedko", files_count:      1, insertions_count:    5, deletions_count:    5},
 		{sha: "01b7b3c03767b61d64f2a7a6a48cf0e13fde7888", date: "2022-11-02 05:23:51 UTC", description: "Remove `mut` requirement of `LogNamespace` getters", pr_number:                                        15060, scopes: ["core"], type:                            "chore", breaking_change:       false, author: "Nathan Fox", files_count:         1, insertions_count:    2, deletions_count:    2},
 		{sha: "f7f4b640719513ab594e324f64b493e315581091", date: "2022-11-02 05:47:03 UTC", description: "move smp crate version to variable", pr_number:                                                        15062, scopes: ["ci"], type:                              "chore", breaking_change:       false, author: "Geoffrey Oxberry", files_count:   1, insertions_count:    23, deletions_count:   17},
 		{sha: "373e1c8dd902b49bc18dd7448d12c1a5c11494ff", date: "2022-11-02 09:33:57 UTC", description: "Add log namespace and schema support", pr_number:                                                      14985, scopes: ["aws_s3 source"], type:                   "feat", breaking_change:        false, author: "Spencer Gilbert", files_count:    5, insertions_count:    240, deletions_count:  80},

@@ -4,6 +4,7 @@ use vector_config_common::{attributes::CustomAttribute, validation};
 
 use crate::Configurable;
 
+/// The metadata associated with a given type or field.
 #[derive(Clone)]
 pub struct Metadata<T> {
     title: Option<&'static str>,
@@ -97,20 +98,12 @@ impl<T> Metadata<T> {
         self.deprecated = true;
     }
 
-    pub fn clear_deprecated(&mut self) {
-        self.deprecated = false;
-    }
-
     pub fn transparent(&self) -> bool {
         self.transparent
     }
 
     pub fn set_transparent(&mut self) {
         self.transparent = true;
-    }
-
-    pub fn clear_transparent(&mut self) {
-        self.transparent = false;
     }
 
     pub fn custom_attributes(&self) -> &[CustomAttribute] {
@@ -121,20 +114,12 @@ impl<T> Metadata<T> {
         self.custom_attributes.push(attribute);
     }
 
-    pub fn clear_custom_attributes(&mut self) {
-        self.custom_attributes.clear();
-    }
-
     pub fn validations(&self) -> &[validation::Validation] {
         &self.validations
     }
 
     pub fn add_validation(&mut self, validation: validation::Validation) {
         self.validations.push(validation);
-    }
-
-    pub fn clear_validations(&mut self) {
-        self.validations.clear();
     }
 
     pub fn merge(mut self, other: Metadata<T>) -> Self {
@@ -164,34 +149,6 @@ impl<T> Metadata<T> {
             deprecated: self.deprecated,
             transparent: self.transparent,
             validations: self.validations.clone(),
-        }
-    }
-
-    /// Gets a version of this metadata suitable for subschema use.
-    ///
-    /// This strips all custom attributes and validations, as well as some flags, which makes this exclusively useful
-    /// for shuttling metadata from a type that (de)serializes to an entirely different type.
-    pub fn as_subschema(&self) -> Self {
-        Self {
-            title: self.title,
-            description: self.description,
-            custom_attributes: Vec::new(),
-            transparent: self.transparent,
-            ..Default::default()
-        }
-    }
-}
-
-impl<T> Metadata<Option<T>> {
-    pub fn flatten_default(self) -> Metadata<T> {
-        Metadata {
-            title: self.title,
-            description: self.description,
-            default_value: self.default_value.flatten(),
-            custom_attributes: self.custom_attributes,
-            deprecated: self.deprecated,
-            transparent: self.transparent,
-            validations: self.validations,
         }
     }
 }
