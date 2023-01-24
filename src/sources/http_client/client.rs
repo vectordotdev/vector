@@ -18,10 +18,7 @@ use crate::{
     sources,
     sources::util::{
         http::HttpMethod,
-        http_client::{
-            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
-            HttpClientBuilder,
-        },
+        http_client::{build_url, call, GenericHttpClientInputs, HttpClientBuilder},
     },
     tls::{TlsConfig, TlsSettings},
     Result,
@@ -90,6 +87,11 @@ pub struct HttpClientConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
+}
+
+/// The default interval to call the http endpoint if none is configured.
+const fn default_scrape_interval_secs() -> u64 {
+    15
 }
 
 const fn default_http_method() -> HttpMethod {

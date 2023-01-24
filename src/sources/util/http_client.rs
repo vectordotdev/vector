@@ -45,11 +45,6 @@ pub(crate) struct GenericHttpClientInputs {
     pub shutdown: ShutdownSignal,
 }
 
-/// The default interval to call the http endpoint if none is configured.
-pub(crate) const fn default_scrape_interval_secs() -> u64 {
-    15
-}
-
 /// Builds the context, allowing the source-specific implementation to leverage data from the
 /// config and the current HTTP request.
 pub(crate) trait HttpClientBuilder {
