@@ -197,6 +197,7 @@ impl Container {
 
         let options = Some(CreateContainerOptions {
             name: format!("vector_test_{}", uuid::Uuid::new_v4()),
+            platform: None,
         });
 
         let config = Config {
