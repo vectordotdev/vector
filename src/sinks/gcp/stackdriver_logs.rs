@@ -119,7 +119,7 @@ const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 pub enum StackdriverLogName {
     /// The billing account ID to which to publish logs.
     #[serde(rename = "billing_account_id")]
-    BillingAccount(#[configurable(transparent)] String),
+    BillingAccount(String),
 
     /// The folder ID to which to publish logs.
     ///
@@ -127,13 +127,13 @@ pub enum StackdriverLogName {
     ///
     /// [folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
     #[serde(rename = "folder_id")]
-    Folder(#[configurable(transparent)] String),
+    Folder(String),
 
     /// The organization ID to which to publish logs.
     ///
     /// This would be the identifier assigned to your organization on Google Cloud Platform.
     #[serde(rename = "organization_id")]
-    Organization(#[configurable(transparent)] String),
+    Organization(String),
 
     /// The project ID to which to publish logs.
     ///
@@ -142,7 +142,7 @@ pub enum StackdriverLogName {
     /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     #[derivative(Default)]
     #[serde(rename = "project_id")]
-    Project(#[configurable(transparent)] String),
+    Project(String),
 }
 
 /// A monitored resource.
@@ -168,6 +168,7 @@ pub struct StackdriverResource {
 
     /// Type-specific labels.
     #[serde(flatten)]
+    #[configurable(metadata(docs::additional_props_description = "A type-specific label."))]
     pub labels: HashMap<String, Template>,
 }
 
@@ -492,7 +493,11 @@ mod tests {
         log.insert("anumber", Value::Bytes("100".into()));
         log.insert(
             "timestamp",
-            Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
+            Value::Timestamp(
+                Utc.ymd(2020, 1, 1)
+                    .and_hms_opt(12, 30, 0)
+                    .expect("invalid timestamp"),
+            ),
         );
 
         let json = encoder.encode_event(Event::from(log)).unwrap();

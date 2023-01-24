@@ -529,12 +529,12 @@ mod tests {
         run_assert_sink(config, input.clone().into_iter()).await;
 
         let output = vec![
-            lines_from_file(&directory.join("warnings-2019-26-07.log")),
-            lines_from_file(&directory.join("errors-2019-26-07.log")),
-            lines_from_file(&directory.join("warnings-2019-27-07.log")),
-            lines_from_file(&directory.join("errors-2019-27-07.log")),
-            lines_from_file(&directory.join("warnings-2019-28-07.log")),
-            lines_from_file(&directory.join("errors-2019-29-07.log")),
+            lines_from_file(directory.join("warnings-2019-26-07.log")),
+            lines_from_file(directory.join("errors-2019-26-07.log")),
+            lines_from_file(directory.join("warnings-2019-27-07.log")),
+            lines_from_file(directory.join("errors-2019-27-07.log")),
+            lines_from_file(directory.join("warnings-2019-28-07.log")),
+            lines_from_file(directory.join("errors-2019-29-07.log")),
         ];
 
         assert_eq!(

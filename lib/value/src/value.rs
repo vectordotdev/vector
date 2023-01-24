@@ -56,7 +56,7 @@ pub enum Value {
     /// Boolean.
     Boolean(bool),
 
-    /// Timetamp (UTC).
+    /// Timestamp (UTC).
     Timestamp(DateTime<Utc>),
 
     /// Object.

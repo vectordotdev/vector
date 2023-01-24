@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use futures::{
@@ -11,6 +11,7 @@ use mongodb::{
     options::ClientOptions,
     Client,
 };
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
@@ -74,6 +75,7 @@ enum CollectError {
 }
 
 /// Configuration for the `mongodb_metrics` source.
+#[serde_as]
 #[configurable_component(source("mongodb_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -81,11 +83,13 @@ pub struct MongoDbMetricsConfig {
     /// A list of MongoDB instances to scrape.
     ///
     /// Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
+    #[configurable(metadata(docs::examples = "mongodb://localhost:27017"))]
     endpoints: Vec<String>,
 
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
     ///
@@ -104,8 +108,8 @@ struct MongoDbMetrics {
     tags: MetricTags,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
-    15
+pub const fn default_scrape_interval_secs() -> Duration {
+    Duration::from_secs(15)
 }
 
 pub fn default_namespace() -> String {
@@ -126,7 +130,7 @@ impl SourceConfig for MongoDbMetricsConfig {
         )
         .await?;
 
-        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
@@ -985,7 +989,7 @@ fn bson_size(value: &Bson) -> usize {
         Bson::Symbol(value) => value.size_of(),
         Bson::Decimal128(value) => value.bytes().size_of(),
         Bson::DbPointer(_) => {
-            // DbPointer parts are not public and cannot be evaludated
+            // DbPointer parts are not public and cannot be evaluated
             0
         }
         Bson::Null | Bson::Undefined | Bson::MaxKey | Bson::MinKey => 0,
@@ -1002,7 +1006,7 @@ fn document_size(doc: &Document) -> usize {
 /// URI components: https://docs.mongodb.com/manual/reference/connection-string/#components
 /// It's not possible to use [url::Url](https://docs.rs/url/2.1.1/url/struct.Url.html) because connection string can have multiple hosts.
 /// Would be nice to serialize [ClientOptions][https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html] to String, but it's not supported.
-/// `endpoint` argument would not be required, but field `original_uri` in `ClieotnOptions` is private.
+/// `endpoint` argument would not be required, but field `original_uri` in `ClientOptions` is private.
 /// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
 /// Based on ClientOptions::parse_uri -- https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708
 fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
@@ -1118,7 +1122,7 @@ mod integration_tests {
             tokio::spawn(async move {
                 MongoDbMetricsConfig {
                     endpoints,
-                    scrape_interval_secs: 15,
+                    scrape_interval_secs: Duration::from_secs(15),
                     namespace: namespace.to_owned(),
                 }
                 .build(SourceContext::new_test(sender, None))

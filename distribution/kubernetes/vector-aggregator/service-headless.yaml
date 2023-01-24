@@ -8,8 +8,8 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Aggregator
-    app.kubernetes.io/version: "0.26.0-distroless-libc"
-  annotations: {}
+    app.kubernetes.io/version: "0.27.0-distroless-libc"
+  annotations:
 spec:
   clusterIP: None
   ports:

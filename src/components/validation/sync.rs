@@ -196,12 +196,12 @@ impl TaskCoordinator<()> {
 }
 
 impl TaskCoordinator<Configuring> {
-    /// Attachs a new child to the wait group that tracks when tasks have started.
+    /// Attaches a new child to the wait group that tracks when tasks have started.
     pub fn track_started(&self) -> WaitGroupChild {
         self.state.tasks_started.add_child()
     }
 
-    /// Attachs a new child to the wait group that tracks when tasks have completed.
+    /// Attaches a new child to the wait group that tracks when tasks have completed.
     pub fn track_completed(&self) -> WaitGroupChild {
         self.state.tasks_completed.add_child()
     }

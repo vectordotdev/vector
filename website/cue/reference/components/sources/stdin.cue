@@ -13,6 +13,7 @@ components: sources: stdin: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		multiline: enabled: false
 		codecs: {
@@ -39,29 +40,7 @@ components: sources: stdin: {
 		platform_name: null
 	}
 
-	configuration: {
-		host_key: {
-			category:    "Context"
-			common:      false
-			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-				"""
-			required:    false
-			type: string: {
-				default: "host"
-			}
-		}
-		max_length: {
-			common:      false
-			description: "The maximum bytes size of a message before rest of it will be discarded."
-			required:    false
-			type: uint: {
-				default: 102400
-				unit:    "bytes"
-			}
-		}
-	}
+	configuration: base.components.sources.stdin.configuration
 
 	output: logs: line: {
 		description: "An individual event from STDIN."

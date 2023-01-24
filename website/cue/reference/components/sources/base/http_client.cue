@@ -172,11 +172,13 @@ base: components: sources: http_client: configuration: {
 	headers: {
 		description: """
 			Headers to apply to the HTTP requests.
+
 			One or more values for the same header can be provided.
 			"""
 		required: false
 		type: object: options: "*": {
-			required: true
+			description: "An HTTP request header."
+			required:    true
 			type: array: items: type: string: {}
 		}
 	}
@@ -204,7 +206,8 @@ base: components: sources: http_client: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			required: true
+			description: "A query string parameter."
+			required:    true
 			type: array: items: type: string: {}
 		}
 	}

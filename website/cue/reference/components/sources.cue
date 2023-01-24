@@ -6,6 +6,14 @@ components: sources: [Name=string]: {
 	features: _
 
 	configuration: {
+		if features.collect != _|_ {
+			if features.collect.proxy != _|_ {
+				if features.collect.proxy.enabled {
+					proxy: base.components.sources.configuration.proxy
+				}
+			}
+		}
+
 		if !features.auto_generated {
 			if features.collect != _|_ {
 				if features.collect.checkpoint.enabled {
@@ -234,12 +242,6 @@ components: sources: [Name=string]: {
 			}
 
 			if features.collect != _|_ {
-				if features.collect.proxy != _|_ {
-					if features.collect.proxy.enabled {
-						proxy: configuration._proxy
-					}
-				}
-
 				if features.collect.tls != _|_ {
 					if features.collect.tls.enabled {
 						tls: configuration._tls_connect & {_args: {

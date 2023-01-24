@@ -8,6 +8,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
     header::HeaderValue,
@@ -175,7 +176,7 @@ const fn default_suppress_timestamp() -> bool {
 
 impl GenerateConfig for PrometheusExporterConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
+        toml::Value::try_from(Self::default()).unwrap()
     }
 }
 
@@ -349,7 +350,7 @@ fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
                 Auth::Basic { user, password } => HeaderValue::from_str(
                     format!(
                         "Basic {}",
-                        base64::encode(format!("{}:{}", user, password.inner()))
+                        BASE64_STANDARD.encode(format!("{}:{}", user, password.inner()))
                     )
                     .as_str(),
                 ),
@@ -1218,7 +1219,7 @@ mod tests {
         // that we check the internal metric data, which, when in this mode, will actually be a
         // sketch (so that we can merge without loss of accuracy).
         //
-        // The render code is actually what will end up rrendering those sketches as aggregated
+        // The render code is actually what will end up rendering those sketches as aggregated
         // summaries in the scrape output.
         let config = PrometheusExporterConfig {
             address: next_addr(), // Not actually bound, just needed to fill config

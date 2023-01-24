@@ -8,6 +8,7 @@ use vector_config::configurable_component;
 #[serde(deny_unknown_fields)]
 pub struct TcpKeepaliveConfig {
     /// The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     pub time_secs: Option<u64>,
 }
 

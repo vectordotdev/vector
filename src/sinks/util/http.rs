@@ -397,7 +397,7 @@ where
                 .layer(DecompressionLayer::new())
                 .service(http_client);
 
-            // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emmited
+            // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emitted
             // in `HttpClient::send`.
             let response = decompression_service.call(request).await?;
 
@@ -537,6 +537,7 @@ pub struct RequestConfig {
 
     /// Additional HTTP headers to add to every HTTP request.
     #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
     pub headers: IndexMap<String, String>,
 }
 

@@ -423,7 +423,7 @@ impl fmt::Display for MetricValue {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
             MetricValue::Counter { value } | MetricValue::Gauge { value } => {
-                write!(fmt, "{}", value)
+                write!(fmt, "{value}")
             }
             MetricValue::Set { values } => {
                 write_list(fmt, " ", values.iter(), |fmt, value| write_word(fmt, value))
@@ -446,7 +446,7 @@ impl fmt::Display for MetricValue {
                 count,
                 sum,
             } => {
-                write!(fmt, "count={} sum={} ", count, sum)?;
+                write!(fmt, "count={count} sum={sum} ")?;
                 write_list(fmt, " ", buckets, |fmt, bucket| {
                     write!(fmt, "{}@{}", bucket.count, bucket.upper_limit)
                 })
@@ -456,7 +456,7 @@ impl fmt::Display for MetricValue {
                 count,
                 sum,
             } => {
-                write!(fmt, "count={} sum={} ", count, sum)?;
+                write!(fmt, "count={count} sum={sum} ")?;
                 write_list(fmt, " ", quantiles, |fmt, quantile| {
                     write!(fmt, "{}@{}", quantile.quantile, quantile.value)
                 })
@@ -537,7 +537,7 @@ pub enum MetricSketch {
     ///
     /// [ddsketch]: https://www.vldb.org/pvldb/vol12/p2195-masson.pdf
     /// [ddagent]: https://github.com/DataDog/datadog-agent
-    AgentDDSketch(#[configurable(derived)] AgentDDSketch),
+    AgentDDSketch(AgentDDSketch),
 }
 
 impl MetricSketch {
@@ -625,7 +625,7 @@ impl ByteSizeOf for Bucket {
 
 /// A single quantile observation.
 ///
-/// Quantiles themselves are "cut points diviing the range of a probability distribution into
+/// Quantiles themselves are "cut points dividing the range of a probability distribution into
 /// continuous intervals with equal probabilities". [[1][quantiles_wikipedia]].
 ///
 /// We use quantiles to measure the value along these probability distributions for representing

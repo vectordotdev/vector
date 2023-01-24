@@ -4,7 +4,7 @@ pub mod udp;
 mod unix;
 
 use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
-use lookup::{lookup_v2::parse_value_path, owned_value_path};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use value::{kind::Collection, Kind};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
@@ -30,22 +30,23 @@ pub struct SocketConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 #[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum Mode {
     /// Listen on TCP.
-    Tcp(#[configurable(derived)] tcp::TcpConfig),
+    Tcp(tcp::TcpConfig),
 
     /// Listen on UDP.
-    Udp(#[configurable(derived)] udp::UdpConfig),
+    Udp(udp::UdpConfig),
 
-    /// Listen on UDS, in datagram mode. (Unix domain socket)
+    /// Listen on a Unix domain socket (UDS), in datagram mode.
     #[cfg(unix)]
-    UnixDatagram(#[configurable(derived)] unix::UnixConfig),
+    UnixDatagram(unix::UnixConfig),
 
-    /// Listen on UDS, in stream mode. (Unix domain socket)
+    /// Listen on a Unix domain socket (UDS), in stream mode.
     #[cfg(unix)]
     #[serde(alias = "unix")]
-    UnixStream(#[configurable(derived)] unix::UnixConfig),
+    UnixStream(unix::UnixConfig),
 }
 
 impl SocketConfig {
@@ -230,20 +231,9 @@ impl SourceConfig for SocketConfig {
 
         let schema_definition = match &self.mode {
             Mode::Tcp(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
-                let legacy_port_key = config
-                    .port_key()
-                    .as_ref()
-                    .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone())
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 let tls_client_metadata_path = config
                     .tls()
@@ -258,7 +248,7 @@ impl SourceConfig for SocketConfig {
                         legacy_host_key,
                         &owned_value_path!("host"),
                         Kind::bytes(),
-                        None,
+                        Some("host"),
                     )
                     .with_source_metadata(
                         Self::NAME,
@@ -277,20 +267,9 @@ impl SourceConfig for SocketConfig {
                     )
             }
             Mode::Udp(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
-                let legacy_port_key = config
-                    .port_key()
-                    .as_ref()
-                    .map_or_else(|| parse_value_path("port").ok(), |k| k.path.clone())
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
                     .with_source_metadata(
@@ -310,14 +289,7 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
@@ -329,14 +301,7 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let legacy_host_key = config
-                    .host_key()
-                    .as_ref()
-                    .map_or_else(
-                        || parse_value_path(log_schema().host_key()).ok(),
-                        |k| k.path.clone(),
-                    )
-                    .map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
@@ -366,6 +331,14 @@ impl SourceConfig for SocketConfig {
     fn can_acknowledge(&self) -> bool {
         false
     }
+}
+
+pub(crate) fn default_host_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+}
+
+fn default_max_length() -> Option<usize> {
+    Some(crate::serde::default_max_length())
 }
 
 #[cfg(test)]
@@ -1014,7 +987,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
-            config.max_length = 11;
+            config.max_length = Some(11);
             let address = init_udp_with_config(tx, config).await;
 
             send_lines_udp(
@@ -1050,7 +1023,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
-            config.max_length = 10;
+            config.max_length = Some(10);
             config.framing = CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
             }

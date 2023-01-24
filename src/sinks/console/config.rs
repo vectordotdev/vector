@@ -12,17 +12,23 @@ use crate::{
     sinks::{console::sink::WriterSink, Healthcheck, VectorSink},
 };
 
-/// Output target.
+/// The [standard stream][standard_streams] to write to.
+///
+/// [standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
-    /// Standard output.
+    /// Write output to [STDOUT][stdout].
+    ///
+    /// [stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
     #[derivative(Default)]
     Stdout,
 
-    /// Standard error.
+    /// Write output to [STDERR][stderr].
+    ///
+    /// [stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
     Stderr,
 }
 
@@ -32,7 +38,7 @@ pub enum Target {
 #[serde(deny_unknown_fields)]
 pub struct ConsoleSinkConfig {
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default = "default_target")]
     pub target: Target,
 
     #[serde(flatten)]
@@ -45,6 +51,10 @@ pub struct ConsoleSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+}
+
+const fn default_target() -> Target {
+    Target::Stdout
 }
 
 impl GenerateConfig for ConsoleSinkConfig {

@@ -25,7 +25,11 @@ fn column(col: usize, row: usize) -> Value {
     } else if col == 1 {
         // And a final column with a date, each of the above duplicated row should have
         // a unique date.
-        Value::Timestamp(Utc.ymd(2013, row as u32 % 10 + 1, 15).and_hms(0, 0, 0))
+        Value::Timestamp(
+            Utc.ymd(2013, row as u32 % 10 + 1, 15)
+                .and_hms_opt(0, 0, 0)
+                .expect("invalid timestamp"),
+        )
     } else {
         Value::from(format!("data-{}-{}", col, row))
     }
@@ -62,8 +66,14 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                     },
                     Condition::BetweenDates {
                         field: "field-1",
-                        from: Utc.ymd(2013, 6, 1).and_hms(0, 0, 0),
-                        to: Utc.ymd(2013, 7, 1).and_hms(0, 0, 0),
+                        from: Utc
+                            .ymd(2013, 6, 1)
+                            .and_hms_opt(0, 0, 0)
+                            .expect("invalid timestamp"),
+                        to: Utc
+                            .ymd(2013, 7, 1)
+                            .and_hms_opt(0, 0, 0)
+                            .expect("invalid timestamp"),
                     },
                 ],
                 file.add_index(case, &["field-0"]).unwrap(),

@@ -62,16 +62,17 @@ pub struct StatsdSinkConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
-    /// TCP.
-    Tcp(#[configurable(transparent)] TcpSinkConfig),
+    /// Send over TCP.
+    Tcp(TcpSinkConfig),
 
-    /// UDP.
-    Udp(#[configurable(transparent)] StatsdUdpConfig),
+    /// Send over UDP.
+    Udp(StatsdUdpConfig),
 
-    /// Unix Domain Socket.
+    /// Send over a Unix domain socket (UDS).
     #[cfg(unix)]
-    Unix(#[configurable(transparent)] UnixSinkConfig),
+    Unix(UnixSinkConfig),
 }
 
 #[derive(Clone, Copy, Debug, Default)]

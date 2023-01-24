@@ -94,12 +94,12 @@ impl DiagnosticMessage for Error {
                 lalrpop_util::ParseError::ExtraToken { token } => {
                     let (start, token, end) = token;
                     vec![Label::primary(
-                        format!("unexpected extra token: {}", token),
+                        format!("unexpected extra token: {token}"),
                         Span::new(*start, *end),
                     )]
                 }
                 lalrpop_util::ParseError::User { error } => {
-                    vec![Label::primary(format!("unexpected error: {}", error), span)]
+                    vec![Label::primary(format!("unexpected error: {error}"), span)]
                 }
                 lalrpop_util::ParseError::UnrecognizedToken { token, expected } => {
                     let (start, token, end) = token;
@@ -138,7 +138,7 @@ impl DiagnosticMessage for Error {
                     }
 
                     vec![
-                        Label::primary(format!(r#"unexpected syntax token: "{}""#, got), span),
+                        Label::primary(format!(r#"unexpected syntax token: "{got}""#), span),
                         Label::context(format!("expected one of: {}", expected.join(", ")), span),
                     ]
                 }
@@ -166,7 +166,7 @@ impl DiagnosticMessage for Error {
             }
 
             NumericLiteral { start, error, end } => vec![Label::primary(
-                format!("invalid numeric literal: {}", error),
+                format!("invalid numeric literal: {error}"),
                 Span::new(*start, *end),
             )],
 
@@ -1350,7 +1350,7 @@ mod test {
         let length = expected.len();
         for (token, (expected_span, expected_tok)) in lexer.by_ref().zip(expected.into_iter()) {
             count += 1;
-            println!("{:?}", token);
+            println!("{token:?}");
             let start = expected_span.find('~').unwrap_or_default();
             let end = expected_span.rfind('~').map(|i| i + 1).unwrap_or_default();
 
@@ -1695,7 +1695,7 @@ mod test {
     }
 
     #[test]
-    fn ampersat_in_query() {
+    fn at_sign_in_query() {
         test(
             data(r#".@foo .bar.@ook"#),
             vec![

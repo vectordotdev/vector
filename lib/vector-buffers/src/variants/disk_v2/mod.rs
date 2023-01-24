@@ -155,12 +155,12 @@ mod ledger;
 mod reader;
 mod record;
 mod ser;
-mod v1_migration;
 mod writer;
 
 #[cfg(test)]
 mod tests;
 
+use self::ledger::Ledger;
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
     io::{Filesystem, ProductionFilesystem},
@@ -168,7 +168,6 @@ pub use self::{
     reader::{Reader, ReaderError},
     writer::{Writer, WriterError},
 };
-use self::{ledger::Ledger, v1_migration::try_disk_v1_migration};
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     topology::{
@@ -293,11 +292,6 @@ where
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
-        // Attempt to migrate a disk v1 buffer based on the same data directory and buffer ID if one
-        // exists. If one doesn't exist, then this method does nothing.
-        try_disk_v1_migration::<T>(self.data_dir.as_path(), self.id.as_str()).await?;
-
-        // Now that we've handled any necessary migrations, go ahead and build the buffer.
         let (writer, reader) = build_disk_v2_buffer(
             usage_handle,
             &self.data_dir,

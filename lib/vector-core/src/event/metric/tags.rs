@@ -19,8 +19,9 @@ use vrl_lib::prelude::fmt::Formatter;
 pub enum TagValue {
     /// Bare tag value.
     Bare,
+
     /// Tag value containing a string.
-    Value(#[configurable(transparent)] String),
+    Value(String),
 }
 
 impl From<String> for TagValue {
@@ -96,15 +97,17 @@ type TagValueRef<'a> = Option<&'a str>;
 pub enum TagValueSet {
     /// This represents a set containing no value.
     Empty,
+
     /// This represents a set containing a single value. This is stored separately to avoid the
     /// overhead of allocating a hash table for the common case of a single value for a tag.
-    Single(#[configurable(transparent)] TagValue),
+    Single(TagValue),
+
     /// This holds an actual set of values. This variant will be automatically created when a single
     /// value is added to, and reduced down to a single value when the length is reduced to 1.  An
     /// index set is used for this set, as it preserves the insertion order of the contained
     /// elements. This allows us to retrieve the last element inserted which in turn allows us to
     /// emulate the set having a single value.
-    Set(#[configurable(transparent)] IndexSet<TagValue>),
+    Set(IndexSet<TagValue>),
 }
 
 impl Default for TagValueSet {
@@ -120,7 +123,7 @@ impl Display for TagValueSet {
                 write!(f, ", ")?;
             }
             if let Some(value) = value {
-                write!(f, "\"{}\"", value)?;
+                write!(f, "\"{value}\"")?;
             } else {
                 write!(f, "null")?;
             }
@@ -455,9 +458,7 @@ impl Serialize for TagValueSet {
 /// Tags for a metric series.
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct MetricTags(
-    #[configurable(transparent)] pub(in crate::event) BTreeMap<String, TagValueSet>,
-);
+pub struct MetricTags(pub(in crate::event) BTreeMap<String, TagValueSet>);
 
 impl MetricTags {
     pub fn is_empty(&self) -> bool {
@@ -716,7 +717,7 @@ mod tests {
             assert!(set.contains(&addition));
 
             // If the addition wasn't in the start set, it will increase the length.
-            assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
+            assert_eq!(set.len(), start_len + usize::from(new_addition));
             // The "single" value will match the addition.
             assert_eq!(set.as_single(), addition.as_option());
         }
@@ -773,7 +774,7 @@ mod tests {
             assert!(set.contains(&addition));
 
             // If the addition wasn't in the start set, it will increase the length.
-            assert_eq!(set.len(), start_len + if new_addition { 1 } else { 0 });
+            assert_eq!(set.len(), start_len + usize::from(new_addition));
             // The "single" value will match the addition.
             if addition.is_value() {
                 assert_eq!(set.as_single(), addition.as_option());

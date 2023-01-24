@@ -97,21 +97,21 @@ mod tests {
         format_timestamp => FormatTimestamp;
 
         invalid {
-            args: func_args![value: Utc.timestamp(10, 0),
+            args: func_args![value: Utc.timestamp_opt(10, 0).single().expect("invalid timestamp"),
                              format: "%Q INVALID"],
             want: Err("invalid format"),
             tdef: TypeDef::bytes().fallible(),
         }
 
         valid_secs {
-            args: func_args![value: Utc.timestamp(10, 0),
+            args: func_args![value: Utc.timestamp_opt(10, 0).single().expect("invalid timestamp"),
                              format: "%s"],
             want: Ok(value!("10")),
             tdef: TypeDef::bytes().fallible(),
         }
 
         date {
-            args: func_args![value: Utc.timestamp(10, 0),
+            args: func_args![value: Utc.timestamp_opt(10, 0).single().expect("invalid timestamp"),
                              format: "%+"],
             want: Ok(value!("1970-01-01T00:00:10+00:00")),
             tdef: TypeDef::bytes().fallible(),

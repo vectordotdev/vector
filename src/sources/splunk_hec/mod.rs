@@ -59,7 +59,7 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// The address _must_ include a port.
     #[serde(default = "default_socket_address")]
@@ -712,10 +712,14 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
                     self.time = Time::Provided(time);
                 } else if let Some(t) = t.as_f64() {
-                    self.time = Time::Provided(Utc.timestamp(
-                        t.floor() as i64,
-                        (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
-                    ));
+                    self.time = Time::Provided(
+                        Utc.timestamp_opt(
+                            t.floor() as i64,
+                            (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
+                        )
+                        .single()
+                        .expect("invalid timestamp"),
+                    );
                 } else {
                     return Err(ApiError::InvalidDataFormat { event: self.events }.into());
                 }
@@ -870,9 +874,11 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
     }
 
     let ts = if t < SEC_CUTOFF {
-        Utc.timestamp(t, 0)
+        Utc.timestamp_opt(t, 0).single().expect("invalid timestamp")
     } else if t < MILLISEC_CUTOFF {
-        Utc.timestamp_millis(t)
+        Utc.timestamp_millis_opt(t)
+            .single()
+            .expect("invalid timestamp")
     } else {
         Utc.timestamp_nanos(t)
     };
@@ -1115,7 +1121,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
     } else {
         splunk_response::SUCCESS
     };
-    response_json(StatusCode::OK, &body)
+    response_json(StatusCode::OK, body)
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
@@ -1350,7 +1356,7 @@ mod tests {
         opts: &SendWithOpts<'_>,
     ) -> RequestBuilder {
         let mut b = reqwest::Client::new()
-            .post(&format!("http://{}/{}", address, api))
+            .post(format!("http://{}/{}", address, api))
             .header("Authorization", format!("Splunk {}", token));
 
         b = match opts.channel {
@@ -1944,7 +1950,7 @@ mod tests {
         let (source, address) = source(None).await;
 
         let b = reqwest::Client::new()
-            .post(&format!(
+            .post(format!(
                 "http://{}/{}",
                 address, "services/collector/event"
             ))
@@ -2002,9 +2008,15 @@ mod tests {
     fn parse_timestamps() {
         let cases = vec![
             Utc::now(),
-            Utc.ymd(1971, 11, 7).and_hms(1, 1, 1),
-            Utc.ymd(2011, 8, 5).and_hms(1, 1, 1),
-            Utc.ymd(2189, 11, 4).and_hms(2, 2, 2),
+            Utc.ymd(1971, 11, 7)
+                .and_hms_opt(1, 1, 1)
+                .expect("invalid timestamp"),
+            Utc.ymd(2011, 8, 5)
+                .and_hms_opt(1, 1, 1)
+                .expect("invalid timestamp"),
+            Utc.ymd(2189, 11, 4)
+                .and_hms_opt(2, 2, 2)
+                .expect("invalid timestamp"),
         ];
 
         for case in cases {
@@ -2012,16 +2024,13 @@ mod tests {
             let millis = case.timestamp_millis();
             let nano = case.timestamp_nanos();
 
+            assert_eq!(parse_timestamp(sec).unwrap().timestamp(), case.timestamp());
             assert_eq!(
-                parse_timestamp(sec as i64).unwrap().timestamp(),
-                case.timestamp()
-            );
-            assert_eq!(
-                parse_timestamp(millis as i64).unwrap().timestamp_millis(),
+                parse_timestamp(millis).unwrap().timestamp_millis(),
                 case.timestamp_millis()
             );
             assert_eq!(
-                parse_timestamp(nano as i64).unwrap().timestamp_nanos(),
+                parse_timestamp(nano).unwrap().timestamp_nanos(),
                 case.timestamp_nanos()
             );
         }

@@ -233,7 +233,7 @@ impl EventEncoder {
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
-        let partition = PartitionKey::new(tenant_id, &mut labels);
+        let partition = PartitionKey { tenant_id };
 
         Some(LokiRecord {
             labels,
@@ -334,7 +334,7 @@ impl LokiSink {
     pub fn new(config: LokiConfig, client: HttpClient) -> crate::Result<Self> {
         let compression = config.compression;
 
-        // if Vector is configured to allow events with out of order timestamps, then then we can
+        // if Vector is configured to allow events with out of order timestamps, then we can
         // safely enable concurrency settings.
         //
         // For rewritten timestamps, we use a static concurrency of 1 to avoid out-of-order

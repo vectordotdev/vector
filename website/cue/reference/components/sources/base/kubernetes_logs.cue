@@ -110,6 +110,11 @@ base: components: sources: kubernetes_logs: configuration: {
 			unit:    "milliseconds"
 		}
 	}
+	ignore_older_secs: {
+		description: "Ignore files with a data modification date older than the specified number of seconds."
+		required:    false
+		type: uint: {}
+	}
 	ingestion_timestamp_field: {
 		description: """
 			Overrides the name of the log field used to add the ingestion timestamp to each event.
@@ -279,6 +284,17 @@ base: components: sources: kubernetes_logs: configuration: {
 					default: ".kubernetes.pod_uid"
 					examples: [".k8s.pod_uid", ""]
 				}
+			}
+		}
+	}
+	read_from: {
+		description: "File position to use when reading a new file."
+		required:    false
+		type: string: {
+			default: "beginning"
+			enum: {
+				beginning: "Read from the beginning of the file."
+				end:       "Start reading from the current end of the file."
 			}
 		}
 	}

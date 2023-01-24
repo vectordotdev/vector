@@ -459,9 +459,11 @@ impl IngestorProcess {
 
         let metadata = object.metadata;
 
-        let timestamp = object
-            .last_modified
-            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()));
+        let timestamp = object.last_modified.map(|ts| {
+            Utc.timestamp_opt(ts.secs(), ts.subsec_nanos())
+                .single()
+                .expect("invalid timestamp")
+        });
 
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(
@@ -633,7 +635,7 @@ impl IngestorProcess {
             .receive_message()
             .queue_url(self.state.queue_url.clone())
             .max_number_of_messages(10)
-            .visibility_timeout(self.state.visibility_timeout_secs as i32)
+            .visibility_timeout(self.state.visibility_timeout_secs)
             .wait_time_seconds(self.state.poll_secs)
             .send()
             .map_ok(|res| res.messages.unwrap_or_default())

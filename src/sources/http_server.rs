@@ -8,7 +8,7 @@ use codecs::{
     NewlineDelimitedDecoderConfig,
 };
 
-use http::{Method, StatusCode, Uri};
+use http::{StatusCode, Uri};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
 use value::{kind::Collection, Kind};
@@ -21,14 +21,12 @@ use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    components::validation::{
-        self, ComponentConfiguration, ComponentType, ExternalResource, ResourceDirection,
-        ValidatableComponent,
-    },
+    components::validation::*,
     config::{
         GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
     },
     event::{Event, Value},
+    register_validatable_component,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
         http::{add_query_parameters, HttpMethod},
@@ -41,7 +39,7 @@ use crate::{
 #[configurable_component(source("http"))]
 #[configurable(metadata(deprecated))]
 #[derive(Clone, Debug)]
-pub struct HttpConfig(#[configurable(derived)] SimpleHttpConfig);
+pub struct HttpConfig(SimpleHttpConfig);
 
 impl GenerateConfig for HttpConfig {
     fn generate_config() -> toml::Value {
@@ -72,7 +70,11 @@ impl SourceConfig for HttpConfig {
 #[configurable_component(source("http_server"))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
+    ///
+    /// It _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
+    #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
 
     /// The expected encoding of received data.
@@ -85,12 +87,16 @@ pub struct SimpleHttpConfig {
     ///
     /// These will override any values included in the JSON payload with conflicting names.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "User-Agent"))]
+    #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
     headers: Vec<String>,
 
     /// A list of URL query parameters to include in the log event.
     ///
     /// These will override any values included in the body with conflicting names.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "application"))]
+    #[configurable(metadata(docs::examples = "source"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
@@ -108,10 +114,13 @@ pub struct SimpleHttpConfig {
 
     /// The URL path on which log event POST requests shall be sent.
     #[serde(default = "default_path")]
+    #[configurable(metadata(docs::examples = "/event/path"))]
+    #[configurable(metadata(docs::examples = "/logs"))]
     path: String,
 
     /// The event key in which the requested URL path used to send the request will be stored.
     #[serde(default = "default_path_key")]
+    #[configurable(metadata(docs::examples = "vector_http_path"))]
     path_key: OptionalValuePath,
 
     /// Specifies the action of the HTTP request.
@@ -243,45 +252,28 @@ impl Default for SimpleHttpConfig {
 impl_generate_config_from_default!(SimpleHttpConfig);
 
 impl ValidatableComponent for SimpleHttpConfig {
-    fn component_name(&self) -> &'static str {
-        Self::NAME
-    }
+    fn validation_configuration() -> ValidationConfiguration {
+        let config = Self {
+            decoding: Some(DeserializerConfig::Json),
+            ..Default::default()
+        };
 
-    fn component_type(&self) -> ComponentType {
-        ComponentType::Source
-    }
+        let listen_addr_http = format!("http://{}/", config.address);
+        let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
 
-    fn component_configuration(&self) -> ComponentConfiguration {
-        ComponentConfiguration::Source(self.clone().into())
-    }
-
-    fn external_resource(&self) -> Option<ExternalResource> {
-        let scheme = self
-            .tls
-            .as_ref()
-            .and_then(|tls| tls.enabled)
-            .map(|e| if e { "https" } else { "http" })
-            .unwrap_or("http");
-        let uri = Uri::builder()
-            .scheme(scheme)
-            .authority(self.address.to_string())
-            .path_and_query(self.path.clone())
-            .build()
-            .expect("should not fail to build request URI");
-        // TODO: Why do we use our own custom method enum that isn't just a newtype wrapper of
-        // `http::Method`? :thinkies:
-        let method = Some(Method::POST);
-        let decoding_config = self
-            .get_decoding_config()
-            .expect("should not fail to get decoding config");
-
-        Some(ExternalResource::new(
+        let external_resource = ExternalResource::new(
             ResourceDirection::Push,
-            validation::HttpConfig::from_parts(uri, method),
-            decoding_config,
-        ))
+            HttpResourceConfig::from_parts(uri, Some(config.method.into())),
+            config
+                .get_decoding_config()
+                .expect("should not fail to get decoding config"),
+        );
+
+        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
     }
 }
+
+register_validatable_component!(SimpleHttpConfig);
 
 const fn default_http_method() -> HttpMethod {
     HttpMethod::Post

@@ -203,7 +203,7 @@ impl TransformConfig for RemapConfig {
 
         // TODO: We could improve on this by adding support for non-fatal error
         // messages in the topology. This would make the topology responsible
-        // for printing warnings (including potentially emiting metrics),
+        // for printing warnings (including potentially emitting metrics),
         // instead of individual transforms.
         if !warnings.is_empty() {
             warn!(message = "VRL compilation warning.", %warnings);
@@ -1463,7 +1463,7 @@ mod tests {
 
     fn transform_one(ft: &mut dyn SyncTransform, event: Event) -> Option<Event> {
         let out = collect_outputs(ft, event);
-        assert_eq!(0, out.named.iter().map(|(_, v)| v.len()).sum::<usize>());
+        assert_eq!(0, out.named.values().map(|v| v.len()).sum::<usize>());
         assert!(out.primary.len() <= 1);
         out.primary.into_events().next()
     }
