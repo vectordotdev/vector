@@ -19,7 +19,7 @@ components: sinks: pulsar: {
 			batch: {
 				enabled:    true
 				common:     true
-				max_events: null
+				batch_size: null
 			}
 			compression: {
 				enabled: true

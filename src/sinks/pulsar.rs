@@ -86,7 +86,7 @@ pub struct PulsarSinkConfig {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BatchConfig {
     /// The maximum size of a batch, in events, before it is flushed.
-    pub max_events: Option<u32>,
+    pub batch_size: Option<u32>,
 }
 
 /// Authentication configuration.
@@ -308,7 +308,7 @@ impl PulsarSinkConfig {
         };
 
         if !is_healthcheck {
-            producer_options.batch_size = self.batch.max_events;
+            producer_options.batch_size = self.batch.batch_size;
         }
 
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
