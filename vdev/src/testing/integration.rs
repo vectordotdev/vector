@@ -92,19 +92,16 @@ impl IntegrationTest {
         })
     }
 
-    pub fn env_exists(&self) -> bool {
-        self.envs_dir.exists(&self.environment)
-    }
-
     pub fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
-        let active = self.env_exists();
+        let active = self.envs_dir.check_active(&self.environment)?;
+
         if !active {
             self.start()?;
         }
 
         self.runner.test(env_vars, args)?;
         if !active {
-            self.stop(false)?;
+            self.stop()?;
         }
         Ok(())
     }
@@ -118,7 +115,7 @@ impl IntegrationTest {
             None => bail!("unknown environment: {}", self.environment),
         };
 
-        if self.envs_dir.exists(&self.environment) {
+        if self.envs_dir.check_active(&self.environment)? {
             bail!("environment is already up");
         }
 
@@ -127,26 +124,15 @@ impl IntegrationTest {
         self.envs_dir.save(&self.environment, cmd_config)
     }
 
-    pub fn stop(&self, force: bool) -> Result<()> {
-        let cmd_config: Environment = if self.envs_dir.exists(&self.environment) {
-            self.envs_dir.read_config(&self.environment)?
-        } else if force {
-            let environments = self.config.environments();
-            if let Some(config) = environments.get(&self.environment) {
-                config.clone()
-            } else {
-                bail!("unknown environment: {}", self.environment);
-            }
-        } else {
-            bail!("environment is not up");
+    pub fn stop(&self) -> Result<()> {
+        let Some(state) = self.envs_dir.load()? else {
+             bail!("No environment for {} is up.",self.integration);
         };
 
-        self.run_compose("Stopping", &["down", "--timeout", "0"], &cmd_config)?;
+        self.run_compose("Stopping", &["down", "--timeout", "0"], &state.config)?;
 
-        self.envs_dir.remove(&self.environment)?;
-        if self.envs_dir.list_active()?.is_empty() {
-            self.runner.stop()?;
-        }
+        self.envs_dir.remove()?;
+        self.runner.stop()?;
 
         Ok(())
     }
