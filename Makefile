@@ -368,10 +368,10 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 test-integration-%-cleanup:
-	cargo vdev integration stop $*
+	cargo vdev --verbose integration stop $*
 
 test-integration-%:
-	cargo vdev integration test $*
+	cargo vdev --verbose integration test $*
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
