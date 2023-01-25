@@ -372,6 +372,9 @@ test-integration-%-cleanup:
 
 test-integration-%:
 	cargo vdev --verbose integration test $*
+ifeq ($(AUTODESPAWN), true)
+	make test-integration-$*-cleanup
+endif
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
