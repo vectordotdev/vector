@@ -15,7 +15,7 @@ use super::{
     InvalidHostSnafu, Request,
 };
 use crate::{
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, MaybeAuth, BodyBox},
     sinks::{
         elasticsearch::{
             ElasticsearchAuth, ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
@@ -292,7 +292,6 @@ async fn get_version(
     version.ok_or_else(||"Unexpected response from Elasticsearch endpoint `/_cluster/state/version`. Missing `version`. Consider setting `api_version` option.".into())
 }
 
-pub type BodyBox = http_body::combinators::BoxBody<hyper::body::Bytes, hyper::Error>;
 
 async fn get(
     base_url: &str,

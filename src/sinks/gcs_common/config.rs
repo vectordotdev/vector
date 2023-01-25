@@ -6,7 +6,7 @@ use vector_config::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},
-    http::HttpClient,
+    http::{HttpClient, BodyBox},
     sinks::{
         gcs_common::service::GcsResponse,
         util::retries::{RetryAction, RetryLogic},
@@ -123,8 +123,6 @@ pub fn build_healthcheck(
 
     Ok(healthcheck.boxed())
 }
-
-pub type BodyBox = http_body::combinators::BoxBody<hyper::body::Bytes, hyper::Error>;
 
 // Use this to map a healthcheck response, as it handles setting up the renewal task.
 pub fn healthcheck_response(
