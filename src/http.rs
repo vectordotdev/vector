@@ -125,13 +125,15 @@ where
                 .context(CallRequestSnafu)?;
 
             let (parts, body) = response.into_parts();
-            let mut buf: Vec<u8> = Vec::new();
+            let mut data_buf: Option<Vec<u8>> = Some(Vec::new());
             let body = body.map_data(move |data| {
-                buf.extend(data);
-                if buf.len() > 20 {
-                    println!("Data buf has reached len 20: {:?}", std::str::from_utf8(&buf));
+                if let Some(buf) = &mut data_buf {
+                    buf.extend_from_slice(&data);
+                    emit!(http_client::HttpBodyDataBuffer {
+                        buf: data_buf.take().unwrap()
+                    });
                 }
-                bytes::Bytes::new()
+                data
             }).boxed();
             let response = hyper::Response::from_parts(parts, body);
 

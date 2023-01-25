@@ -109,3 +109,16 @@ impl<'a, B: HttpBody> std::fmt::Display for FormatBody<'a, B> {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct HttpBodyDataBuffer {
+    pub buf: Vec<u8>,
+}
+
+impl InternalEvent for HttpBodyDataBuffer {
+    fn emit(self) {
+        // log the buffer content of the configured limit
+        // TODO: make this configurable
+        debug!(message = "HttpBodyDataBuffer", buffer = ?self.buf.into_iter().take(20).collect::<Vec<u8>>());
+    }
+}
