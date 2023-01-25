@@ -24,14 +24,14 @@ remap: functions: seahash: {
 			source: #"""
 				seahash("foobar")
 				"""#
-			return: "5348458858952426560"
+			return: 5348458858952426560
 		},
 		{
 			title: "Calculate negative seahash"
 			source: #"""
 				seahash("bar")
 				"""#
-			return: "-2796170501982571315"
+			return: -2796170501982571315
 		},
 	]
 }

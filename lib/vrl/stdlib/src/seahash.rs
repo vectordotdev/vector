@@ -25,7 +25,7 @@ impl Function for Seahash {
                 title: "seahash above i64.MAX",
                 source: r#"seahash("bar")"#,
                 result: Ok("-2796170501982571315"),
-            }
+            },
         ]
     }
 
