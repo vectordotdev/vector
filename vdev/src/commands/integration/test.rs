@@ -1,8 +1,9 @@
 use anyhow::Result;
 use clap::Args;
 
+use crate::testing::integration::{self, IntegrationTest, OldIntegrationTest};
 use crate::testing::runner::{ContainerTestRunner, IntegrationTestRunner};
-use crate::testing::{config::IntegrationTestConfig, integration::IntegrationTest, state::EnvsDir};
+use crate::testing::{config::IntegrationTestConfig, state::EnvsDir};
 
 /// Execute integration tests
 ///
@@ -27,6 +28,13 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        // Temporary hack to run old-style integration tests
+        if self.environment.is_none() && integration::old_exists(&self.integration)? {
+            let integration = OldIntegrationTest::new(&self.integration);
+            integration.build()?;
+            return integration.test();
+        }
+
         let (_test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
         let envs = config.environments();
 
