@@ -86,6 +86,7 @@ pub enum AwsAuthentication {
         assume_role: String,
 
         /// Timeout for assuming the role, in seconds.
+        #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::examples = 30))]
         load_timeout_secs: Option<u64>,
 
@@ -105,6 +106,7 @@ pub enum AwsAuthentication {
     #[derivative(Default)]
     Default {
         /// Timeout for successfully loading any credentials, in seconds.
+        #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::examples = 30))]
         load_timeout_secs: Option<u64>,
 

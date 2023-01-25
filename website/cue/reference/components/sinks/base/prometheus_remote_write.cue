@@ -85,7 +85,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "Timeout for successfully loading any credentials, in seconds."
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: uint: examples: [30]
+				type: uint: {
+					examples: [30]
+					unit: "seconds"
+				}
 			}
 			password: {
 				description:   "Basic authentication password."

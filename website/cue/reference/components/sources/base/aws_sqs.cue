@@ -72,7 +72,10 @@ base: components: sources: aws_sqs: configuration: {
 			load_timeout_secs: {
 				description: "Timeout for successfully loading any credentials, in seconds."
 				required:    false
-				type: uint: examples: [30]
+				type: uint: {
+					examples: [30]
+					unit: "seconds"
+				}
 			}
 			profile: {
 				description: "The credentials profile to use."

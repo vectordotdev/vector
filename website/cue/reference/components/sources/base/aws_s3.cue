@@ -72,7 +72,10 @@ base: components: sources: aws_s3: configuration: {
 			load_timeout_secs: {
 				description: "Timeout for successfully loading any credentials, in seconds."
 				required:    false
-				type: uint: examples: [30]
+				type: uint: {
+					examples: [30]
+					unit: "seconds"
+				}
 			}
 			profile: {
 				description: "The credentials profile to use."
@@ -184,7 +187,7 @@ base: components: sources: aws_s3: configuration: {
 					Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
 					"""
 				required: true
-				type: uint: {}
+				type: uint: unit: "milliseconds"
 			}
 		}
 	}

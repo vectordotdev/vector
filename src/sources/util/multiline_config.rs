@@ -1,12 +1,14 @@
 use std::{convert::TryFrom, time::Duration};
 
 use regex::bytes::Regex;
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 
 use crate::line_agg;
 
 /// Configuration of multi-line aggregation.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -27,8 +29,8 @@ pub struct MultilineConfig {
     /// The maximum amount of time to wait for the next additional line, in milliseconds.
     ///
     /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
-    // TODO: Duration?
-    pub timeout_ms: u64,
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    pub timeout_ms: Duration,
 }
 
 impl TryFrom<&MultilineConfig> for line_agg::Config {
@@ -46,7 +48,7 @@ impl TryFrom<&MultilineConfig> for line_agg::Config {
             .with_context(|_| InvalidMultilineStartPatternSnafu { start_pattern })?;
         let condition_pattern = Regex::new(condition_pattern)
             .with_context(|_| InvalidMultilineConditionPatternSnafu { condition_pattern })?;
-        let timeout = Duration::from_millis(*timeout_ms);
+        let timeout = *timeout_ms;
 
         Ok(Self {
             start_pattern,
