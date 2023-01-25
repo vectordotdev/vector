@@ -12,6 +12,7 @@ use file_source::{
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use regex::bytes::Regex;
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
@@ -67,6 +68,7 @@ enum BuildError {
 }
 
 /// Configuration for the `file` source.
+#[serde_as]
 #[configurable_component(source("file"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -107,12 +109,13 @@ pub struct FileConfig {
     #[serde(default)]
     pub ignore_checkpoints: Option<bool>,
 
+    #[serde(default = "default_read_from")]
     #[configurable(derived)]
-    #[serde(default)]
     pub read_from: ReadFromConfig,
 
     /// Ignore files with a data modification date older than the specified number of seconds.
     #[serde(alias = "ignore_older", default)]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 600))]
     pub ignore_older_secs: Option<u64>,
 
@@ -162,8 +165,9 @@ pub struct FileConfig {
         alias = "glob_minimum_cooldown",
         default = "default_glob_minimum_cooldown_ms"
     )]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::type_unit = "milliseconds"))]
-    pub glob_minimum_cooldown_ms: u64,
+    pub glob_minimum_cooldown_ms: Duration,
 
     #[configurable(derived)]
     #[serde(alias = "fingerprinting", default)]
@@ -211,6 +215,7 @@ pub struct FileConfig {
     ///
     /// If not specified, files will not be removed.
     #[serde(alias = "remove_after", default)]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 0))]
     #[configurable(metadata(docs::examples = 5))]
     #[configurable(metadata(docs::examples = 60))]
@@ -247,13 +252,17 @@ fn default_host_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
 }
 
-const fn default_glob_minimum_cooldown_ms() -> u64 {
-    1000
+fn default_read_from() -> ReadFromConfig {
+    ReadFromConfig::Beginning
+}
+
+const fn default_glob_minimum_cooldown_ms() -> Duration {
+    Duration::from_millis(1000)
 }
 
 const fn default_multi_line_timeout() -> u64 {
     1000
-}
+} // deprecated
 
 const fn default_max_read_bytes() -> usize {
     2048
@@ -369,7 +378,7 @@ impl Default for FileConfig {
             host_key: default_host_key(),
             offset_key: None,
             data_dir: None,
-            glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(), // millis
+            glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
             message_start_indicator: None,
             multi_line_timeout: default_multi_line_timeout(), // millis
             multiline: None,
@@ -483,7 +492,7 @@ pub fn file_source(
     }
 
     let ignore_before = calculate_ignore_before(config.ignore_older_secs);
-    let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown_ms);
+    let glob_minimum_cooldown = config.glob_minimum_cooldown_ms;
     let (ignore_checkpoints, read_from) = reconcile_position_options(
         config.start_at_beginning,
         config.ignore_checkpoints,
@@ -825,7 +834,7 @@ mod tests {
                 lines: 1,
             },
             data_dir: Some(dir.path().to_path_buf()),
-            glob_minimum_cooldown_ms: 100, // millis
+            glob_minimum_cooldown_ms: Duration::from_millis(100),
             ..Default::default()
         }
     }

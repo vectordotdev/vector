@@ -190,9 +190,12 @@ base: components: sources: file: configuration: {
 	ignore_older_secs: {
 		description: "Ignore files with a data modification date older than the specified number of seconds."
 		required:    false
-		type: uint: examples: [
-			600,
-		]
+		type: uint: {
+			examples: [
+				600,
+			]
+			unit: "seconds"
+		}
 	}
 	include: {
 		description: "Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported."
@@ -332,6 +335,9 @@ base: components: sources: file: configuration: {
 			If not specified, files will not be removed.
 			"""
 		required: false
-		type: uint: examples: [0, 5, 60]
+		type: uint: {
+			examples: [0, 5, 60]
+			unit: "seconds"
+		}
 	}
 }
