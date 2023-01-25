@@ -1,0 +1,11 @@
+args:
+- --features
+- humio-integration-tests
+- --lib
+- 'sinks::humio::'
+
+env:
+  HUMIO_ADDRESS: http://localhost:8080
+
+matrix:
+- version: [1.13.1]

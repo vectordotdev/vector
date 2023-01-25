@@ -138,7 +138,10 @@ mod integration_tests {
 
         trace!("Creating container.");
 
-        let options = Some(CreateContainerOptions { name });
+        let options = Some(CreateContainerOptions {
+            name,
+            platform: None,
+        });
         let config = ContainerConfig {
             image: Some("busybox"),
             cmd: Some(cmd),

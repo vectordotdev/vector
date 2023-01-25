@@ -94,18 +94,25 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
 
     fn state(&self) -> Result<RunnerState> {
         let mut command = dockercmd(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
+        let container_name = self.container_name();
 
         for line in command.capture_output()?.lines() {
             if let Some((name, state)) = line.split_once(' ') {
-                if name == self.container_name() {
-                    return Ok(match state {
-                        "created" => RunnerState::Created,
-                        "dead" => RunnerState::Dead,
-                        "exited" => RunnerState::Exited,
-                        "paused" => RunnerState::Paused,
-                        "restarting" => RunnerState::Restarting,
-                        "running" => RunnerState::Running,
-                        _ => RunnerState::Unknown,
+                if name == container_name {
+                    return Ok(if state == "created" {
+                        RunnerState::Created
+                    } else if state == "dead" {
+                        RunnerState::Dead
+                    } else if state == "exited" || state.starts_with("Exited ") {
+                        RunnerState::Exited
+                    } else if state == "paused" {
+                        RunnerState::Paused
+                    } else if state == "restarting" {
+                        RunnerState::Restarting
+                    } else if state == "running" || state.starts_with("Up ") {
+                        RunnerState::Running
+                    } else {
+                        RunnerState::Unknown
                     });
                 }
             }

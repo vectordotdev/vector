@@ -1,0 +1,13 @@
+args:
+- --features
+- shutdown-tests
+- --test
+- shutdown
+- --test-threads
+- '4'
+
+env:
+  KAFKA_HOST: kafka
+
+matrix:
+- version: [latest]

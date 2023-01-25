@@ -4,7 +4,6 @@ use std::time::Duration;
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
-
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
@@ -47,27 +46,24 @@ enum ConfigError {
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
+    #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
 
-    /// The interval between scrapes.
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "scrape_interval_secs")]
     interval: Duration,
 
-    /// Overrides the name of the tag used to add the instance to each metric.
+    /// The tag name added to each event representing the scraped instance's host:port.
     ///
     /// The tag value will be the host/port of the scraped instance.
-    ///
-    /// By default, `"instance"` is used.
     instance_tag: Option<String>,
 
-    /// Overrides the name of the tag used to add the endpoint to each metric.
+    /// The tag name added to each event representing the scraped instance's endpoint.
     ///
     /// The tag value will be the endpoint of the scraped instance.
-    ///
-    /// By default, `"endpoint"` is used.
     endpoint_tag: Option<String>,
 
     /// Controls how tag conflicts are handled if the scraped source has tags to be added.
@@ -86,6 +82,7 @@ pub struct PrometheusScrapeConfig {
     /// scraping the `/federate` endpoint.
     #[serde(default)]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
+    #[configurable(metadata(docs::examples = "query_example()"))]
     query: HashMap<String, Vec<String>>,
 
     #[configurable(derived)]
@@ -93,6 +90,15 @@ pub struct PrometheusScrapeConfig {
 
     #[configurable(derived)]
     auth: Option<Auth>,
+}
+
+fn query_example() -> serde_json::Value {
+    serde_json::json! ({
+        "match[]": [
+            "{job=\"somejob\"}",
+            "{__name__=~\"job:.*\"}"
+        ]
+    })
 }
 
 impl GenerateConfig for PrometheusScrapeConfig {

@@ -28,6 +28,14 @@ pub fn default_target() -> String {
     }
 }
 
+pub fn default_features() -> &'static str {
+    if cfg!(windows) {
+        "default-msvc"
+    } else {
+        "default"
+    }
+}
+
 #[once]
 fn _project_dirs() -> ProjectDirs {
     ProjectDirs::from("", "vector", "vdev").expect("Could not determine the project directory")
