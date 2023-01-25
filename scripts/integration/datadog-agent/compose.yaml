@@ -17,7 +17,7 @@ services:
     volumes:
     - ../../../tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
   datadog-trace-agent:
-    image: docker.io/datadog/agent:7.31.0
+    image: docker.io/datadog/agent:${DATADOG_AGENT_VERSION}
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     - DD_APM_ENABLED=true

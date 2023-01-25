@@ -1,5 +1,4 @@
 args:
-- --no-default-features
 - --features
 - datadog-traces-integration-tests
 - --lib
