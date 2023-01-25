@@ -274,7 +274,7 @@ pub enum Sources {
     #[cfg(feature = "sources-splunk_hec")]
     SplunkHec(splunk_hec::SplunkConfig),
 
-    /// Statsd.
+    /// StatsD.
     #[cfg(feature = "sources-statsd")]
     Statsd(statsd::StatsdConfig),
 

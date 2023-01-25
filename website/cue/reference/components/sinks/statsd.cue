@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: statsd: {
-	title: "Statsd"
+	title: "StatsD"
 
 	classes: sinks.socket.classes
 
