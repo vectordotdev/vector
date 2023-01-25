@@ -56,14 +56,14 @@
       </span>
 
       {{ if $v.deprecated }}
-      <div class="mt-3 border-2 rounded-md border-red-400 flex flex-col space-y-1.5 py-2 px-3">
+      <div class="mt-3 border-2 rounded-md border-yellow-400 flex flex-col space-y-1.5 py-2 px-3">
         <span>
           {{ partial "heading.html" (dict "text" "Deprecated" "level" 4 "toc_hide" true) }}
         </span>
         <div class="flex space-x-5 items-center">
           <div class="flex-shrink-0">
             {{/* Heroicon: outline/exclamation-circle */}}
-            <svg xmlns="http://www.w3.org/2000/svg" class="text-red-500 h-5 w-5" fill="none" viewBox="0 0 24 24"
+            <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-5 w-5" fill="none" viewBox="0 0 24 24"
               stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
