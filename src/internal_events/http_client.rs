@@ -112,24 +112,26 @@ impl<'a, B: HttpBody> std::fmt::Display for FormatBody<'a, B> {
 
 #[derive(Debug)]
 pub struct HttpBodyDataReceived<'a> {
-    pub buf: &'a Vec<u8>,
+    pub buf: &'a mut Vec<u8>,
 }
 
 impl<'a> InternalEvent for HttpBodyDataReceived<'a> {
     fn emit(self) {
-        // log the buffer content of the configured limit
+        // Check if the buffer is empty before any operation
+        if self.buf.is_empty() {
+            return;
+        }
+
+        // Truncate the buffer to the first 20 elements if the buffer is over 20 elements
         // TODO: make this configurable
-        // TODO: see if changing http.rs to use data_buf.take().unwrap() will cause the below line to be simpler
+        if self.buf.len() > 20 {
+            self.buf.truncate(20);
+        }
+
+        // Log the buffer content of the configured limit
         debug!(
             message = "HttpBodyDataReceived",
-            buffer = format!(
-                "{:?}",
-                self.buf
-                    .into_iter()
-                    .take(20)
-                    .map(|b| *b)
-                    .collect::<Vec<u8>>()
-            )
+            buffer = format!("{:?}", self.buf)
         );
     }
 }
