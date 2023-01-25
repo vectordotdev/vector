@@ -3,7 +3,7 @@ use clap::Args;
 use std::collections::BTreeMap;
 
 use crate::platform;
-use crate::testing::{config::RustToolchainConfig, runner::get_agent_test_runner};
+use crate::testing::runner::get_agent_test_runner;
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -35,8 +35,7 @@ fn parse_env(env: Vec<String>) -> BTreeMap<String, String> {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let toolchain_config = RustToolchainConfig::parse()?;
-        let runner = get_agent_test_runner(self.container, toolchain_config.channel);
+        let runner = get_agent_test_runner(self.container)?;
 
         let mut args = vec!["--workspace".to_string()];
         if let Some(extra_args) = &self.args {
