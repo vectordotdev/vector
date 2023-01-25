@@ -61,7 +61,7 @@ impl FunctionExpression for SeahashFn {
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        TypeDef::bytes().infallible()
+        TypeDef::integer().infallible()
     }
 }
 
@@ -74,14 +74,14 @@ mod tests {
 
         seahash {
              args: func_args![value: "foo"],
-             want: Ok("4413582353838009230"),
-             tdef: TypeDef::bytes().infallible(),
+             want: Ok(4413582353838009230 as i64),
+             tdef: TypeDef::integer().infallible(),
         }
 
         seahash_buffer_overflow {
              args: func_args![value: "bar"],
-             want: Ok("-2796170501982571315"),
-             tdef: TypeDef::bytes().infallible(),
+             want: Ok(-2796170501982571315 as i64),
+             tdef: TypeDef::integer().infallible(),
         }
     ];
 }
