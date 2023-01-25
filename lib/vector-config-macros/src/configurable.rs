@@ -447,6 +447,8 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
         get_metadata_default_value(meta_ident, field.default_value())
     };
     let maybe_deprecated = get_metadata_deprecated(meta_ident, field.deprecated());
+    let maybe_deprecated_message =
+        get_metadata_deprecated_message(meta_ident, field.deprecated_message());
     let maybe_transparent = get_metadata_transparent(meta_ident, field.transparent());
     let maybe_validation = get_metadata_validation(meta_ident, field.validation());
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, field.metadata());
@@ -458,6 +460,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
         #maybe_description
         #maybe_default_value
         #maybe_deprecated
+        #maybe_deprecated_message
         #maybe_transparent
         #maybe_validation
         #maybe_custom_attributes
@@ -581,6 +584,17 @@ fn get_metadata_deprecated(
     deprecated.then(|| {
         quote! {
             #meta_ident.set_deprecated();
+        }
+    })
+}
+
+fn get_metadata_deprecated_message(
+    meta_ident: &Ident,
+    message: Option<&String>,
+) -> Option<proc_macro2::TokenStream> {
+    message.map(|message| {
+        quote! {
+            #meta_ident.set_deprecated_message(#message);
         }
     })
 }

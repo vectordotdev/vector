@@ -71,7 +71,11 @@
           </div>
 
           <div class="prose dark:prose-dark max-w-none leading-snug">
+            {{ if $v.deprecated_message }}
             {{ $v.deprecated | markdownify }}
+            {{ else }}
+            This field is deprecated.
+            {{ end }}
           </div>
         </div>
       </div>

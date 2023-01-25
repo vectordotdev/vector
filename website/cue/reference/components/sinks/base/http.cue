@@ -271,6 +271,7 @@ base: components: sinks: http: configuration: {
 		}
 	}
 	headers: {
+		deprecated:  true
 		description: "A list of custom headers to add to each request."
 		required:    false
 		type: object: options: "*": {
