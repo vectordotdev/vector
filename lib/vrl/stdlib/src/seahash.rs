@@ -1,11 +1,9 @@
-use nom::Parser;
 use ::value::Value;
-use value::Value::Integer;
 use vrl::prelude::*;
 
 fn seahash(value: Value) -> Resolved {
     let value = value.try_bytes()?;
-    Ok(Integer(seahash::hash(&value) as i64))
+    Ok(Value::Integer(seahash::hash(&value) as i64))
 }
 
 #[derive(Clone, Copy, Debug)]

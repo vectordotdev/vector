@@ -551,8 +551,6 @@ pub use replace::Replace;
 pub use reverse_dns::ReverseDns;
 #[cfg(feature = "round")]
 pub use round::Round;
-#[cfg(feature = "seahash")]
-pub use seahash::Seahash;
 #[cfg(feature = "set")]
 pub use set::Set;
 #[cfg(feature = "sha2")]
@@ -620,6 +618,8 @@ pub use values::Values;
 pub use crate::array::Array;
 #[cfg(feature = "md5")]
 pub use crate::md5::Md5;
+#[cfg(feature = "seahash")]
+pub use crate::seahash::Seahash;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
 
