@@ -111,14 +111,15 @@ impl<'a, B: HttpBody> std::fmt::Display for FormatBody<'a, B> {
 }
 
 #[derive(Debug)]
-pub struct HttpBodyDataBuffer {
-    pub buf: Vec<u8>,
+pub struct HttpBodyDataReceived<'a> {
+    pub buf: &'a Vec<u8>,
 }
 
-impl InternalEvent for HttpBodyDataBuffer {
+impl<'a> InternalEvent for HttpBodyDataReceived<'a> {
     fn emit(self) {
         // log the buffer content of the configured limit
         // TODO: make this configurable
-        debug!(message = "HttpBodyDataBuffer", buffer = ?self.buf.into_iter().take(20).collect::<Vec<u8>>());
+        // TODO: see if changing http.rs to use data_buf.take().unwrap() will cause the below line to be simpler
+        debug!(message = "HttpBodyDataReceived", buffer = format!("{:?}", self.buf.into_iter().take(20).map(|b| *b).collect::<Vec<u8>>()));
     }
 }

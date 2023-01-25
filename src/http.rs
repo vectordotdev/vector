@@ -129,9 +129,17 @@ where
             let body = body.map_data(move |data| {
                 if let Some(buf) = &mut data_buf {
                     buf.extend_from_slice(&data);
-                    emit!(http_client::HttpBodyDataBuffer {
-                        buf: data_buf.take().unwrap()
-                    });
+                }
+
+                if data_buf.is_some() {
+                    if let Some(buf) = &mut data_buf {
+                        if buf.len() >= 20 {
+                            emit!(http_client::HttpBodyDataReceived {
+                                buf: buf
+                            });
+                            data_buf = None;
+                        }
+                    }
                 }
                 data
             }).boxed();
