@@ -72,10 +72,7 @@ pub struct SyslogConfig {
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        /// The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
-        /// systemd socket activation.
-        ///
-        /// If a socket address is used, it _must_ include a port.
+        #[configurable(derived)]
         address: SocketListenAddr,
 
         #[configurable(derived)]
@@ -84,7 +81,7 @@ pub enum Mode {
         #[configurable(derived)]
         tls: Option<TlsSourceConfig>,
 
-        /// The size, in bytes, of the receive buffer used for each connection.
+        /// The size of the receive buffer used for each connection.
         ///
         /// This should not typically needed to be changed.
         #[configurable(metadata(docs::type_unit = "bytes"))]
@@ -96,10 +93,10 @@ pub enum Mode {
 
     /// Listen on UDP.
     Udp {
-        /// The socket address to listen for messages on.
+        #[configurable(derived)]
         address: SocketListenAddr,
 
-        /// The size, in bytes, of the receive buffer used for the listening socket.
+        /// The size of the receive buffer used for the listening socket.
         ///
         /// This should not typically needed to be changed.
         #[configurable(metadata(docs::type_unit = "bytes"))]

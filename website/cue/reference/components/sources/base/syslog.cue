@@ -75,7 +75,7 @@ base: components: sources: syslog: configuration: {
 	}
 	receive_buffer_bytes: {
 		description: """
-			The size, in bytes, of the receive buffer used for each connection.
+			The size of the receive buffer used for each connection.
 
 			This should not typically needed to be changed.
 			"""
