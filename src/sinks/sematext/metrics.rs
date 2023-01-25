@@ -164,7 +164,7 @@ impl SematextMetricsService {
     ) -> Result<VectorSink> {
         let batch = config.batch.into_batch_settings()?;
         let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
+            retry_attempts: 5,
             ..Default::default()
         });
         let http_service = HttpBatchService::new(client, create_build_request(endpoint));

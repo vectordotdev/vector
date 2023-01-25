@@ -130,7 +130,7 @@ impl SinkConfig for InfluxDbLogsConfig {
 
         let batch = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
+            retry_attempts: 5,
             ..Default::default()
         });
 

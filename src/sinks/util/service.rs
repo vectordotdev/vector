@@ -1,6 +1,7 @@
 use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
 use futures_util::stream::{self, BoxStream};
+use serde_with::serde_as;
 use tower::{
     balance::p2c::Balance,
     buffer::{Buffer, BufferLayer},
@@ -84,11 +85,12 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 /// Middleware settings for outbound requests.
 ///
 /// Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Copy, Debug)]
 pub struct TowerRequestConfig {
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default = "default_concurrency")]
     #[serde(skip_serializing_if = "concurrency_is_none")]
     pub concurrency: Concurrency,
 
@@ -96,125 +98,160 @@ pub struct TowerRequestConfig {
     ///
     /// It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
     /// create orphaned requests, pile on retries, and result in duplicate data downstream.
-    pub timeout_secs: Option<u64>,
+    #[serde(default = "default_timeout_secs")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub timeout_secs: Duration,
 
-    /// The time window, in seconds, used for the `rate_limit_num` option.
-    pub rate_limit_duration_secs: Option<u64>,
+    /// The time window used for the `rate_limit_num` option.
+    #[serde(default = "default_rate_limit_duration_secs")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub rate_limit_duration_secs: Duration,
 
     /// The maximum number of requests allowed within the `rate_limit_duration_secs` time window.
-    pub rate_limit_num: Option<u64>,
+    #[configurable(metadata(docs::type_unit = "requests"))]
+    #[serde(default = "default_rate_limit_num")]
+    pub rate_limit_num: u64,
 
     /// The maximum number of retries to make for failed requests.
     ///
     /// The default, for all intents and purposes, represents an infinite number of retries.
-    pub retry_attempts: Option<usize>,
+    #[configurable(metadata(docs::type_unit = "retries"))]
+    #[serde(default = "default_retry_attempts")]
+    pub retry_attempts: usize,
 
-    /// The maximum amount of time, in seconds, to wait between retries.
-    pub retry_max_duration_secs: Option<u64>,
+    /// The maximum amount of time to wait between retries.
+    #[serde(default = "default_retry_max_duration_secs")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub retry_max_duration_secs: Duration,
 
     /// The amount of time to wait before attempting the first retry for a failed request.
     ///
     /// After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
-    pub retry_initial_backoff_secs: Option<u64>,
+    #[serde(default = "default_retry_initial_backoff_secs")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub retry_initial_backoff_secs: Duration,
 
     #[configurable(derived)]
     #[serde(default)]
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
-pub const CONCURRENCY_DEFAULT: Concurrency = Concurrency::None;
-pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 1;
-pub const RATE_LIMIT_NUM_DEFAULT: u64 = i64::max_value() as u64; // i64 avoids TOML deserialize issue
-pub const RETRY_ATTEMPTS_DEFAULT: usize = isize::max_value() as usize; // isize avoids TOML deserialize issue
-pub const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600;
-pub const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1;
-pub const TIMEOUT_SECONDS_DEFAULT: u64 = 60;
+const fn default_concurrency() -> Concurrency {
+    Concurrency::None
+}
+
+const fn default_timeout_secs() -> Duration {
+    Duration::from_secs(60)
+}
+
+const fn default_rate_limit_duration_secs() -> Duration {
+    Duration::from_secs(1)
+}
+
+const fn default_rate_limit_num() -> u64 {
+    // i64 avoids TOML deserialize issue
+    i64::max_value() as u64
+}
+
+const fn default_retry_attempts() -> usize {
+    // i64 avoids TOML deserialize issue
+    isize::max_value() as usize
+}
+
+const fn default_retry_max_duration_secs() -> Duration {
+    Duration::from_secs(3_600)
+}
+
+const fn default_retry_initial_backoff_secs() -> Duration {
+    Duration::from_secs(1)
+}
 
 impl Default for TowerRequestConfig {
     fn default() -> Self {
-        Self::new(CONCURRENCY_DEFAULT)
+        Self {
+            concurrency: default_concurrency(),
+            timeout_secs: default_timeout_secs(),
+            rate_limit_duration_secs: default_rate_limit_duration_secs(),
+            rate_limit_num: default_rate_limit_num(),
+            retry_attempts: default_retry_attempts(),
+            retry_max_duration_secs: default_retry_max_duration_secs(),
+            retry_initial_backoff_secs: default_retry_initial_backoff_secs(),
+            adaptive_concurrency: AdaptiveConcurrencySettings::default(),
+        }
     }
 }
 
 impl TowerRequestConfig {
-    pub const fn new(concurrency: Concurrency) -> Self {
+    pub fn new(concurrency: Concurrency) -> Self {
         Self {
             concurrency,
-            timeout_secs: Some(TIMEOUT_SECONDS_DEFAULT),
-            rate_limit_duration_secs: Some(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
-            rate_limit_num: Some(RATE_LIMIT_NUM_DEFAULT),
-            retry_attempts: Some(RETRY_ATTEMPTS_DEFAULT),
-            retry_max_duration_secs: Some(RETRY_MAX_DURATION_SECONDS_DEFAULT),
-            retry_initial_backoff_secs: Some(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
-            adaptive_concurrency: AdaptiveConcurrencySettings::const_default(),
+            ..Default::default()
         }
     }
 
-    pub const fn const_default() -> Self {
-        Self::new(CONCURRENCY_DEFAULT)
-    }
-
     pub const fn timeout_secs(mut self, timeout_secs: u64) -> Self {
-        self.timeout_secs = Some(timeout_secs);
+        self.timeout_secs = Duration::from_secs(timeout_secs);
         self
     }
 
     pub const fn rate_limit_duration_secs(mut self, rate_limit_duration_secs: u64) -> Self {
-        self.rate_limit_duration_secs = Some(rate_limit_duration_secs);
+        self.rate_limit_duration_secs = Duration::from_secs(rate_limit_duration_secs);
         self
     }
 
     pub const fn rate_limit_num(mut self, rate_limit_num: u64) -> Self {
-        self.rate_limit_num = Some(rate_limit_num);
+        self.rate_limit_num = rate_limit_num;
         self
     }
 
     pub const fn retry_attempts(mut self, retry_attempts: usize) -> Self {
-        self.retry_attempts = Some(retry_attempts);
+        self.retry_attempts = retry_attempts;
         self
     }
 
     pub const fn retry_max_duration_secs(mut self, retry_max_duration_secs: u64) -> Self {
-        self.retry_max_duration_secs = Some(retry_max_duration_secs);
+        self.retry_max_duration_secs = Duration::from_secs(retry_max_duration_secs);
         self
     }
 
     pub const fn retry_initial_backoff_secs(mut self, retry_initial_backoff_secs: u64) -> Self {
-        self.retry_initial_backoff_secs = Some(retry_initial_backoff_secs);
+        self.retry_initial_backoff_secs = Duration::from_secs(retry_initial_backoff_secs);
         self
     }
 
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
             concurrency: self.concurrency.parse_concurrency(defaults.concurrency),
-            timeout: Duration::from_secs(
-                self.timeout_secs
-                    .or(defaults.timeout_secs)
-                    .unwrap_or(TIMEOUT_SECONDS_DEFAULT),
-            ),
-            rate_limit_duration: Duration::from_secs(
-                self.rate_limit_duration_secs
-                    .or(defaults.rate_limit_duration_secs)
-                    .unwrap_or(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
-            ),
+            timeout: self
+                .timeout_secs
+                .ne(&default_timeout_secs())
+                .then_some(self.timeout_secs)
+                .unwrap_or(default_timeout_secs()),
+            rate_limit_duration: self
+                .rate_limit_duration_secs
+                .ne(&default_rate_limit_duration_secs())
+                .then_some(self.rate_limit_duration_secs)
+                .unwrap_or(default_rate_limit_duration_secs()),
             rate_limit_num: self
                 .rate_limit_num
-                .or(defaults.rate_limit_num)
-                .unwrap_or(RATE_LIMIT_NUM_DEFAULT),
+                .ne(&default_rate_limit_num())
+                .then_some(self.rate_limit_num)
+                .unwrap_or(default_rate_limit_num()),
             retry_attempts: self
                 .retry_attempts
-                .or(defaults.retry_attempts)
-                .unwrap_or(RETRY_ATTEMPTS_DEFAULT),
-            retry_max_duration_secs: Duration::from_secs(
-                self.retry_max_duration_secs
-                    .or(defaults.retry_max_duration_secs)
-                    .unwrap_or(RETRY_MAX_DURATION_SECONDS_DEFAULT),
-            ),
-            retry_initial_backoff_secs: Duration::from_secs(
-                self.retry_initial_backoff_secs
-                    .or(defaults.retry_initial_backoff_secs)
-                    .unwrap_or(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
-            ),
+                .ne(&default_retry_attempts())
+                .then_some(self.retry_attempts)
+                .unwrap_or(default_retry_attempts()),
+            retry_max_duration_secs: self
+                .retry_max_duration_secs
+                .ne(&default_retry_max_duration_secs())
+                .then_some(self.retry_max_duration_secs)
+                .unwrap_or(default_retry_max_duration_secs()),
+            retry_initial_backoff_secs: self
+                .retry_initial_backoff_secs
+                .ne(&default_retry_initial_backoff_secs())
+                .then_some(self.retry_initial_backoff_secs)
+                .unwrap_or(default_retry_initial_backoff_secs()),
             adaptive_concurrency: self.adaptive_concurrency,
         }
     }

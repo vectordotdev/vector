@@ -184,11 +184,11 @@ impl SinkConfig for StackdriverConfig {
             .validate()?
             .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batch_settings()?;
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: Some(1000),
-            rate_limit_duration_secs: Some(1),
-            ..Default::default()
-        });
+        let request = self.request.unwrap_with(
+            &TowerRequestConfig::default()
+                .rate_limit_duration_secs(1)
+                .rate_limit_num(1000),
+        );
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
