@@ -43,7 +43,7 @@ impl Function for Seahash {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kind: kind::BYTES,
+            kind: kind::ANY,
             required: true,
         }]
     }
