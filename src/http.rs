@@ -52,6 +52,7 @@ impl HttpError {
 }
 
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
+pub type BodyBox = http_body::combinators::BoxBody<hyper::body::Bytes, hyper::Error>;
 
 pub struct HttpClient<B = Body> {
     client: Client<ProxyConnector<HttpsConnector<HttpConnector>>, B>,
@@ -89,7 +90,7 @@ where
     pub fn send(
         &self,
         mut request: Request<B>,
-    ) -> BoxFuture<'static, Result<http::Response<Body>, HttpError>> {
+    ) -> BoxFuture<'static, Result<http::Response<BodyBox>, HttpError>> {
         let span = tracing::info_span!("http");
         let _enter = span.enter();
 
@@ -122,6 +123,17 @@ where
                     error
                 })
                 .context(CallRequestSnafu)?;
+
+            let (parts, body) = response.into_parts();
+            let mut buf: Vec<u8> = Vec::new();
+            let body = body.map_data(move |data| {
+                buf.extend(data);
+                if buf.len() > 20 {
+                    println!("Data buf has reached len 20: {:?}", std::str::from_utf8(&buf));
+                }
+                bytes::Bytes::new()
+            }).boxed();
+            let response = hyper::Response::from_parts(parts, body);
 
             // Emit the response into the internal events system.
             emit!(http_client::GotHttpResponse {
@@ -197,7 +209,7 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    type Response = http::Response<Body>;
+    type Response = http::Response<BodyBox>;
     type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 

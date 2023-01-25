@@ -67,9 +67,11 @@ pub struct GcsRequestSettings {
     pub headers: Vec<(HeaderName, HeaderValue)>,
 }
 
+pub type BodyBox = http_body::combinators::BoxBody<hyper::body::Bytes, hyper::Error>;
+
 #[derive(Debug)]
 pub struct GcsResponse {
-    pub inner: http::Response<Body>,
+    pub inner: http::Response<BodyBox>,
     pub metadata: RequestMetadata,
 }
 

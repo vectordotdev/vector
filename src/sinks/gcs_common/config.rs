@@ -124,9 +124,11 @@ pub fn build_healthcheck(
     Ok(healthcheck.boxed())
 }
 
+pub type BodyBox = http_body::combinators::BoxBody<hyper::body::Bytes, hyper::Error>;
+
 // Use this to map a healthcheck response, as it handles setting up the renewal task.
 pub fn healthcheck_response(
-    response: http::Response<hyper::Body>,
+    response: http::Response<BodyBox>,
     auth: GcpAuthenticator,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
