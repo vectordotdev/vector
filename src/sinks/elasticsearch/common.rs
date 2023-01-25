@@ -4,7 +4,7 @@ use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::{Buf, Bytes};
 use http::{Response, StatusCode, Uri};
-use hyper::{body};
+use hyper::body;
 use serde::Deserialize;
 use snafu::ResultExt;
 use vector_core::config::proxy::ProxyConfig;
@@ -15,7 +15,7 @@ use super::{
     InvalidHostSnafu, Request,
 };
 use crate::{
-    http::{Auth, HttpClient, MaybeAuth, BodyBox},
+    http::{Auth, BodyBox, HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
             ElasticsearchAuth, ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
@@ -291,7 +291,6 @@ async fn get_version(
     let ClusterState { version } = serde_json::from_slice(&body)?;
     version.ok_or_else(||"Unexpected response from Elasticsearch endpoint `/_cluster/state/version`. Missing `version`. Consider setting `api_version` option.".into())
 }
-
 
 async fn get(
     base_url: &str,

@@ -6,7 +6,7 @@ use vector_config::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},
-    http::{HttpClient, BodyBox},
+    http::{BodyBox, HttpClient},
     sinks::{
         gcs_common::service::GcsResponse,
         util::retries::{RetryAction, RetryLogic},

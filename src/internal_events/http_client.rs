@@ -120,6 +120,16 @@ impl<'a> InternalEvent for HttpBodyDataReceived<'a> {
         // log the buffer content of the configured limit
         // TODO: make this configurable
         // TODO: see if changing http.rs to use data_buf.take().unwrap() will cause the below line to be simpler
-        debug!(message = "HttpBodyDataReceived", buffer = format!("{:?}", self.buf.into_iter().take(20).map(|b| *b).collect::<Vec<u8>>()));
+        debug!(
+            message = "HttpBodyDataReceived",
+            buffer = format!(
+                "{:?}",
+                self.buf
+                    .into_iter()
+                    .take(20)
+                    .map(|b| *b)
+                    .collect::<Vec<u8>>()
+            )
+        );
     }
 }

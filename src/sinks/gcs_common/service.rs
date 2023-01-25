@@ -14,7 +14,7 @@ use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpAuthenticator,
-    http::{HttpClient, HttpError, BodyBox},
+    http::{BodyBox, HttpClient, HttpError},
 };
 
 #[derive(Debug, Clone)]

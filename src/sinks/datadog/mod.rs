@@ -3,7 +3,7 @@ use snafu::Snafu;
 
 use crate::{
     common::datadog::{get_api_base_endpoint, Region},
-    http::{HttpClient, HttpError, BodyBox},
+    http::{BodyBox, HttpClient, HttpError},
     sinks::HealthcheckError,
 };
 

@@ -126,23 +126,19 @@ where
 
             let (parts, body) = response.into_parts();
             let mut data_buf: Option<Vec<u8>> = Some(Vec::new());
-            let body = body.map_data(move |data| {
-                if let Some(buf) = &mut data_buf {
-                    buf.extend_from_slice(&data);
-                }
 
-                if data_buf.is_some() {
+            let body = body
+                .map_data(move |data| {
                     if let Some(buf) = &mut data_buf {
+                        buf.extend_from_slice(&data);
                         if buf.len() >= 20 {
-                            emit!(http_client::HttpBodyDataReceived {
-                                buf: buf
-                            });
+                            emit!(http_client::HttpBodyDataReceived { buf });
                             data_buf = None;
                         }
                     }
-                }
-                data
-            }).boxed();
+                    data
+                })
+                .boxed();
             let response = hyper::Response::from_parts(parts, body);
 
             // Emit the response into the internal events system.
