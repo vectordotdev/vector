@@ -120,15 +120,15 @@ where
     _s: PhantomData<S>,
 }
 
-fn default_max_bytes<D: SinkBatchSettings>() -> Option<usize> {
+const fn default_max_bytes<D: SinkBatchSettings>() -> Option<usize> {
     D::MAX_BYTES
 }
 
-fn default_max_events<D: SinkBatchSettings>() -> Option<usize> {
+const fn default_max_events<D: SinkBatchSettings>() -> Option<usize> {
     D::MAX_EVENTS
 }
 
-fn default_timeout<D: SinkBatchSettings>() -> Option<f64> {
+const fn default_timeout<D: SinkBatchSettings>() -> Option<f64> {
     Some(D::TIMEOUT_SECS)
 }
 
