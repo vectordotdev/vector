@@ -252,7 +252,7 @@ fn default_host_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
 }
 
-fn default_read_from() -> ReadFromConfig {
+const fn default_read_from() -> ReadFromConfig {
     ReadFromConfig::Beginning
 }
 
@@ -370,7 +370,7 @@ impl Default for FileConfig {
             file_key: default_file_key(),
             start_at_beginning: None,
             ignore_checkpoints: None,
-            read_from: Default::default(),
+            read_from: default_read_from(),
             ignore_older_secs: None,
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::default(),
