@@ -12,6 +12,7 @@ pub struct Metadata<T> {
     default_value: Option<T>,
     custom_attributes: Vec<CustomAttribute>,
     deprecated: bool,
+    deprecated_message: Option<&'static str>,
     transparent: bool,
     validations: Vec<validation::Validation>,
 }
@@ -85,6 +86,7 @@ impl<T> Metadata<T> {
             default_value: self.default_value.map(f),
             custom_attributes: self.custom_attributes,
             deprecated: self.deprecated,
+            deprecated_message: self.deprecated_message,
             transparent: self.transparent,
             validations: self.validations,
         }
@@ -96,6 +98,14 @@ impl<T> Metadata<T> {
 
     pub fn set_deprecated(&mut self) {
         self.deprecated = true;
+    }
+
+    pub fn deprecated_message(&self) -> Option<&'static str> {
+        self.deprecated_message
+    }
+
+    pub fn set_deprecated_message(&mut self, message: &'static str) {
+        self.deprecated_message = Some(message);
     }
 
     pub fn transparent(&self) -> bool {
@@ -132,6 +142,7 @@ impl<T> Metadata<T> {
             default_value: other.default_value.or(self.default_value),
             custom_attributes: self.custom_attributes,
             deprecated: other.deprecated,
+            deprecated_message: other.deprecated_message.or(self.deprecated_message),
             transparent: other.transparent,
             validations: self.validations,
         }
@@ -147,6 +158,7 @@ impl<T> Metadata<T> {
             default_value: None,
             custom_attributes: self.custom_attributes.clone(),
             deprecated: self.deprecated,
+            deprecated_message: self.deprecated_message,
             transparent: self.transparent,
             validations: self.validations.clone(),
         }
@@ -161,6 +173,7 @@ impl<T> Default for Metadata<T> {
             default_value: None,
             custom_attributes: Vec::new(),
             deprecated: false,
+            deprecated_message: None,
             transparent: false,
             validations: Vec::new(),
         }
@@ -182,6 +195,7 @@ impl<T> fmt::Debug for Metadata<T> {
             )
             .field("custom_attributes", &self.custom_attributes)
             .field("deprecated", &self.deprecated)
+            .field("deprecated_message", &self.deprecated_message)
             .field("transparent", &self.transparent)
             .field("validations", &self.validations)
             .finish()

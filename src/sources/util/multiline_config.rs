@@ -12,21 +12,32 @@ use crate::line_agg;
 #[serde(deny_unknown_fields)]
 pub struct MultilineConfig {
     /// Regular expression pattern that is used to match the start of a new message.
+    #[configurable(metadata(docs::examples = "^[\\s]+"))]
+    #[configurable(metadata(docs::examples = "\\\\$"))]
+    #[configurable(metadata(docs::examples = "^(INFO|ERROR) "))]
+    #[configurable(metadata(docs::examples = ";$"))]
     pub start_pattern: String,
 
     /// Regular expression pattern that is used to determine whether or not more lines should be read.
     ///
     /// This setting must be configured in conjunction with `mode`.
+    #[configurable(metadata(docs::examples = "^[\\s]+"))]
+    #[configurable(metadata(docs::examples = "\\\\$"))]
+    #[configurable(metadata(docs::examples = "^(INFO|ERROR) "))]
+    #[configurable(metadata(docs::examples = ";$"))]
     pub condition_pattern: String,
 
     /// Aggregation mode.
     ///
     /// This setting must be configured in conjunction with `condition_pattern`.
+    #[configurable(derived)]
     pub mode: line_agg::Mode,
 
     /// The maximum amount of time to wait for the next additional line, in milliseconds.
     ///
     /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
+    #[configurable(metadata(docs::examples = 1000))]
+    #[configurable(metadata(docs::examples = 600000))]
     pub timeout_ms: u64,
 }
 

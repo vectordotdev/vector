@@ -1,0 +1,12 @@
+args:
+- --features
+- postgresql_metrics-integration-tests
+- --lib
+- ::postgres
+
+env:
+  PG_HOST: postgres
+  PG_SOCKET: /socket
+
+matrix:
+- version: ['13.1']

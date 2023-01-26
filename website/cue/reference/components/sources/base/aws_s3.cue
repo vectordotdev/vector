@@ -2,10 +2,13 @@ package metadata
 
 base: components: sources: aws_s3: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -20,6 +23,7 @@ base: components: sources: aws_s3: configuration: {
 		}
 	}
 	assume_role: {
+		deprecated: true
 		description: """
 			The ARN of an [IAM role][iam_role] to assume at startup.
 
@@ -141,7 +145,7 @@ base: components: sources: aws_s3: configuration: {
 					This setting must be configured in conjunction with `mode`.
 					"""
 				required: true
-				type: string: {}
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
 			}
 			mode: {
 				description: """
@@ -180,7 +184,7 @@ base: components: sources: aws_s3: configuration: {
 			start_pattern: {
 				description: "Regular expression pattern that is used to match the start of a new message."
 				required:    true
-				type: string: {}
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
 			}
 			timeout_ms: {
 				description: """
@@ -189,7 +193,7 @@ base: components: sources: aws_s3: configuration: {
 					Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
 					"""
 				required: true
-				type: uint: {}
+				type: uint: examples: [1000, 600000]
 			}
 		}
 	}

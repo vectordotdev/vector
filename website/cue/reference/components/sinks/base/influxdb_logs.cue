@@ -115,6 +115,7 @@ base: components: sinks: influxdb_logs: configuration: {
 		type: string: {}
 	}
 	namespace: {
+		deprecated: true
 		description: """
 			The namespace of the measurement name to use.
 

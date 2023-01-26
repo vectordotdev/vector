@@ -368,11 +368,10 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 test-integration-%-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
+	cargo vdev --verbose integration stop $*
 
 test-integration-%:
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml build
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
+	cargo vdev --verbose integration test $*
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
 endif
