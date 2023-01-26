@@ -98,6 +98,12 @@ pub struct ReduceConfig {
     /// If this condition resolves to `true` for an event, the previous transaction is flushed
     /// (without this event) and a new transaction is started.
     pub starts_when: Option<AnyCondition>,
+
+    /// A flag to control whether to periodically flush events
+    ///
+    /// In case of frequent events, flushing event will be constantly pushed back thus a flush
+    /// will not happen. Setting this flag ensures a flush will happen when the first event expires
+    pub flush_periodically: Option<bool>,
 }
 
 const fn default_expire_after_ms() -> Duration {
@@ -214,6 +220,7 @@ struct ReduceState {
     fields: HashMap<String, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
     metadata: EventMetadata,
+    flush_periodically: bool,
 }
 
 impl ReduceState {
@@ -226,6 +233,7 @@ impl ReduceState {
             stale_since: Instant::now(),
             fields,
             metadata,
+            flush_periodically: false,
         }
     }
 
@@ -263,8 +271,9 @@ impl ReduceState {
                 }
             }
         }
-        self.events += 1;
-        self.stale_since = Instant::now();
+        if !self.flush_periodically {
+            self.stale_since = Instant::now();
+        }
     }
 
     fn flush(mut self) -> LogEvent {
@@ -288,6 +297,7 @@ pub struct Reduce {
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
     max_events: Option<usize>,
+    flush_periodically: bool,
 }
 
 impl Reduce {
@@ -321,6 +331,7 @@ impl Reduce {
             ends_when,
             starts_when,
             max_events,
+            flush_periodically: config.flush_periodically.unwrap_or_default(),
         })
     }
 
@@ -349,7 +360,7 @@ impl Reduce {
         match self.reduce_merge_states.entry(discriminant) {
             hash_map::Entry::Vacant(entry) => {
                 let mut state = ReduceState::new();
-                state.add_event(event, &self.merge_strategies);
+                state.add_event(event, &self.merge_strategies, self.flush_periodically);
                 entry.insert(state);
             }
             hash_map::Entry::Occupied(mut entry) => {
@@ -397,7 +408,7 @@ impl Reduce {
                 }
                 None => {
                     let mut state = ReduceState::new();
-                    state.add_event(event, &self.merge_strategies);
+                    state.add_event(event, &self.merge_strategies, self.flush_periodically);
                     state.flush().into()
                 }
             })
