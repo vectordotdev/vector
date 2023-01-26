@@ -31,10 +31,12 @@ base: components: sinks: vector: configuration: {
 		description: """
 			The downstream Vector address to which to connect.
 
+			Both IP address and hostname are accepted formats.
+
 			The address _must_ include a port.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -298,10 +300,5 @@ base: components: sinks: vector: configuration: {
 				type: bool: {}
 			}
 		}
-	}
-	version: {
-		description: "Version of the configuration."
-		required:    false
-		type: string: enum: "2": "Marker value for version two."
 	}
 }
