@@ -30,16 +30,21 @@ pub struct WebSocketSinkConfig {
 
     /// The interval, in seconds, between sending [Ping][ping]s to the remote peer.
     ///
-    /// Pings are not sent by default. This option must be configured to a value > 0 in order to
-    /// enable pings.
+    /// If this option is not configured, pings are not sent on an interval. This option must be configured to a value > 0
+    /// in order to enable pings.
     ///
-    /// [ping]: https://en.wikipedia.org/wiki/Ping_(networking_utility)
+    /// If the `ping_timeout` is not set, pings are still sent but there is no expectation of pong
+    /// response times.
+    ///
+    /// [ping]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.2
     #[configurable(metadata(docs::type_unit = "seconds"))]
     pub ping_interval: Option<u64>,
 
-    /// The number of seconds to wait for a PONG response from the remote peer.
+    /// The number of seconds to wait for a [Pong][pong] response from the remote peer.
     ///
     /// If a response is not received within this time, the connection is reestablished.
+    ///
+    /// [pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
     // NOTE: this option is not relevant if the `ping_interval` is not configured.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     pub ping_timeout: Option<u64>,
