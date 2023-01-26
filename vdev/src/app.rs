@@ -128,6 +128,14 @@ impl CommandExt for Command {
         if let Some(cwd) = self.get_current_dir() {
             debug!("  in working directory {cwd:?}");
         }
+        for (key, value) in self.get_envs() {
+            let key = key.to_string_lossy();
+            if let Some(value) = value {
+                debug!("  ${key}={:?}", value.to_string_lossy());
+            } else {
+                debug!("  unset ${key}");
+            }
+        }
     }
 }
 

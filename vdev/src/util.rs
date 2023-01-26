@@ -1,5 +1,5 @@
 use std::process::{Command, Output};
-use std::{collections::BTreeMap, fs};
+use std::{collections::BTreeMap, fmt::Debug, fs, io::ErrorKind, path::Path};
 
 use anyhow::{Context as _, Result};
 use serde::Deserialize;
@@ -45,4 +45,12 @@ pub fn release_channel() -> Result<&'static str> {
             "nightly"
         }
     })
+}
+
+pub fn exists(path: impl AsRef<Path> + Debug) -> Result<bool> {
+    match fs::metadata(path.as_ref()) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error).context(format!("Could not stat {path:?}")),
+    }
 }

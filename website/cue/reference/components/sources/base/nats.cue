@@ -12,7 +12,7 @@ base: components: sources: nats: configuration: {
 				type: object: options: path: {
 					description: "Path to credentials file."
 					required:    true
-					type: string: {}
+					type: string: examples: ["/etc/nats/nats.creds"]
 				}
 			}
 			nkey: {
@@ -88,9 +88,15 @@ base: components: sources: nats: configuration: {
 		}
 	}
 	connection_name: {
-		description: "A name assigned to the NATS connection."
-		required:    true
-		type: string: {}
+		description: """
+			A [name][nats_connection_name] assigned to the NATS connection.
+
+			[nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
+			"""
+		required: true
+		type: string: examples: [
+			"vector",
+		]
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
@@ -222,9 +228,13 @@ base: components: sources: nats: configuration: {
 		type: string: {}
 	}
 	subject: {
-		description: "The NATS subject to pull messages from."
-		required:    true
-		type: string: {}
+		description: """
+			The NATS [subject][nats_subject] to pull messages from.
+
+			[nats_subject]: https://docs.nats.io/nats-concepts/subjects
+			"""
+		required: true
+		type: string: examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
 	}
 	subject_key_field: {
 		description: "The `NATS` subject key."
@@ -330,9 +340,10 @@ base: components: sources: nats: configuration: {
 		description: """
 			The NATS URL to connect to.
 
-			The URL must take the form of `nats://server:port`.
+			The URL takes the form of `nats://server:port`.
+			If the port is not specified it defaults to 4222.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["nats://demo.nats.io", "nats://127.0.0.1:4242"]
 	}
 }

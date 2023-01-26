@@ -45,6 +45,7 @@ base: components: sinks: datadog_events: configuration: {
 		type: string: {}
 	}
 	region: {
+		deprecated: true
 		description: """
 			The Datadog region to send events to.
 

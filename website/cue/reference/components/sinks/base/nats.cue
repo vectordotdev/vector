@@ -38,7 +38,7 @@ base: components: sinks: nats: configuration: {
 				type: object: options: path: {
 					description: "Path to credentials file."
 					required:    true
-					type: string: {}
+					type: string: examples: ["/etc/nats/nats.creds"]
 				}
 			}
 			nkey: {

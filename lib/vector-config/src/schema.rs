@@ -59,6 +59,14 @@ where
     // the original value is a flag, or the value being added to an existing key is a flag, as
     // having a flag declared multiple times, or mixing a flag with a KV pair, doesn't make sense.
     let mut custom_map = Map::new();
+
+    if let Some(message) = metadata.deprecated_message() {
+        custom_map.insert(
+            "deprecated_message".to_string(),
+            serde_json::Value::String(message.to_string()),
+        );
+    }
+
     for attribute in metadata.custom_attributes() {
         match attribute {
             CustomAttribute::Flag(key) => {

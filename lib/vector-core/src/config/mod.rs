@@ -151,9 +151,11 @@ impl Output {
 /// setting, as it is deprecated, and we still need to maintain a way to expose it in the
 /// documentation before it's removed while also making sure people know it shouldn't be used.
 #[configurable_component]
+#[configurable(deprecated)]
 #[configurable(title = "Controls how acknowledgements are handled by this source.")]
 #[configurable(
-    description = "This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. \
+    description = "This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
 Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
