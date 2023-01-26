@@ -49,8 +49,8 @@ async fn firehose_put_records() {
         encoding: JsonSerializerConfig::default().into(), // required for ES destination w/ localstack
         compression: Compression::None,
         request: TowerRequestConfig {
-            timeout_secs: Some(10),
-            retry_attempts: Some(0),
+            timeout_secs: Duration::from_secs(10),
+            retry_attempts: 0,
             ..Default::default()
         },
         tls: None,

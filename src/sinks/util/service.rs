@@ -220,38 +220,53 @@ impl TowerRequestConfig {
     }
 
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
+        let timeout = if self.timeout_secs != default_timeout_secs() {
+            self.timeout_secs
+        } else {
+            default_timeout_secs()
+        };
+
+        let rate_limit_duration =
+            if self.rate_limit_duration_secs != default_rate_limit_duration_secs() {
+                self.rate_limit_duration_secs
+            } else {
+                default_rate_limit_duration_secs()
+            };
+
+        let rate_limit_num = if self.rate_limit_num != default_rate_limit_num() {
+            self.rate_limit_num
+        } else {
+            default_rate_limit_num()
+        };
+
+        let retry_attempts = if self.retry_attempts != default_retry_attempts() {
+            self.retry_attempts
+        } else {
+            default_retry_attempts()
+        };
+
+        let retry_max_duration_secs =
+            if self.retry_max_duration_secs != default_retry_max_duration_secs() {
+                self.retry_max_duration_secs
+            } else {
+                default_retry_max_duration_secs()
+            };
+
+        let retry_initial_backoff_secs =
+            if self.retry_initial_backoff_secs != default_retry_initial_backoff_secs() {
+                self.retry_initial_backoff_secs
+            } else {
+                default_retry_initial_backoff_secs()
+            };
+
         TowerRequestSettings {
             concurrency: self.concurrency.parse_concurrency(defaults.concurrency),
-            timeout: self
-                .timeout_secs
-                .ne(&default_timeout_secs())
-                .then_some(self.timeout_secs)
-                .unwrap_or(default_timeout_secs()),
-            rate_limit_duration: self
-                .rate_limit_duration_secs
-                .ne(&default_rate_limit_duration_secs())
-                .then_some(self.rate_limit_duration_secs)
-                .unwrap_or(default_rate_limit_duration_secs()),
-            rate_limit_num: self
-                .rate_limit_num
-                .ne(&default_rate_limit_num())
-                .then_some(self.rate_limit_num)
-                .unwrap_or(default_rate_limit_num()),
-            retry_attempts: self
-                .retry_attempts
-                .ne(&default_retry_attempts())
-                .then_some(self.retry_attempts)
-                .unwrap_or(default_retry_attempts()),
-            retry_max_duration_secs: self
-                .retry_max_duration_secs
-                .ne(&default_retry_max_duration_secs())
-                .then_some(self.retry_max_duration_secs)
-                .unwrap_or(default_retry_max_duration_secs()),
-            retry_initial_backoff_secs: self
-                .retry_initial_backoff_secs
-                .ne(&default_retry_initial_backoff_secs())
-                .then_some(self.retry_initial_backoff_secs)
-                .unwrap_or(default_retry_initial_backoff_secs()),
+            timeout,
+            rate_limit_duration,
+            rate_limit_num,
+            retry_attempts,
+            retry_max_duration_secs,
+            retry_initial_backoff_secs,
             adaptive_concurrency: self.adaptive_concurrency,
         }
     }

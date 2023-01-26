@@ -410,8 +410,8 @@ async fn run_test(params: TestParams) -> TestResults {
     let test_config = TestConfig {
         request: TowerRequestConfig {
             concurrency: params.concurrency,
-            rate_limit_num: Some(9999),
-            timeout_secs: Some(1),
+            rate_limit_num: 9999,
+            timeout_secs: Duration::from_secs(1),
             ..Default::default()
         },
         params,
