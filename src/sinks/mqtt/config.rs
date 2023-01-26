@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use codecs::JsonSerializerConfig;
 use rand::{thread_rng, Rng};
-use rumqttc::{MqttOptions, TlsConfiguration, Transport};
+use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_config::configurable_component;
 
@@ -15,6 +15,7 @@ use crate::{
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
+use crate::template::Template;
 
 /// Configuration for the `mqtt` sink
 #[configurable_component(sink("mqtt"))]
@@ -49,7 +50,7 @@ pub struct MqttSinkConfig {
     pub tls: Option<TlsEnableableConfig>,
 
     /// MQTT publish topic (templates allowed)
-    pub topic: String,
+    pub topic: Template,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
@@ -81,6 +82,16 @@ pub enum MqttQoS {
     /// ExactlyOnce.
     #[derivative(Default)]
     ExactlyOnce,
+}
+
+impl From<MqttQoS> for QoS {
+    fn from(value: MqttQoS) -> Self {
+        match value {
+            MqttQoS::AtLeastOnce => QoS::AtLeastOnce,
+            MqttQoS::AtMostOnce => QoS::AtMostOnce,
+            MqttQoS::ExactlyOnce => QoS::ExactlyOnce,
+        }
+    }
 }
 
 const fn default_port() -> u16 {

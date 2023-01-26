@@ -159,11 +159,7 @@ impl MqttSink {
                     };
                     let message_len = message.len();
 
-                    let qos = match self.quality_of_service {
-                        MqttQoS::AtLeastOnce => QoS::AtLeastOnce,
-                        MqttQoS::AtMostOnce => QoS::AtMostOnce,
-                        MqttQoS::ExactlyOnce => QoS::ExactlyOnce,
-                    };
+                    let qos = self.quality_of_service;
                     let retain = false;
                     match client.publish(&topic, qos, retain, message).await {
                         Ok(()) => {
