@@ -168,7 +168,9 @@ pub struct PubsubConfig {
     pub ack_deadline_secs: Duration,
 
     /// Deprecated, old name of `ack_deadline_secs`.
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "The `ack_deadline_seconds` option is deprecated, use `ack_deadline_secs` instead."
+    )]
     pub ack_deadline_seconds: Option<u16>,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
@@ -177,7 +179,9 @@ pub struct PubsubConfig {
     pub retry_delay_secs: Duration,
 
     /// Deprecated, old name of `retry_delay_secs`.
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "The `retry_delay_seconds` option is deprecated, use `retry_delay_secs` instead."
+    )]
     pub retry_delay_seconds: Option<f64>,
 
     /// The amount of time, in seconds, with no received activity

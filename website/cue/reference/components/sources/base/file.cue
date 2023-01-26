@@ -204,23 +204,17 @@ base: components: sources: file: configuration: {
 		type: uint: default: 2048
 	}
 	message_start_indicator: {
-		deprecated: true
-		description: """
-			String value used to identify the start of a multi-line message.
-
-			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-			"""
-		required: false
+		deprecated:         true
+		deprecated_message: "The `message_start_indicator` option is deprecated, use `multiline` instead."
+		description:        "String value used to identify the start of a multi-line message."
+		required:           false
 		type: string: {}
 	}
 	multi_line_timeout: {
-		deprecated: true
-		description: """
-			How long to wait for more data when aggregating a multi-line message, in milliseconds.
-
-			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-			"""
-		required: false
+		deprecated:         true
+		deprecated_message: "The `multi_line_timeout` option is deprecated, use `multiline` instead."
+		description:        "How long to wait for more data when aggregating a multi-line message, in milliseconds."
+		required:           false
 		type: uint: default: 1000
 	}
 	multiline: {
@@ -324,13 +318,10 @@ base: components: sources: file: configuration: {
 		type: uint: {}
 	}
 	start_at_beginning: {
-		deprecated: true
-		description: """
-			Whether or not to start reading from the beginning of a new file.
-
-			DEPRECATED: This is a deprecated option -- replaced by `ignore_checkpoints`/`read_from` -- and should be removed.
-			"""
-		required: false
+		deprecated:         true
+		deprecated_message: "The `start_at_beginning` option is deprecated, use `ignore_checkpoints`/`read_from` instead."
+		description:        "Whether or not to start reading from the beginning of a new file."
+		required:           false
 		type: bool: {}
 	}
 }

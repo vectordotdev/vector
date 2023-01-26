@@ -72,7 +72,7 @@ pub struct SplunkConfig {
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
     #[configurable(
-        deprecated = "This option has been deprecated, the *valid_tokens* option should be used."
+        deprecated = "This option has been deprecated, the `valid_tokens` option should be used."
     )]
     token: Option<SensitiveString>,
 

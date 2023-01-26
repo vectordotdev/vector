@@ -2,9 +2,10 @@ package metadata
 
 base: components: sources: gcp_pubsub: configuration: {
 	ack_deadline_seconds: {
-		deprecated:  true
-		description: "Deprecated, old name of `ack_deadline_secs`."
-		required:    false
+		deprecated:         true
+		deprecated_message: "The `ack_deadline_seconds` option is deprecated, use `ack_deadline_secs` instead."
+		description:        "Deprecated, old name of `ack_deadline_secs`."
+		required:           false
 		type: uint: {}
 	}
 	ack_deadline_secs: {
@@ -246,9 +247,10 @@ base: components: sources: gcp_pubsub: configuration: {
 		type: string: {}
 	}
 	retry_delay_seconds: {
-		deprecated:  true
-		description: "Deprecated, old name of `retry_delay_secs`."
-		required:    false
+		deprecated:         true
+		deprecated_message: "The `retry_delay_seconds` option is deprecated, use `retry_delay_secs` instead."
+		description:        "Deprecated, old name of `retry_delay_secs`."
+		required:           false
 		type: float: {}
 	}
 	retry_delay_secs: {
