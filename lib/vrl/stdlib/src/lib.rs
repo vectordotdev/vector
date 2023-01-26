@@ -52,6 +52,8 @@ mod contains;
 mod decode_base16;
 #[cfg(feature = "decode_base64")]
 mod decode_base64;
+#[cfg(feature = "decode_gzip")]
+mod decode_gzip;
 #[cfg(feature = "decode_mime_q")]
 mod decode_mime_q;
 #[cfg(feature = "decode_percent")]
@@ -66,6 +68,8 @@ mod downcase;
 mod encode_base16;
 #[cfg(feature = "encode_base64")]
 mod encode_base64;
+#[cfg(feature = "encode_gzip")]
+mod encode_gzip;
 #[cfg(feature = "encode_json")]
 mod encode_json;
 #[cfg(feature = "encode_key_value")]
@@ -349,6 +353,8 @@ pub use contains::Contains;
 pub use decode_base16::DecodeBase16;
 #[cfg(feature = "decode_base64")]
 pub use decode_base64::DecodeBase64;
+#[cfg(feature = "decode_gzip")]
+pub use decode_gzip::DecodeGzip;
 #[cfg(feature = "decode_mime_q")]
 pub use decode_mime_q::DecodeMimeQ;
 #[cfg(feature = "decode_percent")]
@@ -363,6 +369,8 @@ pub use downcase::Downcase;
 pub use encode_base16::EncodeBase16;
 #[cfg(feature = "encode_base64")]
 pub use encode_base64::EncodeBase64;
+#[cfg(feature = "encode_gzip")]
+pub use encode_gzip::EncodeGzip;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
 #[cfg(feature = "encode_key_value")]
@@ -646,6 +654,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(DecodeBase16),
         #[cfg(feature = "decode_base64")]
         Box::new(DecodeBase64),
+        #[cfg(feature = "decode_gzip")]
+        Box::new(DecodeGzip),
         #[cfg(feature = "decode_percent")]
         Box::new(DecodePercent),
         #[cfg(feature = "decode_mime_q")]
@@ -660,6 +670,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeBase16),
         #[cfg(feature = "encode_base64")]
         Box::new(EncodeBase64),
+        #[cfg(feature = "encode_gzip")]
+        Box::new(EncodeGzip),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
         #[cfg(feature = "encode_key_value")]

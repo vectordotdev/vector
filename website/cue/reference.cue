@@ -309,6 +309,15 @@ _values: {
 	// via the key you use.
 	name: string
 
+	// `deprecated` sets if the given field has been deprecated.
+	deprecated: bool | *false
+
+	if deprecated {
+		// If a field has been deprecated we can optionally set a deprecated
+		// message to be displayed.
+		deprecated_message?: string
+	}
+
 	// `relevant_when` clarifies when an option is relevant.
 	//
 	// For example, if an option depends on the value of another option you can

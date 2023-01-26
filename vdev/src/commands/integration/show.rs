@@ -1,8 +1,8 @@
-use anyhow::{Context, Result};
-use clap::Args;
-use std::path::PathBuf;
+use std::collections::HashSet;
 
-use crate::app;
+use anyhow::Result;
+use clap::Args;
+
 use crate::testing::{config::IntegrationTestConfig, state};
 
 /// Show information about integrations
@@ -17,27 +17,28 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         match self.integration {
             None => {
-                let mut entries = vec![];
-                let root_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
-                for entry in root_dir
-                    .read_dir()
-                    .with_context(|| format!("failed to read directory {}", root_dir.display()))?
-                {
-                    let entry = entry?;
-                    if entry.path().is_dir() {
-                        entries.push(entry.file_name().into_string().unwrap());
-                    }
-                }
-                entries.sort();
-
-                for integration in &entries {
-                    println!("{integration}");
+                let entries = IntegrationTestConfig::collect_all()?;
+                let width = entries
+                    .keys()
+                    .fold(16, |width, entry| width.max(entry.len()));
+                println!("{:width$}  Environment Name(s)", "Integration Name");
+                println!("{:width$}  -------------------", "----------------");
+                for (integration, config) in entries {
+                    let envs_dir = state::EnvsDir::new(&integration);
+                    let active_envs = envs_dir.list_active()?;
+                    let environments = config
+                        .environments()
+                        .keys()
+                        .map(|environment| format(&active_envs, environment))
+                        .collect::<Vec<_>>()
+                        .join("  ");
+                    println!("{integration:width$}  {environments}");
                 }
             }
             Some(integration) => {
                 let (_test_dir, config) = IntegrationTestConfig::load(&integration)?;
-                let envs_dir = state::envs_dir(&integration);
-                let active_envs = state::active_envs(&envs_dir)?;
+                let envs_dir = state::EnvsDir::new(&integration);
+                let active_envs = envs_dir.list_active()?;
 
                 println!("Test args: {}", config.args.join(" "));
 
@@ -53,5 +54,13 @@ impl Cli {
             }
         }
         Ok(())
+    }
+}
+
+fn format(active_envs: &HashSet<String>, environment: &str) -> String {
+    if active_envs.contains(environment) {
+        format!("{environment} (active)")
+    } else {
+        environment.into()
     }
 }
