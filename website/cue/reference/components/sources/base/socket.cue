@@ -165,6 +165,7 @@ base: components: sources: socket: configuration: {
 		}
 	}
 	max_length: {
+		deprecated: true
 		description: """
 			The maximum buffer size of incoming messages.
 

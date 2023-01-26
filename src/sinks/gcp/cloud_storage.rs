@@ -193,6 +193,7 @@ impl SinkConfig for GcsSinkConfig {
             base_url.clone(),
             auth.clone(),
         )?;
+        auth.spawn_regenerate_token();
         let sink = self.build_sink(client, base_url, auth)?;
 
         Ok((sink, healthcheck))

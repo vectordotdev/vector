@@ -194,13 +194,13 @@ impl SinkConfig for StackdriverConfig {
 
         let sink = StackdriverSink {
             config: self.clone(),
-            auth,
+            auth: auth.clone(),
             severity_key: self.severity_key.clone(),
             uri: self.endpoint.parse().unwrap(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
-
+        auth.spawn_regenerate_token();
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch.size),
@@ -361,11 +361,7 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;
-    healthcheck_response(
-        response,
-        sink.auth.clone(),
-        HealthcheckError::NotFound.into(),
-    )
+    healthcheck_response(response, HealthcheckError::NotFound.into())
 }
 
 impl StackdriverConfig {

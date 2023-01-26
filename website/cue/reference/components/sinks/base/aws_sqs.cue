@@ -28,6 +28,7 @@ base: components: sinks: aws_sqs: configuration: {
 		}
 	}
 	assume_role: {
+		deprecated: true
 		description: """
 			The ARN of an [IAM role][iam_role] to assume at startup.
 

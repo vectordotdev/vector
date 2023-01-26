@@ -2,6 +2,7 @@ package metadata
 
 base: components: sources: journald: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
@@ -109,6 +110,7 @@ base: components: sources: journald: configuration: {
 		type: string: {}
 	}
 	remap_priority: {
+		deprecated: true
 		description: """
 			Enables remapping the `PRIORITY` field from an integer to string value.
 
@@ -123,6 +125,7 @@ base: components: sources: journald: configuration: {
 		type: bool: {}
 	}
 	units: {
+		deprecated: true
 		description: """
 			The list of unit names to monitor.
 

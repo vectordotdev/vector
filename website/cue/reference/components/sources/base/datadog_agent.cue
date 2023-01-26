@@ -2,6 +2,7 @@ package metadata
 
 base: components: sources: datadog_agent: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
