@@ -150,6 +150,7 @@ pub struct Config {
 
     /// Ignore files with a data modification date older than the specified number of seconds.
     #[serde(default)]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     ignore_older_secs: Option<u64>,
 
     /// Max amount of bytes to read from a single file before switching over
