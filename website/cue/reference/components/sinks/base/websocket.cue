@@ -191,18 +191,26 @@ base: components: sinks: websocket: configuration: {
 		}
 	}
 	ping_interval: {
-		description: "The interval, in seconds, between sending PINGs to the remote peer."
-		required:    false
-		type: uint: {}
+		description: """
+			The interval, in seconds, between sending [Ping][ping]s to the remote peer.
+
+			Pings are not sent by default. This option must be configured to a value > 0 in order to
+			enable pings.
+
+			[ping]: https://en.wikipedia.org/wiki/Ping_(networking_utility)
+			"""
+		required: false
+		type: uint: unit: "seconds"
 	}
 	ping_timeout: {
 		description: """
-			The timeout, in seconds, while waiting for a PONG response from the remote peer.
+			The number of seconds to wait for a PONG response from the remote peer.
 
-			If a response is not received in this time, the connection is reestablished.
+			If a response is not received within this time, the connection is reestablished.
 			"""
 		required: false
-		type: uint: {}
+		warnings: ["This parameter is ignored if `ping_interval` is not set."]
+		type: uint: unit: "seconds"
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

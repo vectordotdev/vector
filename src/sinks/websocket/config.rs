@@ -28,12 +28,20 @@ pub struct WebSocketSinkConfig {
     #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    /// The interval, in seconds, between sending PINGs to the remote peer.
+    /// The interval, in seconds, between sending [Ping][ping]s to the remote peer.
+    ///
+    /// Pings are not sent by default. This option must be configured to a value > 0 in order to
+    /// enable pings.
+    ///
+    /// [ping]: https://en.wikipedia.org/wiki/Ping_(networking_utility)
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     pub ping_interval: Option<u64>,
 
-    /// The timeout, in seconds, while waiting for a PONG response from the remote peer.
+    /// The number of seconds to wait for a PONG response from the remote peer.
     ///
-    /// If a response is not received in this time, the connection is reestablished.
+    /// If a response is not received within this time, the connection is reestablished.
+    // NOTE: this option is not relevant if the `ping_interval` is not configured.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     pub ping_timeout: Option<u64>,
 
     #[configurable(derived)]
