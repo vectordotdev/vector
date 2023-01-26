@@ -6,7 +6,7 @@ services:
     ports:
     - 3000:3000
     volumes:
-    - ../chroniclepub.pem:/public.pem
+    - ./public.pem:/public.pem:ro
     command:
     - -p
     - /public.pem

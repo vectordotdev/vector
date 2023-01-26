@@ -1,5 +1,5 @@
 use darling::{
-    util::{Flag, SpannedValue},
+    util::{Flag, Override, SpannedValue},
     FromAttributes,
 };
 use proc_macro2::Span;
@@ -187,6 +187,17 @@ impl<'a> Field<'a> {
         self.attrs.deprecated.is_some()
     }
 
+    /// The deprecated message, if one has been set.
+    pub fn deprecated_message(&self) -> Option<&String> {
+        self.attrs
+            .deprecated
+            .as_ref()
+            .and_then(|message| match message {
+                Override::Inherit => None,
+                Override::Explicit(message) => Some(message),
+            })
+    }
+
     /// Validation rules specific to the field, if any.
     ///
     /// Validation rules are applied to the resulting schema for this field on top of any default
@@ -244,7 +255,7 @@ struct Attributes {
     description: Option<String>,
     derived: SpannedValue<Flag>,
     transparent: SpannedValue<Flag>,
-    deprecated: Flag,
+    deprecated: Option<Override<String>>,
     #[darling(skip)]
     visible: bool,
     #[darling(skip)]

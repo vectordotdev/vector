@@ -52,9 +52,7 @@ components: sources: splunk_hec: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.splunk_hec.configuration & {
-		token: warnings: ["This option has been deprecated, the `valid_tokens` option should be used."]
-	}
+	configuration: base.components.sources.splunk_hec.configuration
 
 	output: logs: event: {
 		description: "A single event"

@@ -2,6 +2,7 @@ package metadata
 
 base: components: sources: gcp_pubsub: configuration: {
 	ack_deadline_seconds: {
+		deprecated:  true
 		description: "Deprecated, old name of `ack_deadline_secs`."
 		required:    false
 		type: uint: {}
@@ -19,6 +20,7 @@ base: components: sources: gcp_pubsub: configuration: {
 		}
 	}
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
@@ -244,6 +246,7 @@ base: components: sources: gcp_pubsub: configuration: {
 		type: string: {}
 	}
 	retry_delay_seconds: {
+		deprecated:  true
 		description: "Deprecated, old name of `retry_delay_secs`."
 		required:    false
 		type: float: {}
