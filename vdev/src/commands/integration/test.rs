@@ -1,18 +1,17 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Args;
 
 use crate::testing::integration::{self, IntegrationTest, OldIntegrationTest};
-use crate::testing::runner::{ContainerTestRunner, IntegrationTestRunner};
 use crate::testing::{config::IntegrationTestConfig, state::EnvsDir};
 
 /// Execute integration tests
 ///
-/// If an environment is named, a single test is run. If the environment was not previously started,
+/// If an environment is named, it is used to run the test. If the environment was not previously started,
 /// it is started before the test is run and stopped afterwards.
 ///
-/// If no environment is named, but some have been started already, only those environments are run.
+/// If no environment is named, but one has been started already, that environment is used for the test.
 ///
-/// Otherwise, all environments are started, the test run, and then stopped.
+/// Otherwise, all environments are started, the test run, and then stopped, one by one.
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {
@@ -43,26 +42,23 @@ impl Cli {
         let mut args = config.args;
         args.extend(self.args);
 
-        if let Some(environment) = &self.environment {
-            IntegrationTest::new(&self.integration, environment)?.test(&env_vars, &args)
-        } else {
-            let runner = IntegrationTestRunner::new(self.integration.clone())?;
-            runner.ensure_network()?;
-
-            let active_envs = EnvsDir::new(&self.integration).list_active()?;
-            for env_name in envs.keys() {
-                if !(active_envs.is_empty() || active_envs.contains(env_name)) {
-                    continue;
+        let active = EnvsDir::new(&self.integration).active()?;
+        match (self.environment, active) {
+            (Some(environment), Some(active)) if environment != active => {
+                bail!("Requested environment {environment:?} does not match active one {active:?}")
+            }
+            (Some(environment), _) => {
+                IntegrationTest::new(self.integration, environment)?.test(&env_vars, &args)
+            }
+            (None, Some(active)) => {
+                IntegrationTest::new(self.integration, active)?.test(&env_vars, &args)
+            }
+            (None, None) => {
+                for env_name in envs.keys() {
+                    IntegrationTest::new(&self.integration, env_name)?.test(&env_vars, &args)?;
                 }
-
-                IntegrationTest::new(&self.integration, env_name)?.test(&env_vars, &args)?;
+                Ok(())
             }
-
-            if active_envs.is_empty() {
-                runner.stop()?;
-            }
-
-            Ok(())
         }
     }
 }
