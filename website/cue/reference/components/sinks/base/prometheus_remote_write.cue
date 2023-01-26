@@ -82,7 +82,11 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				}
 			}
 			load_timeout_secs: {
-				description:   "Timeout for successfully loading any credentials, in seconds."
+				description: """
+					Timeout for successfully loading any credentials, in seconds.
+
+					Relevant when the default credentials chain is used or `assume_role`.
+					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
 				type: uint: {
@@ -97,17 +101,23 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				type: string: {}
 			}
 			profile: {
-				description:   "The credentials profile to use."
+				description: """
+					The credentials profile to use.
+
+					Used to select AWS credentials from a provided credentials file.
+					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
 				type: string: examples: ["develop"]
 			}
 			region: {
 				description: """
-					The AWS region to send STS requests to.
+					The [AWS region][aws_region] to send STS requests to.
 
 					If not set, this will default to the configured region
 					for the service itself.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
@@ -157,7 +167,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			}
 			region: {
 				description: """
-					The [AWS region][aws_region] to use.
+					The [AWS region][aws_region] of the target service.
 
 					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
 					"""

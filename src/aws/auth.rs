@@ -73,6 +73,8 @@ pub enum AwsAuthentication {
         credentials_file: String,
 
         /// The credentials profile to use.
+        ///
+        /// Used to select AWS credentials from a provided credentials file.
         #[configurable(metadata(docs::examples = "develop"))]
         profile: Option<String>,
     },
@@ -86,6 +88,8 @@ pub enum AwsAuthentication {
         assume_role: String,
 
         /// Timeout for assuming the role, in seconds.
+        ///
+        /// Relevant when the default credentials chain is used or `assume_role`.
         #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::examples = 30))]
         load_timeout_secs: Option<u64>,
@@ -94,10 +98,12 @@ pub enum AwsAuthentication {
         #[serde(default)]
         imds: ImdsAuthentication,
 
-        /// The AWS region to send STS requests to.
+        /// The [AWS region][aws_region] to send STS requests to.
         ///
         /// If not set, this will default to the configured region
         /// for the service itself.
+        ///
+        /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
         #[configurable(metadata(docs::examples = "us-west-2"))]
         region: Option<String>,
     },
@@ -106,6 +112,8 @@ pub enum AwsAuthentication {
     #[derivative(Default)]
     Default {
         /// Timeout for successfully loading any credentials, in seconds.
+        ///
+        /// Relevant when the default credentials chain is used or `assume_role`.
         #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::examples = 30))]
         load_timeout_secs: Option<u64>,

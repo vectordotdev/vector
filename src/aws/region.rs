@@ -10,7 +10,7 @@ use vector_config::configurable_component;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(default)]
 pub struct RegionOrEndpoint {
-    /// The [AWS region][aws_region] to use.
+    /// The [AWS region][aws_region] of the target service.
     ///
     /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
     #[configurable(metadata(docs::examples = "us-east-1"))]
