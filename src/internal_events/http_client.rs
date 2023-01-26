@@ -130,7 +130,7 @@ impl<'a> InternalEvent for HttpBodyDataReceived<'a> {
 
         // Log the buffer content of the configured limit
         debug!(
-            message = "HttpBodyDataReceived",
+            message = "HttpBodyDataReceived.",
             buffer = format!("{:?}", self.buf)
         );
     }
