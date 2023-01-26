@@ -19,7 +19,7 @@ docker pull timberio/vector:{{< version >}}-debian
 Other available distributions (beyond `debian`):
 
 * `alpine`
-* `distroless`
+* `distroless-libc`
 {{< /success >}}
 
 ## Deployment
