@@ -37,7 +37,7 @@ pub struct TcpConfig {
     // behaviorally there are inconsistencies when adapting the from_address() function to use framing
     // instead of max_length. Merits further investigation.
     #[configurable(
-        deprecated = "This option is deprecated. Configure `max_length` on the framing config instead."
+        deprecated = "The `max_length` option is deprecated. Configure `max_length` on the framing config instead."
     )]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[serde(default = "default_max_length")]
