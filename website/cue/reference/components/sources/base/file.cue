@@ -2,6 +2,7 @@ package metadata
 
 base: components: sources: file: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
@@ -203,6 +204,7 @@ base: components: sources: file: configuration: {
 		type: uint: default: 2048
 	}
 	message_start_indicator: {
+		deprecated: true
 		description: """
 			String value used to identify the start of a multi-line message.
 
@@ -212,6 +214,7 @@ base: components: sources: file: configuration: {
 		type: string: {}
 	}
 	multi_line_timeout: {
+		deprecated: true
 		description: """
 			How long to wait for more data when aggregating a multi-line message, in milliseconds.
 
@@ -321,6 +324,7 @@ base: components: sources: file: configuration: {
 		type: uint: {}
 	}
 	start_at_beginning: {
+		deprecated: true
 		description: """
 			Whether or not to start reading from the beginning of a new file.
 

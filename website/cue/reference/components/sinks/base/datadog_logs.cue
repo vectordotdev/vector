@@ -116,6 +116,7 @@ base: components: sinks: datadog_logs: configuration: {
 		type: string: {}
 	}
 	region: {
+		deprecated: true
 		description: """
 			The Datadog region to send logs to.
 

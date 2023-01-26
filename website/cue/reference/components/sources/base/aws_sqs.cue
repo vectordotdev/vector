@@ -2,6 +2,7 @@ package metadata
 
 base: components: sources: aws_sqs: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 

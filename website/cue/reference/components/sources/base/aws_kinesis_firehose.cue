@@ -2,6 +2,7 @@ package metadata
 
 base: components: sources: aws_kinesis_firehose: configuration: {
 	access_key: {
+		deprecated: true
 		description: """
 			An optional access key to authenticate requests against.
 
@@ -24,6 +25,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 		type: array: items: type: string: examples: ["A94A8FE5CCB19BA61C4C08", "B94B8FE5CCB19BA61C4C12"]
 	}
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 

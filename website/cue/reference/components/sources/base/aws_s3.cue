@@ -2,6 +2,7 @@ package metadata
 
 base: components: sources: aws_s3: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
@@ -22,6 +23,7 @@ base: components: sources: aws_s3: configuration: {
 		}
 	}
 	assume_role: {
+		deprecated: true
 		description: """
 			The ARN of an [IAM role][iam_role] to assume at startup.
 
