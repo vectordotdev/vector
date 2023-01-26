@@ -9,7 +9,6 @@ use once_cell::sync::Lazy;
 use super::config::RustToolchainConfig;
 use crate::app::{self, CommandExt as _};
 
-pub const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
 const VOLUME_TARGET: &str = "vector_target";
@@ -79,9 +78,7 @@ pub trait ContainerTestRunner: TestRunner {
 
     fn image_name(&self) -> String;
 
-    fn network_name(&self) -> String {
-        "host".to_string()
-    }
+    fn network_name(&self) -> String;
 
     fn stop(&self) -> Result<()> {
         dockercmd(["stop", "--time", "0", &self.container_name()])
@@ -193,8 +190,12 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn remove(&self) -> Result<()> {
-        dockercmd(["rm", &self.container_name()])
-            .wait(format!("Removing container {}", self.container_name()))
+        if matches!(self.state()?, RunnerState::Missing) {
+            Ok(())
+        } else {
+            dockercmd(["rm", "--force", "--volumes", &self.container_name()])
+                .wait(format!("Removing container {}", self.container_name()))
+        }
     }
 
     fn unpause(&self) -> Result<()> {
@@ -298,6 +299,10 @@ impl ContainerTestRunner for IntegrationTestRunner {
 pub struct DockerTestRunner;
 
 impl ContainerTestRunner for DockerTestRunner {
+    fn network_name(&self) -> String {
+        "host".to_string()
+    }
+
     fn container_name(&self) -> String {
         format!("vector-test-runner-{}", self.get_rust_version())
     }
