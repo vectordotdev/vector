@@ -1,6 +1,6 @@
 package metadata
 
-components: sources: aws_s3: {
+components: sources: aws_s3: components._aws & {
 	title: "AWS S3"
 
 	features: {
@@ -45,7 +45,9 @@ components: sources: aws_s3: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.aws_s3.configuration
+	configuration: base.components.sources.aws_s3.configuration & {
+		_aws_include: false
+	}
 
 	output: logs: object: {
 		description: "A line from an S3 object."
