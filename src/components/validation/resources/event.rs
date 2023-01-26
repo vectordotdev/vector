@@ -13,7 +13,7 @@ pub enum TestEvent {
     /// The modification made is dependent on the external resource, but this mode is made available
     /// for when a test case wants to exercise the failure path, but cannot cause a failure simply
     /// by constructing the event in a certain way i.e. adding an invalid field, or removing a
-    /// required field, or using an invalud field value, and so on.
+    /// required field, or using an invalid field value, and so on.
     ///
     /// For transforms and sinks, generally, the only way to cause an error is if the event itself
     /// is malformed in some way, which can be achieved without this test event variant.

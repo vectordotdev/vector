@@ -264,7 +264,11 @@ mod tests {
                     MetricValue::Counter { value: 42.0 },
                 )
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
-                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1))),
+                .with_timestamp(Some(
+                    Utc.ymd(2020, 8, 18)
+                        .and_hms_opt(21, 0, 1)
+                        .expect("invalid timestamp"),
+                )),
             ),
             Event::from(
                 Metric::new(
@@ -276,7 +280,11 @@ mod tests {
                     },
                 )
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
-                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2))),
+                .with_timestamp(Some(
+                    Utc.ymd(2020, 8, 18)
+                        .and_hms_opt(21, 0, 2)
+                        .expect("invalid timestamp"),
+                )),
             ),
         ];
 
@@ -325,7 +333,11 @@ mod tests {
                 "code" => "200",
                 "code" => "success"
             )))
-            .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1))),
+            .with_timestamp(Some(
+                Utc.ymd(2020, 8, 18)
+                    .and_hms_opt(21, 0, 1)
+                    .expect("invalid timestamp"),
+            )),
         )];
 
         let len = metrics.len();

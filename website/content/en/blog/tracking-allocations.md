@@ -16,7 +16,7 @@ We are excited to announce that Vector now has support for exposing per-componen
 
 ![vector top with allocation tracing](/img/blog/vector-top-allocation-tracking.png)
 
-To explore the feature, you'll have to [download](https://vector.dev/download/) the nightly build of Vector. Once you've got that, start Vector with the `--allocation-tracing` flag, launch `vector top` and monitor your components!
+To explore the feature, you'll need version [v0.27.0](https://vector.dev/download/), or later, of Vector. Once you've got that, start Vector with the `--allocation-tracing` flag, launch `vector top` and monitor your components!
 
 ## What's new
 

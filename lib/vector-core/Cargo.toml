@@ -46,11 +46,11 @@ serde_with = { version = "2.2.0", default-features = false, features = ["std", "
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.4", default-features = false }
 socket2 = { version = "0.4.7", default-features = false }
-tokio = { version = "1.24.1", default-features = false, features = ["net"] }
+tokio = { version = "1.24.2", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
-toml = { version = "0.5.10", default-features = false }
+toml = { version = "0.5.11", default-features = false }
 tonic = { version = "0.8", default-features = false, features = ["transport"] }
 tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.34", default-features = false }
@@ -71,7 +71,7 @@ vector-config-macros = { path = "../vector-config-macros" }
 vrl-lib = { package = "vrl", path = "../vrl/vrl" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.7.0"
+security-framework = "2.8.1"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.21"

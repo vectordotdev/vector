@@ -71,7 +71,7 @@ components: sources: aws_sqs: components._aws & {
 		}
 		visibility_timeout_secs: {
 			common:      false
-			description: "The visibility timeout to use for messages in secords. This controls how long a message is left unavailable when a Vector receives it. If a `vector` does not delete the message before the timeout expires, it will be made reavailable for another consumer; this can happen if, for example, the `vector` process crashes."
+			description: "The visibility timeout to use for messages in seconds. This controls how long a message is left unavailable when a Vector receives it. If a `vector` does not delete the message before the timeout expires, it will be made reavailable for another consumer; this can happen if, for example, the `vector` process crashes."
 			required:    false
 			warnings: ["Should be set higher than the length of time it takes to process an individual message to avoid that message being reprocessed."]
 			type: uint: {

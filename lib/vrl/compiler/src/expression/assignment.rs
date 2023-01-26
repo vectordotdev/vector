@@ -61,7 +61,7 @@ impl Assignment {
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
                 verify_mutable(&target, config, expr_span, assignment_span)?;
-                verify_overwriteable(
+                verify_overwritable(
                     &target,
                     state,
                     target_span,
@@ -116,7 +116,7 @@ impl Assignment {
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
                 verify_mutable(&ok, config, expr_span, ok_span)?;
-                verify_overwriteable(
+                verify_overwritable(
                     &ok,
                     state,
                     ok_span,
@@ -132,7 +132,7 @@ impl Assignment {
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
                 verify_mutable(&err, config, expr_span, err_span)?;
-                verify_overwriteable(
+                verify_overwritable(
                     &err,
                     state,
                     err_span,
@@ -198,7 +198,7 @@ fn verify_mutable(
 ///
 /// This returns an error if an assignment is done to an object field or array
 /// index, while the parent of the field/index isn't an actual object/array.
-fn verify_overwriteable(
+fn verify_overwritable(
     target: &Target,
     state: &TypeState,
     target_span: Span,

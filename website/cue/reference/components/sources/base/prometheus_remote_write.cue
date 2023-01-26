@@ -2,10 +2,13 @@ package metadata
 
 base: components: sources: prometheus_remote_write: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -21,12 +24,12 @@ base: components: sources: prometheus_remote_write: configuration: {
 	}
 	address: {
 		description: """
-			The address to accept connections on.
+			The socket address to accept connections on.
 
 			The address _must_ include a port.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["0.0.0.0:9090"]
 	}
 	auth: {
 		description: "HTTP Basic authentication configuration."

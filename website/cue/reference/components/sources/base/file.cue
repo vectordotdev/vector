@@ -2,10 +2,13 @@ package metadata
 
 base: components: sources: file: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -201,6 +204,7 @@ base: components: sources: file: configuration: {
 		type: uint: default: 2048
 	}
 	message_start_indicator: {
+		deprecated: true
 		description: """
 			String value used to identify the start of a multi-line message.
 
@@ -210,6 +214,7 @@ base: components: sources: file: configuration: {
 		type: string: {}
 	}
 	multi_line_timeout: {
+		deprecated: true
 		description: """
 			How long to wait for more data when aggregating a multi-line message, in milliseconds.
 
@@ -319,6 +324,7 @@ base: components: sources: file: configuration: {
 		type: uint: {}
 	}
 	start_at_beginning: {
+		deprecated: true
 		description: """
 			Whether or not to start reading from the beginning of a new file.
 

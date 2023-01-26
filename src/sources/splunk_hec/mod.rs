@@ -59,7 +59,7 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// The address _must_ include a port.
     #[serde(default = "default_socket_address")]
@@ -71,7 +71,9 @@ pub struct SplunkConfig {
     /// it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "This option has been deprecated, the *valid_tokens* option should be used."
+    )]
     token: Option<SensitiveString>,
 
     /// Optional list of valid authorization tokens.
@@ -80,6 +82,7 @@ pub struct SplunkConfig {
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     valid_tokens: Option<Vec<SensitiveString>>,
 
     /// Whether or not to forward the Splunk HEC authentication token with events.
@@ -712,10 +715,14 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
                     self.time = Time::Provided(time);
                 } else if let Some(t) = t.as_f64() {
-                    self.time = Time::Provided(Utc.timestamp(
-                        t.floor() as i64,
-                        (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
-                    ));
+                    self.time = Time::Provided(
+                        Utc.timestamp_opt(
+                            t.floor() as i64,
+                            (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
+                        )
+                        .single()
+                        .expect("invalid timestamp"),
+                    );
                 } else {
                     return Err(ApiError::InvalidDataFormat { event: self.events }.into());
                 }
@@ -870,9 +877,11 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
     }
 
     let ts = if t < SEC_CUTOFF {
-        Utc.timestamp(t, 0)
+        Utc.timestamp_opt(t, 0).single().expect("invalid timestamp")
     } else if t < MILLISEC_CUTOFF {
-        Utc.timestamp_millis(t)
+        Utc.timestamp_millis_opt(t)
+            .single()
+            .expect("invalid timestamp")
     } else {
         Utc.timestamp_nanos(t)
     };
@@ -2002,9 +2011,15 @@ mod tests {
     fn parse_timestamps() {
         let cases = vec![
             Utc::now(),
-            Utc.ymd(1971, 11, 7).and_hms(1, 1, 1),
-            Utc.ymd(2011, 8, 5).and_hms(1, 1, 1),
-            Utc.ymd(2189, 11, 4).and_hms(2, 2, 2),
+            Utc.ymd(1971, 11, 7)
+                .and_hms_opt(1, 1, 1)
+                .expect("invalid timestamp"),
+            Utc.ymd(2011, 8, 5)
+                .and_hms_opt(1, 1, 1)
+                .expect("invalid timestamp"),
+            Utc.ymd(2189, 11, 4)
+                .and_hms_opt(2, 2, 2)
+                .expect("invalid timestamp"),
         ];
 
         for case in cases {

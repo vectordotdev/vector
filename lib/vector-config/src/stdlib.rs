@@ -118,7 +118,7 @@ impl Configurable for char {
 }
 
 // Numbers.
-macro_rules! impl_configuable_numeric {
+macro_rules! impl_configurable_numeric {
 	($($ty:ty),+) => {
 		$(
 			impl Configurable for $ty {
@@ -142,7 +142,7 @@ macro_rules! impl_configuable_numeric {
 	};
 }
 
-impl_configuable_numeric!(
+impl_configurable_numeric!(
     u8,
     u16,
     u32,

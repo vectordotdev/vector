@@ -327,6 +327,7 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	endpoint: {
+		deprecated: true
 		description: """
 			The Elasticsearch endpoint to send logs to.
 
@@ -582,6 +583,7 @@ base: components: sinks: elasticsearch: configuration: {
 		type: bool: default: false
 	}
 	suppress_type_name: {
+		deprecated: true
 		description: """
 			Whether or not to send the `type` field to Elasticsearch.
 

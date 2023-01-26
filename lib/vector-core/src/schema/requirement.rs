@@ -11,7 +11,7 @@ use super::Definition;
 /// components.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Requirement {
-    /// Semantic meanings confingured for this requirement.
+    /// Semantic meanings configured for this requirement.
     meaning: BTreeMap<&'static str, SemanticMeaning>,
 }
 

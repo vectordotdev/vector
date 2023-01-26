@@ -66,14 +66,14 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             impl #impl_generics ::vector_config::Configurable for #name #ty_generics #where_clause {
                 fn referenceable_name() -> Option<&'static str> {
                     // If the type name we get back from `std::any::type_name` doesn't start with
-                    // the module path, use a concatentated version.
+                    // the module path, use a concatenated version.
                     //
                     // We do this because `std::any::type_name` states it may or may not return a
                     // fully-qualified type path, as that behavior is not stabilized, so we want to
                     // avoid using non-fully-qualified paths since we might encounter collisions
                     // with schema reference names otherwise.
                     //
-                    // The reason we don't _only_ use the manually-concatentated version is because
+                    // The reason we don't _only_ use the manually-concatenated version is because
                     // it's a little difficult to get it to emit a clean name, as we can't emit
                     // pretty-printed tokens directly -- i.e. just emit the tokens that represent
                     // `MyStructName<T, U, ...>` -- and would need to format the string to do so,
@@ -447,6 +447,8 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
         get_metadata_default_value(meta_ident, field.default_value())
     };
     let maybe_deprecated = get_metadata_deprecated(meta_ident, field.deprecated());
+    let maybe_deprecated_message =
+        get_metadata_deprecated_message(meta_ident, field.deprecated_message());
     let maybe_transparent = get_metadata_transparent(meta_ident, field.transparent());
     let maybe_validation = get_metadata_validation(meta_ident, field.validation());
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, field.metadata());
@@ -458,6 +460,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
         #maybe_description
         #maybe_default_value
         #maybe_deprecated
+        #maybe_deprecated_message
         #maybe_transparent
         #maybe_validation
         #maybe_custom_attributes
@@ -581,6 +584,17 @@ fn get_metadata_deprecated(
     deprecated.then(|| {
         quote! {
             #meta_ident.set_deprecated();
+        }
+    })
+}
+
+fn get_metadata_deprecated_message(
+    meta_ident: &Ident,
+    message: Option<&String>,
+) -> Option<proc_macro2::TokenStream> {
+    message.map(|message| {
+        quote! {
+            #meta_ident.set_deprecated_message(#message);
         }
     })
 }
@@ -992,7 +1006,7 @@ fn generate_enum_variant_subschema(
 /// Sometimes, however, we must refer to them with their disambiguated form: `T::<...>`. This is due
 /// to a limitation in syntax parsing between types in statement versus expression position.
 ///
-/// Statement position would be somehwere like declaring a field on a struct, where using angle
+/// Statement position would be somewhere like declaring a field on a struct, where using angle
 /// brackets has no ambiguous meaning, as you can't compare two items as part of declaring a struct
 /// field. Conversely, expression position implies anywhere we could normally provide an expression,
 /// and expressions can certainly contain comparisons. As such, we need to use the disambiguated

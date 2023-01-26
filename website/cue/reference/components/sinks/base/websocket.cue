@@ -37,10 +37,10 @@ base: components: sinks: websocket: configuration: {
 		required: false
 		type: object: options: {
 			password: {
-				description:   "The password to send."
+				description:   "The basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${PASSWORD}", "password"]
 			}
 			strategy: {
 				description: "The authentication strategy to use."
@@ -61,16 +61,16 @@ base: components: sinks: websocket: configuration: {
 				}
 			}
 			token: {
-				description:   "The bearer token to send."
+				description:   "The bearer authentication token."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
 				type: string: {}
 			}
 			user: {
-				description:   "The username to send."
+				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${USERNAME}", "username"]
 			}
 		}
 	}

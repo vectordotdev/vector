@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.27.0"
+version = "0.28.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -148,9 +148,9 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.3", default-features = false }
-async-trait = { version = "0.1.61", default-features = false }
+async-trait = { version = "0.1.63", default-features = false }
 futures = { version = "0.3.25", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.24.1", default-features = false, features = ["full"] }
+tokio = { version = "1.24.2", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.11", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -181,7 +181,7 @@ aws-config = { version = "0.51.0", default-features = false, features = ["rustls
 aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
 aws-smithy-http = { version = "0.51.0", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { version = "0.51.0", default-features = false, optional = true }
+aws-smithy-http-tower = { version = "0.54.0", default-features = false, optional = true }
 aws-smithy-types = { version = "0.51.0", default-features = false, optional = true }
 
 # Azure
@@ -199,7 +199,7 @@ serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.8", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.91", default-features = false, features = ["raw_value"] }
 serde_with = { version = "2.2.0", default-features = false, features = ["macros", "std"], optional = true }
-serde_yaml = { version = "0.9.16", default-features = false }
+serde_yaml = { version = "0.9.17", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.1", default-features = false, optional = true }
@@ -241,15 +241,15 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.6", default-features = false, optional = true }
 async-compression = { version = "0.3.15", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.14.0", default-features = false, optional = true }
-axum = { version = "0.6.2", default-features = false, features = ["http1", "json"] }
+axum = { version = "0.6.4", default-features = false, features = ["http1", "json"] }
 base64 = { version = "0.21.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
-bollard = { version = "0.13.0", default-features = false, features = ["ssl", "chrono"] }
+bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"] }
 bytes = { version = "1.3.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.10", default-features = false }
-clap = { version = "4.0.32", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.1.4", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -263,7 +263,7 @@ futures-util = { version = "0.3.25", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.5.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
-h2 = { version = "0.3.13", default-features = false, optional = true }
+h2 = { version = "0.3.15", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
 hashbrown = { version = "0.13.2", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.8", default-features = false }
@@ -287,7 +287,7 @@ md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.3.1", default-features = false, features = ["tokio-runtime"], optional = true }
 nats = { version = "0.23.1", default-features = false, optional = true }
 nkeys = { version = "0.2.0", default-features = false, optional = true }
-nom = { version = "7.1.2", default-features = false, optional = true }
+nom = { version = "7.1.3", default-features = false, optional = true }
 notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
 once_cell = { version = "1.17", default-features = false }
 openssl = { version = "0.10.45", default-features = false, features = ["vendored"] }
@@ -297,11 +297,11 @@ paste = "1.0.11"
 percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "5.0.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
+pulsar = { version = "5.0.2", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.29.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.22.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.22.3", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.7.1", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.1", default-features = false, optional = true }
 rumqttc = { version = "0.20.0", default-features = false, features = ["use-rustls"], optional = true }
@@ -317,7 +317,7 @@ syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["connect"], optional = true}
-toml = { version = "0.5.10", default-features = false }
+toml = { version = "0.5.11", default-features = false }
 tonic = { version = "0.8", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.5", default-features = false }
@@ -338,7 +338,7 @@ windows-service = "0.5.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = { version = "0.2.14", default-features = false }
-nix = { version = "0.26.1", default-features = false, features = ["socket", "signal"] }
+nix = { version = "0.26.2", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
 prost-build = { version = "0.11.6", default-features = false, optional = true }
@@ -361,8 +361,9 @@ proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
+test-generator = "0.3.1"
 tokio-test = "0.4.2"
-tokio = { version = "1.24.1", features = ["test-util"] }
+tokio = { version = "1.24.2", features = ["test-util"] }
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
@@ -373,8 +374,6 @@ zstd = { version = "0.12.2", default-features = false }
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
-# Adds `Status::is_reset` test, remove after the next version is released.
-h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
 
@@ -521,11 +520,11 @@ sources-file-descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic", "dep:serde_with"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
-sources-host_metrics =  ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
+sources-host_metrics =  ["heim/cpu", "heim/host", "heim/memory", "heim/net", "dep:serde_with"]
 sources-http_client = ["sources-utils-http-client"]
 sources-http_server = ["sources-utils-http", "sources-utils-http-query"]
 sources-internal_logs = []
-sources-internal_metrics = []
+sources-internal_metrics = ["dep:serde_with"]
 sources-journald = []
 sources-kafka = ["dep:rdkafka", "dep:serde_with"]
 sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
@@ -535,11 +534,11 @@ sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom", "dep:serde_with"]
 sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:serde_with", "dep:tokio-postgres"]
-sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-utils-http-client"]
+sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-utils-http-client", "dep:serde_with"]
 sources-redis= ["dep:redis"]
-sources-socket = ["sources-utils-net", "tokio-util/net"]
+sources-socket = ["sources-utils-net", "tokio-util/net", "dep:serde_with"]
 sources-splunk_hec = ["dep:roaring"]
-sources-statsd = ["sources-utils-net", "tokio-util/net"]
+sources-statsd = ["sources-utils-net", "tokio-util/net", "dep:serde_with"]
 sources-stdin = ["tokio-util/io"]
 sources-syslog = ["codecs/syslog", "sources-utils-net", "tokio-util/net"]
 sources-utils-http = ["dep:snap", "sources-utils-http-auth", "sources-utils-http-encoding", "sources-utils-http-error", "sources-utils-http-prelude"]
@@ -548,7 +547,7 @@ sources-utils-http-encoding = ["dep:snap", "sources-utils-http-error"]
 sources-utils-http-error = []
 sources-utils-http-prelude = ["sources-utils-http", "sources-utils-http-auth", "sources-utils-http-encoding", "sources-utils-http-error"]
 sources-utils-http-query = []
-sources-utils-http-client = ["sources-utils-http", "sources-http_server"]
+sources-utils-http-client = ["sources-utils-http", "sources-http_server", "dep:serde_with"]
 sources-utils-net = ["sources-utils-net-tcp", "sources-utils-net-udp", "sources-utils-net-unix"]
 sources-utils-net-tcp = ["listenfd"]
 sources-utils-net-udp = ["listenfd"]
@@ -666,7 +665,7 @@ sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-axiom = ["sinks-elasticsearch"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
 sinks-azure_monitor_logs = []
-sinks-blackhole = []
+sinks-blackhole = ["dep:serde_with"]
 sinks-chronicle = []
 sinks-clickhouse = []
 sinks-console = []

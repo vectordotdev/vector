@@ -148,7 +148,7 @@ components: sinks: splunk_hec_metrics: {
 		multi_value_tags: {
 			title: "Multivalue Tags"
 			body: """
-				If Splunk recieves a tag with multiple values it will only take the last value specified,
+				If Splunk receives a tag with multiple values it will only take the last value specified,
 				so Vector only sends this last value.
 				"""
 		}}

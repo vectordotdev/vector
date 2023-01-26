@@ -28,6 +28,7 @@ impl<'a> Variant<'a> {
         let original = serde.original;
         let name = serde.attrs.name().deserialize_name();
         let style = serde.style.into();
+        let is_newtype_wrapper_field = style == Style::Newtype;
 
         let attrs = Attributes::from_attributes(&original.attrs)
             .and_then(|attrs| attrs.finalize(serde, &original.attrs))?;
@@ -36,7 +37,7 @@ impl<'a> Variant<'a> {
         let fields = serde
             .fields
             .iter()
-            .map(|field| Field::from_ast(field, is_virtual_newtype))
+            .map(|field| Field::from_ast(field, is_virtual_newtype, is_newtype_wrapper_field))
             .collect_darling_results(&mut accumulator);
 
         let variant = Variant {

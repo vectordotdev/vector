@@ -191,7 +191,11 @@ fn get_timestamp(
 ) -> Option<DateTime<Utc>> {
     attributes.as_ref().and_then(|attributes| {
         let sent_time_str = attributes.get(&MessageSystemAttributeName::SentTimestamp)?;
-        Some(Utc.timestamp_millis(i64::from_str(sent_time_str).ok()?))
+        Some(
+            Utc.timestamp_millis_opt(i64::from_str(sent_time_str).ok()?)
+                .single()
+                .expect("invalid timestamp"),
+        )
     })
 }
 
@@ -335,7 +339,11 @@ mod tests {
 
         assert_eq!(
             get_timestamp(&Some(attributes)),
-            Some(Utc.timestamp_millis(1636408546018))
+            Some(
+                Utc.timestamp_millis_opt(1636408546018)
+                    .single()
+                    .expect("invalid timestamp")
+            )
         );
     }
 }
