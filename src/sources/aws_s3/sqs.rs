@@ -66,8 +66,8 @@ pub(super) struct Config {
     ///
     /// Generally should not be changed unless instructed to do so, as if messages are available,
     /// they will always be consumed, regardless of the value of `poll_secs`.
-    // NOTE: We restrict this to u32 for safe conversion to i64 later.
-    // TODO: Duration?
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    // NOTE: This value isn't used as a `Duration` downstream, so we don't bother using `serde_with`
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
@@ -79,8 +79,8 @@ pub(super) struct Config {
     /// takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it is made available again for another consumer.
     ///
     /// This can happen if there is an issue between consuming a message and deleting it.
-    // NOTE: We restrict this to u32 for safe conversion to i64 later.
-    // TODO: Duration?
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    // NOTE: This value isn't used as a `Duration` downstream, so we don't bother using `serde_with`
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
