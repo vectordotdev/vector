@@ -42,7 +42,7 @@ pub struct WebSocketSinkConfig {
 
     /// The number of seconds to wait for a [Pong][pong] response from the remote peer.
     ///
-    /// If a response is not received within this time, the connection is reestablished.
+    /// If a response is not received within this time, the connection is re-established.
     ///
     /// [pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
     // NOTE: this option is not relevant if the `ping_interval` is not configured.

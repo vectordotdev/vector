@@ -62,7 +62,9 @@ components: sinks: websocket: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.websocket.configuration
+	configuration: base.components.sinks.websocket.configuration & {
+		ping_timeout: warnings: ["This option is ignored if the `ping_interval` option is not set."]
+    }
 
 	input: {
 		logs:    true
