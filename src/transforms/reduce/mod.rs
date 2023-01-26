@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::{
+    cmp::min,
     collections::{hash_map, HashMap},
     num::NonZeroUsize,
     pin::Pin,
@@ -213,6 +214,7 @@ struct ReduceState {
     events: usize,
     fields: HashMap<String, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
+    last_flushed_at: Instant,
     metadata: EventMetadata,
 }
 
@@ -224,6 +226,7 @@ impl ReduceState {
         Self {
             events: 0,
             stale_since: Instant::now(),
+            last_flushed_at: Instant::now(),
             fields,
             metadata,
         }
@@ -327,9 +330,10 @@ impl Reduce {
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let mut flush_discriminants = Vec::new();
         let now = Instant::now();
-        for (k, t) in &self.reduce_merge_states {
-            if (now - t.stale_since) >= self.expire_after {
+        for (k, t) in &mut self.reduce_merge_states {
+            if now - min(t.stale_since, t.last_flushed_at) >= self.expire_after {
                 flush_discriminants.push(k.clone());
+                t.last_flushed_at = Instant::now();
             }
         }
         for k in &flush_discriminants {
