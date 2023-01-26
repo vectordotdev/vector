@@ -307,11 +307,7 @@ components: sinks: [Name=string]: {
 				if features.send.request.enabled {
 					request: {
 						common:      false
-						description: """
-							Middleware settings for outbound requests.
-
-							Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
-							"""
+						description: "Configures the sink request behavior."
 						required:    false
 						if features.send.request.relevant_when != _|_ {
 							relevant_when: features.send.request.relevant_when
@@ -321,55 +317,28 @@ components: sinks: [Name=string]: {
 							options: {
 								adaptive_concurrency: {
 									common:      false
+									description: "Configure the adaptive concurrency algorithms. These values have been tuned by optimizing simulated results. In general you should not need to adjust these."
 									required:    false
-									description: """
-										Configuration of adaptive concurrency parameters.
-
-										These parameters typically do not require changes from the default, and incorrect values can lead to meta-stable or
-										unstable performance and sink behavior. Proceed with caution.
-										"""
 									type: object: {
 										examples: []
 										options: {
 											decrease_ratio: {
 												common:      false
+												description: "The fraction of the current value to set the new concurrency limit when decreasing the limit. Valid values are greater than 0 and less than 1. Smaller values cause the algorithm to scale back rapidly when latency increases. Note that the new limit is rounded down after applying this ratio."
 												required:    false
-												description: """
-												The fraction of the current value to set the new concurrency limit when decreasing the limit.
-
-												Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
-												when latency increases.
-
-												Note that the new limit is rounded down after applying this ratio.
-												"""
 												type: float: default: 0.9
 											}
 											ewma_alpha: {
 												common:      false
-												description: """
-												The weighting of new measurements compared to older measurements.
-
-												Valid values are greater than `0` and less than `1`.
-
-												ARC uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with
-												the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
-												unusually high response variability.
-												"""
+												description: "The adaptive concurrency algorithm uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with the current RTT. This value controls how heavily new measurements are weighted compared to older ones. Valid values are greater than 0 and less than 1. Smaller values cause this reference to adjust more slowly, which may be useful if a service has unusually high response variability."
 												required:    false
 												type: float: default: 0.7
 											}
 											rtt_deviation_scale: {
 												common: false
 												description: """
-													Scale of RTT deviations which are not considered anomalous.
-
-													Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
-
-													When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
-													those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
-													can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
-													an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
-													"""
+												When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
+												"""
 												required: false
 												type: float: default: 2.0
 											}
@@ -414,7 +383,7 @@ components: sinks: [Name=string]: {
 									required:    false
 									type: uint: {
 										default: 18446744073709552000
-										unit:    "retries"
+										unit:    null
 									}
 								}
 								retry_initial_backoff_secs: {
