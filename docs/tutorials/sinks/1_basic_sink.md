@@ -40,7 +40,7 @@ pub struct BasicConfig {
 }
 ```
 
-Note the `configurable_component` option. This is used by Vector to generate documentation from the struct.
+Note the `configurable_component` attribute. This is used by Vector to generate documentation from the struct.
 To do this, doc comments must be included above the struct - Vector won't compile if they aren't.
 
 We also include a single member in our struct - `acknowledgemets`. Every sink needs to be able to control how
@@ -152,12 +152,11 @@ of the object.
 Import this module into Vector. In `src/sinks/mod.rs` add the line:
 
 
-```rust
+```diff
  #[cfg(feature = "sinks-azure_monitor_logs")]
  pub mod azure_monitor_logs;
 
- // Add this line ->
- pub mod basic;
++pub mod basic;
 
  #[cfg(feature = "sinks-blackhole")]
  pub mod blackhole;
@@ -169,7 +168,7 @@ components required. We will ignore the feature flag for now with our new basic 
 Next, each sink needs to be added to the `Sinks` enum. Find the enum in `mod.rs` and add our
 new sink to it.
 
-```rust
+```diff
 #[configurable_component]
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
@@ -178,8 +177,8 @@ new sink to it.
 pub enum Sinks {
     ...
 
-    /// Basic
-    Basic(#[configurable(derived)] basic::BasicConfig),
++    /// Basic
++    Basic(#[configurable(derived)] basic::BasicConfig),
 
     ...
 
@@ -187,13 +186,13 @@ pub enum Sinks {
 
 Then we need to add this to the `get_component_name` function defined below.
 
-```rust
+```diff
 
     fn get_component_name(&self) -> &'static str {
         match self {
             ...
 
-            Self::Basic(config) => config.get_component_name(),
++           Self::Basic(config) => config.get_component_name(),
 
             ...
 
@@ -206,13 +205,14 @@ can be passed back to the source.
 
 We need to make a couple of changes to our `run_inner` function:
 
-```rust
+```diff
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(mut event) = input.next().await {
+-       while let Some(event) = input.next().await {
++       while let Some(mut event) = input.next().await {
             println!("{:#?}", event);
 
-            let finalizers = event.take_finalizers();
-            finalizers.update_status(EventStatus::Delivered);
++           let finalizers = event.take_finalizers();
++           finalizers.update_status(EventStatus::Delivered);
         }
 
         Ok(())
@@ -248,16 +248,20 @@ There are two events that need to be emitted by the component.
 First we need to get the number of bytes that we are sending. Then we need to emit the event.
 Change the body of `run_inner` to look like the following:
 
-```rust
+```diff
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(event) = input.next().await {
-            let bytes = format!("{:#?}", event);
-            println!("{}", bytes);
+        while let Some(mut event) = input.next().await {
++           let bytes = format!("{:#?}", event);
++           println!("{}", bytes);
+-           println!("{:#?}", event);
 
-            emit!(BytesSent {
-                byte_size: bytes.len(),
-                protocol: "none".into()
-            });
++           emit!(BytesSent {
++               byte_size: bytes.len(),
++               protocol: "none".into()
++           });
+
+            let finalizers = event.take_finalizers();
+            finalizers.update_status(EventStatus::Delivered);
         }
 
         Ok(())
@@ -266,19 +270,22 @@ Change the body of `run_inner` to look like the following:
 
 ## EventSent
 
-`EventSent` is emmitted by each component in Vector to instrument how many bytes have been sent 
+`EventSent` is emmitted by each component in Vector to instrument how many bytes have been sent
 to the next downstream component.
 
 Add the following after emmitting `BytesSent`:
 
-```rust
-      let event_byte_size = event.estimated_json_encoded_size_of();
-      emit!(EventsSent {
-          count: 1,
-          byte_size: event_byte_size,
-          output: None,
-      })
+```diff
++     let event_byte_size = event.estimated_json_encoded_size_of();
++     emit!(EventsSent {
++         count: 1,
++         byte_size: event_byte_size,
++         output: None,
++     })
 ```
+
+More details about instrumenting Vector can be found
+[here](https://github.com/vectordotdev/vector/blob/master/docs/specs/instrumentation.md).
 
 # Running our sink
 
