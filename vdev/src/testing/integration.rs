@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path, path::PathBuf, process::Command};
+use std::{path::Path, path::PathBuf, process::Command};
 
 use anyhow::{bail, Context, Result};
 
@@ -81,7 +81,7 @@ impl IntegrationTest {
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
         let envs_dir = EnvsDir::new(&integration);
-        let runner = IntegrationTestRunner::new(integration.clone(), config.needs_docker_sock)?;
+        let runner = IntegrationTestRunner::new(integration.clone())?;
 
         Ok(Self {
             integration,
@@ -100,11 +100,10 @@ impl IntegrationTest {
             self.start()?;
         }
 
-        let default_env = BTreeMap::default();
-        let env_vars = self.config.env.as_ref().unwrap_or(&default_env);
         let mut args = self.config.args.clone();
         args.extend(extra_args);
-        self.runner.test(env_vars, &args)?;
+        self.runner
+            .test(&self.config.env, &self.config.runner_env, &args)?;
 
         if !active {
             self.runner.remove()?;

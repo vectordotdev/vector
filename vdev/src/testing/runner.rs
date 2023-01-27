@@ -1,14 +1,13 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::process::{Command, Stdio};
-use std::{env, ffi::OsStr, ffi::OsString, path::PathBuf};
+use std::{env, ffi::OsString, path::PathBuf};
 
 use anyhow::Result;
 use atty::Stream;
 use once_cell::sync::Lazy;
 
-use super::config::RustToolchainConfig;
+use super::config::{EnvConfig, RustToolchainConfig};
 use crate::app::{self, CommandExt as _};
-use crate::util::ChainArgs as _;
 
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
@@ -29,8 +28,6 @@ const UPSTREAM_IMAGE: &str =
 pub static CONTAINER_TOOL: Lazy<OsString> =
     Lazy::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));
 
-pub static DOCKER_SOCK: Lazy<PathBuf> = Lazy::new(detect_docker_sock);
-
 fn detect_container_tool() -> OsString {
     for tool in ["docker", "podman"] {
         if Command::new(tool)
@@ -47,7 +44,7 @@ fn detect_container_tool() -> OsString {
     fatal!("No container tool could be detected.");
 }
 
-fn dockercmd<S: AsRef<OsStr>>(args: impl IntoIterator<Item = S>) -> Command {
+fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
     let mut command = Command::new(&*CONTAINER_TOOL);
     command.args(args);
     command
@@ -73,7 +70,7 @@ pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
 }
 
 pub trait TestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()>;
+    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()>;
 }
 
 pub trait ContainerTestRunner: TestRunner {
@@ -82,8 +79,6 @@ pub trait ContainerTestRunner: TestRunner {
     fn image_name(&self) -> String;
 
     fn network_name(&self) -> String;
-
-    fn needs_docker_sock(&self) -> bool;
 
     fn stop(&self) -> Result<()> {
         dockercmd(["stop", "--time", "0", &self.container_name()])
@@ -209,33 +204,26 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn create(&self) -> Result<()> {
-        let docker_volume = format!("{}:/var/run/docker.sock", DOCKER_SOCK.display());
-        let docker_args = if self.needs_docker_sock() {
-            vec!["--volume", &docker_volume]
-        } else {
-            vec![]
-        };
-        dockercmd(
-            [
-                "create",
-                "--name",
-                &self.container_name(),
-                "--network",
-                &self.network_name(),
-                "--workdir",
-                MOUNT_PATH,
-                "--volume",
-                &format!("{}:{MOUNT_PATH}", app::path()),
-                "--volume",
-                &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
-                "--volume",
-                &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
-                "--volume",
-                &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
-            ]
-            .chain_args(docker_args)
-            .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
-        )
+        dockercmd([
+            "create",
+            "--name",
+            &self.container_name(),
+            "--network",
+            &self.network_name(),
+            "--workdir",
+            MOUNT_PATH,
+            "--volume",
+            &format!("{}:{MOUNT_PATH}", app::path()),
+            "--volume",
+            &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
+            "--volume",
+            &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
+            "--volume",
+            &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
+            &self.image_name(),
+            "/bin/sleep",
+            "infinity",
+        ])
         .wait(format!("Creating container {}", self.container_name()))
     }
 }
@@ -244,7 +232,7 @@ impl<T> TestRunner for T
 where
     T: ContainerTestRunner,
 {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
+    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()> {
         self.ensure_running()?;
 
         let mut command = dockercmd(["exec"]);
@@ -253,9 +241,16 @@ where
         }
 
         command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
-        for (key, value) in env_vars {
-            command.env(key, value);
-            command.args(["--env", key]);
+        if let Some(env_vars) = outer_env {
+            for (key, value) in env_vars {
+                command.env(key, value);
+                command.args(["--env", key]);
+            }
+        }
+        if let Some(env_vars) = inner_env {
+            for (key, value) in env_vars {
+                command.args(["--env", &format!("{key}={value}")]);
+            }
         }
 
         command.arg(&self.container_name());
@@ -268,15 +263,11 @@ where
 
 pub struct IntegrationTestRunner {
     integration: String,
-    needs_docker_sock: bool,
 }
 
 impl IntegrationTestRunner {
-    pub fn new(integration: String, needs_docker_sock: bool) -> Result<Self> {
-        Ok(Self {
-            integration,
-            needs_docker_sock,
-        })
+    pub fn new(integration: String) -> Result<Self> {
+        Ok(Self { integration })
     }
 
     pub(super) fn ensure_network(&self) -> Result<()> {
@@ -310,10 +301,6 @@ impl ContainerTestRunner for IntegrationTestRunner {
     fn image_name(&self) -> String {
         format!("{}:latest", self.container_name())
     }
-
-    fn needs_docker_sock(&self) -> bool {
-        self.needs_docker_sock
-    }
 }
 
 pub struct DockerTestRunner;
@@ -330,36 +317,27 @@ impl ContainerTestRunner for DockerTestRunner {
     fn image_name(&self) -> String {
         env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
     }
-
-    fn needs_docker_sock(&self) -> bool {
-        false
-    }
 }
 
 pub struct LocalTestRunner;
 
 impl TestRunner for LocalTestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
+    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);
         command.args(args);
 
-        for (key, value) in env_vars {
-            command.env(key, value);
+        if let Some(env_vars) = outer_env {
+            for (key, value) in env_vars {
+                command.env(key, value);
+            }
+        }
+        if let Some(env_vars) = inner_env {
+            for (key, value) in env_vars {
+                command.env(key, value);
+            }
         }
 
         command.check_run()
-    }
-}
-
-fn detect_docker_sock() -> PathBuf {
-    match env::var_os("DOCKER_HOST") {
-        Some(host) => host
-            .into_string()
-            .expect("Invalid value in $DOCKER_HOST")
-            .strip_prefix("unix://")
-            .expect("$DOCKER_HOST is not a socket path")
-            .into(),
-        None => "/var/run/docker.sock".into(),
     }
 }

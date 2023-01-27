@@ -6,10 +6,11 @@ args:
 - --test-threads
 - '4'
 
-needs_docker_sock: true
-
 env:
   KAFKA_HOST: kafka
+
+runner_env:
+  DOCKER_HOST: "http://1.1.1.1:54321/"
 
 matrix:
 - version: [latest]
