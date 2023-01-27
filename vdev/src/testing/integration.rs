@@ -92,7 +92,11 @@ impl IntegrationTest {
             .try_exists()
             .with_context(|| format!("Could not lookup {compose_path:?}"))?
             .then_some(compose_path);
-        let runner = IntegrationTestRunner::new(integration.clone(), compose_path.is_some())?;
+        let runner = IntegrationTestRunner::new(
+            integration.clone(),
+            config.needs_docker_sock,
+            compose_path.is_some(),
+        )?;
 
         Ok(Self {
             integration,

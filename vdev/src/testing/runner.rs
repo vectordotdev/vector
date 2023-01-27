@@ -30,6 +30,8 @@ const UPSTREAM_IMAGE: &str =
 pub static CONTAINER_TOOL: Lazy<OsString> =
     Lazy::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));
 
+pub static DOCKER_SOCK: Lazy<PathBuf> = Lazy::new(detect_docker_sock);
+
 fn detect_container_tool() -> OsString {
     for tool in ["docker", "podman"] {
         if Command::new(tool)
@@ -81,6 +83,8 @@ pub trait ContainerTestRunner: TestRunner {
     fn image_name(&self) -> String;
 
     fn network_name(&self) -> Option<String>;
+
+    fn needs_docker_sock(&self) -> bool;
 
     fn stop(&self) -> Result<()> {
         dockercmd(["stop", "--time", "0", &self.container_name()])
@@ -210,6 +214,11 @@ pub trait ContainerTestRunner: TestRunner {
             Some(name) => vec!["--network".into(), name],
             None => vec![],
         };
+        let docker_volume = format!("{}:/var/run/docker.sock", DOCKER_SOCK.display());
+        let docker_args = self
+            .needs_docker_sock()
+            .then(|| vec!["--volume", &docker_volume])
+            .unwrap_or_default();
         dockercmd(
             ["create", "--name", &self.container_name()]
                 .chain_args(network_args)
@@ -226,10 +235,9 @@ pub trait ContainerTestRunner: TestRunner {
                     &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
                     "--volume",
                     &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
-                    &self.image_name(),
-                    "/bin/sleep",
-                    "infinity",
-                ]),
+                ])
+                .chain_args(docker_args)
+                .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
         )
         .wait(format!("Creating container {}", self.container_name()))
     }
@@ -270,13 +278,15 @@ where
 
 pub struct IntegrationTestRunner {
     integration: String,
+    needs_docker_sock: bool,
     needs_network: bool,
 }
 
 impl IntegrationTestRunner {
-    pub fn new(integration: String, needs_network: bool) -> Result<Self> {
+    pub fn new(integration: String, needs_docker_sock: bool, needs_network: bool) -> Result<Self> {
         Ok(Self {
             integration,
+            needs_docker_sock,
             needs_network,
         })
     }
@@ -317,6 +327,10 @@ impl ContainerTestRunner for IntegrationTestRunner {
     fn image_name(&self) -> String {
         format!("{}:latest", self.container_name())
     }
+
+    fn needs_docker_sock(&self) -> bool {
+        self.needs_docker_sock
+    }
 }
 
 pub struct DockerTestRunner;
@@ -332,6 +346,10 @@ impl ContainerTestRunner for DockerTestRunner {
 
     fn image_name(&self) -> String {
         env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
+    }
+
+    fn needs_docker_sock(&self) -> bool {
+        false
     }
 }
 
@@ -355,5 +373,17 @@ impl TestRunner for LocalTestRunner {
         }
 
         command.check_run()
+    }
+}
+
+fn detect_docker_sock() -> PathBuf {
+    match env::var_os("DOCKER_HOST") {
+        Some(host) => host
+            .into_string()
+            .expect("Invalid value in $DOCKER_HOST")
+            .strip_prefix("unix://")
+            .expect("$DOCKER_HOST is not a socket path")
+            .into(),
+        None => "/var/run/docker.sock".into(),
     }
 }
