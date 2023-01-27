@@ -1,3 +1,5 @@
+use std::num::NonZeroU64;
+
 use codecs::JsonSerializerConfig;
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -30,15 +32,14 @@ pub struct WebSocketSinkConfig {
 
     /// The interval, in seconds, between sending [Ping][ping]s to the remote peer.
     ///
-    /// If this option is not configured, pings are not sent on an interval. This option must be configured to a value > 0
-    /// in order to enable pings.
+    /// If this option is not configured, pings are not sent on an interval.
     ///
     /// If the `ping_timeout` is not set, pings are still sent but there is no expectation of pong
     /// response times.
     ///
     /// [ping]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.2
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    pub ping_interval: Option<u64>,
+    pub ping_interval: Option<NonZeroU64>,
 
     /// The number of seconds to wait for a [Pong][pong] response from the remote peer.
     ///
@@ -47,7 +48,7 @@ pub struct WebSocketSinkConfig {
     /// [pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
     // NOTE: this option is not relevant if the `ping_interval` is not configured.
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    pub ping_timeout: Option<u64>,
+    pub ping_timeout: Option<NonZeroU64>,
 
     #[configurable(derived)]
     #[serde(

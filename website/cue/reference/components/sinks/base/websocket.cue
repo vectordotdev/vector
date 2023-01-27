@@ -194,8 +194,7 @@ base: components: sinks: websocket: configuration: {
 		description: """
 			The interval, in seconds, between sending [Ping][ping]s to the remote peer.
 
-			If this option is not configured, pings are not sent on an interval. This option must be configured to a value > 0
-			in order to enable pings.
+			If this option is not configured, pings are not sent on an interval.
 
 			If the `ping_timeout` is not set, pings are still sent but there is no expectation of pong
 			response times.
