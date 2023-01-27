@@ -16,7 +16,7 @@ use futures::{Stream, StreamExt};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use once_cell::sync::OnceCell;
 use rdkafka::{
-    consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
+    consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
     message::{BorrowedMessage, Headers as _, Message},
     ClientConfig, ClientContext, Statistics,
 };
@@ -403,6 +403,13 @@ async fn kafka_source(
         }
     }
 
+    // Since commits are async internally, we try one last sync commit inside the interval
+    // in case there have been acks.
+    if let Ok(current_assignment) = consumer.assignment() {
+        // not logging on error because it will error if there are no offsets stored for a partition,
+        // and this is best-effort cleanup anyway
+        let _ = consumer.commit(&current_assignment, CommitMode::Sync);
+    }
     Ok(())
 }
 
