@@ -2,121 +2,125 @@ package metadata
 
 components: _aws: {
 	configuration: {
-		auth: {
-			common:      false
-			description: "Options for the authentication strategy."
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					access_key_id: {
-						category:    "Auth"
-						common:      false
-						description: "The AWS access key id. Used for AWS authentication when communicating with AWS services."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["AKIAIOSFODNN7EXAMPLE"]
+		_aws_include: bool | *true
+
+		if _aws_include {
+			auth: {
+				common:      false
+				description: "Options for the authentication strategy."
+				required:    false
+				type: object: {
+					examples: []
+					options: {
+						access_key_id: {
+							category:    "Auth"
+							common:      false
+							description: "The AWS access key id. Used for AWS authentication when communicating with AWS services."
+							required:    false
+							type: string: {
+								default: null
+								examples: ["AKIAIOSFODNN7EXAMPLE"]
+							}
 						}
-					}
-					secret_access_key: {
-						category:    "Auth"
-						common:      false
-						description: "The AWS secret access key. Used for AWS authentication when communicating with AWS services."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+						secret_access_key: {
+							category:    "Auth"
+							common:      false
+							description: "The AWS secret access key. Used for AWS authentication when communicating with AWS services."
+							required:    false
+							type: string: {
+								default: null
+								examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+							}
 						}
-					}
-					assume_role: {
-						category:    "Auth"
-						common:      false
-						description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["arn:aws:iam::123456789098:role/my_role"]
+						assume_role: {
+							category:    "Auth"
+							common:      false
+							description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
+							required:    false
+							type: string: {
+								default: null
+								examples: ["arn:aws:iam::123456789098:role/my_role"]
+							}
 						}
-					}
-					region: {
-						category:    "Auth"
-						common:      false
-						description: "The [AWS region](\(urls.aws_regions)) to send STS requests to. If not set, this will default to the configured region for the service itself."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["us-west-2"]
+						region: {
+							category:    "Auth"
+							common:      false
+							description: "The [AWS region](\(urls.aws_regions)) to send STS requests to. If not set, this will default to the configured region for the service itself."
+							required:    false
+							type: string: {
+								default: null
+								examples: ["us-west-2"]
+							}
 						}
-					}
-					load_timeout_secs: {
-						category:    "Auth"
-						common:      false
-						description: "The timeout for loading credentials. Relevant when the default credentials chain is used or `assume_role`."
-						required:    false
-						type: uint: {
-							unit:    "seconds"
-							default: 5
-							examples: [30]
+						load_timeout_secs: {
+							category:    "Auth"
+							common:      false
+							description: "The timeout for loading credentials. Relevant when the default credentials chain is used or `assume_role`."
+							required:    false
+							type: uint: {
+								unit:    "seconds"
+								default: 5
+								examples: [30]
+							}
 						}
-					}
-					imds: {
-						description: "Configuration for authenticating with AWS through IMDS."
-						required:    false
-						type: object: {
-							options: {
-								connect_timeout_seconds: {
-									description: "Connect timeout for IMDS."
-									required:    false
-									type: uint: {
-										default: 1
-										unit:    "seconds"
+						imds: {
+							description: "Configuration for authenticating with AWS through IMDS."
+							required:    false
+							type: object: {
+								options: {
+									connect_timeout_seconds: {
+										description: "Connect timeout for IMDS."
+										required:    false
+										type: uint: {
+											default: 1
+											unit:    "seconds"
+										}
 									}
-								}
-								max_attempts: {
-									description: "Number of IMDS retries for fetching tokens and metadata."
-									required:    false
-									type: uint: default: 4
-								}
-								read_timeout_seconds: {
-									description: "Read timeout for IMDS."
-									required:    false
-									type: uint: {
-										default: 1
-										unit:    "seconds"
+									max_attempts: {
+										description: "Number of IMDS retries for fetching tokens and metadata."
+										required:    false
+										type: uint: default: 4
+									}
+									read_timeout_seconds: {
+										description: "Read timeout for IMDS."
+										required:    false
+										type: uint: {
+											default: 1
+											unit:    "seconds"
+										}
 									}
 								}
 							}
 						}
-					}
-					profile: {
-						category:    "Auth"
-						common:      false
-						description: "The AWS profile name. Used to select AWS credentials from a provided credentials file."
-						required:    false
-						type: string: {
-							default: "default"
-							examples: ["develop"]
+						profile: {
+							category:    "Auth"
+							common:      false
+							description: "The AWS profile name. Used to select AWS credentials from a provided credentials file."
+							required:    false
+							type: string: {
+								default: "default"
+								examples: ["develop"]
+							}
 						}
 					}
 				}
 			}
-		}
 
-		endpoint: {
-			common:      false
-			description: "Custom endpoint for use with AWS-compatible services."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["http://127.0.0.0:5000/path/to/service"]
+			endpoint: {
+				common:      false
+				description: "Custom endpoint for use with AWS-compatible services."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["http://127.0.0.0:5000/path/to/service"]
+				}
 			}
-		}
-		region: {
-			description: "The [AWS region](\(urls.aws_regions)) of the target service."
-			required:    true
-			type: string: {
-				examples: ["us-east-1"]
+			region: {
+				description: "The [AWS region](\(urls.aws_regions)) of the target service."
+				required:    true
+				type: string: {
+					examples: ["us-east-1"]
+				}
 			}
 		}
 	}
@@ -217,7 +221,7 @@ components: _aws: {
 				{
 					title: "Assuming roles"
 					body: """
-						Vector can assume an AWS IAM role via the [`assume_role`](#auth.assume_role) option. This is an
+						Vector can assume an AWS IAM role via the [`auth.assume_role`](#auth.assume_role) option. This is an
 						optional setting that is helpful for a variety of use cases, such as cross
 						account access.
 						"""
