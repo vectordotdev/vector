@@ -150,7 +150,7 @@ impl InfluxDbSvc {
 
         let batch = config.batch.into_batch_settings()?;
         let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: 5,
+            retry_attempts: Some(5),
             ..Default::default()
         });
 

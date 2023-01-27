@@ -216,7 +216,7 @@ impl GcsSinkConfig {
         auth: GcpAuthenticator,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: 1000,
+            rate_limit_num: Some(1000),
             ..Default::default()
         });
 

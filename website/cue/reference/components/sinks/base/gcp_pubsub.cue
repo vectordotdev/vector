@@ -297,7 +297,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window used for the `rate_limit_num` option."
+				description: "The time window, in seconds, used for the `rate_limit_num` option."
 				required:    false
 				type: uint: {
 					default: 1
@@ -326,7 +326,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 			}
 			retry_initial_backoff_secs: {
 				description: """
-					The amount of time to wait before attempting the first retry for a failed request.
+					The number of seconds to wait before attempting the first retry for a failed request.
 
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
@@ -337,7 +337,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time to wait between retries."
+				description: "The maximum amount of time, in seconds, to wait between retries."
 				required:    false
 				type: uint: {
 					default: 3600
@@ -346,7 +346,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The maximum number of seconds a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.

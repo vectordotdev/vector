@@ -49,7 +49,7 @@ async fn insert_events() {
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
-            retry_attempts: 1,
+            retry_attempts: Some(1),
             ..Default::default()
         },
         ..Default::default()
@@ -103,7 +103,7 @@ async fn skip_unknown_fields() {
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
-            retry_attempts: 1,
+            retry_attempts: Some(1),
             ..Default::default()
         },
         ..Default::default()
@@ -153,7 +153,7 @@ async fn insert_events_unix_timestamps() {
         encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
         batch,
         request: TowerRequestConfig {
-            retry_attempts: 1,
+            retry_attempts: Some(1),
             ..Default::default()
         },
         ..Default::default()
