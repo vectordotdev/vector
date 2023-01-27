@@ -277,7 +277,7 @@ pub enum Sinks {
 
     /// MQTT.
     #[cfg(feature = "sinks-mqtt")]
-    Mqtt(#[configurable(derived)] self::mqtt::MqttSinkConfig),
+    Mqtt(self::mqtt::MqttSinkConfig),
 
     /// NATS.
     #[cfg(feature = "sinks-nats")]

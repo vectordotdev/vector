@@ -6,6 +6,7 @@ use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_config::configurable_component;
 
+use crate::template::Template;
 use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -15,7 +16,6 @@ use crate::{
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
-use crate::template::Template;
 
 /// Configuration for the `mqtt` sink
 #[configurable_component(sink("mqtt"))]
@@ -72,6 +72,7 @@ pub struct MqttSinkConfig {
 #[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
+#[allow(clippy::enum_variant_names)]
 pub enum MqttQoS {
     /// AtLeastOnce.
     AtLeastOnce,
@@ -123,7 +124,7 @@ impl GenerateConfig for MqttSinkConfig {
             keep_alive: default_keep_alive(),
             clean_session: default_clean_session(),
             tls: None,
-            topic: "vector".into(),
+            topic: Template::try_from("vector").expect("Cannot parse as a template"),
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: AcknowledgementsConfig::default(),
             quality_of_service: Default::default(),
@@ -172,7 +173,7 @@ impl MqttSinkConfig {
                 alpn,
             }));
         }
-        MqttConnector::new(options, self.topic.clone())
+        MqttConnector::new(options, self.topic.to_string())
     }
 }
 

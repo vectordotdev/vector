@@ -3,7 +3,7 @@ use std::{collections::VecDeque, fmt::Debug};
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{pin_mut, stream::BoxStream, Stream, StreamExt};
-use rumqttc::{AsyncClient, ClientError, ConnectionError, EventLoop, MqttOptions, QoS};
+use rumqttc::{AsyncClient, ClientError, ConnectionError, EventLoop, MqttOptions};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_common::internal_event::{ByteSize, CountByteSize, Output, Protocol, Registered};
@@ -159,9 +159,8 @@ impl MqttSink {
                     };
                     let message_len = message.len();
 
-                    let qos = self.quality_of_service;
                     let retain = false;
-                    match client.publish(&topic, qos, retain, message).await {
+                    match client.publish(&topic, self.quality_of_service.into(), retain, message).await {
                         Ok(()) => {
                             self.events_sent.emit(CountByteSize(1, event_byte_size));
                             self.bytes_sent.emit(ByteSize(message_len));
@@ -190,21 +189,18 @@ impl StreamSink<Event> for MqttSink {
         let input = input.fuse().peekable();
         pin_mut!(input);
 
+        let (client, connection) = self.connector.connect();
+        pin_mut!(client);
+        pin_mut!(connection);
         while input.as_mut().peek().await.is_some() {
-            let (client, connection) = self.connector.connect();
-            pin_mut!(client);
-            pin_mut!(connection);
-
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            if self
+            let _result = self
                 .handle_events(&mut input, &mut client, &mut connection)
-                .await
-                .is_ok()
-            {
-                let _ = client.disconnect().await;
-            }
+                .await;
         }
+
+        let _ = client.disconnect().await;
 
         Ok(())
     }
