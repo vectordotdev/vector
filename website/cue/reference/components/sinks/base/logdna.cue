@@ -107,8 +107,12 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send logs to."
-		required:    false
+		description: """
+			The HTTP endpoint to send logs to.
+
+			Both IP address and hostname are accepted formats.
+			"""
+		required: false
 		type: string: {
 			default: "https://logs.logdna.com/"
 			examples: ["http://127.0.0.1", "http://example.com"]

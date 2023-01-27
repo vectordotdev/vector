@@ -31,7 +31,9 @@ pub struct LogdnaConfig {
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     api_key: SensitiveString,
 
-    /// The endpoint to send logs to.
+    /// The HTTP endpoint to send logs to.
+    ///
+    /// Both IP address and hostname are accepted formats.
     #[serde(alias = "host")]
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(docs::examples = "http://127.0.0.1"))]
