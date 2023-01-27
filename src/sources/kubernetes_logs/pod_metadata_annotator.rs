@@ -26,61 +26,85 @@ use crate::event::{Event, LogEvent};
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
     /// Event field for the `Pod`'s name.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_name"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_name: OptionalTargetPath,
 
     /// Event field for the `Pod`'s namespace.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_ns"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_namespace: OptionalTargetPath,
 
     /// Event field for the `Pod`'s uid.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_uid"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_uid: OptionalTargetPath,
 
     /// Event field for the `Pod`'s IPv4 address.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_ip"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_ip: OptionalTargetPath,
 
     /// Event field for the `Pod`'s IPv4 and IPv6 addresses.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_ips"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_ips: OptionalTargetPath,
 
     /// Event field for the `Pod`'s labels.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_labels"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_labels: OptionalTargetPath,
 
     /// Event field for the `Pod`'s annotations.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_annotations"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_annotations: OptionalTargetPath,
 
     /// Event field for the `Pod`'s node_name.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_host"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_node_name: OptionalTargetPath,
 
     /// Event field for the `Pod`'s owner reference.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_owner"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_owner: OptionalTargetPath,
 
     /// Event field for the `Container`'s name.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.container_name"))]
     #[configurable(metadata(docs::examples = ""))]
     pub container_name: OptionalTargetPath,
 
     /// Event field for the `Container`'s ID.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.container_id"))]
     #[configurable(metadata(docs::examples = ""))]
     pub container_id: OptionalTargetPath,
 
     /// Event field for the `Container`'s image.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.container_image"))]
     #[configurable(metadata(docs::examples = ""))]
     pub container_image: OptionalTargetPath,

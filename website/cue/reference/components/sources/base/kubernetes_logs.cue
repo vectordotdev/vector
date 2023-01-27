@@ -48,6 +48,9 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: """
 			Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in
 			`Node` filter.
+
+			The built-in `Node` filter uses `self_node_name` to only watch `Pod`s coqlocated on the same
+			`Node`.
 			"""
 		required: false
 		type: string: {
@@ -113,7 +116,7 @@ base: components: sources: kubernetes_logs: configuration: {
 	ignore_older_secs: {
 		description: "Ignore files with a data modification date older than the specified number of seconds."
 		required:    false
-		type: uint: {}
+		type: uint: unit: "seconds"
 	}
 	ingestion_timestamp_field: {
 		description: """
@@ -165,8 +168,12 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: "Configuration for how the events are enriched with `Namespace` metadata."
 		required:    false
 		type: object: options: namespace_labels: {
-			description: "Event field for the `Namespace`'s labels."
-			required:    false
+			description: """
+				Event field for the `Namespace`'s labels.
+
+				Set to `""` to suppress this key.
+				"""
+			required: false
 			type: string: {
 				default: ".kubernetes.namespace_labels"
 				examples: [".k8s.ns_labels", ""]
@@ -177,8 +184,12 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: "Configuration for how the events are enriched with `Node` metadata."
 		required:    false
 		type: object: options: node_labels: {
-			description: "Event field for the `Node`'s labels."
-			required:    false
+			description: """
+				Event field for the `Node`'s labels.
+
+				Set to `""` to suppress this key.
+				"""
+			required: false
 			type: string: {
 				default: ".kubernetes.node_labels"
 				examples: [".k8s.node_labels", ""]
@@ -190,96 +201,144 @@ base: components: sources: kubernetes_logs: configuration: {
 		required:    false
 		type: object: options: {
 			container_id: {
-				description: "Event field for the `Container`'s ID."
-				required:    false
+				description: """
+					Event field for the `Container`'s ID.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.container_id"
 					examples: [".k8s.container_id", ""]
 				}
 			}
 			container_image: {
-				description: "Event field for the `Container`'s image."
-				required:    false
+				description: """
+					Event field for the `Container`'s image.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.container_image"
 					examples: [".k8s.container_image", ""]
 				}
 			}
 			container_name: {
-				description: "Event field for the `Container`'s name."
-				required:    false
+				description: """
+					Event field for the `Container`'s name.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.container_name"
 					examples: [".k8s.container_name", ""]
 				}
 			}
 			pod_annotations: {
-				description: "Event field for the `Pod`'s annotations."
-				required:    false
+				description: """
+					Event field for the `Pod`'s annotations.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.pod_annotations"
 					examples: [".k8s.pod_annotations", ""]
 				}
 			}
 			pod_ip: {
-				description: "Event field for the `Pod`'s IPv4 address."
-				required:    false
+				description: """
+					Event field for the `Pod`'s IPv4 address.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.pod_ip"
 					examples: [".k8s.pod_ip", ""]
 				}
 			}
 			pod_ips: {
-				description: "Event field for the `Pod`'s IPv4 and IPv6 addresses."
-				required:    false
+				description: """
+					Event field for the `Pod`'s IPv4 and IPv6 addresses.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.pod_ips"
 					examples: [".k8s.pod_ips", ""]
 				}
 			}
 			pod_labels: {
-				description: "Event field for the `Pod`'s labels."
-				required:    false
+				description: """
+					Event field for the `Pod`'s labels.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.pod_labels"
 					examples: [".k8s.pod_labels", ""]
 				}
 			}
 			pod_name: {
-				description: "Event field for the `Pod`'s name."
-				required:    false
+				description: """
+					Event field for the `Pod`'s name.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.pod_name"
 					examples: [".k8s.pod_name", ""]
 				}
 			}
 			pod_namespace: {
-				description: "Event field for the `Pod`'s namespace."
-				required:    false
+				description: """
+					Event field for the `Pod`'s namespace.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.pod_namespace"
 					examples: [".k8s.pod_ns", ""]
 				}
 			}
 			pod_node_name: {
-				description: "Event field for the `Pod`'s node_name."
-				required:    false
+				description: """
+					Event field for the `Pod`'s node_name.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.pod_node_name"
 					examples: [".k8s.pod_host", ""]
 				}
 			}
 			pod_owner: {
-				description: "Event field for the `Pod`'s owner reference."
-				required:    false
+				description: """
+					Event field for the `Pod`'s owner reference.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.pod_owner"
 					examples: [".k8s.pod_owner", ""]
 				}
 			}
 			pod_uid: {
-				description: "Event field for the `Pod`'s uid."
-				required:    false
+				description: """
+					Event field for the `Pod`'s uid.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
 				type: string: {
 					default: ".kubernetes.pod_uid"
 					examples: [".k8s.pod_uid", ""]

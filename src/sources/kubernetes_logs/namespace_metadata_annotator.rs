@@ -19,6 +19,8 @@ use super::Config;
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
     /// Event field for the `Namespace`'s labels.
+    ///
+    /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.ns_labels"))]
     #[configurable(metadata(docs::examples = ""))]
     pub namespace_labels: OptionalTargetPath,

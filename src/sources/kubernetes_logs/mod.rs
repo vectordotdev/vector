@@ -111,6 +111,9 @@ pub struct Config {
 
     /// Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in
     /// `Node` filter.
+    ///
+    /// The built-in `Node` filter uses `self_node_name` to only watch `Pod`s coqlocated on the same
+    /// `Node`.
     #[configurable(metadata(docs::examples = "metadata.name!=pod-name-to-exclude"))]
     #[configurable(metadata(
         docs::examples = "metadata.name!=pod-name-to-exclude,metadata.name=mypod"
