@@ -93,14 +93,18 @@ impl IntegrationTest {
         })
     }
 
-    pub fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
+    pub fn test(&self, extra_args: Vec<String>) -> Result<()> {
         let active = self.envs_dir.check_active(&self.environment)?;
 
         if !active {
             self.start()?;
         }
 
-        self.runner.test(env_vars, args)?;
+        let default_env = BTreeMap::default();
+        let env_vars = self.config.env.as_ref().unwrap_or(&default_env);
+        let mut args = self.config.args.clone();
+        args.extend(extra_args);
+        self.runner.test(env_vars, &args)?;
 
         if !active {
             self.runner.remove()?;
