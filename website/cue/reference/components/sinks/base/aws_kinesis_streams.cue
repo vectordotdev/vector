@@ -34,17 +34,21 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			access_key_id: {
 				description: "The AWS access key ID."
 				required:    true
-				type: string: {}
+				type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
 			}
 			assume_role: {
-				description: "The ARN of the role to assume."
-				required:    true
-				type: string: {}
+				description: """
+					The ARN of an [IAM role][iam_role] to assume.
+
+					[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+					"""
+				required: true
+				type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
 			}
 			credentials_file: {
 				description: "Path to the credentials file."
 				required:    true
-				type: string: {}
+				type: string: examples: ["/my/aws/credentials"]
 			}
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
@@ -74,29 +78,42 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				}
 			}
 			load_timeout_secs: {
-				description: "Timeout for successfully loading any credentials, in seconds."
-				required:    false
-				type: uint: {}
+				description: """
+					Timeout for successfully loading any credentials, in seconds.
+
+					Relevant when the default credentials chain is used or `assume_role`.
+					"""
+				required: false
+				type: uint: {
+					examples: [30]
+					unit: "seconds"
+				}
 			}
 			profile: {
-				description: "The credentials profile to use."
-				required:    false
-				type: string: {}
+				description: """
+					The credentials profile to use.
+
+					Used to select AWS credentials from a provided credentials file.
+					"""
+				required: false
+				type: string: examples: ["develop"]
 			}
 			region: {
 				description: """
-					The AWS region to send STS requests to.
+					The [AWS region][aws_region] to send STS requests to.
 
 					If not set, this will default to the configured region
 					for the service itself.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
 					"""
 				required: false
-				type: string: {}
+				type: string: examples: ["us-west-2"]
 			}
 			secret_access_key: {
 				description: "The AWS secret access key."
 				required:    true
-				type: string: {}
+				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 		}
 	}
@@ -276,9 +293,9 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The API endpoint of the service."
+		description: "Custom endpoint for use with AWS-compatible services."
 		required:    false
-		type: string: {}
+		type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 	}
 	partition_key_field: {
 		description: """
@@ -290,9 +307,13 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 		type: string: {}
 	}
 	region: {
-		description: "The AWS region to use."
-		required:    false
-		type: string: {}
+		description: """
+			The [AWS region][aws_region] of the target service.
+
+			[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+			"""
+		required: false
+		type: string: examples: ["us-east-1"]
 	}
 	request: {
 		description: """

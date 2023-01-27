@@ -141,7 +141,10 @@ base: components: sources: docker_logs: configuration: {
 					Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
 					"""
 				required: true
-				type: uint: examples: [1000, 600000]
+				type: uint: {
+					examples: [1000, 600000]
+					unit: "milliseconds"
+				}
 			}
 		}
 	}

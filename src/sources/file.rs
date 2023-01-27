@@ -1794,7 +1794,7 @@ mod tests {
                 start_pattern: "INFO".to_owned(),
                 condition_pattern: "INFO".to_owned(),
                 mode: line_agg::Mode::HaltBefore,
-                timeout_ms: 25, // less than 50 in sleep()
+                timeout_ms: Duration::from_millis(25), // less than 50 in sleep()
             }),
             ..test_default_file_config(&dir)
         };
@@ -1853,7 +1853,7 @@ mod tests {
                 start_pattern: "INFO".to_owned(),
                 condition_pattern: "INFO".to_owned(),
                 mode: line_agg::Mode::HaltBefore,
-                timeout_ms: 25, // less than 50 in sleep()
+                timeout_ms: Duration::from_millis(25), // less than 50 in sleep()
             }),
             ..test_default_file_config(&dir)
         };

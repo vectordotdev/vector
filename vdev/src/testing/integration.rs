@@ -5,11 +5,12 @@ use anyhow::{bail, Context, Result};
 use super::config::{Environment, IntegrationTestConfig, RustToolchainConfig};
 use super::runner::{
     ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL,
-    NETWORK_ENV_VAR,
 };
 use super::state::EnvsDir;
 use crate::app::{self, CommandExt as _};
 use crate::util::exists;
+
+const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 
 #[allow(clippy::dbg_macro)]
 fn old_integration_path(integration: &str) -> PathBuf {
@@ -100,7 +101,9 @@ impl IntegrationTest {
         }
 
         self.runner.test(env_vars, args)?;
+
         if !active {
+            self.runner.remove()?;
             self.stop()?;
         }
         Ok(())
@@ -129,10 +132,13 @@ impl IntegrationTest {
              bail!("No environment for {} is up.",self.integration);
         };
 
-        self.run_compose("Stopping", &["down", "--timeout", "0"], &state.config)?;
-
+        self.runner.remove()?;
+        self.run_compose(
+            "Stopping",
+            &["down", "--timeout", "0", "--volumes"],
+            &state.config,
+        )?;
         self.envs_dir.remove()?;
-        self.runner.stop()?;
 
         Ok(())
     }
