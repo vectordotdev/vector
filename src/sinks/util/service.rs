@@ -124,7 +124,7 @@ pub struct TowerRequestConfig {
     #[serde(default = "default_retry_max_duration_secs")]
     pub retry_max_duration_secs: Option<u64>,
 
-    /// The time to wait before attempting the first retry for a failed request.
+    /// The maximum amount of time to wait before attempting the first retry for a failed request.
     ///
     /// After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
     #[configurable(metadata(docs::type_unit = "seconds"))]
