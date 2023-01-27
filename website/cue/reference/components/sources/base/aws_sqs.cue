@@ -118,10 +118,11 @@ base: components: sources: aws_sqs: configuration: {
 
 			Defaults to the number of available CPUs on the system.
 
-			Should not typically need to be changed, but it can sometimes be beneficial to raise this value when there is a
-			high rate of messages being pushed into the queue and the messages being fetched are small. In these cases,
-			System resources may not be fully utilized without fetching more messages per second, as it spends more time
-			fetching the messages than processing them.
+			Should not typically need to be changed, but it can sometimes be beneficial to raise this
+			value when there is a high rate of messages being pushed into the queue and the messages
+			being fetched are small. In these cases, system resources may not be fully utilized without
+			fetching more messages per second, as it spends more time fetching the messages than
+			processing them.
 			"""
 		required: false
 		type: uint: {}
@@ -268,16 +269,19 @@ base: components: sources: aws_sqs: configuration: {
 		description: """
 			How long to wait while polling the queue for new messages, in seconds.
 
-			Generally should not be changed unless instructed to do so, as if messages are available, they will always be
-			consumed, regardless of the value of `poll_secs`.
+			Generally should not be changed unless instructed to do so, as if messages are available,
+			they will always be consumed, regardless of the value of `poll_secs`.
 			"""
 		required: false
-		type: uint: default: 15
+		type: uint: {
+			default: 15
+			unit:    "seconds"
+		}
 	}
 	queue_url: {
 		description: "The URL of the SQS queue to poll for messages."
 		required:    true
-		type: string: {}
+		type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
 	}
 	region: {
 		description: """
@@ -383,6 +387,9 @@ base: components: sources: aws_sqs: configuration: {
 			This can happen if there is an issue between consuming a message and deleting it.
 			"""
 		required: false
-		type: uint: default: 300
+		type: uint: {
+			default: 300
+			unit:    "seconds"
+		}
 	}
 }
