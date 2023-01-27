@@ -31,10 +31,12 @@ base: components: sinks: vector: configuration: {
 		description: """
 			The downstream Vector address to which to connect.
 
+			Both IP address and hostname are accepted formats.
+
 			The address _must_ include a port.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -48,17 +50,23 @@ base: components: sinks: vector: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: unit: "bytes"
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 1000
+					unit:    "events"
+				}
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -310,10 +318,5 @@ base: components: sinks: vector: configuration: {
 				type: bool: {}
 			}
 		}
-	}
-	version: {
-		description: "Version of the configuration."
-		required:    false
-		type: string: enum: "2": "Marker value for version two."
 	}
 }

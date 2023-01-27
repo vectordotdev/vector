@@ -31,11 +31,13 @@ base: components: sinks: socket: configuration: {
 		description: """
 			The address to connect to.
 
+			Both IP address and hostname are accepted formats.
+
 			The address _must_ include a port.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: string: {}
+		type: string: examples: ["92.12.333.224:5000", "https://somehost:5000"]
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -189,7 +191,7 @@ base: components: sinks: socket: configuration: {
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: object: options: time_secs: {
-			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
+			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
 			required:    false
 			type: uint: unit: "seconds"
 		}
@@ -211,17 +213,22 @@ base: components: sinks: socket: configuration: {
 			"""
 		relevant_when: "mode = \"unix\""
 		required:      true
-		type: string: {}
+		type: string: examples: ["/path/to/socket"]
 	}
 	send_buffer_bytes: {
 		description: """
-			The size, in bytes, of the socket's send buffer.
+			The size of the socket's send buffer.
 
 			If set, the value of the setting is passed via the `SO_SNDBUF` option.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
-		type: uint: {}
+		type: uint: {
+			examples: [
+				65536,
+			]
+			unit: "bytes"
+		}
 	}
 	tls: {
 		description:   "Configures the TLS options for incoming/outgoing connections."

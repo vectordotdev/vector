@@ -622,7 +622,7 @@ _values: {
 	unit?: #Unit | null
 }
 
-#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency" | "connections" | "retries"
+#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency" | "connections" | "tasks" | "retries"
 
 administration: _
 components:     _
