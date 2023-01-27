@@ -20,6 +20,7 @@ Other available distributions (beyond `debian`):
 
 * `alpine`
 * `distroless-libc`
+* `distroless-static`
 {{< /success >}}
 
 ## Deployment
