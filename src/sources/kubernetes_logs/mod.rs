@@ -154,6 +154,7 @@ pub struct Config {
     /// Ignore files with a data modification date older than the specified number of seconds.
     #[serde(default)]
     #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 600))]
     ignore_older_secs: Option<u64>,
 
     /// Max amount of bytes to read from a single file before switching over
@@ -170,14 +171,11 @@ pub struct Config {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     max_line_bytes: usize,
 
-    /// The number of lines to read when generating a unique fingerprint of a log file.
+    /// The number of lines to read for generating the checksum.
     ///
-    /// This is helpful when some containers share common first log lines.
+    /// If your files share a common header that is not always a fixed size,
     ///
-    /// **WARNING**: If the file has less than this amount of lines then it won't be read at all.
-    /// This is important since container logs are broken up into several files, so the greater
-    /// `lines` value is, the greater the chance of it not reading the last file/logs of
-    /// the container.
+    /// If the file has less than this amount of lines, it won’t be read at all.
     #[configurable(metadata(docs::type_unit = "lines"))]
     fingerprint_lines: usize,
 
