@@ -29,6 +29,8 @@ const UPSTREAM_IMAGE: &str =
 pub static CONTAINER_TOOL: Lazy<OsString> =
     Lazy::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));
 
+pub static DOCKER_SOCK: Lazy<PathBuf> = Lazy::new(detect_docker_sock);
+
 fn detect_container_tool() -> OsString {
     for tool in ["docker", "podman"] {
         if Command::new(tool)
@@ -124,7 +126,7 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(RunnerState::Missing)
     }
 
-    fn verify_state(&self) -> Result<()> {
+    fn ensure_running(&self) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
             RunnerState::Created | RunnerState::Exited => self.start()?,
@@ -203,6 +205,7 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn create(&self) -> Result<()> {
+        let docker_sock = DOCKER_SOCK.display();
         dockercmd([
             "create",
             "--name",
@@ -219,6 +222,8 @@ pub trait ContainerTestRunner: TestRunner {
             &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
             "--volume",
             &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
+            "--volume",
+            &format!("{docker_sock}:/var/run/docker.sock"),
             &self.image_name(),
             "/bin/sleep",
             "infinity",
@@ -232,7 +237,7 @@ where
     T: ContainerTestRunner,
 {
     fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
-        self.verify_state()?;
+        self.ensure_running()?;
 
         let mut command = dockercmd(["exec"]);
         if atty::is(Stream::Stdout) {
@@ -320,5 +325,17 @@ impl TestRunner for LocalTestRunner {
         }
 
         command.check_run()
+    }
+}
+
+fn detect_docker_sock() -> PathBuf {
+    match env::var_os("DOCKER_HOST") {
+        Some(host) => host
+            .into_string()
+            .expect("Invalid value in $DOCKER_HOST")
+            .strip_prefix("unix://")
+            .expect("$DOCKER_HOST is not a socket path")
+            .into(),
+        None => "/var/run/docker.sock".into(),
     }
 }
