@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::process::{Command, Stdio};
-use std::{env, ffi::OsString, path::PathBuf};
+use std::{env, ffi::OsStr, ffi::OsString, path::PathBuf};
 
 use anyhow::Result;
 use atty::Stream;
@@ -8,6 +8,7 @@ use once_cell::sync::Lazy;
 
 use super::config::RustToolchainConfig;
 use crate::app::{self, CommandExt as _};
+use crate::util::ChainArgs as _;
 
 pub const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const MOUNT_PATH: &str = "/home/vector";
@@ -47,7 +48,7 @@ fn detect_container_tool() -> OsString {
     fatal!("No container tool could be detected.");
 }
 
-fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
+fn dockercmd<S: AsRef<OsStr>>(args: impl IntoIterator<Item = S>) -> Command {
     let mut command = Command::new(&*CONTAINER_TOOL);
     command.args(args);
     command
@@ -84,6 +85,8 @@ pub trait ContainerTestRunner: TestRunner {
     fn network_name(&self) -> String {
         "host".to_string()
     }
+
+    fn needs_docker_sock(&self) -> bool;
 
     fn stop(&self) -> Result<()> {
         dockercmd(["stop", "--time", "0", &self.container_name()])
@@ -205,29 +208,33 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn create(&self) -> Result<()> {
-        let docker_sock = DOCKER_SOCK.display();
-        dockercmd([
-            "create",
-            "--name",
-            &self.container_name(),
-            "--network",
-            &self.network_name(),
-            "--workdir",
-            MOUNT_PATH,
-            "--volume",
-            &format!("{}:{MOUNT_PATH}", app::path()),
-            "--volume",
-            &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
-            "--volume",
-            &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
-            "--volume",
-            &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
-            "--volume",
-            &format!("{docker_sock}:/var/run/docker.sock"),
-            &self.image_name(),
-            "/bin/sleep",
-            "infinity",
-        ])
+        let docker_volume = format!("{}:/var/run/docker.sock", DOCKER_SOCK.display());
+        let docker_args = if self.needs_docker_sock() {
+            vec!["--volume", &docker_volume]
+        } else {
+            vec![]
+        };
+        dockercmd(
+            [
+                "create",
+                "--name",
+                &self.container_name(),
+                "--network",
+                &self.network_name(),
+                "--workdir",
+                MOUNT_PATH,
+                "--volume",
+                &format!("{}:{MOUNT_PATH}", app::path()),
+                "--volume",
+                &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
+                "--volume",
+                &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
+                "--volume",
+                &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
+            ]
+            .chain_args(docker_args)
+            .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
+        )
         .wait(format!("Creating container {}", self.container_name()))
     }
 }
@@ -260,14 +267,18 @@ where
 
 pub struct IntegrationTestRunner {
     integration: String,
+    needs_docker_sock: bool,
 }
 
 impl IntegrationTestRunner {
-    pub fn new(integration: String) -> Result<Self> {
-        Ok(Self { integration })
+    pub fn new(integration: String, needs_docker_sock: bool) -> Result<Self> {
+        Ok(Self {
+            integration,
+            needs_docker_sock,
+        })
     }
 
-    pub fn ensure_network(&self) -> Result<()> {
+    pub(super) fn ensure_network(&self) -> Result<()> {
         let mut command = dockercmd(["network", "ls", "--format", "{{.Name}}"]);
 
         if command
@@ -298,6 +309,10 @@ impl ContainerTestRunner for IntegrationTestRunner {
     fn image_name(&self) -> String {
         format!("{}:latest", self.container_name())
     }
+
+    fn needs_docker_sock(&self) -> bool {
+        self.needs_docker_sock
+    }
 }
 
 pub struct DockerTestRunner;
@@ -309,6 +324,10 @@ impl ContainerTestRunner for DockerTestRunner {
 
     fn image_name(&self) -> String {
         env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
+    }
+
+    fn needs_docker_sock(&self) -> bool {
+        false
     }
 }
 

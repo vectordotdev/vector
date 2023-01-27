@@ -80,7 +80,7 @@ impl IntegrationTest {
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
         let envs_dir = EnvsDir::new(&integration);
-        let runner = IntegrationTestRunner::new(integration.clone())?;
+        let runner = IntegrationTestRunner::new(integration.clone(), config.needs_docker_sock)?;
 
         Ok(Self {
             integration,

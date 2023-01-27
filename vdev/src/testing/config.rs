@@ -39,6 +39,8 @@ pub struct IntegrationTestConfig {
     pub args: Vec<String>,
     pub env: Option<BTreeMap<String, String>>,
     matrix: Vec<LinkedHashMap<String, Vec<String>>>,
+    #[serde(default)]
+    pub needs_docker_sock: bool,
 }
 
 pub type Environment = HashMap<String, String>;

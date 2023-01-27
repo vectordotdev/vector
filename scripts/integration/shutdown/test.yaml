@@ -6,6 +6,8 @@ args:
 - --test-threads
 - '4'
 
+needs_docker_sock: true
+
 env:
   KAFKA_HOST: kafka
 
