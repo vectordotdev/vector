@@ -159,22 +159,24 @@ impl IntegrationTest {
             let compose_config = ComposeConfig::parse(Path::new(&self.compose_path))?;
             for service in compose_config.services.values() {
                 // Make sure all volume files are world readable
-                for volume in &service.volumes {
-                    let source = volume
-                        .split_once(':')
-                        .expect("Invalid volume in compose file")
-                        .0;
-                    let path: PathBuf = [&self.test_dir, Path::new(source)].iter().collect();
-                    if path.is_file() {
-                        let perms = path
-                            .metadata()
-                            .with_context(|| format!("Could not get permissions on {path:?}"))?
-                            .permissions();
-                        let new_perms = Permissions::from_mode(perms.mode() | ALL_READ);
-                        if new_perms != perms {
-                            fs::set_permissions(&path, new_perms).with_context(|| {
-                                format!("Could not set permissions on {path:?}")
-                            })?;
+                if let Some(volumes) = &service.volumes {
+                    for volume in volumes {
+                        let source = volume
+                            .split_once(':')
+                            .expect("Invalid volume in compose file")
+                            .0;
+                        let path: PathBuf = [&self.test_dir, Path::new(source)].iter().collect();
+                        if path.is_file() {
+                            let perms = path
+                                .metadata()
+                                .with_context(|| format!("Could not get permissions on {path:?}"))?
+                                .permissions();
+                            let new_perms = Permissions::from_mode(perms.mode() | ALL_READ);
+                            if new_perms != perms {
+                                fs::set_permissions(&path, new_perms).with_context(|| {
+                                    format!("Could not set permissions on {path:?}")
+                                })?;
+                            }
                         }
                     }
                 }

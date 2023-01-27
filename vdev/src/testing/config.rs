@@ -41,7 +41,7 @@ pub struct ComposeConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct ComposeService {
-    pub volumes: Vec<String>,
+    pub volumes: Option<Vec<String>>,
 }
 
 impl ComposeConfig {
