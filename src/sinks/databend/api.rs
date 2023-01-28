@@ -198,10 +198,11 @@ impl DatabendAPIClient {
         let req_body = Body::from(data);
         let request = Request::put(presigned.url).body(req_body)?;
         let response = self.client.send(request).await?;
-        match response.status() {
+        let status = response.status();
+        match status {
             StatusCode::OK => Ok(()),
             _ => Err(DatabendError::Server {
-                code: response.status().as_u16(),
+                code: status.as_u16(),
                 message: "Presigned Upload Failed".to_string(),
             }),
         }

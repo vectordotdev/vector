@@ -20,8 +20,10 @@ services:
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
     depends_on:
-      - minio
-      - createbuckets
+      createbuckets:
+        condition: service_completed_successfully
+    healthcheck:
+      test: "curl -f localhost:8080/v1/health || exit 1"
 
   runner:
     build:
@@ -45,7 +47,8 @@ services:
       - DATABEND_USER=vector
       - DATABEND_PASSWORD=vector
     depends_on:
-      - databend
+      databend:
+        condition: service_healthy
     volumes:
       - ${PWD}:/code
       - target:/code/target

@@ -7,10 +7,11 @@ use vector_common::sensitive_string::SensitiveString;
 use vector_core::config::proxy::ProxyConfig;
 use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
+use crate::sinks::util::test::load_sink;
 use crate::{
     config::{SinkConfig, SinkContext},
     http::{Auth, HttpClient},
-    sinks::util::{BatchConfig, Compression, TowerRequestConfig, UriSerde},
+    sinks::util::UriSerde,
     test_util::{
         components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         random_string, trace_init,
@@ -56,21 +57,22 @@ async fn insert_events() {
         password: SensitiveString::from(databend_password()),
     });
 
-    let mut batch = BatchConfig::default();
-    batch.max_events = Some(1);
+    let cfg = format!(
+        r#"
+            endpoint = "{}"
+            table = "{}"
+            auth.strategy = "basic"
+            auth.user = "{}"
+            auth.password = "{}"
+            batch.max_events = 1
+        "#,
+        endpoint.clone(),
+        table.clone(),
+        databend_user(),
+        databend_password(),
+    );
 
-    let config = DatabendConfig {
-        endpoint: endpoint.clone(),
-        table: table.clone(),
-        compression: Compression::None,
-        batch,
-        auth: auth.clone(),
-        request: TowerRequestConfig {
-            retry_attempts: Some(1),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
+    let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
 
     let proxy = ProxyConfig::default();
     let http_client = HttpClient::new(None, &proxy).unwrap();
