@@ -30,7 +30,6 @@ use super::{
 #[serde(deny_unknown_fields)]
 pub struct DatabendConfig {
     /// The endpoint of the Databend server.
-    #[serde(alias = "host")]
     #[configurable(metadata(docs::examples = "http://localhost:8000"))]
     pub endpoint: UriSerde,
 
