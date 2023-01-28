@@ -106,7 +106,7 @@ impl DriverResponse for DatabendResponse {
 }
 
 impl DatabendService {
-    pub(crate) const fn new(
+    pub(super) const fn new(
         client: DatabendAPIClient,
         database: String,
         table: String,
@@ -118,7 +118,7 @@ impl DatabendService {
         }
     }
 
-    pub(crate) fn new_stage_location(&self) -> String {
+    pub(super) fn new_stage_location(&self) -> String {
         let now = Utc::now().timestamp();
         let suffix = thread_rng()
             .sample_iter(&Alphanumeric)
@@ -131,7 +131,7 @@ impl DatabendService {
         )
     }
 
-    pub(crate) async fn get_presigned_url(
+    pub(super) async fn get_presigned_url(
         &self,
         stage_location: &str,
     ) -> Result<DatabendPresignedResponse, DatabendError> {

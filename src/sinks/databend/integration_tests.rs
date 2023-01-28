@@ -115,7 +115,7 @@ async fn insert_events() {
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 }
 
-pub fn response_to_map(resp: &DatabendHttpResponse) -> Vec<BTreeMap<String, String>> {
+fn response_to_map(resp: &DatabendHttpResponse) -> Vec<BTreeMap<String, String>> {
     let mut result = Vec::new();
     for row in &resp.data {
         let mut map = BTreeMap::new();

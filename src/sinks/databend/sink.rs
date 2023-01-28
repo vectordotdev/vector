@@ -32,12 +32,24 @@ pub(crate) struct EventCollection {
 }
 
 pub struct DatabendSink {
-    pub encoder: DatabendEventEncoder,
-    pub batch_settings: BatcherSettings,
-    pub service: Svc<DatabendService, DatabendRetryLogic>,
+    encoder: DatabendEventEncoder,
+    batch_settings: BatcherSettings,
+    service: Svc<DatabendService, DatabendRetryLogic>,
 }
 
 impl DatabendSink {
+    pub(super) const fn new(
+        encoder: DatabendEventEncoder,
+        batch_settings: BatcherSettings,
+        service: Svc<DatabendService, DatabendRetryLogic>,
+    ) -> Self {
+        Self {
+            encoder,
+            batch_settings,
+            service,
+        }
+    }
+
     async fn run_inner(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
             .map(|mut event| EventData {

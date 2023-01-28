@@ -114,11 +114,7 @@ impl SinkConfig for DatabendConfig {
             transformer: self.encoding.clone(),
         };
 
-        let sink = DatabendSink {
-            encoder,
-            batch_settings,
-            service,
-        };
+        let sink = DatabendSink::new(encoder, batch_settings, service);
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -132,7 +128,7 @@ impl SinkConfig for DatabendConfig {
     }
 }
 
-pub(crate) async fn select_one(client: DatabendAPIClient) -> crate::Result<()> {
+async fn select_one(client: DatabendAPIClient) -> crate::Result<()> {
     let req = DatabendHttpRequest::new("SELECT 1".to_string());
     client.query(req).await?;
     Ok(())

@@ -11,7 +11,7 @@ use crate::{http::Auth, http::HttpClient, sinks::util::UriSerde};
 use super::error::DatabendError;
 
 #[derive(Serialize, Debug)]
-pub struct StageAttachment {
+pub(super) struct StageAttachment {
     location: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -22,7 +22,7 @@ pub struct StageAttachment {
 }
 
 #[derive(Serialize, Debug)]
-pub struct DatabendHttpRequest {
+pub(super) struct DatabendHttpRequest {
     sql: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -52,19 +52,22 @@ impl DatabendHttpRequest {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct DatabendHttpResponseSchemaField {
+pub(super) struct DatabendHttpResponseSchemaField {
+    #[allow(dead_code)]
     pub name: String,
+    #[allow(dead_code)]
     pub r#type: String,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct DatabendHttpResponseError {
+pub(super) struct DatabendHttpResponseError {
     pub code: u16,
     pub message: String,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct DatabendHttpResponse {
+pub(super) struct DatabendHttpResponse {
+    #[allow(dead_code)]
     pub schema: Vec<DatabendHttpResponseSchemaField>,
     pub data: Vec<Vec<String>>,
     pub error: Option<DatabendHttpResponseError>,
@@ -72,21 +75,23 @@ pub struct DatabendHttpResponse {
 }
 
 #[derive(Debug)]
-pub struct DatabendPresignedResponse {
+pub(super) struct DatabendPresignedResponse {
+    #[allow(dead_code)]
     pub method: String,
+    #[allow(dead_code)]
     pub headers: BTreeMap<String, String>,
     pub url: String,
 }
 
 #[derive(Clone)]
-pub struct DatabendAPIClient {
+pub(super) struct DatabendAPIClient {
     client: HttpClient,
     endpoint: UriSerde,
     auth: Option<Auth>,
 }
 
 impl DatabendAPIClient {
-    pub const fn new(client: HttpClient, endpoint: UriSerde, auth: Option<Auth>) -> Self {
+    pub(super) const fn new(client: HttpClient, endpoint: UriSerde, auth: Option<Auth>) -> Self {
         Self {
             client,
             endpoint,
@@ -94,11 +99,11 @@ impl DatabendAPIClient {
         }
     }
 
-    pub fn get_protocol(&self) -> &str {
+    pub(super) fn get_protocol(&self) -> &str {
         self.endpoint.uri.scheme_str().unwrap_or("http")
     }
 
-    pub fn get_endpoint(&self) -> &str {
+    pub(super) fn get_endpoint(&self) -> &str {
         self.endpoint.uri.host().unwrap_or("unknown")
     }
 
@@ -156,7 +161,7 @@ impl DatabendAPIClient {
         }
     }
 
-    pub async fn query_page(
+    pub(super) async fn query_page(
         &self,
         next_uri: String,
     ) -> Result<DatabendHttpResponse, DatabendError> {
@@ -164,7 +169,7 @@ impl DatabendAPIClient {
         self.do_request(url, None).await
     }
 
-    pub async fn query(
+    pub(super) async fn query(
         &self,
         req: DatabendHttpRequest,
     ) -> Result<DatabendHttpResponse, DatabendError> {
@@ -185,7 +190,7 @@ impl DatabendAPIClient {
         }
     }
 
-    pub async fn upload_with_presigned(
+    pub(super) async fn upload_with_presigned(
         &self,
         presigned: DatabendPresignedResponse,
         data: Bytes,
