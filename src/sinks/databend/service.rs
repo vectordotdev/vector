@@ -1,8 +1,8 @@
-use bytes::Bytes;
 use std::collections::BTreeMap;
 use std::task::{Context, Poll};
 use std::time::SystemTime;
 
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use rand::{thread_rng, Rng};
 use rand_distr::Alphanumeric;
