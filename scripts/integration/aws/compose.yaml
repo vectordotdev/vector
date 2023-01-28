@@ -18,4 +18,3 @@ services:
 networks:
   default:
     name: ${VECTOR_NETWORK}
-    external: true

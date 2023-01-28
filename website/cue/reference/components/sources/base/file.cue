@@ -2,6 +2,7 @@ package metadata
 
 base: components: sources: file: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
@@ -25,10 +26,13 @@ base: components: sources: file: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
+			By default, the [global `data_dir` option][global_data_dir] is used. Make sure the running user has write
+			permissions to this directory.
+
+			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["/var/local/lib/vector/"]
 	}
 	encoding: {
 		description: "Character set encoding."
@@ -48,7 +52,7 @@ base: components: sources: file: configuration: {
 				logged.
 				"""
 			required: true
-			type: string: {}
+			type: string: examples: ["utf-16le", "utf-16be"]
 		}
 	}
 	exclude: {
@@ -62,7 +66,7 @@ base: components: sources: file: configuration: {
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["/var/log/binary-file.log"]
 		}
 	}
 	file_key: {
@@ -71,10 +75,15 @@ base: components: sources: file: configuration: {
 
 			The value will be the full path to the file where the event was read message.
 
-			By default, `file` is used.
+			Set to `""` to suppress this key.
 			"""
 		required: false
-		type: string: default: "file"
+		type: string: {
+			default: "file"
+			examples: [
+				"path",
+			]
+		}
 	}
 	fingerprint: {
 		description: """
@@ -84,12 +93,6 @@ base: components: sources: file: configuration: {
 			"""
 		required: false
 		type: object: options: {
-			bytes: {
-				description:   "Maximum number of bytes to use, from the lines that are read, for generating the checksum."
-				relevant_when: "strategy = \"checksum\""
-				required:      false
-				type: uint: {}
-			}
 			ignored_header_bytes: {
 				description: """
 					The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
@@ -98,7 +101,10 @@ base: components: sources: file: configuration: {
 					"""
 				relevant_when: "strategy = \"checksum\""
 				required:      false
-				type: uint: default: 0
+				type: uint: {
+					default: 0
+					unit:    "bytes"
+				}
 			}
 			lines: {
 				description: """
@@ -110,7 +116,10 @@ base: components: sources: file: configuration: {
 					"""
 				relevant_when: "strategy = \"checksum\""
 				required:      false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "lines"
+				}
 			}
 			strategy: {
 				description: """
@@ -135,25 +144,33 @@ base: components: sources: file: configuration: {
 	}
 	glob_minimum_cooldown_ms: {
 		description: """
-			Delay between file discovery calls, in milliseconds.
+			Delay between file discovery calls.
 
-			This controls the interval at which files are searched. A higher value results in greater chances of some short-lived files being missed between searches, but a lower value increases the performance impact of file discovery.
+			This controls the interval at which files are searched. A higher value results in greater
+			chances of some short-lived files being missed between searches, but a lower value increases
+			the performance impact of file discovery.
 			"""
 		required: false
-		type: uint: default: 1000
+		type: uint: {
+			default: 1000
+			unit:    "milliseconds"
+		}
 	}
 	host_key: {
 		description: """
 			Overrides the name of the log field used to add the current hostname to each event.
 
-			The value is the current hostname.
-
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
+
+			Set to `""` to suppress this key.
 
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {}
+		type: string: {
+			default: "host"
+			examples: ["hostname"]
+		}
 	}
 	ignore_checkpoints: {
 		description: """
@@ -176,49 +193,47 @@ base: components: sources: file: configuration: {
 	ignore_older_secs: {
 		description: "Ignore files with a data modification date older than the specified number of seconds."
 		required:    false
-		type: uint: {}
+		type: uint: {
+			examples: [
+				600,
+			]
+			unit: "seconds"
+		}
 	}
 	include: {
 		description: "Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported."
 		required:    true
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["/var/log/**/*.log"]
 	}
 	line_delimiter: {
 		description: "String sequence used to separate one file line from another."
 		required:    false
-		type: string: default: "\n"
+		type: string: {
+			default: "\n"
+			examples: [
+				"\r\n",
+			]
+		}
 	}
 	max_line_bytes: {
 		description: """
-			The maximum number of bytes a line can contain before being discarded.
+			The maximum size of a line before it will be discarded.
 
 			This protects against malformed lines or tailing incorrect files.
 			"""
 		required: false
-		type: uint: default: 102400
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
 	}
 	max_read_bytes: {
 		description: "An approximate limit on the amount of data read from a single file at a given time."
 		required:    false
-		type: uint: default: 2048
-	}
-	message_start_indicator: {
-		description: """
-			String value used to identify the start of a multi-line message.
-
-			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-			"""
-		required: false
-		type: string: {}
-	}
-	multi_line_timeout: {
-		description: """
-			How long to wait for more data when aggregating a multi-line message, in milliseconds.
-
-			DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-			"""
-		required: false
-		type: uint: default: 1000
+		type: uint: {
+			default: 2048
+			unit:    "bytes"
+		}
 	}
 	multiline: {
 		description: """
@@ -235,7 +250,7 @@ base: components: sources: file: configuration: {
 					This setting must be configured in conjunction with `mode`.
 					"""
 				required: true
-				type: string: {}
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
 			}
 			mode: {
 				description: """
@@ -274,7 +289,7 @@ base: components: sources: file: configuration: {
 			start_pattern: {
 				description: "Regular expression pattern that is used to match the start of a new message."
 				required:    true
-				type: string: {}
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
 			}
 			timeout_ms: {
 				description: """
@@ -283,7 +298,10 @@ base: components: sources: file: configuration: {
 					Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
 					"""
 				required: true
-				type: uint: {}
+				type: uint: {
+					examples: [1000, 600000]
+					unit: "milliseconds"
+				}
 			}
 		}
 	}
@@ -296,7 +314,9 @@ base: components: sources: file: configuration: {
 			Off by default, the offset is only added to the event if this is set.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: [
+			"offset",
+		]
 	}
 	oldest_first: {
 		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
@@ -306,9 +326,12 @@ base: components: sources: file: configuration: {
 	read_from: {
 		description: "File position to use when reading a new file."
 		required:    false
-		type: string: enum: {
-			beginning: "Read from the beginning of the file."
-			end:       "Start reading from the current end of the file."
+		type: string: {
+			default: "beginning"
+			enum: {
+				beginning: "Read from the beginning of the file."
+				end:       "Start reading from the current end of the file."
+			}
 		}
 	}
 	remove_after_secs: {
@@ -318,15 +341,9 @@ base: components: sources: file: configuration: {
 			If not specified, files will not be removed.
 			"""
 		required: false
-		type: uint: {}
-	}
-	start_at_beginning: {
-		description: """
-			Whether or not to start reading from the beginning of a new file.
-
-			DEPRECATED: This is a deprecated option -- replaced by `ignore_checkpoints`/`read_from` -- and should be removed.
-			"""
-		required: false
-		type: bool: {}
+		type: uint: {
+			examples: [0, 5, 60]
+			unit: "seconds"
+		}
 	}
 }

@@ -33,11 +33,18 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
     /// Version of the configuration.
+    // NOTE: this option is deprecated and has already been removed from the "old" docs.
+    // At some point in the future we will remove it entirely as a breaking change.
+    #[configurable(metadata(docs::hidden))]
     version: Option<super::VectorConfigVersion>,
 
     /// The downstream Vector address to which to connect.
     ///
+    /// Both IP address and hostname are accepted formats.
+    ///
     /// The address _must_ include a port.
+    #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
+    #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     address: String,
 
     /// Whether or not to compress requests.
