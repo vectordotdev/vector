@@ -59,7 +59,7 @@ pub struct DatabendHttpResponseSchemaField {
 
 #[derive(Deserialize, Debug)]
 pub struct DatabendHttpResponseError {
-    pub code: i64,
+    pub code: u16,
     pub message: String,
 }
 
@@ -142,7 +142,7 @@ impl DatabendAPIClient {
         let response = self.client.send(request).await?;
         if response.status() != StatusCode::OK {
             return Err(DatabendError::Server {
-                code: response.status().as_u16() as i64,
+                code: response.status().as_u16(),
                 message: "Http Status not OK".to_string(),
             });
         }
@@ -205,7 +205,7 @@ impl DatabendAPIClient {
         match response.status() {
             StatusCode::OK => Ok(()),
             _ => Err(DatabendError::Server {
-                code: response.status().as_u16() as i64,
+                code: response.status().as_u16(),
                 message: "Presigned Upload Failed".to_string(),
             }),
         }

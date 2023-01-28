@@ -3,7 +3,7 @@ use snafu::Snafu;
 #[derive(Debug, Snafu)]
 pub enum DatabendError {
     #[snafu(display("Server responded with an error: {}, {}", code, message))]
-    Server { code: i64, message: String },
+    Server { code: u16, message: String },
 
     #[snafu(display("Parse response failed: {}", response))]
     Parser { response: String },
