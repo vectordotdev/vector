@@ -14,7 +14,6 @@ const TARGET_PATH: &str = "/home/target";
 const VOLUME_TARGET: &str = "vector_target";
 const VOLUME_CARGO_GIT: &str = "vector_cargo_git";
 const VOLUME_CARGO_REGISTRY: &str = "vector_cargo_registry";
-const RUNNER_HOSTNAME: &str = "runner";
 const TEST_COMMAND: &[&str] = &[
     "cargo",
     "nextest",
@@ -211,8 +210,6 @@ pub trait ContainerTestRunner: TestRunner {
             &self.container_name(),
             "--network",
             &self.network_name(),
-            "--hostname",
-            RUNNER_HOSTNAME,
             "--workdir",
             MOUNT_PATH,
             "--volume",
