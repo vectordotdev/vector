@@ -4,6 +4,7 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use chrono::Utc;
 use futures::future::BoxFuture;
+use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 use rand_distr::Alphanumeric;
 use snafu::Snafu;
@@ -19,6 +20,18 @@ use super::{
     api::{DatabendAPIClient, DatabendHttpRequest, DatabendPresignedResponse},
     error::DatabendError,
 };
+
+static DEFAULT_FILE_FORMAT_OPTIONS: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
+    let mut m = BTreeMap::new();
+    m.insert("type".to_string(), "NDJSON".to_string());
+    m
+});
+
+static DEFAULT_COPY_OPTIONS: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
+    let mut m = BTreeMap::new();
+    m.insert("purge".to_string(), "true".to_string());
+    m
+});
 
 #[derive(Clone)]
 pub struct DatabendRetryLogic;
@@ -160,16 +173,16 @@ impl DatabendService {
 
     pub(crate) async fn insert_with_stage(
         &self,
-        stage_location: &str,
+        stage_location: String,
     ) -> Result<(), DatabendError> {
-        let file_format_options = BTreeMap::from([("type".to_string(), "NDJSON".to_string())]);
-        let copy_options = BTreeMap::from([("purge".to_string(), "true".to_string())]);
         let mut req = DatabendHttpRequest::new(format!(
             "INSERT INTO `{}`.`{}` VALUES",
             self.database, self.table
         ));
+        let file_format_options = DEFAULT_FILE_FORMAT_OPTIONS.clone();
+        let copy_options = DEFAULT_COPY_OPTIONS.clone();
         req.add_stage_attachment(
-            stage_location.to_string(),
+            stage_location,
             Some(file_format_options),
             Some(copy_options),
         );
@@ -201,7 +214,7 @@ impl Service<DatabendRequest> for DatabendService {
                 .client
                 .upload_with_presigned(presigned_resp, request.data)
                 .await?;
-            service.insert_with_stage(&stage_location).await?;
+            service.insert_with_stage(stage_location).await?;
             emit!(EndpointBytesSent {
                 byte_size,
                 protocol,
