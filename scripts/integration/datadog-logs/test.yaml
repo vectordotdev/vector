@@ -1,0 +1,8 @@
+args:
+- --features
+- datadog-logs-integration-tests
+- --lib
+- '::datadog::logs::'
+
+matrix:
+- version: [latest]

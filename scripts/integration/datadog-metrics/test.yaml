@@ -1,0 +1,8 @@
+args:
+- --features
+- datadog-metrics-integration-tests
+- --lib
+- '::datadog::metrics::'
+
+matrix:
+- version: [latest]
