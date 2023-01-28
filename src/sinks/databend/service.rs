@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::task::{Context, Poll};
-use std::time::SystemTime;
 
 use bytes::Bytes;
+use chrono::Utc;
 use futures::future::BoxFuture;
 use rand::{thread_rng, Rng};
 use rand_distr::Alphanumeric;
@@ -105,20 +105,17 @@ impl DatabendService {
         }
     }
 
-    pub(crate) fn new_stage_location(&self) -> Result<String, DatabendError> {
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
+    pub(crate) fn new_stage_location(&self) -> String {
+        let now = Utc::now().timestamp();
         let suffix = thread_rng()
             .sample_iter(&Alphanumeric)
             .take(8)
             .map(char::from)
             .collect::<String>();
-        Ok(format!(
+        format!(
             "@~/vector/{}/{}/{}-{}",
-            self.database,
-            self.table,
-            now.as_secs(),
-            suffix,
-        ))
+            self.database, self.table, now, suffix,
+        )
     }
 
     pub(crate) async fn get_presigned_url(
@@ -195,7 +192,7 @@ impl Service<DatabendRequest> for DatabendService {
 
         let future = async move {
             let metadata = request.get_metadata();
-            let stage_location = service.new_stage_location()?;
+            let stage_location = service.new_stage_location();
             let protocol = service.client.get_protocol();
             let endpoint = service.client.get_endpoint();
             let byte_size = request.data.len();

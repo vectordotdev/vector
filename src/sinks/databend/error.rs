@@ -28,14 +28,6 @@ impl From<serde_json::Error> for DatabendError {
     }
 }
 
-impl From<std::time::SystemTimeError> for DatabendError {
-    fn from(error: std::time::SystemTimeError) -> Self {
-        Self::Client {
-            message: error.to_string(),
-        }
-    }
-}
-
 impl From<http::Error> for DatabendError {
     fn from(error: http::Error) -> Self {
         Self::Client {
