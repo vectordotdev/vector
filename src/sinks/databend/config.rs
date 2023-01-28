@@ -39,7 +39,8 @@ pub struct DatabendConfig {
 
     /// The database that contains the table that data will be inserted into.
     #[configurable(metadata(docs::examples = "mydatabase"))]
-    pub database: Option<String>,
+    #[serde(default = "default_database")]
+    pub database: String,
 
     #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
@@ -101,11 +102,8 @@ impl SinkConfig for DatabendConfig {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let database = match config.database {
-            None => "default".to_string(),
-            Some(db) => db,
-        };
-        let table = config.table.clone();
+        let database = config.database;
+        let table = config.table;
         let client = DatabendAPIClient::new(self.build_client(&cx)?, endpoint, auth);
         let service = DatabendService::new(client, database, table);
         let service = ServiceBuilder::new()
@@ -138,4 +136,8 @@ pub(crate) async fn select_one(client: DatabendAPIClient) -> crate::Result<()> {
     let req = DatabendHttpRequest::new("SELECT 1".to_string());
     client.query(req).await?;
     Ok(())
+}
+
+fn default_database() -> String {
+    "default".to_string()
 }
