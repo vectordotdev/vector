@@ -26,29 +26,11 @@ impl RustToolchainConfig {
         let repo_path = app::path();
         let config_file: PathBuf = [repo_path, "rust-toolchain.toml"].iter().collect();
         let contents = fs::read_to_string(&config_file)
-            .with_context(|| format!("failed to read {config_file:?}"))?;
+            .with_context(|| format!("failed to read {}", config_file.display()))?;
         let config: RustToolchainRootConfig = toml::from_str(&contents)
-            .with_context(|| format!("failed to parse {config_file:?}"))?;
+            .with_context(|| format!("failed to parse {}", config_file.display()))?;
 
         Ok(config.toolchain)
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ComposeConfig {
-    pub services: BTreeMap<String, ComposeService>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ComposeService {
-    pub volumes: Option<Vec<String>>,
-}
-
-impl ComposeConfig {
-    pub fn parse(path: &Path) -> Result<Self> {
-        let contents =
-            fs::read_to_string(path).with_context(|| format!("failed to read {path:?}"))?;
-        serde_yaml::from_str(&contents).with_context(|| format!("failed to parse {path:?}"))
     }
 }
 
