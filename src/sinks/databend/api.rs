@@ -65,19 +65,10 @@ pub struct DatabendHttpResponseError {
 
 #[derive(Deserialize, Debug)]
 pub struct DatabendHttpResponse {
-    pub id: String,
-    pub session_id: Option<String>,
-    pub session: Option<BTreeMap<String, String>>,
     pub schema: Vec<DatabendHttpResponseSchemaField>,
     pub data: Vec<Vec<String>>,
-    pub state: String,
     pub error: Option<DatabendHttpResponseError>,
-    // pub stats: BTreeMap<String, String>,
-    // pub affect: Option<String>,
-    pub stats_uri: Option<String>,
-    pub final_uri: Option<String>,
     pub next_uri: Option<String>,
-    pub kill_uri: Option<String>,
 }
 
 #[derive(Debug)]
