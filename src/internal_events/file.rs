@@ -82,60 +82,89 @@ mod source {
     use std::{io::Error, path::Path, time::Duration};
 
     use file_source::FileSourceInternalEvents;
-    use metrics::counter;
+    use metrics::{counter, register_counter, Counter, SharedString};
 
     use super::{FileOpen, InternalEvent};
     use crate::emit;
-    use vector_common::internal_event::{error_stage, error_type};
+    use vector_common::internal_event::{
+        error_stage, error_type, ByteSize, InternalEventHandle, RegisterInternalEvent,
+    };
 
     #[derive(Debug)]
-    pub struct FileBytesReceived<'a> {
-        pub byte_size: usize,
-        pub file: &'a str,
+    pub struct FileBytesReceived {
+        pub file: SharedString,
     }
 
-    impl<'a> InternalEvent for FileBytesReceived<'a> {
-        fn emit(self) {
-            trace!(
-                message = "Bytes received.",
-                byte_size = %self.byte_size,
-                protocol = "file",
-                file = %self.file,
-            );
-            counter!(
-                "component_received_bytes_total", self.byte_size as u64,
-                "protocol" => "file",
-                "file" => self.file.to_owned()
-            );
+    impl RegisterInternalEvent for FileBytesReceived {
+        type Handle = FileBytesReceivedHandle;
+
+        fn register(self) -> Self::Handle {
+            FileBytesReceivedHandle {
+                received_bytes: register_counter!("component_received_bytes_total", "protocol" => "file", "file" => self.file.clone()),
+                file: self.file,
+            }
         }
     }
 
-    #[derive(Debug)]
-    pub struct FileEventsReceived<'a> {
-        pub count: usize,
-        pub file: &'a str,
-        pub byte_size: usize,
+    #[derive(Clone)]
+    pub struct FileBytesReceivedHandle {
+        received_bytes: Counter,
+        file: SharedString,
     }
 
-    impl InternalEvent for FileEventsReceived<'_> {
-        fn emit(self) {
+    impl InternalEventHandle for FileBytesReceivedHandle {
+        type Data = ByteSize;
+
+        fn emit(&self, data: Self::Data) {
+            self.received_bytes.increment(data.0 as u64);
+            trace!(message = "Bytes received.", byte_size = %data.0, protocol = "file", file = %self.file);
+        }
+    }
+
+    pub struct FileEventsReceivedData {
+        pub byte_size: usize,
+        pub count: u64,
+    }
+
+    #[derive(Debug)]
+    pub struct FileEventsReceived {
+        pub file: SharedString,
+    }
+
+    impl RegisterInternalEvent for FileEventsReceived {
+        type Handle = FileEventsReceivedHandle;
+
+        fn register(self) -> Self::Handle {
+            FileEventsReceivedHandle {
+                component_received_event_bytes_total: register_counter!("component_received_event_bytes_total", "file" => self.file.clone()),
+                component_received_events_total: register_counter!("component_received_events_total", "file" => self.file.clone()),
+                events_in_total: register_counter!("events_in_total", "file" => self.file.clone()),
+                file: self.file,
+            }
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct FileEventsReceivedHandle {
+        component_received_event_bytes_total: Counter,
+        component_received_events_total: Counter,
+        events_in_total: Counter,
+        file: SharedString,
+    }
+
+    impl InternalEventHandle for FileEventsReceivedHandle {
+        type Data = FileEventsReceivedData;
+
+        fn emit(&self, data: Self::Data) {
+            self.component_received_event_bytes_total
+                .increment(data.byte_size as u64);
+            self.component_received_events_total.increment(data.count);
+            self.events_in_total.increment(data.count);
             trace!(
                 message = "Events received.",
-                count = %self.count,
-                byte_size = %self.byte_size,
+                count = %data.count,
+                byte_size = %data.byte_size,
                 file = %self.file
-            );
-            counter!(
-                "events_in_total", self.count as u64,
-                "file" => self.file.to_owned(),
-            );
-            counter!(
-                "component_received_events_total", self.count as u64,
-                "file" => self.file.to_owned(),
-            );
-            counter!(
-                "component_received_event_bytes_total", self.byte_size as u64,
-                "file" => self.file.to_owned(),
             );
         }
     }
