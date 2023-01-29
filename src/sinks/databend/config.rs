@@ -1,6 +1,6 @@
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
-use vector_config::{component::GenerateConfig, configurable_component};
+use vector_config::configurable_component;
 use vector_core::tls::TlsSettings;
 
 use crate::{
@@ -26,7 +26,7 @@ use super::{
 
 /// Configuration for the `databend` sink.
 #[configurable_component(sink("databend"))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatabendConfig {
     /// The endpoint of the Databend server.
@@ -35,6 +35,7 @@ pub struct DatabendConfig {
 
     /// The table that data will be inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
+    #[serde(default)]
     pub table: String,
 
     /// The database that contains the table that data will be inserted into.
@@ -76,6 +77,8 @@ pub struct DatabendConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
+impl_generate_config_from_default!(DatabendConfig);
+
 impl DatabendConfig {
     pub(super) fn build_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(&self.tls)?;
@@ -85,16 +88,6 @@ impl DatabendConfig {
 
     fn default_database() -> String {
         "default".to_string()
-    }
-}
-
-impl GenerateConfig for DatabendConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"endpoint = "http://localhost:8000"
-            database = "default""#,
-        )
-        .unwrap()
     }
 }
 
@@ -144,4 +137,28 @@ async fn select_one(client: DatabendAPIClient) -> crate::Result<()> {
     let req = DatabendHttpRequest::new("SELECT 1".to_string());
     client.query(req).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DatabendConfig>();
+    }
+
+    #[test]
+    fn parse_database() {
+        let cfg = toml::from_str::<DatabendConfig>(
+            r#"
+            endpoint = "http://localhost:8000"
+            database = "mydatabase"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(cfg.endpoint.uri, "http://localhost:8000");
+        assert_eq!(cfg.database, "mydatabase");
+        assert_eq!(cfg.table, "");
+    }
 }
