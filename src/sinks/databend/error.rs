@@ -10,6 +10,9 @@ pub enum DatabendError {
 
     #[snafu(display("Client error: {}", message))]
     Client { message: String },
+
+    #[snafu(display("Invalid config: {}", message))]
+    InvalidConfig { message: String },
 }
 
 impl From<crate::Error> for DatabendError {

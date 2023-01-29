@@ -110,7 +110,7 @@ impl SinkConfig for DatabendConfig {
         let database = config.database;
         let table = config.table;
         let client = DatabendAPIClient::new(self.build_client(&cx)?, endpoint, auth);
-        let service = DatabendService::new(client, database, table);
+        let service = DatabendService::new(client, database, table)?;
         let service = ServiceBuilder::new()
             .settings(request_settings, DatabendRetryLogic)
             .service(service);

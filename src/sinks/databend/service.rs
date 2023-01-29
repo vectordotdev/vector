@@ -106,16 +106,26 @@ impl DriverResponse for DatabendResponse {
 }
 
 impl DatabendService {
-    pub(super) const fn new(
+    pub(super) fn new(
         client: DatabendAPIClient,
         database: String,
         table: String,
-    ) -> DatabendService {
-        DatabendService {
+    ) -> Result<Self, DatabendError> {
+        if database.is_empty() {
+            return Err(DatabendError::InvalidConfig {
+                message: "database is required".to_string(),
+            });
+        }
+        if table.is_empty() {
+            return Err(DatabendError::InvalidConfig {
+                message: "table is required".to_string(),
+            });
+        }
+        Ok(Self {
             client,
             database,
             table,
-        }
+        })
     }
 
     pub(super) fn new_stage_location(&self) -> String {

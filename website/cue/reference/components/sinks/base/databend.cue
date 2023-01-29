@@ -294,8 +294,11 @@ base: components: sinks: databend: configuration: {
 	}
 	table: {
 		description: "The table that data will be inserted into."
-		required:    true
-		type: string: examples: ["mytable"]
+		required:    false
+		type: string: {
+			default: ""
+			examples: ["mytable"]
+		}
 	}
 	tls: {
 		description: "TLS configuration."
