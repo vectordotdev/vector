@@ -45,7 +45,7 @@ pub struct ComposeService {
 }
 
 impl ComposeConfig {
-    #[allow(dead_code)] // Only used on `cfg(unix)` currently
+    #[cfg(unix)]
     pub fn parse(path: &Path) -> Result<Self> {
         let contents =
             fs::read_to_string(path).with_context(|| format!("failed to read {path:?}"))?;
