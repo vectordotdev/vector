@@ -195,7 +195,7 @@ fn default_partial_event_marker_field() -> Option<String> {
     Some(event::PARTIAL.to_string())
 }
 
-fn default_retry_backoff_secs() -> Duration {
+const fn default_retry_backoff_secs() -> Duration {
     Duration::from_secs(2)
 }
 
