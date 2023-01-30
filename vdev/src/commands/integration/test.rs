@@ -37,25 +37,18 @@ impl Cli {
         let (_test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
         let envs = config.environments();
 
-        let env_vars = config.env.unwrap_or_default();
-
-        let mut args = config.args;
-        args.extend(self.args);
-
         let active = EnvsDir::new(&self.integration).active()?;
         match (self.environment, active) {
             (Some(environment), Some(active)) if environment != active => {
                 bail!("Requested environment {environment:?} does not match active one {active:?}")
             }
             (Some(environment), _) => {
-                IntegrationTest::new(self.integration, environment)?.test(&env_vars, &args)
+                IntegrationTest::new(self.integration, environment)?.test(self.args)
             }
-            (None, Some(active)) => {
-                IntegrationTest::new(self.integration, active)?.test(&env_vars, &args)
-            }
+            (None, Some(active)) => IntegrationTest::new(self.integration, active)?.test(self.args),
             (None, None) => {
                 for env_name in envs.keys() {
-                    IntegrationTest::new(&self.integration, env_name)?.test(&env_vars, &args)?;
+                    IntegrationTest::new(&self.integration, env_name)?.test(self.args.clone())?;
                 }
                 Ok(())
             }
