@@ -89,7 +89,7 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: object: {
 			examples: [{
-				"_SYSTEMD_UNIT": ["ntpd.service", "sshd.service"]
+				"_SYSTEMD_UNIT": ["sshd.service", "ntpd.service"]
 				"_TRANSPORT": ["kernel"]
 			}]
 			options: "*": {
@@ -130,7 +130,6 @@ base: components: sources: journald: configuration: {
 	remap_priority: {
 		deprecated:         true
 		deprecated_message: "This option has been deprecated, use the `remap` transform and `to_syslog_level` function instead."
-
 		description: """
 			Enables remapping the `PRIORITY` field from an integer to string value.
 
