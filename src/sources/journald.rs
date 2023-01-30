@@ -191,7 +191,7 @@ pub struct JournaldConfig {
     log_namespace: Option<bool>,
 }
 
-fn default_batch_size() -> usize {
+const fn default_batch_size() -> usize {
     16
 }
 
