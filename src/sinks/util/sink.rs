@@ -1121,7 +1121,7 @@ mod tests {
 
     impl Partition<Bytes> for Partitions {
         fn partition(&self) -> Bytes {
-            format!("{:?}", self).into()
+            format!("{self:?}").into()
         }
     }
 

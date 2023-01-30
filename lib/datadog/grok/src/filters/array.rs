@@ -95,12 +95,12 @@ pub fn parse<'a>(
     delimiter: Option<&'a str>,
 ) -> Result<Vec<Value>, String> {
     let result = parse_array(brackets, delimiter)(input)
-        .map_err(|_| format!("could not parse '{}' as array", input))
+        .map_err(|_| format!("could not parse '{input}' as array"))
         .and_then(|(rest, result)| {
             rest.trim()
                 .is_empty()
                 .then_some(result)
-                .ok_or_else(|| format!("could not parse '{}' as array", input))
+                .ok_or_else(|| format!("could not parse '{input}' as array"))
         })?;
 
     Ok(result)

@@ -823,7 +823,7 @@ mod test {
     fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
         let bind = next_addr();
         let socket = UdpSocket::bind(bind)
-            .map_err(|error| panic!("{:}", error))
+            .map_err(|error| panic!("{error:}"))
             .ok()
             .unwrap();
 
@@ -831,7 +831,7 @@ mod test {
             assert_eq!(
                 socket
                     .send_to(line.as_bytes(), addr)
-                    .map_err(|error| panic!("{:}", error))
+                    .map_err(|error| panic!("{error:}"))
                     .ok()
                     .unwrap(),
                 line.as_bytes().len()
@@ -1261,10 +1261,9 @@ mod test {
     fn parses_unix_config(mode: &str) -> SocketConfig {
         toml::from_str::<SocketConfig>(&format!(
             r#"
-               mode = "{}"
+               mode = "{mode}"
                path = "/does/not/exist"
-            "#,
-            mode
+            "#
         ))
         .unwrap()
     }
@@ -1273,11 +1272,10 @@ mod test {
     fn parses_unix_config_file_mode(mode: &str) -> SocketConfig {
         toml::from_str::<SocketConfig>(&format!(
             r#"
-               mode = "{}"
+               mode = "{mode}"
                path = "/does/not/exist"
                socket_file_mode = 0o777
-            "#,
-            mode
+            "#
         ))
         .unwrap()
     }

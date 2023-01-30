@@ -80,7 +80,7 @@ where
         let client = client_builder.build(proxy);
 
         let version = crate::get_version();
-        let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
+        let user_agent = HeaderValue::from_str(&format!("Vector/{version}"))
             .expect("Invalid header value for version!");
 
         Ok(HttpClient { client, user_agent })
@@ -313,7 +313,7 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
         // it also supports arbitrary schemes, which is where we bomb out down here, since we can't generate a static
         // string for an arbitrary input string... and anything other than "http" and "https" makes no sense for an HTTP
         // client anyways.
-        s => panic!("invalid URI scheme for HTTP client: {}", s),
+        s => panic!("invalid URI scheme for HTTP client: {s}"),
     })
 }
 

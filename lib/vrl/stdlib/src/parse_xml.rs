@@ -281,7 +281,7 @@ fn inner_kind() -> Kind {
 }
 
 /// Process an XML node, and return a VRL `Value`.
-fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
+fn process_node(node: Node, config: &ParseXmlConfig<'_>) -> Value {
     // Helper to recurse over a `Node`s children, and build an object.
     let recurse = |node: Node| -> BTreeMap<String, Value> {
         let mut map = BTreeMap::new();

@@ -505,8 +505,8 @@ mod tests {
         base.d("memory");
         base.d("unified");
         for subdir in SUBDIRS {
-            base.group(&format!("unified/{}", subdir), CPU_STAT, Some(""));
-            base.group(&format!("memory/{}", subdir), MEMORY_STAT, None);
+            base.group(&format!("unified/{subdir}"), CPU_STAT, Some(""));
+            base.group(&format!("memory/{subdir}"), MEMORY_STAT, None);
         }
         base.test().await;
     }
@@ -524,11 +524,11 @@ mod tests {
         base.d("unified");
         for subdir in SUBDIRS {
             base.group(
-                &format!("unified/{}", subdir),
+                &format!("unified/{subdir}"),
                 if subdir == "." { NONE } else { CPU_STAT },
                 Some(""),
             );
-            base.group(&format!("memory/{}", subdir), MEMORY_STAT, None);
+            base.group(&format!("memory/{subdir}"), MEMORY_STAT, None);
         }
         base.test().await;
     }
@@ -541,8 +541,8 @@ mod tests {
         base.d("cpu");
         base.d("memory");
         for subdir in SUBDIRS {
-            base.group(&format!("cpu/{}", subdir), CPU_STAT, None);
-            base.group(&format!("memory/{}", subdir), MEMORY_STAT, None);
+            base.group(&format!("cpu/{subdir}"), CPU_STAT, None);
+            base.group(&format!("memory/{subdir}"), MEMORY_STAT, None);
         }
     }
 

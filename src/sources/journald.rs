@@ -594,7 +594,7 @@ impl StartJournalctl {
         }
 
         if let Some(cursor) = checkpoint {
-            command.arg(format!("--after-cursor={}", cursor));
+            command.arg(format!("--after-cursor={cursor}"));
         } else if self.since_now {
             command.arg("--since=now");
         } else {
@@ -730,7 +730,7 @@ fn fixup_unit(unit: &str) -> String {
     if unit.contains('.') {
         unit.into()
     } else {
-        format!("{}.service", unit)
+        format!("{unit}.service")
     }
 }
 
@@ -879,7 +879,7 @@ impl Checkpointer {
 
     async fn set(&mut self, token: &str) -> Result<(), io::Error> {
         self.file.seek(SeekFrom::Start(0)).await?;
-        self.file.write_all(format!("{}\n", token).as_bytes()).await
+        self.file.write_all(format!("{token}\n").as_bytes()).await
     }
 
     async fn get(&mut self) -> Result<Option<String>, io::Error> {
@@ -974,7 +974,7 @@ mod checkpointer_tests {
         assert_eq!(checkpointer.get().await.unwrap().unwrap(), "first test");
         let contents = read_to_string(filename.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+            .unwrap_or_else(|_| panic!("Failed to read: {filename:?}"));
         assert!(contents.starts_with("first test\n"));
 
         checkpointer
@@ -984,7 +984,7 @@ mod checkpointer_tests {
         assert_eq!(checkpointer.get().await.unwrap().unwrap(), "second");
         let contents = read_to_string(filename.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+            .unwrap_or_else(|_| panic!("Failed to read: {filename:?}"));
         assert!(contents.starts_with("second\n"));
     }
 }
@@ -1351,7 +1351,7 @@ mod tests {
         let since_now = false;
 
         let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--since=2000-01-01"));
@@ -1360,7 +1360,7 @@ mod tests {
         let journal_dir = None;
 
         let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(cmd_line.contains("--since=now"));
 
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
@@ -1368,7 +1368,7 @@ mod tests {
         let cursor = Some("2021-01-01");
 
         let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--after-cursor="));

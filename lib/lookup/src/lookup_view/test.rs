@@ -197,8 +197,8 @@ fn iter() {
     for (index, expected) in SUFFICIENTLY_DECOMPOSED.iter().enumerate() {
         let parsed = iter
             .next()
-            .unwrap_or_else(|| panic!("Expected at index {}: {:?}, got None.", index, expected));
-        assert_eq!(expected, parsed, "Failed at {}", index);
+            .unwrap_or_else(|| panic!("Expected at index {index}: {expected:?}, got None."));
+        assert_eq!(expected, parsed, "Failed at {index}");
     }
 }
 
@@ -209,8 +209,8 @@ fn into_iter() {
     for (index, expected) in SUFFICIENTLY_DECOMPOSED.iter().cloned().enumerate() {
         let parsed = iter
             .next()
-            .unwrap_or_else(|| panic!("Expected at index {}: {:?}, got None.", index, expected));
-        assert_eq!(expected, parsed, "Failed at {}", index);
+            .unwrap_or_else(|| panic!("Expected at index {index}: {expected:?}, got None."));
+        assert_eq!(expected, parsed, "Failed at {index}");
     }
 }
 

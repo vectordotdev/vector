@@ -157,8 +157,8 @@ impl<'a> LookSegment<'a> for SegmentBuf {
 impl Display for SegmentBuf {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            SegmentBuf::Index(i) => write!(formatter, "{}", i),
-            SegmentBuf::Field(field) => write!(formatter, "{}", field),
+            SegmentBuf::Index(i) => write!(formatter, "{i}"),
+            SegmentBuf::Field(field) => write!(formatter, "{field}"),
             SegmentBuf::Coalesce(v) => write!(
                 formatter,
                 "({})",

@@ -685,7 +685,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    let _ = Box::pin(tokio::spawn(async move {
+    drop(Box::pin(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
         let mut stream = FramedRead::new(reader, decoder);
@@ -710,7 +710,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
         }
 
         debug!("Finished capturing {} command output.", origin);
-    }));
+    })));
 }
 
 #[cfg(test)]
@@ -910,8 +910,8 @@ mod tests {
         expected_command.args(vec!["arg1".to_owned(), "arg2".to_owned()]);
 
         // Unfortunately the current_dir is not included in the formatted string
-        let expected_command_string = format!("{:?}", expected_command);
-        let command_string = format!("{:?}", command);
+        let expected_command_string = format!("{expected_command:?}");
+        let command_string = format!("{command:?}");
 
         assert_eq!(expected_command_string, command_string);
     }

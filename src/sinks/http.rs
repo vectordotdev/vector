@@ -980,14 +980,12 @@ mod tests {
         let in_addr = next_addr();
         let config = format!(
             r#"
-                uri = "http://{addr}/frames"
+                uri = "http://{in_addr}/frames"
                 compression = "gzip"
                 framing.method = "newline_delimited"
                 encoding.codec = "json"
-                {extras}
-            "#,
-            addr = in_addr,
-            extras = extra_config
+                {extra_config}
+            "#
         );
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 

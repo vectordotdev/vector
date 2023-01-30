@@ -345,7 +345,7 @@ mod tests {
         };
 
         let mut builder = reqwest::Client::new()
-            .post(format!("http://{}", address))
+            .post(format!("http://{address}"))
             .header("host", address.to_string())
             .header(
                 "x-amzn-trace-id",

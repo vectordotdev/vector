@@ -119,12 +119,12 @@ impl Display for LookupBuf {
                 .map(|next| next.is_field() || next.is_coalesce())
                 .unwrap_or(false);
             match (segment, maybe_next) {
-                (SegmentBuf::Field(_), true) => write!(f, r#"{}."#, segment)?,
-                (SegmentBuf::Field(_), false) => write!(f, "{}", segment)?,
-                (SegmentBuf::Index(_), true) => write!(f, r#"[{}]."#, segment)?,
-                (SegmentBuf::Index(_), false) => write!(f, "[{}]", segment)?,
-                (SegmentBuf::Coalesce(_), true) => write!(f, r#"{}."#, segment)?,
-                (SegmentBuf::Coalesce(_), false) => write!(f, "{}", segment)?,
+                (SegmentBuf::Field(_), true) => write!(f, r#"{segment}."#)?,
+                (SegmentBuf::Field(_), false) => write!(f, "{segment}")?,
+                (SegmentBuf::Index(_), true) => write!(f, r#"[{segment}]."#)?,
+                (SegmentBuf::Index(_), false) => write!(f, "[{segment}]")?,
+                (SegmentBuf::Coalesce(_), true) => write!(f, r#"{segment}."#)?,
+                (SegmentBuf::Coalesce(_), false) => write!(f, "{segment}")?,
             }
         }
         Ok(())

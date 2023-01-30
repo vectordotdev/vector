@@ -96,7 +96,7 @@ async fn start_test_detail(
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -235,7 +235,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -247,7 +247,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
 
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
-        println!("EVENT: {:?}", e);
+        println!("EVENT: {e:?}");
         e.iter_logs_mut().for_each(|log| {
             log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
@@ -315,7 +315,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -377,7 +377,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -389,7 +389,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
 
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
-        println!("EVENT: {:?}", e);
+        println!("EVENT: {e:?}");
         e.iter_logs_mut().for_each(|log| {
             log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
@@ -440,7 +440,7 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -452,7 +452,7 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
 
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
-        println!("EVENT: {:?}", e);
+        println!("EVENT: {e:?}");
         e.iter_logs_mut().for_each(|log| {
             log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });

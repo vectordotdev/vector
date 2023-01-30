@@ -80,7 +80,7 @@ impl DatadogEventsConfig {
             get_api_base_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region);
 
         // We know this URI will be valid since we have just built it up ourselves.
-        http::Uri::try_from(format!("{}/api/v1/events", api_base_endpoint)).expect("URI not valid")
+        http::Uri::try_from(format!("{api_base_endpoint}/api/v1/events")).expect("URI not valid")
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {

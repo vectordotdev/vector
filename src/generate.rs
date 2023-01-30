@@ -130,8 +130,7 @@ pub(crate) fn generate_example(
             let (name, source_type) = if let Some(c_index) = source_expr.find(':') {
                 if c_index == 0 {
                     errs.push(format!(
-                        "failed to generate source '{}': empty name is not allowed",
-                        source_expr
+                        "failed to generate source '{source_expr}': empty name is not allowed"
                     ));
                     continue;
                 }
@@ -141,7 +140,7 @@ pub(crate) fn generate_example(
                     chopped_expr.drain(1..).collect(),
                 )
             } else {
-                (format!("source{}", i), source_expr.clone())
+                (format!("source{i}"), source_expr.clone())
             };
             source_names.push(name.clone());
 
@@ -149,10 +148,7 @@ pub(crate) fn generate_example(
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
-                        errs.push(format!(
-                            "failed to generate source '{}': {}",
-                            source_type, err
-                        ));
+                        errs.push(format!("failed to generate source '{source_type}': {err}"));
                     }
                     Value::Table(Map::new())
                 }
@@ -178,8 +174,7 @@ pub(crate) fn generate_example(
             let (name, transform_type) = if let Some(c_index) = transform_expr.find(':') {
                 if c_index == 0 {
                     errs.push(format!(
-                        "failed to generate transform '{}': empty name is not allowed",
-                        transform_expr
+                        "failed to generate transform '{transform_expr}': empty name is not allowed"
                     ));
                     continue;
                 }
@@ -189,7 +184,7 @@ pub(crate) fn generate_example(
                     chopped_expr.drain(1..).collect(),
                 )
             } else {
-                (format!("transform{}", i), transform_expr.clone())
+                (format!("transform{i}"), transform_expr.clone())
             };
             transform_names.push(name.clone());
 
@@ -213,8 +208,7 @@ pub(crate) fn generate_example(
                 Err(err) => {
                     if err != ExampleError::MissingExample {
                         errs.push(format!(
-                            "failed to generate transform '{}': {}",
-                            transform_type, err
+                            "failed to generate transform '{transform_type}': {err}"
                         ));
                     }
                     Value::Table(Map::new())
@@ -246,8 +240,7 @@ pub(crate) fn generate_example(
             let (name, sink_type) = if let Some(c_index) = sink_expr.find(':') {
                 if c_index == 0 {
                     errs.push(format!(
-                        "failed to generate sink '{}': empty name is not allowed",
-                        sink_expr
+                        "failed to generate sink '{sink_expr}': empty name is not allowed"
                     ));
                     continue;
                 }
@@ -257,14 +250,14 @@ pub(crate) fn generate_example(
                     chopped_expr.drain(1..).collect(),
                 )
             } else {
-                (format!("sink{}", i), sink_expr.clone())
+                (format!("sink{i}"), sink_expr.clone())
             };
 
             let mut example = match SinkDescription::example(&sink_type) {
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
-                        errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
+                        errs.push(format!("failed to generate sink '{sink_type}': {err}"));
                     }
                     Value::Table(Map::new())
                 }
@@ -308,7 +301,7 @@ pub(crate) fn generate_example(
         match toml::to_string(&globals) {
             Ok(s) => s,
             Err(err) => {
-                errs.push(format!("failed to marshal globals: {}", err));
+                errs.push(format!("failed to marshal globals: {err}"));
                 return Err(errs);
             }
         }
@@ -323,7 +316,7 @@ pub(crate) fn generate_example(
             }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
-            Err(e) => errs.push(format!("failed to marshal sources: {}", e)),
+            Err(e) => errs.push(format!("failed to marshal sources: {e}")),
         }
     }
     if let Some(transforms) = config.transforms {
@@ -334,7 +327,7 @@ pub(crate) fn generate_example(
             }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
-            Err(e) => errs.push(format!("failed to marshal transforms: {}", e)),
+            Err(e) => errs.push(format!("failed to marshal transforms: {e}")),
         }
     }
     if let Some(sinks) = config.sinks {
@@ -345,7 +338,7 @@ pub(crate) fn generate_example(
             }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
-            Err(e) => errs.push(format!("failed to marshal sinks: {}", e)),
+            Err(e) => errs.push(format!("failed to marshal sinks: {e}")),
         }
     }
 
@@ -358,7 +351,7 @@ pub(crate) fn generate_example(
                     &file.as_ref().unwrap().join("\n")
                 )
             }
-            Err(e) => errs.push(format!("failed to write to file: {}", e)),
+            Err(e) => errs.push(format!("failed to write to file: {e}")),
         };
     };
 
@@ -379,7 +372,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Ok(s) => {
             #[allow(clippy::print_stdout)]
             {
-                println!("{}", s);
+                println!("{s}");
             }
             exitcode::OK
         }
@@ -416,7 +409,7 @@ mod tests {
         let mut errors = Vec::new();
 
         for name in SourceDescription::types() {
-            let param = format!("{}//", name);
+            let param = format!("{name}//");
             let cfg = generate_example(true, &param, &None, TransformInputsStrategy::Auto).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
@@ -424,7 +417,7 @@ mod tests {
         }
 
         for name in TransformDescription::types() {
-            let param = format!("/{}/", name);
+            let param = format!("/{name}/");
             let cfg = generate_example(true, &param, &None, TransformInputsStrategy::Auto).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
@@ -432,7 +425,7 @@ mod tests {
         }
 
         for name in SinkDescription::types() {
-            let param = format!("//{}", name);
+            let param = format!("//{name}");
             let cfg = generate_example(true, &param, &None, TransformInputsStrategy::Auto).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
@@ -442,7 +435,7 @@ mod tests {
         for (component, error) in &errors {
             #[allow(clippy::print_stdout)]
             {
-                println!("{:?} : {}", component, error);
+                println!("{component:?} : {error}");
             }
         }
         assert!(errors.is_empty());

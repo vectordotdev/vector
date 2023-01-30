@@ -380,7 +380,7 @@ impl DataStreamConfig {
                 .or_else(|| self.namespace(log))?;
             (dtype, dataset, namespace)
         };
-        Some(format!("{}-{}-{}", dtype, dataset, namespace))
+        Some(format!("{dtype}-{dataset}-{namespace}"))
     }
 }
 

@@ -100,7 +100,7 @@ impl Lua {
 
         let additional_paths = search_dirs
             .iter()
-            .map(|d| format!("{}/?.lua", d))
+            .map(|d| format!("{d}/?.lua"))
             .collect::<Vec<_>>()
             .join(";");
 
@@ -112,7 +112,7 @@ impl Lua {
             let current_paths = package
                 .get::<_, String>("path")
                 .unwrap_or_else(|_| ";".to_string());
-            let paths = format!("{};{}", additional_paths, current_paths);
+            let paths = format!("{additional_paths};{current_paths}");
             package.set("path", paths).context(InvalidLuaSnafu)?;
         }
 

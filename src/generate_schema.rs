@@ -10,14 +10,14 @@ pub fn cmd() -> exitcode::ExitCode {
 
             #[allow(clippy::print_stdout)]
             {
-                println!("{}", json);
+                println!("{json}");
             }
             exitcode::OK
         }
         Err(e) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("error while generating schema: {:?}", e);
+                eprintln!("error while generating schema: {e:?}");
             }
             exitcode::SOFTWARE
         }

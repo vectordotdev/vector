@@ -180,13 +180,13 @@ impl Grok {
 
                 if let Some(definition) = m.at(DEFINITION_INDEX) {
                     self.insert_definition(raw_pattern, definition);
-                    name = format!("{}={}", name, definition);
+                    name = format!("{name}={definition}");
                 }
 
                 // Since a pattern with a given name can show up more than once, we need to
                 // loop through the number of matches found and apply the transformations
                 // on each of them.
-                for _ in 0..named_regex.matches(&format!("%{{{}}}", name)).count() {
+                for _ in 0..named_regex.matches(&format!("%{{{name}}}")).count() {
                     // Check if we have a definition for the raw pattern key and fail quickly
                     // if not.
                     let pattern_definition = match self.definitions.get(raw_pattern) {
@@ -200,7 +200,7 @@ impl Grok {
                     // engine understands and uses a named group.
 
                     let replacement = if with_alias_only && m.at(ALIAS_INDEX).is_none() {
-                        format!("(?:{})", pattern_definition)
+                        format!("(?:{pattern_definition})")
                     } else {
                         // If an alias is specified by the user use that one to
                         // match the name<index> conversion, otherwise just use
@@ -210,16 +210,16 @@ impl Grok {
                                 Some(a) => String::from(a),
                                 None => name.clone(),
                             },
-                            format!("name{}", index),
+                            format!("name{index}"),
                         );
 
-                        format!("(?<name{}>{})", index, pattern_definition)
+                        format!("(?<name{index}>{pattern_definition})")
                     };
 
                     // Finally, look for the original %{...} style pattern and
                     // replace it with our replacement (only the first occurrence
                     // since we are iterating one by one).
-                    named_regex = named_regex.replacen(&format!("%{{{}}}", name), &replacement, 1);
+                    named_regex = named_regex.replacen(&format!("%{{{name}}}"), &replacement, 1);
 
                     index += 1;
                 }

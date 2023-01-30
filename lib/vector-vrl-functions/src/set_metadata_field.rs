@@ -65,7 +65,7 @@ impl Function for SetMetadataField {
         if let MetadataKey::Query(target_path) = &key {
             if ctx.is_read_only_path(target_path) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
-                    context: format!("{} is read-only, and cannot be modified", target_path),
+                    context: format!("{target_path} is read-only, and cannot be modified"),
                 }
                 .into());
             }

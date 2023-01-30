@@ -168,10 +168,7 @@ impl Runner {
             .insert(validator_name.to_string(), validator)
             .is_some()
         {
-            panic!(
-                "attempted to add duplicate validator '{}' to runner",
-                validator_name
-            );
+            panic!("attempted to add duplicate validator '{validator_name}' to runner");
         }
     }
 
@@ -363,18 +360,10 @@ impl Runner {
 /// returned explaining the cause.
 fn load_component_test_cases(test_case_data_path: PathBuf) -> Result<Vec<TestCase>, String> {
     std::fs::File::open(test_case_data_path)
-        .map_err(|e| {
-            format!(
-                "I/O error during open of component validation test cases file: {}",
-                e
-            )
-        })
+        .map_err(|e| format!("I/O error during open of component validation test cases file: {e}"))
         .and_then(|file| {
             serde_yaml::from_reader(file).map_err(|e| {
-                format!(
-                    "Deserialization error for component validation test cases file: {}",
-                    e
-                )
+                format!("Deserialization error for component validation test cases file: {e}")
             })
         })
 }

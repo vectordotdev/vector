@@ -47,7 +47,7 @@ where
         K: Borrow<Q>,
         Q: ?Sized + Hash + Eq,
     {
-        self.map.get(k).map(|&(ref v, _)| v)
+        self.map.get(k).map(|(v, _)| v)
     }
 
     /// Get a mut reference to the value by key.
@@ -247,7 +247,7 @@ mod tests {
     async fn next_expired_does_not_wake_when_the_value_is_available_upfront() {
         let mut map = ExpiringHashMap::<String, String>::default();
 
-        let a_minute_ago = Instant::now() - Duration::from_secs(60);
+        let a_minute_ago = Instant::now().checked_sub(Duration::from_secs(60)).unwrap();
         map.insert_at("key".to_owned(), "val".to_owned(), a_minute_ago);
 
         let mut fut = task::spawn(map.next_expired());

@@ -451,7 +451,7 @@ mod integration_tests {
             humio_address(),
             repository_name
         );
-        let search_query = format!(r#"message="{}""#, message);
+        let search_query = format!(r#"message="{message}""#);
 
         // events are not available to search API immediately
         // poll up 200 times for event to show up
@@ -472,10 +472,7 @@ mod integration_tests {
                 return logs[0].clone();
             }
         }
-        panic!(
-            "did not find event in Humio repository {} with message {}",
-            repository_name, message
-        );
+        panic!("did not find event in Humio repository {repository_name} with message {message}");
     }
 
     #[derive(Debug)]

@@ -41,7 +41,7 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
                     Some(value) => {
                         let token = value
                             .to_str()
-                            .map_err(|error| format!("Failed stringify HeaderValue: {:?}", error))?
+                            .map_err(|error| format!("Failed stringify HeaderValue: {error:?}"))?
                             .to_owned();
                         Ok(HttpSourceAuth { token: Some(token) })
                     }

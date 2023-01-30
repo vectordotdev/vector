@@ -213,15 +213,14 @@ enum ReportingError {
 impl Display for ReportingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Http(err) => write!(f, "{}", err),
+            Self::Http(err) => write!(f, "{err}"),
             Self::StatusCode(status) => {
                 write!(
                     f,
-                    "Request was unsuccessful and could not be retried: {}",
-                    status
+                    "Request was unsuccessful and could not be retried: {status}"
                 )
             }
-            Self::EndpointError(err) => write!(f, "{}", err),
+            Self::EndpointError(err) => write!(f, "{err}"),
             Self::TooManyRedirects => {
                 write!(f, "Too many redirects from the server")
             }
@@ -469,9 +468,8 @@ fn setup_logs_reporting(
             .vector.configuration_key = "{configuration_key}"
             .vector.configuration_version_hash = "{configuration_version_hash}"
             .vector.version = "{vector_version}"
-            {}
+            {custom_logs_tags_vrl}
         "#,
-            custom_logs_tags_vrl,
         )),
         ..Default::default()
     };
@@ -564,9 +562,8 @@ fn setup_metrics_reporting(
             .tags.configuration_version_hash = "{configuration_version_hash}"
             .tags.configuration_key = "{configuration_key}"
             .tags.vector_version = "{vector_version}"
-            {}
-        "#,
-            custom_metric_tags_vrl
+            {custom_metric_tags_vrl}
+        "#
         )),
         ..Default::default()
     };
@@ -628,9 +625,9 @@ fn setup_metrics_reporting(
 fn convert_tags_to_vrl(tags: &IndexMap<String, String>, is_metric: bool) -> String {
     let json_tags = serde_json::to_string(&tags).unwrap();
     if is_metric {
-        format!(r#".tags = merge(.tags, {}, deep: true)"#, json_tags)
+        format!(r#".tags = merge(.tags, {json_tags}, deep: true)"#)
     } else {
-        format!(r#". = merge(., {}, deep: true)"#, json_tags)
+        format!(r#". = merge(., {json_tags}, deep: true)"#)
     }
 }
 
@@ -733,10 +730,7 @@ fn build_request<'a>(
         .header("DD-API-KEY", auth.api_key)
         .body(Body::from(payload.json_string()))
         .unwrap_or_else(|_| {
-            panic!(
-                "couldn't create {} HTTP request. Please report",
-                DATADOG_REPORTING_PRODUCT
-            )
+            panic!("couldn't create {DATADOG_REPORTING_PRODUCT} HTTP request. Please report")
         })
 }
 

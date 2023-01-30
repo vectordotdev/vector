@@ -327,7 +327,7 @@ impl ReduceValueMerger for TimestampWindowMerger {
     }
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(format!("{}_end", k).as_str(), Value::Timestamp(self.latest));
+        v.insert(format!("{k}_end").as_str(), Value::Timestamp(self.latest));
         v.insert(k.as_str(), Value::Timestamp(self.started));
         Ok(())
     }

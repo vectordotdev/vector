@@ -205,8 +205,7 @@ impl DnsMessageParser {
                 }
                 for _i in 0..8 {
                     if current_byte & 0b1000_0000 == 0b1000_0000 {
-                        write!(port_string, "{} ", current_bit)
-                            .expect("can always write to String");
+                        write!(port_string, "{current_bit} ").expect("can always write to String");
                     }
                     current_byte <<= 1;
                     current_bit += 1;
@@ -239,10 +238,7 @@ impl DnsMessageParser {
             parse_ipv6_address(&mut dec)?
         };
         let domain_name = parse_domain_name(&mut decoder)?;
-        Ok((
-            Some(format!("{} {} {}", prefix, ipv6_address, domain_name)),
-            None,
-        ))
+        Ok((Some(format!("{prefix} {ipv6_address} {domain_name}")), None))
     }
 
     fn parse_loc_rdata(
@@ -289,8 +285,7 @@ impl DnsMessageParser {
 
         Ok((
             Some(format!(
-                "{} {} {:.2}m {}m {}m {}m",
-                latitude, longitude, altitude, size, horizontal_precision, vertical_precision
+                "{latitude} {longitude} {altitude:.2}m {size}m {horizontal_precision}m {vertical_precision}m"
             )),
             None,
         ))
@@ -326,12 +321,8 @@ impl DnsMessageParser {
                 let mut dec = BinDecoder::new(&address_vec);
                 parse_ipv6_address(&mut dec)?
             };
-            write!(
-                apl_rdata,
-                "{}{}:{}/{}",
-                negation, address_family, address, prefix
-            )
-            .expect("can always write to String");
+            write!(apl_rdata, "{negation}{address_family}:{address}/{prefix}")
+                .expect("can always write to String");
             apl_rdata.push(' ');
         }
         Ok((Some(apl_rdata.trim_end().to_string()), None))
@@ -381,21 +372,21 @@ impl DnsMessageParser {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let rmailbx = parse_domain_name(&mut decoder)?;
                 let emailbx = parse_domain_name(&mut decoder)?;
-                Ok((Some(format!("{} {}", rmailbx, emailbx)), None))
+                Ok((Some(format!("{rmailbx} {emailbx}")), None))
             }
 
             dns_message::RTYPE_RP => {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let mbox = parse_domain_name(&mut decoder)?;
                 let txt = parse_domain_name(&mut decoder)?;
-                Ok((Some(format!("{} {}", mbox, txt)), None))
+                Ok((Some(format!("{mbox} {txt}")), None))
             }
 
             dns_message::RTYPE_AFSDB => {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let subtype = parse_u16(&mut decoder)?;
                 let hostname = parse_domain_name(&mut decoder)?;
-                Ok((Some(format!("{} {}", subtype, hostname)), None))
+                Ok((Some(format!("{subtype} {hostname}")), None))
             }
 
             dns_message::RTYPE_X25 => {
@@ -438,7 +429,7 @@ impl DnsMessageParser {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let preference = parse_u16(&mut decoder)?;
                 let intermediate_host = parse_domain_name(&mut decoder)?;
-                Ok((Some(format!("{} {}", preference, intermediate_host)), None))
+                Ok((Some(format!("{preference} {intermediate_host}")), None))
             }
 
             dns_message::RTYPE_NSAP => {
@@ -446,7 +437,7 @@ impl DnsMessageParser {
                 let mut decoder = BinDecoder::new(raw_rdata);
                 let rdata_len = raw_rdata.len() as u16;
                 let nsap_rdata = HEXUPPER.encode(&parse_vec_with_u16_len(&mut decoder, rdata_len)?);
-                Ok((Some(format!("0x{}", nsap_rdata)), None))
+                Ok((Some(format!("0x{nsap_rdata}")), None))
             }
 
             dns_message::RTYPE_PX => {
@@ -454,7 +445,7 @@ impl DnsMessageParser {
                 let preference = parse_u16(&mut decoder)?;
                 let map822 = parse_domain_name(&mut decoder)?;
                 let mapx400 = parse_domain_name(&mut decoder)?;
-                Ok((Some(format!("{} {} {}", preference, map822, mapx400)), None))
+                Ok((Some(format!("{preference} {map822} {mapx400}")), None))
             }
 
             dns_message::RTYPE_LOC => self.parse_loc_rdata(rdata.anything()),
@@ -463,7 +454,7 @@ impl DnsMessageParser {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let preference = parse_u16(&mut decoder)?;
                 let exchanger = parse_domain_name(&mut decoder)?;
-                Ok((Some(format!("{} {}", preference, exchanger)), None))
+                Ok((Some(format!("{preference} {exchanger}")), None))
             }
 
             dns_message::RTYPE_CERT => {
@@ -475,7 +466,7 @@ impl DnsMessageParser {
                 let crl_len = raw_rdata.len() as u16 - 5;
                 let crl = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, crl_len)?);
                 Ok((
-                    Some(format!("{} {} {} {}", cert_type, key_tag, algorithm, crl)),
+                    Some(format!("{cert_type} {key_tag} {algorithm} {crl}")),
                     None,
                 ))
             }
@@ -491,10 +482,7 @@ impl DnsMessageParser {
                 let data_len = raw_rdata.len() as u16 - 3;
                 let data = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, data_len)?);
 
-                Ok((
-                    Some(format!("{} {} {} {}", meaning, coding, subcoding, data)),
-                    None,
-                ))
+                Ok((Some(format!("{meaning} {coding} {subcoding} {data}")), None))
             }
 
             dns_message::RTYPE_APL => self.parse_apl_rdata(rdata.anything()),
@@ -747,11 +735,11 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
             }
             DNSSECRData::Unknown { code: _, rdata } => Ok((None, Some(rdata.anything().to_vec()))),
             _ => Err(DnsMessageParserError::SimpleError {
-                cause: format!("Unsupported rdata {:?}", rdata),
+                cause: format!("Unsupported rdata {rdata:?}"),
             }),
         },
         _ => Err(DnsMessageParserError::SimpleError {
-            cause: format!("Unsupported rdata {:?}", rdata),
+            cause: format!("Unsupported rdata {rdata:?}"),
         }),
     }
 }
@@ -856,7 +844,7 @@ fn parse_edns_opt_dnssec_algorithms(
     let algorithm_names: Vec<String> = algorithms.iter().map(|alg| alg.to_string()).collect();
     EdnsOptionEntry {
         opt_code: Into::<u16>::into(opt_code),
-        opt_name: format!("{:?}", opt_code),
+        opt_name: format!("{opt_code:?}"),
         opt_data: algorithm_names.join(" "),
     }
 }
@@ -864,7 +852,7 @@ fn parse_edns_opt_dnssec_algorithms(
 fn parse_edns_opt(opt_code: EdnsCode, opt_data: &[u8]) -> EdnsOptionEntry {
     EdnsOptionEntry {
         opt_code: Into::<u16>::into(opt_code),
-        opt_name: format!("{:?}", opt_code),
+        opt_name: format!("{opt_code:?}"),
         opt_data: BASE64.encode(opt_data),
     }
 }
@@ -873,17 +861,14 @@ fn parse_loc_rdata_size(data: u8) -> DnsParserResult<f64> {
     let base = (data & 0xF0) >> 4;
     if base > 9 {
         return Err(DnsMessageParserError::SimpleError {
-            cause: format!("The base shouldnt be greater than 9. Base: {}", base),
+            cause: format!("The base shouldnt be greater than 9. Base: {base}"),
         });
     }
 
     let exponent = data & 0x0F;
     if exponent > 9 {
         return Err(DnsMessageParserError::SimpleError {
-            cause: format!(
-                "The exponent shouldnt be greater than 9. Exponent: {}",
-                exponent
-            ),
+            cause: format!("The exponent shouldnt be greater than 9. Exponent: {exponent}"),
         });
     }
 
@@ -1099,7 +1084,7 @@ fn parse_unknown_record_type(rtype: u16) -> Option<String> {
 fn format_bytes_as_hex_string(bytes: &[u8]) -> String {
     bytes
         .iter()
-        .map(|e| format!("{:02X}", e))
+        .map(|e| format!("{e:02X}"))
         .collect::<Vec<String>>()
         .join(".")
 }
@@ -1179,7 +1164,7 @@ mod tests {
             DnsMessageParserError::SimpleError { cause: e } => {
                 panic!("Expected TrustDnsError, got {}.", &e)
             }
-            _ => panic!("{}.", err),
+            _ => panic!("{err}."),
         }
     }
 

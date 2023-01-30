@@ -281,7 +281,7 @@ mod tests {
     };
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
-        let config = format!(r#"address = "{}""#, addr);
+        let config = format!(r#"address = "{addr}""#);
         let source: VectorConfig = toml::from_str(&config).unwrap();
 
         let (tx, rx) = SourceSender::new_test();
@@ -317,7 +317,7 @@ mod tests {
         let addr = test_util::next_addr();
 
         assert_source_compliance(&SOURCE_TAGS, async {
-            let config = format!(r#"address = "{}""#, addr);
+            let config = format!(r#"address = "{addr}""#);
             run_test(&config, addr).await;
         })
         .await;
@@ -329,9 +329,8 @@ mod tests {
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let config = format!(
-                r#"address = "{}"
-            compression=true"#,
-                addr
+                r#"address = "{addr}"
+            compression=true"#
             );
             run_test(&config, addr).await;
         })

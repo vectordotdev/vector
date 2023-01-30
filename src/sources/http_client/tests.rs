@@ -47,7 +47,7 @@ async fn bytes_decoding() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
     run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         query: HashMap::new(),
         decoding: default_decoding(),
@@ -75,7 +75,7 @@ async fn json_decoding_newline_delimited() {
     wait_for_tcp(in_addr).await;
 
     run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json,
@@ -105,7 +105,7 @@ async fn json_decoding_character_delimited() {
     wait_for_tcp(in_addr).await;
 
     run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json,
@@ -131,13 +131,13 @@ async fn request_query_applied() {
 
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::query::raw())
-        .map(|query| format!(r#"{{"data" : "{}"}}"#, query));
+        .map(|query| format!(r#"{{"data" : "{query}"}}"#));
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
     let events = run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint?key1=val1", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint?key1=val1"),
         interval: INTERVAL,
         query: HashMap::from([
             ("key1".to_string(), vec!["val2".to_string()]),
@@ -205,7 +205,7 @@ async fn headers_applied() {
     wait_for_tcp(in_addr).await;
 
     run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         query: HashMap::new(),
         decoding: default_decoding(),
@@ -236,7 +236,7 @@ async fn accept_header_override() {
     wait_for_tcp(in_addr).await;
 
     run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         query: HashMap::new(),
         decoding: DeserializerConfig::Bytes,

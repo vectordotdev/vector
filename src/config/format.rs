@@ -112,7 +112,7 @@ mod tests {
 
         for (input, expected) in cases {
             let output = Format::from_path(std::path::PathBuf::from(input));
-            assert_eq!(expected, output.ok(), "{}", input)
+            assert_eq!(expected, output.ok(), "{input}")
         }
     }
 
@@ -253,23 +253,20 @@ mod tests {
                 Ok(expected) => {
                     #[allow(clippy::expect_fun_call)] // false positive
                     let output: ConfigBuilder = output.expect(&format!(
-                        "expected Ok, got Err with format {:?} and input {:?}",
-                        format, input
+                        "expected Ok, got Err with format {format:?} and input {input:?}"
                     ));
                     let output_json = serde_json::to_value(output).unwrap();
                     let expected_output: ConfigBuilder = deserialize(expected, Format::Toml)
                         .expect("Invalid TOML passed as an expectation");
                     let expected_json = serde_json::to_value(expected_output).unwrap();
-                    assert_eq!(expected_json, output_json, "{}", input)
+                    assert_eq!(expected_json, output_json, "{input}")
                 }
                 Err(expected) => assert_eq!(
                     expected,
                     output.expect_err(&format!(
-                        "expected Err, got Ok with format {:?} and input {:?}",
-                        format, input
+                        "expected Err, got Ok with format {format:?} and input {input:?}"
                     )),
-                    "{}",
-                    input
+                    "{input}"
                 ),
             }
         }

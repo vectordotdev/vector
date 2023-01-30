@@ -44,22 +44,20 @@ pub fn interpolate(
                             Some(v) if !v.is_empty() => v,
                             _ => {
                                 errors.push(format!(
-                                    "Non-empty env var required in config. name = {:?}, error = {:?}",
-                                    name, def_or_err
+                                    "Non-empty env var required in config. name = {name:?}, error = {def_or_err:?}"
                                 ));
                                 ""
                             },
                         }
                         "?" => val.unwrap_or_else(|| {
                             errors.push(format!(
-                                "Missing env var required in config. name = {:?}, error = {:?}",
-                                name, def_or_err
+                                "Missing env var required in config. name = {name:?}, error = {def_or_err:?}"
                             ));
                             ""
                         }),
                         _ => val.unwrap_or_else(|| {
                             warnings
-                                .push(format!("Unknown env var in config. name = {:?}", name));
+                                .push(format!("Unknown env var in config. name = {name:?}"));
                             ""
                         }),
                     }

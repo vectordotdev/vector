@@ -214,8 +214,7 @@ impl StreamSink<Event> for UnitTestSink {
                                         break;
                                     }
                                     Err(error) => {
-                                        condition_errors
-                                            .push(format!("  condition[{}]: {}", j, error));
+                                        condition_errors.push(format!("  condition[{j}]: {error}"));
                                     }
                                 }
                             }

@@ -64,7 +64,7 @@ pub async fn get_component_sent_events_total(url: &str) -> Result<u64, Box<dyn s
 pub async fn assert_vector_started(url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
     if !extract_vector_started(&metrics) {
-        return Err(format!("`vector_started`-ish metric was not found:\n{}", metrics).into());
+        return Err(format!("`vector_started`-ish metric was not found:\n{metrics}").into());
     }
     Ok(())
 }
@@ -125,7 +125,7 @@ pub async fn assert_metrics_present(
         required_metrics.remove(metric_name);
     }
     if !required_metrics.is_empty() {
-        return Err(format!("Some host metrics were not found:\n{:?}", required_metrics).into());
+        return Err(format!("Some host metrics were not found:\n{required_metrics:?}").into());
     }
     Ok(())
 }
@@ -217,7 +217,7 @@ mod tests {
         for (input, expected_value) in cases {
             let input = input.join("\n");
             let actual_value = extract_vector_started(&input);
-            assert_eq!(expected_value, actual_value, "input: {}", input);
+            assert_eq!(expected_value, actual_value, "input: {input}");
         }
     }
 }

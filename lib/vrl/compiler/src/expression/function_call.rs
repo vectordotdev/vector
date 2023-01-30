@@ -47,13 +47,11 @@ impl<'a> Builder<'a> {
         let (ident_span, ident) = ident.take();
 
         // Check if function exists.
-        let (function_id, function) = if let Some(function) = funcs
+        let Some((function_id, function)) = funcs
             .iter()
             .enumerate()
             .find(|(_pos, f)| f.identifier() == ident.as_ref())
-        {
-            function
-        } else {
+        else {
             let idents = funcs
                 .iter()
                 .map(|func| func.identifier())
@@ -990,8 +988,7 @@ impl DiagnosticMessage for Error {
             } => {
                 vec![Label::primary(
                     format!(
-                        r#"required argument missing: "{}" (position {})"#,
-                        keyword, position
+                        r#"required argument missing: "{keyword}" (position {position})"#
                     ),
                     call_span,
                 )]

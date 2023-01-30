@@ -77,7 +77,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Err(errs) => {
             #[allow(clippy::print_stderr)]
             for err in errs {
-                eprintln!("{}", err);
+                eprintln!("{err}");
             }
             return exitcode::CONFIG;
         }
@@ -86,11 +86,11 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut dot = String::from("digraph {\n");
 
     for (id, _source) in config.sources() {
-        writeln!(dot, "  \"{}\" [shape=trapezium]", id).expect("write to String never fails");
+        writeln!(dot, "  \"{id}\" [shape=trapezium]").expect("write to String never fails");
     }
 
     for (id, transform) in config.transforms() {
-        writeln!(dot, "  \"{}\" [shape=diamond]", id).expect("write to String never fails");
+        writeln!(dot, "  \"{id}\" [shape=diamond]").expect("write to String never fails");
 
         for input in transform.inputs.iter() {
             if let Some(port) = &input.port {
@@ -101,14 +101,13 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 )
                 .expect("write to String never fails");
             } else {
-                writeln!(dot, "  \"{}\" -> \"{}\"", input, id)
-                    .expect("write to String never fails");
+                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
             }
         }
     }
 
     for (id, sink) in config.sinks() {
-        writeln!(dot, "  \"{}\" [shape=invtrapezium]", id).expect("write to String never fails");
+        writeln!(dot, "  \"{id}\" [shape=invtrapezium]").expect("write to String never fails");
 
         for input in &sink.inputs {
             if let Some(port) = &input.port {
@@ -119,8 +118,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 )
                 .expect("write to String never fails");
             } else {
-                writeln!(dot, "  \"{}\" -> \"{}\"", input, id)
-                    .expect("write to String never fails");
+                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
             }
         }
     }
@@ -129,7 +127,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     #[allow(clippy::print_stdout)]
     {
-        println!("{}", dot);
+        println!("{dot}");
     }
 
     exitcode::OK

@@ -400,7 +400,7 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
+            uri: format!("ws://{addr}"),
             tls: None,
             encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
@@ -423,7 +423,7 @@ mod tests {
         let auth_clone = auth.clone();
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
+            uri: format!("ws://{addr}"),
             tls: None,
             encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
@@ -445,7 +445,7 @@ mod tests {
         let tls = MaybeTlsSettings::from_config(&tls_config, true).unwrap();
 
         let config = WebSocketSinkConfig {
-            uri: format!("wss://{}", addr),
+            uri: format!("wss://{addr}"),
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
@@ -471,7 +471,7 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
+            uri: format!("ws://{addr}"),
             tls: None,
             encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
@@ -491,7 +491,7 @@ mod tests {
             time::sleep(Duration::from_millis(10)).await;
             event
         });
-        let _ = tokio::spawn(sink.run(events));
+        drop(tokio::spawn(sink.run(events)));
 
         receiver.connected().await;
         time::sleep(Duration::from_millis(500)).await;

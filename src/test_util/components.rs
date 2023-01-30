@@ -1,5 +1,6 @@
 #![allow(clippy::print_stdout)] // tests
 #![allow(clippy::print_stderr)] // tests
+#![allow(ungated_async_fn_track_caller)] // See https://github.com/rust-lang/rust/issues/87417 for more information
 #![deny(missing_docs)]
 
 //! This is a framework for testing components for their compliance with
@@ -185,7 +186,7 @@ impl ComponentTester {
             event_test_util::debug_print_events();
             metrics.sort_by(|a, b| a.name().cmp(b.name()));
             for metric in &metrics {
-                println!("{}", metric);
+                println!("{metric}");
             }
         }
 
@@ -224,10 +225,8 @@ impl ComponentTester {
                     .collect::<Vec<_>>();
                 let partial = partial_matches.join("");
 
-                self.errors.push(format!(
-                    "  - Missing metric `{}{}`{}",
-                    name, tag_suffix, partial
-                ));
+                self.errors
+                    .push(format!("  - Missing metric `{name}{tag_suffix}`{partial}"));
             }
         }
     }
@@ -235,7 +234,7 @@ impl ComponentTester {
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
             if let Err(err_msg) = event_test_util::contains_name_once(name) {
-                self.errors.push(format!("  - {}", err_msg));
+                self.errors.push(format!("  - {err_msg}"));
             }
         }
     }

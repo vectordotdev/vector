@@ -899,7 +899,7 @@ mod tests {
         // Events are marked as delivered as soon as they are aggregated.
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let request = Request::get(format!("{}://{}/metrics", proto, address))
+        let request = Request::get(format!("{proto}://{address}/metrics"))
             .body(Body::empty())
             .expect("Error creating request.");
         let proxy = ProxyConfig::default();
@@ -963,7 +963,7 @@ mod tests {
         // Events are marked as delivered as soon as they are aggregated.
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let mut request = Request::get(format!("{}://{}/metrics", proto, address))
+        let mut request = Request::get(format!("{proto}://{address}/metrics"))
             .body(Body::empty())
             .expect("Error creating request.");
 

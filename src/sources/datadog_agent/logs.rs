@@ -80,7 +80,7 @@ pub(crate) fn decode_log_body(
     let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Error parsing JSON: {:?}", error),
+            format!("Error parsing JSON: {error:?}"),
         )
     })?;
 

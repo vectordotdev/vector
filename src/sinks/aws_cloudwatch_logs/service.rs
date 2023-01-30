@@ -70,13 +70,13 @@ pub enum CloudwatchError {
 impl fmt::Display for CloudwatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CloudwatchError::Put(error) => write!(f, "CloudwatchError::Put: {}", error),
-            CloudwatchError::Describe(error) => write!(f, "CloudwatchError::Describe: {}", error),
+            CloudwatchError::Put(error) => write!(f, "CloudwatchError::Put: {error}"),
+            CloudwatchError::Describe(error) => write!(f, "CloudwatchError::Describe: {error}"),
             CloudwatchError::CreateStream(error) => {
-                write!(f, "CloudwatchError::CreateStream: {}", error)
+                write!(f, "CloudwatchError::CreateStream: {error}")
             }
             CloudwatchError::CreateGroup(error) => {
-                write!(f, "CloudwatchError::CreateGroup: {}", error)
+                write!(f, "CloudwatchError::CreateGroup: {error}")
             }
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
         }

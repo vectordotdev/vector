@@ -107,7 +107,7 @@ mod integration_test {
         let topic = format!("test-{}", random_string(10));
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
-            topic: format!("{}-%Y%m%d", topic),
+            topic: format!("{topic}-%Y%m%d"),
             compression: KafkaCompression::None,
             encoding: TextSerializerConfig::default().into(),
             key_field: None,
@@ -241,7 +241,7 @@ mod integration_test {
         let kafka_auth = KafkaAuthConfig { sasl, tls };
         let config = KafkaSinkConfig {
             bootstrap_servers: server.clone(),
-            topic: format!("{}-%Y%m%d", topic),
+            topic: format!("{topic}-%Y%m%d"),
             key_field: None,
             encoding: TextSerializerConfig::default().into(),
             batch: BatchConfig::default(),
@@ -254,7 +254,7 @@ mod integration_test {
             acknowledgements: Default::default(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
-        println!("Topic name generated in test: {:?}", topic);
+        println!("Topic name generated in test: {topic:?}");
 
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -303,7 +303,7 @@ mod integration_test {
             || match consumer.fetch_watermarks(&topic, 0, Duration::from_secs(3)) {
                 Ok((_low, high)) => ready(high > 0),
                 Err(err) => {
-                    println!("retrying due to error fetching watermarks: {}", err);
+                    println!("retrying due to error fetching watermarks: {err}");
                     ready(false)
                 }
             },

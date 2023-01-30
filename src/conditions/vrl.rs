@@ -126,7 +126,7 @@ impl Conditional for Vrl {
                 )
                 .colored()
                 .to_string();
-                format!("source execution aborted: {}", err)
+                format!("source execution aborted: {err}")
             }
             vrl::Terminate::Error(err) => {
                 let err = Formatter::new(
@@ -137,7 +137,7 @@ impl Conditional for Vrl {
                 )
                 .colored()
                 .to_string();
-                format!("source execution failed: {}", err)
+                format!("source execution failed: {err}")
             }
         });
 

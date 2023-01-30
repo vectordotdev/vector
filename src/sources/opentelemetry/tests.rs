@@ -66,7 +66,7 @@ async fn receive_grpc_logs_vector_namespace() {
         test_util::wait_for_tcp(grpc_addr).await;
 
         // send request via grpc client
-        let mut client = LogsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
             .await
             .unwrap();
         let req = Request::new(ExportLogsServiceRequest {
@@ -206,7 +206,7 @@ async fn receive_grpc_logs_legacy_namespace() {
         test_util::wait_for_tcp(grpc_addr).await;
 
         // send request via grpc client
-        let mut client = LogsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
             .await
             .unwrap();
         let req = Request::new(ExportLogsServiceRequest {

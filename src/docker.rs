@@ -85,7 +85,7 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
                             .map_err(Into::into)
                     }
                 }
-                Some(scheme) => Err(format!("Unknown scheme: {}", scheme).into()),
+                Some(scheme) => Err(format!("Unknown scheme: {scheme}").into()),
             }
         }
     }
@@ -114,10 +114,7 @@ fn get_authority(url: &str) -> Result<String, Error> {
 
 async fn pull_image(docker: &Docker, image: &str, tag: &str) {
     let mut filters = HashMap::new();
-    filters.insert(
-        String::from("reference"),
-        vec![format!("{}:{}", image, tag)],
-    );
+    filters.insert(String::from("reference"), vec![format!("{image}:{tag}")]);
 
     let options = Some(ListImagesOptions {
         filters,
@@ -138,7 +135,7 @@ async fn pull_image(docker: &Docker, image: &str, tag: &str) {
             .for_each(|item| async move {
                 let info = item.unwrap();
                 if let Some(error) = info.error {
-                    panic!("{:?}", error);
+                    panic!("{error:?}");
                 }
             })
             .await
@@ -180,7 +177,7 @@ impl Container {
     }
 
     pub fn bind(mut self, src: impl std::fmt::Display, dst: &str) -> Self {
-        let bind = format!("{}:{}", src, dst);
+        let bind = format!("{src}:{dst}");
         self.binds.get_or_insert_with(Vec::new).push(bind);
         self
     }

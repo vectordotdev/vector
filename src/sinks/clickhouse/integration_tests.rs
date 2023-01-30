@@ -208,16 +208,15 @@ async fn insert_events_unix_timestamps_toml_config() {
 
     let config: ClickhouseConfig = toml::from_str(&format!(
         r#"
-host = "{}"
-table = "{}"
+host = "{host}"
+table = "{table}"
 compression = "none"
 [request]
 retry_attempts = 1
 [batch]
 max_events = 1
 [encoding]
-timestamp_format = "unix""#,
-        host, table
+timestamp_format = "unix""#
     ))
     .unwrap();
 
@@ -368,11 +367,10 @@ impl ClickhouseClient {
             .post(&self.host)
             //
             .body(format!(
-                "CREATE TABLE {}
-                    ({})
+                "CREATE TABLE {table}
+                    ({schema})
                     ENGINE = MergeTree()
-                    ORDER BY (host, timestamp);",
-                table, schema
+                    ORDER BY (host, timestamp);"
             ))
             .send()
             .await
@@ -387,7 +385,7 @@ impl ClickhouseClient {
         let response = self
             .client
             .post(&self.host)
-            .body(format!("SELECT * FROM {} FORMAT JSON", table))
+            .body(format!("SELECT * FROM {table} FORMAT JSON"))
             .send()
             .await
             .unwrap();
@@ -398,7 +396,7 @@ impl ClickhouseClient {
             let text = response.text().await.unwrap();
             match serde_json::from_str(&text) {
                 Ok(value) => value,
-                Err(_) => panic!("json failed: {:?}", text),
+                Err(_) => panic!("json failed: {text:?}"),
             }
         }
     }

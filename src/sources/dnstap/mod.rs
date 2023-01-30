@@ -304,7 +304,7 @@ impl FrameHandler for DnstapFrameHandler {
             match parse_dnstap_data(&self.schema, &mut log_event, frame) {
                 Err(err) => {
                     emit!(DnstapParseError {
-                        error: format!("Dnstap protobuf decode error {:?}.", err)
+                        error: format!("Dnstap protobuf decode error {err:?}.")
                     });
                     None
                 }
@@ -478,7 +478,7 @@ mod integration_tests {
                         break;
                     }
                     Err(e) => {
-                        println!("Error: {}", e);
+                        println!("Error: {e}");
                         break;
                     }
                 }
@@ -664,7 +664,7 @@ mod integration_tests {
         dnstap_exec(vec![
             "nslookup",
             "-type=A",
-            format!("-port={}", port).as_str(),
+            format!("-port={port}").as_str(),
             "h1.example.com",
             "localhost",
         ])

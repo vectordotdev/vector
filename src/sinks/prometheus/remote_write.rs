@@ -555,7 +555,7 @@ mod tests {
             let (rx, trigger, server) = build_test_server(addr);
             tokio::spawn(server);
 
-            let config = format!("endpoint = \"http://{}/write\"\n{}", addr, config);
+            let config = format!("endpoint = \"http://{addr}/write\"\n{config}");
             let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
             let cx = SinkContext::new_test();
 
@@ -645,7 +645,7 @@ mod integration_tests {
             let cx = SinkContext::new_test();
 
             let config = RemoteWriteConfig {
-                endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
+                endpoint: format!("{url}/api/v1/prom/write?db={database}"),
                 tls: Some(TlsConfig {
                     ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                     ..Default::default()
@@ -657,7 +657,7 @@ mod integration_tests {
             let (sink, _) = config.build(cx).await.expect("error building config");
             sink.run_events(events.clone()).await.unwrap();
 
-            let result = query(url, &format!("show series on {}", database)).await;
+            let result = query(url, &format!("show series on {database}")).await;
 
             let values = &result["results"][0]["series"][0]["values"];
             assert_eq!(values.as_array().unwrap().len(), 5);
@@ -718,7 +718,7 @@ mod integration_tests {
 
     fn create_events(name_range: Range<i32>, value: impl Fn(f64) -> f64) -> Vec<Event> {
         name_range
-            .map(move |num| create_event(format!("metric_{}", num), value(num as f64)))
+            .map(move |num| create_event(format!("metric_{num}"), value(num as f64)))
             .collect()
     }
 }

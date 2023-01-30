@@ -234,7 +234,7 @@ impl From<OwnedValuePath> for String {
                 OwnedSegment::Field(field) => {
                     serialize_field(field.as_ref(), (i != 0).then_some("."))
                 }
-                OwnedSegment::Index(index) => format!("[{}]", index),
+                OwnedSegment::Index(index) => format!("[{index}]"),
                 OwnedSegment::Coalesce(fields) => {
                     let mut output = String::new();
                     let (last, fields) = fields.split_last().expect("coalesce must not be empty");

@@ -33,7 +33,7 @@ async fn main() {
             (
                 secret.clone(),
                 ExecResponse {
-                    value: format!("{}.retrieved", secret),
+                    value: format!("{secret}.retrieved"),
                     error: None,
                 },
             )

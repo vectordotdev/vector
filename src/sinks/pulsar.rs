@@ -269,7 +269,7 @@ impl PulsarSinkConfig {
 
         if let Some(producer_name) = self.producer_name.clone() {
             pulsar_builder = pulsar_builder.with_name(if is_healthcheck {
-                format!("{}-healthcheck", producer_name)
+                format!("{producer_name}-healthcheck")
             } else {
                 producer_name
             });
@@ -536,7 +536,7 @@ mod integration_tests {
         for line in input {
             let msg = match consumer.next().await.unwrap() {
                 Ok(msg) => msg,
-                Err(error) => panic!("{:?}", error),
+                Err(error) => panic!("{error:?}"),
             };
             consumer.ack(&msg).await.unwrap();
             assert_eq!(String::from_utf8_lossy(&msg.payload.data), line);

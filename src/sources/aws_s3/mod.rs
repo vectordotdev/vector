@@ -375,10 +375,7 @@ mod test {
             assert_eq!(
                 super::determine_compression(content_encoding, content_type, key),
                 expected,
-                "key={:?} content_encoding={:?} content_type={:?}",
-                key,
-                content_encoding,
-                content_type,
+                "key={key:?} content_encoding={content_encoding:?} content_type={content_type:?}",
             );
         }
     }

@@ -74,7 +74,7 @@ mod tests {
 
         let in_addr = next_addr();
 
-        let config = format!(r#"address = "http://{}/""#, in_addr);
+        let config = format!(r#"address = "http://{in_addr}/""#);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::new_test();
@@ -118,7 +118,7 @@ mod tests {
 
         let in_addr = next_addr();
 
-        let config = format!(r#"address = "http://{}/""#, in_addr);
+        let config = format!(r#"address = "http://{in_addr}/""#);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::new_test();

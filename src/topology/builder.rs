@@ -95,7 +95,7 @@ pub(self) async fn load_enrichment_tables<'a>(
             let mut table = match table.inner.build(&config.global).await {
                 Ok(table) => table,
                 Err(error) => {
-                    errors.push(format!("Enrichment Table \"{}\": {}", name, error));
+                    errors.push(format!("Enrichment Table \"{name}\": {error}"));
                     continue;
                 }
             };
@@ -272,7 +272,7 @@ pub async fn build_pieces(
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
-                errors.push(format!("Source \"{}\": {}", key, error));
+                errors.push(format!("Source \"{key}\": {error}"));
                 continue;
             }
             Ok(server) => server,
@@ -390,7 +390,7 @@ pub async fn build_pieces(
             .await
         {
             Err(error) => {
-                errors.push(format!("Transform \"{}\": {}", key, error));
+                errors.push(format!("Transform \"{key}\": {error}"));
                 continue;
             }
             Ok(transform) => transform,
@@ -454,7 +454,7 @@ pub async fn build_pieces(
                 .await;
             match buffer {
                 Err(error) => {
-                    errors.push(format!("Sink \"{}\": {}", key, error));
+                    errors.push(format!("Sink \"{key}\": {error}"));
                     continue;
                 }
                 Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
@@ -470,7 +470,7 @@ pub async fn build_pieces(
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {
-                errors.push(format!("Sink \"{}\": {}", key, error));
+                errors.push(format!("Sink \"{key}\": {error}"));
                 continue;
             }
             Ok(built) => built,

@@ -23,7 +23,7 @@ fn mock_apex_api_token() -> String {
 }
 
 fn line_generator(index: usize) -> String {
-    format!("random line {}", index)
+    format!("random line {index}")
 }
 
 fn event_generator(index: usize) -> Event {

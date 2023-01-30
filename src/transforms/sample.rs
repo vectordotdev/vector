@@ -151,7 +151,7 @@ mod tests {
 
     fn condition_contains(key: &str, needle: &str) -> Condition {
         let vrl_config = VrlConfig {
-            source: format!(r#"contains!(."{}", "{}")"#, key, needle),
+            source: format!(r#"contains!(."{key}", "{needle}")"#),
             runtime: Default::default(),
         };
 

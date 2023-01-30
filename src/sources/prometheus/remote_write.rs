@@ -103,13 +103,13 @@ impl RemoteWriteSource {
             });
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
-                format!("Could not decode write request: {}", error),
+                format!("Could not decode write request: {error}"),
             )
         })?;
         parser::parse_request(request).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
-                format!("Could not decode write request: {}", error),
+                format!("Could not decode write request: {error}"),
             )
         })
     }

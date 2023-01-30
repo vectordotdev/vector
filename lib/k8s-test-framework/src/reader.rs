@@ -98,7 +98,7 @@ mod tests {
         let mut expected_num = 0;
         while let Some(line) = reader.read_line().await {
             // Assert we're getting expected lines.
-            assert_eq!(line, format!("Line {}\n", expected_num));
+            assert_eq!(line, format!("Line {expected_num}\n"));
 
             // On line 100 issue a `kill` to stop the infinite stream.
             if expected_num == 100 {

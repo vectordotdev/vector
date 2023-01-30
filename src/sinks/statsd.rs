@@ -175,7 +175,7 @@ fn encode_tags(tags: &MetricTags) -> String {
     let parts: Vec<_> = tags
         .iter_all()
         .map(|(name, tag_value)| match tag_value {
-            Some(value) => format!("{}:{}", name, value),
+            Some(value) => format!("{name}:{value}"),
             None => name.to_owned(),
         })
         .collect();
@@ -223,7 +223,7 @@ impl Encoder<Event> for StatsdEncoder {
             MetricValue::Gauge { value } => {
                 match metric.kind() {
                     MetricKind::Incremental => {
-                        push_event(&mut buf, metric, format!("{:+}", value), "g", None)
+                        push_event(&mut buf, metric, format!("{value:+}"), "g", None)
                     }
                     MetricKind::Absolute => push_event(&mut buf, metric, value, "g", None),
                 };

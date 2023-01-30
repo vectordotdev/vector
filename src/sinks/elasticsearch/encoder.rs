@@ -101,25 +101,22 @@ fn write_bulk_action(
             (Some(id), true) => {
                 write!(
                     writer,
-                    r#"{{"{}":{{"_index":"{}","_id":"{}"}}}}"#,
-                    bulk_action, index, id
+                    r#"{{"{bulk_action}":{{"_index":"{index}","_id":"{id}"}}}}"#
                 )
             }
             (Some(id), false) => {
                 write!(
                     writer,
-                    r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#,
-                    bulk_action, index, doc_type, id
+                    r#"{{"{bulk_action}":{{"_index":"{index}","_type":"{doc_type}","_id":"{id}"}}}}"#
                 )
             }
             (None, true) => {
-                write!(writer, r#"{{"{}":{{"_index":"{}"}}}}"#, bulk_action, index)
+                write!(writer, r#"{{"{bulk_action}":{{"_index":"{index}"}}}}"#)
             }
             (None, false) => {
                 write!(
                     writer,
-                    r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
-                    bulk_action, index, doc_type
+                    r#"{{"{bulk_action}":{{"_index":"{index}","_type":"{doc_type}"}}}}"#
                 )
             }
         },

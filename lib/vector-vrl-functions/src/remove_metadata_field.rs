@@ -54,7 +54,7 @@ impl Function for RemoveMetadataField {
         if let MetadataKey::Query(query) = &key {
             if ctx.is_read_only_path(query) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
-                    context: format!("{} is read-only, and cannot be removed", query),
+                    context: format!("{query} is read-only, and cannot be removed"),
                 }
                 .into());
             }

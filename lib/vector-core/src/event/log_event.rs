@@ -384,10 +384,7 @@ impl LogEvent {
     /// Merge all fields specified at `fields` from `incoming` to `current`.
     pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
         for field in fields {
-            let incoming_val = match incoming.remove(field.as_ref()) {
-                None => continue,
-                Some(val) => val,
-            };
+            let Some(incoming_val) = incoming.remove(field.as_ref()) else { continue };
             match self.get_mut(field.as_ref()) {
                 None => {
                     self.insert(field.as_ref(), incoming_val);

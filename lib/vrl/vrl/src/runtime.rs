@@ -82,7 +82,7 @@ impl Runtime {
             }
             Err(err) => {
                 return Err(Terminate::Error(
-                    format!("error querying target object: {}", err).into(),
+                    format!("error querying target object: {err}").into(),
                 ))
             }
         };

@@ -124,7 +124,7 @@ impl DatadogLogsConfig {
             .or_else(|| {
                 self.site
                     .as_ref()
-                    .map(|s| format!("https://http-intake.logs.{}/api/v2/logs", s))
+                    .map(|s| format!("https://http-intake.logs.{s}/api/v2/logs"))
             })
             .unwrap_or_else(|| match self.region {
                 Some(Region::Eu) => "https://http-intake.logs.datadoghq.eu/api/v2/logs".to_string(),

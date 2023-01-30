@@ -81,15 +81,15 @@ impl Application {
             .unwrap_or_else(|_| match opts.log_level() {
                 "off" => "off".to_owned(),
                 level => [
-                    format!("vector={}", level),
-                    format!("codec={}", level),
-                    format!("vrl={}", level),
-                    format!("file_source={}", level),
+                    format!("vector={level}"),
+                    format!("codec={level}"),
+                    format!("vrl={level}"),
+                    format!("file_source={level}"),
                     "tower_limit=trace".to_owned(),
-                    format!("rdkafka={}", level),
-                    format!("buffers={}", level),
-                    format!("lapin={}", level),
-                    format!("kube={}", level),
+                    format!("rdkafka={level}"),
+                    format!("buffers={level}"),
+                    format!("lapin={level}"),
+                    format!("kube={level}"),
                 ]
                 .join(","),
             });

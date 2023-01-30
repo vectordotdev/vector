@@ -34,7 +34,7 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
                 encoding => {
                     return Err(ErrorMessage::new(
                         StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                        format!("Unsupported encoding {}", encoding),
+                        format!("Unsupported encoding {encoding}"),
                     ))
                 }
             }
@@ -51,6 +51,6 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
     });
     ErrorMessage::new(
         StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Failed decompressing payload with {} decoder.", encoding),
+        format!("Failed decompressing payload with {encoding} decoder."),
     )
 }

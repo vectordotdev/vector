@@ -145,7 +145,7 @@ impl TableRegistry {
         match *locked {
             None => Err("finish_load has been called".to_string()),
             Some(ref mut tables) => match tables.get_mut(table) {
-                None => Err(format!("table '{}' not loaded", table)),
+                None => Err(format!("table '{table}' not loaded")),
                 Some(table) => table.add_index(case, fields),
             },
         }
@@ -209,7 +209,7 @@ impl TableSearch {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
-                None => Err(format!("table {} not loaded", table)),
+                None => Err(format!("table {table} not loaded")),
                 Some(table) => table.find_table_row(case, condition, select, index),
             }
         } else {
@@ -231,7 +231,7 @@ impl TableSearch {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
-                None => Err(format!("table {} not loaded", table)),
+                None => Err(format!("table {table} not loaded")),
                 Some(table) => table.find_table_rows(case, condition, select, index),
             }
         } else {
@@ -264,9 +264,9 @@ fn fmt_enrichment_table(
             tables.truncate(std::cmp::max(tables.len(), 0));
             tables.push(')');
 
-            write!(f, "{} {}", name, tables)
+            write!(f, "{name} {tables}")
         }
-        None => write!(f, "{} loading", name),
+        None => write!(f, "{name} loading"),
     }
 }
 

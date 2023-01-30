@@ -107,7 +107,7 @@ impl TryFrom<&str> for BulkAction {
         match input {
             "index" => Ok(BulkAction::Index),
             "create" => Ok(BulkAction::Create),
-            _ => Err(format!("Invalid bulk action: {}", input)),
+            _ => Err(format!("Invalid bulk action: {input}")),
         }
     }
 }

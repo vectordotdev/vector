@@ -165,7 +165,7 @@ impl<'a> DnstapParser<'a> {
             }
         } else {
             emit!(DnstapParseWarning {
-                error: format!("Unknown dnstap data type: {}", dnstap_data_type_id)
+                error: format!("Unknown dnstap data type: {dnstap_data_type_id}")
             });
             need_raw_data = true;
         }
@@ -889,8 +889,7 @@ fn to_socket_family_name(socket_family: i32) -> Result<&'static str> {
         Ok("INET6")
     } else {
         Err(Error::from(format!(
-            "Unknown socket family: {}",
-            socket_family
+            "Unknown socket family: {socket_family}"
         )))
     }
 }
@@ -910,8 +909,7 @@ fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
         Ok("DNSCryptTCP")
     } else {
         Err(Error::from(format!(
-            "Unknown socket protocol: {}",
-            socket_protocol
+            "Unknown socket protocol: {socket_protocol}"
         )))
     }
 }
@@ -939,7 +937,7 @@ fn to_dnstap_message_type(type_id: i32) -> String {
         12 => String::from("ToolResponse"),
         13 => String::from("UpdateQuery"),
         14 => String::from("UpdateResponse"),
-        _ => format!("Unknown dnstap message type: {}", type_id),
+        _ => format!("Unknown dnstap message type: {type_id}"),
     }
 }
 

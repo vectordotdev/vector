@@ -630,7 +630,7 @@ mod integration_tests {
         pubsub_conn
             .subscribe(key.clone().to_string())
             .await
-            .unwrap_or_else(|_| panic!("Failed to subscribe channel:{}.", key));
+            .unwrap_or_else(|_| panic!("Failed to subscribe channel:{key}."));
         debug!("Subscribed to channel:{}.", key);
         let mut pubsub_stream = pubsub_conn.on_message();
 

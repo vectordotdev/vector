@@ -112,7 +112,7 @@ mod test {
         for test in tests {
             let lookup_buf = LookupBuf::from_str(test).unwrap();
             if !ValuePath::eq(&test, &lookup_buf) {
-                panic!("Equality failed. Path={:?}", test);
+                panic!("Equality failed. Path={test:?}");
             }
         }
     }

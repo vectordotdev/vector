@@ -339,7 +339,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let stream_name = gen_name();
     let config = CloudwatchLogsSinkConfig {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
+        stream_name: Template::try_from(format!("{stream_name}-{{{{key}}}}")).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: None,
@@ -375,7 +375,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let response = create_client_test()
         .await
         .get_log_events()
-        .log_stream_name(format!("{}-0", stream_name))
+        .log_stream_name(format!("{stream_name}-0"))
         .log_group_name(GROUP_NAME)
         .start_time(timestamp.timestamp_millis())
         .send()
@@ -399,7 +399,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let response = create_client_test()
         .await
         .get_log_events()
-        .log_stream_name(format!("{}-1", stream_name))
+        .log_stream_name(format!("{stream_name}-1"))
         .log_group_name(GROUP_NAME)
         .start_time(timestamp.timestamp_millis())
         .send()

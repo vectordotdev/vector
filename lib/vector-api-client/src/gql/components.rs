@@ -203,7 +203,7 @@ impl fmt::Display for components_query::ComponentsQueryComponentsEdgesNodeOn {
             components_query::ComponentsQueryComponentsEdgesNodeOn::Sink(_) => "sink",
         };
 
-        write!(f, "{}", res)
+        write!(f, "{res}")
     }
 }
 
@@ -221,7 +221,7 @@ impl fmt::Display for component_added_subscription::ComponentAddedSubscriptionCo
             }
         };
 
-        write!(f, "{}", res)
+        write!(f, "{res}")
     }
 }
 
@@ -241,6 +241,6 @@ impl fmt::Display
             }
         };
 
-        write!(f, "{}", res)
+        write!(f, "{res}")
     }
 }

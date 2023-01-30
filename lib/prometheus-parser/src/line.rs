@@ -401,7 +401,7 @@ mod test {
     #[test]
     fn test_parse_escaped_string() {
         fn wrap(s: &str) -> String {
-            format!("  \t \"{}\"  .", s)
+            format!("  \t \"{s}\"  .")
         }
 
         // parser should not consume more that it needed
@@ -441,7 +441,7 @@ mod test {
     #[test]
     fn test_parse_name() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 
@@ -467,7 +467,7 @@ mod test {
     #[test]
     fn test_parse_header() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 
@@ -541,7 +541,7 @@ mod test {
     #[test]
     fn test_parse_value() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 
@@ -609,7 +609,7 @@ mod test {
     #[test]
     fn test_parse_labels() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 

@@ -186,7 +186,7 @@ impl Test {
 
         Self {
             name: title,
-            category: format!("docs/{}/{}", category, name),
+            category: format!("docs/{category}/{name}"),
             error: None,
             source,
             object,

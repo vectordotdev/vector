@@ -93,7 +93,7 @@ where
 {
     let cfg = T::generate_config().to_string();
     toml::from_str::<T>(&cfg)
-        .unwrap_or_else(|_| panic!("Invalid config generated from string:\n'{}'\n", cfg));
+        .unwrap_or_else(|_| panic!("Invalid config generated from string:\n'{cfg}'\n"));
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {

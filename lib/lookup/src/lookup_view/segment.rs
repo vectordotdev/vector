@@ -119,12 +119,12 @@ impl<'a> LookSegment<'a> for Segment<'a> {
 impl<'a> Display for Segment<'a> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Segment::Index(i) => write!(formatter, "{}", i),
+            Segment::Index(i) => write!(formatter, "{i}"),
             Segment::Field(Field {
                 name,
                 requires_quoting: false,
-            }) => write!(formatter, "{}", name),
-            Segment::Field(field) => write!(formatter, "{}", field),
+            }) => write!(formatter, "{name}"),
+            Segment::Field(field) => write!(formatter, "{field}"),
             Segment::Coalesce(v) => write!(
                 formatter,
                 "({})",

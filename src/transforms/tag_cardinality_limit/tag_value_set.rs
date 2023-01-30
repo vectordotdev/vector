@@ -19,7 +19,7 @@ enum TagValueSetStorage {
 impl fmt::Debug for TagValueSetStorage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TagValueSetStorage::Set(set) => write!(f, "Set({:?})", set),
+            TagValueSetStorage::Set(set) => write!(f, "Set({set:?})"),
             TagValueSetStorage::Bloom(_) => write!(f, "Bloom"),
         }
     }

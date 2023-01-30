@@ -721,8 +721,7 @@ pub(self) mod tests {
 
             assert!(
                 all_metrics_count > some_metrics.len(),
-                "collector={:?}",
-                collector
+                "collector={collector:?}"
             );
         }
     }
@@ -856,7 +855,7 @@ pub(self) mod tests {
         // Pick an arbitrary key value
         if let Some(key) = keys.into_iter().next() {
             let key_prefix = &key[..key.len() - 1].to_string();
-            let key_prefix_pattern = PatternWrapper::try_from(format!("{}*", key_prefix)).unwrap();
+            let key_prefix_pattern = PatternWrapper::try_from(format!("{key_prefix}*")).unwrap();
             let key_pattern = PatternWrapper::try_from(key.clone()).unwrap();
 
             let filter = FilterList {

@@ -371,6 +371,6 @@ impl tracing::field::Visit for SpanFields {
     }
 
     fn record_debug(&mut self, field: &tracing_core::Field, value: &dyn std::fmt::Debug) {
-        self.record(field, format!("{:?}", value));
+        self.record(field, format!("{value:?}"));
     }
 }

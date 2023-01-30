@@ -256,13 +256,13 @@ pub enum DecodeError {
 impl std::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DecodeError::IO(err) => write!(f, "{}", err),
-            DecodeError::Decode(err) => write!(f, "{}", err),
+            DecodeError::IO(err) => write!(f, "{err}"),
+            DecodeError::Decode(err) => write!(f, "{err}"),
             DecodeError::UnknownCompression(compression) => {
-                write!(f, "unknown compression: {}", compression)
+                write!(f, "unknown compression: {compression}")
             }
             DecodeError::UnexpectedValue(value) => {
-                write!(f, "unexpected msgpack value, ignoring: {}", value)
+                write!(f, "unexpected msgpack value, ignoring: {value}")
             }
         }
     }
@@ -533,7 +533,7 @@ impl TcpSourceAcker for FluentAcker {
         let mut acks = String::new();
         for chunk in self.chunks {
             let ack = match ack {
-                TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk),
+                TcpSourceAck::Ack => format!(r#"{{"ack": "{chunk}"}}"#),
                 _ => String::from("{}"),
             };
             acks.push_str(&ack);
@@ -1048,7 +1048,7 @@ mod integration_tests {
     fn make_file(name: &str, content: &str) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         let mut file = File::create(dir.path().join(name)).unwrap();
-        write!(&mut file, "{}", content).unwrap();
+        write!(&mut file, "{content}").unwrap();
         dir
     }
 
@@ -1102,7 +1102,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(&format!("http://{test_address}/"))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1183,7 +1183,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(&format!("http://{test_address}/"))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()

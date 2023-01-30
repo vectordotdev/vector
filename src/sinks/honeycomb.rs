@@ -198,11 +198,7 @@ async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Resu
     } else {
         let body = String::from_utf8_lossy(&body[..]);
 
-        Err(format!(
-            "Server returned unexpected error status: {} body: {}",
-            status, body
-        )
-        .into())
+        Err(format!("Server returned unexpected error status: {status} body: {body}").into())
     }
 }
 #[cfg(test)]

@@ -21,8 +21,7 @@ pub fn make_config() -> AmqpSinkConfig {
     let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
     let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
     let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
-    config.connection.connection_string =
-        format!("amqp://{}:{}@rabbitmq:5672/{}", user, pass, vhost);
+    config.connection.connection_string = format!("amqp://{user}:{pass}@rabbitmq:5672/{vhost}");
     config
 }
 

@@ -71,7 +71,7 @@ impl HumanFormatter for i64 {
             0 => "--".into(),
             n => match NumberPrefix::decimal(*n as f64) {
                 NumberPrefix::Standalone(n) => n.to_string(),
-                NumberPrefix::Prefixed(p, n) => format!("{:.2} {}", n, p),
+                NumberPrefix::Prefixed(p, n) => format!("{n:.2} {p}"),
             },
         }
     }
@@ -83,7 +83,7 @@ impl HumanFormatter for i64 {
             0 => "--".into(),
             n => match NumberPrefix::binary(*n as f64) {
                 NumberPrefix::Standalone(n) => n.to_string(),
-                NumberPrefix::Prefixed(p, n) => format!("{:.2} {}B", n, p),
+                NumberPrefix::Prefixed(p, n) => format!("{n:.2} {p}B"),
             },
         }
     }

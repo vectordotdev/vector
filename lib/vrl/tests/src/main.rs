@@ -64,7 +64,7 @@ pub struct Cmd {
 impl Cmd {
     fn timezone(&self) -> TimeZone {
         if let Some(ref tz) = self.timezone {
-            TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {}", tz))
+            TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {tz}"))
         } else {
             TimeZone::Named(Tz::UTC)
         }
@@ -199,7 +199,7 @@ fn main() {
 
         let compile_timing_fmt = cmd
             .timings
-            .then(|| format!("comp: {:>9.3?}", compile_end))
+            .then(|| format!("comp: {compile_end:>9.3?}"))
             .unwrap_or_default();
 
         match result {
@@ -221,7 +221,7 @@ fn main() {
 
                 let timings_fmt = cmd
                     .timings
-                    .then(|| format!(" ({}, run: {:>9.3?})", compile_timing_fmt, run_end))
+                    .then(|| format!(" ({compile_timing_fmt}, run: {run_end:>9.3?})"))
                     .unwrap_or_default();
 
                 let timings_color = if run_end.as_millis() > 10 { 1 } else { 245 };
@@ -253,7 +253,7 @@ fn main() {
                                 match serde_json::from_str::<'_, serde_json::Value>(want.trim()) {
                                     Ok(want) => want,
                                     Err(err) => {
-                                        eprintln!("{}", err);
+                                        eprintln!("{err}");
                                         want.into()
                                     }
                                 }
@@ -269,7 +269,7 @@ fn main() {
                                     let got = serde_json::to_string_pretty(&got).unwrap();
 
                                     let diff = prettydiff::diff_lines(&want, &got);
-                                    println!("  {}", diff);
+                                    println!("  {diff}");
                                 }
 
                                 failed = true;
@@ -279,7 +279,7 @@ fn main() {
                         }
 
                         if cmd.verbose {
-                            println!("{:#}", got);
+                            println!("{got:#}");
                         }
 
                         if failed && cmd.fail_early {
@@ -301,7 +301,7 @@ fn main() {
                                     match serde_json::from_str::<'_, serde_json::Value>(&want) {
                                         Ok(want) => want,
                                         Err(err) => {
-                                            eprintln!("{}", err);
+                                            eprintln!("{err}");
                                             want.into()
                                         }
                                     };
@@ -317,7 +317,7 @@ fn main() {
                                         let want = serde_json::to_string_pretty(&want).unwrap();
                                         let got = serde_json::to_string_pretty(&got).unwrap();
                                         let diff = prettydiff::diff_lines(&want, &got);
-                                        println!("{}", diff);
+                                        println!("{diff}");
                                     }
 
                                     failed = true;
@@ -328,7 +328,7 @@ fn main() {
 
                                 if !cmd.no_diff {
                                     let diff = prettydiff::diff_lines(&want, &got);
-                                    println!("{}", diff);
+                                    println!("{diff}");
                                 }
 
                                 failed = true;
@@ -336,7 +336,7 @@ fn main() {
                         }
 
                         if cmd.verbose {
-                            println!("{:#}", err);
+                            println!("{err:#}");
                         }
 
                         if failed && cmd.fail_early {
@@ -362,7 +362,7 @@ fn main() {
                     {
                         let timings_fmt = cmd
                             .timings
-                            .then(|| format!(" ({})", compile_timing_fmt))
+                            .then(|| format!(" ({compile_timing_fmt})"))
                             .unwrap_or_default();
                         let timings = Colour::Fixed(245).paint(timings_fmt);
 
@@ -373,7 +373,7 @@ fn main() {
 
                         if !cmd.no_diff {
                             let diff = prettydiff::diff_lines(&want, &got);
-                            println!("{}", diff);
+                            println!("{diff}");
                         }
 
                         failed = true;
@@ -382,7 +382,7 @@ fn main() {
 
                 if cmd.verbose {
                     formatter.enable_colors(true);
-                    println!("{:#}", formatter);
+                    println!("{formatter:#}");
                 }
 
                 if failed && cmd.fail_early {

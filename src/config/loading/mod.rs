@@ -30,7 +30,7 @@ pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()
         .read_dir()
-        .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])
+        .map_err(|err| vec![format!("Could not read config dir: {path:?}, {err}.")])
 }
 
 pub(super) fn component_name<P: AsRef<Path> + Debug>(path: P) -> Result<String, Vec<String>> {
@@ -38,7 +38,7 @@ pub(super) fn component_name<P: AsRef<Path> + Debug>(path: P) -> Result<String, 
         .file_stem()
         .and_then(|name| name.to_str())
         .map(|name| name.to_string())
-        .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
+        .ok_or_else(|| vec![format!("Couldn't get component name for file: {path:?}")])
 }
 
 pub(super) fn open_file<P: AsRef<Path> + Debug>(path: P) -> Option<File> {

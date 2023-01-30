@@ -395,7 +395,7 @@ mod tests {
         buffer.put(&b"defghijklmnopqrstuvwxyzand here we are"[..]);
         let result = decoder.decode(&mut buffer);
 
-        println!("{:?}", result);
+        println!("{result:?}");
         assert!(result.is_err());
         assert_eq!(b"and here we are"[..], buffer);
     }

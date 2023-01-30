@@ -304,7 +304,7 @@ fn resolve_grok_pattern(
             resolves_match_function(grok_alias.clone(), pattern, context)?;
 
             if let Some(grok_alias) = &grok_alias {
-                context.append_regex(&format!(":{}", grok_alias));
+                context.append_regex(&format!(":{grok_alias}"));
             }
             context.append_regex("}");
         }

@@ -65,6 +65,6 @@ pub(crate) fn get_api_base_endpoint(
 ) -> String {
     endpoint.cloned().unwrap_or_else(|| {
         let base = get_base_domain(site, region);
-        format!("https://api.{}", base)
+        format!("https://api.{base}")
     })
 }

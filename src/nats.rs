@@ -63,7 +63,7 @@ impl std::fmt::Display for NatsAuthConfig {
             CredentialsFile { .. } => "credentials_file",
             Nkey { .. } => "nkey",
         };
-        write!(f, "{}", word)
+        write!(f, "{word}")
     }
 }
 

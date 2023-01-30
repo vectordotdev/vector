@@ -119,8 +119,8 @@ impl FileWatcher {
                     (Box::new(reader), pos)
                 }
                 (false, false, ReadFrom::Beginning) => {
-                    let pos = reader.seek(io::SeekFrom::Start(0)).unwrap();
-                    (Box::new(reader), pos)
+                    reader.rewind().unwrap();
+                    (Box::new(reader), 0)
                 }
                 (false, false, ReadFrom::End) => {
                     let pos = reader.seek(io::SeekFrom::End(0)).unwrap();

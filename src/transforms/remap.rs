@@ -462,16 +462,16 @@ where
             },
             Event::Metric(ref mut metric) => {
                 let m = log_schema().metadata_key();
-                metric.replace_tag(format!("{}.dropped.reason", m), reason.into());
+                metric.replace_tag(format!("{m}.dropped.reason"), reason.into());
                 metric.replace_tag(
-                    format!("{}.dropped.component_id", m),
+                    format!("{m}.dropped.component_id"),
                     self.component_key
                         .as_ref()
                         .map(ToString::to_string)
                         .unwrap_or_else(String::new),
                 );
-                metric.replace_tag(format!("{}.dropped.component_type", m), "remap".into());
-                metric.replace_tag(format!("{}.dropped.component_kind", m), "transform".into());
+                metric.replace_tag(format!("{m}.dropped.component_type"), "remap".into());
+                metric.replace_tag(format!("{m}.dropped.component_kind"), "transform".into());
             }
             Event::Trace(ref mut trace) => {
                 trace.insert(
@@ -1490,7 +1490,7 @@ mod tests {
         match (buf.pop(), err_buf.pop()) {
             (Some(good), None) => Ok(good),
             (None, Some(bad)) => Err(bad),
-            (a, b) => panic!("expected output xor error output, got {:?} and {:?}", a, b),
+            (a, b) => panic!("expected output xor error output, got {a:?} and {b:?}"),
         }
     }
 

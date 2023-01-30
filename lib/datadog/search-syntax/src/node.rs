@@ -42,9 +42,9 @@ pub enum ComparisonValue {
 impl std::fmt::Display for ComparisonValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::String(s) => write!(f, "{}", s),
-            Self::Integer(num) => write!(f, "{}", num),
-            Self::Float(num) => write!(f, "{}", num),
+            Self::String(s) => write!(f, "{s}"),
+            Self::Integer(num) => write!(f, "{num}"),
+            Self::Float(num) => write!(f, "{num}"),
             Self::Unbounded => write!(f, "*"),
         }
     }
@@ -181,8 +181,8 @@ impl QueryNode {
         match self {
             QueryNode::MatchAllDocs => String::from("*:*"),
             QueryNode::MatchNoDocs => String::from("-*:*"),
-            QueryNode::AttributeExists { attr } => format!("_exists_:{}", attr),
-            QueryNode::AttributeMissing { attr } => format!("_missing_:{}", attr),
+            QueryNode::AttributeExists { attr } => format!("_exists_:{attr}"),
+            QueryNode::AttributeMissing { attr } => format!("_missing_:{attr}"),
             QueryNode::AttributeRange {
                 attr,
                 lower,
@@ -339,7 +339,7 @@ impl QueryNode {
         if attr == DEFAULT_FIELD {
             String::new()
         } else {
-            format!("{}:", attr)
+            format!("{attr}:")
         }
     }
 }

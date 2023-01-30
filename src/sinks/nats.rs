@@ -299,8 +299,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -358,8 +357,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
         );
     }
 
@@ -388,8 +386,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -418,8 +415,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
         );
     }
 
@@ -449,8 +445,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -480,8 +475,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Config { .. })),
-            "publish_and_check failed, expected BuildError::Config, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Config, got: {r:?}"
         );
     }
 
@@ -512,8 +506,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -538,8 +531,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
         );
     }
 
@@ -572,8 +564,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -604,8 +595,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
         );
     }
 
@@ -640,8 +630,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -676,8 +665,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
         );
     }
 }

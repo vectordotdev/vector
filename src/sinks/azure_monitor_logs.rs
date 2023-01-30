@@ -302,10 +302,8 @@ impl AzureMonitorLogsSink {
         rfc1123date: &str,
         len: usize,
     ) -> crate::Result<String> {
-        let string_to_hash = format!(
-            "POST\n{}\n{}\n{}:{}\n{}",
-            len, CONTENT_TYPE, X_MS_DATE, rfc1123date, RESOURCE
-        );
+        let string_to_hash =
+            format!("POST\n{len}\n{CONTENT_TYPE}\n{X_MS_DATE}:{rfc1123date}\n{RESOURCE}");
         let mut signer = sign::Signer::new(hash::MessageDigest::sha256(), &self.shared_key)?;
         signer.update(string_to_hash.as_bytes())?;
 

@@ -57,8 +57,8 @@ fn main() {
     let source = "upcase(\").\")";
     let program = parser::parse(source).unwrap();
 
-    println!("{:?}", program);
-    println!("{}", program);
+    println!("{program:?}");
+    println!("{program}");
 }
 
 prop_compose! {
@@ -284,7 +284,7 @@ proptest! {
 
         assert_eq!(program.to_string(),
                    expr.to_string(),
-                   "{}", source);
+                   "{source}");
     }
 
     #[test]
@@ -295,6 +295,6 @@ proptest! {
 
         assert_eq!(program.to_string(),
                    expr.to_string(),
-                   "{}", source);
+                   "{source}");
     }
 }

@@ -175,7 +175,7 @@ fn parse<'a>(
         quotes,
         value_re,
     )
-    .map_err(|_| format!("could not parse '{}' as 'keyvalue'", input))?;
+    .map_err(|_| format!("could not parse '{input}' as 'keyvalue'"))?;
 
     if rest.trim().is_empty() {
         Ok(result)

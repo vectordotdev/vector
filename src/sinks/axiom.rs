@@ -190,7 +190,7 @@ mod integration_tests {
             email: email.clone(),
             password: password.clone(),
         };
-        let login_url = format!("{}/auth/signin/credentials", url);
+        let login_url = format!("{url}/auth/signin/credentials");
         let login_res = client
             .post(&login_url)
             .json(&login_payload)
@@ -231,7 +231,7 @@ mod integration_tests {
             None => {
                 // Try to initialize the deployment
                 client
-                    .post(format!("{}/auth/init", url))
+                    .post(format!("{url}/auth/init"))
                     .json(&auth_init_payload)
                     .send()
                     .await
@@ -276,7 +276,7 @@ mod integration_tests {
             name: "Vector Test Token".to_string(),
         };
         let create_token_res: CreateTokenResponse = client
-            .post(format!("{}/api/v1/tokens/personal", url))
+            .post(format!("{url}/api/v1/tokens/personal"))
             .header("Cookie", session_cookie.clone())
             .json(&create_token_payload)
             .send()
@@ -320,8 +320,8 @@ mod integration_tests {
             description: "Vector Test Dataset".to_string(),
         };
         let create_dataset_res = client
-            .post(format!("{}/api/v1/datasets", url))
-            .header("Authorization", format!("Bearer {}", token))
+            .post(format!("{url}/api/v1/datasets"))
+            .header("Authorization", format!("Bearer {token}"))
             .json(&create_dataset_payload)
             .send()
             .await
@@ -385,13 +385,13 @@ mod integration_tests {
         }
 
         let query_req = QueryRequest {
-            apl: format!("['{}'] | order by _time desc | limit 2", dataset),
+            apl: format!("['{dataset}'] | order by _time desc | limit 2"),
             start_time: Utc::now() - Duration::minutes(10),
             end_time: Utc::now() + Duration::minutes(10),
         };
         let query_res: QueryResponse = client
-            .post(format!("{}/api/v1/datasets/_apl?format=legacy", url))
-            .header("Authorization", format!("Bearer {}", token))
+            .post(format!("{url}/api/v1/datasets/_apl?format=legacy"))
+            .header("Authorization", format!("Bearer {token}"))
             .json(&query_req)
             .send()
             .await

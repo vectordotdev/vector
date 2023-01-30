@@ -100,12 +100,12 @@ impl<'a> Display for Lookup<'a> {
                 .unwrap_or(false);
 
             match (segment, maybe_next) {
-                (Segment::Field(_), true) => write!(f, r#"{}."#, segment)?,
-                (Segment::Field(_), false) => write!(f, "{}", segment)?,
-                (Segment::Index(_), true) => write!(f, r#"[{}]."#, segment)?,
-                (Segment::Index(_), false) => write!(f, "[{}]", segment)?,
-                (Segment::Coalesce(_), true) => write!(f, r#"{}."#, segment)?,
-                (Segment::Coalesce(_), false) => write!(f, "{}", segment)?,
+                (Segment::Field(_), true) => write!(f, r#"{segment}."#)?,
+                (Segment::Field(_), false) => write!(f, "{segment}")?,
+                (Segment::Index(_), true) => write!(f, r#"[{segment}]."#)?,
+                (Segment::Index(_), false) => write!(f, "[{segment}]")?,
+                (Segment::Coalesce(_), true) => write!(f, r#"{segment}."#)?,
+                (Segment::Coalesce(_), false) => write!(f, "{segment}")?,
             }
         }
         Ok(())

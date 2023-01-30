@@ -58,18 +58,18 @@ impl SecretBackendLoader {
         let secrets = self.secret_keys.iter().flat_map(|(backend_name, keys)| {
             match self.backends.get_mut(&ComponentKey::from(backend_name.clone())) {
                 None => {
-                    vec![Err(format!("Backend \"{}\" is required for secret retrieval but was not found in config.", backend_name))]
+                    vec![Err(format!("Backend \"{backend_name}\" is required for secret retrieval but was not found in config."))]
                 },
                 Some(backend) => {
                     debug!(message = "Retrieving secret from a backend.", backend = ?backend_name);
                     match backend.retrieve(keys.clone(), signal_rx) {
                         Err(e) => {
-                            vec![Err(format!("Error while retrieving secret from backend \"{}\": {}.", backend_name, e))]
+                            vec![Err(format!("Error while retrieving secret from backend \"{backend_name}\": {e}."))]
                         },
                         Ok(s) => {
                             s.into_iter().map(|(k, v)| {
                                 trace!(message = "Successfully retrieved a secret.", backend = ?backend_name, secret_key = ?k);
-                                Ok((format!("{}.{}", backend_name, k), v))
+                                Ok((format!("{backend_name}.{k}"), v))
                             }).collect::<Vec<Result<(String, String), String>>>()
                         }
                     }

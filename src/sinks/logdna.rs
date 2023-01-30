@@ -304,7 +304,7 @@ impl LogdnaConfig {
             .map(|endpoint| endpoint.uri)
             .unwrap_or_else(|| HOST.clone());
 
-        let uri = format!("{}{}?{}", host, PATH, query);
+        let uri = format!("{host}{PATH}?{query}");
 
         uri.parse::<http::Uri>()
             .expect("This should be a valid uri")
@@ -418,7 +418,7 @@ mod tests {
         let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        let endpoint = format!("http://{}", addr).parse::<http::Uri>().unwrap();
+        let endpoint = format!("http://{addr}").parse::<http::Uri>().unwrap();
         config.endpoint = Some(endpoint.into());
 
         let (sink, _) = config.build(cx).await.unwrap();
@@ -476,7 +476,7 @@ mod tests {
                 let (p, host) = hosts
                     .iter()
                     .enumerate()
-                    .find(|(_, host)| query.contains(&format!("hostname={}", host)))
+                    .find(|(_, host)| query.contains(&format!("hostname={host}")))
                     .expect("invalid hostname");
                 let lines = &partitions[p];
 

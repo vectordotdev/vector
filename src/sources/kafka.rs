@@ -902,8 +902,8 @@ mod integration_test {
         let producer: FutureProducer = client_config(None);
 
         for i in 0..count {
-            let text = format!("{} {:03}", TEXT, i);
-            let key = format!("{} {}", KEY, i);
+            let text = format!("{TEXT} {i:03}");
+            let key = format!("{KEY} {i}");
             let record = FutureRecord::to(&topic)
                 .payload(&text)
                 .key(&key)
@@ -914,7 +914,7 @@ mod integration_test {
                 }));
 
             if let Err(error) = producer.send(record, Timeout::Never).await {
-                panic!("Cannot send event to Kafka: {:?}", error);
+                panic!("Cannot send event to Kafka: {error:?}");
             }
         }
 
@@ -998,12 +998,9 @@ mod integration_test {
             if let LogNamespace::Legacy = log_namespace {
                 assert_eq!(
                     event.as_log()[log_schema().message_key()],
-                    format!("{} {:03}", TEXT, i).into()
+                    format!("{TEXT} {i:03}").into()
                 );
-                assert_eq!(
-                    event.as_log()["message_key"],
-                    format!("{} {}", KEY, i).into()
-                );
+                assert_eq!(event.as_log()["message_key"], format!("{KEY} {i}").into());
                 assert_eq!(
                     event.as_log()[log_schema().source_type_key()],
                     "kafka".into()
@@ -1032,11 +1029,11 @@ mod integration_test {
 
                 assert_eq!(
                     event.as_log().value(),
-                    &vrl::value!(format!("{} {:03}", TEXT, i))
+                    &vrl::value!(format!("{TEXT} {i:03}"))
                 );
                 assert_eq!(
                     meta.get(path!("kafka", "message_key")).unwrap(),
-                    &vrl::value!(format!("{} {}", KEY, i))
+                    &vrl::value!(format!("{KEY} {i}"))
                 );
 
                 assert_eq!(
@@ -1216,14 +1213,14 @@ mod integration_test {
             Offset::Offset(offset) => {
                 assert!((offset as isize - events1.len() as isize).abs() <= 1)
             }
-            o => panic!("Invalid offset for partition 0 {:?}", o),
+            o => panic!("Invalid offset for partition 0 {o:?}"),
         }
 
         match fetch_tpl_offset(&group_id, &topic, 1) {
             Offset::Offset(offset) => {
                 assert!((offset as isize - events2.len() as isize).abs() <= 1)
             }
-            o => panic!("Invalid offset for partition 0 {:?}", o),
+            o => panic!("Invalid offset for partition 0 {o:?}"),
         }
 
         let mut all_events = events1

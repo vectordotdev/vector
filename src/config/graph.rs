@@ -138,8 +138,7 @@ impl Graph {
                 _ => panic!("only transforms and sinks have inputs"),
             };
             Err(format!(
-                "Input \"{}\" for {} \"{}\" doesn't match any components.",
-                from, output_type, to
+                "Input \"{from}\" for {output_type} \"{to}\" doesn't match any components."
             ))
         }
     }
@@ -288,7 +287,7 @@ impl Graph {
 
         for id in self.valid_inputs() {
             if let Some(_other) = mapped.insert(id.to_string(), id.clone()) {
-                errors.insert(format!("Input specifier {} is ambiguous", id));
+                errors.insert(format!("Input specifier {id} is ambiguous"));
             }
         }
 

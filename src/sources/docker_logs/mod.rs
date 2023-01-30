@@ -966,7 +966,7 @@ impl ContainerLogInfo {
     fn log_since(&self) -> i64 {
         self.last_log
             .as_ref()
-            .map(|&(ref d, _)| d.timestamp())
+            .map(|(d, _)| d.timestamp())
             .unwrap_or_else(|| self.created.timestamp())
             - 1
     }

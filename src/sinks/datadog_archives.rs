@@ -364,7 +364,7 @@ impl DatadogArchivesSinkConfig {
         match s3_options.storage_class {
             Some(class @ S3StorageClass::DeepArchive) | Some(class @ S3StorageClass::Glacier) => {
                 return Err(ConfigError::UnsupportedStorageClass {
-                    storage_class: format!("{:?}", class),
+                    storage_class: format!("{class:?}"),
                 });
             }
             _ => (),
@@ -1161,7 +1161,7 @@ mod tests {
             } else {
                 assert_eq!(
                     res.err().unwrap().to_string(),
-                    format!(r#"Unsupported storage class: {:?}"#, class)
+                    format!(r#"Unsupported storage class: {class:?}"#)
                 );
             }
         }

@@ -425,9 +425,9 @@ async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
         Err(err) => match err {
             SdkError::ServiceError { err, raw: _ } => match err.kind {
                 CreateBucketErrorKind::BucketAlreadyOwnedByYou(_) => {}
-                err => panic!("Failed to create bucket: {:?}", err),
+                err => panic!("Failed to create bucket: {err:?}"),
             },
-            err => panic!("Failed to create bucket: {:?}", err),
+            err => panic!("Failed to create bucket: {err:?}"),
         },
     }
 }

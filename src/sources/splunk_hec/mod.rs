@@ -1272,7 +1272,7 @@ mod tests {
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
             default_token: TOKEN.to_owned().into(),
-            endpoint: format!("http://{}", address),
+            endpoint: format!("http://{address}"),
             host_key: "host".to_owned(),
             indexed_fields: vec![],
             index: None,
@@ -1357,8 +1357,8 @@ mod tests {
         opts: &SendWithOpts<'_>,
     ) -> RequestBuilder {
         let mut b = reqwest::Client::new()
-            .post(format!("http://{}/{}", address, api))
-            .header("Authorization", format!("Splunk {}", token));
+            .post(format!("http://{address}/{api}"))
+            .header("Authorization", format!("Splunk {token}"));
 
         b = match opts.channel {
             Some(c) => match c {
@@ -1451,7 +1451,7 @@ mod tests {
         .await;
 
         let messages = (0..n)
-            .map(|i| format!("multiple_simple_text_event_{}", i))
+            .map(|i| format!("multiple_simple_text_event_{i}"))
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
 
@@ -1498,7 +1498,7 @@ mod tests {
         .await;
 
         let messages = (0..n)
-            .map(|i| format!("multiple_simple_json_event{}", i))
+            .map(|i| format!("multiple_simple_json_event{i}"))
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
 
@@ -1736,7 +1736,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(&format!("http://{}/services/collector/health", address))
+            .get(&format!("http://{address}/services/collector/health"))
             .header("Authorization", format!("Splunk {}", "invalid token"))
             .send()
             .await
@@ -1750,7 +1750,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(&format!("http://{}/services/collector/health", address))
+            .get(&format!("http://{address}/services/collector/health"))
             .send()
             .await
             .unwrap();
@@ -1955,7 +1955,7 @@ mod tests {
                 "http://{}/{}",
                 address, "services/collector/event"
             ))
-            .header("Authorization", format!("Splunk {}", TOKEN))
+            .header("Authorization", format!("Splunk {TOKEN}"))
             .body::<&[u8]>(message);
 
         assert_eq!(200, b.send().await.unwrap().status().as_u16());
