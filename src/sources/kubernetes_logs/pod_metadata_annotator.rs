@@ -29,6 +29,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_name"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_name"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_name: OptionalTargetPath,
 
@@ -36,6 +37,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_ns"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_ns"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_namespace: OptionalTargetPath,
 
@@ -43,6 +45,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_uid"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_uid"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_uid: OptionalTargetPath,
 
@@ -50,6 +53,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_ip"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_ip"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_ip: OptionalTargetPath,
 
@@ -57,6 +61,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_ips"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_ips"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_ips: OptionalTargetPath,
 
@@ -64,6 +69,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_labels"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_labels"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_labels: OptionalTargetPath,
 
@@ -71,6 +77,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_annotations"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_annotations"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_annotations: OptionalTargetPath,
 
@@ -78,6 +85,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_host"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_host"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_node_name: OptionalTargetPath,
 
@@ -85,6 +93,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_owner"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_owner"))]
     #[configurable(metadata(docs::examples = ""))]
     pub pod_owner: OptionalTargetPath,
 
@@ -92,6 +101,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.container_name"))]
+    #[configurable(metadata(docs::examples = "k8s.container_name"))]
     #[configurable(metadata(docs::examples = ""))]
     pub container_name: OptionalTargetPath,
 
@@ -99,6 +109,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.container_id"))]
+    #[configurable(metadata(docs::examples = "k8s.container_id"))]
     #[configurable(metadata(docs::examples = ""))]
     pub container_id: OptionalTargetPath,
 
@@ -106,6 +117,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.container_image"))]
+    #[configurable(metadata(docs::examples = "k8s.container_image"))]
     #[configurable(metadata(docs::examples = ""))]
     pub container_image: OptionalTargetPath,
 }

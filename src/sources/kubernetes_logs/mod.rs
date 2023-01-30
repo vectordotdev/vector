@@ -205,15 +205,17 @@ pub struct Config {
     /// This is useful to compute the latency between important event processing
     /// stages. For example, the time delta between when a log line was written and when it was
     /// processed by the `kubernetes_logs` source.
-    #[configurable(metadata(docs::examples = ".ingest_timestamp"))]
+    #[configurable(metadata(docs::examples = ".ingest_timestamp", docs::examples = "ingest_ts"))]
     ingestion_timestamp_field: Option<OptionalTargetPath>,
 
     /// The default time zone for timestamps without an explicit zone.
     timezone: Option<TimeZone>,
 
-    /// Optional path to a readable kubeconfig file.
+    /// Optional path to a readable [kubeconfig][kubeconfig] file.
     ///
     /// If not set, a connection to Kubernetes is made using the in-cluster configuration.
+    ///
+    /// [kubeconfig]: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
     #[configurable(metadata(docs::examples = "/path/to/.kube/config"))]
     kube_config_file: Option<PathBuf>,
 

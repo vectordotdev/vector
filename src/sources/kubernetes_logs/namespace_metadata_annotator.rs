@@ -22,6 +22,7 @@ pub struct FieldsSpec {
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.ns_labels"))]
+    #[configurable(metadata(docs::examples = "k8s.ns_labels"))]
     #[configurable(metadata(docs::examples = ""))]
     pub namespace_labels: OptionalTargetPath,
 }
