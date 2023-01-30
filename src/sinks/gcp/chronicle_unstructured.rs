@@ -99,13 +99,19 @@ impl SinkBatchSettings for ChronicleUnstructuredDefaultBatchSettings {
 #[derive(Clone, Debug)]
 pub struct ChronicleUnstructuredConfig {
     /// The endpoint to send data to.
+    #[configurable(metadata(
+        docs::examples = "127.0.0.1:8080",
+        docs::examples = "example.com:12345"
+    ))]
     pub endpoint: Option<String>,
 
+    /// The GCP region to use.
     #[configurable(derived)]
     pub region: Option<Region>,
 
     /// The Unique identifier (UUID) corresponding to the Chronicle instance.
     #[configurable(validation(format = "uuid"))]
+    #[configurable(metadata(docs::examples = "c8c65bfa-5f2c-42d4-9189-64bb7b939f2c"))]
     pub customer_id: String,
 
     #[serde(flatten)]
@@ -131,6 +137,7 @@ pub struct ChronicleUnstructuredConfig {
     /// Chronicle will reject the entry with an error.
     ///
     /// [unstructured_log_types_doc]: https://cloud.google.com/chronicle/docs/ingestion/parser-list/supported-default-parsers
+    #[configurable(metadata(docs::examples = "WINDOWS_DNS", docs::examples = "{{ log_type }}"))]
     pub log_type: Template,
 
     #[configurable(derived)]
