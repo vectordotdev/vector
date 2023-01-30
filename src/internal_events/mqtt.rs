@@ -7,20 +7,6 @@ use vector_core::internal_event::InternalEvent;
 use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
-pub struct MqttConnectionShutdown;
-
-impl InternalEvent for MqttConnectionShutdown {
-    fn emit(self) {
-        warn!(message = "Closed by the server.");
-        counter!("connection_shutdown_total", 1);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("MqttConnectionShutdown")
-    }
-}
-
-#[derive(Debug)]
 pub struct MqttConnectionError {
     pub error: ConnectionError,
 }
