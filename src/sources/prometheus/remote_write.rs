@@ -347,8 +347,8 @@ mod integration_tests {
     use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PUSH_SOURCE_TAGS};
 
     fn source_receive_address() -> SocketAddr {
-        let address =
-            std::env::var("SOURCE_RECEIVE_ADDRESS").unwrap_or_else(|_| "runner:9102".into());
+        let address = std::env::var("REMOTE_WRITE_SOURCE_RECEIVE_ADDRESS")
+            .unwrap_or_else(|_| "127.0.0.1:9102".into());
         // TODO: This logic should maybe be moved up into the source, and possibly into other
         // sources, wrapped in a new socket address type that does the lookup during config parsing.
         address
