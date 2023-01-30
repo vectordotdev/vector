@@ -152,7 +152,7 @@ impl From<HttpMethod> for Method {
     }
 }
 
-fn default_http_method() -> HttpMethod {
+const fn default_http_method() -> HttpMethod {
     HttpMethod::Get
 }
 
