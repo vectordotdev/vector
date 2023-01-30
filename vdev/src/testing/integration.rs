@@ -8,7 +8,11 @@ use super::runner::{
 };
 use super::state::EnvsDir;
 use crate::app::{self, CommandExt as _};
-use crate::util::exists;
+use crate::util;
+
+/// Unix permissions mask to allow everybody to read a file
+#[cfg(unix)]
+const ALL_READ: u32 = 0o444;
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 
@@ -22,7 +26,7 @@ fn old_integration_path(integration: &str) -> PathBuf {
 
 pub fn old_exists(integration: &str) -> Result<bool> {
     let path = old_integration_path(integration);
-    exists(path)
+    util::exists(path)
 }
 
 /// Temporary runner setup for old-style integration tests
@@ -73,6 +77,7 @@ pub struct IntegrationTest {
     config: IntegrationTestConfig,
     envs_dir: EnvsDir,
     runner: IntegrationTestRunner,
+    compose_path: PathBuf,
 }
 
 impl IntegrationTest {
@@ -82,6 +87,10 @@ impl IntegrationTest {
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
         let envs_dir = EnvsDir::new(&integration);
         let runner = IntegrationTestRunner::new(integration.clone())?;
+        let compose_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
+        let compose_path = dunce::canonicalize(&compose_path).with_context(|| {
+            format!("Could not canonicalize docker compose path {compose_path:?}")
+        })?;
 
         Ok(Self {
             integration,
@@ -90,6 +99,7 @@ impl IntegrationTest {
             config,
             envs_dir,
             runner,
+            compose_path,
         })
     }
 
@@ -122,6 +132,7 @@ impl IntegrationTest {
             bail!("environment is already up");
         }
 
+        self.prepare_compose()?;
         self.run_compose("Starting", &["up", "--detach"], cmd_config)?;
 
         self.envs_dir.save(&self.environment, cmd_config)
@@ -143,17 +154,50 @@ impl IntegrationTest {
         Ok(())
     }
 
-    fn run_compose(&self, action: &str, args: &[&'static str], config: &Environment) -> Result<()> {
-        let compose_path: PathBuf = [&self.test_dir, Path::new("compose.yaml")].iter().collect();
-        let compose_file = dunce::canonicalize(compose_path)
-            .context("Could not canonicalize docker compose path")?
-            .display()
-            .to_string();
+    #[allow(clippy::dbg_macro)]
+    // Fix up potential issues before starting a compose container
+    fn prepare_compose(&self) -> Result<()> {
+        #[cfg(unix)]
+        {
+            use super::config::ComposeConfig;
+            use std::fs::{self, Permissions};
+            use std::os::unix::fs::PermissionsExt as _;
 
+            let compose_config = ComposeConfig::parse(Path::new(&self.compose_path))?;
+            for service in compose_config.services.values() {
+                // Make sure all volume files are world readable
+                if let Some(volumes) = &service.volumes {
+                    for volume in volumes {
+                        let source = volume
+                            .split_once(':')
+                            .expect("Invalid volume in compose file")
+                            .0;
+                        let path: PathBuf = [&self.test_dir, Path::new(source)].iter().collect();
+                        if path.is_file() {
+                            let perms = path
+                                .metadata()
+                                .with_context(|| format!("Could not get permissions on {path:?}"))?
+                                .permissions();
+                            let new_perms = Permissions::from_mode(perms.mode() | ALL_READ);
+                            if new_perms != perms {
+                                fs::set_permissions(&path, new_perms).with_context(|| {
+                                    format!("Could not set permissions on {path:?}")
+                                })?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn run_compose(&self, action: &str, args: &[&'static str], config: &Environment) -> Result<()> {
         let mut command = CONTAINER_TOOL.clone();
         command.push("-compose");
         let mut command = Command::new(command);
-        command.args(["--file", &compose_file]);
+        let compose_arg = self.compose_path.display().to_string();
+        command.args(["--file", &compose_arg]);
         command.args(args);
 
         command.current_dir(&self.test_dir);
