@@ -361,7 +361,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			}
 			retry_initial_backoff_secs: {
 				description: """
-					The maximum amount of time to wait before attempting the first retry for a failed request.
+					The amount of time to wait before attempting the first retry for a failed request.
 
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
