@@ -58,7 +58,11 @@ enum TcpError {
 pub struct TcpSinkConfig {
     /// The address to connect to.
     ///
+    /// Both IP address and hostname are accepted formats.
+    ///
     /// The address _must_ include a port.
+    #[configurable(metadata(docs::examples = "92.12.333.224:5000"))]
+    #[configurable(metadata(docs::examples = "https://somehost:5000"))]
     address: String,
 
     #[configurable(derived)]
@@ -67,9 +71,11 @@ pub struct TcpSinkConfig {
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    /// The size, in bytes, of the socket's send buffer.
+    /// The size of the socket's send buffer.
     ///
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     send_buffer_bytes: Option<usize>,
 }
 

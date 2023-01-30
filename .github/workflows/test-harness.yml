@@ -18,7 +18,7 @@ jobs:
 
     steps:
     - name: Indicate that we picked up the command with a comment reaction
-      uses: actions/github-script@v6.3.3
+      uses: actions/github-script@v6.4.0
       with:
         github-token: '${{secrets.GITHUB_TOKEN}}'
         script: |
@@ -38,7 +38,7 @@ jobs:
 
     - name: Get Pull Request info
       id: pr-info
-      uses: actions/github-script@v6.3.3
+      uses: actions/github-script@v6.4.0
       with:
         script: |
           const pr_info_response = await github.pulls.get({
@@ -111,7 +111,7 @@ jobs:
         AWS_DEFAULT_REGION: '${{ secrets.TEST_HARNESS_AWS_DEFAULT_REGION }}'
 
     - name: Post a comment with the results
-      uses: actions/github-script@v6.3.3
+      uses: actions/github-script@v6.4.0
       with:
         github-token: '${{secrets.GITHUB_TOKEN}}'
         script: |

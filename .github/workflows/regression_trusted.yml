@@ -83,7 +83,7 @@ jobs:
         # https://octokit.github.io/rest.js/v19#custom-requests
         # `github-script` aliases `octokit` to the `github` namespace.
       - name: 'Download metadata'
-        uses: actions/github-script@v6.3.3
+        uses: actions/github-script@v6.4.0
         with:
           script: |
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
@@ -153,7 +153,7 @@ jobs:
         # https://octokit.github.io/rest.js/v19#custom-requests
         # `github-script` aliases `octokit` to the `github` namespace.
       - name: 'Download baseline image'
-        uses: actions/github-script@v6.3.3
+        uses: actions/github-script@v6.4.0
         with:
           script: |
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
@@ -221,7 +221,7 @@ jobs:
         # https://octokit.github.io/rest.js/v19#custom-requests
         # `github-script` aliases `octokit` to the `github` namespace.
       - name: 'Download comparison image'
-        uses: actions/github-script@v6.3.3
+        uses: actions/github-script@v6.4.0
         with:
           script: |
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({

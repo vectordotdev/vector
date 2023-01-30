@@ -152,7 +152,7 @@ base: components: sinks: papertrail: configuration: {
 		description: "TCP keepalive settings for socket-based components."
 		required:    false
 		type: object: options: time_secs: {
-			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
+			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
 			required:    false
 			type: uint: unit: "seconds"
 		}
