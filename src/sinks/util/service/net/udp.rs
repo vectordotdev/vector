@@ -50,12 +50,16 @@ pub enum UdpError {
 pub struct UdpConnectorConfig {
     /// The address to connect to.
     ///
+    /// Both IP addresses and hostnames/fully-qualified domain names are accepted formats.
+    ///
     /// The address _must_ include a port.
     address: HostAndPort,
 
     /// The size of the socket's send buffer, in bytes.
     ///
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     send_buffer_size: Option<usize>,
 }
 

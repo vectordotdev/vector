@@ -45,12 +45,12 @@ pub enum UnixError {
 #[configurable_component]
 #[derive(Clone, Copy, Debug)]
 pub enum UnixMode {
-    /// Datagram-oriented mode.
+    /// Datagram-oriented.
     ///
     /// This corresponds to the socket having the `SOCK_DGRAM` type.
     Datagram,
 
-    /// Stream-oriented mode.
+    /// Stream-oriented.
     ///
     /// This corresponds to the socket having the `SOCK_STREAM` type.
     Stream,
@@ -63,6 +63,7 @@ pub struct UnixConnectorConfig {
     /// The Unix socket path.
     ///
     /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
     path: PathBuf,
 
     /// The Unix socket mode to use.
@@ -71,6 +72,8 @@ pub struct UnixConnectorConfig {
     /// The size of the socket's send buffer, in bytes.
     ///
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     send_buffer_size: Option<usize>,
 }
 

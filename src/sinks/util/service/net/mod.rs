@@ -12,6 +12,8 @@ use vector_config::configurable_component;
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(try_from = "String", into = "String")]
+#[configurable(metadata(docs::examples = "92.12.333.224:5000"))]
+#[configurable(metadata(docs::examples = "https://somehost:5000"))]
 struct HostAndPort {
     /// Hostname.
     host: String,

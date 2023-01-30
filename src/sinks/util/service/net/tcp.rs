@@ -15,10 +15,12 @@ use tokio::{
 use tower::Service;
 
 use vector_config::configurable_component;
+use vector_core::tcp::TcpKeepaliveConfig;
 
 use crate::{
     dns,
     internal_events::{TcpSocketConnectionEstablished, TcpSocketOutgoingConnectionError},
+    net,
     sinks::{util::retries::ExponentialBackoff, Healthcheck},
 };
 
@@ -54,12 +56,19 @@ pub enum TcpError {
 pub struct TcpConnectorConfig {
     /// The address to connect to.
     ///
+    /// Both IP addresses and hostnames/fully-qualified domain names are accepted formats.
+    ///
     /// The address _must_ include a port.
     address: HostAndPort,
+
+    #[configurable(derived)]
+    keepalive: Option<TcpKeepaliveConfig>,
 
     /// The size of the socket's send buffer, in bytes.
     ///
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     send_buffer_size: Option<u32>,
 }
 
@@ -67,13 +76,20 @@ impl TcpConnectorConfig {
     pub const fn from_address(host: String, port: u16) -> Self {
         Self {
             address: HostAndPort { host, port },
+            keepalive: None,
             send_buffer_size: None,
         }
+    }
+
+    pub const fn set_keepalive(mut self, keepalive: TcpKeepaliveConfig) -> Self {
+        self.keepalive = Some(keepalive);
+        self
     }
 
     pub fn as_connector(&self) -> TcpConnector {
         TcpConnector {
             address: self.address.clone(),
+            keepalive: self.keepalive,
             send_buffer_size: self.send_buffer_size,
         }
     }
@@ -82,6 +98,7 @@ impl TcpConnectorConfig {
 #[derive(Clone)]
 pub struct TcpConnector {
     address: HostAndPort,
+    keepalive: Option<TcpKeepaliveConfig>,
     send_buffer_size: Option<u32>,
 }
 
@@ -109,6 +126,16 @@ impl TcpConnector {
         }
 
         let stream = socket.connect(addr).await.context(FailedToConnectSnafu)?;
+
+        let maybe_keepalive_secs = self
+            .keepalive
+            .as_ref()
+            .and_then(|config| config.time_secs.map(Duration::from_secs));
+        if let Some(keepalive_secs) = maybe_keepalive_secs {
+            if let Err(error) = net::set_keepalive(&stream, keepalive_secs) {
+                warn!(%error, "Failed configuring keepalive on TCP socket.");
+            }
+        }
 
         Ok((addr, stream))
     }
