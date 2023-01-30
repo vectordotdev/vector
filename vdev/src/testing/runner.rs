@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::process::{Command, Stdio};
 use std::{env, ffi::OsString, path::PathBuf};
 
@@ -6,15 +6,15 @@ use anyhow::Result;
 use atty::Stream;
 use once_cell::sync::Lazy;
 
-use super::config::RustToolchainConfig;
+use super::config::{EnvConfig, RustToolchainConfig};
 use crate::app::{self, CommandExt as _};
 
-pub const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
 const VOLUME_TARGET: &str = "vector_target";
 const VOLUME_CARGO_GIT: &str = "vector_cargo_git";
 const VOLUME_CARGO_REGISTRY: &str = "vector_cargo_registry";
+const RUNNER_HOSTNAME: &str = "runner";
 const TEST_COMMAND: &[&str] = &[
     "cargo",
     "nextest",
@@ -26,7 +26,7 @@ const TEST_COMMAND: &[&str] = &[
 const UPSTREAM_IMAGE: &str =
     "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a";
 
-static CONTAINER_TOOL: Lazy<OsString> =
+pub static CONTAINER_TOOL: Lazy<OsString> =
     Lazy::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));
 
 fn detect_container_tool() -> OsString {
@@ -42,8 +42,7 @@ fn detect_container_tool() -> OsString {
             return OsString::from(String::from(tool));
         }
     }
-    critical!("No container tool could be detected.");
-    std::process::exit(1);
+    fatal!("No container tool could be detected.");
 }
 
 fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
@@ -52,7 +51,7 @@ fn dockercmd<'a>(args: impl IntoIterator<Item = &'a str>) -> Command {
     command
 }
 
-enum RunnerState {
+pub enum RunnerState {
     Running,
     Restarting,
     Created,
@@ -63,50 +62,58 @@ enum RunnerState {
     Unknown,
 }
 
-pub fn get_agent_test_runner(container: bool, rust_version: String) -> Box<dyn TestRunner> {
+pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
     if container {
-        Box::new(DockerTestRunner::new(rust_version))
+        Ok(Box::new(DockerTestRunner))
     } else {
-        Box::new(LocalTestRunner::new())
+        Ok(Box::new(LocalTestRunner))
     }
 }
 
 pub trait TestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()>;
+    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()>;
 }
 
-pub trait ContainerTestRunnerBase: TestRunner {
+pub trait ContainerTestRunner: TestRunner {
     fn container_name(&self) -> String;
 
     fn image_name(&self) -> String;
 
-    fn network_name(&self) -> String {
-        "host".to_string()
-    }
+    fn network_name(&self) -> String;
 
     fn stop(&self) -> Result<()> {
         dockercmd(["stop", "--time", "0", &self.container_name()])
             .wait(format!("Stopping container {}", self.container_name()))
     }
-}
 
-trait ContainerTestRunner: ContainerTestRunnerBase {
-    fn get_rust_version(&self) -> &str;
+    fn get_rust_version(&self) -> String {
+        match RustToolchainConfig::parse() {
+            Ok(config) => config.channel,
+            Err(error) => fatal!("Could not read `rust-toolchain.toml` file: {error}"),
+        }
+    }
 
     fn state(&self) -> Result<RunnerState> {
         let mut command = dockercmd(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
+        let container_name = self.container_name();
 
         for line in command.capture_output()?.lines() {
             if let Some((name, state)) = line.split_once(' ') {
-                if name == self.container_name() {
-                    return Ok(match state {
-                        "created" => RunnerState::Created,
-                        "dead" => RunnerState::Dead,
-                        "exited" => RunnerState::Exited,
-                        "paused" => RunnerState::Paused,
-                        "restarting" => RunnerState::Restarting,
-                        "running" => RunnerState::Running,
-                        _ => RunnerState::Unknown,
+                if name == container_name {
+                    return Ok(if state == "created" {
+                        RunnerState::Created
+                    } else if state == "dead" {
+                        RunnerState::Dead
+                    } else if state == "exited" || state.starts_with("Exited ") {
+                        RunnerState::Exited
+                    } else if state == "paused" {
+                        RunnerState::Paused
+                    } else if state == "restarting" {
+                        RunnerState::Restarting
+                    } else if state == "running" || state.starts_with("Up ") {
+                        RunnerState::Running
+                    } else {
+                        RunnerState::Unknown
                     });
                 }
             }
@@ -115,7 +122,7 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
         Ok(RunnerState::Missing)
     }
 
-    fn verify_state(&self) -> Result<()> {
+    fn ensure_running(&self) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
             RunnerState::Created | RunnerState::Exited => self.start()?,
@@ -184,8 +191,12 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
     }
 
     fn remove(&self) -> Result<()> {
-        dockercmd(["rm", &self.container_name()])
-            .wait(format!("Removing container {}", self.container_name()))
+        if matches!(self.state()?, RunnerState::Missing) {
+            Ok(())
+        } else {
+            dockercmd(["rm", "--force", "--volumes", &self.container_name()])
+                .wait(format!("Removing container {}", self.container_name()))
+        }
     }
 
     fn unpause(&self) -> Result<()> {
@@ -200,6 +211,8 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
             &self.container_name(),
             "--network",
             &self.network_name(),
+            "--hostname",
+            RUNNER_HOSTNAME,
             "--workdir",
             MOUNT_PATH,
             "--volume",
@@ -218,21 +231,49 @@ trait ContainerTestRunner: ContainerTestRunnerBase {
     }
 }
 
+impl<T> TestRunner for T
+where
+    T: ContainerTestRunner,
+{
+    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()> {
+        self.ensure_running()?;
+
+        let mut command = dockercmd(["exec"]);
+        if atty::is(Stream::Stdout) {
+            command.arg("--tty");
+        }
+
+        command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
+        if let Some(env_vars) = outer_env {
+            for (key, value) in env_vars {
+                command.env(key, value);
+                command.args(["--env", key]);
+            }
+        }
+        if let Some(env_vars) = inner_env {
+            for (key, value) in env_vars {
+                command.args(["--env", &format!("{key}={value}")]);
+            }
+        }
+
+        command.arg(&self.container_name());
+        command.args(TEST_COMMAND);
+        command.args(args);
+
+        command.check_run()
+    }
+}
+
 pub struct IntegrationTestRunner {
     integration: String,
-    rust_version: String,
 }
 
 impl IntegrationTestRunner {
     pub fn new(integration: String) -> Result<Self> {
-        let rust_version = RustToolchainConfig::parse()?.channel;
-        Ok(Self {
-            integration,
-            rust_version,
-        })
+        Ok(Self { integration })
     }
 
-    pub fn ensure_network(&self) -> Result<()> {
+    pub(super) fn ensure_network(&self) -> Result<()> {
         let mut command = dockercmd(["network", "ls", "--format", "{{.Name}}"]);
 
         if command
@@ -247,30 +288,7 @@ impl IntegrationTestRunner {
     }
 }
 
-impl TestRunner for IntegrationTestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
-        self.verify_state()?;
-
-        let mut command = dockercmd(["exec"]);
-        if atty::is(Stream::Stdout) {
-            command.arg("--tty");
-        }
-
-        command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
-        for (key, value) in env_vars {
-            command.env(key, value);
-            command.args(["--env", key]);
-        }
-
-        command.arg(&self.container_name());
-        command.args(TEST_COMMAND);
-        command.args(args);
-
-        command.check_run()
-    }
-}
-
-impl ContainerTestRunnerBase for IntegrationTestRunner {
+impl ContainerTestRunner for IntegrationTestRunner {
     fn network_name(&self) -> String {
         format!("vector-integration-tests-{}", self.integration)
     }
@@ -278,7 +296,8 @@ impl ContainerTestRunnerBase for IntegrationTestRunner {
     fn container_name(&self) -> String {
         format!(
             "vector-test-runner-{}-{}",
-            self.integration, self.rust_version
+            self.integration,
+            self.get_rust_version()
         )
     }
 
@@ -287,48 +306,15 @@ impl ContainerTestRunnerBase for IntegrationTestRunner {
     }
 }
 
-impl ContainerTestRunner for IntegrationTestRunner {
-    fn get_rust_version(&self) -> &str {
-        &self.rust_version
+pub struct DockerTestRunner;
+
+impl ContainerTestRunner for DockerTestRunner {
+    fn network_name(&self) -> String {
+        "host".to_string()
     }
-}
 
-pub struct DockerTestRunner {
-    rust_version: String,
-}
-
-impl DockerTestRunner {
-    pub fn new(rust_version: String) -> Self {
-        Self { rust_version }
-    }
-}
-
-impl TestRunner for DockerTestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
-        self.verify_state()?;
-
-        let mut command = dockercmd(["exec"]);
-        if atty::is(Stream::Stdout) {
-            command.arg("--tty");
-        }
-
-        command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
-        for (key, value) in env_vars {
-            command.env(key, value);
-            command.args(["--env", key]);
-        }
-
-        command.arg(&self.container_name());
-        command.args(TEST_COMMAND);
-        command.args(args);
-
-        command.check_run()
-    }
-}
-
-impl ContainerTestRunnerBase for DockerTestRunner {
     fn container_name(&self) -> String {
-        format!("vector-test-runner-{}", self.rust_version)
+        format!("vector-test-runner-{}", self.get_rust_version())
     }
 
     fn image_name(&self) -> String {
@@ -336,28 +322,23 @@ impl ContainerTestRunnerBase for DockerTestRunner {
     }
 }
 
-impl ContainerTestRunner for DockerTestRunner {
-    fn get_rust_version(&self) -> &str {
-        &self.rust_version
-    }
-}
-
-pub struct LocalTestRunner {}
-
-impl LocalTestRunner {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+pub struct LocalTestRunner;
 
 impl TestRunner for LocalTestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
+    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);
         command.args(args);
 
-        for (key, value) in env_vars {
-            command.env(key, value);
+        if let Some(env_vars) = outer_env {
+            for (key, value) in env_vars {
+                command.env(key, value);
+            }
+        }
+        if let Some(env_vars) = inner_env {
+            for (key, value) in env_vars {
+                command.env(key, value);
+            }
         }
 
         command.check_run()

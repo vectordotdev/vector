@@ -258,7 +258,7 @@ components: transforms: log_to_metric: {
 		{
 			title: "Set"
 			notes: """
-				In this example we'll demonstrate how to use sets. Sets are primarily a Statsd concept
+				In this example we'll demonstrate how to use sets. Sets are primarily a StatsD concept
 				that represent the number of unique values seen for a given metric.
 				The idea is that you pass the unique/high-cardinality value as the metric value
 				and the metric store will count the number of unique values seen.

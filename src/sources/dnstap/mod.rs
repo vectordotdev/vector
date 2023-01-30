@@ -30,8 +30,11 @@ use vector_core::config::{LegacyKey, LogNamespace};
 #[configurable_component(source("dnstap"))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
-    /// Maximum length, in bytes, that a frame can be.
+    /// Maximum DNSTAP frame length that the source will accept.
+    ///
+    /// If any frame is longer than this, it will be discarded.
     #[serde(default = "default_max_frame_length")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_frame_length: usize,
 
     /// Overrides the name of the log field used to add the source path to each event.
@@ -45,8 +48,8 @@ pub struct DnstapConfig {
 
     /// Absolute path to the socket file to read DNSTAP data from.
     ///
-    /// The DNS server must be configured to send its DNSTAP data to this socket file. The socket file will be created,
-    /// if it doesn't already exist, when the source first starts.
+    /// The DNS server must be configured to send its DNSTAP data to this socket file. The socket file will be created
+    /// if it doesn't already exist when the source first starts.
     pub socket_path: PathBuf,
 
     /// Whether or not to skip parsing/decoding of DNSTAP frames.
@@ -76,9 +79,11 @@ pub struct DnstapConfig {
     /// The size, in bytes, of the send buffer used for the socket.
     ///
     /// This should not typically needed to be changed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     pub socket_send_buffer_size: Option<usize>,
 
     /// The namespace to use for logs. This overrides the global settings.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
 }

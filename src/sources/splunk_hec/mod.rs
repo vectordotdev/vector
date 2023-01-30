@@ -59,7 +59,7 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     ///
     /// The address _must_ include a port.
     #[serde(default = "default_socket_address")]
@@ -71,7 +71,9 @@ pub struct SplunkConfig {
     /// it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "This option has been deprecated, the *valid_tokens* option should be used."
+    )]
     token: Option<SensitiveString>,
 
     /// Optional list of valid authorization tokens.
@@ -80,6 +82,7 @@ pub struct SplunkConfig {
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     valid_tokens: Option<Vec<SensitiveString>>,
 
     /// Whether or not to forward the Splunk HEC authentication token with events.

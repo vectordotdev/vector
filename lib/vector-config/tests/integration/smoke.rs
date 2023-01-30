@@ -371,7 +371,7 @@ pub mod vector_v2 {
     #[derive(Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct VectorConfig {
-        /// The address to listen for connections on.
+        /// The socket address to listen for connections on.
         ///
         /// It _must_ include a port.
         pub address: SocketAddr,

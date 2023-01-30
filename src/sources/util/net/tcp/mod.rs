@@ -108,7 +108,7 @@ where
         self,
         addr: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
-        shutdown_timeout_secs: u64,
+        shutdown_timeout_secs: Duration,
         tls: MaybeTlsSettings,
         tls_client_metadata_key: Option<OwnedValuePath>,
         receive_buffer_bytes: Option<usize>,
@@ -142,7 +142,7 @@ where
             let tripwire = cx.shutdown.clone();
             let tripwire = async move {
                 let _ = tripwire.await;
-                sleep(Duration::from_secs(shutdown_timeout_secs)).await;
+                sleep(shutdown_timeout_secs).await;
             }
             .shared();
 

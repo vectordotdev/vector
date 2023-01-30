@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
+use std::{net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -46,6 +46,7 @@ pub struct SyslogConfig {
     ///
     /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
     max_length: usize,
 
     /// Overrides the name of the log field used to add the peer host to each event.
@@ -72,7 +73,7 @@ pub struct SyslogConfig {
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        /// The address to listen for connections on.
+        #[configurable(derived)]
         address: SocketListenAddr,
 
         #[configurable(derived)]
@@ -81,9 +82,10 @@ pub enum Mode {
         #[configurable(derived)]
         tls: Option<TlsSourceConfig>,
 
-        /// The size, in bytes, of the receive buffer used for each connection.
+        /// The size of the receive buffer used for each connection.
         ///
         /// This should not typically needed to be changed.
+        #[configurable(metadata(docs::type_unit = "bytes"))]
         receive_buffer_bytes: Option<usize>,
 
         /// The maximum number of TCP connections that will be allowed at any given time.
@@ -92,12 +94,13 @@ pub enum Mode {
 
     /// Listen on UDP.
     Udp {
-        /// The address to listen for messages on.
+        #[configurable(derived)]
         address: SocketListenAddr,
 
-        /// The size, in bytes, of the receive buffer used for the listening socket.
+        /// The size of the receive buffer used for the listening socket.
         ///
         /// This should not typically needed to be changed.
+        #[configurable(metadata(docs::type_unit = "bytes"))]
         receive_buffer_bytes: Option<usize>,
     },
 
@@ -107,6 +110,7 @@ pub enum Mode {
         /// The Unix socket path.
         ///
         /// This should be an absolute path.
+        #[configurable(metadata(docs::examples = "/path/to/socket"))]
         path: PathBuf,
 
         /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
@@ -174,7 +178,7 @@ impl SourceConfig for SyslogConfig {
                     host_key,
                     log_namespace,
                 };
-                let shutdown_secs = 30;
+                let shutdown_secs = Duration::from_secs(30);
                 let tls_config = tls.as_ref().map(|tls| tls.tls_config.clone());
                 let tls_client_metadata_key = tls
                     .as_ref()

@@ -33,12 +33,10 @@ impl Cli {
         }
 
         command.arg("--features");
-        if !self.feature.is_empty() {
-            command.args([self.feature.join(",")]);
-        } else if cfg!(windows) {
-            command.arg("default-msvc");
+        if self.feature.is_empty() {
+            command.arg(platform::default_features());
         } else {
-            command.arg("default");
+            command.arg(self.feature.join(","));
         }
 
         let target = self.target.unwrap_or_else(platform::default_target);

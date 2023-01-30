@@ -59,6 +59,14 @@ where
     // the original value is a flag, or the value being added to an existing key is a flag, as
     // having a flag declared multiple times, or mixing a flag with a KV pair, doesn't make sense.
     let mut custom_map = Map::new();
+
+    if let Some(message) = metadata.deprecated_message() {
+        custom_map.insert(
+            "deprecated_message".to_string(),
+            serde_json::Value::String(message.to_string()),
+        );
+    }
+
     for attribute in metadata.custom_attributes() {
         match attribute {
             CustomAttribute::Flag(key) => {
@@ -425,6 +433,9 @@ pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
 where
     T: Configurable + Serialize,
 {
+    // Set env variable to enable generating all schemas, including platform-specific ones.
+    std::env::set_var("VECTOR_GENERATE_SCHEMA", "true");
+
     let mut schema_gen = SchemaSettings::draft2019_09().into_generator();
 
     let schema = get_or_generate_schema::<T>(&mut schema_gen, T::metadata())?;
