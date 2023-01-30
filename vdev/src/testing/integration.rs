@@ -223,8 +223,11 @@ mod unix {
                         .split_once(':')
                         .expect("Invalid volume in compose file")
                         .0;
-                    let path: PathBuf = [test_dir, Path::new(source)].iter().collect();
-                    add_read_permission(&path)?;
+                    // Only fixup relative paths, i.e. within our source tree.
+                    if !source.starts_with('/') && !source.starts_with('$') {
+                        let path: PathBuf = [test_dir, Path::new(source)].iter().collect();
+                        add_read_permission(&path)?;
+                    }
                 }
             }
         }
