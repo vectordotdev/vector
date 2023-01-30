@@ -57,7 +57,6 @@ use crate::{
     SourceSender,
 };
 
-const DEFAULT_BATCH_SIZE: usize = 16;
 const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
@@ -95,55 +94,77 @@ type Matches = HashMap<String, HashSet<String>>;
 
 /// Configuration for the `journald` source.
 #[configurable_component(source("journald"))]
-#[derive(Clone, Debug, Default)]
-#[serde(deny_unknown_fields, default)]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct JournaldConfig {
     /// Only include entries that appended to the journal after the entries have been read.
-    pub since_now: Option<bool>,
+    #[serde(default)]
+    pub since_now: bool,
 
     /// Only include entries that occurred after the current boot of the system.
-    pub current_boot_only: Option<bool>,
+    #[serde(default = "crate::serde::default_true")]
+    pub current_boot_only: bool,
 
     /// The list of unit names to monitor.
     ///
-    /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
+    /// If empty or not present, all units are accepted. Unit names lacking a `.` will have
+    /// `.service` appended to make them a valid service unit name.
     // TODO: Why isn't this just an alias on `include_units`?
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     pub units: Vec<String>,
 
     /// A list of unit names to monitor.
     ///
-    /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
+    /// If empty or not present, all units are accepted. Unit names lacking a `.` will have
+    /// `.service` appended to make them a valid service unit name.
+    #[configurable(metadata(docs::examples = "ntpd", docs::examples = "sysinit.target"))]
     pub include_units: Vec<String>,
 
     /// A list of unit names to exclude from monitoring.
     ///
-    /// Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
+    /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit
+    /// name.
+    #[configurable(metadata(docs::examples = "badservice", docs::examples = "sysinit.target"))]
     pub exclude_units: Vec<String>,
 
     /// A list of sets of field/value pairs to monitor.
     ///
-    /// If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
-    #[configurable(metadata(docs::additional_props_description = "A field/value pair."))]
+    /// If empty or not present, all journal fields are accepted. If `include_units` is specified,
+    /// it will be merged into this list.
+    #[configurable(metadata(
+        docs::additional_props_description = "The set of field values to match in journal entries that are to be included."
+    ))]
+    #[configurable(metadata(docs::examples = "matches_examples()"))]
     pub include_matches: Matches,
 
-    /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source.
+    /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause
+    /// the entry to be excluded from this source.
     ///
     /// If `exclude_units` is specified, it will be merged into this list.
-    #[configurable(metadata(docs::additional_props_description = "A field/value pair."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "The set of field values to match in journal entries that are to be excluded."
+    ))]
+    #[configurable(metadata(docs::examples = "matches_examples()"))]
     pub exclude_matches: Matches,
 
     /// The directory used to persist file checkpoint positions.
     ///
-    /// By default, the global `data_dir` option is used. Make sure the running user has write permissions to this directory.
+    /// By default, the global `data_dir` option is used. Make sure the running user has write
+    /// permissions to this directory.
+    #[configurable(metadata(docs::examples = "/var/lib/vector"))]
     pub data_dir: Option<PathBuf>,
 
-    /// The `systemd` journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.
-    pub batch_size: Option<usize>,
+    /// The systemd journal is read in batches, and a checkpoint is set at the end of each batch.
+    ///
+    /// This option limits the size of the batch.
+    #[serde(default = "default_batch_size")]
+    #[configurable(metadata(docs::type_unit = "events"))]
+    pub batch_size: usize,
 
     /// The full path of the `journalctl` executable.
     ///
-    /// If not set, a search is done for the journalctl` path.
+    /// If not set, a search is done for the `journalctl` path.
     pub journalctl_path: Option<PathBuf>,
 
     /// The full path of the journal directory.
@@ -159,7 +180,9 @@ pub struct JournaldConfig {
     ///
     /// Has no effect unless the value of the field is already an integer.
     #[serde(default)]
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "This option has been deprecated, use the `remap` transform and `to_syslog_level` function instead."
+    )]
     remap_priority: bool,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -168,12 +191,34 @@ pub struct JournaldConfig {
     log_namespace: Option<bool>,
 }
 
+fn default_batch_size() -> usize {
+    16
+}
+
+fn matches_examples() -> Matches {
+    Matches::from_iter(
+        [
+            (
+                "_SYSTEMD_UNIT".to_owned(),
+                HashSet::from_iter(vec!["sshd.service".to_owned(), "ntpd.service".to_owned()]),
+            ),
+            (
+                "_TRANSPORT".to_owned(),
+                HashSet::from_iter(vec!["kernel".to_owned()]),
+            ),
+        ]
+        .into_iter(),
+    )
+}
+
 impl JournaldConfig {
     fn merged_include_matches(&self) -> crate::Result<Matches> {
         let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
             (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
             (true, false) => {
-                warn!("The `units` setting is deprecated, use `include_units` instead.");
+                warn!(
+                    "DEPRECATION, the `units` setting is deprecated, use `include_units` instead."
+                );
                 &self.units
             }
             (false, _) => &self.include_units,
@@ -244,6 +289,27 @@ impl JournaldConfig {
     }
 }
 
+impl Default for JournaldConfig {
+    fn default() -> Self {
+        Self {
+            since_now: false,
+            current_boot_only: true,
+            units: vec![],
+            include_units: vec![],
+            exclude_units: vec![],
+            include_matches: Default::default(),
+            exclude_matches: Default::default(),
+            data_dir: None,
+            batch_size: default_batch_size(),
+            journalctl_path: None,
+            journal_directory: None,
+            acknowledgements: Default::default(),
+            remap_priority: false,
+            log_namespace: None,
+        }
+    }
+}
+
 impl_generate_config_from_default!(JournaldConfig);
 
 type Record = HashMap<String, String>;
@@ -252,7 +318,7 @@ type Record = HashMap<String, String>;
 impl SourceConfig for JournaldConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {
-            warn!("Option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead.");
+            warn!("DEPRECATION, option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead.");
         }
 
         let data_dir = cx
@@ -287,11 +353,11 @@ impl SourceConfig for JournaldConfig {
         let starter = StartJournalctl::new(
             journalctl_path,
             self.journal_directory.clone(),
-            self.current_boot_only.unwrap_or(true),
-            self.since_now.unwrap_or(false),
+            self.current_boot_only,
+            self.since_now,
         );
 
-        let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
+        let batch_size = self.batch_size;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
