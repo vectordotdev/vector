@@ -78,6 +78,7 @@ pub struct IntegrationTest {
     envs_dir: EnvsDir,
     runner: IntegrationTestRunner,
     compose_path: PathBuf,
+    env_config: Environment,
 }
 
 impl IntegrationTest {
@@ -91,6 +92,9 @@ impl IntegrationTest {
         let compose_path = dunce::canonicalize(&compose_path).with_context(|| {
             format!("Could not canonicalize docker compose path {compose_path:?}")
         })?;
+        let Some(env_config) = config.environments().get(&environment).map(Clone::clone) else {
+            bail!("Could not find environment named {environment:?}");
+        };
 
         Ok(Self {
             integration,
@@ -100,6 +104,7 @@ impl IntegrationTest {
             envs_dir,
             runner,
             compose_path,
+            env_config,
         })
     }
 
@@ -110,7 +115,12 @@ impl IntegrationTest {
             self.start()?;
         }
 
-        self.runner.test(env_vars, args)?;
+        let mut env_vars = env_vars.clone();
+        // Make sure the test runner has the same config environment vars as the services do.
+        if let Some((key, value)) = self.config_env(&self.env_config) {
+            env_vars.insert(key, value);
+        }
+        self.runner.test(&env_vars, args)?;
 
         if !active {
             self.runner.remove()?;
@@ -122,20 +132,14 @@ impl IntegrationTest {
     pub fn start(&self) -> Result<()> {
         self.runner.ensure_network()?;
 
-        let environments = self.config.environments();
-        let cmd_config = match environments.get(&self.environment) {
-            Some(config) => config,
-            None => bail!("unknown environment: {}", self.environment),
-        };
-
         if self.envs_dir.check_active(&self.environment)? {
             bail!("environment is already up");
         }
 
         self.prepare_compose()?;
-        self.run_compose("Starting", &["up", "--detach"], cmd_config)?;
+        self.run_compose("Starting", &["up", "--detach"], &self.env_config)?;
 
-        self.envs_dir.save(&self.environment, cmd_config)
+        self.envs_dir.save(&self.environment, &self.env_config)
     }
 
     pub fn stop(&self) -> Result<()> {
@@ -206,16 +210,22 @@ impl IntegrationTest {
         if let Some(env_vars) = &self.config.env {
             command.envs(env_vars);
         }
-        // TODO: Export all config variables, not just `version`
-        if let Some(version) = config.get("version") {
-            let version_env = format!(
-                "{}_VERSION",
-                self.integration.replace('-', "_").to_uppercase()
-            );
-            command.env(version_env, version);
-        }
+        command.envs(self.config_env(config));
 
         waiting!("{action} environment {}", self.environment);
         command.check_run()
+    }
+
+    fn config_env(&self, config: &Environment) -> Option<(String, String)> {
+        // TODO: Export all config variables, not just `version`
+        config.get("version").map(|version| {
+            (
+                format!(
+                    "{}_VERSION",
+                    self.integration.replace('-', "_").to_uppercase()
+                ),
+                version.to_string(),
+            )
+        })
     }
 }
