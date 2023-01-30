@@ -112,7 +112,7 @@ pub enum Error {
 ///
 /// Rules can reference aliases as %{alias_name}, aliases can reference each other themselves, cross-references or circular dependencies are not allowed and result in an error.
 /// Only one can match any given log. The first one that matches, from top to bottom, is the one that does the parsing.
-/// For further documentation and the full list of available matcher and filters check out https://docs.datadoghq.com/logs/processing/parsing
+/// For further documentation and the full list of available matcher and filters check out <https://docs.datadoghq.com/logs/processing/parsing>
 pub fn parse_grok_rules(
     patterns: &[String],
     aliases: BTreeMap<String, String>,
