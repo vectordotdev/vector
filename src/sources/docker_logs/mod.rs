@@ -115,7 +115,7 @@ pub struct DockerLogsConfig {
     /// By default, the source will collect logs for all containers. If `include_containers` is configured, only
     /// containers that match a configured inclusion and are also not excluded will be matched.
     ///
-    /// This can be used in conjunction with `include_containers`.
+    /// This can be used in conjunction with `exclude_containers`.
     #[configurable(metadata(
         docs::examples = "include_",
         docs::examples = "include_me_0",
