@@ -27,7 +27,7 @@ use crate::{
             },
         },
         util::{
-            service::ServiceBuilderExt, BatchConfig, Compression, Concurrency, SinkBatchSettings,
+            service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
             TowerRequestConfig,
         },
         Healthcheck, UriParseSnafu, VectorSink,
@@ -44,9 +44,8 @@ pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 10.0;
 
 pub const PAYLOAD_LIMIT: usize = 3_200_000;
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = TowerRequestConfig::new(Concurrency::None)
-    .retry_attempts(5)
-    .retry_max_duration_secs(300);
+const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
+const DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS: u64 = 300;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogTracesDefaultBatchSettings;
@@ -160,7 +159,11 @@ impl DatadogTracesConfig {
 
     pub fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.inner());
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        let request_limits = self.request.unwrap_with(
+            &TowerRequestConfig::default()
+                .retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS)
+                .retry_max_duration_secs(DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS),
+        );
         let endpoints = self.generate_traces_endpoint_configuration()?;
 
         let batcher_settings = self
