@@ -48,6 +48,7 @@ pub struct ComposeService {
 }
 
 impl ComposeConfig {
+    #[cfg(unix)]
     pub fn parse(path: &Path) -> Result<Self> {
         let contents =
             fs::read_to_string(path).with_context(|| format!("failed to read {path:?}"))?;
