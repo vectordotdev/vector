@@ -23,8 +23,8 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	delay_deletion_ms: {
 		description: """
-			How long to delay removing metadata entries from our cache when we receive a deletion
-			event from the watched stream.
+			How long to delay removing metadata entries from the cache when a pod deletion event
+			event is received from the watch stream.
 
 			A longer delay will allow for continued enrichment of logs after the originating Pod is
 			removed. If relevant metadata has been removed, the log will be forwarded un-enriched and a
@@ -139,13 +139,15 @@ base: components: sources: kubernetes_logs: configuration: {
 			processed by the `kubernetes_logs` source.
 			"""
 		required: false
-		type: string: examples: [".ingest_timestamp"]
+		type: string: examples: [".ingest_timestamp", "ingest_ts"]
 	}
 	kube_config_file: {
 		description: """
-			Optional path to a readable kubeconfig file.
+			Optional path to a readable [kubeconfig][kubeconfig] file.
 
 			If not set, a connection to Kubernetes is made using the in-cluster configuration.
+
+			[kubeconfig]: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
 			"""
 		required: false
 		type: string: examples: ["/path/to/.kube/config"]
@@ -188,7 +190,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			required: false
 			type: string: {
 				default: ".kubernetes.namespace_labels"
-				examples: [".k8s.ns_labels", ""]
+				examples: [".k8s.ns_labels", "k8s.ns_labels", ""]
 			}
 		}
 	}
@@ -204,7 +206,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			required: false
 			type: string: {
 				default: ".kubernetes.node_labels"
-				examples: [".k8s.node_labels", ""]
+				examples: [".k8s.node_labels", "k8s.node_labels", ""]
 			}
 		}
 	}
@@ -221,7 +223,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.container_id"
-					examples: [".k8s.container_id", ""]
+					examples: [".k8s.container_id", "k8s.container_id", ""]
 				}
 			}
 			container_image: {
@@ -233,7 +235,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.container_image"
-					examples: [".k8s.container_image", ""]
+					examples: [".k8s.container_image", "k8s.container_image", ""]
 				}
 			}
 			container_name: {
@@ -245,7 +247,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.container_name"
-					examples: [".k8s.container_name", ""]
+					examples: [".k8s.container_name", "k8s.container_name", ""]
 				}
 			}
 			pod_annotations: {
@@ -257,7 +259,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.pod_annotations"
-					examples: [".k8s.pod_annotations", ""]
+					examples: [".k8s.pod_annotations", "k8s.pod_annotations", ""]
 				}
 			}
 			pod_ip: {
@@ -269,7 +271,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.pod_ip"
-					examples: [".k8s.pod_ip", ""]
+					examples: [".k8s.pod_ip", "k8s.pod_ip", ""]
 				}
 			}
 			pod_ips: {
@@ -281,7 +283,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.pod_ips"
-					examples: [".k8s.pod_ips", ""]
+					examples: [".k8s.pod_ips", "k8s.pod_ips", ""]
 				}
 			}
 			pod_labels: {
@@ -293,7 +295,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.pod_labels"
-					examples: [".k8s.pod_labels", ""]
+					examples: [".k8s.pod_labels", "k8s.pod_labels", ""]
 				}
 			}
 			pod_name: {
@@ -305,7 +307,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.pod_name"
-					examples: [".k8s.pod_name", ""]
+					examples: [".k8s.pod_name", "k8s.pod_name", ""]
 				}
 			}
 			pod_namespace: {
@@ -317,7 +319,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.pod_namespace"
-					examples: [".k8s.pod_ns", ""]
+					examples: [".k8s.pod_ns", "k8s.pod_ns", ""]
 				}
 			}
 			pod_node_name: {
@@ -329,7 +331,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.pod_node_name"
-					examples: [".k8s.pod_host", ""]
+					examples: [".k8s.pod_host", "k8s.pod_host", ""]
 				}
 			}
 			pod_owner: {
@@ -341,7 +343,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.pod_owner"
-					examples: [".k8s.pod_owner", ""]
+					examples: [".k8s.pod_owner", "k8s.pod_owner", ""]
 				}
 			}
 			pod_uid: {
@@ -353,7 +355,7 @@ base: components: sources: kubernetes_logs: configuration: {
 				required: false
 				type: string: {
 					default: ".kubernetes.pod_uid"
-					examples: [".k8s.pod_uid", ""]
+					examples: [".k8s.pod_uid", "k8s.pod_uid", ""]
 				}
 			}
 		}
