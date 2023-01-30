@@ -10,10 +10,6 @@ use super::state::EnvsDir;
 use crate::app::{self, CommandExt as _};
 use crate::util;
 
-/// Unix permissions mask to allow everybody to read a file
-#[cfg(unix)]
-const ALL_READ: u32 = 0o444;
-
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 
 #[allow(clippy::dbg_macro)]
@@ -161,41 +157,10 @@ impl IntegrationTest {
         Ok(())
     }
 
-    #[allow(clippy::dbg_macro)]
     // Fix up potential issues before starting a compose container
     fn prepare_compose(&self) -> Result<()> {
         #[cfg(unix)]
-        {
-            use super::config::ComposeConfig;
-            use std::fs::{self, Permissions};
-            use std::os::unix::fs::PermissionsExt as _;
-
-            let compose_config = ComposeConfig::parse(Path::new(&self.compose_path))?;
-            for service in compose_config.services.values() {
-                // Make sure all volume files are world readable
-                if let Some(volumes) = &service.volumes {
-                    for volume in volumes {
-                        let source = volume
-                            .split_once(':')
-                            .expect("Invalid volume in compose file")
-                            .0;
-                        let path: PathBuf = [&self.test_dir, Path::new(source)].iter().collect();
-                        if path.is_file() {
-                            let perms = path
-                                .metadata()
-                                .with_context(|| format!("Could not get permissions on {path:?}"))?
-                                .permissions();
-                            let new_perms = Permissions::from_mode(perms.mode() | ALL_READ);
-                            if new_perms != perms {
-                                fs::set_permissions(&path, new_perms).with_context(|| {
-                                    format!("Could not set permissions on {path:?}")
-                                })?;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        unix::prepare_compose_volumes(&self.compose_path, &self.test_dir)?;
         Ok(())
     }
 
@@ -230,5 +195,75 @@ impl IntegrationTest {
                 version.to_string(),
             )
         })
+    }
+}
+
+#[cfg(unix)]
+mod unix {
+    use std::fs::{self, Metadata, Permissions};
+    use std::os::unix::fs::PermissionsExt as _;
+    use std::path::{Path, PathBuf};
+
+    use anyhow::{Context, Result};
+
+    use super::super::config::ComposeConfig;
+
+    /// Unix permissions mask to allow everybody to read a file
+    const ALL_READ: u32 = 0o444;
+    /// Unix permissions mask to allow everybody to read a directory
+    const ALL_READ_DIR: u32 = 0o555;
+
+    pub fn prepare_compose_volumes(path: &Path, test_dir: &Path) -> Result<()> {
+        let compose_config = ComposeConfig::parse(path)?;
+        for service in compose_config.services.values() {
+            // Make sure all volume files are world readable
+            if let Some(volumes) = &service.volumes {
+                for volume in volumes {
+                    let source = volume
+                        .split_once(':')
+                        .expect("Invalid volume in compose file")
+                        .0;
+                    // Only fixup relative paths, i.e. within our source tree.
+                    if !source.starts_with('/') && !source.starts_with('$') {
+                        let path: PathBuf = [test_dir, Path::new(source)].iter().collect();
+                        add_read_permission(&path)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Recursively add read permissions to the
+    fn add_read_permission(path: &Path) -> Result<()> {
+        let metadata = path
+            .metadata()
+            .with_context(|| format!("Could not get permissions on {path:?}"))?;
+
+        if metadata.is_file() {
+            add_permission(path, &metadata, ALL_READ)
+        } else {
+            if metadata.is_dir() {
+                add_permission(path, &metadata, ALL_READ_DIR)?;
+                for entry in fs::read_dir(path)
+                    .with_context(|| format!("Could not read directory {path:?}"))?
+                {
+                    let entry = entry
+                        .with_context(|| format!("Could not read directory entry in {path:?}"))?;
+                    add_read_permission(&entry.path())?;
+                }
+            }
+            Ok(())
+        }
+    }
+
+    fn add_permission(path: &Path, metadata: &Metadata, bits: u32) -> Result<()> {
+        let perms = metadata.permissions();
+        let new_perms = Permissions::from_mode(perms.mode() | bits);
+        if new_perms != perms {
+            fs::set_permissions(path, new_perms)
+                .with_context(|| format!("Could not set permissions on {path:?}"))?;
+        }
+        Ok(())
     }
 }
