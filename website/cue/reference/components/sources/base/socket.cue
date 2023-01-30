@@ -165,13 +165,12 @@ base: components: sources: socket: configuration: {
 		}
 	}
 	max_length: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This option has been deprecated. Configure `max_length` on the framing config instead."
 		description: """
 			The maximum buffer size of incoming messages.
 
 			Messages larger than this are truncated.
-
-			This option is deprecated. Configure `max_length` on the framing config instead.
 			"""
 		required: false
 		type: uint: {

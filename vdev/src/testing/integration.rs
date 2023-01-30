@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path, path::PathBuf, process::Command};
+use std::{path::Path, path::PathBuf, process::Command};
 
 use anyhow::{bail, Context, Result};
 
@@ -108,19 +108,22 @@ impl IntegrationTest {
         })
     }
 
-    pub fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
+    pub fn test(&self, extra_args: Vec<String>) -> Result<()> {
         let active = self.envs_dir.check_active(&self.environment)?;
 
         if !active {
             self.start()?;
         }
 
-        let mut env_vars = env_vars.clone();
+        let mut env_vars = self.config.env.clone().unwrap_or_default();
         // Make sure the test runner has the same config environment vars as the services do.
         if let Some((key, value)) = self.config_env(&self.env_config) {
             env_vars.insert(key, value);
         }
-        self.runner.test(&env_vars, args)?;
+        let mut args = self.config.args.clone();
+        args.extend(extra_args);
+        self.runner
+            .test(&Some(env_vars), &self.config.runner_env, &args)?;
 
         if !active {
             self.runner.remove()?;

@@ -130,6 +130,7 @@ base: components: sources: journald: configuration: {
 	remap_priority: {
 		deprecated:         true
 		deprecated_message: "This option has been deprecated, use the `remap` transform and `to_syslog_level` function instead."
+
 		description: """
 			Enables remapping the `PRIORITY` field from an integer to string value.
 

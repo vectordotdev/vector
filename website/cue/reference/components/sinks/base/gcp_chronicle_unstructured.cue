@@ -90,7 +90,7 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 	customer_id: {
 		description: "The Unique identifier (UUID) corresponding to the Chronicle instance."
 		required:    true
-		type: string: {}
+		type: string: examples: ["c8c65bfa-5f2c-42d4-9189-64bb7b939f2c"]
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -211,7 +211,7 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 	endpoint: {
 		description: "The endpoint to send data to."
 		required:    false
-		type: string: {}
+		type: string: examples: ["127.0.0.1:8080", "example.com:12345"]
 	}
 	log_type: {
 		description: """
@@ -223,10 +223,13 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 			[unstructured_log_types_doc]: https://cloud.google.com/chronicle/docs/ingestion/parser-list/supported-default-parsers
 			"""
 		required: true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["WINDOWS_DNS", "{{ log_type }}"]
+			syntax: "template"
+		}
 	}
 	region: {
-		description: "Google Chronicle regions."
+		description: "The GCP region to use."
 		required:    false
 		type: string: enum: {
 			asia: "APAC region."

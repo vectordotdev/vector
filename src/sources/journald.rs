@@ -110,8 +110,8 @@ pub struct JournaldConfig {
     /// If empty or not present, all units are accepted. Unit names lacking a `.` will have
     /// `.service` appended to make them a valid service unit name.
     // TODO: Why isn't this just an alias on `include_units`?
-    #[configurable(deprecated)]
     #[configurable(metadata(docs::hidden))]
+    #[configurable(deprecated = "This option has been deprecated, use `include_units` instead.")]
     pub units: Vec<String>,
 
     /// A list of unit names to monitor.
