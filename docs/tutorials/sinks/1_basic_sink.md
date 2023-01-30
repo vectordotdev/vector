@@ -1,6 +1,13 @@
-Let's write a basic sink for Vector.
+Let's write a basic sink for Vector. Currently, there are two styles of sink in
+Vector - 'event' and 'event streams'. The 'event' style sinks are deprecated,
+but currently a significant portion of Vectors sinks are still developed in
+this style. A tracking issue that covers which sinks have been converted to
+'event streams' can be found [here](https://github.com/vectordotdev/vector/
+issues/9261).
 
-Create a new rust module in `src/sinks/basic.rs`.
+This tutorial covers writing an 'event stream' Sink.
+
+Create a new rust module in `src/sinks/` called `basic.rs`.
 
 # Imports
 
@@ -22,8 +29,10 @@ use vector_core::{
 
 # Configuration
 
-The first step when developing a Sink is to create a struct that represents the configuration for that sink.
-Since our sink has no configuration options, we just create a simple struct:
+The first step when developing a Sink is to create a struct that represents the
+configuration for that sink. The configuration file passed to Vector on startup 
+is deserialized to the fields in this struct so the user can customise the sinks
+behaviour.
 
 ```rust
 #[configurable_component(sink("basic"))]
@@ -40,12 +49,14 @@ pub struct BasicConfig {
 }
 ```
 
-Note the `configurable_component` attribute. This is used by Vector to generate documentation from the struct.
-To do this, doc comments must be included above the struct - Vector won't compile if they aren't.
+Note the `configurable_component` attribute. This is used by Vector to generate
+documentation from the struct. To do this, doc comments must be included above
+the struct - Vector won't compile if they aren't.
 
-We also include a single member in our struct - `acknowledgemets`. Every sink needs to be able to control how
-it handles acknowledgements - do connected sources need to wait for this sink to send the message before
-acknowledging that they have received the events. We will make this a configurable option.
+We also include a single member in our struct - `acknowledgemets`. Every sink
+needs to be able to control how it handles acknowledgements - do connected
+sources need to wait for this sink to send the message before acknowledging
+that they have received the events. We will make this a configurable option.
 
 Next we want to implement the `GenerateConfig` trait for our struct:
 
@@ -57,12 +68,13 @@ impl GenerateConfig for BasicConfig {
 }
 ```
 
-This is used by the `vector generate` command to generate a default configuration for the sink.
+This is used by the `vector generate` command to generate a default
+configuration for the sink.
 
 # SinkConfig
 
-We need to implement the `SinkConfig` trait. This is used by Vector to generate the main Sink from the
-configuration.
+We need to implement the `SinkConfig` trait. This is used by Vector to generate
+the main Sink from the configuration.
 
 ```rust
 #[async_trait::async_trait]
@@ -86,16 +98,16 @@ impl SinkConfig for BasicConfig {
 
 ## The `build` function
 
-Of particular interest is the `build` function. This is an async function that
+Of particular importance is the `build` function. This is an async function that
 builds two components of the sink.
 
 First, the healthcheck is an async block that can be used to check the health
 of the service we are connecting to. In this very simple case we are just
-outputting to the console which we assume will work, so the healthcheck
-returns `Ok(())` indicating our target is healthy.
+outputting to the console which we assume will work, so the healthcheck returns
+`Ok(())` indicating our target is healthy.
 
-The actual work for this sink is done in `BasicSink` (to be implemented shortly).
-The `build` function converts this into a `VectorSink` via
+The actual work for this sink is done in `BasicSink` (to be implemented
+shortly). The `build` function converts this into a `VectorSink` via
 `VectorSink::from_event_streamsink` and returns it.
 
 
@@ -123,12 +135,14 @@ impl StreamSink<Event> for BasicSink {
 }
 ```
 
-`StreamSink` is an async trait with a single async function: `run`. The main parameter
-to this function, `input` is a stream of the events that are being sent to this sink.
-We pull from this stream to send the events on to our destination.
+`StreamSink` is an async trait with a single async function: `run`. The main
+parameter to this function, `input` is a stream of the events that are being
+sent to this sink. We pull from this stream to send the events on to our
+destination.
 
-In order to handle lifetime issues that arise from using `asynctrait`, this function
-simply calls another method `run_inner` that is implemented directly on `BasicSink`.
+In order to handle lifetime issues that arise from using  [`async_trait`]
+(https://docs.rs/async-trait/latest/async_trait/), this function simply calls
+another method `run_inner` that is implemented directly on `BasicSink`.
 
 Let's look an `run_inner`:
 
@@ -144,8 +158,8 @@ impl BasicSink {
 }
 ```
 
-Our sink simply pulls each event from the input stream and prints the debug representation
-of the object.
+Our sink simply pulls each event from the input stream and prints the debug
+representation of the object.
 
 # Importing to Vector
 
@@ -162,11 +176,12 @@ Import this module into Vector. In `src/sinks/mod.rs` add the line:
  pub mod blackhole;
 ```
 
-All sinks are feature gated, this allows us to build custom versions of Vector with only the
-components required. We will ignore the feature flag for now with our new basic sink.
+All sinks are feature gated, this allows us to build custom versions of Vector
+with only the components required. We will ignore the feature flag for now with
+our new basic sink.
 
-Next, each sink needs to be added to the `Sinks` enum. Find the enum in `mod.rs` and add our
-new sink to it.
+Next, each sink needs to be added to the `Sinks` enum. Find the enum in
+`mod.rs` and add our new sink to it.
 
 ```diff
 #[configurable_component]
@@ -200,8 +215,8 @@ Then we need to add this to the `get_component_name` function defined below.
 
 # Acknowledgements
 
-When our sink finishes processing the event, it needs to acknowledge this so that this
-can be passed back to the source.
+When our sink finishes processing the event, it needs to acknowledge this so
+that this can be passed back to the source.
 
 We need to make a couple of changes to our `run_inner` function:
 
@@ -219,25 +234,26 @@ We need to make a couple of changes to our `run_inner` function:
     }
 ```
 
-First we need to make `event` `mut` so that we can update the events status when
+First we need to make `event` mutable so that we can update the events status when
 it is delivered.
 
-Next we access the events finalizers with the `take_finalizers` function. We then update the
-status with `EventStatus::Delivered` to indicate the event has been delivered successfully.
+Next we access the events finalizers with the `take_finalizers` function. We
+then update the status with `EventStatus::Delivered` to indicate the event has
+been delivered successfully.
 
-If there had been an error whilst delivering the event, but the error was not a permanent
-error, we would update the status with `EventStatus::Errored`. Vector will attempt to redeliver
-this event again.
+If there had been an error whilst delivering the event, but the error was not a
+permanent error, we would update the status with `EventStatus::Errored`. Vector
+will attempt to redeliver this event again.
 
-If the error was a permanent one that would never work no matter how many times we retry
-delivery, we update the status with `EventStatus::Rejected`.
+If the error was a permanent one that would never work no matter how many times
+we retry delivery, we update the status with `EventStatus::Rejected`.
 
-# Emitting events
+# Emitting internal events
 
-Vector should be observable. It emit events about how it is running so users can introspect
-its state to allow users to determine how healthy it is running. Our sink must emit some
-metric when an event has been delivered to update the count of how many events have been
-delivered.
+Vector should be observable. It emit events about how it is running so users
+can introspect its state to allow users to determine how healthy it is running.
+Our sink must emit some metric when an event has been delivered to update the
+count of how many events have been delivered.
 
 There are two events that need to be emitted by the component.
 
@@ -245,8 +261,8 @@ There are two events that need to be emitted by the component.
 
 `BytesSent` instruments how many bytes the sink is sending downstream.
 
-First we need to get the number of bytes that we are sending. Then we need to emit the event.
-Change the body of `run_inner` to look like the following:
+First we need to get the number of bytes that we are sending. Then we need to
+emit the event. Change the body of `run_inner` to look like the following:
 
 ```diff
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -270,8 +286,8 @@ Change the body of `run_inner` to look like the following:
 
 ## EventSent
 
-`EventSent` is emmitted by each component in Vector to instrument how many bytes have been sent
-to the next downstream component.
+`EventSent` is emmitted by each component in Vector to instrument how many
+bytes have been sent to the next downstream component.
 
 Add the following after emmitting `BytesSent`:
 
@@ -309,7 +325,7 @@ This simply connects a `stdin` source to our `basic` sink. Run it with:
 cargo run -- -c ./basic.yml
 ```
 
-Type some text into the terminal and Vector should output the Debug information for the
-log event.
+Type some text into the terminal and Vector should output the Debug information
+for the log event.
 
 Our sink works!

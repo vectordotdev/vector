@@ -1,7 +1,8 @@
-Most Vector sinks involve some form of network connectivity. Connecting to a network
-requires more involved functionality that we have covered so far in our basic sink.
-This tutorial will modify our sink to send the events to an HTTP endpoint. We will
-cover a number of Vector components that make adding this functionality easy.
+Most Vector sinks involve some form of network connectivity. Connecting to a
+network requires more involved functionality than we have covered so far in
+our basic sink. This tutorial will modify the sink created in the [previous
+tutorial][tutorial_1] to send the events to an HTTP endpoint. We will cover a
+number of Vector framework components that make adding this functionality easy.
 
 # Imports
 
@@ -41,8 +42,8 @@ use vector_core::{
 
 # Configuration
 
-First we want to update our config to allow an endpoint to be specified. Add this
-field to the `BasicConfig` struct:
+First we want to update our config to allow an endpoint to be specified. Add
+this field to the `BasicConfig` struct:
 
 ```rust
     /// The endpoint to send HTTP traffic to.
@@ -53,14 +54,18 @@ field to the `BasicConfig` struct:
     pub endpoint: String,
 ```
 
-Every field in the configuration struct must have a comment. This is used to
-generate documentation for the Sink. The metadata attribute added here is used
-to generate examples for the documentation. (This is possible because the config
-struct is annotated with `#[configurable_component(sink("basic"))]`).
+Every field in the configuration struct must have a doc comment (`///`).
+These are used to generate documentation for the Sink. The metadata
+attribute added here is used to generate examples for the documentation.
+(This is possible because the config struct is annotated with
+`#[configurable_component(sink("basic"))]`). Since the comments here are
+used for for user-facing documentation they should be good grammar and be
+correctly capitalized and punctuated.
 
-We then want to update our sink to take the endpoint from the config. At the same
-time let's create an `HttpClient` that will handle sending the data. `HttpClient`
-is our wrapper over [`hyper`][hyper_docs] used to send data over http.
+We then want to update our sink to take the endpoint from the config. At the
+same time let's create an `HttpClient` that will handle sending the data.
+`HttpClient` is our wrapper over [`hyper`][hyper_docs] used to send data over
+http.
 
 Update the `BasicSink` struct to look like:
 
@@ -109,7 +114,7 @@ The `Encoder` trait is generic over the type of input that we are
 expecting. In our case it is `Event` since we will be encoding a single
 event at a time. Other Sinks may encode a `Vec<Event>`  if they are
 sending batches of events, or they may send a completely different type
-if each event is processed in someway prior to encoding.
+if each event is processed in some way prior to encoding.
 
 The `encode_input` serializes the event to a String and writes these
 bytes:
@@ -128,8 +133,8 @@ bytes:
 # Request Builder
 
 Next we create a request builder that turns the event into a request. The
-request is used by a [Tower service](https://docs.rs/tower/latest/tower/trait.Service.html)
-that is responsible for actually sending the data.
+request is used by a [Tower service][tower] that is responsible for actually
+sending the data.
 
 The request looks like:
 
@@ -497,4 +502,6 @@ BODY:
 {"log":{"host":"computer","message":"zork","source_type":"stdin","timestamp":"2023-01-23T10:21:57.215019942Z"}}
 ```
 
+[tutorial_1]: https://github.com/vectordotdev/vector/tree/master/docs/tutorials/sinsk/1_basic_sink.md
+[tower]: https://docs.rs/tower/latest/tower/trait.Service.html
 [hyper_docs]: https://docs.rs/hyper/latest/hyper/
