@@ -110,7 +110,8 @@ base: components: sources: journald: configuration: {
 		type: string: {}
 	}
 	remap_priority: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This option has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead."
 		description: """
 			Enables remapping the `PRIORITY` field from an integer to string value.
 
@@ -125,7 +126,8 @@ base: components: sources: journald: configuration: {
 		type: bool: {}
 	}
 	units: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `include_units` instead."
 		description: """
 			The list of unit names to monitor.
 

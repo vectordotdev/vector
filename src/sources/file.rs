@@ -96,9 +96,9 @@ pub struct FileConfig {
     pub file_key: OptionalValuePath,
 
     /// Whether or not to start reading from the beginning of a new file.
-    ///
-    /// DEPRECATED: This is a deprecated option -- replaced by `ignore_checkpoints`/`read_from` -- and should be removed.
-    #[configurable(deprecated)]
+    #[configurable(
+        deprecated = "This option has been deprecated, use `ignore_checkpoints`/`read_from` instead."
+    )]
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub start_at_beginning: Option<bool>,
@@ -180,17 +180,13 @@ pub struct FileConfig {
     pub ignore_not_found: bool,
 
     /// String value used to identify the start of a multi-line message.
-    ///
-    /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use `multiline` instead.")]
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub message_start_indicator: Option<String>,
 
     /// How long to wait for more data when aggregating a multi-line message, in milliseconds.
-    ///
-    /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use `multiline` instead.")]
     #[configurable(metadata(docs::hidden))]
     #[serde(default = "default_multi_line_timeout")]
     pub multi_line_timeout: u64,

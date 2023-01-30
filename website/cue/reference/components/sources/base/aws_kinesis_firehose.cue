@@ -2,14 +2,13 @@ package metadata
 
 base: components: sources: aws_kinesis_firehose: configuration: {
 	access_key: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `access_keys` instead."
 		description: """
 			An optional access key to authenticate requests against.
 
 			AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
 			configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
-
-			This option has been deprecated, the `access_keys` option should be used instead.
 			"""
 		required: false
 		type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
