@@ -23,7 +23,7 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	delay_deletion_ms: {
 		description: """
-			How long to delay removing metadata entries from our map when we receive a deletion
+			How long to delay removing metadata entries from our cache when we receive a deletion
 			event from the watched stream.
 
 			A longer delay will allow for continued enrichment of logs after the originating Pod is
@@ -46,11 +46,13 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	extra_field_selector: {
 		description: """
-			Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in
-			`Node` filter.
+			Specifies the [field selector][field_selector] to filter Pods with, to be used in addition
+			to the built-in [Node][node] filter.
 
-			The built-in `Node` filter uses `self_node_name` to only watch `Pod`s coqlocated on the same
-			`Node`.
+			The built-in Node filter uses `self_node_name` to only watch Pods located on the same Node.
+
+			[field_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/
+			[node]: https://kubernetes.io/docs/concepts/architecture/nodes/
 			"""
 		required: false
 		type: string: {
@@ -60,8 +62,12 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	extra_label_selector: {
 		description: """
-			Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in
-			`exclude` filter.
+			Specifies the [label selector][label_selector] to filter [Pods][pods] with, to be used in
+			addition to the built-in [exclude][exclude] filter.
+
+			[label_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+			[pods]: https://kubernetes.io/docs/concepts/workloads/pods/
+			[exclude]: https://vector.dev/docs/reference/configuration/sources/kubernetes_logs/#pod-exclusion
 			"""
 		required: false
 		type: string: {
@@ -71,8 +77,12 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	extra_namespace_label_selector: {
 		description: """
-			Specifies the label selector to filter `Namespace`s with, to be used in addition to the
-			built-in `exclude` filter.
+			Specifies the [label selector][label_selector] to filter [Namespaces][namespaces] with, to
+			be used in addition to the built-in [exclude][exclude] filter.
+
+			[label_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+			[namespaces]: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+			[exclude]: https://vector.dev/docs/reference/configuration/sources/kubernetes_logs/#namespace-exclusion
 			"""
 		required: false
 		type: string: {
@@ -167,11 +177,11 @@ base: components: sources: kubernetes_logs: configuration: {
 		}
 	}
 	namespace_annotation_fields: {
-		description: "Configuration for how the events are enriched with `Namespace` metadata."
+		description: "Configuration for how the events are enriched with Namespace metadata."
 		required:    false
 		type: object: options: namespace_labels: {
 			description: """
-				Event field for the `Namespace`'s labels.
+				Event field for the Namespace's labels.
 
 				Set to `""` to suppress this key.
 				"""
@@ -183,11 +193,11 @@ base: components: sources: kubernetes_logs: configuration: {
 		}
 	}
 	node_annotation_fields: {
-		description: "Configuration for how the events are enriched with `Node` metadata."
+		description: "Configuration for how the events are enriched with Node metadata."
 		required:    false
 		type: object: options: node_labels: {
 			description: """
-				Event field for the `Node`'s labels.
+				Event field for the Node's labels.
 
 				Set to `""` to suppress this key.
 				"""
@@ -199,12 +209,12 @@ base: components: sources: kubernetes_logs: configuration: {
 		}
 	}
 	pod_annotation_fields: {
-		description: "Configuration for how the events are enriched with `Pod` metadata."
+		description: "Configuration for how the events are enriched with Pod metadata."
 		required:    false
 		type: object: options: {
 			container_id: {
 				description: """
-					Event field for the `Container`'s ID.
+					Event field for the Container's ID.
 
 					Set to `""` to suppress this key.
 					"""
@@ -216,7 +226,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			container_image: {
 				description: """
-					Event field for the `Container`'s image.
+					Event field for the Container's image.
 
 					Set to `""` to suppress this key.
 					"""
@@ -228,7 +238,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			container_name: {
 				description: """
-					Event field for the `Container`'s name.
+					Event field for the Container's name.
 
 					Set to `""` to suppress this key.
 					"""
@@ -240,7 +250,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_annotations: {
 				description: """
-					Event field for the `Pod`'s annotations.
+					Event field for the Pod's annotations.
 
 					Set to `""` to suppress this key.
 					"""
@@ -252,7 +262,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_ip: {
 				description: """
-					Event field for the `Pod`'s IPv4 address.
+					Event field for the Pod's IPv4 address.
 
 					Set to `""` to suppress this key.
 					"""
@@ -264,7 +274,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_ips: {
 				description: """
-					Event field for the `Pod`'s IPv4 and IPv6 addresses.
+					Event field for the Pod's IPv4 and IPv6 addresses.
 
 					Set to `""` to suppress this key.
 					"""
@@ -288,7 +298,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_name: {
 				description: """
-					Event field for the `Pod`'s name.
+					Event field for the Pod's name.
 
 					Set to `""` to suppress this key.
 					"""
@@ -300,7 +310,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_namespace: {
 				description: """
-					Event field for the `Pod`'s namespace.
+					Event field for the Pod's namespace.
 
 					Set to `""` to suppress this key.
 					"""
@@ -312,7 +322,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_node_name: {
 				description: """
-					Event field for the `Pod`'s node_name.
+					Event field for the Pod's node_name.
 
 					Set to `""` to suppress this key.
 					"""
@@ -324,7 +334,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_owner: {
 				description: """
-					Event field for the `Pod`'s owner reference.
+					Event field for the Pod's owner reference.
 
 					Set to `""` to suppress this key.
 					"""
@@ -336,7 +346,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_uid: {
 				description: """
-					Event field for the `Pod`'s uid.
+					Event field for the Pod's uid.
 
 					Set to `""` to suppress this key.
 					"""
@@ -361,10 +371,11 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	self_node_name: {
 		description: """
-			The name of the Kubernetes `Node` that is running.
+			The name of the Kubernetes [Node][node] that is running.
 
 			Configured to use an environment variable by default, to be evaluated to a value provided by
-			Kubernetes at `Pod` deploy time.
+			Kubernetes at Pod creation.
+			[node]: https://kubernetes.io/docs/concepts/architecture/nodes/
 			"""
 		required: false
 		type: string: default: "${VECTOR_SELF_NODE_NAME}"

@@ -1,7 +1,7 @@
 //! This mod implements `kubernetes_logs` source.
-//! The scope of this source is to consume the log files that `kubelet` keeps
-//! at `/var/log/pods` at the host of the k8s node when `vector` itself is
-//! running inside the cluster as a `DaemonSet`.
+//! The scope of this source is to consume the log files that a kubelet keeps
+//! at "/var/log/pods" on the host of the Kubernetes Node when Vector itself is
+//! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
 
@@ -87,33 +87,44 @@ const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
-    /// Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in
-    /// `exclude` filter.
+    /// Specifies the [label selector][label_selector] to filter [Pods][pods] with, to be used in
+    /// addition to the built-in [exclude][exclude] filter.
+    ///
+    /// [label_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+    /// [pods]: https://kubernetes.io/docs/concepts/workloads/pods/
+    /// [exclude]: https://vector.dev/docs/reference/configuration/sources/kubernetes_logs/#pod-exclusion
     #[configurable(metadata(docs::examples = "my_custom_label!=my_value"))]
     #[configurable(metadata(
         docs::examples = "my_custom_label!=my_value,my_other_custom_label=my_value"
     ))]
     extra_label_selector: String,
 
-    /// Specifies the label selector to filter `Namespace`s with, to be used in addition to the
-    /// built-in `exclude` filter.
+    /// Specifies the [label selector][label_selector] to filter [Namespaces][namespaces] with, to
+    /// be used in addition to the built-in [exclude][exclude] filter.
+    ///
+    /// [label_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+    /// [namespaces]: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+    /// [exclude]: https://vector.dev/docs/reference/configuration/sources/kubernetes_logs/#namespace-exclusion
     #[configurable(metadata(docs::examples = "my_custom_label!=my_value"))]
     #[configurable(metadata(
         docs::examples = "my_custom_label!=my_value,my_other_custom_label=my_value"
     ))]
     extra_namespace_label_selector: String,
 
-    /// The name of the Kubernetes `Node` that is running.
+    /// The name of the Kubernetes [Node][node] that is running.
     ///
     /// Configured to use an environment variable by default, to be evaluated to a value provided by
-    /// Kubernetes at `Pod` deploy time.
+    /// Kubernetes at Pod creation.
+    /// [node]: https://kubernetes.io/docs/concepts/architecture/nodes/
     self_node_name: String,
 
-    /// Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in
-    /// `Node` filter.
+    /// Specifies the [field selector][field_selector] to filter Pods with, to be used in addition
+    /// to the built-in [Node][node] filter.
     ///
-    /// The built-in `Node` filter uses `self_node_name` to only watch `Pod`s coqlocated on the same
-    /// `Node`.
+    /// The built-in Node filter uses `self_node_name` to only watch Pods located on the same Node.
+    ///
+    /// [field_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/
+    /// [node]: https://kubernetes.io/docs/concepts/architecture/nodes/
     #[configurable(metadata(docs::examples = "metadata.name!=pod-name-to-exclude"))]
     #[configurable(metadata(
         docs::examples = "metadata.name!=pod-name-to-exclude,metadata.name=mypod"
@@ -206,7 +217,7 @@ pub struct Config {
     #[configurable(metadata(docs::examples = "/path/to/.kube/config"))]
     kube_config_file: Option<PathBuf>,
 
-    /// How long to delay removing metadata entries from our map when we receive a deletion
+    /// How long to delay removing metadata entries from our cache when we receive a deletion
     /// event from the watched stream.
     ///
     /// A longer delay will allow for continued enrichment of logs after the originating Pod is

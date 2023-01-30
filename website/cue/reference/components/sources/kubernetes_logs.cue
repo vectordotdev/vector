@@ -6,8 +6,8 @@ components: sources: kubernetes_logs: {
 	title: "Kubernetes Logs"
 
 	description: """
-		Collects all log data for Kubernetes Nodes, automatically enriching data
-		with Kubernetes metadata via the Kubernetes API.
+		Collects Pod logs from Kubernetes Nodes, automatically enriching data
+		with metadata via the Kubernetes API.
 		"""
 
 	classes: {
@@ -262,14 +262,14 @@ components: sources: kubernetes_logs: {
 			body: """
 				Vector provides rich filtering options for Kubernetes log collection:
 
-				* Built-in [`Pod`](#pod-exclusion) and [`Container`](#container-exclusion)
+				* Built-in [Pod](#pod-exclusion) and [Container](#container-exclusion)
 				  exclusion rules.
 				* The `exclude_paths_glob_patterns` option allows you to exclude
 				  Kubernetes log files by the file name and path.
 				* The `extra_field_selector` option specifies the field selector to
-				  filter `Pod`s with, to be used in addition to the built-in `Node` filter.
+				  filter Pods with, to be used in addition to the built-in Node filter.
 				* The `extra_label_selector` option specifies the label selector to
-				  filter `Pod`s with, to be used in addition to the [built-in
+				  filter Pods with, to be used in addition to the [built-in
 				  `vector.dev/exclude` filter](#pod-exclusion).
 				"""
 		}
@@ -281,18 +281,28 @@ components: sources: kubernetes_logs: {
 				ignores compressed and temporary files. This behavior can be configured with the
 				[`exclude_paths_glob_patterns`](\(urls.vector_kubernetes_logs_source)#configuration) option.
 
-				[Globbing](\(urls.globbing)) is used to continually discover `Pod`s log files
+				[Globbing](\(urls.globbing)) is used to continually discover Pods' log files
 				at a rate defined by the `glob_minimum_cooldown` option. In environments when files are
 				rotated rapidly, we recommend lowering the `glob_minimum_cooldown` to catch files
 				before they are compressed.
 				"""
 		}
 
+		namespace_exclusion: {
+			title: "Namespace exclusion"
+			body:  """
+					By default, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					will skip logs from the Namespaces that have a `vector.dev/exclude: "true"` **label**.
+					You can configure additional exclusion rules via label selectors,
+					see [the available options](\(urls.vector_kubernetes_logs_source)#configuration).
+					"""
+		}
+
 		pod_exclusion: {
 			title: "Pod exclusion"
 			body:  """
 					By default, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
-					will skip logs from the `Pod`s that have a `vector.dev/exclude: "true"` *label*.
+					will skip logs from the Pods that have a `vector.dev/exclude: "true"` **label**.
 					You can configure additional exclusion rules via label or field selectors,
 					see [the available options](\(urls.vector_kubernetes_logs_source)#configuration).
 					"""
@@ -302,9 +312,9 @@ components: sources: kubernetes_logs: {
 			title: "Container exclusion"
 			body:  """
 					The [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
-					can skip the logs from the individual `container`s of a particular
-					`Pod`. Add an *annotation* `vector.dev/exclude-containers` to the
-					`Pod`, and enumerate the `name`s of all the `container`s to exclude in
+					can skip the logs from the individual Containers of a particular
+					Pod. Add an **annotation** `vector.dev/exclude-containers` to the
+					Pod, and enumerate the names of all the Containers to exclude in
 					the value of the annotation like so:
 
 					```yaml
@@ -312,9 +322,8 @@ components: sources: kubernetes_logs: {
 					```
 
 					This annotation will make Vector skip logs originating from the
-					`container1` and `container2` of the `Pod` marked with the annotation,
-					while logs from other `container`s in the `Pod` will still be
-					collected.
+					_container1_ and _container2_ of the Pod marked with the annotation,
+					while logs from other Containers in the Pod will still be collected.
 					"""
 		}
 
@@ -349,7 +358,7 @@ components: sources: kubernetes_logs: {
 			title: "Pod removal"
 			body: """
 				To ensure all data is collected, Vector will continue to collect logs from the
-				`Pod` for some time after its removal. This ensures that Vector obtains some of
+				Pod for some time after its removal. This ensures that Vector obtains some of
 				the most important data, such as crash details.
 				"""
 		}
@@ -415,15 +424,15 @@ components: sources: kubernetes_logs: {
 				Vector requires access to the Kubernetes API.
 				Specifically, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
 				uses the `/api/v1/pods`, `/api/v1/namespaces`, and `/api/v1/nodes` endpoints
-				to "list" and "watch" resources we use to enrich events with additional metadata.
+				to `list` and `watch` resources we use to enrich events with additional metadata.
 
 				Modern Kubernetes clusters run with RBAC (role-based access control)
 				scheme. RBAC-enabled clusters require some configuration to grant Vector
 				the authorization to access the Kubernetes API endpoints.	As RBAC is
 				currently the standard way of controlling access to the Kubernetes API,
-				we ship the necessary configuration out of the box: see `ClusterRole`,
-				`ClusterRoleBinding` and a `ServiceAccount` in our `kubectl` YAML
-				config, and the `rbac` configuration at the Helm chart.
+				we ship the necessary configuration out of the box: see the [ClusterRole, ClusterRoleBinding][rbac],
+				and [ServiceAccount][serviceaccount] in our Kubectl YAML
+				config, and the [`rbac.yaml`][rbac_helm] template configuration of the Helm chart.
 
 				If your cluster doesn't use any access control scheme	and doesn't
 				restrict access to the Kubernetes API, you don't need to do any extra
@@ -432,8 +441,12 @@ components: sources: kubernetes_logs: {
 				Clusters using legacy ABAC scheme are not officially supported
 				(although Vector might work if you configure access properly) -
 				we encourage switching to RBAC. If you use a custom access control
-				scheme - make sure Vector `Pod`/`ServiceAccount` is granted "list" and "watch" access
+				scheme - make sure Vector's Pod/ServiceAccount is granted `list` and `watch` access
 				to the `/api/v1/pods`, `/api/v1/namespaces`, and `/api/v1/nodes` resources.
+
+				[serviceaccount]: https://github.com/vectordotdev/vector/blob/master/distribution/kubernetes/vector-agent/serviceaccount.yaml
+				[rbac]: https://github.com/vectordotdev/vector/blob/master/distribution/kubernetes/vector-agent/rbac.yaml
+				[rbac_helm]: https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/rbac.yaml
 				"""
 		}
 	}

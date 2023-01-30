@@ -13,12 +13,12 @@ use crate::event::{Event, LogEvent};
 
 use super::Config;
 
-/// Configuration for how the events are enriched with `Namespace` metadata.
+/// Configuration for how the events are enriched with Namespace metadata.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
-    /// Event field for the `Namespace`'s labels.
+    /// Event field for the Namespace's labels.
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.ns_labels"))]
