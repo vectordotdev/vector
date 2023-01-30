@@ -76,20 +76,24 @@ base: components: sources: journald: configuration: {
 			Unit names lacking a `.` will have `.service` appended to make them a valid service unit
 			name.
 			"""
-		required: true
-		type: array: items: type: string: examples: ["badservice", "sysinit.target"]
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["badservice", "sysinit.target"]
+		}
 	}
 	include_matches: {
 		description: """
 			A list of sets of field/value pairs to monitor.
 
-			If empty or not present, all journal fields are accepted. If `include_units` is specified,
-			it will be merged into this list.
+			If empty or not present, all journal fields are accepted.
+
+			If `include_units` is specified, it will be merged into this list.
 			"""
 		required: false
 		type: object: {
 			examples: [{
-				"_SYSTEMD_UNIT": ["sshd.service", "ntpd.service"]
+				"_SYSTEMD_UNIT": ["ntpd.service", "sshd.service"]
 				"_TRANSPORT": ["kernel"]
 			}]
 			options: "*": {
@@ -103,11 +107,15 @@ base: components: sources: journald: configuration: {
 		description: """
 			A list of unit names to monitor.
 
-			If empty or not present, all units are accepted. Unit names lacking a `.` will have
-			`.service` appended to make them a valid service unit name.
+			If empty or not present, all units are accepted.
+
+			Unit names lacking a `.` will have `.service` appended to make them a valid service unit name.
 			"""
-		required: true
-		type: array: items: type: string: examples: ["ntpd", "sysinit.target"]
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["ntpd", "sysinit.target"]
+		}
 	}
 	journal_directory: {
 		description: """

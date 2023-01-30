@@ -110,14 +110,17 @@ pub struct JournaldConfig {
     /// If empty or not present, all units are accepted. Unit names lacking a `.` will have
     /// `.service` appended to make them a valid service unit name.
     // TODO: Why isn't this just an alias on `include_units`?
-    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
     #[configurable(deprecated = "This option has been deprecated, use `include_units` instead.")]
+    #[configurable(metadata(docs::hidden))]
     pub units: Vec<String>,
 
     /// A list of unit names to monitor.
     ///
-    /// If empty or not present, all units are accepted. Unit names lacking a `.` will have
-    /// `.service` appended to make them a valid service unit name.
+    /// If empty or not present, all units are accepted.
+    ///
+    /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit name.
+    #[serde(default)]
     #[configurable(metadata(docs::examples = "ntpd", docs::examples = "sysinit.target"))]
     pub include_units: Vec<String>,
 
@@ -125,13 +128,15 @@ pub struct JournaldConfig {
     ///
     /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit
     /// name.
+    #[serde(default)]
     #[configurable(metadata(docs::examples = "badservice", docs::examples = "sysinit.target"))]
     pub exclude_units: Vec<String>,
 
     /// A list of sets of field/value pairs to monitor.
     ///
-    /// If empty or not present, all journal fields are accepted. If `include_units` is specified,
-    /// it will be merged into this list.
+    /// If empty or not present, all journal fields are accepted.
+    ///
+    /// If `include_units` is specified, it will be merged into this list.
     #[configurable(metadata(
         docs::additional_props_description = "The set of field values to match in journal entries that are to be included."
     ))]
