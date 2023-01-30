@@ -191,18 +191,29 @@ base: components: sinks: websocket: configuration: {
 		}
 	}
 	ping_interval: {
-		description: "The interval, in seconds, between sending PINGs to the remote peer."
-		required:    false
-		type: uint: {}
+		description: """
+			The interval, in seconds, between sending [Ping][ping]s to the remote peer.
+
+			If this option is not configured, pings are not sent on an interval.
+
+			If the `ping_timeout` is not set, pings are still sent but there is no expectation of pong
+			response times.
+
+			[ping]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.2
+			"""
+		required: false
+		type: uint: unit: "seconds"
 	}
 	ping_timeout: {
 		description: """
-			The timeout, in seconds, while waiting for a PONG response from the remote peer.
+			The number of seconds to wait for a [Pong][pong] response from the remote peer.
 
-			If a response is not received in this time, the connection is reestablished.
+			If a response is not received within this time, the connection is re-established.
+
+			[pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
 			"""
 		required: false
-		type: uint: {}
+		type: uint: unit: "seconds"
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

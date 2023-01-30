@@ -108,7 +108,7 @@ pub struct JournaldConfig {
     ///
     /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
     // TODO: Why isn't this just an alias on `include_units`?
-    #[configurable(deprecated = "The `units` setting is deprecated, use `include_units` instead.")]
+    #[configurable(deprecated = "This option has been deprecated, use `include_units` instead.")]
     pub units: Vec<String>,
 
     /// A list of unit names to monitor.
@@ -160,7 +160,7 @@ pub struct JournaldConfig {
     /// Has no effect unless the value of the field is already an integer.
     #[serde(default)]
     #[configurable(
-        deprecated = "The `remap_priority` option has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead."
+        deprecated = "This option has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead."
     )]
     remap_priority: bool,
 

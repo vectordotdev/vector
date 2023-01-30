@@ -143,7 +143,9 @@ base: components: sources: redis: configuration: {
 	key: {
 		description: "The Redis key to read messages from."
 		required:    true
-		type: string: {}
+		type: string: examples: [
+			"vector",
+		]
 	}
 	list: {
 		description: "Options for the Redis `list` data type."
@@ -166,7 +168,7 @@ base: components: sources: redis: configuration: {
 			By default, this is not set and the field will not be automatically added.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["redis_key"]
 	}
 	url: {
 		description: """
@@ -175,6 +177,6 @@ base: components: sources: redis: configuration: {
 			The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured via TLS.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["redis://127.0.0.1:6379/0"]
 	}
 }

@@ -3,9 +3,13 @@ package metadata
 base: components: sources: gcp_pubsub: configuration: {
 	ack_deadline_seconds: {
 		deprecated:         true
-		deprecated_message: "The `ack_deadline_seconds` option is deprecated, use `ack_deadline_secs` instead."
-		description:        "Deprecated, old name of `ack_deadline_secs`."
-		required:           false
+		deprecated_message: "This option has been deprecated, use `ack_deadline_secs` instead."
+		description: """
+			The acknowledgement deadline, in seconds, to use for this stream.
+
+			Messages that are not acknowledged when this deadline expires may be retransmitted.
+			"""
+		required: false
 		type: uint: {}
 	}
 	ack_deadline_secs: {
@@ -248,8 +252,8 @@ base: components: sources: gcp_pubsub: configuration: {
 	}
 	retry_delay_seconds: {
 		deprecated:         true
-		deprecated_message: "The `retry_delay_seconds` option is deprecated, use `retry_delay_secs` instead."
-		description:        "Deprecated, old name of `retry_delay_secs`."
+		deprecated_message: "This option has been deprecated, use `retry_delay_secs` instead."
+		description:        "The amount of time, in seconds, to wait between retry attempts after an error."
 		required:           false
 		type: float: {}
 	}
