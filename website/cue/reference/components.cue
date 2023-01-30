@@ -866,7 +866,7 @@ components: {
 			}
 
 			_proxy: {
-				common:      false
+				common: false
 				description: """
 					Proxy configuration.
 
@@ -876,16 +876,16 @@ components: {
 					to use based on the type of traffic being proxied, as well as set specific hosts that
 					should not be proxied.
 					"""
-				required:    false
+				required: false
 				type: object: options: {
 					enabled: {
-						common:      false
+						common: false
                         description: "Enables proxying support."
 						required:    false
 						type: bool: default: true
 					}
 					http: {
-						common:      false
+						common: false
 						description: """
 							Proxy endpoint to use when proxying HTTP traffic.
 
@@ -895,7 +895,7 @@ components: {
 				        type: string: examples: ["http://foo.bar:3128"]
 					}
 					https: {
-						common:      false
+						common: false
 						description: """
 							Proxy endpoint to use when proxying HTTPS traffic.
 
@@ -905,7 +905,7 @@ components: {
 				        type: string: examples: ["http://foo.bar:3128"]
 					}
 					no_proxy: {
-						common:      false
+						common: false
 						description: """
 							A list of hosts to avoid proxying.
 
@@ -921,7 +921,7 @@ components: {
 
 							[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 							"""
-						required:    false
+						required: false
 						type: array: {
 							default: []
 							items: type: string: {
