@@ -37,17 +37,21 @@ pub struct HttpSinkConfig {
     /// The full URI to make HTTP requests to.
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
+    #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
     pub uri: UriSerde,
 
     /// The HTTP method to use when making the request.
-    pub method: Option<HttpMethod>,
+    #[serde(default = "default_http_method")]
+    pub method: HttpMethod,
 
     #[configurable(derived)]
     pub auth: Option<Auth>,
 
     /// A list of custom headers to add to each request.
     #[configurable(deprecated)]
-    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and it's value."
+    ))]
     pub headers: Option<IndexMap<String, String>>,
 
     #[configurable(derived)]
@@ -60,6 +64,7 @@ pub struct HttpSinkConfig {
     /// A string to prefix the payload with.
     ///
     /// This option is ignored if the encoding is not character delimited JSON.
+    ///
     /// If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "{\"data\":"))]
     #[serde(default)]
@@ -68,6 +73,7 @@ pub struct HttpSinkConfig {
     /// A string to suffix the payload with.
     ///
     /// This option is ignored if the encoding is not character delimited JSON.
+    ///
     /// If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "}"))]
     #[serde(default)]
@@ -146,6 +152,10 @@ impl From<HttpMethod> for Method {
     }
 }
 
+fn default_http_method() -> HttpMethod {
+    HttpMethod::Get
+}
+
 impl GenerateConfig for HttpSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -165,7 +175,7 @@ impl HttpSinkConfig {
 
 struct HttpSink {
     pub uri: UriSerde,
-    pub method: Option<HttpMethod>,
+    pub method: HttpMethod,
     pub auth: Option<Auth>,
     pub payload_prefix: String,
     pub payload_suffix: String,
@@ -184,7 +194,7 @@ fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
 
     HttpSink {
         uri: Default::default(),
-        method: Default::default(),
+        method: default_http_method(),
         auth: Default::default(),
         compression: Default::default(),
         transformer: Default::default(),
@@ -270,7 +280,7 @@ impl ValidatableComponent for HttpSinkConfig {
         let config = Self {
             uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
                 .expect("should never fail to parse"),
-            method: Some(HttpMethod::Post),
+            method: HttpMethod::Post,
             encoding: EncodingConfigWithFraming::new(
                 None,
                 JsonSerializerConfig::new(MetricTagValues::Full).into(),
@@ -289,7 +299,7 @@ impl ValidatableComponent for HttpSinkConfig {
 
         let external_resource = ExternalResource::new(
             ResourceDirection::Push,
-            HttpResourceConfig::from_parts(config.uri.uri.clone(), config.method.map(Into::into)),
+            HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
             config.encoding.clone(),
         );
 
@@ -329,7 +339,7 @@ impl util::http::HttpSink for HttpSink {
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
-        let method = match &self.method.unwrap_or(HttpMethod::Post) {
+        let method = match &self.method {
             HttpMethod::Get => Method::GET,
             HttpMethod::Head => Method::HEAD,
             HttpMethod::Post => Method::POST,

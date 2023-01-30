@@ -144,10 +144,16 @@ base: components: sinks: axiom: configuration: {
 			headers: {
 				description: "Additional HTTP headers to add to every HTTP request."
 				required:    false
-				type: object: options: "*": {
-					description: "An HTTP request header."
-					required:    true
-					type: string: {}
+				type: object: {
+					examples: [{
+						Accept:               "text/plain"
+						"X-My-Custom-Header": "A-Value"
+					}]
+					options: "*": {
+						description: "An HTTP request header and it's value."
+						required:    true
+						type: string: {}
+					}
 				}
 			}
 			rate_limit_duration_secs: {
