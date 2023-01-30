@@ -62,25 +62,12 @@ where
             // metrics, we might generate N requests to represent all of the metrics in the batch.
             //
             // We do this as for different socket modes, there are optimal request sizes to use to
-            // ensure the highest rate of delivery, such as staying with the MTU for UDP, etc.
+            // ensure the highest rate of delivery, such as staying within the MTU for UDP, etc.
             .incremental_request_builder(self.request_builder)
             // This unrolls the vector of request results that our request builder generates.
             .flat_map(stream::iter)
-            // Generating requests _can_ fail, so we log and filter out errors here.
-            .filter_map(|request| async move {
-                match request {
-                    Err(e) => {
-                        let (error_message, error_code, dropped_events) = e.into_parts();
-                        emit!(StatsdEncodingError {
-                            error_message,
-                            error_code,
-                            dropped_events: dropped_events as usize,
-                        });
-                        None
-                    }
-                    Ok(req) => Some(req),
-                }
-            })
+            // Generating requests _cannot_ fail, so we just unwrap our built requests.
+            .unwrap_infallible()
             // Finally, we generate the driver which will take our requests, send them off, and appropriately handle
             // finalization of the events, and logging/metrics, as the requests are responded to.
             .into_driver(self.service)

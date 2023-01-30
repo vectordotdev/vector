@@ -358,27 +358,20 @@ mod tests {
     #[test]
     fn absolute_distribution() {
         let samples1 = generate_f64s(1, 100);
-
-        let mut samples2 = samples1.clone();
-        samples2.extend(generate_f64s(75, 125));
-
-        let sketch_samples = generate_f64s(101, 125);
+        let samples2 = generate_f64s(1, 125);
+        let expected_samples = generate_f64s(101, 125);
 
         let distributions = vec![
             get_distribution(samples1, MetricKind::Absolute),
             get_distribution(samples2, MetricKind::Absolute),
         ];
 
-        let expected_sketches = vec![
+        let expected_distributions = vec![
             None,
-            Some(get_sketch(
-                distributions[1].name(),
-                sketch_samples,
-                MetricKind::Incremental,
-            )),
+            Some(get_distribution(expected_samples, MetricKind::Incremental)),
         ];
 
-        run_comparisons(distributions, expected_sketches);
+        run_comparisons(distributions, expected_distributions);
     }
 
     #[test]
@@ -460,7 +453,6 @@ mod tests {
     fn absolute_aggregated_histogram() {
         let samples1 = generate_f64s(1, 100);
         let samples2 = generate_f64s(1, 125);
-        let sketch_samples = generate_f64s(101, 125);
 
         let agg_histograms = vec![
             get_aggregated_histogram(samples1, MetricKind::Absolute),
@@ -476,8 +468,6 @@ mod tests {
     fn incremental_aggregated_histogram() {
         let samples1 = generate_f64s(1, 100);
         let samples2 = generate_f64s(1, 125);
-        let sketch1_samples = samples1.clone();
-        let sketch2_samples = samples2.clone();
 
         let agg_histograms = vec![
             get_aggregated_histogram(samples1, MetricKind::Incremental),
@@ -500,10 +490,6 @@ mod tests {
         let samples3 = generate_f64s(75, 187);
         let samples4 = generate_f64s(22, 45);
         let samples5 = generate_f64s(1, 100);
-        let sketch1_samples = samples1.clone();
-        let sketch3_samples = generate_f64s(126, 187);
-        let sketch4_samples = samples4.clone();
-        let sketch5_samples = samples5.clone();
 
         let agg_histograms = vec![
             get_aggregated_histogram(samples1, MetricKind::Incremental),

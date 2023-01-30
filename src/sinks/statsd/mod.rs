@@ -24,7 +24,7 @@ mod tests {
 
     use crate::{
         config::{SinkConfig, SinkContext},
-        sinks::{statsd::config::Mode, util::service::udp::UdpConnectorConfig},
+        sinks::{statsd::config::Mode, util::service::net::UdpConnectorConfig},
         test_util::{
             collect_n,
             components::{assert_sink_compliance, SINK_TAGS},
@@ -82,7 +82,7 @@ mod tests {
                 .with_namespace(Some("vector")),
             ),
         ];
-        let (mut tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(1);
 
         let context = SinkContext::new_test();
         assert_sink_compliance(&SINK_TAGS, async move {

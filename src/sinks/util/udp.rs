@@ -27,11 +27,11 @@ use crate::{
         SocketEventsSent, SocketMode, SocketSendError, UdpSendIncompleteError,
         UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError,
     },
+    net,
     sinks::{
         util::{retries::ExponentialBackoff, StreamSink},
         Healthcheck, VectorSink,
     },
-    udp,
 };
 
 #[derive(Debug, Snafu)]
@@ -139,7 +139,7 @@ impl UdpConnector {
         let socket = UdpSocket::bind(bind_address).await.context(BindSnafu)?;
 
         if let Some(send_buffer_bytes) = self.send_buffer_bytes {
-            if let Err(error) = udp::set_send_buffer_size(&socket, send_buffer_bytes) {
+            if let Err(error) = net::set_send_buffer_size(&socket, send_buffer_bytes) {
                 warn!(message = "Failed configuring send buffer size on UDP socket.", %error);
             }
         }

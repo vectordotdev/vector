@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use bytes::BytesMut;
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
@@ -16,16 +18,6 @@ use crate::{
 pub enum RequestBuilderError {
     #[snafu(display("Failed to build the request builder: {}", reason))]
     FailedToBuild { reason: &'static str },
-}
-
-impl RequestBuilderError {
-    /// Converts this error into its constituent parts: the error reason, and how many events were
-    /// dropped as a result.
-    pub const fn into_parts(self) -> (&'static str, &'static str, u64) {
-        match self {
-            Self::FailedToBuild { reason } => ("Failed to build the request builder.", reason, 0),
-        }
-    }
 }
 
 /// Incremental request builder specific to StatsD.
@@ -76,7 +68,7 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
     type Metadata = (EventFinalizers, RequestMetadata);
     type Payload = Vec<u8>;
     type Request = StatsdRequest;
-    type Error = RequestBuilderError;
+    type Error = Infallible;
 
     fn encode_events_incremental(
         &mut self,
@@ -95,7 +87,7 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
 
             loop {
                 // Grab the previously pending metric, or the next metric from the drain.
-                let (metric, was_encoded) = match pending.take() {
+                let (mut metric, was_encoded) = match pending.take() {
                     Some(metric) => (metric, true),
                     None => match metrics.next() {
                         Some(metric) => (metric, false),
@@ -114,8 +106,7 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
                 // it, as we need to be able to stick at least one encoded metric into each request.
                 if !was_encoded {
                     self.encode_buf.clear();
-                    let _ = self
-                        .encoder
+                    self.encoder
                         .encode(&metric, &mut self.encode_buf)
                         .expect("should not fail to encode metric REMOVE ME AFTER TESTING");
                 }

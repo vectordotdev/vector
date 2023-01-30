@@ -68,7 +68,7 @@ impl<T> StatsdService<T> {
     ///
     /// The `transport` service is responsible for sending the actual encoded requests to the downstream
     /// endpoint.
-    pub fn with_transport(transport: T) -> Self {
+    pub const fn from_transport(transport: T) -> Self {
         Self { transport }
     }
 }
@@ -77,7 +77,7 @@ impl<T> Service<StatsdRequest> for StatsdService<T>
 where
     T: Service<Vec<u8>>,
     T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-    T::Future: Send + Sync,
+    T::Future: Send + 'static,
 {
     type Response = StatsdResponse;
     type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -90,7 +90,7 @@ where
     fn call(&mut self, request: StatsdRequest) -> Self::Future {
         let StatsdRequest {
             payload,
-            finalizers,
+            finalizers: _,
             metadata,
         } = request;
 

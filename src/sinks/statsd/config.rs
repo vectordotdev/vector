@@ -13,16 +13,17 @@ use crate::{
     internal_events::SocketMode,
     sinks::{
         util::{
-            service::udp::{UdpConnector, UdpConnectorConfig},
-            tcp::TcpSinkConfig,
-            unix::UnixSinkConfig,
+            service::net::{TcpConnectorConfig, UdpConnectorConfig},
             BatchConfig, SinkBatchSettings,
         },
         Healthcheck,
     },
 };
 
-use super::{request_builder::StatsdRequestBuilder, sink::StatsdSink};
+#[cfg(unix)]
+use crate::sinks::util::service::net::UnixConnectorConfig;
+
+use super::{request_builder::StatsdRequestBuilder, service::StatsdService, sink::StatsdSink};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct StatsdDefaultBatchSettings;
@@ -67,14 +68,24 @@ pub struct StatsdSinkConfig {
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
     /// Send over TCP.
-    Tcp(TcpSinkConfig),
+    Tcp(TcpConnectorConfig),
 
     /// Send over UDP.
     Udp(UdpConnectorConfig),
 
     /// Send over a Unix domain socket (UDS).
     #[cfg(unix)]
-    Unix(UnixSinkConfig),
+    Unix(UnixConnectorConfig),
+}
+
+impl Mode {
+    const fn as_socket_mode(&self) -> SocketMode {
+        match self {
+            Self::Tcp(_) => SocketMode::Tcp,
+            Self::Udp(_) => SocketMode::Udp,
+            Self::Unix(_) => SocketMode::Unix,
+        }
+    }
 }
 
 fn default_address() -> SocketAddr {
@@ -103,25 +114,53 @@ impl SinkConfig for StatsdSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
-        let (service, healthcheck, socket_mode) = match &self.mode {
-            Mode::Tcp(config) => config.build(Default::default(), encoder),
-            Mode::Udp(config) => {
-                let connector = UdpConnector::from(config.clone());
-                let service = connector.service();
-                let healthcheck = connector.healthcheck();
-
-                (service, healthcheck, SocketMode::Udp)
-            }
-            #[cfg(unix)]
-            Mode::Unix(config) => config.build(Default::default(), encoder),
-        };
-
+        let socket_mode = self.mode.as_socket_mode();
         let request_builder =
             StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode)?;
         let protocol = Protocol::from(socket_mode.as_str());
-        let sink = StatsdSink::new(service, batcher_settings, request_builder, protocol);
 
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+        match &self.mode {
+            Mode::Tcp(config) => {
+                let connector = config.as_connector();
+                let service = connector.service();
+                let healthcheck = connector.healthcheck();
+
+                let sink = StatsdSink::new(
+                    StatsdService::from_transport(service),
+                    batcher_settings,
+                    request_builder,
+                    protocol,
+                );
+                Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+            }
+            Mode::Udp(config) => {
+                let connector = config.as_connector();
+                let service = connector.service();
+                let healthcheck = connector.healthcheck();
+
+                let sink = StatsdSink::new(
+                    StatsdService::from_transport(service),
+                    batcher_settings,
+                    request_builder,
+                    protocol,
+                );
+                Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+            }
+            #[cfg(unix)]
+            Mode::Unix(config) => {
+                let connector = config.as_connector();
+                let service = connector.service();
+                let healthcheck = connector.healthcheck();
+
+                let sink = StatsdSink::new(
+                    StatsdService::from_transport(service),
+                    batcher_settings,
+                    request_builder,
+                    protocol,
+                );
+                Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+            }
+        }
     }
 
     fn input(&self) -> Input {

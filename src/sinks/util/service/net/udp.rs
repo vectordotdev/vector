@@ -13,12 +13,12 @@ use vector_config::configurable_component;
 
 use crate::{
     dns,
-    internal_events::{
-        UdpSendIncompleteError, UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError,
-    },
+    internal_events::{UdpSendIncompleteError, UdpSocketOutgoingConnectionError},
+    net,
     sinks::{util::retries::ExponentialBackoff, Healthcheck},
-    udp,
 };
+
+use super::HostAndPort;
 
 #[derive(Debug, Snafu)]
 pub enum UdpError {
@@ -44,47 +44,6 @@ pub enum UdpError {
     ServiceSocketChannelClosed,
 }
 
-/// Hostname and port tuple.
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(try_from = "String", into = "String")]
-struct HostAndPort {
-    /// Hostname.
-    host: String,
-
-    /// Port.
-    port: u16,
-}
-
-impl TryFrom<String> for HostAndPort {
-    type Error = UdpError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        let uri = value
-            .parse::<http::Uri>()
-            .map_err(|e| UdpError::InvalidAddress {
-                reason: e.to_string(),
-            })?;
-        let host = uri
-            .host()
-            .ok_or(UdpError::InvalidAddress {
-                reason: "missing host".to_string(),
-            })?
-            .to_string();
-        let port = uri.port_u16().ok_or(UdpError::InvalidAddress {
-            reason: "missing port".to_string(),
-        })?;
-
-        Ok(Self { host, port })
-    }
-}
-
-impl From<HostAndPort> for String {
-    fn from(value: HostAndPort) -> Self {
-        format!("{}:{}", value.host, value.port)
-    }
-}
-
 /// `UdpConnector` configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -101,19 +60,17 @@ pub struct UdpConnectorConfig {
 }
 
 impl UdpConnectorConfig {
-    pub fn from_address(host: String, port: u16) -> Self {
+    pub const fn from_address(host: String, port: u16) -> Self {
         Self {
             address: HostAndPort { host, port },
             send_buffer_size: None,
         }
     }
-}
 
-impl From<UdpConnectorConfig> for UdpConnector {
-    fn from(config: UdpConnectorConfig) -> Self {
-        Self {
-            address: config.address,
-            send_buffer_size: config.send_buffer_size,
+    pub fn as_connector(&self) -> UdpConnector {
+        UdpConnector {
+            address: self.address.clone(),
+            send_buffer_size: self.send_buffer_size,
         }
     }
 }
@@ -141,7 +98,7 @@ impl UdpConnector {
             .context(FailedToBindSnafu)?;
 
         if let Some(send_buffer_size) = self.send_buffer_size {
-            if let Err(error) = udp::set_send_buffer_size(&socket, send_buffer_size) {
+            if let Err(error) = net::set_send_buffer_size(&socket, send_buffer_size) {
                 warn!(%error, "Failed configuring send buffer size on UDP socket.");
             }
         }
@@ -159,10 +116,7 @@ impl UdpConnector {
 
         loop {
             match self.connect().await {
-                Ok(socket) => {
-                    emit!(UdpSocketConnectionEstablished {});
-                    return socket;
-                }
+                Ok(socket) => return socket,
                 Err(error) => {
                     emit!(UdpSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
@@ -207,7 +161,7 @@ pub struct UdpService {
 }
 
 impl UdpService {
-    fn new(connector: UdpConnector) -> Self {
+    const fn new(connector: UdpConnector) -> Self {
         Self {
             connector,
             state: UdpServiceState::Disconnected,
@@ -253,7 +207,7 @@ impl Service<Vec<u8>> for UdpService {
     fn call(&mut self, buf: Vec<u8>) -> Self::Future {
         let (tx, rx) = oneshot::channel();
 
-        let mut socket = match std::mem::replace(&mut self.state, UdpServiceState::Sending(rx)) {
+        let socket = match std::mem::replace(&mut self.state, UdpServiceState::Sending(rx)) {
             UdpServiceState::Connected(socket) => socket,
             _ => panic!("poll_ready must be called first"),
         };
@@ -269,8 +223,9 @@ impl Service<Vec<u8>> for UdpService {
                         });
                     }
 
-                    // Send the socket back to the service, since theoretically it's still valid to
-                    // reuse given that we may have simply overrun the OS socket buffers, etc.
+                    // Send the socket back to the service no matter what, since theoretically it's
+                    // still valid to reuse even if we didn't send all of the buffer, as we may have
+                    // simply overrun the OS socket buffers, etc.
                     let _ = tx.send(Some(socket));
 
                     Ok(sent)
