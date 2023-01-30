@@ -2,7 +2,7 @@ args:
 - --features
 - prometheus-integration-tests
 - --lib
-- '::prometheus::'
+- '::prometheus::remote_write::'
 
 matrix:
-- version: ['1.8']
+- version: [v2.33.4]
