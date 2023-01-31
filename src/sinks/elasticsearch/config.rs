@@ -4,7 +4,6 @@ use std::{
 };
 
 use futures::{FutureExt, TryFutureExt};
-use snafu::ResultExt;
 use vector_config::configurable_component;
 
 use crate::{
@@ -184,14 +183,14 @@ impl ElasticsearchConfig {
         self.bulk.as_ref().map(|bulk_config| bulk_config.action)
     }
 
-    pub fn index(&self) -> Template {
+    pub fn index(&self) -> Option<Template> {
         self.bulk.as_ref().map(|bulk_config| bulk_config.index)
     }
 
     pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
-                index: self.index(),
+                index: self.index().expect("index should not be undefined"),
                 action: self.bulk_action(),
             }),
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(

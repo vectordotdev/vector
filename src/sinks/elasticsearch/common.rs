@@ -150,10 +150,7 @@ impl ElasticsearchCommon {
                         // to make the transition smoother.
                         Err(error) => {
                             // For now, estimate version.
-                            let assumed_version = match config.suppress_type_name {
-                                Some(true) => 8,
-                                _ => 6,
-                            };
+                            let assumed_version = if config.suppress_type_name { 8 } else { 6 };
                             warn!(message = "Failed to determine Elasticsearch version from `/_cluster/state/version`. Please fix the reported error or set an API version explicitly via `api_version`.",%assumed_version, %error);
                             assumed_version
                         }
@@ -164,10 +161,10 @@ impl ElasticsearchCommon {
             ver
         };
 
-        let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
-        let suppress_type_name = if let Some(suppress_type_name) = config.suppress_type_name {
+        let doc_type = config.doc_type.clone();
+        let suppress_type_name = if config.suppress_type_name {
             warn!(message = "DEPRECATION, use of deprecated option `suppress_type_name`. Please use `api_version` option instead.");
-            suppress_type_name
+            config.suppress_type_name
         } else {
             version >= 7
         };

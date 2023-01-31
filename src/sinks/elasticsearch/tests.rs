@@ -22,8 +22,8 @@ async fn sets_create_action_when_configured() {
 
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
-            action: Some(String::from("{{ action }}te")),
-            index: Some(String::from("vector")),
+            action: String::from("{{ action }}te"),
+            index: String::from("vector"),
         }),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
