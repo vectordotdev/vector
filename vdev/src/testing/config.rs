@@ -57,6 +57,7 @@ impl ComposeConfig {
 }
 
 #[derive(Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct IntegrationTestConfig {
     /// The list of arguments to add to the docker command line for the runner
     pub args: Vec<String>,
