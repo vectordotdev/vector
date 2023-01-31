@@ -13,4 +13,4 @@ runner_env:
   DOCKER_HOST: "http://1.1.1.1:54321/"
 
 matrix:
-- version: [latest]
+  version: [latest]

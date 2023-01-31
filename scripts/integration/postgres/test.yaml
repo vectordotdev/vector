@@ -9,4 +9,4 @@ env:
   PG_SOCKET: /socket
 
 matrix:
-- version: ['13.1']
+  version: ['13.1']

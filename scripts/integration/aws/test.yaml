@@ -17,4 +17,4 @@ env:
   WATCHLOGS_ADDRESS: http://mock-watchlogs:6000
 
 matrix:
-- version: [latest]
+  version: [latest]

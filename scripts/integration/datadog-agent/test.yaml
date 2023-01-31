@@ -11,4 +11,4 @@ env:
   TRACE_AGENT_URL: http://datadog-trace-agent:8126/v0.4/traces
 
 matrix:
-- version: ['7']
+  version: ['7']

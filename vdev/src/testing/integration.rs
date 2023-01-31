@@ -73,7 +73,7 @@ pub struct IntegrationTest {
     config: IntegrationTestConfig,
     envs_dir: EnvsDir,
     runner: IntegrationTestRunner,
-    compose_path: PathBuf,
+    compose_path: Option<PathBuf>,
     env_config: Environment,
 }
 
@@ -83,14 +83,20 @@ impl IntegrationTest {
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
         let envs_dir = EnvsDir::new(&integration);
-        let runner = IntegrationTestRunner::new(integration.clone())?;
         let compose_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
-        let compose_path = dunce::canonicalize(&compose_path).with_context(|| {
-            format!("Could not canonicalize docker compose path {compose_path:?}")
-        })?;
         let Some(env_config) = config.environments().get(&environment).map(Clone::clone) else {
             bail!("Could not find environment named {environment:?}");
         };
+        // TODO: Wrap up the optional compose logic in another type
+        let compose_path = compose_path
+            .try_exists()
+            .with_context(|| format!("Could not lookup {compose_path:?}"))?
+            .then_some(compose_path);
+        let runner = IntegrationTestRunner::new(
+            integration.clone(),
+            config.needs_docker_sock,
+            compose_path.is_some(),
+        )?;
 
         Ok(Self {
             integration,
@@ -104,7 +110,7 @@ impl IntegrationTest {
         })
     }
 
-    pub fn test(&self, extra_args: Vec<String>) -> Result<()> {
+    pub fn test(self, extra_args: Vec<String>) -> Result<()> {
         let active = self.envs_dir.check_active(&self.environment)?;
 
         if !active {
@@ -129,59 +135,74 @@ impl IntegrationTest {
     }
 
     pub fn start(&self) -> Result<()> {
-        self.runner.ensure_network()?;
+        if let Some(compose_path) = &self.compose_path {
+            self.runner.ensure_network()?;
 
-        if self.envs_dir.check_active(&self.environment)? {
-            bail!("environment is already up");
+            if self.envs_dir.check_active(&self.environment)? {
+                bail!("environment is already up");
+            }
+
+            #[cfg(unix)]
+            unix::prepare_compose_volumes(compose_path, &self.test_dir)?;
+            self.run_compose("Starting", &["up", "--detach"], &self.env_config)?;
+
+            self.envs_dir.save(&self.environment, &self.env_config)
+        } else {
+            Ok(())
         }
-
-        self.prepare_compose()?;
-        self.run_compose("Starting", &["up", "--detach"], &self.env_config)?;
-
-        self.envs_dir.save(&self.environment, &self.env_config)
     }
 
     pub fn stop(&self) -> Result<()> {
-        let Some(state) = self.envs_dir.load()? else {
-             bail!("No environment for {} is up.",self.integration);
-        };
+        if self.compose_path.is_some() {
+            let Some(state) = self.envs_dir.load()? else {
+                bail!("No environment for {} is up.",self.integration);
+            };
 
-        self.runner.remove()?;
-        self.run_compose(
-            "Stopping",
-            &["down", "--timeout", "0", "--volumes"],
-            &state.config,
-        )?;
-        self.envs_dir.remove()?;
+            self.runner.remove()?;
+            self.run_compose(
+                "Stopping",
+                &["down", "--timeout", "0", "--volumes"],
+                &state.config,
+            )?;
+            self.envs_dir.remove()?;
+        }
 
-        Ok(())
-    }
-
-    // Fix up potential issues before starting a compose container
-    fn prepare_compose(&self) -> Result<()> {
-        #[cfg(unix)]
-        unix::prepare_compose_volumes(&self.compose_path, &self.test_dir)?;
         Ok(())
     }
 
     fn run_compose(&self, action: &str, args: &[&'static str], config: &Environment) -> Result<()> {
-        let mut command = CONTAINER_TOOL.clone();
-        command.push("-compose");
-        let mut command = Command::new(command);
-        let compose_arg = self.compose_path.display().to_string();
-        command.args(["--file", &compose_arg]);
-        command.args(args);
+        if let Some(compose_path) = &self.compose_path {
+            let mut command = CONTAINER_TOOL.clone();
+            command.push("-compose");
+            let mut command = Command::new(command);
+            let compose_arg = compose_path.display().to_string();
+            command.args(["--file", &compose_arg]);
+            command.args(args);
 
-        command.current_dir(&self.test_dir);
+            command.current_dir(&self.test_dir);
 
-        command.env(NETWORK_ENV_VAR, self.runner.network_name());
-        if let Some(env_vars) = &self.config.env {
-            command.envs(env_vars);
+            if let Some(network_name) = self.runner.network_name() {
+                command.env(NETWORK_ENV_VAR, network_name);
+            }
+            if let Some(env_vars) = &self.config.env {
+                command.envs(env_vars);
+            }
+            // TODO: Export all config variables, not just `version`
+            if let Some(version) = config.get("version") {
+                let version_env = format!(
+                    "{}_VERSION",
+                    self.integration.replace('-', "_").to_uppercase()
+                );
+                command.env(version_env, version);
+            }
+
+            command.envs(self.config_env(config));
+
+            waiting!("{action} environment {}", self.environment);
+            command.check_run()
+        } else {
+            Ok(())
         }
-        command.envs(self.config_env(config));
-
-        waiting!("{action} environment {}", self.environment);
-        command.check_run()
     }
 
     fn config_env(&self, config: &Environment) -> Option<(String, String)> {
@@ -213,6 +234,7 @@ mod unix {
     /// Unix permissions mask to allow everybody to read a directory
     const ALL_READ_DIR: u32 = 0o555;
 
+    /// Fix up potential issues before starting a compose container
     pub fn prepare_compose_volumes(path: &Path, test_dir: &Path) -> Result<()> {
         let compose_config = ComposeConfig::parse(path)?;
         for service in compose_config.services.values() {

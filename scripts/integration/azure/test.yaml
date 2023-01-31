@@ -10,4 +10,4 @@ env:
   LOGSTASH_ADDRESS: 0.0.0.0:8081
 
 matrix:
-- version: [3.14.0]
+  version: [3.14.0]
