@@ -173,16 +173,15 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 }
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::const_default().rate_limit_num(250);
-
 const DEFAULT_KEY_PREFIX: &str = "blob/%F/";
 const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 impl AzureBlobSinkConfig {
     pub fn build_processor(&self, client: Arc<ContainerClient>) -> crate::Result<VectorSink> {
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        let request_limits = self
+            .request
+            .unwrap_with(&TowerRequestConfig::default().rate_limit_num(250));
         let service = ServiceBuilder::new()
             .settings(request_limits, AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));

@@ -47,6 +47,6 @@ impl Cli {
             }
         }
 
-        runner.test(&parse_env(self.env.unwrap_or_default()), &args)
+        runner.test(&self.env.map(parse_env), &None, &args)
     }
 }

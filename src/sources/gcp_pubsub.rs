@@ -167,8 +167,12 @@ pub struct PubsubConfig {
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub ack_deadline_secs: Duration,
 
-    /// Deprecated, old name of `ack_deadline_secs`.
-    #[configurable(deprecated)]
+    /// The acknowledgement deadline, in seconds, to use for this stream.
+    ///
+    /// Messages that are not acknowledged when this deadline expires may be retransmitted.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `ack_deadline_secs` instead."
+    )]
     pub ack_deadline_seconds: Option<u16>,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
@@ -176,8 +180,10 @@ pub struct PubsubConfig {
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
     pub retry_delay_secs: Duration,
 
-    /// Deprecated, old name of `retry_delay_secs`.
-    #[configurable(deprecated)]
+    /// The amount of time, in seconds, to wait between retry attempts after an error.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `retry_delay_secs` instead."
+    )]
     pub retry_delay_seconds: Option<f64>,
 
     /// The amount of time, in seconds, with no received activity

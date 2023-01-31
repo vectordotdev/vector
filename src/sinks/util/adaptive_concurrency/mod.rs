@@ -23,9 +23,11 @@ pub(self) fn instant_now() -> std::time::Instant {
 ///
 /// These parameters typically do not require changes from the default, and incorrect values can lead to meta-stable or
 /// unstable performance and sink behavior. Proceed with caution.
+// The defaults for these values were chosen after running several simulations on a test service that had
+// various responses to load. The values are the best balances found between competing outcomes.
 #[configurable_component]
 #[derive(Clone, Copy, Debug)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct AdaptiveConcurrencySettings {
     /// The fraction of the current value to set the new concurrency limit when decreasing the limit.
     ///
@@ -34,6 +36,7 @@ pub struct AdaptiveConcurrencySettings {
     ///
     /// Note that the new limit is rounded down after applying this ratio.
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
+    #[serde(default = "default_decrease_ratio")]
     pub(super) decrease_ratio: f64,
 
     /// The weighting of new measurements compared to older measurements.
@@ -58,17 +61,19 @@ pub struct AdaptiveConcurrencySettings {
     pub(super) rtt_deviation_scale: f64,
 }
 
-impl AdaptiveConcurrencySettings {
-    pub const fn const_default() -> Self {
-        // The defaults for these values were chosen after running several simulations on a test service that had
-        // various responses to load. The values are the best balances found between competing outcomes.
-        Self {
-            decrease_ratio: 0.9,
-            ewma_alpha: 0.4,
-            rtt_deviation_scale: 2.5,
-        }
-    }
+const fn default_decrease_ratio() -> f64 {
+    0.9
+}
 
+const fn default_ewma_alpha() -> f64 {
+    0.4
+}
+
+const fn default_rtt_deviation_scale() -> f64 {
+    2.5
+}
+
+impl AdaptiveConcurrencySettings {
     pub const fn max_concurrency() -> usize {
         MAX_CONCURRENCY
     }
@@ -76,6 +81,10 @@ impl AdaptiveConcurrencySettings {
 
 impl Default for AdaptiveConcurrencySettings {
     fn default() -> Self {
-        AdaptiveConcurrencySettings::const_default()
+        Self {
+            decrease_ratio: default_decrease_ratio(),
+            ewma_alpha: default_ewma_alpha(),
+            rtt_deviation_scale: default_rtt_deviation_scale(),
+        }
     }
 }

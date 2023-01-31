@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::process::{Command, Stdio};
 use std::{env, ffi::OsString, path::PathBuf};
 
@@ -6,15 +6,15 @@ use anyhow::Result;
 use atty::Stream;
 use once_cell::sync::Lazy;
 
-use super::config::RustToolchainConfig;
+use super::config::{EnvConfig, RustToolchainConfig};
 use crate::app::{self, CommandExt as _};
 
-pub const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
 const VOLUME_TARGET: &str = "vector_target";
 const VOLUME_CARGO_GIT: &str = "vector_cargo_git";
 const VOLUME_CARGO_REGISTRY: &str = "vector_cargo_registry";
+const RUNNER_HOSTNAME: &str = "runner";
 const TEST_COMMAND: &[&str] = &[
     "cargo",
     "nextest",
@@ -71,7 +71,7 @@ pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
 }
 
 pub trait TestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()>;
+    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()>;
 }
 
 pub trait ContainerTestRunner: TestRunner {
@@ -79,9 +79,7 @@ pub trait ContainerTestRunner: TestRunner {
 
     fn image_name(&self) -> String;
 
-    fn network_name(&self) -> String {
-        "host".to_string()
-    }
+    fn network_name(&self) -> String;
 
     fn stop(&self) -> Result<()> {
         dockercmd(["stop", "--time", "0", &self.container_name()])
@@ -124,7 +122,7 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(RunnerState::Missing)
     }
 
-    fn verify_state(&self) -> Result<()> {
+    fn ensure_running(&self) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
             RunnerState::Created | RunnerState::Exited => self.start()?,
@@ -193,8 +191,12 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn remove(&self) -> Result<()> {
-        dockercmd(["rm", &self.container_name()])
-            .wait(format!("Removing container {}", self.container_name()))
+        if matches!(self.state()?, RunnerState::Missing) {
+            Ok(())
+        } else {
+            dockercmd(["rm", "--force", "--volumes", &self.container_name()])
+                .wait(format!("Removing container {}", self.container_name()))
+        }
     }
 
     fn unpause(&self) -> Result<()> {
@@ -209,6 +211,8 @@ pub trait ContainerTestRunner: TestRunner {
             &self.container_name(),
             "--network",
             &self.network_name(),
+            "--hostname",
+            RUNNER_HOSTNAME,
             "--workdir",
             MOUNT_PATH,
             "--volume",
@@ -231,8 +235,8 @@ impl<T> TestRunner for T
 where
     T: ContainerTestRunner,
 {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
-        self.verify_state()?;
+    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()> {
+        self.ensure_running()?;
 
         let mut command = dockercmd(["exec"]);
         if atty::is(Stream::Stdout) {
@@ -240,9 +244,16 @@ where
         }
 
         command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
-        for (key, value) in env_vars {
-            command.env(key, value);
-            command.args(["--env", key]);
+        if let Some(env_vars) = outer_env {
+            for (key, value) in env_vars {
+                command.env(key, value);
+                command.args(["--env", key]);
+            }
+        }
+        if let Some(env_vars) = inner_env {
+            for (key, value) in env_vars {
+                command.args(["--env", &format!("{key}={value}")]);
+            }
         }
 
         command.arg(&self.container_name());
@@ -262,7 +273,7 @@ impl IntegrationTestRunner {
         Ok(Self { integration })
     }
 
-    pub fn ensure_network(&self) -> Result<()> {
+    pub(super) fn ensure_network(&self) -> Result<()> {
         let mut command = dockercmd(["network", "ls", "--format", "{{.Name}}"]);
 
         if command
@@ -298,6 +309,10 @@ impl ContainerTestRunner for IntegrationTestRunner {
 pub struct DockerTestRunner;
 
 impl ContainerTestRunner for DockerTestRunner {
+    fn network_name(&self) -> String {
+        "host".to_string()
+    }
+
     fn container_name(&self) -> String {
         format!("vector-test-runner-{}", self.get_rust_version())
     }
@@ -310,13 +325,20 @@ impl ContainerTestRunner for DockerTestRunner {
 pub struct LocalTestRunner;
 
 impl TestRunner for LocalTestRunner {
-    fn test(&self, env_vars: &BTreeMap<String, String>, args: &[String]) -> Result<()> {
+    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);
         command.args(args);
 
-        for (key, value) in env_vars {
-            command.env(key, value);
+        if let Some(env_vars) = outer_env {
+            for (key, value) in env_vars {
+                command.env(key, value);
+            }
+        }
+        if let Some(env_vars) = inner_env {
+            for (key, value) in env_vars {
+                command.env(key, value);
+            }
         }
 
         command.check_run()

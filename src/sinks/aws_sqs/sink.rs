@@ -41,10 +41,9 @@ impl SqsSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            timeout_secs: Some(30),
-            ..Default::default()
-        });
+        let request = self
+            .request
+            .unwrap_with(&TowerRequestConfig::default().timeout_secs(30));
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
         let service = tower::ServiceBuilder::new()
             .settings(request, super::retry::SqsRetryLogic)
