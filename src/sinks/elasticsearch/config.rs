@@ -230,21 +230,28 @@ const fn default_index() -> Template {
     Template::try_from("vector-%Y.%m.%d").unwrap()
 }
 
-/// Elasticsearch Data stream mode configuration.
+/// Elasticsearch data stream mode configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct DataStreamConfig {
     /// The data stream type used to construct the data stream at index time.
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
+    #[configurable(metadata(docs::examples = "metrics"))]
+    #[configurable(metadata(docs::examples = "syntetics"))]
+    #[configurable(metadata(docs::examples = "{{ type }}"))]
     pub dtype: Template,
 
     /// The data stream dataset used to construct the data stream at index time.
     #[serde(default = "DataStreamConfig::default_dataset")]
+    #[configurable(metadata(docs::examples = "generic"))]
+    #[configurable(metadata(docs::examples = "nginx"))]
+    #[configurable(metadata(docs::examples = "{{ service }}"))]
     pub dataset: Template,
 
     /// The data stream namespace used to construct the data stream at index time.
     #[serde(default = "DataStreamConfig::default_namespace")]
+    #[configurable(metadata(docs::examples = "{{ environment }}"))]
     pub namespace: Template,
 
     /// Automatically routes events by deriving the data stream name using specific event fields.
