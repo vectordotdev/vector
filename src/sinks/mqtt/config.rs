@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use codecs::JsonSerializerConfig;
-use rand::{thread_rng, Rng};
 use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -100,10 +99,8 @@ const fn default_port() -> u16 {
     1883
 }
 
-/// a client ID containing a random string because it must be unique
-/// per broker
 fn default_client_id() -> String {
-    format!("vector-{:08x}", thread_rng().gen::<u64>())
+    "vector".to_string()
 }
 
 const fn default_keep_alive() -> u16 {

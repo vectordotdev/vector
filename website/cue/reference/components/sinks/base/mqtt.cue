@@ -35,7 +35,7 @@ base: components: sinks: mqtt: configuration: {
 	client_id: {
 		description: "MQTT client ID"
 		required:    false
-		type: string: default: "vector-a8b2071fc2dc800c"
+		type: string: default: "vector"
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
