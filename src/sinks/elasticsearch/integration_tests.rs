@@ -18,7 +18,7 @@ use crate::{
     config::{ProxyConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        util::{BatchConfig, Compression},
+        util::{BatchConfig, Compression, SinkBatchSettings},
         HealthcheckError,
     },
     test_util::{
@@ -116,7 +116,8 @@ async fn ensure_pipeline_in_params() {
             ..Default::default()
         }),
         pipeline: Some(pipeline.clone()),
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
     let common = ElasticsearchCommon::parse_single(&config)
         .await
@@ -137,7 +138,8 @@ async fn structures_events_correctly() {
         doc_type: "log_lines".to_string(),
         id_key: Some("my_id".into()),
         compression: Compression::None,
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
     let common = ElasticsearchCommon::parse_single(&config)
         .await
@@ -214,7 +216,8 @@ async fn auto_version_http() {
         doc_type: "log_lines".to_string(),
         compression: Compression::None,
         api_version: ElasticsearchApiVersion::Auto,
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
     let _ = ElasticsearchCommon::parse_single(&config)
         .await
@@ -238,7 +241,8 @@ async fn auto_version_https() {
             ..Default::default()
         }),
         api_version: ElasticsearchApiVersion::Auto,
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
     let _ = ElasticsearchCommon::parse_single(&config)
         .await
@@ -257,7 +261,8 @@ async fn auto_version_aws() {
         endpoints: vec![aws_server()],
         aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
         api_version: ElasticsearchApiVersion::Auto,
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
 
     let _ = ElasticsearchCommon::parse_single(&config)
@@ -274,7 +279,8 @@ async fn insert_events_over_http() {
             endpoints: vec![http_server()],
             doc_type: "log_lines".into(),
             compression: Compression::None,
-            ..config()
+            batch: batch_settings(),
+            ..Default::default()
         },
         false,
         BatchStatus::Delivered,
@@ -291,7 +297,8 @@ async fn insert_events_over_http_with_gzip_compression() {
             endpoints: vec![http_server()],
             doc_type: "log_lines".into(),
             compression: Compression::gzip_default(),
-            ..config()
+            batch: batch_settings(),
+            ..Default::default()
         },
         false,
         BatchStatus::Delivered,
@@ -316,7 +323,8 @@ async fn insert_events_over_https() {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
-            ..config()
+            batch: batch_settings(),
+            ..Default::default()
         },
         false,
         BatchStatus::Delivered,
@@ -337,7 +345,8 @@ async fn insert_events_on_aws() {
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             api_version: ElasticsearchApiVersion::V6,
-            ..config()
+            batch: batch_settings(),
+            ..Default::default()
         },
         false,
         BatchStatus::Delivered,
@@ -359,7 +368,8 @@ async fn insert_events_on_aws_with_compression() {
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
             api_version: ElasticsearchApiVersion::V6,
-            ..config()
+            batch: batch_settings(),
+            ..Default::default()
         },
         false,
         BatchStatus::Delivered,
@@ -376,7 +386,8 @@ async fn insert_events_with_failure() {
             endpoints: vec![http_server()],
             doc_type: "log_lines".into(),
             compression: Compression::None,
-            ..config()
+            batch: batch_settings(),
+            ..Default::default()
         },
         true,
         BatchStatus::Rejected,
@@ -393,7 +404,8 @@ async fn insert_events_with_failure_and_gzip_compression() {
             endpoints: vec![http_server()],
             doc_type: "log_lines".into(),
             compression: Compression::gzip_default(),
-            ..config()
+            batch: batch_settings(),
+            ..Default::default()
         },
         true,
         BatchStatus::Rejected,
@@ -414,7 +426,8 @@ async fn insert_events_in_data_stream() {
             index: Template::try_from(stream_index.clone()).expect("unable to parse template"),
             ..Default::default()
         }),
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
     let common = ElasticsearchCommon::parse_single(&cfg)
         .await
@@ -448,7 +461,8 @@ async fn distributed_insert_events() {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             ..Default::default()
         }),
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
     config.bulk = Some(BulkConfig {
         index: gen_index(),
@@ -478,7 +492,8 @@ async fn distributed_insert_events_failover() {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             ..Default::default()
         }),
-        ..config()
+        batch: batch_settings(),
+        ..Default::default()
     };
     config.bulk = Some(BulkConfig {
         index: gen_index(),
@@ -702,12 +717,8 @@ async fn create_data_stream(common: &ElasticsearchCommon, name: &str) -> crate::
     Ok(())
 }
 
-fn config() -> ElasticsearchConfig {
+fn batch_settings<D: SinkBatchSettings + Clone + Default>() -> BatchConfig<D> {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(1);
-
-    ElasticsearchConfig {
-        batch,
-        ..Default::default()
-    }
+    batch
 }
