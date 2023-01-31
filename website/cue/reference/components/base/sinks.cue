@@ -168,7 +168,7 @@ base: components: sinks: configuration: {
 					default: []
 					items: type: string: {
 						examples: ["localhost", ".foo.bar", "*"]
-                    }
+					}
 				}
 			}
 		}

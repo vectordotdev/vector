@@ -879,8 +879,8 @@ components: {
 				required: false
 				type: object: options: {
 					enabled: {
-						common:		 false
-                        description: "Enables proxying support."
+						common:      false
+						description: "Enables proxying support."
 						required:    false
 						type: bool: default: true
 					}
@@ -892,7 +892,7 @@ components: {
 							Must be a valid URI string.
 							"""
 						required: false
-				        type: string: examples: ["http://foo.bar:3128"]
+						type: string: examples: ["http://foo.bar:3128"]
 					}
 					https: {
 						common: false
@@ -902,7 +902,7 @@ components: {
 							Must be a valid URI string.
 							"""
 						required: false
-				        type: string: examples: ["http://foo.bar:3128"]
+						type: string: examples: ["http://foo.bar:3128"]
 					}
 					no_proxy: {
 						common: false
