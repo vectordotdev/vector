@@ -380,11 +380,6 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 			}
 		}
 	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
-	}
 	tls: {
 		description: "TLS configuration."
 		required:    false
