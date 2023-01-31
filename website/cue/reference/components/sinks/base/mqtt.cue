@@ -278,7 +278,7 @@ base: components: sinks: mqtt: configuration: {
 		}
 	}
 	topic: {
-		description: "MQTT publish topic (templates allowed)"
+		description: "MQTT publish topic"
 		required:    true
 		type: string: syntax: "template"
 	}
