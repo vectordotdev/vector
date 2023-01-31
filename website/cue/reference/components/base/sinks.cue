@@ -166,9 +166,7 @@ base: components: sinks: configuration: {
 				required: false
 				type: array: {
 					default: []
-					items: type: string: {
-						examples: ["localhost", ".foo.bar", "*"]
-					}
+					items: type: string: examples: ["localhost", ".foo.bar", "*"]
 				}
 			}
 		}
