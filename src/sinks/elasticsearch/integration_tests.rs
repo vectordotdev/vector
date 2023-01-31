@@ -112,8 +112,8 @@ async fn ensure_pipeline_in_params() {
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
         bulk: Some(BulkConfig {
-            index: Some(index),
-            action: None,
+            index,
+            ..Default::default()
         }),
         pipeline: Some(pipeline.clone()),
         ..config()
@@ -131,10 +131,10 @@ async fn structures_events_correctly() {
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
         bulk: Some(BulkConfig {
-            index: Some(index.clone()),
-            action: None,
+            index: index.clone(),
+            ..Default::default()
         }),
-        doc_type: Some("log_lines".into()),
+        doc_type: "log_lines".to_string(),
         id_key: Some("my_id".into()),
         compression: Compression::None,
         ..config()
@@ -211,7 +211,7 @@ async fn auto_version_http() {
 
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
-        doc_type: Some("log_lines".into()),
+        doc_type: "log_lines".to_string(),
         compression: Compression::None,
         api_version: ElasticsearchApiVersion::Auto,
         ..config()
@@ -231,7 +231,7 @@ async fn auto_version_https() {
             password: "vector".to_string().into(),
         }),
         endpoints: vec![https_server()],
-        doc_type: Some("log_lines".into()),
+        doc_type: "log_lines".to_string(),
         compression: Compression::None,
         tls: Some(TlsConfig {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
@@ -272,7 +272,7 @@ async fn insert_events_over_http() {
     run_insert_tests(
         ElasticsearchConfig {
             endpoints: vec![http_server()],
-            doc_type: Some("log_lines".into()),
+            doc_type: "log_lines".into(),
             compression: Compression::None,
             ..config()
         },
@@ -289,7 +289,7 @@ async fn insert_events_over_http_with_gzip_compression() {
     run_insert_tests(
         ElasticsearchConfig {
             endpoints: vec![http_server()],
-            doc_type: Some("log_lines".into()),
+            doc_type: "log_lines".into(),
             compression: Compression::gzip_default(),
             ..config()
         },
@@ -310,7 +310,7 @@ async fn insert_events_over_https() {
                 password: "vector".to_string().into(),
             }),
             endpoints: vec![https_server()],
-            doc_type: Some("log_lines".into()),
+            doc_type: "log_lines".into(),
             compression: Compression::None,
             tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
@@ -374,7 +374,7 @@ async fn insert_events_with_failure() {
     run_insert_tests(
         ElasticsearchConfig {
             endpoints: vec![http_server()],
-            doc_type: Some("log_lines".into()),
+            doc_type: "log_lines".into(),
             compression: Compression::None,
             ..config()
         },
@@ -391,7 +391,7 @@ async fn insert_events_with_failure_and_gzip_compression() {
     run_insert_tests(
         ElasticsearchConfig {
             endpoints: vec![http_server()],
-            doc_type: Some("log_lines".into()),
+            doc_type: "log_lines".into(),
             compression: Compression::gzip_default(),
             ..config()
         },
@@ -411,8 +411,8 @@ async fn insert_events_in_data_stream() {
         endpoints: vec![http_server()],
         mode: ElasticsearchMode::DataStream,
         bulk: Some(BulkConfig {
-            index: Some(stream_index.clone()),
-            action: None,
+            index: Template::try_from(stream_index.clone()).expect("unable to parse template"),
+            ..Default::default()
         }),
         ..config()
     };
@@ -442,7 +442,7 @@ async fn distributed_insert_events() {
             password: "vector".to_string().into(),
         }),
         endpoints: vec![https_server(), http_server()],
-        doc_type: Some("log_lines".into()),
+        doc_type: "log_lines".into(),
         compression: Compression::None,
         tls: Some(TlsConfig {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
@@ -451,8 +451,8 @@ async fn distributed_insert_events() {
         ..config()
     };
     config.bulk = Some(BulkConfig {
-        index: Some(gen_index()),
-        action: None,
+        index: gen_index(),
+        ..Default::default()
     });
     run_insert_tests_with_multiple_endpoints(&config).await;
 }
@@ -472,7 +472,7 @@ async fn distributed_insert_events_failover() {
             https_server(),
             "http://localhost:2347".into(),
         ],
-        doc_type: Some("log_lines".into()),
+        doc_type: "log_lines".into(),
         compression: Compression::None,
         tls: Some(TlsConfig {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
@@ -481,8 +481,8 @@ async fn distributed_insert_events_failover() {
         ..config()
     };
     config.bulk = Some(BulkConfig {
-        index: Some(gen_index()),
-        action: None,
+        index: gen_index(),
+        ..Default::default()
     });
     run_insert_tests_with_multiple_endpoints(&config).await;
 }
@@ -493,8 +493,8 @@ async fn run_insert_tests(
     status: BatchStatus,
 ) {
     config.bulk = Some(BulkConfig {
-        index: Some(gen_index()),
-        action: None,
+        index: gen_index(),
+        ..Default::default()
     });
     run_insert_tests_with_config(&config, break_events, status).await;
 }
@@ -528,11 +528,7 @@ async fn run_insert_tests_with_config(
             "{}",
             Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
         ),
-        ElasticsearchMode::Bulk => config
-            .bulk
-            .as_ref()
-            .map(|x| x.index.clone().unwrap())
-            .unwrap(),
+        ElasticsearchMode::Bulk => config.bulk.as_ref().unwrap().index.to_string(),
     };
     let base_url = common.base_url.clone();
 
@@ -630,11 +626,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
             "{}",
             Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
         ),
-        ElasticsearchMode::Bulk => config
-            .bulk
-            .as_ref()
-            .map(|x| x.index.clone().unwrap())
-            .unwrap(),
+        ElasticsearchMode::Bulk => config.bulk.as_ref().unwrap().index.to_string(),
     };
 
     let (sink, healthcheck) = config
@@ -693,8 +685,9 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     assert_eq!(input.len() as u64, total);
 }
 
-fn gen_index() -> String {
-    format!("test-{}", random_string(10).to_lowercase())
+fn gen_index() -> Template {
+    Template::try_from(format!("test-{}", random_string(10).to_lowercase()))
+        .expect("can't parse template")
 }
 
 async fn create_data_stream(common: &ElasticsearchCommon, name: &str) -> crate::Result<()> {
