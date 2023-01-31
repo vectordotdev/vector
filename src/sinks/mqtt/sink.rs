@@ -56,9 +56,7 @@ impl MqttConnector {
     }
 
     pub async fn healthcheck(&self) -> crate::Result<()> {
-        let (client, connection) = self.connect();
-        drop(client);
-        drop(connection);
+        // FIXME: Right now there is no way to implement the healthcheck properly: https://github.com/bytebeamio/rumqtt/issues/562
         Ok(())
     }
 }
