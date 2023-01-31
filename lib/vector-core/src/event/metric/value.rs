@@ -637,7 +637,7 @@ impl ByteSizeOf for Bucket {
 /// floating-point numbers and can represent higher-precision cut points, such as 0.9999, or the
 /// 99.99th percentile.
 ///
-/// [quantile_wikipedia]: https://en.wikipedia.org/wiki/Quantile
+/// [quantiles_wikipedia]: https://en.wikipedia.org/wiki/Quantile
 #[configurable_component]
 #[derive(Clone, Copy, Debug)]
 pub struct Quantile {
