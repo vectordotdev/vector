@@ -4,5 +4,8 @@ args:
 - --lib
 - '::datadog::metrics::'
 
+required_env:
+- DD_API_KEY
+
 matrix:
-- version: [latest]
+  version: [latest]

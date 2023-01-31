@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Args;
+use itertools::Itertools as _;
 
 use crate::testing::{config::IntegrationTestConfig, state};
 
@@ -39,6 +40,16 @@ impl Cli {
                 let active_env = envs_dir.active()?;
 
                 println!("Test args: {}", config.args.join(" "));
+
+                let required = config.required_env.iter().join(" ");
+                println!(
+                    "Required environment variables: {}",
+                    if config.required_env.is_empty() {
+                        "N/A"
+                    } else {
+                        &required
+                    }
+                );
 
                 println!("Environments:");
                 for environment in config.environments().keys() {

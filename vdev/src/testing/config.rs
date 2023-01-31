@@ -1,6 +1,6 @@
-use std::collections::BTreeMap;
-use std::fs;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 use anyhow::{bail, Context, Result};
 use hashlink::LinkedHashMap;
@@ -67,6 +67,9 @@ pub struct IntegrationTestConfig {
     /// might otherwise affect the operation of either docker or docker-compose but are needed in
     /// the runner.
     pub(super) runner_env: EnvConfig,
+    /// The set of environment variables that are required to be set before running the integration.
+    #[serde(default)]
+    pub required_env: BTreeSet<String>,
     /// The matrix of environment configurations values.
     matrix: LinkedHashMap<String, Vec<String>>,
     /// Does the test runner need access to the host's docker socket?
@@ -133,5 +136,19 @@ impl IntegrationTestConfig {
         }
 
         Ok(configs)
+    }
+
+    pub fn check_required(&self) -> Result<()> {
+        let missing: Vec<_> = self
+            .required_env
+            .iter()
+            .filter(|var| env::var(var).is_err())
+            .collect();
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            let missing = missing.into_iter().join(", ");
+            bail!("Required environment variables are not set: {missing}");
+        }
     }
 }

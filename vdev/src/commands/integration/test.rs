@@ -35,6 +35,7 @@ impl Cli {
         }
 
         let (_test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
+        config.check_required()?;
         let envs = config.environments();
 
         let active = EnvsDir::new(&self.integration).active()?;

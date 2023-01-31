@@ -13,5 +13,8 @@ env:
   TRACE_AGENT_URL: http://datadog-trace-agent:8126/v0.3/traces
   VECTOR_PORT: '8081'
 
+required_env:
+- DD_API_KEY
+
 matrix:
   version: [latest]
