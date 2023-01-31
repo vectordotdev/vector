@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -10,6 +10,9 @@ use serde::Deserialize;
 use crate::{app, util};
 
 const FILE_NAME: &str = "test.yaml";
+
+pub type Environment = BTreeMap<String, String>;
+pub type EnvConfig = Option<Environment>;
 
 #[derive(Deserialize, Debug)]
 pub struct RustToolchainRootConfig {
@@ -26,22 +29,46 @@ impl RustToolchainConfig {
         let repo_path = app::path();
         let config_file: PathBuf = [repo_path, "rust-toolchain.toml"].iter().collect();
         let contents = fs::read_to_string(&config_file)
-            .with_context(|| format!("failed to read {}", config_file.display()))?;
+            .with_context(|| format!("failed to read {config_file:?}"))?;
         let config: RustToolchainRootConfig = toml::from_str(&contents)
-            .with_context(|| format!("failed to parse {}", config_file.display()))?;
+            .with_context(|| format!("failed to parse {config_file:?}"))?;
 
         Ok(config.toolchain)
     }
 }
 
-#[derive(Deserialize, Clone, Debug)]
-pub struct IntegrationTestConfig {
-    pub args: Vec<String>,
-    pub env: Option<BTreeMap<String, String>>,
-    matrix: Vec<LinkedHashMap<String, Vec<String>>>,
+#[derive(Debug, Deserialize)]
+pub struct ComposeConfig {
+    pub services: BTreeMap<String, ComposeService>,
 }
 
-pub type Environment = HashMap<String, String>;
+#[derive(Debug, Deserialize)]
+pub struct ComposeService {
+    pub volumes: Option<Vec<String>>,
+}
+
+impl ComposeConfig {
+    #[cfg(unix)]
+    pub fn parse(path: &Path) -> Result<Self> {
+        let contents =
+            fs::read_to_string(path).with_context(|| format!("failed to read {path:?}"))?;
+        serde_yaml::from_str(&contents).with_context(|| format!("failed to parse {path:?}"))
+    }
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct IntegrationTestConfig {
+    /// The list of arguments to add to the docker command line for the runner
+    pub args: Vec<String>,
+    /// The set of environment variables to set in both the services and the runner.
+    pub(super) env: EnvConfig,
+    /// The set of environment variables to set in just the runner. This is used for settings that
+    /// might otherwise affect the operation of either docker or docker-compose but are needed in
+    /// the runner.
+    pub(super) runner_env: EnvConfig,
+    /// The matrix of environment configurations values.
+    matrix: Vec<LinkedHashMap<String, Vec<String>>>,
+}
 
 impl IntegrationTestConfig {
     fn parse_file(config_file: &Path) -> Result<Self> {

@@ -29,7 +29,7 @@ use std::{
 pub use crate::value::regex::ValueRegex;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
-pub use iter::IterItem;
+pub use iter::{IterItem, ValueIter};
 use lookup::lookup_v2::ValuePath;
 use ordered_float::NotNan;
 

@@ -18,17 +18,10 @@ use crate::{
     http::HttpClient,
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, Region},
-        util::{
-            batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
-            TowerRequestConfig,
-        },
+        util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
         Healthcheck, UriParseSnafu, VectorSink,
     },
 };
-
-// TODO: revisit our concurrency and batching defaults
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::new(Concurrency::None).retry_attempts(5);
 
 // This default is centered around "series" data, which should be the lion's share of what we
 // process.  Given that a single series, when encoded, is in the 150-300 byte range, we can fit a
@@ -38,6 +31,9 @@ const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
 // "we've exceeded our maximum payload size, split this batch" scenarios anyways.
 pub const MAXIMUM_PAYLOAD_COMPRESSED_SIZE: usize = 3_200_000;
 pub const MAXIMUM_PAYLOAD_SIZE: usize = 62_914_560;
+
+// TODO: revisit our concurrency and batching defaults
+const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
@@ -227,7 +223,11 @@ impl DatadogMetricsConfig {
     fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        // TODO: revisit our concurrency and batching defaults
+        let request_limits = self.request.unwrap_with(
+            &TowerRequestConfig::default().retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
+        );
+
         let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
         let service = ServiceBuilder::new()
             .settings(request_limits, DatadogMetricsRetryLogic)

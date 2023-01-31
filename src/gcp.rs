@@ -89,6 +89,7 @@ pub struct GcpAuthConfig {
 
     /// Skip all authentication handling. For use with integration tests only.
     #[serde(default, skip_serializing)]
+    #[configurable(metadata(docs::hidden))]
     pub skip_authentication: bool,
 }
 

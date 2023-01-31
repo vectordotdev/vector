@@ -411,6 +411,8 @@ base: components: sinks: elasticsearch: configuration: {
 					When set to `single`, only the last non-bare value of tags will be displayed with the
 					metric.  When set to `full`, all metric tags will be exposed as separate assignments as
 					described by [the `native_json` codec][vector_native_json].
+
+					[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 					"""
 				required: false
 				type: string: {
@@ -556,14 +558,20 @@ base: components: sinks: elasticsearch: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -572,7 +580,10 @@ base: components: sinks: elasticsearch: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -581,22 +592,31 @@ base: components: sinks: elasticsearch: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}

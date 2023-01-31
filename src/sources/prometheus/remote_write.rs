@@ -340,13 +340,22 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    use std::net::{SocketAddr, ToSocketAddrs as _};
     use tokio::time::Duration;
 
     use super::*;
     use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PUSH_SOURCE_TAGS};
 
-    fn source_receive_address() -> String {
-        std::env::var("SOURCE_RECEIVE_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9102".into())
+    fn source_receive_address() -> SocketAddr {
+        let address = std::env::var("REMOTE_WRITE_SOURCE_RECEIVE_ADDRESS")
+            .unwrap_or_else(|_| "127.0.0.1:9102".into());
+        // TODO: This logic should maybe be moved up into the source, and possibly into other
+        // sources, wrapped in a new socket address type that does the lookup during config parsing.
+        address
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap_or_else(|| panic!("Socket address {address:?} did not resolve"))
     }
 
     #[tokio::test]
@@ -359,7 +368,7 @@ mod integration_tests {
         // It could be nice to split up the Prometheus integration tests in the future, or
         // maybe there's a way to do a one-shot remote write from Prometheus? Not sure.
         let config = PrometheusRemoteWriteConfig {
-            address: source_receive_address().parse().unwrap(),
+            address: source_receive_address(),
             auth: None,
             tls: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
