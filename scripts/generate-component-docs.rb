@@ -809,6 +809,15 @@ def resolve_schema(root_schema, schema)
   description = get_rendered_description_from_schema(schema)
   resolved['description'] = description unless description.empty?
 
+  ## Resolve the deprecated flag. An optional deprecated message can also be set in the metadata.
+  if schema.fetch('deprecated', false)
+    resolved['deprecated'] = true
+    message = get_schema_metadata(schema, 'deprecated_message')
+    if message
+      resolved['deprecated_message'] = message
+    end
+  end
+
   # Reconcile the resolve schema, which essentially gives us a chance to, once the schema is
   # entirely resolved, check it for logical inconsistencies, fix up anything that we reasonably can,
   # and so on.

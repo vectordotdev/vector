@@ -25,6 +25,7 @@ cidr-utils = { version = "0.5", optional = true }
 csv = { version = "1.1", optional = true }
 data-encoding = { version = "2.3.3", optional = true }
 dns-lookup = { version = "1.0.8", optional = true }
+flate2 = { version = "1.0.25", default-features = false, features = ["default"], optional = true }
 grok = { version = "2", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
@@ -86,17 +87,21 @@ default = [
     "contains",
     "decode_base16",
     "decode_base64",
+    "decode_gzip",
     "decode_percent",
     "decode_mime_q",
+    "decode_zlib",
     "decrypt",
     "del",
     "downcase",
     "encode_base16",
     "encode_base64",
+    "encode_gzip",
     "encode_json",
     "encode_key_value",
     "encode_logfmt",
     "encode_percent",
+    "encode_zlib",
     "encrypt",
     "ends_with",
     "exists",
@@ -233,17 +238,21 @@ contains = []
 cryptography = ["dep:aes", "dep:ctr", "dep:cbc", "dep:cfb-mode", "dep:ofb"]
 decode_base16 = ["dep:base16"]
 decode_base64 = ["dep:base64"]
+decode_gzip = ["dep:flate2"]
 decode_percent = ["dep:percent-encoding"]
 decode_mime_q = ["dep:data-encoding","dep:charset","dep:quoted_printable"]
+decode_zlib = ["dep:flate2"]
 decrypt = ["cryptography", "random_bytes", "encrypt"]
 del = []
 downcase = []
 encode_base16 = ["dep:base16"]
 encode_base64 = ["dep:base64"]
+encode_gzip = ["dep:flate2"]
 encode_json = ["dep:serde_json", "value/json", "dep:chrono", "dep:regex"]
 encode_key_value = ["vector-common/encoding", "value/json"]
 encode_logfmt = ["encode_key_value"]
 encode_percent = ["dep:percent-encoding"]
+encode_zlib = ["dep:flate2"]
 encrypt = ["cryptography", "random_bytes", "decrypt"]
 ends_with = []
 exists = []

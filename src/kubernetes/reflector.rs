@@ -13,7 +13,7 @@ use tokio_util::time::DelayQueue;
 
 use super::meta_cache::{MetaCache, MetaDescribe};
 
-/// Handles events from a [`kube::runtime::watcher`] to delay the application of Deletion events.
+/// Handles events from a [`kube::runtime::watcher()`] to delay the application of Deletion events.
 pub async fn custom_reflector<K, W>(
     mut store: store::Writer<K>,
     mut meta_cache: MetaCache,

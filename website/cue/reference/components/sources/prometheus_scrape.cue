@@ -14,6 +14,7 @@ components: sources: prometheus_scrape: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
@@ -52,102 +53,8 @@ components: sources: prometheus_scrape: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoints: {
-			description: "Endpoints to scrape metrics from."
-			required:    true
-			warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metrics`."]
-			type: array: {
-				items: type: string: {
-					examples: ["http://localhost:9090/metrics"]
-				}
-			}
-		}
-		scrape_interval_secs: {
-			common:      true
-			description: "The interval between scrapes, in seconds."
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		instance_tag: {
-			category: "Context"
-			common:   true
-			description: """
-				The tag name added to each event representing the scraped instance's host:port.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["instance"]
-			}
-		}
-		endpoint_tag: {
-			category: "Context"
-			common:   true
-			description: """
-				The tag name added to each event representing the scraped instance's endpoint.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["endpoint"]
-			}
-		}
-		honor_labels: {
-			category: "Context"
-			common:   true
-			description: """
-				Controls how tag conflicts are handled if the scraped source has tags that Vector would add. If true,
-				Vector will not add the new tag if the scraped metric has the tag already. If false, Vector will rename
-				the conflicting tag by adding `exported_` to it.  This matches Prometheus's `honor_labels`
-				configuration.
-				"""
-			required: false
-			type: bool: {
-				default: false
-			}
-		}
-		query: {
-			common: false
-			description: """
-				Custom parameters for the scrape request query string.
-				One or more values for the same parameter key can be provided.
-				The parameters provided in this option are appended to any parameters manually provided in the `endpoints` option.
-				This option is especially useful when scraping the `/federate` endpoint.
-				"""
-			required: false
-			type: object: {
-				examples: [{"match[]": [#"{job="somejob"}"#, #"{__name__=~"job:.*"}"#]}]
-				options: {
-					"*": {
-						common:      false
-						description: "Any query key"
-						required:    false
-						type: array: {
-							default: null
-							examples: [[
-								#"{job="somejob"}"#,
-								#"{__name__=~"job:.*"}"#,
-							]]
-							items: type: string: {
-								examples: [
-									#"{job="somejob"}"#,
-									#"{__name__=~"job:.*"}"#,
-								]
-								syntax: "literal"
-							}
-						}
-					}
-				}
-			}
-		}
-		auth: configuration._http_auth & {_args: {
-			password_example: "${PROMETHEUS_PASSWORD}"
-			username_example: "${PROMETHEUS_USERNAME}"
-		}}
+	configuration: base.components.sources.prometheus_scrape.configuration & {
+		endpoints: warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metrics`."]
 	}
 
 	how_it_works: {

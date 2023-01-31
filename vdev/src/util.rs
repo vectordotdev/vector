@@ -1,5 +1,6 @@
+use std::ffi::{OsStr, OsString};
 use std::process::{Command, Output};
-use std::{collections::BTreeMap, fs};
+use std::{collections::BTreeMap, fmt::Debug, fs, io::ErrorKind, path::Path};
 
 use anyhow::{Context as _, Result};
 use serde::Deserialize;
@@ -45,4 +46,37 @@ pub fn release_channel() -> Result<&'static str> {
             "nightly"
         }
     })
+}
+
+pub fn exists(path: impl AsRef<Path> + Debug) -> Result<bool> {
+    match fs::metadata(path.as_ref()) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error).context(format!("Could not stat {path:?}")),
+    }
+}
+
+pub trait ChainArgs {
+    fn chain_args<I: Into<OsString>>(&self, args: impl IntoIterator<Item = I>) -> Vec<OsString>;
+    fn chain_arg(&self, arg: impl Into<OsString>) -> Vec<OsString> {
+        self.chain_args([arg])
+    }
+}
+
+impl<T: AsRef<OsStr>> ChainArgs for Vec<T> {
+    fn chain_args<I: Into<OsString>>(&self, args: impl IntoIterator<Item = I>) -> Vec<OsString> {
+        self.iter()
+            .map(Into::into)
+            .chain(args.into_iter().map(Into::into))
+            .collect()
+    }
+}
+
+impl<T: AsRef<OsStr>> ChainArgs for [T] {
+    fn chain_args<I: Into<OsString>>(&self, args: impl IntoIterator<Item = I>) -> Vec<OsString> {
+        self.iter()
+            .map(Into::into)
+            .chain(args.into_iter().map(Into::into))
+            .collect()
+    }
 }

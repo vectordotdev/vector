@@ -1,15 +1,18 @@
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+
 use anyhow::{bail, Context, Result};
 use hashlink::LinkedHashMap;
 use itertools::{self, Itertools};
 use serde::Deserialize;
 
-use std::collections::BTreeMap;
-use std::fs;
-use std::path::{Path, PathBuf};
-
-use crate::app;
+use crate::{app, util};
 
 const FILE_NAME: &str = "test.yaml";
+
+pub type Environment = BTreeMap<String, String>;
+pub type EnvConfig = Option<Environment>;
 
 #[derive(Deserialize, Debug)]
 pub struct RustToolchainRootConfig {
@@ -26,19 +29,49 @@ impl RustToolchainConfig {
         let repo_path = app::path();
         let config_file: PathBuf = [repo_path, "rust-toolchain.toml"].iter().collect();
         let contents = fs::read_to_string(&config_file)
-            .with_context(|| format!("failed to read {}", config_file.display()))?;
+            .with_context(|| format!("failed to read {config_file:?}"))?;
         let config: RustToolchainRootConfig = toml::from_str(&contents)
-            .with_context(|| format!("failed to parse {}", config_file.display()))?;
+            .with_context(|| format!("failed to parse {config_file:?}"))?;
 
         Ok(config.toolchain)
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ComposeConfig {
+    pub services: BTreeMap<String, ComposeService>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ComposeService {
+    pub volumes: Option<Vec<String>>,
+}
+
+impl ComposeConfig {
+    #[cfg(unix)]
+    pub fn parse(path: &Path) -> Result<Self> {
+        let contents =
+            fs::read_to_string(path).with_context(|| format!("failed to read {path:?}"))?;
+        serde_yaml::from_str(&contents).with_context(|| format!("failed to parse {path:?}"))
+    }
+}
+
 #[derive(Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct IntegrationTestConfig {
+    /// The list of arguments to add to the docker command line for the runner
     pub args: Vec<String>,
-    pub env: Option<BTreeMap<String, String>>,
-    matrix: Vec<LinkedHashMap<String, Vec<String>>>,
+    /// The set of environment variables to set in both the services and the runner.
+    pub(super) env: EnvConfig,
+    /// The set of environment variables to set in just the runner. This is used for settings that
+    /// might otherwise affect the operation of either docker or docker-compose but are needed in
+    /// the runner.
+    pub(super) runner_env: EnvConfig,
+    /// The matrix of environment configurations values.
+    matrix: LinkedHashMap<String, Vec<String>>,
+    /// Does the test runner need access to the host's docker socket?
+    #[serde(default)]
+    pub needs_docker_sock: bool,
 }
 
 impl IntegrationTestConfig {
@@ -55,21 +88,21 @@ impl IntegrationTestConfig {
         Ok(config)
     }
 
-    pub fn environments(&self) -> LinkedHashMap<String, LinkedHashMap<String, String>> {
-        let mut environments = LinkedHashMap::new();
-
-        for matrix in &self.matrix {
-            for product in matrix.values().multi_cartesian_product() {
-                let mut config = LinkedHashMap::new();
-                for (variable, &value) in matrix.keys().zip(product.iter()) {
-                    config.insert(variable.clone(), value.clone());
-                }
-
-                environments.insert(product.iter().join("-"), config);
-            }
-        }
-
-        environments
+    pub fn environments(&self) -> LinkedHashMap<String, Environment> {
+        self.matrix
+            .values()
+            .multi_cartesian_product()
+            .map(|product| {
+                let key = product.iter().join("-");
+                let config: Environment = self
+                    .matrix
+                    .keys()
+                    .zip(product.into_iter())
+                    .map(|(variable, value)| (variable.clone(), value.clone()))
+                    .collect();
+                (key, config)
+            })
+            .collect()
     }
 
     pub fn load(integration: &str) -> Result<(PathBuf, Self)> {
@@ -84,19 +117,19 @@ impl IntegrationTestConfig {
         Ok((test_dir, config))
     }
 
-    #[allow(dead_code)]
-    pub fn collect_all(root: &str) -> Result<BTreeMap<String, Self>> {
+    pub fn collect_all() -> Result<BTreeMap<String, Self>> {
         let mut configs = BTreeMap::new();
-        let tests_dir: PathBuf = [root, "scripts", "integration"].iter().collect();
+        let tests_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
         for entry in tests_dir.read_dir()? {
             let entry = entry?;
-            if !entry.path().is_dir() {
-                continue;
+            if entry.path().is_dir() {
+                let config_file: PathBuf =
+                    [entry.path().to_str().unwrap(), FILE_NAME].iter().collect();
+                if util::exists(&config_file)? {
+                    let config = Self::parse_file(&config_file)?;
+                    configs.insert(entry.file_name().into_string().unwrap(), config);
+                }
             }
-
-            let config_file: PathBuf = [entry.path().to_str().unwrap(), FILE_NAME].iter().collect();
-            let config = Self::parse_file(&config_file)?;
-            configs.insert(entry.file_name().into_string().unwrap(), config);
         }
 
         Ok(configs)

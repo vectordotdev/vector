@@ -34,7 +34,7 @@ pub enum Compression {
     /// The compression scheme of the object is determined from its `Content-Encoding` and
     /// `Content-Type` metadata, as well as the key suffix (for example, `.gz`).
     ///
-    /// It is set to 'none' if the compression scheme cannot be determined.
+    /// It is set to `none` if the compression scheme cannot be determined.
     #[derivative(Default)]
     Auto,
     /// Uncompressed.
@@ -45,7 +45,7 @@ pub enum Compression {
     Zstd,
 }
 
-/// Strategies for consuming objects from S3.
+/// Strategies for consuming objects from AWS S3.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative)]
 #[serde(rename_all = "lowercase")]
@@ -86,6 +86,7 @@ pub struct AwsS3Config {
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     assume_role: Option<String>,
 
     #[configurable(derived)]
@@ -95,6 +96,7 @@ pub struct AwsS3Config {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
+    #[configurable(derived)]
     multiline: Option<MultilineConfig>,
 
     #[configurable(derived)]
@@ -624,7 +626,7 @@ mod integration_tests {
                 start_pattern: "abc".to_owned(),
                 mode: line_agg::Mode::HaltWith,
                 condition_pattern: "geh".to_owned(),
-                timeout_ms: 1000,
+                timeout_ms: Duration::from_millis(1000),
             }),
             logs.join("\n").into_bytes(),
             vec!["abc\ndef\ngeh".to_owned()],
