@@ -33,7 +33,7 @@ base: components: sinks: elasticsearch: configuration: {
 		type: string: {
 			default: "auto"
 			enum: {
-				auto: "Auto-detect the api version. Will fail if endpoint isn't reachable."
+				auto: "Auto-detect the API version. Fails if an endpoint isn't reachable."
 				v6:   "Use the Elasticsearch 6.x API."
 				v7:   "Use the Elasticsearch 7.x API."
 				v8:   "Use the Elasticsearch 8.x API."
@@ -41,7 +41,7 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	auth: {
-		description: "Authentication strategies."
+		description: "Elasticsearch Authentication strategies."
 		required:    false
 		type: object: options: {
 			access_key_id: {
@@ -211,18 +211,32 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	bulk: {
-		description: "Bulk mode configuration."
+		description: "Elasticsearch bulk mode configuration."
 		required:    false
 		type: object: options: {
 			action: {
-				description: "The bulk action to use."
-				required:    false
-				type: string: {}
+				description: """
+					Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
+
+					Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
+
+					[es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
+					"""
+				required: false
+				type: string: {
+					default: "index"
+					examples: ["create", "{{ action }}"]
+					syntax: "template"
+				}
 			}
 			index: {
-				description: "The name of the index to use."
+				description: "The name of the index to write events to."
 				required:    false
-				type: string: {}
+				type: string: {
+					default: "vector-%Y.%m.%d"
+					examples: ["application-{{ application_id }}-%Y-%m-%d", "{{ index }}"]
+					syntax: "template"
+				}
 			}
 		}
 	}
@@ -251,7 +265,7 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	data_stream: {
-		description: "Data stream mode configuration."
+		description: "Elasticsearch data stream mode configuration."
 		required:    false
 		type: object: options: {
 			auto_routing: {
@@ -273,7 +287,8 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: string: {
 					default: "generic"
-					syntax:  "template"
+					examples: ["generic", "nginx", "{{ service }}"]
+					syntax: "template"
 				}
 			}
 			namespace: {
@@ -281,7 +296,8 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: string: {
 					default: "default"
-					syntax:  "template"
+					examples: ["{{ environment }}"]
+					syntax: "template"
 				}
 			}
 			sync_fields: {
@@ -298,36 +314,42 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: string: {
 					default: "logs"
-					syntax:  "template"
+					examples: ["metrics", "syntetics", "{{ type }}"]
+					syntax: "template"
 				}
 			}
 		}
 	}
 	distribution: {
-		description: "Options for determining health of an endpoint."
+		description: "Options for determining the health of an endpoint."
 		required:    false
 		type: object: options: {
 			retry_initial_backoff_secs: {
-				description: "Initial timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
+				description: "Initial delay between attempts to reactivate endpoints once they become unhealthy."
 				required:    false
-				type: uint: {}
+				type: uint: default: 1
 			}
 			retry_max_duration_secs: {
-				description: "Maximum timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
+				description: "Maximum delay between attempts to reactivate endpoints once they become unhealthy."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	doc_type: {
 		description: """
-			The `doc_type` for your index data.
+			The [`doc_type`][doc_type] for your index data.
 
 			This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to
 			set this option since Elasticsearch has removed it.
+
+			[doc_type]: https://www.elastic.co/guide/en/elasticsearch/reference/6.8/actions-index.html
 			"""
 		required: false
-		type: string: {}
+		type: string: default: "_doc"
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -354,25 +376,26 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	endpoint: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, the `endpoints` option should be used instead."
 		description: """
 			The Elasticsearch endpoint to send logs to.
 
-			This should be the full URL as shown in the example.
+			This should be the complete URL.
 			"""
 		required: false
 		type: string: {}
 	}
 	endpoints: {
 		description: """
-			The Elasticsearch endpoints to send logs to.
+			A list of Elasticsearch endpoints to send logs to.
 
-			Each endpoint should be the full URL as shown in the example.
+			Each endpoint should be a complete URL as shown in the example.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
 		}
 	}
 	id_key: {
@@ -386,7 +409,7 @@ base: components: sinks: elasticsearch: configuration: {
 			[perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["id", "_id"]
 	}
 	metrics: {
 		description: "Configuration for the `metric_to_log` transform."
@@ -442,7 +465,7 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	mode: {
-		description: "Indexing mode."
+		description: "Elasticsearch Indexing mode."
 		required:    false
 		type: string: {
 			default: "bulk"
@@ -459,15 +482,21 @@ base: components: sinks: elasticsearch: configuration: {
 	pipeline: {
 		description: "The name of the pipeline to apply."
 		required:    false
-		type: string: {}
+		type: string: examples: ["pipeline-name"]
 	}
 	query: {
-		description: "Custom parameters to add to the query string of each request sent to Elasticsearch."
+		description: "Custom parameters to add to the query string for each HTTP request sent to Elasticsearch."
 		required:    false
-		type: object: options: "*": {
-			description: "A query string parameter."
-			required:    true
-			type: string: {}
+		type: object: {
+			examples: [{
+				field: "value"
+				fruit: "mango"
+			}]
+			options: "*": {
+				description: "A query string parameter."
+				required:    true
+				type: string: {}
+			}
 		}
 	}
 	request: {
@@ -628,18 +657,17 @@ base: components: sinks: elasticsearch: configuration: {
 		type: bool: default: false
 	}
 	suppress_type_name: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, the `api_version` option should be used instead."
 		description: """
 			Whether or not to send the `type` field to Elasticsearch.
 
-			`type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
+			The `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
 
 			If enabled, the `doc_type` option will be ignored.
-
-			This option has been deprecated, the `api_version` option should be used instead.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: false
 	}
 	tls: {
 		description: "TLS configuration."
