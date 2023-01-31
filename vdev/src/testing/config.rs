@@ -69,7 +69,7 @@ pub struct IntegrationTestConfig {
     pub(super) runner_env: EnvConfig,
     /// The matrix of environment configurations values.
     matrix: LinkedHashMap<String, Vec<String>>,
-    /// Do the test runners need access to the host's docker socket?
+    /// Does the test runner need access to the host's docker socket?
     #[serde(default)]
     pub needs_docker_sock: bool,
 }

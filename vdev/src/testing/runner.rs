@@ -214,10 +214,10 @@ pub trait ContainerTestRunner: TestRunner {
             Some(name) => vec!["--network".into(), name],
             None => vec![],
         };
-        let docker_volume = format!("{}:/var/run/docker.sock", DOCKER_SOCK.display());
+        let docker_sock = format!("{}:/var/run/docker.sock", DOCKER_SOCK.display());
         let docker_args = self
             .needs_docker_sock()
-            .then(|| vec!["--volume", &docker_volume])
+            .then(|| vec!["--volume", &docker_sock])
             .unwrap_or_default();
         dockercmd(
             ["create", "--name", &self.container_name()]
