@@ -1,0 +1,10 @@
+args:
+- --features
+- fluent-integration-tests
+- --lib
+- "::fluent::"
+
+needs_docker_sock: true
+
+matrix:
+  default: ["default"]
