@@ -202,7 +202,7 @@ base: components: sinks: humio_logs: configuration: {
 	endpoint: {
 		description: "The base URL of the Humio instance."
 		required:    false
-		type: string: {}
+		type: string: default: "https://cloud.humio.com"
 	}
 	event_type: {
 		description: """
@@ -211,7 +211,10 @@ base: components: sinks: humio_logs: configuration: {
 			If unset, Humio will default it to none.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["json", "none"]
+			syntax: "template"
+		}
 	}
 	host_key: {
 		description: """
@@ -237,7 +240,10 @@ base: components: sinks: humio_logs: configuration: {
 			[humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ host }}", "custom_index"]
+			syntax: "template"
+		}
 	}
 	indexed_fields: {
 		description: """
@@ -515,6 +521,6 @@ base: components: sinks: humio_logs: configuration: {
 	token: {
 		description: "The Humio ingestion token."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 	}
 }

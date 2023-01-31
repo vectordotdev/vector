@@ -7,7 +7,10 @@ use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::{sink::StreamSink, transform::Transform};
 
-use super::{host_key, logs::HumioLogsConfig};
+use super::{
+    host_key,
+    logs::{HumioLogsConfig, HOST},
+};
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformConfig,
@@ -40,11 +43,16 @@ pub struct HumioMetricsConfig {
     transform: MetricToLogConfig,
 
     /// The Humio ingestion token.
+    #[configurable(metadata(
+        docs::examples = "${HUMIO_TOKEN}",
+        docs::examples = "A94A8FE5CCB19BA61C4C08"
+    ))]
     token: SensitiveString,
 
     /// The base URL of the Humio instance.
     #[serde(alias = "host")]
-    pub(super) endpoint: Option<String>,
+    #[serde(default = "default_endpoint")]
+    pub(super) endpoint: String,
 
     /// The source of events sent to this sink.
     ///
@@ -54,6 +62,7 @@ pub struct HumioMetricsConfig {
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
     /// If unset, Humio will default it to none.
+    #[configurable(metadata(docs::examples = "json", docs::examples = "none"))]
     event_type: Option<Template>,
 
     /// Overrides the name of the log field used to grab the hostname to send to Humio.
@@ -84,6 +93,7 @@ pub struct HumioMetricsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
     index: Option<Template>,
 
     #[configurable(derived)]
@@ -108,6 +118,10 @@ pub struct HumioMetricsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_endpoint() -> String {
+    HOST.to_string()
 }
 
 impl GenerateConfig for HumioMetricsConfig {
@@ -225,7 +239,7 @@ mod tests {
         "#})
         .unwrap();
 
-        assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
+        assert_eq!("https://localhost:9200/".to_string(), config.endpoint);
         let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
@@ -233,7 +247,7 @@ mod tests {
         "#})
         .unwrap();
 
-        assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
+        assert_eq!("https://localhost:9200/".to_string(), config.endpoint);
     }
 
     #[tokio::test]
