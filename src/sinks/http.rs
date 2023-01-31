@@ -194,7 +194,7 @@ fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
 
     HttpSink {
         uri: Default::default(),
-        method: default_http_method(),
+        method: Default::default(),
         auth: Default::default(),
         compression: Default::default(),
         transformer: Default::default(),
@@ -339,16 +339,7 @@ impl util::http::HttpSink for HttpSink {
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
-        let method = match &self.method {
-            HttpMethod::Get => Method::GET,
-            HttpMethod::Head => Method::HEAD,
-            HttpMethod::Post => Method::POST,
-            HttpMethod::Put => Method::PUT,
-            HttpMethod::Delete => Method::DELETE,
-            HttpMethod::Options => Method::OPTIONS,
-            HttpMethod::Trace => Method::TRACE,
-            HttpMethod::Patch => Method::PATCH,
-        };
+        let method: Method = self.method.into();
         let uri: Uri = self.uri.uri.clone();
 
         let content_type = {
@@ -658,6 +649,7 @@ mod tests {
         user = "waldo"
         password = "hunter2"
     "#,
+            "post",
             |parts| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
@@ -674,13 +666,12 @@ mod tests {
     async fn http_happy_path_put() {
         run_sink(
             r#"
-        method = "put"
-
         [auth]
         strategy = "basic"
         user = "waldo"
         password = "hunter2"
     "#,
+            "put",
             |parts| {
                 assert_eq!(Method::PUT, parts.method);
                 assert_eq!("/frames", parts.uri.path());
@@ -701,6 +692,7 @@ mod tests {
         foo = "bar"
         baz = "quux"
     "#,
+            "post",
             |parts| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
@@ -722,7 +714,7 @@ mod tests {
         components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
             let num_lines = 10;
 
-            let (in_addr, sink) = build_sink("").await;
+            let (in_addr, sink) = build_sink("", "post").await;
 
             let (batch, mut receiver) = BatchNotifier::new_with_receiver();
             let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
@@ -759,7 +751,7 @@ mod tests {
             const NUM_LINES: usize = 1000;
             const NUM_FAILURES: usize = 2;
 
-            let (in_addr, sink) = build_sink("").await;
+            let (in_addr, sink) = build_sink("", "post").await;
 
             let counter = Arc::new(atomic::AtomicUsize::new(0));
             let in_counter = Arc::clone(&counter);
@@ -806,7 +798,7 @@ mod tests {
         components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
             let num_lines = 1000;
 
-            let (in_addr, sink) = build_sink("").await;
+            let (in_addr, sink) = build_sink("", "post").await;
 
             let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
 
@@ -838,6 +830,7 @@ mod tests {
         uri = "http://$IN_ADDR/frames"
         compression = "gzip"
         encoding.codec = "json"
+        method = "post"
 
         [auth]
         strategy = "basic"
@@ -898,6 +891,7 @@ mod tests {
         encoding.codec = "json"
         payload_prefix = '{"data":'
         payload_suffix = "}"
+        method = "post"
 
         [auth]
         strategy = "basic"
@@ -965,10 +959,14 @@ mod tests {
         .await
     }
 
-    async fn run_sink(extra_config: &str, assert_parts: impl Fn(http::request::Parts)) {
+    async fn run_sink(
+        extra_config: &str,
+        method: &str,
+        assert_parts: impl Fn(http::request::Parts),
+    ) {
         let num_lines = 1000;
 
-        let (in_addr, sink) = build_sink(extra_config).await;
+        let (in_addr, sink) = build_sink(extra_config, method).await;
 
         let (rx, trigger, server) = build_test_server(in_addr);
         tokio::spawn(server);
@@ -986,18 +984,24 @@ mod tests {
         assert_eq!(input_lines, output_lines);
     }
 
-    async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::VectorSink) {
+    async fn build_sink(
+        extra_config: &str,
+        method: &str,
+    ) -> (std::net::SocketAddr, crate::sinks::VectorSink) {
         let in_addr = next_addr();
+
         let config = format!(
             r#"
                 uri = "http://{addr}/frames"
                 compression = "gzip"
                 framing.method = "newline_delimited"
                 encoding.codec = "json"
+                method = "{method}"
                 {extras}
             "#,
             addr = in_addr,
-            extras = extra_config
+            extras = extra_config,
+            method = method
         );
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
