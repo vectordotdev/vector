@@ -22,6 +22,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct MqttSinkConfig {
     /// MQTT server address
+    #[configurable(metadata(docs::examples = "mqtt.example.com"))]
     pub host: String,
 
     /// TCP port
