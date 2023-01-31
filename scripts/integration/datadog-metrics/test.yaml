@@ -5,7 +5,7 @@ args:
 - '::datadog::metrics::'
 
 required_env:
-- DD_API_KEY
+- TEST_DATADOG_API_KEY
 
 matrix:
   version: [latest]

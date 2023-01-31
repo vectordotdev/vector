@@ -11,7 +11,7 @@ env:
   TRACE_AGENT_URL: http://datadog-trace-agent:8126/v0.4/traces
 
 required_env:
-- DD_API_KEY
+- TEST_DATADOG_API_KEY
 
 matrix:
   version: ['7']
