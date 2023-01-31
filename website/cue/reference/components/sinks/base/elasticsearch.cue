@@ -33,7 +33,7 @@ base: components: sinks: elasticsearch: configuration: {
 		type: string: {
 			default: "auto"
 			enum: {
-				auto: "Auto-detect the API version. Fails if an endpoint isn't reachable."
+				auto: "Auto-detect the API version. Fails if the version endpoint (`/_cluster/state/version`) isn't reachable."
 				v6:   "Use the Elasticsearch 6.x API."
 				v7:   "Use the Elasticsearch 7.x API."
 				v8:   "Use the Elasticsearch 8.x API."
@@ -111,7 +111,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "Basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${ELASTICSEARCH_PASSWORD}", "password"]
 			}
 			profile: {
 				description: """
@@ -154,7 +154,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "Basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${ELASTICSEARCH_USERNAME}", "username"]
 			}
 		}
 	}
@@ -489,8 +489,7 @@ base: components: sinks: elasticsearch: configuration: {
 		required:    false
 		type: object: {
 			examples: [{
-				field: "value"
-				fruit: "mango"
+				"X-Powered-By": "Vector"
 			}]
 			options: "*": {
 				description: "A query string parameter."

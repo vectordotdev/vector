@@ -40,9 +40,13 @@ pub enum ElasticsearchAuth {
     /// HTTP Basic Authentication.
     Basic {
         /// Basic authentication username.
+        #[configurable(metadata(docs::examples = "${ELASTICSEARCH_USERNAME}"))]
+        #[configurable(metadata(docs::examples = "username"))]
         user: String,
 
         /// Basic authentication password.
+        #[configurable(metadata(docs::examples = "${ELASTICSEARCH_PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
     },
 
@@ -177,7 +181,7 @@ impl ElasticsearchCommonMode {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchApiVersion {
-    /// Auto-detect the API version. Fails if an endpoint isn't reachable.
+    /// Auto-detect the API version. Fails if the version endpoint (`/_cluster/state/version`) isn't reachable.
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,

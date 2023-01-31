@@ -150,7 +150,8 @@ pub struct ElasticsearchConfig {
 
     #[serde(default)]
     #[configurable(derived)]
-    pub distribution: Option<HealthConfig>,
+    #[serde(rename = "distribution")]
+    pub endpoint_health: Option<HealthConfig>,
 
     #[serde(alias = "normal", default)]
     #[configurable(derived)]
@@ -178,13 +179,7 @@ fn default_doc_type() -> String {
 }
 
 fn query_examples() -> HashMap<String, String> {
-    HashMap::<_, _>::from_iter(
-        [
-            ("field".to_owned(), "value".to_owned()),
-            ("fruit".to_owned(), "mango".to_owned()),
-        ]
-        .into_iter(),
-    )
+    HashMap::<_, _>::from_iter([("X-Powered-By".to_owned(), "Vector".to_owned())].into_iter())
 }
 
 impl Default for ElasticsearchConfig {
@@ -207,7 +202,7 @@ impl Default for ElasticsearchConfig {
             query: None,
             aws: None,
             tls: None,
-            distribution: None,
+            endpoint_health: None,
             bulk: Default::default(), // the default mode is Bulk
             data_stream: None,
             metrics: None,
@@ -479,7 +474,7 @@ impl SinkConfig for ElasticsearchConfig {
             .tower
             .unwrap_with(&TowerRequestConfig::default());
 
-        let health_config = self.distribution.clone().unwrap_or_default();
+        let health_config = self.endpoint_health.clone().unwrap_or_default();
 
         let services = commons
             .iter()
