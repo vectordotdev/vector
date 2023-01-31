@@ -254,27 +254,34 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 	resource: {
 		description: "The monitored resource to associate the metrics with."
 		required:    true
-		type: object: options: {
-			"*": {
-				description: "A type-specific label."
-				required:    true
-				type: string: {}
-			}
-			type: {
-				description: """
-					The monitored resource type.
+		type: object: {
+			examples: [{
+				instanceId: "Twilight"
+				projectId:  "vector-123456"
+				type:       "global"
+				zone:       "us-central1-a"
+			}]
+			options: {
+				"*": {
+					description: """
+						Values for all of the labels listed in the associated monitored resource descriptor.
 
-					For example, the type of a Compute Engine VM instance is `gce_instance`.
-					"""
-				required: true
-				type: string: {}
+						For example, Compute Engine VM instances use the labels `projectId`, `instanceId`, and `zone`.
+						"""
+					required: true
+					type: string: {}
+				}
+				type: {
+					description: """
+						The monitored resource type.
+
+						For example, the type of a Compute Engine VM instance is `gce_instance`.
+						"""
+					required: true
+					type: string: examples: ["global", "gce_instance"]
+				}
 			}
 		}
-	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
 	}
 	tls: {
 		description: "TLS configuration."

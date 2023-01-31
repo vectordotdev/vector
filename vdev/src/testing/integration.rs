@@ -83,7 +83,6 @@ impl IntegrationTest {
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
         let envs_dir = EnvsDir::new(&integration);
-        let runner = IntegrationTestRunner::new(integration.clone())?;
         let compose_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
         let Some(env_config) = config.environments().get(&environment).map(Clone::clone) else {
             bail!("Could not find environment named {environment:?}");
@@ -93,6 +92,11 @@ impl IntegrationTest {
             .try_exists()
             .with_context(|| format!("Could not lookup {compose_path:?}"))?
             .then_some(compose_path);
+        let runner = IntegrationTestRunner::new(
+            integration.clone(),
+            config.needs_docker_sock,
+            compose_path.is_some(),
+        )?;
 
         Ok(Self {
             integration,
@@ -106,7 +110,7 @@ impl IntegrationTest {
         })
     }
 
-    pub fn test(&self, extra_args: Vec<String>) -> Result<()> {
+    pub fn test(self, extra_args: Vec<String>) -> Result<()> {
         let active = self.envs_dir.check_active(&self.environment)?;
 
         if !active {
@@ -177,7 +181,9 @@ impl IntegrationTest {
 
             command.current_dir(&self.test_dir);
 
-            command.env(NETWORK_ENV_VAR, self.runner.network_name());
+            if let Some(network_name) = self.runner.network_name() {
+                command.env(NETWORK_ENV_VAR, network_name);
+            }
             if let Some(env_vars) = &self.config.env {
                 command.envs(env_vars);
             }

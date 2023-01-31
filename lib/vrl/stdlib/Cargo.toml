@@ -90,6 +90,7 @@ default = [
     "decode_gzip",
     "decode_percent",
     "decode_mime_q",
+    "decode_zlib",
     "decrypt",
     "del",
     "downcase",
@@ -100,6 +101,7 @@ default = [
     "encode_key_value",
     "encode_logfmt",
     "encode_percent",
+    "encode_zlib",
     "encrypt",
     "ends_with",
     "exists",
@@ -239,6 +241,7 @@ decode_base64 = ["dep:base64"]
 decode_gzip = ["dep:flate2"]
 decode_percent = ["dep:percent-encoding"]
 decode_mime_q = ["dep:data-encoding","dep:charset","dep:quoted_printable"]
+decode_zlib = ["dep:flate2"]
 decrypt = ["cryptography", "random_bytes", "encrypt"]
 del = []
 downcase = []
@@ -249,6 +252,7 @@ encode_json = ["dep:serde_json", "value/json", "dep:chrono", "dep:regex"]
 encode_key_value = ["vector-common/encoding", "value/json"]
 encode_logfmt = ["encode_key_value"]
 encode_percent = ["dep:percent-encoding"]
+encode_zlib = ["dep:flate2"]
 encrypt = ["cryptography", "random_bytes", "decrypt"]
 ends_with = []
 exists = []

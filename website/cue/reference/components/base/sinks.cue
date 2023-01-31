@@ -116,9 +116,11 @@ base: components: sinks: configuration: {
 		description: """
 			Proxy configuration.
 
-			Configure to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
-			proxy configuration convention, users can set different proxies to use based on the type of traffic being proxied,
-			as well as set specific hosts that should not be proxied.
+			Configure to proxy traffic through an HTTP(S) proxy when making external requests.
+
+			Similar to common proxy configuration convention, users can set different proxies
+			to use based on the type of traffic being proxied, as well as set specific hosts that
+			should not be proxied.
 			"""
 		required: false
 		type: object: options: {
@@ -164,7 +166,9 @@ base: components: sinks: configuration: {
 				required: false
 				type: array: {
 					default: []
-					items: type: string: {}
+					items: type: string: {
+						examples: ["localhost", ".foo.bar", "*"]
+					}
 				}
 			}
 		}

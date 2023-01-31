@@ -44,13 +44,13 @@ pub trait Target: std::fmt::Debug + SecretTarget {
 
     /// Get a value for a given path, or `None` if no value is found.
     ///
-    /// See [`Target::insert`] for more details.
+    /// See [`Target::target_insert`] for more details.
     fn target_get(&self, path: &OwnedTargetPath) -> Result<Option<&Value>, String>;
 
     /// Get a mutable reference to the value for a given path, or `None` if no
     /// value is found.
     ///
-    /// See [`Target::insert`] for more details.
+    /// See [`Target::target_insert`] for more details.
     fn target_get_mut(&mut self, path: &OwnedTargetPath) -> Result<Option<&mut Value>, String>;
 
     /// Remove the given path from the object.

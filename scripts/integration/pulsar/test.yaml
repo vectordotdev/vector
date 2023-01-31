@@ -8,4 +8,4 @@ env:
   PULSAR_ADDRESS: pulsar://pulsar:6650
 
 matrix:
-- version: [latest]
+  version: [latest]

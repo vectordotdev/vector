@@ -1,5 +1,5 @@
 //! This sink sends data to Google Chronicles unstructured log entries endpoint.
-//! See https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries
+//! See <https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries>
 //! for more information.
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
