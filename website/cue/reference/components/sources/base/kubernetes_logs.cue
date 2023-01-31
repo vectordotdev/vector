@@ -106,8 +106,7 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	glob_minimum_cooldown_ms: {
 		description: """
-			This value specifies not exactly the globbing, but interval
-			between the polling the files to watch from the `paths_provider`.
+			The interval at which the file system is polled to identify new files to read from.
 
 			This is quite efficient, yet might still create some load of the
 			file system; in addition, it is currently coupled with checksum dumping
@@ -377,6 +376,7 @@ base: components: sources: kubernetes_logs: configuration: {
 
 			Configured to use an environment variable by default, to be evaluated to a value provided by
 			Kubernetes at Pod creation.
+
 			[node]: https://kubernetes.io/docs/concepts/architecture/nodes/
 			"""
 		required: false

@@ -115,6 +115,7 @@ pub struct Config {
     ///
     /// Configured to use an environment variable by default, to be evaluated to a value provided by
     /// Kubernetes at Pod creation.
+    ///
     /// [node]: https://kubernetes.io/docs/concepts/architecture/nodes/
     self_node_name: String,
 
@@ -190,8 +191,7 @@ pub struct Config {
     #[configurable(metadata(docs::type_unit = "lines"))]
     fingerprint_lines: usize,
 
-    /// This value specifies not exactly the globbing, but interval
-    /// between the polling the files to watch from the `paths_provider`.
+    /// The interval at which the file system is polled to identify new files to read from.
     ///
     /// This is quite efficient, yet might still create some load of the
     /// file system; in addition, it is currently coupled with checksum dumping
