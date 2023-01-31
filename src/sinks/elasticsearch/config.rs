@@ -164,7 +164,7 @@ pub struct ElasticsearchConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-const fn default_doc_type() -> String {
+fn default_doc_type() -> String {
     "_doc".to_owned()
 }
 
@@ -180,11 +180,15 @@ fn query_examples() -> HashMap<String, String> {
 
 impl ElasticsearchConfig {
     pub fn bulk_action(&self) -> Option<Template> {
-        self.bulk.as_ref().map(|bulk_config| bulk_config.action)
+        self.bulk
+            .as_ref()
+            .map(|bulk_config| bulk_config.action.clone())
     }
 
     pub fn index(&self) -> Option<Template> {
-        self.bulk.as_ref().map(|bulk_config| bulk_config.index)
+        self.bulk
+            .as_ref()
+            .map(|bulk_config| bulk_config.index.clone())
     }
 
     pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
@@ -221,12 +225,12 @@ pub struct BulkConfig {
     pub index: Template,
 }
 
-const fn default_bulk_action() -> Template {
-    Template::try_from("index").unwrap()
+fn default_bulk_action() -> Template {
+    Template::try_from("index").expect("unable to parse template")
 }
 
-const fn default_index() -> Template {
-    Template::try_from("vector-%Y.%m.%d").unwrap()
+fn default_index() -> Template {
+    Template::try_from("vector-%Y.%m.%d").expect("unable to parse template")
 }
 
 /// Elasticsearch data stream mode configuration.
