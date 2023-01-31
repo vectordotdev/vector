@@ -37,17 +37,21 @@ pub struct HttpSinkConfig {
     /// The full URI to make HTTP requests to.
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
+    #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
     pub uri: UriSerde,
 
     /// The HTTP method to use when making the request.
-    pub method: Option<HttpMethod>,
+    #[serde(default = "default_http_method")]
+    pub method: HttpMethod,
 
     #[configurable(derived)]
     pub auth: Option<Auth>,
 
     /// A list of custom headers to add to each request.
     #[configurable(deprecated)]
-    #[configurable(metadata(docs::additional_props_description = "An HTTP request header."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and it's value."
+    ))]
     pub headers: Option<IndexMap<String, String>>,
 
     #[configurable(derived)]
@@ -60,6 +64,7 @@ pub struct HttpSinkConfig {
     /// A string to prefix the payload with.
     ///
     /// This option is ignored if the encoding is not character delimited JSON.
+    ///
     /// If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "{\"data\":"))]
     #[serde(default)]
@@ -68,6 +73,7 @@ pub struct HttpSinkConfig {
     /// A string to suffix the payload with.
     ///
     /// This option is ignored if the encoding is not character delimited JSON.
+    ///
     /// If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "}"))]
     #[serde(default)]
@@ -104,8 +110,6 @@ pub struct HttpSinkConfig {
 #[derivative(Default)]
 pub enum HttpMethod {
     /// GET.
-    ///
-    /// This is the default.
     #[derivative(Default)]
     Get,
 
@@ -146,6 +150,10 @@ impl From<HttpMethod> for Method {
     }
 }
 
+const fn default_http_method() -> HttpMethod {
+    HttpMethod::Get
+}
+
 impl GenerateConfig for HttpSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -165,7 +173,7 @@ impl HttpSinkConfig {
 
 struct HttpSink {
     pub uri: UriSerde,
-    pub method: Option<HttpMethod>,
+    pub method: HttpMethod,
     pub auth: Option<Auth>,
     pub payload_prefix: String,
     pub payload_suffix: String,
@@ -270,7 +278,7 @@ impl ValidatableComponent for HttpSinkConfig {
         let config = Self {
             uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
                 .expect("should never fail to parse"),
-            method: Some(HttpMethod::Post),
+            method: HttpMethod::Post,
             encoding: EncodingConfigWithFraming::new(
                 None,
                 JsonSerializerConfig::new(MetricTagValues::Full).into(),
@@ -289,7 +297,7 @@ impl ValidatableComponent for HttpSinkConfig {
 
         let external_resource = ExternalResource::new(
             ResourceDirection::Push,
-            HttpResourceConfig::from_parts(config.uri.uri.clone(), config.method.map(Into::into)),
+            HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
             config.encoding.clone(),
         );
 
@@ -329,16 +337,7 @@ impl util::http::HttpSink for HttpSink {
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
-        let method = match &self.method.unwrap_or(HttpMethod::Post) {
-            HttpMethod::Get => Method::GET,
-            HttpMethod::Head => Method::HEAD,
-            HttpMethod::Post => Method::POST,
-            HttpMethod::Put => Method::PUT,
-            HttpMethod::Delete => Method::DELETE,
-            HttpMethod::Options => Method::OPTIONS,
-            HttpMethod::Trace => Method::TRACE,
-            HttpMethod::Patch => Method::PATCH,
-        };
+        let method: Method = self.method.into();
         let uri: Uri = self.uri.uri.clone();
 
         let content_type = {
@@ -648,6 +647,7 @@ mod tests {
         user = "waldo"
         password = "hunter2"
     "#,
+            "post",
             |parts| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
@@ -664,13 +664,12 @@ mod tests {
     async fn http_happy_path_put() {
         run_sink(
             r#"
-        method = "put"
-
         [auth]
         strategy = "basic"
         user = "waldo"
         password = "hunter2"
     "#,
+            "put",
             |parts| {
                 assert_eq!(Method::PUT, parts.method);
                 assert_eq!("/frames", parts.uri.path());
@@ -691,6 +690,7 @@ mod tests {
         foo = "bar"
         baz = "quux"
     "#,
+            "post",
             |parts| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
@@ -712,7 +712,7 @@ mod tests {
         components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
             let num_lines = 10;
 
-            let (in_addr, sink) = build_sink("").await;
+            let (in_addr, sink) = build_sink("", "post").await;
 
             let (batch, mut receiver) = BatchNotifier::new_with_receiver();
             let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
@@ -749,7 +749,7 @@ mod tests {
             const NUM_LINES: usize = 1000;
             const NUM_FAILURES: usize = 2;
 
-            let (in_addr, sink) = build_sink("").await;
+            let (in_addr, sink) = build_sink("", "post").await;
 
             let counter = Arc::new(atomic::AtomicUsize::new(0));
             let in_counter = Arc::clone(&counter);
@@ -796,7 +796,7 @@ mod tests {
         components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
             let num_lines = 1000;
 
-            let (in_addr, sink) = build_sink("").await;
+            let (in_addr, sink) = build_sink("", "post").await;
 
             let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
 
@@ -828,6 +828,7 @@ mod tests {
         uri = "http://$IN_ADDR/frames"
         compression = "gzip"
         encoding.codec = "json"
+        method = "post"
 
         [auth]
         strategy = "basic"
@@ -888,6 +889,7 @@ mod tests {
         encoding.codec = "json"
         payload_prefix = '{"data":'
         payload_suffix = "}"
+        method = "post"
 
         [auth]
         strategy = "basic"
@@ -955,10 +957,14 @@ mod tests {
         .await
     }
 
-    async fn run_sink(extra_config: &str, assert_parts: impl Fn(http::request::Parts)) {
+    async fn run_sink(
+        extra_config: &str,
+        method: &str,
+        assert_parts: impl Fn(http::request::Parts),
+    ) {
         let num_lines = 1000;
 
-        let (in_addr, sink) = build_sink(extra_config).await;
+        let (in_addr, sink) = build_sink(extra_config, method).await;
 
         let (rx, trigger, server) = build_test_server(in_addr);
         tokio::spawn(server);
@@ -976,18 +982,24 @@ mod tests {
         assert_eq!(input_lines, output_lines);
     }
 
-    async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::VectorSink) {
+    async fn build_sink(
+        extra_config: &str,
+        method: &str,
+    ) -> (std::net::SocketAddr, crate::sinks::VectorSink) {
         let in_addr = next_addr();
+
         let config = format!(
             r#"
                 uri = "http://{addr}/frames"
                 compression = "gzip"
                 framing.method = "newline_delimited"
                 encoding.codec = "json"
+                method = "{method}"
                 {extras}
             "#,
             addr = in_addr,
-            extras = extra_config
+            extras = extra_config,
+            method = method
         );
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 

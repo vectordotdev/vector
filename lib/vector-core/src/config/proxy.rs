@@ -39,9 +39,11 @@ impl NoProxyInterceptor {
 
 /// Proxy configuration.
 ///
-/// Configure to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
-/// proxy configuration convention, users can set different proxies to use based on the type of traffic being proxied,
-/// as well as set specific hosts that should not be proxied.
+/// Configure to proxy traffic through an HTTP(S) proxy when making external requests.
+///
+/// Similar to common proxy configuration convention, users can set different proxies
+/// to use based on the type of traffic being proxied, as well as set specific hosts that
+/// should not be proxied.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -86,6 +88,9 @@ pub struct ProxyConfig {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
+    #[configurable(metadata(docs::examples = "localhost"))]
+    #[configurable(metadata(docs::examples = ".foo.bar"))]
+    #[configurable(metadata(docs::examples = "*"))]
     pub no_proxy: NoProxy,
 }
 

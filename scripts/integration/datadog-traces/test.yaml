@@ -14,4 +14,4 @@ env:
   VECTOR_PORT: '8081'
 
 matrix:
-- version: [latest]
+  version: [latest]

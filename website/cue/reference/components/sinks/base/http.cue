@@ -281,7 +281,7 @@ base: components: sinks: http: configuration: {
 		description: "A list of custom headers to add to each request."
 		required:    false
 		type: object: options: "*": {
-			description: "An HTTP request header."
+			description: "An HTTP request header and it's value."
 			required:    true
 			type: string: {}
 		}
@@ -289,19 +289,18 @@ base: components: sinks: http: configuration: {
 	method: {
 		description: "The HTTP method to use when making the request."
 		required:    false
-		type: string: enum: {
-			delete: "DELETE."
-			get: """
-				GET.
-
-				This is the default.
-				"""
-			head:    "HEAD."
-			options: "OPTIONS."
-			patch:   "PATCH."
-			post:    "POST."
-			put:     "PUT."
-			trace:   "TRACE."
+		type: string: {
+			default: "get"
+			enum: {
+				delete:  "DELETE."
+				get:     "GET."
+				head:    "HEAD."
+				options: "OPTIONS."
+				patch:   "PATCH."
+				post:    "POST."
+				put:     "PUT."
+				trace:   "TRACE."
+			}
 		}
 	}
 	payload_prefix: {
@@ -309,6 +308,7 @@ base: components: sinks: http: configuration: {
 			A string to prefix the payload with.
 
 			This option is ignored if the encoding is not character delimited JSON.
+
 			If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
 			"""
 		required: false
@@ -322,6 +322,7 @@ base: components: sinks: http: configuration: {
 			A string to suffix the payload with.
 
 			This option is ignored if the encoding is not character delimited JSON.
+
 			If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
 			"""
 		required: false
@@ -411,10 +412,16 @@ base: components: sinks: http: configuration: {
 			headers: {
 				description: "Additional HTTP headers to add to every HTTP request."
 				required:    false
-				type: object: options: "*": {
-					description: "An HTTP request header."
-					required:    true
-					type: string: {}
+				type: object: {
+					examples: [{
+						Accept:               "text/plain"
+						"X-My-Custom-Header": "A-Value"
+					}]
+					options: "*": {
+						description: "An HTTP request header and it's value."
+						required:    true
+						type: string: {}
+					}
 				}
 			}
 			rate_limit_duration_secs: {
@@ -572,6 +579,6 @@ base: components: sinks: http: configuration: {
 			This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["https://10.22.212.22:9000/endpoint"]
 	}
 }

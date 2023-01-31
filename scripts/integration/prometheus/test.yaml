@@ -8,4 +8,4 @@ env:
   REMOTE_WRITE_SOURCE_RECEIVE_ADDRESS: runner:9102
 
 matrix:
-- version: [v2.33.4]
+  version: [v2.33.4]
