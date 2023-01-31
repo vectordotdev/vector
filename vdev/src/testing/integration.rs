@@ -91,13 +91,7 @@ impl IntegrationTest {
         // TODO: Wrap up the optional compose logic in another type
         let compose_path = compose_path
             .try_exists()
-            .with_context(|| format!("Could not lookup {compose_path:?}"))?
-            .then(|| {
-                dunce::canonicalize(&compose_path).with_context(|| {
-                    format!("Could not canonicalize docker compose path {compose_path:?}")
-                })
-            })
-            .transpose()?;
+            .with_context(|| format!("Could not lookup {compose_path:?}"))?;
 
         Ok(Self {
             integration,
