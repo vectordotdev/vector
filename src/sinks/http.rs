@@ -110,8 +110,6 @@ pub struct HttpSinkConfig {
 #[derivative(Default)]
 pub enum HttpMethod {
     /// GET.
-    ///
-    /// This is the default.
     #[derivative(Default)]
     Get,
 

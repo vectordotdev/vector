@@ -292,12 +292,8 @@ base: components: sinks: http: configuration: {
 		type: string: {
 			default: "get"
 			enum: {
-				delete: "DELETE."
-				get: """
-					GET.
-
-					This is the default.
-					"""
+				delete:  "DELETE."
+				get:     "GET."
 				head:    "HEAD."
 				options: "OPTIONS."
 				patch:   "PATCH."
