@@ -20,8 +20,8 @@ use crate::{
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
-            BatchActionTemplateSnafu, ElasticsearchApiVersion, ElasticsearchAuth,
-            ElasticsearchCommon, ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
+            ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchCommon,
+            ElasticsearchCommonMode, ElasticsearchMode,
         },
         util::{
             http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
@@ -45,35 +45,45 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 pub struct ElasticsearchConfig {
     /// The Elasticsearch endpoint to send logs to.
     ///
-    /// This should be the full URL as shown in the example.
-    #[configurable(deprecated)]
+    /// This should be the complete URL.
+    #[configurable(
+        deprecated = "This option has been deprecated, the `endpoints` option should be used instead."
+    )]
     pub endpoint: Option<String>,
 
-    /// The Elasticsearch endpoints to send logs to.
+    /// A list of Elasticsearch endpoints to send logs to.
     ///
-    /// Each endpoint should be the full URL as shown in the example.
+    /// Each endpoint should be a complete URL as shown in the example.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "http://10.24.32.122:9000"))]
+    #[configurable(metadata(docs::examples = "https://example.com"))]
+    #[configurable(metadata(docs::examples = "https://user:password@example.com"))]
     pub endpoints: Vec<String>,
 
-    /// The `doc_type` for your index data.
+    /// The [`doc_type`][doc_type] for your index data.
     ///
     /// This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to
     /// set this option since Elasticsearch has removed it.
-    pub doc_type: Option<String>,
+    ///
+    /// [doc_type]: https://www.elastic.co/guide/en/elasticsearch/reference/6.8/actions-index.html
+    #[serde(default = "default_doc_type")]
+    pub doc_type: String,
 
     /// The API version of Elasticsearch.
     #[serde(default)]
+    #[configurable(derived)]
     pub api_version: ElasticsearchApiVersion,
 
     /// Whether or not to send the `type` field to Elasticsearch.
     ///
-    /// `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
+    /// The `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
     ///
     /// If enabled, the `doc_type` option will be ignored.
-    ///
-    /// This option has been deprecated, the `api_version` option should be used instead.
-    #[configurable(deprecated)]
-    pub suppress_type_name: Option<bool>,
+    #[configurable(
+        deprecated = "This option has been deprecated, the `api_version` option should be used instead."
+    )]
+    #[serde(default)]
+    pub suppress_type_name: bool,
 
     /// Whether or not to retry successful requests containing partial failures.
     ///
@@ -88,9 +98,12 @@ pub struct ElasticsearchConfig {
     ///
     /// [es_id]: https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html
     /// [perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
+    #[configurable(metadata(docs::examples = "id"))]
+    #[configurable(metadata(docs::examples = "_id"))]
     pub id_key: Option<String>,
 
     /// The name of the pipeline to apply.
+    #[configurable(metadata(docs::examples = "pipeline-name"))]
     pub pipeline: Option<String>,
 
     #[configurable(derived)]
@@ -119,8 +132,9 @@ pub struct ElasticsearchConfig {
     #[configurable(derived)]
     pub auth: Option<ElasticsearchAuth>,
 
-    /// Custom parameters to add to the query string of each request sent to Elasticsearch.
+    /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
+    #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: Option<HashMap<String, String>>,
 
     #[configurable(derived)]
@@ -151,36 +165,35 @@ pub struct ElasticsearchConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
+const fn default_doc_type() -> String {
+    "_doc".to_owned()
+}
+
+fn query_examples() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("field".to_owned(), "value".to_owned()),
+            ("fruit".to_owned(), "mango".to_owned()),
+        ]
+        .into_iter(),
+    )
+}
+
 impl ElasticsearchConfig {
-    pub fn bulk_action(&self) -> crate::Result<Option<Template>> {
-        Ok(self
-            .bulk
-            .as_ref()
-            .and_then(|n| n.action.as_deref())
-            .map(|value| Template::try_from(value).context(BatchActionTemplateSnafu))
-            .transpose()?)
+    pub fn bulk_action(&self) -> Option<Template> {
+        self.bulk.as_ref().map(|bulk_config| bulk_config.action)
     }
 
-    pub fn index(&self) -> crate::Result<Template> {
-        let index = self
-            .bulk
-            .as_ref()
-            .and_then(|n| n.index.as_deref())
-            .map(String::from)
-            .unwrap_or_else(BulkConfig::default_index);
-        Ok(Template::try_from(index.as_str()).context(IndexTemplateSnafu)?)
+    pub fn index(&self) -> Template {
+        self.bulk.as_ref().map(|bulk_config| bulk_config.index)
     }
 
     pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
-            ElasticsearchMode::Bulk => {
-                let index = self.index()?;
-                let bulk_action = self.bulk_action()?;
-                Ok(ElasticsearchCommonMode::Bulk {
-                    index,
-                    action: bulk_action,
-                })
-            }
+            ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
+                index: self.index(),
+                action: self.bulk_action(),
+            }),
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
             )),
@@ -188,25 +201,36 @@ impl ElasticsearchConfig {
     }
 }
 
-/// Bulk mode configuration.
+/// Elasticsearch bulk mode configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct BulkConfig {
-    /// The bulk action to use.
-    pub action: Option<String>,
+    /// Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
+    ///
+    /// Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
+    ///
+    /// [es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
+    #[configurable(metadata(docs::examples = "create"))]
+    #[configurable(metadata(docs::examples = "{{ action }}"))]
+    #[serde(default = "default_bulk_action")]
+    pub action: Template,
 
-    /// The name of the index to use.
-    pub index: Option<String>,
+    /// The name of the index to write events to.
+    #[configurable(metadata(docs::examples = "application-{{ application_id }}-%Y-%m-%d"))]
+    #[serde(default = "default_index")]
+    pub index: Template,
 }
 
-impl BulkConfig {
-    fn default_index() -> String {
-        "vector-%Y.%m.%d".into()
-    }
+const fn default_bulk_action() -> Template {
+    Template::try_from("index").unwrap()
 }
 
-/// Data stream mode configuration.
+const fn default_index() -> Template {
+    Template::try_from("vector-%Y.%m.%d").unwrap()
+}
+
+/// Elasticsearch Data stream mode configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]

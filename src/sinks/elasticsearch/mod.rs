@@ -31,7 +31,7 @@ use crate::{
     template::{Template, TemplateParseError},
 };
 
-/// Authentication strategies.
+/// Elasticsearch Authentication strategies.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
@@ -50,7 +50,7 @@ pub enum ElasticsearchAuth {
     Aws(AwsAuthentication),
 }
 
-/// Indexing mode.
+/// Elasticsearch Indexing mode.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -172,12 +172,12 @@ impl ElasticsearchCommonMode {
     }
 }
 
-/// Configuration for api version.
+/// Configuration for Elasticsearch API version.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchApiVersion {
-    /// Auto-detect the api version. Will fail if endpoint isn't reachable.
+    /// Auto-detect the API version. Fails if an endpoint isn't reachable.
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,
