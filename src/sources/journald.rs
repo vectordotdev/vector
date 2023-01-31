@@ -105,16 +105,6 @@ pub struct JournaldConfig {
     #[serde(default = "crate::serde::default_true")]
     pub current_boot_only: bool,
 
-    /// The list of unit names to monitor.
-    ///
-    /// If empty or not present, all units are accepted. Unit names lacking a `.` will have
-    /// `.service` appended to make them a valid service unit name.
-    // TODO: Why isn't this just an alias on `include_units`?
-    #[serde(default)]
-    #[configurable(deprecated = "This option has been deprecated, use `include_units` instead.")]
-    #[configurable(metadata(docs::hidden))]
-    pub units: Vec<String>,
-
     /// A list of unit names to monitor.
     ///
     /// If empty or not present, all units are accepted.
@@ -137,6 +127,7 @@ pub struct JournaldConfig {
     /// If empty or not present, all journal fields are accepted.
     ///
     /// If `include_units` is specified, it will be merged into this list.
+    #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "The set of field values to match in journal entries that are to be included."
     ))]
@@ -147,6 +138,7 @@ pub struct JournaldConfig {
     /// the entry to be excluded from this source.
     ///
     /// If `exclude_units` is specified, it will be merged into this list.
+    #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "The set of field values to match in journal entries that are to be excluded."
     ))]
@@ -174,7 +166,7 @@ pub struct JournaldConfig {
 
     /// The full path of the journal directory.
     ///
-    /// If not set, `journalctl` will use the default system journal paths.
+    /// If not set, `journalctl` will use the default system journal path.
     pub journal_directory: Option<PathBuf>,
 
     #[configurable(derived)]
@@ -217,19 +209,8 @@ fn matches_examples() -> Matches {
 }
 
 impl JournaldConfig {
-    fn merged_include_matches(&self) -> crate::Result<Matches> {
-        let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
-            (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
-            (true, false) => {
-                warn!(
-                    "DEPRECATION, the `units` setting is deprecated, use `include_units` instead."
-                );
-                &self.units
-            }
-            (false, _) => &self.include_units,
-        };
-
-        Ok(Self::merge_units(&self.include_matches, include_units))
+    fn merged_include_matches(&self) -> Matches {
+        Self::merge_units(&self.include_matches, &self.include_units)
     }
 
     fn merged_exclude_matches(&self) -> Matches {
@@ -299,7 +280,6 @@ impl Default for JournaldConfig {
         Self {
             since_now: false,
             current_boot_only: true,
-            units: vec![],
             include_units: vec![],
             exclude_units: vec![],
             include_matches: Default::default(),
@@ -340,7 +320,7 @@ impl SourceConfig for JournaldConfig {
             return Err(BuildError::DuplicatedUnit { unit }.into());
         }
 
-        let include_matches = self.merged_include_matches()?;
+        let include_matches = self.merged_include_matches();
         let exclude_matches = self.merged_exclude_matches();
 
         if let Some((field, value)) = find_duplicate_match(&include_matches, &exclude_matches) {
@@ -1372,7 +1352,7 @@ mod tests {
         let hashset =
             |v: &[&str]| -> HashSet<String> { v.iter().copied().map(String::from).collect() };
 
-        let matches = journald_config.merged_include_matches().unwrap();
+        let matches = journald_config.merged_include_matches();
         let units = matches.get("_SYSTEMD_UNIT").unwrap();
         assert_eq!(
             units,
