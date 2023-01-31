@@ -59,7 +59,7 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: object: {
 			examples: [{
-				"_SYSTEMD_UNIT": ["ntpd.service", "sshd.service"]
+				"_SYSTEMD_UNIT": ["sshd.service", "ntpd.service"]
 				"_TRANSPORT": ["kernel"]
 			}]
 			options: "*": {
@@ -93,7 +93,7 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: object: {
 			examples: [{
-				"_SYSTEMD_UNIT": ["ntpd.service", "sshd.service"]
+				"_SYSTEMD_UNIT": ["sshd.service", "ntpd.service"]
 				"_TRANSPORT": ["kernel"]
 			}]
 			options: "*": {
@@ -121,7 +121,7 @@ base: components: sources: journald: configuration: {
 		description: """
 			The full path of the journal directory.
 
-			If not set, `journalctl` will use the default system journal paths.
+			If not set, `journalctl` will use the default system journal path.
 			"""
 		required: false
 		type: string: {}

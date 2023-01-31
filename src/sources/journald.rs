@@ -149,6 +149,7 @@ pub struct JournaldConfig {
     ///
     /// By default, the global `data_dir` option is used. Make sure the running user has write
     /// permissions to this directory.
+    #[serde(default)]
     #[configurable(metadata(docs::examples = "/var/lib/vector"))]
     pub data_dir: Option<PathBuf>,
 
@@ -162,11 +163,13 @@ pub struct JournaldConfig {
     /// The full path of the `journalctl` executable.
     ///
     /// If not set, a search is done for the `journalctl` path.
+    #[serde(default)]
     pub journalctl_path: Option<PathBuf>,
 
     /// The full path of the journal directory.
     ///
     /// If not set, `journalctl` will use the default system journal path.
+    #[serde(default)]
     pub journal_directory: Option<PathBuf>,
 
     #[configurable(derived)]
@@ -192,17 +195,14 @@ const fn default_batch_size() -> usize {
     16
 }
 
-fn matches_examples() -> Matches {
-    Matches::from_iter(
+fn matches_examples() -> HashMap<String, Vec<String>> {
+    HashMap::<_, _>::from_iter(
         [
             (
                 "_SYSTEMD_UNIT".to_owned(),
-                HashSet::from_iter(vec!["sshd.service".to_owned(), "ntpd.service".to_owned()]),
+                vec!["sshd.service".to_owned(), "ntpd.service".to_owned()],
             ),
-            (
-                "_TRANSPORT".to_owned(),
-                HashSet::from_iter(vec!["kernel".to_owned()]),
-            ),
+            ("_TRANSPORT".to_owned(), vec!["kernel".to_owned()]),
         ]
         .into_iter(),
     )
