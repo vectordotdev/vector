@@ -66,9 +66,7 @@ pub struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
 
     /// The Datadog region to send logs to.
-    ///
-    /// This option is deprecated, and the `site` field should be used instead.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
     #[serde(default)]
     pub region: Option<Region>,
 
