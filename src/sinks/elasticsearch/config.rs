@@ -138,7 +138,6 @@ pub struct ElasticsearchConfig {
     #[serde(default)]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
-    #[configurable(metadata(docs::syntax_override = "literal"))]
     pub query: Option<HashMap<String, String>>,
 
     #[serde(default)]
