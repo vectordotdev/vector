@@ -14,7 +14,7 @@ use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpAuthenticator,
-    http::{HttpClient, HttpError},
+    http::{BodyBox, HttpClient, HttpError},
 };
 
 #[derive(Debug, Clone)]
@@ -69,7 +69,7 @@ pub struct GcsRequestSettings {
 
 #[derive(Debug)]
 pub struct GcsResponse {
-    pub inner: http::Response<Body>,
+    pub inner: http::Response<BodyBox>,
     pub metadata: RequestMetadata,
 }
 

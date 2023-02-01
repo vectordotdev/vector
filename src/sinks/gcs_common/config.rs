@@ -6,7 +6,7 @@ use vector_config::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},
-    http::HttpClient,
+    http::{BodyBox, HttpClient},
     sinks::{
         gcs_common::service::GcsResponse,
         util::retries::{RetryAction, RetryLogic},
@@ -125,7 +125,8 @@ pub fn build_healthcheck(
 }
 
 pub fn healthcheck_response(
-    response: http::Response<hyper::Body>,
+    response: http::Response<BodyBox>,
+    auth: GcpAuthenticator,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
     match response.status() {

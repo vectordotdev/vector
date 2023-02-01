@@ -1,10 +1,9 @@
 use http::{Request, StatusCode, Uri};
-use hyper::body::Body;
 use snafu::Snafu;
 
 use crate::{
     common::datadog::{get_api_base_endpoint, Region},
-    http::{HttpClient, HttpError},
+    http::{BodyBox, HttpClient, HttpError},
     sinks::HealthcheckError,
 };
 
@@ -67,8 +66,8 @@ impl DatadogApiError {
     /// Common DatadogApiError handling for HTTP Responses.
     /// Returns Ok(response) if the response was Ok/Accepted.
     pub fn from_result(
-        result: Result<http::Response<Body>, HttpError>,
-    ) -> Result<http::Response<Body>, DatadogApiError> {
+        result: Result<http::Response<BodyBox>, HttpError>,
+    ) -> Result<http::Response<BodyBox>, DatadogApiError> {
         match result {
             Ok(response) => {
                 match response.status() {

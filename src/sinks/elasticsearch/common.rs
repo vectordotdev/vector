@@ -4,7 +4,7 @@ use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::{Buf, Bytes};
 use http::{Response, StatusCode, Uri};
-use hyper::{body, Body};
+use hyper::body;
 use serde::Deserialize;
 use snafu::ResultExt;
 use vector_core::config::proxy::ProxyConfig;
@@ -15,7 +15,7 @@ use super::{
     InvalidHostSnafu, Request,
 };
 use crate::{
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, BodyBox, HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
             ElasticsearchAuth, ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
@@ -300,7 +300,7 @@ async fn get(
     request: &RequestConfig,
     client: HttpClient,
     path: &str,
-) -> crate::Result<Response<Body>> {
+) -> crate::Result<Response<BodyBox>> {
     let mut builder = Request::get(format!("{}{}", base_url, path));
 
     if let Some(authorization) = &http_auth {
