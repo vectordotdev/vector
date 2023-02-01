@@ -80,6 +80,20 @@ pub struct DatadogEventsConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
+impl Default for DatadogEventsConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: None,
+            region: None,
+            site: default_site(),
+            default_api_key: Default::default(),
+            tls: None,
+            request: TowerRequestConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+        }
+    }
+}
+
 impl GenerateConfig for DatadogEventsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
