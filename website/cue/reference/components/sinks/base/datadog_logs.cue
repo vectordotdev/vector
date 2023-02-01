@@ -88,12 +88,15 @@ base: components: sinks: datadog_logs: configuration: {
 			The default Datadog [API key][api_key] to send logs with.
 
 			If a log has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-			precedence over the default.
+			precedence over this setting.
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
 			"""
-		required: true
-		type: string: {}
+		required: false
+		type: string: {
+			default: ""
+			examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+		}
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -120,9 +123,16 @@ base: components: sinks: datadog_logs: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send logs to."
-		required:    false
-		type: string: {}
+		description: """
+			The endpoint to send logs to.
+
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
+
+			If set, overrides the `site` option.
+			"""
+		required: false
+		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 	}
 	region: {
 		deprecated: true
@@ -298,7 +308,10 @@ base: components: sinks: datadog_logs: configuration: {
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: default: "datadoghq.com"
+		type: string: {
+			default: "datadoghq.com"
+			examples: ["us3.datadoghq.com", "datadoghq.eu"]
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
