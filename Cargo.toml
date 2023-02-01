@@ -367,7 +367,7 @@ tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.17"
-zstd = { version = "0.12.2", default-features = false }
+zstd = { version = "0.12.3", default-features = false }
 
 [patch.crates-io]
 # Removes dependency on `time` v0.1
