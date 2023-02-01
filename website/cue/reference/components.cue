@@ -866,50 +866,64 @@ components: {
 			}
 
 			_proxy: {
-				common:      false
-				description: "Configures an HTTP(S) proxy for Vector to use. By default, the globally configured proxy is used."
-				required:    false
+				common: false
+				description: """
+					Proxy configuration.
+
+					Configure to proxy traffic through an HTTP(S) proxy when making external requests.
+
+					Similar to common proxy configuration convention, users can set different proxies
+					to use based on the type of traffic being proxied, as well as set specific hosts that
+					should not be proxied.
+					"""
+				required: false
 				type: object: options: {
 					enabled: {
 						common:      false
-						description: "If false the proxy will be disabled."
+						description: "Enables proxying support."
 						required:    false
 						type: bool: default: true
 					}
 					http: {
-						common:      false
-						description: "The URL to proxy HTTP requests through."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["http://foo.bar:3128"]
-						}
+						common: false
+						description: """
+							Proxy endpoint to use when proxying HTTP traffic.
+
+							Must be a valid URI string.
+							"""
+						required: false
+						type: string: examples: ["http://foo.bar:3128"]
 					}
 					https: {
-						common:      false
-						description: "The URL to proxy HTTPS requests through."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["http://foo.bar:3128"]
-						}
+						common: false
+						description: """
+							Proxy endpoint to use when proxying HTTPS traffic.
+
+							Must be a valid URI string.
+							"""
+						required: false
+						type: string: examples: ["http://foo.bar:3128"]
 					}
 					no_proxy: {
-						common:      false
+						common: false
 						description: """
-							A list of hosts to avoid proxying. Allowed patterns here include:
+							A list of hosts to avoid proxying.
 
-							Pattern | Example match
-							:-------|:-------------
-							Domain names | `example.com` matches requests to `example.com`
-							Wildcard domains | `.example.com` matches requests to `example.com` and its subdomains
-							IP addresses | `127.0.0.1` matches requests to 127.0.0.1
-							[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
-							Splat | `*` matches all hosts
+							Multiple patterns are allowed:
+
+							| Pattern             | Example match                                                               |
+							| ------------------- | --------------------------------------------------------------------------- |
+							| Domain names        | `example.com` matches requests to `example.com`                     |
+							| Wildcard domains    | `.example.com` matches requests to `example.com` and its subdomains |
+							| IP addresses        | `127.0.0.1` matches requests to `127.0.0.1`                         |
+							| [CIDR][cidr] blocks | `192.168.0.0/16` matches requests to any IP addresses in this range     |
+							| Splat               | `*` matches all hosts                                                   |
+
+							[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 							"""
-						required:    false
+						required: false
 						type: array: {
-							default: null
+							default: []
 							items: type: string: {
 								examples: ["localhost", ".foo.bar", "*"]
 							}

@@ -108,9 +108,11 @@ pub struct RedisSourceConfig {
     /// The Redis URL to connect to.
     ///
     /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured via TLS.
+    #[configurable(metadata(docs::examples = "redis://127.0.0.1:6379/0"))]
     url: String,
 
     /// The Redis key to read messages from.
+    #[configurable(metadata(docs::examples = "vector"))]
     key: String,
 
     /// Sets the name of the log field to use to add the key to each event.
@@ -118,6 +120,7 @@ pub struct RedisSourceConfig {
     /// The value will be the Redis key that the event was read from.
     ///
     /// By default, this is not set and the field will not be automatically added.
+    #[configurable(metadata(docs::examples = "redis_key"))]
     redis_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]
@@ -453,7 +456,7 @@ mod integration_test {
         // Briefly wait to ensure the source is subscribed.
         //
         // TODO: This is a prime example of where being able to check if the shutdown signal had been polled at least
-        // once would serve as the most precise indicator of "is the source ready and waiting to receieve?".
+        // once would serve as the most precise indicator of "is the source ready and waiting to receive?".
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Now create a normal Redis client and use it to publish a bunch of message, which we'll ensure the source consumes.

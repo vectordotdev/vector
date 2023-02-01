@@ -30,7 +30,7 @@ base: components: sinks: logdna: configuration: {
 	api_key: {
 		description: "The Ingestion API key."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${LOGDNA_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -44,29 +44,43 @@ base: components: sinks: logdna: configuration: {
 					serialized / compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	default_app: {
 		description: "The default app that will be set for events that do not contain a `file` or `app` field."
 		required:    false
-		type: string: {}
+		type: string: {
+			default: "vector"
+			examples: [
+				"my-app",
+			]
+		}
 	}
 	default_env: {
 		description: "The default environment that will be set for events that do not contain an `env` field."
 		required:    false
-		type: string: {}
+		type: string: {
+			default: "production"
+			examples: ["staging"]
+		}
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -93,24 +107,34 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send logs to."
-		required:    false
-		type: string: {}
+		description: """
+			The HTTP endpoint to send logs to.
+
+			Both IP address and hostname are accepted formats.
+			"""
+		required: false
+		type: string: {
+			default: "https://logs.logdna.com/"
+			examples: ["http://127.0.0.1", "http://example.com"]
+		}
 	}
 	hostname: {
 		description: "The hostname that will be attached to each batch of events."
 		required:    true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["${HOSTNAME}", "my-local-machine"]
+			syntax: "template"
+		}
 	}
 	ip: {
 		description: "The IP address that will be attached to each batch of events."
 		required:    false
-		type: string: {}
+		type: string: examples: ["0.0.0.0"]
 	}
 	mac: {
 		description: "The MAC address that will be attached to each batch of events."
 		required:    false
-		type: string: {}
+		type: string: examples: ["my-mac-address"]
 	}
 	request: {
 		description: """
@@ -193,14 +217,20 @@ base: components: sinks: logdna: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -209,7 +239,10 @@ base: components: sinks: logdna: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
@@ -218,28 +251,40 @@ base: components: sinks: logdna: configuration: {
 					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
 					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	tags: {
 		description: "The tags that will be attached to each batch of events."
 		required:    false
-		type: array: items: type: string: syntax: "template"
+		type: array: items: type: string: {
+			examples: ["tag1", "tag2"]
+			syntax: "template"
+		}
 	}
 }

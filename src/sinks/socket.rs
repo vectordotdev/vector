@@ -35,14 +35,14 @@ pub struct SocketSinkConfig {
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
     /// Send over TCP.
-    Tcp(#[configurable(transparent)] TcpMode),
+    Tcp(TcpMode),
 
     /// Send over UDP.
-    Udp(#[configurable(transparent)] UdpMode),
+    Udp(UdpMode),
 
     /// Send over a Unix domain socket (UDS).
     #[cfg(unix)]
-    Unix(#[configurable(transparent)] UnixMode),
+    Unix(UnixMode),
 }
 
 /// TCP configuration.

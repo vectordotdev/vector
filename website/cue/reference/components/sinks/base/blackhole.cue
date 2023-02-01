@@ -29,12 +29,18 @@ base: components: sinks: blackhole: configuration: {
 	}
 	print_interval_secs: {
 		description: """
-			The number of seconds between reporting a summary of activity.
+			The interval between reporting a summary of activity.
 
 			Set to `0` to disable reporting.
 			"""
 		required: false
-		type: uint: default: 1
+		type: uint: {
+			default: 1
+			examples: [
+				10,
+			]
+			unit: "seconds"
+		}
 	}
 	rate: {
 		description: """
@@ -43,6 +49,8 @@ base: components: sinks: blackhole: configuration: {
 			By default, there is no limit.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: examples: [
+			1000,
+		]
 	}
 }

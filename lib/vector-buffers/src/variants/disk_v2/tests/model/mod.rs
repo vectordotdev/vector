@@ -836,7 +836,7 @@ proptest! {
             // itself, input actions, and the sequencer.
             //
             // At the very top, we have our input actions, which are mapped one-to-one with the
-            // possible actions that can influence the disk buffer: reaading records, writing
+            // possible actions that can influence the disk buffer: reading records, writing
             // records, flushing writes, and acknowledging reads.
             //
             // After that, we have the model itself, which essentially a barebones re-implementation
@@ -890,7 +890,7 @@ proptest! {
                 // doing the next operation.
                 tokio::task::yield_now().await;
 
-                // We manully check if the sequencer has any write operations left, either
+                // We manually check if the sequencer has any write operations left, either
                 // in-flight or yet-to-be-triggered, and if none are left, we mark the writer
                 // closed.  This allows us to properly inform the model that reads should start
                 // returning `None` if there's no more flushed records left vs being blocked on

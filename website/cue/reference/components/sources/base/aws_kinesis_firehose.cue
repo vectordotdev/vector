@@ -2,13 +2,13 @@ package metadata
 
 base: components: sources: aws_kinesis_firehose: configuration: {
 	access_key: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `access_keys` instead."
 		description: """
 			An optional access key to authenticate requests against.
 
 			AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
 			configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
-
-			This option has been deprecated, the `access_keys` option should be used instead.
 			"""
 		required: false
 		type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
@@ -24,10 +24,13 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 		type: array: items: type: string: examples: ["A94A8FE5CCB19BA61C4C08", "B94B8FE5CCB19BA61C4C12"]
 	}
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -42,7 +45,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 		}
 	}
 	address: {
-		description: "The address to listen for connections on."
+		description: "The socket address to listen for connections on."
 		required:    true
 		type: string: examples: ["0.0.0.0:443", "localhost:443"]
 	}

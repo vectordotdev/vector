@@ -65,7 +65,7 @@ base: components: sources: splunk_hec: configuration: {
 	}
 	address: {
 		description: """
-			The address to listen for connections on.
+			The socket address to listen for connections on.
 
 			The address _must_ include a port.
 			"""
@@ -178,6 +178,8 @@ base: components: sources: splunk_hec: configuration: {
 		}
 	}
 	token: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `valid_tokens` instead."
 		description: """
 			Optional authorization token.
 
@@ -199,6 +201,6 @@ base: components: sources: splunk_hec: configuration: {
 			If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
 	}
 }

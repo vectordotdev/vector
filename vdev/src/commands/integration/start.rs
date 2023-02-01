@@ -1,54 +1,29 @@
-use std::process::Command;
-
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Args;
 
-use crate::app::CommandExt as _;
-use crate::testing::{config::IntegrationTestConfig, runner::*, state};
+use crate::testing::{config::IntegrationTestConfig, integration::IntegrationTest};
 
 /// Start an environment
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {
-    /// The desired integration
+    /// The integration name
     integration: String,
 
-    /// The desired environment
-    environment: String,
+    /// The desired environment name to start. If omitted, the first environment name is used.
+    environment: Option<String>,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let (test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
-
-        let envs_dir = state::envs_dir(&self.integration);
-        let runner = IntegrationTestRunner::new(self.integration)?;
-        runner.ensure_network()?;
-
-        let mut command = Command::new("cargo");
-        command.current_dir(&test_dir);
-        command.env(NETWORK_ENV_VAR, runner.network_name());
-        command.args(["run", "--quiet", "--", "start"]);
-
-        let environments = config.environments();
-        let json = match environments.get(&self.environment) {
-            Some(config) => serde_json::to_string(config)?,
-            None => bail!("unknown environment: {}", self.environment),
+        let environment = if let Some(environment) = self.environment {
+            environment
+        } else {
+            let (_test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
+            let envs = config.environments();
+            let env = envs.keys().next().expect("Integration has no environments");
+            env.clone()
         };
-        command.arg(&json);
-
-        if state::env_exists(&envs_dir, &self.environment) {
-            bail!("environment is already up");
-        }
-
-        if let Some(env_vars) = config.env {
-            command.envs(env_vars);
-        }
-
-        waiting!("Starting environment {}", &self.environment);
-        command.check_run()?;
-
-        state::save_env(&envs_dir, &self.environment, &json)?;
-        Ok(())
+        IntegrationTest::new(self.integration, environment)?.start()
     }
 }

@@ -175,7 +175,7 @@ where
 /// in all requests will not be acked until r1 has completed.
 ///
 /// # Ordering
-/// Per partition ordering can be achived by holding onto future of a request
+/// Per partition ordering can be achieved by holding onto future of a request
 /// until it finishes. Until then all further requests in that partition are
 /// delayed.
 ///

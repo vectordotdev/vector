@@ -250,7 +250,7 @@ by evaluating and adjusting to their mutual dependencies.
 
 With the above component changes in place, we'll gain some flexibility in how we
 build topologies. The goal will be, where possible, to consolidate stateless
-transform-like processing into cloneable `Push` implementations that are passed
+transform-like processing into clonable `Push` implementations that are passed
 to sources in place of the current raw channels senders. This will effectively
 "inline" this logic into the source task, allowing it to execute with the
 natural concurrency of a given source (e.g. per connection).
@@ -372,7 +372,7 @@ choose to add it as a user-facing feature.
 Formalizing the idea of a staged, compiler-like path from raw config files to
 running topologies gives us the opportunity to clean up and better organize
 a number of existing features. Environment variable interpolation, multiple
-config files, type checking, etc are are examples of potential stages that could
+config files, type checking, etc are examples of potential stages that could
 be much better implemented in this framework. Other requested features like
 snippets, input wildcards, etc would also be much easier to implement with this
 in place.

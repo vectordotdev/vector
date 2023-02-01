@@ -215,11 +215,11 @@ impl CloudWatchMetricsSvc {
     ) -> crate::Result<VectorSink> {
         let default_namespace = config.default_namespace.clone();
         let batch = config.batch.into_batch_settings()?;
-        let request_settings = config.request.unwrap_with(&TowerRequestConfig {
-            timeout_secs: Some(30),
-            rate_limit_num: Some(150),
-            ..Default::default()
-        });
+        let request_settings = config.request.unwrap_with(
+            &TowerRequestConfig::default()
+                .timeout_secs(30)
+                .rate_limit_num(150),
+        );
 
         let service = CloudWatchMetricsSvc { client };
         let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));

@@ -475,16 +475,16 @@ impl TestDefinition<OutputId> {
 #[serde(untagged)]
 pub enum TestInputValue {
     /// A string.
-    String(#[configurable(transparent)] String),
+    String(String),
 
     /// An integer.
-    Integer(#[configurable(transparent)] i64),
+    Integer(i64),
 
     /// A floating-point number.
-    Float(#[configurable(transparent)] f64),
+    Float(f64),
 
     /// A boolean.
-    Boolean(#[configurable(transparent)] bool),
+    Boolean(bool),
 }
 
 /// A unit test input.

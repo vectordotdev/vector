@@ -386,7 +386,7 @@ mod tests {
                     } },
                 ] },
             },
-            // Non existent, the types we know are moved into the returned array.
+            // Nonexistent, the types we know are moved into the returned array.
             TestCase {
                 old: type_def! { object {
                     "nonk" => type_def! { bytes },

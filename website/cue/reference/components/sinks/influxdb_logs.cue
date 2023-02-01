@@ -53,7 +53,7 @@ components: sinks: influxdb_logs: {
 		}
 		namespace: {
 			description: """
-				`{namespace}.vector` will be encoded as the destination infuxdb measurement.
+				`{namespace}.vector` will be encoded as the destination influxdb measurement.
 				"""
 			groups: ["v1", "v2"]
 			required: false

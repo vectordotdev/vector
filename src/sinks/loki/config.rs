@@ -33,10 +33,10 @@ pub enum ExtendedCompression {
 #[serde(untagged)]
 pub enum CompressionConfigAdapter {
     /// Basic compression.
-    Original(#[configurable(derived)] Compression),
+    Original(Compression),
 
     /// Loki-specific compression.
-    Extended(#[configurable(derived)] ExtendedCompression),
+    Extended(ExtendedCompression),
 }
 
 impl CompressionConfigAdapter {

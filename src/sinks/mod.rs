@@ -135,238 +135,233 @@ pub enum HealthcheckError {
 pub enum Sinks {
     /// AMQP.
     #[cfg(feature = "sinks-amqp")]
-    Amqp(#[configurable(derived)] amqp::AmqpSinkConfig),
+    Amqp(amqp::AmqpSinkConfig),
 
     /// Apex Logs.
     #[cfg(feature = "sinks-apex")]
-    Apex(#[configurable(derived)] apex::ApexSinkConfig),
+    Apex(apex::ApexSinkConfig),
 
     /// AWS CloudWatch Logs.
     #[cfg(feature = "sinks-aws_cloudwatch_logs")]
-    AwsCloudwatchLogs(#[configurable(derived)] aws_cloudwatch_logs::CloudwatchLogsSinkConfig),
+    AwsCloudwatchLogs(aws_cloudwatch_logs::CloudwatchLogsSinkConfig),
 
     /// AWS CloudWatch Metrics.
     #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
-    AwsCloudwatchMetrics(
-        #[configurable(derived)] aws_cloudwatch_metrics::CloudWatchMetricsSinkConfig,
-    ),
+    AwsCloudwatchMetrics(aws_cloudwatch_metrics::CloudWatchMetricsSinkConfig),
 
     /// AWS Kinesis Firehose.
     #[cfg(feature = "sinks-aws_kinesis_firehose")]
-    AwsKinesisFirehose(#[configurable(derived)] aws_kinesis::firehose::KinesisFirehoseSinkConfig),
+    AwsKinesisFirehose(aws_kinesis::firehose::KinesisFirehoseSinkConfig),
+
     /// AWS Kinesis Streams.
     #[cfg(feature = "sinks-aws_kinesis_streams")]
-    AwsKinesisStreams(#[configurable(derived)] aws_kinesis::streams::KinesisStreamsSinkConfig),
+    AwsKinesisStreams(aws_kinesis::streams::KinesisStreamsSinkConfig),
 
     /// AWS S3.
     #[cfg(feature = "sinks-aws_s3")]
-    AwsS3(#[configurable(derived)] aws_s3::S3SinkConfig),
+    AwsS3(aws_s3::S3SinkConfig),
 
     /// AWS SQS.
     #[cfg(feature = "sinks-aws_sqs")]
-    AwsSqs(#[configurable(derived)] aws_sqs::SqsSinkConfig),
+    AwsSqs(aws_sqs::SqsSinkConfig),
 
     /// Axiom.
     #[cfg(feature = "sinks-axiom")]
-    Axiom(#[configurable(derived)] axiom::AxiomConfig),
+    Axiom(axiom::AxiomConfig),
 
     /// Azure Blob Storage.
     #[cfg(feature = "sinks-azure_blob")]
-    AzureBlob(#[configurable(derived)] azure_blob::AzureBlobSinkConfig),
+    AzureBlob(azure_blob::AzureBlobSinkConfig),
 
     /// Azure Monitor Logs.
     #[cfg(feature = "sinks-azure_monitor_logs")]
-    AzureMonitorLogs(#[configurable(derived)] azure_monitor_logs::AzureMonitorLogsConfig),
+    AzureMonitorLogs(azure_monitor_logs::AzureMonitorLogsConfig),
 
     /// Blackhole.
     #[cfg(feature = "sinks-blackhole")]
-    Blackhole(#[configurable(derived)] blackhole::BlackholeConfig),
+    Blackhole(blackhole::BlackholeConfig),
 
     /// Clickhouse.
     #[cfg(feature = "sinks-clickhouse")]
-    Clickhouse(#[configurable(derived)] clickhouse::ClickhouseConfig),
+    Clickhouse(clickhouse::ClickhouseConfig),
 
     /// Console.
     #[cfg(feature = "sinks-console")]
-    Console(#[configurable(derived)] console::ConsoleSinkConfig),
+    Console(console::ConsoleSinkConfig),
 
     /// Datadog Archives.
     #[cfg(feature = "sinks-datadog_archives")]
-    DatadogArchives(#[configurable(derived)] datadog_archives::DatadogArchivesSinkConfig),
+    DatadogArchives(datadog_archives::DatadogArchivesSinkConfig),
 
     /// Datadog Events.
     #[cfg(feature = "sinks-datadog_events")]
-    DatadogEvents(#[configurable(derived)] datadog::events::DatadogEventsConfig),
+    DatadogEvents(datadog::events::DatadogEventsConfig),
 
     /// Datadog Logs.
     #[cfg(feature = "sinks-datadog_logs")]
-    DatadogLogs(#[configurable(derived)] datadog::logs::DatadogLogsConfig),
+    DatadogLogs(datadog::logs::DatadogLogsConfig),
 
     /// Datadog Metrics.
     #[cfg(feature = "sinks-datadog_metrics")]
-    DatadogMetrics(#[configurable(derived)] datadog::metrics::DatadogMetricsConfig),
+    DatadogMetrics(datadog::metrics::DatadogMetricsConfig),
 
     /// Datadog Traces.
     #[cfg(feature = "sinks-datadog_traces")]
-    DatadogTraces(#[configurable(derived)] datadog::traces::DatadogTracesConfig),
+    DatadogTraces(datadog::traces::DatadogTracesConfig),
 
     /// Elasticsearch.
     #[cfg(feature = "sinks-elasticsearch")]
-    Elasticsearch(#[configurable(derived)] elasticsearch::ElasticsearchConfig),
+    Elasticsearch(elasticsearch::ElasticsearchConfig),
 
     /// File.
     #[cfg(feature = "sinks-file")]
-    File(#[configurable(derived)] file::FileSinkConfig),
+    File(file::FileSinkConfig),
 
     /// Google Chronicle (unstructured).
     #[cfg(feature = "sinks-gcp")]
-    GcpChronicleUnstructured(
-        #[configurable(derived)] gcp::chronicle_unstructured::ChronicleUnstructuredConfig,
-    ),
+    GcpChronicleUnstructured(gcp::chronicle_unstructured::ChronicleUnstructuredConfig),
 
     /// GCP Stackdriver Logs.
     #[cfg(feature = "sinks-gcp")]
-    GcpStackdriverLogs(#[configurable(derived)] gcp::stackdriver_logs::StackdriverConfig),
+    GcpStackdriverLogs(gcp::stackdriver_logs::StackdriverConfig),
 
     /// GCP Stackdriver Metrics.
     #[cfg(feature = "sinks-gcp")]
-    GcpStackdriverMetrics(#[configurable(derived)] gcp::stackdriver_metrics::StackdriverConfig),
+    GcpStackdriverMetrics(gcp::stackdriver_metrics::StackdriverConfig),
 
     /// GCP Cloud Storage.
     #[cfg(feature = "sinks-gcp")]
-    GcpCloudStorage(#[configurable(derived)] gcp::cloud_storage::GcsSinkConfig),
+    GcpCloudStorage(gcp::cloud_storage::GcsSinkConfig),
 
     /// GCP Pub/Sub.
     #[cfg(feature = "sinks-gcp")]
-    GcpPubsub(#[configurable(derived)] gcp::pubsub::PubsubConfig),
+    GcpPubsub(gcp::pubsub::PubsubConfig),
 
     /// Honeycomb.
     #[cfg(feature = "sinks-honeycomb")]
-    Honeycomb(#[configurable(derived)] honeycomb::HoneycombConfig),
+    Honeycomb(honeycomb::HoneycombConfig),
 
     /// HTTP.
     #[cfg(feature = "sinks-http")]
-    Http(#[configurable(derived)] http::HttpSinkConfig),
+    Http(http::HttpSinkConfig),
 
     /// Humio Logs.
     #[cfg(feature = "sinks-humio")]
-    HumioLogs(#[configurable(derived)] humio::logs::HumioLogsConfig),
+    HumioLogs(humio::logs::HumioLogsConfig),
 
     /// Humio Metrics.
     #[cfg(feature = "sinks-humio")]
-    HumioMetrics(#[configurable(derived)] humio::metrics::HumioMetricsConfig),
+    HumioMetrics(humio::metrics::HumioMetricsConfig),
 
     /// InfluxDB Logs.
     #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
-    InfluxdbLogs(#[configurable(derived)] influxdb::logs::InfluxDbLogsConfig),
+    InfluxdbLogs(influxdb::logs::InfluxDbLogsConfig),
 
     /// InfluxDB Metrics.
     #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
-    InfluxdbMetrics(#[configurable(derived)] influxdb::metrics::InfluxDbConfig),
+    InfluxdbMetrics(influxdb::metrics::InfluxDbConfig),
 
     /// Kafka.
     #[cfg(feature = "sinks-kafka")]
-    Kafka(#[configurable(derived)] kafka::KafkaSinkConfig),
+    Kafka(kafka::KafkaSinkConfig),
 
     /// LogDNA.
     #[cfg(feature = "sinks-logdna")]
-    Logdna(#[configurable(derived)] logdna::LogdnaConfig),
+    Logdna(logdna::LogdnaConfig),
 
     /// Loki.
     #[cfg(feature = "sinks-loki")]
-    Loki(#[configurable(derived)] loki::LokiConfig),
+    Loki(loki::LokiConfig),
 
     /// NATS.
     #[cfg(feature = "sinks-nats")]
-    Nats(#[configurable(derived)] self::nats::NatsSinkConfig),
+    Nats(self::nats::NatsSinkConfig),
 
     /// New Relic.
     #[cfg(feature = "sinks-new_relic")]
-    NewRelic(#[configurable(derived)] new_relic::NewRelicConfig),
+    NewRelic(new_relic::NewRelicConfig),
 
     /// Papertrail.
     #[cfg(feature = "sinks-papertrail")]
-    Papertrail(#[configurable(derived)] papertrail::PapertrailConfig),
+    Papertrail(papertrail::PapertrailConfig),
 
     /// Prometheus Exporter.
     #[cfg(feature = "sinks-prometheus")]
-    PrometheusExporter(#[configurable(derived)] prometheus::exporter::PrometheusExporterConfig),
+    PrometheusExporter(prometheus::exporter::PrometheusExporterConfig),
 
     /// Prometheus Remote Write.
     #[cfg(feature = "sinks-prometheus")]
-    PrometheusRemoteWrite(#[configurable(derived)] prometheus::remote_write::RemoteWriteConfig),
+    PrometheusRemoteWrite(prometheus::remote_write::RemoteWriteConfig),
 
     /// Apache Pulsar.
     #[cfg(feature = "sinks-pulsar")]
-    Pulsar(#[configurable(derived)] pulsar::PulsarSinkConfig),
+    Pulsar(pulsar::PulsarSinkConfig),
 
     /// Redis.
     #[cfg(feature = "sinks-redis")]
-    Redis(#[configurable(derived)] redis::RedisSinkConfig),
+    Redis(redis::RedisSinkConfig),
 
     /// Sematext Logs.
     #[cfg(feature = "sinks-sematext")]
-    SematextLogs(#[configurable(derived)] sematext::logs::SematextLogsConfig),
+    SematextLogs(sematext::logs::SematextLogsConfig),
 
     /// Sematext Metrics.
     #[cfg(feature = "sinks-sematext")]
-    SematextMetrics(#[configurable(derived)] sematext::metrics::SematextMetricsConfig),
+    SematextMetrics(sematext::metrics::SematextMetricsConfig),
 
     /// Socket.
     #[cfg(feature = "sinks-socket")]
-    Socket(#[configurable(derived)] socket::SocketSinkConfig),
+    Socket(socket::SocketSinkConfig),
 
     /// Splunk HEC Logs.
     #[cfg(feature = "sinks-splunk_hec")]
-    SplunkHecLogs(#[configurable(derived)] splunk_hec::logs::config::HecLogsSinkConfig),
+    SplunkHecLogs(splunk_hec::logs::config::HecLogsSinkConfig),
 
     /// Splunk HEC Metrics.
     #[cfg(feature = "sinks-splunk_hec")]
-    SplunkHecMetrics(#[configurable(derived)] splunk_hec::metrics::config::HecMetricsSinkConfig),
+    SplunkHecMetrics(splunk_hec::metrics::config::HecMetricsSinkConfig),
 
     /// StatsD.
     #[cfg(feature = "sinks-statsd")]
-    Statsd(#[configurable(derived)] statsd::StatsdSinkConfig),
+    Statsd(statsd::StatsdSinkConfig),
 
     /// Test (adaptive concurrency).
     #[cfg(all(test, feature = "sources-demo_logs"))]
-    TestArc(#[configurable(derived)] self::util::adaptive_concurrency::tests::TestConfig),
+    TestArc(self::util::adaptive_concurrency::tests::TestConfig),
 
     /// Test (backpressure).
     #[cfg(test)]
-    TestBackpressure(
-        #[configurable(derived)] crate::test_util::mock::sinks::BackpressureSinkConfig,
-    ),
+    TestBackpressure(crate::test_util::mock::sinks::BackpressureSinkConfig),
 
     /// Test (basic).
     #[cfg(test)]
-    TestBasic(#[configurable(derived)] crate::test_util::mock::sinks::BasicSinkConfig),
+    TestBasic(crate::test_util::mock::sinks::BasicSinkConfig),
 
     /// Test (error).
     #[cfg(test)]
-    TestError(#[configurable(derived)] crate::test_util::mock::sinks::ErrorSinkConfig),
+    TestError(crate::test_util::mock::sinks::ErrorSinkConfig),
 
     /// Test (oneshot).
     #[cfg(test)]
-    TestOneshot(#[configurable(derived)] crate::test_util::mock::sinks::OneshotSinkConfig),
+    TestOneshot(crate::test_util::mock::sinks::OneshotSinkConfig),
 
     /// Test (panic).
     #[cfg(test)]
-    TestPanic(#[configurable(derived)] crate::test_util::mock::sinks::PanicSinkConfig),
+    TestPanic(crate::test_util::mock::sinks::PanicSinkConfig),
 
     /// Unit test.
-    UnitTest(#[configurable(derived)] UnitTestSinkConfig),
+    UnitTest(UnitTestSinkConfig),
 
     /// Unit test stream.
-    UnitTestStream(#[configurable(derived)] UnitTestStreamSinkConfig),
+    UnitTestStream(UnitTestStreamSinkConfig),
 
     /// Vector.
     #[cfg(feature = "sinks-vector")]
-    Vector(#[configurable(derived)] vector::VectorConfig),
+    Vector(vector::VectorConfig),
 
     /// Websocket.
     #[cfg(feature = "sinks-websocket")]
-    Websocket(#[configurable(derived)] websocket::WebSocketSinkConfig),
+    Websocket(websocket::WebSocketSinkConfig),
 }
 
 impl NamedComponent for Sinks {

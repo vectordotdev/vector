@@ -85,7 +85,7 @@ impl Arbitrary for FieldBuf {
 ///
 /// They represent either a field or an index. A sequence of `SegmentBuf`s can become a `LookupBuf`.
 ///
-/// This is the owned, allocated side of a `Segement` for `LookupBuf.` It owns its fields unlike `Lookup`. Think of `String` to `&str` or `PathBuf` to `Path`.
+/// This is the owned, allocated side of a `Segment` for `LookupBuf.` It owns its fields unlike `Lookup`. Think of `String` to `&str` or `PathBuf` to `Path`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum SegmentBuf {
     Field(FieldBuf),

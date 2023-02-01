@@ -287,7 +287,9 @@ def get_docs_type_for_value(schema, value)
   if ['number', 'integer'].include?(value_type)
     numeric_type = get_schema_metadata(schema, 'docs::numeric_type')
     if numeric_type.nil?
-      @logger.error "All fields with numeric types should have 'docs::numeric_type' metadata included."
+      @logger.error "All fields with numeric types should have 'docs::numeric_type' metadata included." +
+        "e.g. #[configurable(metadata(docs::numeric_type = \"bytes\"))]"
+      @logger.error "Value: #{value} (type: #{value_type})"
       exit 1
     end
 
@@ -806,6 +808,15 @@ def resolve_schema(root_schema, schema)
 
   description = get_rendered_description_from_schema(schema)
   resolved['description'] = description unless description.empty?
+
+  ## Resolve the deprecated flag. An optional deprecated message can also be set in the metadata.
+  if schema.fetch('deprecated', false)
+    resolved['deprecated'] = true
+    message = get_schema_metadata(schema, 'deprecated_message')
+    if message
+      resolved['deprecated_message'] = message
+    end
+  end
 
   # Reconcile the resolve schema, which essentially gives us a chance to, once the schema is
   # entirely resolved, check it for logical inconsistencies, fix up anything that we reasonably can,
@@ -1519,7 +1530,7 @@ end
 # This provides a mechanism to fix up any inconsistencies that are created during the resolution
 # process that would otherwise be very complex to fix in the resolution codepath. Sometimes,
 # inconsistencies are only present after resolving merged subschemas, and so on, and so this
-# function serves as a spot to do such reconcilation, as it is called right before returning a
+# function serves as a spot to do such reconciliation, as it is called right before returning a
 # resolved schema.
 def reconcile_resolved_schema!(resolved_schema)
   @logger.debug "Reconciling resolved schema..."

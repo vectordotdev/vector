@@ -12,10 +12,12 @@ base: components: sources: docker_logs: configuration: {
 
 			Use an HTTPS URL to enable TLS encryption.
 
-			If absent, the `DOCKER_HOST` environment variable is used. If `DOCKER_HOST` is also absent, the default Docker local socket (`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows) is used.
+			If absent, the `DOCKER_HOST` environment variable is used. If `DOCKER_HOST` is also absent,
+			the default Docker local socket (`/var/run/docker.sock` on Unix platforms,
+			`//./pipe/docker_engine` on Windows) is used.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["http://localhost:2375", "https://localhost:2376", "unix:///var/run/docker.sock", "npipe:////./pipe/docker_engine", "/var/run/docker.sock", "//./pipe/docker_engine"]
 	}
 	exclude_containers: {
 		description: """
@@ -32,7 +34,7 @@ base: components: sources: docker_logs: configuration: {
 			This can be used in conjunction with `include_containers`.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
 	}
 	host_key: {
 		description: """
@@ -55,10 +57,10 @@ base: components: sources: docker_logs: configuration: {
 			By default, the source will collect logs for all containers. If `include_containers` is configured, only
 			containers that match a configured inclusion and are also not excluded will be matched.
 
-			This can be used in conjunction with `include_containers`.
+			This can be used in conjunction with `exclude_containers`.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["include_", "include_me_0", "ad08cc418cf9"]
 	}
 	include_images: {
 		description: """
@@ -67,7 +69,7 @@ base: components: sources: docker_logs: configuration: {
 			If not provided, all images will be included.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["httpd", "redis"]
 	}
 	include_labels: {
 		description: """
@@ -76,7 +78,7 @@ base: components: sources: docker_logs: configuration: {
 			Labels should follow the syntax described in the [Docker object labels](https://docs.docker.com/config/labels-custom-metadata/) documentation.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["org.opencontainers.image.vendor=Vector", "com.mycorp.internal.animal=fish"]
 	}
 	multiline: {
 		description: """
@@ -93,7 +95,7 @@ base: components: sources: docker_logs: configuration: {
 					This setting must be configured in conjunction with `mode`.
 					"""
 				required: true
-				type: string: {}
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
 			}
 			mode: {
 				description: """
@@ -132,7 +134,7 @@ base: components: sources: docker_logs: configuration: {
 			start_pattern: {
 				description: "Regular expression pattern that is used to match the start of a new message."
 				required:    true
-				type: string: {}
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
 			}
 			timeout_ms: {
 				description: """
@@ -141,7 +143,10 @@ base: components: sources: docker_logs: configuration: {
 					Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
 					"""
 				required: true
-				type: uint: {}
+				type: uint: {
+					examples: [1000, 600000]
+					unit: "milliseconds"
+				}
 			}
 		}
 	}
@@ -151,16 +156,17 @@ base: components: sources: docker_logs: configuration: {
 
 			If `auto_partial_merge` is disabled, partial events will be emitted with a log field, controlled by this
 			configuration value, is set, indicating that the event is not complete.
-
-			By default, `"_partial"` is used.
 			"""
 		required: false
 		type: string: default: "_partial"
 	}
 	retry_backoff_secs: {
-		description: "The amount of time, in seconds, to wait before retrying after an error."
+		description: "The amount of time to wait before retrying after an error."
 		required:    false
-		type: uint: default: 2
+		type: uint: {
+			default: 2
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description: """

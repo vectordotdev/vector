@@ -28,7 +28,7 @@ mod models;
 #[configurable_component(source("aws_kinesis_firehose"))]
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
-    /// The address to listen for connections on.
+    /// The socket address to listen for connections on.
     #[configurable(metadata(docs::examples = "0.0.0.0:443"))]
     #[configurable(metadata(docs::examples = "localhost:443"))]
     address: SocketAddr,
@@ -37,9 +37,7 @@ pub struct AwsKinesisFirehoseConfig {
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
-    ///
-    /// This option has been deprecated, the `access_keys` option should be used instead.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use `access_keys` instead.")]
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
@@ -414,7 +412,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_legacy_namespace() {
-        let gziped_record = {
+        let gzipped_record = {
             let mut buf = Vec::new();
             let mut gz = GzEncoder::new(RECORD.as_bytes(), flate2::Compression::fast());
             gz.read_to_end(&mut buf).unwrap();
@@ -441,7 +439,7 @@ mod tests {
                 Compression::Gzip,
                 true,
                 RECORD.as_bytes(),
-                gziped_record,
+                gzipped_record,
             ),
             (
                 Compression::None,
@@ -515,7 +513,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_vector_namespace() {
-        let gziped_record = {
+        let gzipped_record = {
             let mut buf = Vec::new();
             let mut gz = GzEncoder::new(RECORD.as_bytes(), flate2::Compression::fast());
             gz.read_to_end(&mut buf).unwrap();
@@ -542,7 +540,7 @@ mod tests {
                 Compression::Gzip,
                 true,
                 RECORD.as_bytes(),
-                gziped_record,
+                gzipped_record,
             ),
             (
                 Compression::None,

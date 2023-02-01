@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::{
     collections::{hash_map, HashMap},
+    num::NonZeroUsize,
     pin::Pin,
     time::{Duration, Instant},
 };
@@ -49,6 +50,9 @@ pub struct ReduceConfig {
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[derivative(Default(value = "default_flush_period_ms()"))]
     pub flush_period_ms: Duration,
+
+    /// The maximum number of events to group together.
+    pub max_events: Option<NonZeroUsize>,
 
     /// An ordered list of fields by which to group events.
     ///
@@ -206,37 +210,19 @@ impl TransformConfig for ReduceConfig {
 
 #[derive(Debug)]
 struct ReduceState {
+    events: usize,
     fields: HashMap<String, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
     metadata: EventMetadata,
 }
 
 impl ReduceState {
-    fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
-        let (value, metadata) = e.into_parts();
-
-        let fields = if let Value::Object(fields) = value {
-            fields
-                .into_iter()
-                .filter_map(|(k, v)| {
-                    if let Some(strat) = strategies.get(&k) {
-                        match get_value_merger(v, strat) {
-                            Ok(m) => Some((k, m)),
-                            Err(error) => {
-                                warn!(message = "Failed to create merger.", field = ?k, %error);
-                                None
-                            }
-                        }
-                    } else {
-                        Some((k, v.into()))
-                    }
-                })
-                .collect()
-        } else {
-            HashMap::new()
-        };
+    fn new() -> Self {
+        let fields = HashMap::new();
+        let metadata = EventMetadata::default();
 
         Self {
+            events: 0,
             stale_since: Instant::now(),
             fields,
             metadata,
@@ -277,6 +263,7 @@ impl ReduceState {
                 }
             }
         }
+        self.events += 1;
         self.stale_since = Instant::now();
     }
 
@@ -287,6 +274,7 @@ impl ReduceState {
                 warn!(message = "Failed to merge values for field.", %error);
             }
         }
+        self.events = 0;
         event
     }
 }
@@ -299,6 +287,7 @@ pub struct Reduce {
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
+    max_events: Option<usize>,
 }
 
 impl Reduce {
@@ -321,6 +310,7 @@ impl Reduce {
             .map(|c| c.build(enrichment_tables))
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
+        let max_events = config.max_events.map(|max| max.into());
 
         Ok(Reduce {
             expire_after: config.expire_after_ms,
@@ -330,6 +320,7 @@ impl Reduce {
             reduce_merge_states: HashMap::new(),
             ends_when,
             starts_when,
+            max_events,
         })
     }
 
@@ -357,7 +348,9 @@ impl Reduce {
     fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
         match self.reduce_merge_states.entry(discriminant) {
             hash_map::Entry::Vacant(entry) => {
-                entry.insert(ReduceState::new(event, &self.merge_strategies));
+                let mut state = ReduceState::new();
+                state.add_event(event, &self.merge_strategies);
+                entry.insert(state);
             }
             hash_map::Entry::Occupied(mut entry) => {
                 entry.get_mut().add_event(event, &self.merge_strategies);
@@ -371,13 +364,24 @@ impl Reduce {
             None => (false, event),
         };
 
-        let (ends_here, event) = match &self.ends_when {
+        let (mut ends_here, event) = match &self.ends_when {
             Some(condition) => condition.check(event),
             None => (false, event),
         };
 
         let event = event.into_log();
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);
+
+        if let Some(max_events) = self.max_events {
+            if max_events == 1 {
+                ends_here = true;
+            } else if let Some(entry) = self.reduce_merge_states.get(&discriminant) {
+                // The current event will finish this set
+                if entry.events + 1 == max_events {
+                    ends_here = true;
+                }
+            }
+        }
 
         if starts_here {
             if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
@@ -391,9 +395,11 @@ impl Reduce {
                     state.add_event(event, &self.merge_strategies);
                     state.flush().into()
                 }
-                None => ReduceState::new(event, &self.merge_strategies)
-                    .flush()
-                    .into(),
+                None => {
+                    let mut state = ReduceState::new();
+                    state.add_event(event, &self.merge_strategies);
+                    state.flush().into()
+                }
             })
         } else {
             self.push_or_new_reduce_state(event, discriminant)
@@ -675,6 +681,132 @@ group_by = [ "request_id" ]
             assert_eq!(out.recv().await, None);
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn max_events_0() {
+        let reduce_config = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "id" ]
+merge_strategies.id = "retain"
+merge_strategies.message = "array"
+max_events = 0
+            "#,
+        );
+
+        match reduce_config {
+            Ok(_conf) => unreachable!("max_events=0 should be rejected."),
+            Err(err) => assert!(err.to_string().contains(
+                "invalid value: integer `0`, expected a nonzero usize for key `max_events`"
+            )),
+        }
+    }
+
+    #[tokio::test]
+    async fn max_events_1() {
+        let reduce_config = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "id" ]
+merge_strategies.id = "retain"
+merge_strategies.message = "array"
+max_events = 1
+            "#,
+        )
+        .unwrap();
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let mut e_1 = LogEvent::from("test 1");
+            e_1.insert("id", "1");
+
+            let mut e_2 = LogEvent::from("test 2");
+            e_2.insert("id", "1");
+
+            let mut e_3 = LogEvent::from("test 3");
+            e_3.insert("id", "1");
+
+            for event in vec![e_1.into(), e_2.into(), e_3.into()] {
+                tx.send(event).await.unwrap();
+            }
+
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], vec!["test 1"].into());
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_2["message"], vec!["test 2"].into());
+
+            let output_3 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_3["message"], vec!["test 3"].into());
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn max_events() {
+        let reduce_config = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "id" ]
+merge_strategies.id = "retain"
+merge_strategies.message = "array"
+max_events = 3
+            "#,
+        )
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let mut e_1 = LogEvent::from("test 1");
+            e_1.insert("id", "1");
+
+            let mut e_2 = LogEvent::from("test 2");
+            e_2.insert("id", "1");
+
+            let mut e_3 = LogEvent::from("test 3");
+            e_3.insert("id", "1");
+
+            let mut e_4 = LogEvent::from("test 4");
+            e_4.insert("id", "1");
+
+            let mut e_5 = LogEvent::from("test 5");
+            e_5.insert("id", "1");
+
+            let mut e_6 = LogEvent::from("test 6");
+            e_6.insert("id", "1");
+
+            for event in vec![
+                e_1.into(),
+                e_2.into(),
+                e_3.into(),
+                e_4.into(),
+                e_5.into(),
+                e_6.into(),
+            ] {
+                tx.send(event).await.unwrap();
+            }
+
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(
+                output_1["message"],
+                vec!["test 1", "test 2", "test 3"].into()
+            );
+
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(
+                output_2["message"],
+                vec!["test 4", "test 5", "test 6"].into()
+            );
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 
     #[tokio::test]
