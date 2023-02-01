@@ -172,4 +172,3 @@ VRL has some core concepts that you should be aware of as you dive in.
 [rust]: https://rust-lang.org
 [rust_security]: https://thenewstack.io/microsoft-rust-is-the-industrys-best-chance-at-safe-systems-programming/
 [vrl_error_handling]: /docs/reference/vrl/errors#handling
-[vrl_playground]: https://playground.vrl.dev
