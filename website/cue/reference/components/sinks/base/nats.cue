@@ -114,9 +114,18 @@ base: components: sinks: nats: configuration: {
 		}
 	}
 	connection_name: {
-		description: "A name assigned to the NATS connection."
-		required:    false
-		type: string: default: "vector"
+		description: """
+			A [name][nats_connection_name] assigned to the NATS connection.
+
+			[nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
+			"""
+		required: false
+		type: string: {
+			default: "vector"
+			examples: [
+				"foo",
+			]
+		}
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -235,8 +244,12 @@ base: components: sinks: nats: configuration: {
 		}
 	}
 	subject: {
-		description: "The NATS subject to publish messages to."
-		required:    true
+		description: """
+			The NATS [subject][nats_subject] to publish messages to.
+
+			[nats_subject]: https://docs.nats.io/nats-concepts/subjects
+			"""
+		required: true
 		type: string: {
 			examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
 			syntax: "template"
@@ -342,8 +355,9 @@ base: components: sinks: nats: configuration: {
 			The NATS URL to connect to.
 
 			The URL must take the form of `nats://server:port`.
+			If the port is not specified it defaults to 4222.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["nats://demo.nats.io", "nats://127.0.0.1:4242"]
 	}
 }
