@@ -33,10 +33,14 @@ base: components: sinks: elasticsearch: configuration: {
 		type: string: {
 			default: "auto"
 			enum: {
-				auto: "Auto-detect the API version. Fails if the version endpoint (`/_cluster/state/version`) isn't reachable."
-				v6:   "Use the Elasticsearch 6.x API."
-				v7:   "Use the Elasticsearch 7.x API."
-				v8:   "Use the Elasticsearch 8.x API."
+				auto: """
+					Auto-detect the API version. Fails if the [cluster state version endpoint][es_version] isn't reachable.
+
+					[es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
+					"""
+				v6: "Use the Elasticsearch 6.x API."
+				v7: "Use the Elasticsearch 7.x API."
+				v8: "Use the Elasticsearch 8.x API."
 			}
 		}
 	}

@@ -181,7 +181,9 @@ impl ElasticsearchCommonMode {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchApiVersion {
-    /// Auto-detect the API version. Fails if the version endpoint (`/_cluster/state/version`) isn't reachable.
+    /// Auto-detect the API version. Fails if the [cluster state version endpoint][es_version] isn't reachable.
+    ///
+    /// [es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,
