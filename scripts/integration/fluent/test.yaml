@@ -4,7 +4,8 @@ args:
 - --lib
 - "::fluent::"
 
-needs_docker_sock: true
+runner:
+  needs_docker_sock: true
 
 matrix:
   default: ["default"]

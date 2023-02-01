@@ -6,7 +6,7 @@ use anyhow::Result;
 use atty::Stream;
 use once_cell::sync::Lazy;
 
-use super::config::{Environment, RustToolchainConfig};
+use super::config::{Environment, IntegrationRunnerConfig, RustToolchainConfig};
 use crate::app::{self, CommandExt as _};
 use crate::util::ChainArgs as _;
 
@@ -293,10 +293,14 @@ pub struct IntegrationTestRunner {
 }
 
 impl IntegrationTestRunner {
-    pub fn new(integration: String, needs_docker_sock: bool, needs_network: bool) -> Result<Self> {
+    pub fn new(
+        integration: String,
+        config: &IntegrationRunnerConfig,
+        needs_network: bool,
+    ) -> Result<Self> {
         Ok(Self {
             integration,
-            needs_docker_sock,
+            needs_docker_sock: config.needs_docker_sock,
             needs_network,
         })
     }

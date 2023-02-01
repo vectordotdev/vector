@@ -94,7 +94,7 @@ impl IntegrationTest {
             .then_some(compose_path);
         let runner = IntegrationTestRunner::new(
             integration.clone(),
-            config.needs_docker_sock,
+            &config.runner,
             compose_path.is_some(),
         )?;
 
@@ -126,7 +126,7 @@ impl IntegrationTest {
         let mut args = self.config.args.clone();
         args.extend(extra_args);
         self.runner
-            .test(&env_vars, &self.config.runner_env, &args)?;
+            .test(&env_vars, &self.config.runner.env, &args)?;
 
         if !active {
             self.runner.remove()?;

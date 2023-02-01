@@ -41,9 +41,11 @@ impl Cli {
                 println!("Test args: {}", config.args.join(" "));
 
                 println!("Environment:");
-                print_env(&config.env);
-                println!("Runner environment:");
-                print_env(&config.runner_env);
+                print_env("  ", &config.env);
+                println!("Runner:");
+                println!("  Environment:");
+                print_env("    ", &config.runner.env);
+                println!("  Needs docker socket: {}", config.runner.needs_docker_sock);
 
                 println!("Environments:");
                 for environment in config.environments().keys() {
@@ -62,14 +64,14 @@ fn format(active_env: &Option<String>, environment: &str) -> String {
     }
 }
 
-fn print_env(environment: &Environment) {
+fn print_env(prefix: &str, environment: &Environment) {
     if environment.is_empty() {
-        println!("  N/A");
+        println!("{prefix}N/A");
     } else {
         for (key, value) in environment {
             match value {
-                Some(value) => println!("  {key}={value:?}"),
-                None => println!("  {key} (passthrough)"),
+                Some(value) => println!("{prefix}{key}={value:?}"),
+                None => println!("{prefix}{key} (passthrough)"),
             }
         }
     }
