@@ -20,29 +20,29 @@ use crate::{
 #[configurable_component(sink("mqtt"))]
 #[derive(Clone, Debug)]
 pub struct MqttSinkConfig {
-    /// MQTT server address
+    /// MQTT server address.
     #[configurable(metadata(docs::examples = "mqtt.example.com"))]
     pub host: String,
 
-    /// TCP port
+    /// TCP port of the MQTT server to connect to.
     #[serde(default = "default_port")]
     pub port: u16,
 
-    /// MQTT username
+    /// MQTT username.
     pub user: Option<String>,
 
-    /// MQTT password
+    /// MQTT password.
     pub password: Option<String>,
 
-    /// MQTT client ID
+    /// MQTT client ID.
     #[serde(default = "default_client_id")]
     pub client_id: String,
 
-    /// Connection keep-alive interval
+    /// Connection keep-alive interval.
     #[serde(default = "default_keep_alive")]
     pub keep_alive: u16,
 
-    /// Clean MQTT session on login or not
+    /// If set to true, the MQTT session is cleaned on login.
     #[serde(default = "default_clean_session")]
     pub clean_session: bool,
 
