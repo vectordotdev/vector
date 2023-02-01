@@ -1,8 +1,7 @@
 use anyhow::Result;
 use clap::Args;
-use itertools::Itertools as _;
 
-use crate::testing::{config::IntegrationTestConfig, state};
+use crate::testing::{config::Environment, config::IntegrationTestConfig, state};
 
 /// Show information about integrations
 #[derive(Args, Debug)]
@@ -41,15 +40,10 @@ impl Cli {
 
                 println!("Test args: {}", config.args.join(" "));
 
-                let required = config.required_env.iter().join(" ");
-                println!(
-                    "Required environment variables: {}",
-                    if config.required_env.is_empty() {
-                        "N/A"
-                    } else {
-                        &required
-                    }
-                );
+                println!("Environment:");
+                print_env(&config.env);
+                println!("Runner environment:");
+                print_env(&config.runner_env);
 
                 println!("Environments:");
                 for environment in config.environments().keys() {
@@ -65,5 +59,18 @@ fn format(active_env: &Option<String>, environment: &str) -> String {
     match active_env {
         Some(active) if active == environment => format!("{environment} (active)"),
         _ => environment.into(),
+    }
+}
+
+fn print_env(environment: &Environment) {
+    if environment.is_empty() {
+        println!("  N/A");
+    } else {
+        for (key, value) in environment {
+            match value {
+                Some(value) => println!("  {key}={value:?}"),
+                None => println!("  {key} (passthrough)"),
+            }
+        }
     }
 }
