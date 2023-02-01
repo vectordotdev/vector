@@ -237,7 +237,10 @@ base: components: sinks: nats: configuration: {
 	subject: {
 		description: "The NATS subject to publish messages to."
 		required:    true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
