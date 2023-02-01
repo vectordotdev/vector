@@ -84,9 +84,12 @@ base: components: sinks: humio_metrics: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The base URL of the Humio instance."
+		description: "The base URL of the Humio instance. The scheme (`http` or `https`) must be specified."
 		required:    false
-		type: string: default: "https://cloud.humio.com"
+		type: string: {
+			default: "https://cloud.humio.com"
+			examples: ["http://127.0.0.1", "http://example.com"]
+		}
 	}
 	event_type: {
 		description: """
@@ -96,7 +99,7 @@ base: components: sinks: humio_metrics: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["json", "none"]
+			examples: ["json", "none", "{{ event_type }}"]
 			syntax: "template"
 		}
 	}

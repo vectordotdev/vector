@@ -200,9 +200,12 @@ base: components: sinks: humio_logs: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The base URL of the Humio instance."
+		description: "The base URL of the Humio instance. The scheme (`http` or `https`) must be specified."
 		required:    false
-		type: string: default: "https://cloud.humio.com"
+		type: string: {
+			default: "https://cloud.humio.com"
+			examples: ["http://127.0.0.1", "http://example.com"]
+		}
 	}
 	event_type: {
 		description: """
@@ -212,7 +215,7 @@ base: components: sinks: humio_logs: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["json", "none"]
+			examples: ["json", "none", "{{ event_type }}"]
 			syntax: "template"
 		}
 	}
@@ -425,12 +428,8 @@ base: components: sinks: humio_logs: configuration: {
 		type: string: default: "timestamp"
 	}
 	timestamp_nanos_key: {
-		description: """
-			Overrides the name of the log field used to grab the nanosecond-enabled timestamp to send to Humio.
-
-			By default, `@timestamp.nanos` is used.
-			"""
-		required: false
+		description: "Overrides the name of the log field used to grab the nanosecond-enabled timestamp to send to Humio."
+		required:    false
 		type: string: default: "@timestamp.nanos"
 	}
 	tls: {

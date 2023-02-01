@@ -35,9 +35,13 @@ pub struct HumioLogsConfig {
     ))]
     pub(super) token: SensitiveString,
 
-    /// The base URL of the Humio instance.
+    /// The base URL of the Humio instance. The scheme (`http` or `https`) must be specified.
     #[serde(alias = "host")]
     #[serde(default = "default_endpoint")]
+    #[configurable(metadata(
+        docs::examples = "http://127.0.0.1",
+        docs::examples = "http://example.com",
+    ))]
     pub(super) endpoint: String,
 
     /// The source of events sent to this sink.
@@ -51,7 +55,11 @@ pub struct HumioLogsConfig {
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
     /// If unset, Humio will default it to none.
-    #[configurable(metadata(docs::examples = "json", docs::examples = "none"))]
+    #[configurable(metadata(
+        docs::examples = "json",
+        docs::examples = "none",
+        docs::examples = "{{ event_type }}"
+    ))]
     pub(super) event_type: Option<Template>,
 
     /// Overrides the name of the log field used to grab the hostname to send to Humio.
@@ -101,8 +109,6 @@ pub struct HumioLogsConfig {
     pub(super) tls: Option<TlsConfig>,
 
     /// Overrides the name of the log field used to grab the nanosecond-enabled timestamp to send to Humio.
-    ///
-    /// By default, `@timestamp.nanos` is used.
     #[serde(default = "timestamp_nanos_key")]
     pub(super) timestamp_nanos_key: Option<String>,
 
