@@ -92,11 +92,8 @@ base: components: sinks: datadog_logs: configuration: {
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
 			"""
-		required: false
-		type: string: {
-			default: ""
-			examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
-		}
+		required: true
+		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
