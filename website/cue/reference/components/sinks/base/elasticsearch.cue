@@ -314,7 +314,7 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: string: {
 					default: "logs"
-					examples: ["metrics", "syntetics", "{{ type }}"]
+					examples: ["metrics", "synthetics", "{{ type }}"]
 					syntax: "template"
 				}
 			}
@@ -327,7 +327,10 @@ base: components: sinks: elasticsearch: configuration: {
 			retry_initial_backoff_secs: {
 				description: "Initial delay between attempts to reactivate endpoints once they become unhealthy."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
 				description: "Maximum delay between attempts to reactivate endpoints once they become unhealthy."

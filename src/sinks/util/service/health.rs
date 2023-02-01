@@ -35,6 +35,8 @@ const UNHEALTHY_AMOUNT_OF_ERRORS: usize = 5;
 pub struct HealthConfig {
     /// Initial delay between attempts to reactivate endpoints once they become unhealthy.
     #[serde(default = "default_retry_initial_backoff_secs")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    // not using Duration type because the value is only used as a u64.
     pub retry_initial_backoff_secs: u64,
 
     /// Maximum delay between attempts to reactivate endpoints once they become unhealthy.

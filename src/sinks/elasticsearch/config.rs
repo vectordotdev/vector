@@ -286,7 +286,7 @@ pub struct DataStreamConfig {
     /// The data stream type used to construct the data stream at index time.
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
     #[configurable(metadata(docs::examples = "metrics"))]
-    #[configurable(metadata(docs::examples = "syntetics"))]
+    #[configurable(metadata(docs::examples = "synthetics"))]
     #[configurable(metadata(docs::examples = "{{ type }}"))]
     pub dtype: Template,
 
