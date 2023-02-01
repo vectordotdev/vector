@@ -381,7 +381,8 @@ base: components: sinks: elasticsearch: configuration: {
 		description: """
 			The Elasticsearch endpoint to send logs to.
 
-			This should be the complete URL.
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
 			"""
 		required: false
 		type: string: {}
@@ -390,7 +391,8 @@ base: components: sinks: elasticsearch: configuration: {
 		description: """
 			A list of Elasticsearch endpoints to send logs to.
 
-			Each endpoint should be a complete URL as shown in the example.
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
 			"""
 		required: false
 		type: array: {

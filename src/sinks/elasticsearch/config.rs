@@ -44,7 +44,8 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 pub struct ElasticsearchConfig {
     /// The Elasticsearch endpoint to send logs to.
     ///
-    /// This should be the complete URL.
+    /// The endpoint must contain an HTTP scheme, and may specify a
+    /// hostname or IP address and port.
     #[serde(default)]
     #[configurable(
         deprecated = "This option has been deprecated, the `endpoints` option should be used instead."
@@ -53,7 +54,8 @@ pub struct ElasticsearchConfig {
 
     /// A list of Elasticsearch endpoints to send logs to.
     ///
-    /// Each endpoint should be a complete URL as shown in the example.
+    /// The endpoint must contain an HTTP scheme, and may specify a
+    /// hostname or IP address and port.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "http://10.24.32.122:9000"))]
     #[configurable(metadata(docs::examples = "https://example.com"))]
