@@ -35,16 +35,18 @@ pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
     #[serde(with = "vector_core::serde::ascii_char")]
     pub delimiter: u8,
+
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
     ///
     /// By default, there is no maximum length enforced. If events are malformed, this can lead to
-    /// additional resource usage as events continued to be buffered in memory, and can potentially
+    /// additional resource usage as events continue to be buffered in memory, and can potentially
     /// lead to memory exhaustion in extreme cases.
     ///
-    /// Consider setting this to a reasonable value, based on the expected maximum buffer length, if
-    /// there is a risk of malformed data, such as if user-controlled data is consumed.
+    /// If there is a risk of processing malformed data, such as logs with user-controlled input,
+    /// consider setting the maximum length to a reasonably large value as a safety net. This will
+    /// ensure that processing is not truly unbounded.
     #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
     pub max_length: Option<usize>,
 }

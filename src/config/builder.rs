@@ -54,9 +54,11 @@ pub struct ConfigBuilder {
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
 
     /// All configured sources.
+    #[serde(default)]
     pub sources: IndexMap<ComponentKey, SourceOuter>,
 
     /// All configured sinks.
+    #[serde(default)]
     pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
 
     /// All configured transforms.
