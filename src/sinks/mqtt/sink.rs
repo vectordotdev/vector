@@ -13,7 +13,7 @@ use vector_core::{
     ByteSizeOf,
 };
 
-use crate::sinks::mqtt::config::MqttQoS;
+use crate::sinks::mqtt::config::{ConfigurationError, MqttQoS};
 use crate::{
     codecs::{Encoder, Transformer},
     emit,
@@ -37,6 +37,8 @@ pub enum MqttError {
     Tls { source: TlsError },
     #[snafu(display("MQTT client error: {}", source))]
     Client { source: ClientError },
+    #[snafu(display("MQTT configuration error: {}", source))]
+    Configuration { source: ConfigurationError },
 }
 
 #[derive(Clone)]
@@ -56,7 +58,7 @@ impl MqttConnector {
     }
 
     pub async fn healthcheck(&self) -> crate::Result<()> {
-        // FIXME: Right now there is no way to implement the healthcheck properly: https://github.com/bytebeamio/rumqtt/issues/562
+        // TODO: Right now there is no way to implement the healthcheck properly: https://github.com/bytebeamio/rumqtt/issues/562
         Ok(())
     }
 }

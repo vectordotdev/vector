@@ -277,11 +277,11 @@ pub enum Sinks {
 
     /// MQTT.
     #[cfg(feature = "sinks-mqtt")]
-    Mqtt(self::mqtt::MqttSinkConfig),
+    Mqtt(mqtt::MqttSinkConfig),
 
     /// NATS.
     #[cfg(feature = "sinks-nats")]
-    Nats(self::nats::NatsSinkConfig),
+    Nats(nats::NatsSinkConfig),
 
     /// New Relic.
     #[cfg(feature = "sinks-new_relic")]

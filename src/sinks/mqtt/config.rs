@@ -2,15 +2,15 @@ use std::time::Duration;
 
 use codecs::JsonSerializerConfig;
 use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 
 use crate::template::Template;
 use crate::{
     codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     sinks::{
-        mqtt::sink::{MqttConnector, MqttError, MqttSink, TlsSnafu},
+        mqtt::sink::{ConfigurationSnafu, MqttConnector, MqttError, MqttSink, TlsSnafu},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -20,8 +20,8 @@ use crate::{
 #[configurable_component(sink("mqtt"))]
 #[derive(Clone, Debug)]
 pub struct MqttSinkConfig {
-    /// MQTT server address.
-    #[configurable(metadata(docs::examples = "mqtt.example.com"))]
+    /// MQTT server address (The broker’s domain name or IP address).
+    #[configurable(metadata(docs::examples = "mqtt.example.com", docs::examples = "127.0.0.1"))]
     pub host: String,
 
     /// TCP port of the MQTT server to connect to.
@@ -111,9 +111,9 @@ const fn default_clean_session() -> bool {
     false
 }
 
-impl GenerateConfig for MqttSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+impl Default for MqttSinkConfig {
+    fn default() -> Self {
+        Self {
             host: "localhost".into(),
             port: default_port(),
             user: None,
@@ -126,10 +126,11 @@ impl GenerateConfig for MqttSinkConfig {
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: AcknowledgementsConfig::default(),
             quality_of_service: Default::default(),
-        })
-        .unwrap()
+        }
     }
 }
+
+impl_generate_config_from_default!(MqttSinkConfig);
 
 #[async_trait::async_trait]
 impl SinkConfig for MqttSinkConfig {
@@ -152,8 +153,17 @@ impl SinkConfig for MqttSinkConfig {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub enum ConfigurationError {
+    #[snafu(display("Client id is not allowed to be empty"))]
+    EmptyClientId,
+}
+
 impl MqttSinkConfig {
     fn build_connector(&self) -> Result<MqttConnector, MqttError> {
+        if self.client_id.is_empty() {
+            return Err(ConfigurationError::EmptyClientId).context(ConfigurationSnafu);
+        }
         let tls = MaybeTlsSettings::from_config(&self.tls, false).context(TlsSnafu)?;
         let mut options = MqttOptions::new(&self.client_id, &self.host, self.port);
         options.set_keep_alive(Duration::from_secs(self.keep_alive.into()));
