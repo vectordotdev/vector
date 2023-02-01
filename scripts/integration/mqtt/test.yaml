@@ -1,0 +1,8 @@
+args:
+- --features
+- mqtt-integration-tests
+- --lib
+- '::mqtt::'
+
+matrix:
+  version: ['5.0.15']
