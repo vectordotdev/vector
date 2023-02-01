@@ -204,7 +204,7 @@ impl Default for ElasticsearchConfig {
             aws: None,
             tls: None,
             endpoint_health: None,
-            bulk: Default::default(), // the default mode is Bulk
+            bulk: Some(BulkConfig::default()), // the default mode is Bulk
             data_stream: None,
             metrics: None,
             acknowledgements: Default::default(),
