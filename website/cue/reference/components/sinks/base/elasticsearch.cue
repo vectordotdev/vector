@@ -36,7 +36,11 @@ base: components: sinks: elasticsearch: configuration: {
 				auto: """
 					Auto-detect the API version.
 
-					Fails if the [cluster state version endpoint][es_version] isn't reachable.
+					If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
+					stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to
+					true. Otherwise, the version is assumed to be V8. In the future, the sink will instead
+					return an Error during configuration parsing, since a wronly assumed version could lead to
+					incorrect API calls.
 
 					[es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
 					"""
