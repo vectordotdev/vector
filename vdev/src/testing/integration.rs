@@ -137,15 +137,13 @@ impl IntegrationTest {
 
     pub fn start(&self) -> Result<()> {
         self.config.check_required()?;
-        if let Some(compose_path) = &self.compose_path {
+        if self.compose_path.is_some() {
             self.runner.ensure_network()?;
 
             if self.envs_dir.check_active(&self.environment)? {
                 bail!("environment is already up");
             }
 
-            #[cfg(unix)]
-            unix::prepare_compose_volumes(compose_path, &self.test_dir)?;
             self.run_compose("Starting", &["up", "--detach"], &self.env_config)?;
 
             self.envs_dir.save(&self.environment, &self.env_config)
@@ -174,6 +172,13 @@ impl IntegrationTest {
 
     fn run_compose(&self, action: &str, args: &[&'static str], config: &Environment) -> Result<()> {
         if let Some(compose_path) = &self.compose_path {
+            #[cfg(unix)]
+            if args[0] == "up" {
+                // This preparation step is safe to do every time compose is run, but is only really
+                // necessary when bring up the volumes.
+                unix::prepare_compose_volumes(compose_path, &self.test_dir)?;
+            }
+
             let mut command = CONTAINER_TOOL.clone();
             command.push("-compose");
             let mut command = Command::new(command);
