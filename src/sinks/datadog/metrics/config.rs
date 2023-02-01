@@ -16,7 +16,7 @@ use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{get_api_validate_endpoint, healthcheck},
+        datadog::{get_api_validate_endpoint, healthcheck, default_site},
         util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
         Healthcheck, UriParseSnafu, VectorSink,
     },
@@ -113,6 +113,7 @@ pub struct DatadogMetricsConfig {
     /// The Datadog [site][dd_site] to send metrics to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
+    #[serde(default = "default_site")]
     pub site: String,
 
     /// The default Datadog [API key][api_key] to send metrics with.
