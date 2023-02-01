@@ -99,7 +99,8 @@ base: components: sinks: datadog_traces: configuration: {
 		description: """
 			The endpoint to send traces to.
 
-			This should include the protocol, host, and port.
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
 
 			If set, overrides to `site` option.
 			"""

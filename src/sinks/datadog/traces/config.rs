@@ -62,7 +62,8 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
 pub struct DatadogTracesConfig {
     /// The endpoint to send traces to.
     ///
-    /// This should include the protocol, host, and port.
+    /// The endpoint must contain an HTTP scheme, and may specify a
+    /// hostname or IP address and port.
     ///
     /// If set, overrides to `site` option.
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
