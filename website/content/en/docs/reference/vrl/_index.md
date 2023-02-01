@@ -115,7 +115,7 @@ acquainted with Vector and VRL:
 {{< jump "/docs/setup/quickstart" >}} {{< jump "/guides/level-up/transformation"
 >}}
 
-There is an online [VRL playground][vrl_playground], where you can play with VRL.
+There is an online [VRL playground][vrl_playground], where you can experiment with VRL.
 
 ## The goals of VRL {#goals}
 
